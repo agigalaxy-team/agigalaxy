@@ -1,0 +1,7 @@
+{
+  "signed-envelope.mjs": "aacd16f43857e0340ac61ac67e3f7dea059826f139b6320d02d276bdca7c65d2",
+  "manifest.mjs": "65c0463b50d4b500f6b4fcb2e5a59eb35572953be64da7e866c909d82300bb6b",
+  "trust-keyring.mjs": "4f2f9ef27b9b1cb318ae069ef07b01d3bb119f58b6b7bab4ec4d56f74a96b346",
+  "discovery-client.mjs": "0b99a37d20a9019ddc9d0c1c4fbf457f94b248a9e0da96c174bc44294eff47bb",
+  "trust-store.mjs": "a36eb5f8f7c2d3e743099d687889767eb6da6dfa23cde1fe96a6670975c8bd39"
+}

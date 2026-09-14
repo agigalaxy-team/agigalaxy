@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "not-configured",
+  "roles": {
+    "operations": {
+      "ownerRef": null,
+      "backupOwnerRef": null,
+      "receiver": "operations"
+    },
+    "identity": {
+      "ownerRef": null,
+      "backupOwnerRef": null,
+      "receiver": "identity"
+    },
+    "data": {
+      "ownerRef": null,
+      "backupOwnerRef": null,
+      "receiver": "data"
+    }
+  },
+  "note": "Deployment operator must assign real people and notification integrations. This inventory is documentation, not loaded by Alertmanager."
+}

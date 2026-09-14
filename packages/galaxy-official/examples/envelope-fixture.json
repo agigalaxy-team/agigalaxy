@@ -1,0 +1,16 @@
+{
+  "note": "Synthetic test key only; fixed verification time; not an authorization credential.",
+  "token": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6InN5bnRoZXRpYy1leGFtcGxlIn0.eyJkYXRhIjp7InNjaGVtYVZlcnNpb24iOjEsInN5bnRoZXRpYyI6dHJ1ZX0sImlzcyI6Imh0dHBzOi8vb2ZmaWNpYWwuZXhhbXBsZS5vcmciLCJhdWQiOiJodHRwczovL29mZmljaWFsLmV4YW1wbGUub3JnIiwiaWF0IjoxMDAwLCJuYmYiOjEwMDAsImV4cCI6MTMwMCwianRpIjoic3ludGhldGljLW9mZmxpbmUtcHJvb2YifQ.k0Cd3JpN41VBbAt5WQXiKotCe0JG7tm2lEdkCR5kjW88W6Gwe0zGux2bbrz3KVpykFzYjlL2eyz0N4utVhwfBg",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAqumdiT0k3bf6VU2rgUN04cCXbVcgHWa67b9/frqjPp8=\n-----END PUBLIC KEY-----\n",
+  "policy": {
+    "type": "proof",
+    "kid": "synthetic-example",
+    "issuer": "https://official.example.org",
+    "audience": "https://official.example.org",
+    "now": 1000,
+    "maxAge": 300,
+    "notBefore": 900,
+    "notAfter": 2000,
+    "revoked": false
+  }
+}

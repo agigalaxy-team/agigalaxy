@@ -1,0 +1,15 @@
+[Unit]
+Description=Galaxy OCI scoped cost collection
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=galaxy-api
+Group=galaxy-api
+ExecStart=/usr/bin/node /opt/galaxy/current/packages/galaxy-official/scripts/collect-oci-cost.mjs /etc/galaxy/oci-cost.json /var/lib/galaxy/metrics/cost.json
+TimeoutStartSec=15min
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/galaxy/metrics

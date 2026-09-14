@@ -1,0 +1,16 @@
+{
+  "name": "@galaxy/a2a",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/bridge.mjs",
+    "./host": "./src/host-flow.mjs",
+    "./host-v2": "./src/host-flow-v2.mjs",
+    "./facts-v2": "./src/facts-v2.mjs",
+    "./discovery": "./src/card-discovery.mjs"
+  },
+  "engines": { "node": ">=24.13.0" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@a2a-js/sdk": "1.1.0", "zod": "4.5.4" }
+}

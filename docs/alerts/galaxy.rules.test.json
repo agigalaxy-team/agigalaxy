@@ -1,0 +1,1085 @@
+{
+  "rule_files": [
+    "galaxy.rules.json"
+  ],
+  "evaluation_interval": "1m",
+  "tests": [
+    {
+      "name": "GalaxyTargetDown fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"galaxy-api\",instance=\"127.0.0.1:9464\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyTargetDown",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyTargetDown",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "severity": "critical",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Galaxy metrics target cannot be scraped",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyTargetDown",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyApiTargetMissing fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"galaxy-api\",instance=\"127.0.0.1:9464\"}",
+          "values": "_ _ _ _ _ _ _ _ _ _ _ _ _ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyApiTargetMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyApiTargetMissing",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Expected Galaxy scrape job is missing",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyApiTargetMissing",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyWorkerTargetMissing fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"galaxy-worker\",instance=\"127.0.0.1:9464\"}",
+          "values": "_ _ _ _ _ _ _ _ _ _ _ _ _ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyWorkerTargetMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyWorkerTargetMissing",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-worker",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Expected Galaxy scrape job is missing",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyWorkerTargetMissing",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyDatabaseCollectionFailed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_database_collection_success{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        },
+        {
+          "series": "galaxy_database_collection_enabled{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyDatabaseCollectionFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyDatabaseCollectionFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Database metrics query failed",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyDatabaseCollectionFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyStorageCollectionFailed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_storage_collection_success{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        },
+        {
+          "series": "galaxy_storage_collection_enabled{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyStorageCollectionFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyStorageCollectionFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Configured local filesystem metrics unavailable",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyStorageCollectionFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyStorageLow fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_storage_bytes{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",kind=\"available\"}",
+          "values": "5 5 5 5 5 5 5 5 5 5 5 5 5 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50"
+        },
+        {
+          "series": "galaxy_storage_bytes{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",kind=\"total\"}",
+          "values": "100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyStorageLow",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyStorageLow",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Configured local filesystem has less than 10 percent available",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyStorageLow",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyJobQueueDelayed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_job_oldest_open_age_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "600 600 600 600 600 600 600 600 600 600 600 600 600 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyJobQueueDelayed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyJobQueueDelayed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Oldest open job has exceeded five minutes",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyJobQueueDelayed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyQuotaRejections fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_resource_quota_rejections_total{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",kind=\"payload\"}",
+          "values": "0 10 20 30 40 50 60 70 80 90 100 110 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120 120"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyQuotaRejections",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyQuotaRejections",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "kind": "payload",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Resource quota repeatedly rejects growth",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyQuotaRejections",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyAuthenticationFailures fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",route=\"POST /v1/sessions\",status=\"401\"}",
+          "values": "0 30 60 90 120 150 180 210 240 270 300 330 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360 360"
+        },
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",route=\"POST /v1/sessions\",status=\"200\"}",
+          "values": "0 1 2 3 4 5 6 7 8 9 10 11 12 72 132 192 252 312 372 432 492 552 612 672 732 792 852 912 972 1032 1092 1152 1212 1272 1332 1392 1452 1512 1572 1632 1692"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyAuthenticationFailures",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyAuthenticationFailures",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "identity"
+              },
+              "exp_annotations": {
+                "summary": "Authentication or policy denials exceed volume and ratio thresholds",
+                "runbook_ref": "docs/alerting-v1.md#identity"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyAuthenticationFailures",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRevocationRequestFailed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",route=\"POST /v1/consents/:id/revoke\",status=\"500\"}",
+          "values": "0 1 2 3 4 5 6 7 8 9 10 11 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRevocationRequestFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyRevocationRequestFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "critical",
+                "owner_role": "identity"
+              },
+              "exp_annotations": {
+                "summary": "Revocation HTTP request returned a server error",
+                "runbook_ref": "docs/alerting-v1.md#identity"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRevocationRequestFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRevocationJobsDelayed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_revocation_oldest_open_job_age_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "120 120 120 120 120 120 120 120 120 120 120 120 120 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        },
+        {
+          "series": "galaxy_revocation_open_jobs{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRevocationJobsDelayed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyRevocationJobsDelayed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "critical",
+                "owner_role": "identity"
+              },
+              "exp_annotations": {
+                "summary": "Open work remains after direct Consent or binding revocation",
+                "runbook_ref": "docs/alerting-v1.md#identity"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRevocationJobsDelayed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRuntimeLogUnavailable fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_runtime_log_ready{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRuntimeLogUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyRuntimeLogUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Runtime diagnostic sink is unavailable",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRuntimeLogUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRuntimeLogLoss fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_runtime_log_events{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",kind=\"droppedRecords\"}",
+          "values": "0 1 2 3 4 5 6 7 8 9 10 11 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12 12"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRuntimeLogLoss",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyRuntimeLogLoss",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "kind": "droppedRecords",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Runtime diagnostics were dropped or failed",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRuntimeLogLoss",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupStatusUnavailable fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_status_available{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupStatusUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupStatusUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "create",
+                "severity": "warning",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Expected backup status is missing or invalid",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupStatusUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupFailed fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_last_attempt_success{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "create",
+                "severity": "critical",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Latest backup action failed",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupStuck fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_started_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
+          "values": "-4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 -4000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+        },
+        {
+          "series": "galaxy_backup_running{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
+          "values": "1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupStuck",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupStuck",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "create",
+                "severity": "warning",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Backup action has been running for more than one hour",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupStuck",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupStale fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_last_success_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
+          "values": "-90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "create",
+                "severity": "warning",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Scheduled backup success is overdue",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyCostBudgetExceeded fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_cost_amount{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",currency=\"USD\",kind=\"operator-estimate\"}",
+          "values": "110 110 110 110 110 110 110 110 110 110 110 110 110 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80"
+        },
+        {
+          "series": "galaxy_cost_budget{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",currency=\"USD\",kind=\"operator-estimate\"}",
+          "values": "100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100"
+        },
+        {
+          "series": "galaxy_cost_period_start_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        },
+        {
+          "series": "galaxy_cost_period_end_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyCostBudgetExceeded",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyCostBudgetExceeded",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "currency": "USD",
+                "kind": "operator-estimate",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Supplied current period cost exceeds its budget",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyCostBudgetExceeded",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyCostInputStale fires after delay and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_cost_observed_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "-90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyCostInputStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyCostInputStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Optional cost observation is older than one day",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyCostInputStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupStale copy schedule",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_last_success_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"copy\"}",
+          "values": "-90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "copy",
+                "severity": "warning",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Scheduled backup success is overdue",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyBackupStale check schedule",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_backup_last_success_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"check\"}",
+          "values": "-700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "12m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "action": "check",
+                "severity": "warning",
+                "owner_role": "data"
+              },
+              "exp_annotations": {
+                "summary": "Scheduled backup success is overdue",
+                "runbook_ref": "docs/alerting-v1.md#data"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyBackupStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "Normal policy denials do not imply revocation failure",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"loopback\",component=\"api\",route=\"POST /v1/consents/:id/revoke\",status=\"403\"}",
+          "values": "0+1x40"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyAuthenticationFailures",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRevocationRequestFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "High denial volume below ratio threshold is not an authentication incident",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"loopback\",component=\"api\",route=\"POST /v1/sessions\",status=\"401\"}",
+          "values": "0+30x40"
+        },
+        {
+          "series": "galaxy_http_requests_total{job=\"galaxy-api\",instance=\"loopback\",component=\"api\",route=\"POST /v1/sessions\",status=\"200\"}",
+          "values": "0+100x40"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyAuthenticationFailures",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "35m",
+          "alertname": "GalaxyRevocationRequestFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "Configured cost file failure is visible and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_cost_input_available{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "0x10 1x10"
+        },
+        {
+          "series": "galaxy_cost_collection_enabled{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "1x21"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyCostInputUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "GalaxyCostInputUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Configured cost input is unreadable or invalid",
+                "runbook_ref": "docs/alerting-v1.md#operations"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "15m",
+          "alertname": "GalaxyCostInputUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRevocationDependencyJobsDelayed fires and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_revocation_oldest_dependent_job_age_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "90x10 0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRevocationDependencyJobsDelayed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "GalaxyRevocationDependencyJobsDelayed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "identity"
+              },
+              "exp_annotations": {
+                "summary": "Revoked ancestor or direct authorization still has open jobs",
+                "runbook_ref": "docs/alerting-v1.md#identity"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "15m",
+          "alertname": "GalaxyRevocationDependencyJobsDelayed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyRevocationSearchResidue fires and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_revocation_search_documents{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\"}",
+          "values": "1x10 0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyRevocationSearchResidue",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "GalaxyRevocationSearchResidue",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "galaxy-api",
+                "instance": "127.0.0.1:9464",
+                "component": "api",
+                "severity": "warning",
+                "owner_role": "identity"
+              },
+              "exp_annotations": {
+                "summary": "Search candidates still reference revoked authorization",
+                "runbook_ref": "docs/alerting-v1.md#identity"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "15m",
+          "alertname": "GalaxyRevocationSearchResidue",
+          "exp_alerts": []
+        }
+      ]
+    }
+  ]
+}

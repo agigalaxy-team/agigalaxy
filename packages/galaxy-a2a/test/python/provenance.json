@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-13T02:11:13.085Z",
+  "pythonSdk": "1.1.2",
+  "protocol": "1.0",
+  "jsSdk": "1.1.0",
+  "upstreamSampleSdkPin": "1.1.0",
+  "sampleCommit": "1bb0871294af52fdb2c7e5173e43fade0eb008ba",
+  "sampleLicense": "Apache-2.0",
+  "sampleChanges": "executor bytes unchanged; separate ephemeral HTTP wrapper",
+  "pypi": "https://pypi.org/pypi/a2a-sdk/1.1.2/json",
+  "releaseDistinction": "GitHub release 1.1.4 observed; PyPI latest available distribution was 1.1.2 at verification.",
+  "sources": [
+    {
+      "path": "samples/python/agents/helloworld/agent_executor.py",
+      "url": "https://api.github.com/repos/a2aproject/a2a-samples/contents/samples/python/agents/helloworld/agent_executor.py?ref=1bb0871294af52fdb2c7e5173e43fade0eb008ba",
+      "sha256": "4ca9015d8a626fb141c619e6dd81027550b2d154eeeb993106c972d627e71ae6",
+      "bytes": 2849
+    },
+    {
+      "path": "LICENSE",
+      "url": "https://api.github.com/repos/a2aproject/a2a-samples/contents/LICENSE?ref=1bb0871294af52fdb2c7e5173e43fade0eb008ba",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    }
+  ]
+}

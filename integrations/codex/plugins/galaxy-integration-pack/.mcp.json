@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "galaxy-integration": {
+      "command": "node",
+      "args": ["./scripts/launch-galaxy-integration-mcp.mjs"]
+    }
+  }
+}

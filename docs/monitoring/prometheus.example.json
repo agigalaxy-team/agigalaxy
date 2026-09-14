@@ -1,0 +1,141 @@
+{
+  "global": {
+    "scrape_interval": "30s",
+    "scrape_timeout": "10s",
+    "evaluation_interval": "30s"
+  },
+  "rule_files": [
+    "external.rules.json"
+  ],
+  "alerting": {
+    "alertmanagers": [
+      {
+        "static_configs": [
+          {
+            "targets": [
+              "127.0.0.1:9093"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "scrape_configs": [
+    {
+      "job_name": "galaxy-blackbox-exporter",
+      "static_configs": [
+        {
+          "targets": [
+            "127.0.0.1:9115"
+          ]
+        }
+      ],
+      "scrape_timeout": "5s"
+    },
+    {
+      "job_name": "galaxy-external-website",
+      "metrics_path": "/probe",
+      "params": {
+        "module": [
+          "galaxy_website_https"
+        ]
+      },
+      "static_configs": [
+        {
+          "targets": [],
+          "labels": {
+            "scope": "website-http-tls"
+          }
+        }
+      ],
+      "relabel_configs": [
+        {
+          "source_labels": [
+            "__address__"
+          ],
+          "target_label": "__param_target"
+        },
+        {
+          "source_labels": [
+            "__param_target"
+          ],
+          "target_label": "instance"
+        },
+        {
+          "target_label": "__address__",
+          "replacement": "127.0.0.1:9115"
+        }
+      ]
+    },
+    {
+      "job_name": "galaxy-external-liveness",
+      "metrics_path": "/probe",
+      "params": {
+        "module": [
+          "galaxy_liveness_https"
+        ]
+      },
+      "static_configs": [
+        {
+          "targets": [],
+          "labels": {
+            "scope": "api-process"
+          }
+        }
+      ],
+      "relabel_configs": [
+        {
+          "source_labels": [
+            "__address__"
+          ],
+          "target_label": "__param_target"
+        },
+        {
+          "source_labels": [
+            "__param_target"
+          ],
+          "target_label": "instance"
+        },
+        {
+          "target_label": "__address__",
+          "replacement": "127.0.0.1:9115"
+        }
+      ]
+    },
+    {
+      "job_name": "galaxy-external-readiness",
+      "metrics_path": "/probe",
+      "params": {
+        "module": [
+          "galaxy_readiness_https"
+        ]
+      },
+      "static_configs": [
+        {
+          "targets": [],
+          "labels": {
+            "scope": "api-readiness"
+          }
+        }
+      ],
+      "relabel_configs": [
+        {
+          "source_labels": [
+            "__address__"
+          ],
+          "target_label": "__param_target"
+        },
+        {
+          "source_labels": [
+            "__param_target"
+          ],
+          "target_label": "instance"
+        },
+        {
+          "target_label": "__address__",
+          "replacement": "127.0.0.1:9115"
+        }
+      ]
+    }
+  ]
+}

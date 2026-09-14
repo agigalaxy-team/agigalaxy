@@ -1,0 +1,1938 @@
+{
+  "version": 1,
+  "kind": "development-source-reference-not-deployed-api",
+  "publicApiEndpoints": [],
+  "serviceVersion": "0.1.0",
+  "schema": 75,
+  "endpointPolicy": "Paths are relative to an explicitly configured isolated service; no production base URL, OAuth credential or runnable public server is supplied.",
+  "entries": [
+    {
+      "method": "POST",
+      "path": "/v1/identity/providers",
+      "service": "identity",
+      "operation": "providers",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/begin",
+      "service": "identity",
+      "operation": "begin",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:begin"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/status",
+      "service": "identity",
+      "operation": "status",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:status"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/cancel",
+      "service": "identity",
+      "operation": "cancel",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:cancel"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/confirm",
+      "service": "identity",
+      "operation": "confirm",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:confirm"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/query",
+      "service": "identity",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:query"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/identity/revoke",
+      "service": "identity",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/identity-links.mjs:revoke"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/identity/callback/{providerId}",
+      "service": "identity",
+      "operation": "callback",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "query": [
+          "code",
+          "state",
+          "iss",
+          "error",
+          "error_description",
+          "error_uri",
+          "session_state"
+        ],
+        "meaning": "OIDC callback tied to an existing pending login; duplicate/unrecognized query keys rejected."
+      },
+      "status": 200,
+      "condition": "selected-oidc-provider",
+      "documentation": "identity-login-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/binding-challenges",
+      "service": "bindings",
+      "operation": "challenge",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": [
+          "subjectId",
+          "genesisProof",
+          "installationId",
+          "scopes"
+        ]
+      },
+      "status": 201,
+      "condition": "configured-service",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/bindings",
+      "service": "bindings",
+      "operation": "bind",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": [
+          "challenge",
+          "signature",
+          "clientSession"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/session-challenges",
+      "service": "access",
+      "operation": "challenge",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": [
+          "bindingId",
+          "credentialHash"
+        ]
+      },
+      "status": 201,
+      "condition": "configured-service",
+      "documentation": "adr-008-authentication-and-protocol-profiles.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "service": "access",
+      "operation": "activate",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": [
+          "challenge",
+          "signature"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "adr-008-authentication-and-protocol-profiles.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/bindings/{id}",
+      "service": "bindings",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "binding-management-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/bindings/{id}/revoke",
+      "service": "bindings",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "binding-management-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/bindings/query",
+      "service": "bindings",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "binding",
+      "input": {
+        "schema": "src/shared/binding-management-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "binding-management-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/consents",
+      "service": "consents",
+      "operation": "list",
+      "authentication": "galaxy-session",
+      "scope": "consent",
+      "input": {
+        "query": [
+          "after"
+        ],
+        "meaning": "Optional UUID cursor; at most one after parameter."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "api-behavior-v0.1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/consents",
+      "service": "consents",
+      "operation": "create",
+      "authentication": "galaxy-session",
+      "scope": "consent",
+      "input": {
+        "fields": [
+          "signedIntent"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "confirmed-consent-client.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/consents/{id}/revoke",
+      "service": "consents",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "consent",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "confirmed-consent-client.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/cases",
+      "service": "cases",
+      "operation": "submit",
+      "authentication": "galaxy-session",
+      "scope": "case-teaser",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific. kind=case only."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "local-case-publication.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/case-events",
+      "service": "cases",
+      "operation": "submit",
+      "authentication": "galaxy-session",
+      "scope": "case-teaser",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific. kind must not be case."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "local-case-publication.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cases/{id}",
+      "service": "cases",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "case-teaser",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "api-behavior-v0.1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/evidence-submissions",
+      "service": "evidence",
+      "operation": "submit",
+      "authentication": "galaxy-session",
+      "scope": "evidence",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 202,
+      "condition": "configured-service",
+      "documentation": "source-adapter-acceptance.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/verifications/{id}",
+      "service": "evidence",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "evidence",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "source-adapter-acceptance.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/proof-previews",
+      "service": "proofs",
+      "operation": "preview",
+      "authentication": "galaxy-session",
+      "scope": "proof",
+      "input": {
+        "fields": [
+          "id",
+          "evidenceId"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "confirmed-consent-client.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/proofs",
+      "service": "proofs",
+      "operation": "publish",
+      "authentication": "galaxy-session",
+      "scope": "proof",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "confirmed-consent-client.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/proofs/{id}/revoke",
+      "service": "proofs",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "proof",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "confirmed-consent-client.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/proofs/{id}",
+      "service": "proofs",
+      "operation": "get",
+      "authentication": "optional-galaxy-session",
+      "scope": "proof",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "api-behavior-v0.1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/proofs/{id}/status",
+      "service": "proofs",
+      "operation": "get",
+      "authentication": "optional-galaxy-session",
+      "scope": "proof",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "api-behavior-v0.1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/history/query",
+      "service": "history",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "history",
+      "input": {
+        "schema": "src/shared/history-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "history-query-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profiles/{subjectId}",
+      "service": "history",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "history",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "history-query-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profiles/statements",
+      "service": "profiles",
+      "operation": "publish",
+      "authentication": "galaxy-session",
+      "scope": "history",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "profile-statements-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discovery/query",
+      "service": "discovery",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "history",
+      "input": {
+        "schema": "src/shared/discovery-schema.mjs:discoveryQuerySchema"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "project-discovery-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discovery/preferences/read",
+      "service": "discovery",
+      "operation": "preferences",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "project-discovery-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/discovery/preferences/save",
+      "service": "discovery",
+      "operation": "save",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "schema": "src/shared/discovery-schema.mjs:discoverySaveSchema"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "project-discovery-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/search/query",
+      "service": "search",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "query-type",
+      "input": {
+        "schema": "src/shared/search-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "typed-source-search-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/assistance",
+      "service": "assistance",
+      "operation": "create",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "open-assistance-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/assistance/{id}/events",
+      "service": "assistance",
+      "operation": "submit",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "open-assistance-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/assistance/{id}",
+      "service": "assistance",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "open-assistance-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/assistance/query",
+      "service": "assistance",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "schema": "src/shared/assistance-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/assistance/events/receipt",
+      "service": "assistance",
+      "operation": "receipt",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "schema": "src/shared/assistance-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/requester-history/query",
+      "service": "assistance",
+      "operation": "requesterHistory",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "schema": "src/shared/assistance-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/requester-history/facts",
+      "service": "assistance",
+      "operation": "requesterHistoryFacts",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "schema": "src/shared/assistance-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/context-grants",
+      "service": "context",
+      "operation": "create",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-grants-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/context-grants/{id}/accept",
+      "service": "context",
+      "operation": "accept",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-grants-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/context-grants/{id}/revoke",
+      "service": "context",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-grants-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/context-grants/{id}",
+      "service": "context",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-grants-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/context-grants/query",
+      "service": "context",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": {
+        "fields": [
+          "assistanceId"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-recovery-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/context-grants/receipt",
+      "service": "context",
+      "operation": "receipt",
+      "authentication": "galaxy-session",
+      "scope": "context",
+      "input": {
+        "schema": "src/shared/context-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "context-recovery-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/query",
+      "service": "notifications",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "schema": "src/shared/notifications-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/preferences/read",
+      "service": "notifications",
+      "operation": "preferences",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/preferences/save",
+      "service": "notifications",
+      "operation": "save",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "fields": [
+          "expectedRevision",
+          "settings"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/read",
+      "service": "notifications",
+      "operation": "markRead",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "fields": [
+          "id"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/notifications/archive",
+      "service": "notifications",
+      "operation": "archive",
+      "authentication": "galaxy-session",
+      "scope": "notifications",
+      "input": {
+        "fields": [
+          "expectedRevision",
+          "before"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "notifications-requester-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/qualification/policies",
+      "service": "qualification",
+      "operation": "list",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "qualification-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/qualification/evaluate",
+      "service": "qualification",
+      "operation": "evaluate",
+      "authentication": "galaxy-session",
+      "scope": "assistance",
+      "input": {
+        "schema": "src/shared/qualification-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "qualification-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderation/config",
+      "service": "moderation",
+      "operation": "config",
+      "authentication": "galaxy-session",
+      "scope": "moderation",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "case-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderation/reports",
+      "service": "moderation",
+      "operation": "report",
+      "authentication": "galaxy-session",
+      "scope": "moderation",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "case-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderation/reports/query",
+      "service": "moderation",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "moderation",
+      "input": {
+        "schema": "src/shared/moderation-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "case-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderation/reports/{id}/read",
+      "service": "moderation",
+      "operation": "get",
+      "authentication": "galaxy-session",
+      "scope": "moderation",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "case-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/moderation/reports/{id}/events",
+      "service": "moderation",
+      "operation": "event",
+      "authentication": "galaxy-session",
+      "scope": "moderation",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "case-moderation-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/honor/rules",
+      "service": "honor",
+      "operation": "list",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "honor-rule-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/honor/rule-history",
+      "service": "honor",
+      "operation": "ruleHistory",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "schema": "src/honor.mjs:ruleHistory"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "honor-rule-history-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/honor/ranking",
+      "service": "honor",
+      "operation": "ranking",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": [
+          "ruleId",
+          "ruleVersion"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "public-contribution-sharing-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/honor/query",
+      "service": "honor",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "history",
+      "input": {
+        "schema": "src/honor.mjs:query"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "honor-pagination-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/honor/{subjectId}/{ruleId}/{ruleVersion}",
+      "service": "honor",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "history",
+      "input": null,
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "honor-pagination-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/capsules/events",
+      "service": "capsules",
+      "operation": "publish",
+      "authentication": "galaxy-session",
+      "scope": "capsules",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "capsule-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/capsules/uses",
+      "service": "capsules",
+      "operation": "recordUse",
+      "authentication": "galaxy-session",
+      "scope": "capsules",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "capsule-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/capsules/read",
+      "service": "capsules",
+      "operation": "get",
+      "authentication": "optional-galaxy-session",
+      "scope": "capsules",
+      "input": {
+        "schema": "src/shared/capsule-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "capsule-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/capsules/query",
+      "service": "capsules",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "capsules",
+      "input": {
+        "schema": "src/shared/capsule-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "capsule-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/capsules/uses/query",
+      "service": "capsules",
+      "operation": "uses",
+      "authentication": "optional-galaxy-session",
+      "scope": "capsules",
+      "input": {
+        "schema": "src/shared/capsule-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "capsule-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/specification",
+      "service": "builders",
+      "operation": "specification",
+      "authentication": "none",
+      "scope": null,
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builders-registry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/events",
+      "service": "builders",
+      "operation": "publish",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "fields": [
+          "consentId",
+          "payloadJson"
+        ],
+        "meaning": "Exact reviewed payload JSON and existing signed Consent; action/visibility/current ownership remain service-specific."
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builders-registry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/read",
+      "service": "builders",
+      "operation": "get",
+      "authentication": "optional-galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builders-registry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/query",
+      "service": "builders",
+      "operation": "query",
+      "authentication": "optional-galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builders-registry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/notices/query",
+      "service": "builders",
+      "operation": "notices",
+      "authentication": "optional-galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builders-registry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/reports/export",
+      "service": "builders",
+      "operation": "exportReport",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builder-recovery-and-retry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/manage/read",
+      "service": "builders",
+      "operation": "manage",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builder-recovery-and-retry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/owned/query",
+      "service": "builders",
+      "operation": "owned",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builder-recovery-and-retry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/events/receipt",
+      "service": "builders",
+      "operation": "receipt",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "schema": "src/shared/builders-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "builder-recovery-and-retry-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/builders/node-control/export",
+      "service": "builders",
+      "operation": "exportNodeControl",
+      "authentication": "galaxy-session",
+      "scope": "builders",
+      "input": {
+        "fields": [
+          "builderId",
+          "controlId"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "node-control-portable-proof-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/config",
+      "service": "audit",
+      "operation": "config",
+      "authentication": "galaxy-session",
+      "scope": "audit",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/grants",
+      "service": "audit",
+      "operation": "listGrants",
+      "authentication": "galaxy-session",
+      "scope": "audit",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/query",
+      "service": "audit",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "audit",
+      "input": {
+        "schema": "src/shared/audit-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/export",
+      "service": "audit",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "audit",
+      "input": {
+        "schema": "src/shared/audit-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/grants/approve",
+      "service": "audit",
+      "operation": "approve",
+      "authentication": "galaxy-session",
+      "scope": "audit-review",
+      "input": {
+        "fields": [
+          "signed"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/audit/grants/revoke",
+      "service": "audit",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "audit-review",
+      "input": {
+        "fields": [
+          "id"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "audit-access-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/data-exports/specification",
+      "service": "dataExport",
+      "operation": "specification",
+      "authentication": "galaxy-session",
+      "scope": "data-export",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "data-export-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/data-exports/create",
+      "service": "dataExport",
+      "operation": "create",
+      "authentication": "galaxy-session",
+      "scope": "data-export",
+      "input": {
+        "schema": "src/shared/data-export-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "data-export-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/data-exports/page",
+      "service": "dataExport",
+      "operation": "page",
+      "authentication": "galaxy-session",
+      "scope": "data-export",
+      "input": {
+        "schema": "src/shared/data-export-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "data-export-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/data-exports/revoke",
+      "service": "dataExport",
+      "operation": "revoke",
+      "authentication": "galaxy-session",
+      "scope": "data-export",
+      "input": {
+        "schema": "src/shared/data-export-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "data-export-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deletion-requests/status",
+      "service": "deletion",
+      "operation": "statusWithProof",
+      "authentication": "local-key-signature",
+      "scope": null,
+      "input": {
+        "fields": [
+          "signed"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "deletion-requests-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deletion-requests/config",
+      "service": "deletion",
+      "operation": "config",
+      "authentication": "galaxy-session",
+      "scope": "data-delete",
+      "input": {
+        "fields": []
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "deletion-requests-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deletion-requests/submit",
+      "service": "deletion",
+      "operation": "submit",
+      "authentication": "galaxy-session",
+      "scope": "data-delete",
+      "input": {
+        "fields": [
+          "signed"
+        ]
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "deletion-requests-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deletion-requests/read",
+      "service": "deletion",
+      "operation": "read",
+      "authentication": "galaxy-session",
+      "scope": "data-delete",
+      "input": {
+        "schema": "src/shared/deletion-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "deletion-requests-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deletion-requests/query",
+      "service": "deletion",
+      "operation": "query",
+      "authentication": "galaxy-session",
+      "scope": "data-delete",
+      "input": {
+        "schema": "src/shared/deletion-schema.mjs"
+      },
+      "status": 200,
+      "condition": "configured-service",
+      "documentation": "deletion-requests-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/galaxy-network.json",
+      "authentication": "none",
+      "meaning": "Signed Manifest, ETag and conditional 304; default capability labels binding/sessions/docs-mcp only.",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/galaxy-signing-keys.json",
+      "authentication": "none",
+      "meaning": "Configured public keyring; no private keys.",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/policy",
+      "authentication": "none",
+      "meaning": "Public Manifest policy.",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/signing-keys/status",
+      "authentication": "none",
+      "meaning": "Current loaded public trust metadata.",
+      "documentation": "connection-contract-v0.2.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/service-status",
+      "authentication": "none",
+      "meaning": "Configured retirement/incident status; not independent monitoring.",
+      "documentation": "service-retirement-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/mcp/docs",
+      "authentication": "none",
+      "meaning": "MCP JSON-RPC, reviewed public document allowlist only; exact Host.",
+      "documentation": "personal-mcp-oauth-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/oauth-protected-resource/mcp/personal",
+      "authentication": "none",
+      "meaning": "Only when Personal MCP configured; RFC9728 metadata.",
+      "documentation": "personal-mcp-oauth-v1.md"
+    },
+    {
+      "method": "POST",
+      "path": "/mcp/personal",
+      "authentication": "oauth-resource",
+      "meaning": "Only when configured; MCP JSON-RPC with scope challenges and current Galaxy authorization.",
+      "documentation": "personal-mcp-oauth-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/mcp/personal",
+      "authentication": "oauth-resource",
+      "meaning": "Authenticates then SDK returns 405; no persistent MCP session or event stream in this profile.",
+      "documentation": "personal-mcp-oauth-v1.md"
+    },
+    {
+      "method": "DELETE",
+      "path": "/mcp/personal",
+      "authentication": "oauth-resource",
+      "meaning": "Authenticates then SDK returns 405; no persistent MCP session or event stream in this profile.",
+      "documentation": "personal-mcp-oauth-v1.md"
+    },
+    {
+      "method": "GET",
+      "path": "/healthz",
+      "authentication": "none",
+      "exposure": "internal-only",
+      "meaning": "Internal API probe; excluded from public Caddy routes.",
+      "documentation": "runtime-health-and-limits.md"
+    },
+    {
+      "method": "GET",
+      "path": "/readyz",
+      "authentication": "none",
+      "exposure": "internal-only",
+      "meaning": "Internal API probe; excluded from public Caddy routes.",
+      "documentation": "runtime-health-and-limits.md"
+    }
+  ],
+  "sources": {
+    "packages/galaxy-official/src/access.mjs": "e17ff1b1e37f7751ebd03e067806eef6e5fe76f6684e1883abeae211409ae78d",
+    "packages/galaxy-official/src/adapters/http/attachment-http.mjs": "f8f9852daed666efa2ae8159d4022b64920857ecbcc2e4673b46c145799c907a",
+    "packages/galaxy-official/src/adapters/http/browser-policy.mjs": "19ae9c9f3605fe0827c85b73bdf9be6f2f5ad5022dd515c03c565ff7e93423b3",
+    "packages/galaxy-official/src/adapters/http/failure-audit.mjs": "7a44fedef3e11e6466bb4c71c570c7c47057e52f2b9b11ae8645b4ba3891486a",
+    "packages/galaxy-official/src/adapters/http/hub-http.mjs": "43a38a4b401ab46a78c6c5a561c68b6a0c1575b3ebb9d268c4ba9d4c43ae6f6d",
+    "packages/galaxy-official/src/adapters/http/identity-group-http.mjs": "1392128227583dd333951a8773cbe04f0d7acce943b321e2d9c74867a7aeb613",
+    "packages/galaxy-official/src/adapters/http/information-http.mjs": "d671419be55e4fa5650dbbe983f9bcc5ee340e2416c8c05de37561e10ae6ab73",
+    "packages/galaxy-official/src/adapters/http/outcome-material-http.mjs": "e17962cc4391e1a003b670de54a98b5b4d8b3710af96177679877affd6cf578a",
+    "packages/galaxy-official/src/adapters/http/policy.mjs": "4d13505e706b38b51e5197b1846445f8dc0334d9d0985d16194cdd766e09e3b5",
+    "packages/galaxy-official/src/adapters/http/readiness.mjs": "6fbe8665f15b5801b5b2dce9d92897065a12733fc3ff7963a5646db5a88d1f02",
+    "packages/galaxy-official/src/adapters/http/request-quotas.mjs": "86d0ea06ba6b111c4944bdd5113ff822b3506379e93b41f15febf3e27a390f39",
+    "packages/galaxy-official/src/adapters/http/request.mjs": "52ccd73037cdf457a7d78e3df3898a3f830a574076a0e65ac40e3680c0c5bbb8",
+    "packages/galaxy-official/src/adapters/http/routes.mjs": "e264d4516df1959bf5eda49d631f9b313b0fd417b2b7c6c3e329cd5468ec2d3f",
+    "packages/galaxy-official/src/adapters/http/target-governance-http.mjs": "c7be19bcdc71f7608c3cd5859e6e293c236407f2e3792fb557df97ee2c99dcde",
+    "packages/galaxy-official/src/adapters/http/trust-package-http.mjs": "887aa3d5d823c60225f655c66eb98bcf32c7196894e3b8d786f5bc02102c9972",
+    "packages/galaxy-official/src/adapters/http/watch-control-http.mjs": "4e2f7be0994611c278824bf8e533c9087241f3768129cce4afc633903eec4b36",
+    "packages/galaxy-official/src/assistance-client.mjs": "bc2680cff14a7d23b5e1297176b44fdfe5c156e28393a5616b2372ae133009cd",
+    "packages/galaxy-official/src/assistance-flow.mjs": "a02a38617857481e988ad7fc9497e8ea6983fa758ef22c07fd3fd45e145e9163",
+    "packages/galaxy-official/src/assistance.mjs": "77396191695ffa1709e490c35cddfd95816ce997e4524d9778c88de69684c8b3",
+    "packages/galaxy-official/src/audit-client.mjs": "c97c67ba384cbac23799d408d0b0d1e63c0b083be2e2e80126f8de1c4a332831",
+    "packages/galaxy-official/src/audit.mjs": "b3ea3354984c57533cd5fae559a0824a394dca4d6218fae907df9a0022d414ac",
+    "packages/galaxy-official/src/binding-management-client.mjs": "1ffc073702380216c91962994d5df9a3695ca6bf4ef1639d2fb4463c436d3513",
+    "packages/galaxy-official/src/binding-status-client.mjs": "0bc916eaee17a3117c95cd64ac55f97ffc03e920a2702c0b7649f41307788f58",
+    "packages/galaxy-official/src/bindings.mjs": "2c7f83468654342e79ca9ffbcdbfe7de5c56b0880f40dfd91140d900750e27d4",
+    "packages/galaxy-official/src/browser-client.mjs": "89ae973ff241f6f65b2fd41bbd2e6a10f9be0d4794d46e66d794c4f415b25b90",
+    "packages/galaxy-official/src/builder-client.mjs": "20f5e513aeb0cd65a8c33bed9704465c12df613f2e3dd8c8e9c5c3e30fee362f",
+    "packages/galaxy-official/src/builder-flow.mjs": "837071b700da78d7c31156dbacf11669720bbf412f463cb8ba8bab6a4b4e2527",
+    "packages/galaxy-official/src/builder-probe-observer.mjs": "e8bcb41d78478391523c358faa08e83e1bae7e040c97afb818ab469e562b90d2",
+    "packages/galaxy-official/src/builder-probes.mjs": "2b3b959c1e2029f8e6e485d282afbc548a4d6241c4d70d1f06479f0782f4f5d2",
+    "packages/galaxy-official/src/builder-support-v2.mjs": "25ca19fa78a05bafb6234a6e357693c5f5f4567e4ebdc6e4dd708dce05a2e708",
+    "packages/galaxy-official/src/builders.mjs": "5c1ad7681f224483d13e77f407d056868afd3761c8b973d07de73a303324c9f3",
+    "packages/galaxy-official/src/capsule-client.mjs": "427f2b63ac18e5223831813bcdb6d0373fa27c70d34acf9eb9f5150046e67bbb",
+    "packages/galaxy-official/src/capsule-flow.mjs": "3c00fa990c5e75d451909a93ed961930541abe798a2d926ab99c08fda8271d27",
+    "packages/galaxy-official/src/capsule-sources-v2.mjs": "8d9fed5b088b661fe32fb0a7e55ffdd6bb4ad3705a3f343d7a350439e7dd8b55",
+    "packages/galaxy-official/src/capsules-v2.mjs": "be8b543cd14023a6a0cdd61014a4c5e0249d33efc9c48705764cf2fb9ad5d207",
+    "packages/galaxy-official/src/capsules.mjs": "4d374037ff0baa536dcbd23a7bc17bd8fc38a0a2a94ff771e6a24631b5315b9d",
+    "packages/galaxy-official/src/case-client.mjs": "3e65fd9f4e65e1e692f31303e42602dc389574e66b2244f4607061ac876e75eb",
+    "packages/galaxy-official/src/case-review-flow.mjs": "ed19becc030f4447f8a7c22803d9d63779c6d21beeada2bfa25f89ca1f8ccc8f",
+    "packages/galaxy-official/src/cases.mjs": "b8317be26c814f511645afd98b8d83fe733e51de2ff9ff05c571c678869b1ab4",
+    "packages/galaxy-official/src/chat-attachments.mjs": "daba02a1e145c635d39732d11f837e06da22f86c99968ca36b7e91121e0cd171",
+    "packages/galaxy-official/src/chat-config.mjs": "159c642d8653843708e5ffbc782bf52aa637399490bdfc8294b75c4871a0639c",
+    "packages/galaxy-official/src/chat-contact-adapter.mjs": "7c9289022bcfe5d66d858c4638d7fc2083c33c6c72e090ae55db9bb1cda08413",
+    "packages/galaxy-official/src/chat-shared-summaries.mjs": "fd11ab684e43b364db4602752a6f827771f615850d0314a7c31707138a91d8b0",
+    "packages/galaxy-official/src/chat-shared-summary-client.mjs": "75e094dfa5da1a453cc9da1d30b4aef36952bedc7e7b9ed48bfbd7240a641d19",
+    "packages/galaxy-official/src/chat.mjs": "7bb3dc050685f74b088a762a88f1e9a70b5633cfb00abb4d2fe9dffdf65dd613",
+    "packages/galaxy-official/src/choice-snapshots-v2.mjs": "e631d7b9f19271fc12a2eb79bc77ba0e8a5fa9d42d8f0b6b28f3e77cc8ecc6df",
+    "packages/galaxy-official/src/choice-source-reader-v2.mjs": "8ffd0a7f05bb5cf84eef9b6c8380ec0f16aa22f79ffe2618d0c2fdb69a2d285e",
+    "packages/galaxy-official/src/ci-observation-v2.mjs": "754fe2bd5ab78ba98c92bd51db41621cc600743d3919b85776b951c044343172",
+    "packages/galaxy-official/src/ci-worker-v2.mjs": "424eccc919f3d38c643d891b0ecfeec5b77cc9daae0a92efc28e5ad1b864b2ff",
+    "packages/galaxy-official/src/comment-governance-v2.mjs": "1b6942aa94b53050cd8722669d7bcadbb61923f89567db8c88367d6fb0852f97",
+    "packages/galaxy-official/src/community-accounts.mjs": "e8858fec3d3acde526c984afa5ee3eaec89fd5b613f23bd41ef00c4d7a9fc8f6",
+    "packages/galaxy-official/src/configurations-v2.mjs": "756f3811f872d85d5fd83450b367572789728cd09544cb867196dbc260ffd741",
+    "packages/galaxy-official/src/connection-client.mjs": "835e42fd96b241b4229a9f4aacc82020a5819907ca731f3e59929badf45d4c90",
+    "packages/galaxy-official/src/consent-client.mjs": "2bd1b3a279e2b0ee1e174dceef12e07584741615dad932b7eacf5da57b955970",
+    "packages/galaxy-official/src/consent-reader.mjs": "9e6656c005a2379b768bc2a7ee1164ad2c846fdb09088f9c2bb76c985085df51",
+    "packages/galaxy-official/src/consents.mjs": "3093c6b38aa57882320d78ee6529d0d07a21b5f1a709474c40eb2d15a7d5b0e3",
+    "packages/galaxy-official/src/contacts-v2.mjs": "98cf1953014db1f9640f574850c9c88b39b61e2481f2d1859e165835c2faf1e8",
+    "packages/galaxy-official/src/context-client.mjs": "682d63090ffa0bbacab6db571166149e21aad0d2d15c5c6ed1f4c460aa0720ea",
+    "packages/galaxy-official/src/context-flow.mjs": "a33e0bd200d6dc905c04ecdf9871df8b5c3d215a433951ad1f97817b3b4df173",
+    "packages/galaxy-official/src/context-v2-client.mjs": "a2644076147286bab45e68a397fc184e4e768c168f778712b744776a3fd9ac88",
+    "packages/galaxy-official/src/context-v2.mjs": "c95e2235cce9b944d4354293d61fcf2801cb7a423942a310c10c27b5b2e2772d",
+    "packages/galaxy-official/src/context.mjs": "bbd6924639cdef98415de981eadf0344d823e46d6afd526ae03701dfd91e6bf4",
+    "packages/galaxy-official/src/contribution-sharing-v2.mjs": "5d6a2ab867e16767cd7eefdb9e43712c93aac9228e7b0e18f00a65c041e16899",
+    "packages/galaxy-official/src/data-export-client.mjs": "f145942768a04a4aeecfbd37aefd6737189b421957328a3a0c829fa5d07639e0",
+    "packages/galaxy-official/src/data-export.mjs": "9a3eadcde57a5e6c9b20a1a75cba98d459b6437b2dff1811bb7873f5c2f7d199",
+    "packages/galaxy-official/src/database.mjs": "6c67828e946a1793a4d218912096b92fb87c7d67a09ee07b99920d2e04aa9fbc",
+    "packages/galaxy-official/src/deletion-client.mjs": "d1902b5b9aaa4761e933b85c960faf1a7173304810f5ad0c27475417b332011a",
+    "packages/galaxy-official/src/deletion.mjs": "22f13cc05dd746b72a7fb7b39c4f06195161786a407514bd77e12349e256be03",
+    "packages/galaxy-official/src/discovery-client.mjs": "92fc58eed5c5e051bd59a0328c1548e1561d3eb317c207d625b1a569b5d745ac",
+    "packages/galaxy-official/src/discovery-v2.mjs": "db910ebf9b5e33e078f1207b66df45401fce71b6faa6e4fc303517a7d17de7f1",
+    "packages/galaxy-official/src/discovery.mjs": "fb47ab0675dbe6cee4d9cd941a5798064f8ef84a36cc73eb2cf8fbdbe7b0197b",
+    "packages/galaxy-official/src/docs-mcp.mjs": "5609871bb3604491d1162de33e173f3df516cf8737387b0c37df4be0cb9a0596",
+    "packages/galaxy-official/src/domain/assistance-case-review.mjs": "09c9fb2a0ebe0eee97160ca83e4f8ea85174b879cc73c9d7d083778cf135a369",
+    "packages/galaxy-official/src/domain/assistance.mjs": "ff2845d2a7cd8d9e04e7af3ec502e54598190d60c8d611321b065d847ca31505",
+    "packages/galaxy-official/src/domain/builder-probe-source.mjs": "6c1bfef78f8fea9ac4cd2644977ef445ada9a06c3cc4abf48603c9c0565b7943",
+    "packages/galaxy-official/src/domain/builder-work-evidence.mjs": "45539647c2a6b0045da0e9c179634d9d33631c981c91330100e1f35aec17735b",
+    "packages/galaxy-official/src/domain/case-review.mjs": "827dd2442f5c7e0e8b9c6928e117145076e38e88225fe25b3b6e712f3ae2e174",
+    "packages/galaxy-official/src/domain/consent-policy.mjs": "35df7ab1a145de07f50c7baa07d48923b146b325675ecf0df394b679cbe53b15",
+    "packages/galaxy-official/src/domain/contribution-risk.mjs": "5d12af536915a65d4fd86873593a8772ef03455753bb07a67264ecbcb62a29ec",
+    "packages/galaxy-official/src/domain/discovery-match.mjs": "deb5645a0dd10ca570de91fc80375354b1fbbf0a411996d929f75c43629d6f8d",
+    "packages/galaxy-official/src/domain/export-view.mjs": "ef11e8a8147927f1f33afe91f91f47f389366667f133ca49e58ef53647be2a9f",
+    "packages/galaxy-official/src/domain/history-collaboration.mjs": "e79a465fdddac6097dcbe1d6ce9c89ccbec0c9f2a693f09ff4843ff48279a234",
+    "packages/galaxy-official/src/domain/history-fields.mjs": "65ec9e770a9bc56d987a59bcaa8cfded850a8d665c2cc6ceaa6d537c1bf002f0",
+    "packages/galaxy-official/src/domain/history-progress.mjs": "7e799b45df2d6aee36b24b5ec5cc1c0f68255953e51f6c9be2ac50c268aeda3e",
+    "packages/galaxy-official/src/domain/history-rebuild.mjs": "95203aa8396ffb0237778c22d5959a9d22688e6fd9e229b19bcd830cb9dcf5a0",
+    "packages/galaxy-official/src/domain/history-search.mjs": "7c7b21b843c8206a24ec6f3017666fc798abba0a5da5a7f04d2f9003650247f6",
+    "packages/galaxy-official/src/domain/history-v2.mjs": "0fda1e98e9d56e278093e9efc6e617beb4bea3a87f52bd88cf2950236993a5ea",
+    "packages/galaxy-official/src/domain/honor-pagination.mjs": "3135f1d62cd8420fb784ab48db030cd9b5f79cabf586f9f44697b6b6f3930e0c",
+    "packages/galaxy-official/src/domain/identity-control.mjs": "bc5fb62a81ad54d256ef2d45fa724cb7f6f7f7828fc6c91e391f2b3f91ad1d4b",
+    "packages/galaxy-official/src/domain/intervention.mjs": "ac932628fe0c0688d55cb06c2058578527259ebe4a2221fedc87f6c57c82742d",
+    "packages/galaxy-official/src/domain/moderation-case-target.mjs": "b1910ce2c1670e9de654b428462c9272088c263fba621863958f442524b090f8",
+    "packages/galaxy-official/src/domain/moderation-verifier.mjs": "a4b57fde25f4bd6c0cf4b02087eb0711cd1eb001d012c4125ac320bfd68093f1",
+    "packages/galaxy-official/src/domain/proof-case-context.mjs": "a6ca1a939b69dbd1e6b59f9fab213d8278f9cf1bb66206b29cb680e4cb81aa61",
+    "packages/galaxy-official/src/domain/proof-source.mjs": "d55cc2a3249d04949f5183b31aab5bff5e24dd8ff40aa5d07bf5527bed01b058",
+    "packages/galaxy-official/src/domain/qualification-v2.mjs": "17793d33dbb0413ece56c32b243beeb86966a3d24b8ed89a7598dbbe5c3eb548",
+    "packages/galaxy-official/src/domain/requester-history.mjs": "5f36ecd6b820f3a1b4d31146868cc0ba22ac87a5ce84cde43f4ed7f6374d13e1",
+    "packages/galaxy-official/src/domain/task-v2.mjs": "8a9a78adea42f53f89beee1777f0e1dc8ddbf0ed8157bfc6d56b6708f1924f3f",
+    "packages/galaxy-official/src/domain/verification-current.mjs": "9e5029052fad62d26433ffe8d28a1e075b965134ec7a1b75a09d6dbe95164e7f",
+    "packages/galaxy-official/src/evidence-source.mjs": "1cf09ddb7e66c6c0603c722af02b88af2d277e3448be69813a40d0d837393201",
+    "packages/galaxy-official/src/evidence.mjs": "156ae4c56ee426d789f104e89c11674ddea98101fb24bdc5a11cf2290b9fb4d8",
+    "packages/galaxy-official/src/experience-review.mjs": "40f5f594ac8ad9bce2d6e953d8e6ef374b8e42b33c39739b980c508802112f04",
+    "packages/galaxy-official/src/fact-source-router-v2.mjs": "7334ddbbfec6fc1b59c9604a55d76c6cf9f896ed8eecd28268e5085f4722c2a0",
+    "packages/galaxy-official/src/github-evidence.mjs": "2ef6f6a54d1a1ae1fc7bf958025cf2d654b3e52fa1174265072054315e7118a2",
+    "packages/galaxy-official/src/governance-config.mjs": "1b0a534557ed40fe03a5da1278afe66a8ffce32e3f8e5c413e06511d3a42580d",
+    "packages/galaxy-official/src/help-flow-v2.mjs": "9a1b771ccd3431b8d9fcedc556efd522ad1f40b619f270682d139432e2a60b0b",
+    "packages/galaxy-official/src/help-runtime-v2.mjs": "f25f9e2cd872d6b047eeb3e17aa5770e1c42bee97dfdd14299fecdc8df957cbf",
+    "packages/galaxy-official/src/help-sources-v2.mjs": "8cc2d71b0a83f470d6143fb3016c92fa30694597a30039a5b7687780d65808ee",
+    "packages/galaxy-official/src/history-client.mjs": "e3984162a6ad0a273d3e3bfe47bdcdabef3c88a2a7dd2f6ce5a9fe16dd17888f",
+    "packages/galaxy-official/src/history-v2.mjs": "df0ce94e4c8f3cf9eb6dc02b3701d791d1115d2409359515c08f2ea84f23592e",
+    "packages/galaxy-official/src/history.mjs": "ab412ce2d5cac621ee1c47fcbfdce08e3b24a2b4180085f5d05c1a1b70eab24c",
+    "packages/galaxy-official/src/honor-client.mjs": "89a326008760ec92f53304c89b3af190025cd66039858e9a3bea9e752165c27d",
+    "packages/galaxy-official/src/honor-v2.mjs": "a61ef660cd1675462dad5bd74c04e9982afcc7f0053c20835025b92b0b313036",
+    "packages/galaxy-official/src/honor.mjs": "14aab592629cc4ec4b629a43534dedcea081c46c46248880db2e5e32ab9e94d5",
+    "packages/galaxy-official/src/host-connection-controller.mjs": "7adf78e58c83851a71100e0c5bb63193c26cac4b55eca2236da4e5aa0651502c",
+    "packages/galaxy-official/src/http.mjs": "212a99130f5235b467e75819e55a91a5604fd73df1fb4f44848178030cb5f633",
+    "packages/galaxy-official/src/hub-peering-v2.mjs": "29c6c02deb513c1951044efc6eb756c1fbbfd7ff0063753f1de3ee27aca02d47",
+    "packages/galaxy-official/src/hubs-v2.mjs": "7874b05297144a04a4b6240c54c2de1d2f172024a6bb514c3231041a05062b0d",
+    "packages/galaxy-official/src/identity-config.mjs": "bba2c836f153a2908c1e9778a5ef8a9ebea24bfd99ade159baa4f78d950e0da2",
+    "packages/galaxy-official/src/identity-control.mjs": "bc0c7677882d34f04ceeae6e9c5a939685d0ec9492e9ec9b6695ca157f07f9bc",
+    "packages/galaxy-official/src/identity-group-client-v2.mjs": "7fd9f14d9af62e05db26dc18cf13b930eb2bab5b4a852d58902c48b180b225d0",
+    "packages/galaxy-official/src/identity-group-device-signer-v2.mjs": "37398ef47c21070fdc342f00ed737d547c8548b87670b3641c4a2e80dd080428",
+    "packages/galaxy-official/src/identity-group-source-v2.mjs": "aa53a55901902b5c4aec8199dbe450a7111deb47090ff7b517f375909615a8b1",
+    "packages/galaxy-official/src/identity-group-v2.mjs": "be4d6dbb0797f6336cf3bfa92161cf1d7eb4eef71c58a377e99983f0d0eeb2b4",
+    "packages/galaxy-official/src/identity-link-client.mjs": "c2366af90a7f04969b915ca76c3d12027256377e222ee757e545746d0928563b",
+    "packages/galaxy-official/src/identity-links.mjs": "039c85601a28784d8128b13a53ab8272eb77136822658c6044b0f2077d0fd1b2",
+    "packages/galaxy-official/src/information-v2.mjs": "ad272fbe50dcd323e9bfb13b447fccee28b8bc92966bb708b2d4f655f46f0e2f",
+    "packages/galaxy-official/src/information-watches-v2.mjs": "0a1eeaedc3c1e563684f7f06775fef806e66dc8b320cc94411d1ab2bd96c4382",
+    "packages/galaxy-official/src/infrastructure/access-repository.mjs": "2b21152416c0987e090e1ed9f0266295c8a3bcf994493522d609392d13dc1172",
+    "packages/galaxy-official/src/infrastructure/account-quota-schema-v2.mjs": "26aae5a6c8e878dffd67722bcbc6cd5e8af5930688b365f07375c3557246b232",
+    "packages/galaxy-official/src/infrastructure/api-reads.mjs": "0aac4fdeac95f5c06d08aced2be4798ded0d796d3f164a1ad09c45d4b840114b",
+    "packages/galaxy-official/src/infrastructure/attachment-clamav.mjs": "84b4ba4a059d185446524ce59f0ab862e2096ac517de3c39be445b9b23fb6b95",
+    "packages/galaxy-official/src/infrastructure/attachment-configuration.mjs": "3526d36a71d23029f1b4833c30bbc81248790da514845baf279361305cc74371",
+    "packages/galaxy-official/src/infrastructure/attachment-s3-store.mjs": "7b2a34ecc2dc20f74c91f383fa81fcbed27ea72acadccb2aab6a5e89d78a2adb",
+    "packages/galaxy-official/src/infrastructure/auth-audit.mjs": "16be64d5fa554975fccb88de3b0c008156d8bd15fde65cb6bdea2cdc3b9dfed9",
+    "packages/galaxy-official/src/infrastructure/bindings-repository.mjs": "2ff8cf3b8581849ccfa9515bd905179caa2025137f8b53f8e4a875848d5f991f",
+    "packages/galaxy-official/src/infrastructure/builder-support-v2-schema.mjs": "7bcee7f2de8146425234affc806bb9a09c83af22741c7301efb494e61f59654b",
+    "packages/galaxy-official/src/infrastructure/capsule-schema-v2.mjs": "5a94c8c09f07847e441add9c027ad206490fbcb3995b53e27a3a3b4d21d61eea",
+    "packages/galaxy-official/src/infrastructure/case-facts-v2-migration.mjs": "3d9da117930ee4a5c2c0231a0f75cabbd36d7884c0a0e4fcdba4c56ba449602f",
+    "packages/galaxy-official/src/infrastructure/case-repository.mjs": "abfbbec4124665fcdff2966af857babad2d06d7d8404eabf3377bd068d101403",
+    "packages/galaxy-official/src/infrastructure/chat-attachments-schema.mjs": "d8384c4bd2342ea1ea0290b8c29f3baafeffbea668363d134aec5669dcbb880e",
+    "packages/galaxy-official/src/infrastructure/chat-content-budget-v2.mjs": "c32686d2a564afff32b888684e3341fa4c2e186b807ca030aacf53e3e05e6046",
+    "packages/galaxy-official/src/infrastructure/chat-schema-v2.mjs": "d3a069f8e75193110476cb63061159b39ec26d59662c94ac2fdce428ceeafb3d",
+    "packages/galaxy-official/src/infrastructure/chat-shared-summaries-schema-v2.mjs": "4fccfb05f4cf7f4f8cc8c7471cebe953b715aa11d07a86784753cbce3778424d",
+    "packages/galaxy-official/src/infrastructure/choice-snapshot-schema-v2.mjs": "ca7313ce019e24ebf850ff681c213be1a24e49f9a1de2f20f24602b10efc0c23",
+    "packages/galaxy-official/src/infrastructure/ci-observation-v2-schema.mjs": "c3e1fc92b8ba5d353b1d73f23ffb2cbd2fc26384dd27cff0845a6b8cf06473a8",
+    "packages/galaxy-official/src/infrastructure/community-room-invites-v2.mjs": "0227a5341abce401b071f5c83b346bf3e6a3c572f9219ecbf88ed7ebbbe4d544",
+    "packages/galaxy-official/src/infrastructure/configuration-v2-schema.mjs": "580027ce95bec26bc5a135f4787d1c002e0e6232707cbd63f6e4d0f2c3c2a06d",
+    "packages/galaxy-official/src/infrastructure/consent-repository.mjs": "2a6a5bc0f348508de0fc1a45e29f9c9d450513afd9a354cfacf934b2f8a10747",
+    "packages/galaxy-official/src/infrastructure/contacts-schema-v2.mjs": "ad7c64be72e59a6ddd5d36594b3efe58ab4fd3289c4078e481805e5c4211b841",
+    "packages/galaxy-official/src/infrastructure/context-grants-v2.mjs": "2721953fa89b3aaa660b03abf58c181b0e78d726f43f7c429d215d7d3c7263a9",
+    "packages/galaxy-official/src/infrastructure/context-read-audit.mjs": "fa0f1cc390e84591625e326db2b6e37fd4b1b2f8b740d3699b92576472899ec0",
+    "packages/galaxy-official/src/infrastructure/context-v2-audit.mjs": "c9c9b2e47b9582455503db49e74bf07fd78fd106fba5071c1b036ea582d29e8a",
+    "packages/galaxy-official/src/infrastructure/contribution-sharing-v2-schema.mjs": "51d571ab1b42c8c61cb66ab411aab87f4ca2d8c008cba5e9ff20e48fed0d54d4",
+    "packages/galaxy-official/src/infrastructure/evidence-repository.mjs": "bcc09f2ea42d318586dd9c85eff7aa690c5838e89af5a9bbc596ba38151f5a3e",
+    "packages/galaxy-official/src/infrastructure/evidence-verification-v2-migration.mjs": "7197700f0fecbc732e50e42fc76bad32602f91d7bf9fceeab3efa4918c6532c6",
+    "packages/galaxy-official/src/infrastructure/experience-review-schema.mjs": "8d366b8fc8671259798149534b45352892c793b5569ad38a4a678d103cc3ef25",
+    "packages/galaxy-official/src/infrastructure/experience-reviewer-registry.mjs": "a6bfac1c849aa369c507bfafe0fa9b2f3b27535de1039e834004355aa32bfb12",
+    "packages/galaxy-official/src/infrastructure/export-datasets.mjs": "b8c46e45754073a25adc061366e4904aeb13ccc6c16ad4e27a49c8671c1164a3",
+    "packages/galaxy-official/src/infrastructure/export-retention.mjs": "14bfdd1583c51f24866593add6222bd01fdd61e50a95c08b58a3b0129bc7a51a",
+    "packages/galaxy-official/src/infrastructure/failure-audit-spool.mjs": "29b20fcf58ee285216da6fcc599ea652efa4bbe21e641d3bf2b26e7c59c019c8",
+    "packages/galaxy-official/src/infrastructure/history-v2-repository.mjs": "ec6a3abafe6e4144309f8ba5e46f0c69221fe1c572c474c98701197dadddb045",
+    "packages/galaxy-official/src/infrastructure/honor-rule-registry.mjs": "710257403c4c5a25b4889ad910b84f1a255a08929386a8ea0bbf6319fe49d70d",
+    "packages/galaxy-official/src/infrastructure/honor-source-pages.mjs": "e5a219d2cbed8f9be674a32983a22d68d6ed1e8d8610f52d19a1fc8c0873e9d0",
+    "packages/galaxy-official/src/infrastructure/http-failure-audit.mjs": "cf93cbcc1614e6d44e6c3c3c8839ba9843c9261696ca50b814e173b1590aa759",
+    "packages/galaxy-official/src/infrastructure/hubs-v2-schema.mjs": "c23c11250e18165c23c371acb945a96ac4bc204c90ad1c32979fad7a1e63cdc7",
+    "packages/galaxy-official/src/infrastructure/identity-control-repository.mjs": "22e72aaad0dc1e6f3db372c7a14ce92e6331e33d06b303562fd170e86fc71776",
+    "packages/galaxy-official/src/infrastructure/identity-control-schema-v2.mjs": "b017973827124c5418d8ac7edca9cc36116d1a1efc4c7b9faa45c2130a7a85ab",
+    "packages/galaxy-official/src/infrastructure/identity-group-v2-schema.mjs": "853e13fa4d850d75fec96c6acb02e4e284903251296b9591c8b462a31287976b",
+    "packages/galaxy-official/src/infrastructure/information-watches-v2-schema.mjs": "063be5f90cf94183408afb7eadd8fccacb59a7b18501579a07787eef72d373fb",
+    "packages/galaxy-official/src/infrastructure/lifecycle-export-v2.mjs": "2fc02592a59b7eed354225d373d7d3e5279e3c9bc56f5c1e4dd1545f23fafea9",
+    "packages/galaxy-official/src/infrastructure/lifecycle-registry-v2.mjs": "3b65a06ad6b6b2a032115ec81dd43633b7d89b399024ad026b2e805278f0a174",
+    "packages/galaxy-official/src/infrastructure/lifecycle-v2-migration.mjs": "1c661b360e86bffdfb2eb98c4c095e38dc1b571e7673395874a473c28af4dd06",
+    "packages/galaxy-official/src/infrastructure/migrations.mjs": "813721cfd5b2a1fc112c8d82d7f0bd98772d21099b1a9cd063da76305dff887d",
+    "packages/galaxy-official/src/infrastructure/notification-audit.mjs": "f062ba7a845edd16ed0d7d05645b8be3420600b08b17000a92ce515c5bb645dd",
+    "packages/galaxy-official/src/infrastructure/object-audit.mjs": "6591a54717b93848d46171cfed2f993e22efed5c2da308bfb6aa912f463d1595",
+    "packages/galaxy-official/src/infrastructure/operational-snapshot.mjs": "edd94185d42089168aacc0e235cda7bcfed236c2e7be23174fa444ae78ad7e7a",
+    "packages/galaxy-official/src/infrastructure/outcome-material-v2-schema.mjs": "145a2894e59262adeb7fa4d3020c94d6119d91d77ea01ff97df349200f127534",
+    "packages/galaxy-official/src/infrastructure/personal-notifications-schema-v2.mjs": "4ee4649b5e98504b6d640fb853ee52a6aaadd15c8618519517f8ab6302c6560f",
+    "packages/galaxy-official/src/infrastructure/projects-schema-v2.mjs": "95f9861bf61a00e2725ca0970e87369c1f11ea4d881820542bfa0a6aff301666",
+    "packages/galaxy-official/src/infrastructure/proofs-repository.mjs": "4e05ea2f8525e582064c83a8d53740f30abc64bdc7e2b51fdcd2f5b36ef93284",
+    "packages/galaxy-official/src/infrastructure/prosody-chat.mjs": "a3066c882850e836c6344e390ebdf4d767c6ad48dbbc2b6ede43990a52ab9cd9",
+    "packages/galaxy-official/src/infrastructure/qualification-policy-registry.mjs": "e2c2a3ae27d0dc19e11df1fb0e6b39917595bb14ba24a5bfffee284908f8c32e",
+    "packages/galaxy-official/src/infrastructure/qualification-requests-v2-schema.mjs": "a5587996c07eef797d0b1d38b5bdb9216442a7566e48a89ce55acc29903e5820",
+    "packages/galaxy-official/src/infrastructure/recovery-state.mjs": "8b304d4293c6395348fc3a5b6b84c50d1edca627ae98a67d44c110511d883484",
+    "packages/galaxy-official/src/infrastructure/recruitment-schema-v2.mjs": "d2f7a535e1a1e9a7315f9ab0f91a4fe52c89a132f12e804c55dc494beaf5e41d",
+    "packages/galaxy-official/src/infrastructure/resource-budgets.mjs": "9d5ef98e06729f9f1d3afbf575b1364aa210eaa6f700f9c9ebe42c1fe3863279",
+    "packages/galaxy-official/src/infrastructure/search-index-builders-v1.mjs": "6bf0cbd5dd875ed513b7e5197d54b7318a359ed3f60a2e3de3cf804ddd58d5f7",
+    "packages/galaxy-official/src/infrastructure/search-index-schema-v1.mjs": "496c2aa2e5a9f826ae31bac0bc4a07619423dffbba752f471c3aded6dde7a9cf",
+    "packages/galaxy-official/src/infrastructure/target-governance-v2-schema.mjs": "4e8fb5d4d2fe8a636b92052f4eca0a155214042c2eb61c83550f54bc004f476e",
+    "packages/galaxy-official/src/infrastructure/task-comment-v2-audit.mjs": "a88a214eaeb2f49c029e349029379039c0b6aeb624d0acd685440c7a329965eb",
+    "packages/galaxy-official/src/infrastructure/task-comments-v2-schema.mjs": "746562528aa59d37a5ccdbae142ec888c05c442bfae92f6e06fa552eec7af342",
+    "packages/galaxy-official/src/infrastructure/task-participation-schema-v2.mjs": "b63294c52a2e89563c65db1bf90fe2b8c9c3d9789080cba490eec8523b2bb399",
+    "packages/galaxy-official/src/infrastructure/task-repository.mjs": "e36dc70a2ef187bb90557c0e5fbf8cac323655f21877993d7af6d38bc59b62bf",
+    "packages/galaxy-official/src/infrastructure/trust-package-permissions-schema-v1.mjs": "85a8f8c82723563449ab40ec7db170786d10cf48bd38c60333620186d2e6109d",
+    "packages/galaxy-official/src/infrastructure/verification-record-repository.mjs": "cfe9c739f8462f62f3b14315551f525ac7a65cb8e092300b2dfd9fe3300540cd",
+    "packages/galaxy-official/src/infrastructure/watch-control-v2-schema.mjs": "f369dc91ab413ecf94796953dd79193b5d17d9e36a38b2415e86554b1d3b3182",
+    "packages/galaxy-official/src/infrastructure/worker-pack-uses-v2-schema.mjs": "8604ad09e3262b03618504f40a77a017b5fbe36be4b224ac4b00e8e460ddd952",
+    "packages/galaxy-official/src/infrastructure/worker-reads.mjs": "96cca75406e448b1865f408e27ce22fefded34790f75552e18abd2ce8b1eda26",
+    "packages/galaxy-official/src/local-assistance-store.mjs": "379bb8852be18fc9ff8af487d1adc5e142a88ee2d2faf88b995ab0d29046a962",
+    "packages/galaxy-official/src/local-binding-receipts.mjs": "ea1ab9b75e5afc9d94cd63306941ec17b8db3b03257c33a8612154682934637f",
+    "packages/galaxy-official/src/local-builder-journal.mjs": "6d5422adf6ff48a628cd0b6b7a8a707878d4a7734a6b671f0bc3f215d1aff1a8",
+    "packages/galaxy-official/src/local-case-publication.mjs": "001338ccd1b0b016aeae08823d22bb62b3cd8a2b78ea92e4ecc3c11b672cdf16",
+    "packages/galaxy-official/src/local-context-file.mjs": "3facef6c0f3c476879420733c9d88503508327df587ea67dd3ebb33a900b1f69",
+    "packages/galaxy-official/src/local-context-store.mjs": "b588a48515075b5ddcb52c8311553e3b2fd0dba81a81f7c47be46e48b5b6a8be",
+    "packages/galaxy-official/src/local-data-export.mjs": "2d6c8b5fbdaa7213a517906f86a88f9484679ebd7d0dff16b6ebce9d6626a8da",
+    "packages/galaxy-official/src/local-help-store-v2.mjs": "465febf2a6d129e051c84e2d533e6b9de435da00e7b2d2f15dc396d2003bab7c",
+    "packages/galaxy-official/src/local-host-runtime.mjs": "aef36d333b4112ceb6ec905e6d841cd73ad676714b79348d10ac7b6cd76b8561",
+    "packages/galaxy-official/src/local-publication-flow.mjs": "29ef2cb69285c5fa9dd10e5766d21e4699605dd7bafc20baf163e288d66d2984",
+    "packages/galaxy-official/src/local-search-feedback.mjs": "7e0c9d16d4f6c8c01730aab22c2c9e8b3fbf0576c67b98a1cf0b2c26c47105fb",
+    "packages/galaxy-official/src/manifest.mjs": "79f1d947dbf14119a2663227f9e5109bde4e4a81ef1baf289ce6e0b3061347c3",
+    "packages/galaxy-official/src/migrate.mjs": "76489f5e9fdeaab654d1e8680693090dcb94e6b1391cc57685e5e42c66371e9f",
+    "packages/galaxy-official/src/moderation-client.mjs": "3ecb9a0c35cc7fd65553635f7facad9a005004eee856e85254a1847d8021c71a",
+    "packages/galaxy-official/src/moderation-flow.mjs": "19ea3404de4b7953d6bd449dfc2a70521f0025c98995e741f350d6c8d5d4837b",
+    "packages/galaxy-official/src/moderation.mjs": "cbb59f1424cedc8a579ac7451fbeed45ba38bb9547808e87682c515ffeb8d233",
+    "packages/galaxy-official/src/network-profile.mjs": "e3a860e18f320f306104890ac6fa275e218327e33ba8fea68761d24c7570bf5d",
+    "packages/galaxy-official/src/node-control-proof-flow.mjs": "f34c87d46d855d888b9311e7c8482a0b575275b4131dae1aa42d28dcc7eea344",
+    "packages/galaxy-official/src/notification-inbox.mjs": "7c965df825f0ea0d8b6cc6fc4f2f929b928ebab1d3098ae788816fac973fd1ac",
+    "packages/galaxy-official/src/notifications-client.mjs": "84b7405bd7c54f0e8fe5351e60a15aa75b406dffb62eaaf61a50bf16a44000eb",
+    "packages/galaxy-official/src/notifications.mjs": "44cd4b4ab136acaf7dcba3e858ae94b0a4d8301037443eb7a7a96ab9972d2074",
+    "packages/galaxy-official/src/oauth-introspection.mjs": "cb0cb8e3d2d672a7c501cd8e9e28a0f055d18bc52a78dd59c6f12aa835aa21a3",
+    "packages/galaxy-official/src/oauth-resource-access.mjs": "0150d25d55c922c9b746d5e90b5df2aa23b28cf6f65177c8631b5fe7a325da1d",
+    "packages/galaxy-official/src/oidc-login.mjs": "2f5e69efdd26a9df2dfc7ab13ea40568562bbd47aa02ca3366d418a9757359d0",
+    "packages/galaxy-official/src/operations/backup-cleanup.mjs": "b6b9afc520119955502716798027fdbdf3a58301cfd8e88911cddceedaffbc14",
+    "packages/galaxy-official/src/operations/backup-status.mjs": "768703698df73a2bbb4b00a34c283d1dc492455bdbde65a9808ba15dc8fbdbb2",
+    "packages/galaxy-official/src/operations/backup.mjs": "a4e4632f948c6e08f23949f405cdc4bc3c86e1da7972497044e815e2c97b4140",
+    "packages/galaxy-official/src/operations/chat-maintenance-v2.mjs": "b00ad1cf4daecdf94526cad8d340a2b1db8ee6d73cd9c7859b334c3499a97b40",
+    "packages/galaxy-official/src/operations/cost-input.mjs": "cf42c6a6ab1017b6abeeb0d1b0d62d64eeef7084f248ff5fa870a8ede1f64b01",
+    "packages/galaxy-official/src/operations/deletion-execute.mjs": "118296a89c6fc072da9dfb4fdc31b995c7c3f851fcffb62bbbabe11b9b3d39e1",
+    "packages/galaxy-official/src/operations/deletion-ledger.mjs": "16e704d9c3c398943357b0c8d8122a607986dff4947a4e9c047953a5e413f88a",
+    "packages/galaxy-official/src/operations/deletion-minimize.mjs": "dd61699fdcdb06b4b80748ac7f779b89c2db98a4d0888d3caf43e6171f107c29",
+    "packages/galaxy-official/src/operations/deletion-preview.mjs": "01cf193256b9139f7addf5ccc2120fb4a33388eb4741c374a57388f2cf9a1c41",
+    "packages/galaxy-official/src/operations/deletion-review.mjs": "474dbce3118a61c3a4c49851ebea8ddb8d953a3fb61ffee13dc8dd244e6d3f62",
+    "packages/galaxy-official/src/operations/deletion-transports.mjs": "7ef94f9cefa6d11c4a773a0349f1ef9afea9ace9f92b1fc8137c3573993698e6",
+    "packages/galaxy-official/src/operations/governance-review.mjs": "db2771d81a3f4243b4105e335cd58206f8df1b43ed61900f2d4b4988f1990e1d",
+    "packages/galaxy-official/src/operations/hub-retention-v2.mjs": "0a2c55fd4a1208b9d39feedd43de4e1d630b5e08be385de237d98f5af40e2e8b",
+    "packages/galaxy-official/src/operations/identity-group-retention-v2.mjs": "226533f22c9b5347f6da9ccfa945fc295777fbfb3803f3908e1b4e048ae337cc",
+    "packages/galaxy-official/src/operations/incident-notices.mjs": "e88eda83ce711b9add255d88cdfb47ad4b085d82fd7c263041430fb06896bb8d",
+    "packages/galaxy-official/src/operations/incident.mjs": "d70d2e26c23a654a5461b179272c16c94e7117416ee86621b0fe156ae751eec3",
+    "packages/galaxy-official/src/operations/information-watch-retention-v2.mjs": "df6c326895eedcf9563c1518b0d7ab846a0c828b508c394ef9c842faae6047bf",
+    "packages/galaxy-official/src/operations/lifecycle-product-v2.mjs": "3ec1c162e5cb3013c41dfb30ae8b5a88a3acb8b6662efde6af3c5ba3357fa6fe",
+    "packages/galaxy-official/src/operations/lifecycle-retention-v2.mjs": "aa3a738f1669ad10276b7579b91a0f28901b9232781302966902dcfa8989a65e",
+    "packages/galaxy-official/src/operations/metrics.mjs": "c06bdd0c42abde1445c3b3ad7d1476ea31faeb67aa4d8c630c79c9a8105f2a77",
+    "packages/galaxy-official/src/operations/outcome-material-retention-v2.mjs": "e5ecfe78d18ca090da66d2381c99fd318df49212780f8ebac40c8edc08fe9ab6",
+    "packages/galaxy-official/src/operations/qualification-request-retention-v2.mjs": "b16cac2b93f7074a85df6f75955a3aeabd70ad0738593f8a55e0c5897b099a1e",
+    "packages/galaxy-official/src/operations/readiness-v2.mjs": "ae47ef6dcc600fcf75601b0aaeca8316cf939a29a09b02c27fb0267fe6eb21e9",
+    "packages/galaxy-official/src/operations/runtime-config-audit.mjs": "7e3ac1b5dd84ffa278b37ce23d02f53f6dd040ef7f3796df80aa7c7136c382cf",
+    "packages/galaxy-official/src/operations/runtime-log.mjs": "e3693aedc4603e3d8cbfcab5e39c67165c33d274ad327ff76b93346606cd1d9e",
+    "packages/galaxy-official/src/operations/service-access-v2.mjs": "8a5c110432cc614322c6ebecf6e0d837b342e6cc601028ef69c6076aa5a96cf0",
+    "packages/galaxy-official/src/operations/service-release.mjs": "4d84bebc598dcc058cf778817ec83305d74a4c1b41a8b1db7d7060335b40f6f6",
+    "packages/galaxy-official/src/operations/target-governance-retention-v2.mjs": "8dc998882c262c9d4af2fab3c44b55cacded2c9b7364a351388f0c56cfafd86c",
+    "packages/galaxy-official/src/operations/task-comment-retention-v2.mjs": "f3eae34f169f430dc2263aad3bd4fb9e605a48ef6ab32796e1ef95fc1e60b6ae",
+    "packages/galaxy-official/src/operations/watch-control-retention-v2.mjs": "c21a511dab8cef073e26da8c804a4b7159150330945a5e472447680953edca55",
+    "packages/galaxy-official/src/outcome-material-v2.mjs": "30687639201c24eb3ce6249d73e51d960d54099c6dfd63761ee5189228792416",
+    "packages/galaxy-official/src/personal-mcp-attachments.mjs": "0923c105ca3bac44cb81c59e577170238118ac77d825da717cf6080a88198896",
+    "packages/galaxy-official/src/personal-mcp-builders-v2.mjs": "cd529f24ec47807fb7c0acb52e68b0642ac15ff9fc0e6cab4a04a82ccaa40524",
+    "packages/galaxy-official/src/personal-mcp-capsules-v2.mjs": "85059a17a316a357715dbc63f32d0899a01f5098bd697939d8d61fba86c5e49f",
+    "packages/galaxy-official/src/personal-mcp-chat-v2.mjs": "1c7e3859557eca708b7be8f799ff6c5c0cd5a40d948a5cdfd3c974b113f4133c",
+    "packages/galaxy-official/src/personal-mcp-choices-v2.mjs": "8534b0e49fb01279753d723427af02308b47726cfca45f578fcde19314b6ad00",
+    "packages/galaxy-official/src/personal-mcp-ci-v2.mjs": "b31327d952e7c1eec4631368e2fff8b7e7aa9d116ce70ce821c3b25f39922827",
+    "packages/galaxy-official/src/personal-mcp-comments-v2.mjs": "d42013f445722baa5feff6264646130c3a29ede80d3deaf9875297a1d4177c0c",
+    "packages/galaxy-official/src/personal-mcp-config.mjs": "d6295938d25e189b556192b39777dc1d98d99eae597bf23bef0bea765d388113",
+    "packages/galaxy-official/src/personal-mcp-configurations-v2.mjs": "4caf61406fc1ce71d881c40d3adcbd36df8b5acbec9b7a9a3ca2f7d58b761ae1",
+    "packages/galaxy-official/src/personal-mcp-context-v2.mjs": "ad8f9af0a3d9c7f49fd82e93f88dcc823d0c1b8ce130e471d1900d061b0aa378",
+    "packages/galaxy-official/src/personal-mcp-discovery-v2.mjs": "0337dfcc3fed7e3f4c7a3426e0ce4414a27ccad52be8db4e1c132773ff509e39",
+    "packages/galaxy-official/src/personal-mcp-facts-v2.mjs": "357d1bcf38cb540ca97334917a5f4f3ae532186651541bdf15b5132edd8fa0a4",
+    "packages/galaxy-official/src/personal-mcp-honor-v2.mjs": "29900c2aa8b6ef1d9ab1ddeac519cdf210e7b4fa0484b0bae8296db63d505f91",
+    "packages/galaxy-official/src/personal-mcp-hubs-v2.mjs": "d3d0654b13d72b6f93cb860ab1fcac8a0a1b77391cc6591b10a5462876c17749",
+    "packages/galaxy-official/src/personal-mcp-identity-groups-v2.mjs": "952b457ad5adb8fb3017afc1657bbbcfa589e1b579ae0cd79977a72e765968b9",
+    "packages/galaxy-official/src/personal-mcp-information-v2.mjs": "cdba70d305ed18ec99694be5c8daeafa2b4cf43d0a28f099e4929c30ef6a196d",
+    "packages/galaxy-official/src/personal-mcp-outcome-materials-v2.mjs": "d9bfb5dfbb3ea5bcef44dee46eb679b4de0408f16f8f1d940f59cd452e1a074a",
+    "packages/galaxy-official/src/personal-mcp-qualification-v2.mjs": "6a804a1fbac082c4505210fc86ae97f5424767c4c00adc4f2e6883945eaf18e0",
+    "packages/galaxy-official/src/personal-mcp-search-v2.mjs": "9d4c2612ea3b2c63e65458862138f65df9ab016ebb10f0549b50d34a922389a2",
+    "packages/galaxy-official/src/personal-mcp-summaries-v2.mjs": "447709a09e389a47efa1583b7553053cf8cc273a3b0488402185563804ae7172",
+    "packages/galaxy-official/src/personal-mcp-target-governance-v2.mjs": "8c4f0c785c14ffac88d65eb68065cf3afc677b060a29a0e361d92c60a363c161",
+    "packages/galaxy-official/src/personal-mcp-task-tools-v2.mjs": "2e1ab415d93e48461fd0eaff5532747425396d28746af5848d420f1131cb2940",
+    "packages/galaxy-official/src/personal-mcp-trust-package.mjs": "31fb16c569065cf1a9c5f54fa779c0c464c0aaa3ee3c67097498ac9ea4b3e5cd",
+    "packages/galaxy-official/src/personal-mcp-worker-pack-uses-v2.mjs": "20b1492fdc883bc42c74aea7b789f6da19c84c580d3b5255d0fd732093b13b58",
+    "packages/galaxy-official/src/personal-mcp.mjs": "b1cd04e115807122cd3df916d9d9692b3866f303f8809ee152d28f03b157fa69",
+    "packages/galaxy-official/src/personal-summaries.mjs": "5021982eec8c32ee1ebb4ceb5b1067671c39da75dbf33880846a89ce581dda91",
+    "packages/galaxy-official/src/personal-summary-client.mjs": "ceb64a7674a1756a50f376cbb753ceb90d6d0ea91eca78e25879afa3affc1ed8",
+    "packages/galaxy-official/src/personal-summary-local.mjs": "24f3d3d531f8777a7bcf8f54b0d62a59be6fa0f99e2f7b6b5ca6a1ac77264cb3",
+    "packages/galaxy-official/src/profile-client.mjs": "f411db8b60cb7125e69f51f2bbe2b8b8c0acf52c59430a5d814edade813bde02",
+    "packages/galaxy-official/src/profile-flow.mjs": "59c4a5c2a1eb35e4a806d8727867afaddf097745ce434fd87da728cab9b466fb",
+    "packages/galaxy-official/src/profile.mjs": "30a20b8b151543929ad9dfbb89ad43a32a3291bb3fede093d41c7750e28d60d5",
+    "packages/galaxy-official/src/project-discovery-client.mjs": "4cdd99b1f00ab505cef3f0d9fcdfc77ff9afa47cdf2c7a5eacf88bbe21209240",
+    "packages/galaxy-official/src/projects-v2.mjs": "068d19e659349116d7a5e793f98eba71e399aec5fae687112fd72f124d2620a3",
+    "packages/galaxy-official/src/proof-client.mjs": "a0ed1ecaf82c7d4b7a1bca31ccbb860ed10f472bbad6f4bcc6445a25fb80d8c5",
+    "packages/galaxy-official/src/proofs.mjs": "ebc88a138db7a7df1733c2388c98f6bf71f21a088b00296c5aaa0bfca0945ad8",
+    "packages/galaxy-official/src/public-fetch.mjs": "1446334341ed1c9212824d6bb14bad13b102b269de4e34778c9122c74beed0f6",
+    "packages/galaxy-official/src/public-writes.mjs": "7b7dc5480abd665f56ca42aa3c06f25ee6d7980432afd8b9fd3bc61098990f93",
+    "packages/galaxy-official/src/qualification-calculation.mjs": "0383cd39355d6888095b6cbe6cf0259101f9fb201705d23c6322a773f8dae929",
+    "packages/galaxy-official/src/qualification-candidates-v2.mjs": "8133c5793035dbcfc037dbc3c8a24df327f13a8246255d6badcca274bdfbfeb6",
+    "packages/galaxy-official/src/qualification-requests-v2.mjs": "2659afb210381ba594c0a125b1c61342b1c6087992d6f45f4393c8c53e1b5b0f",
+    "packages/galaxy-official/src/qualification-v2.mjs": "675f07827f89e05b9cf55c9058d56374a909b3e739a12159328acc53b915c3a5",
+    "packages/galaxy-official/src/qualification.mjs": "0be468537057f5150f7244362fdb0f2275b0a8d390f7122a501e4a83e6a3434f",
+    "packages/galaxy-official/src/recruitment-v2.mjs": "736f38afd744c06532878a68b09f9978c653c2b98ed06d42ce9082dff754c165",
+    "packages/galaxy-official/src/release-artifact.mjs": "aee6d825e9de3fd55394c686addc725f752668b241da03c35d76ef575421ac33",
+    "packages/galaxy-official/src/requester-history-v2.mjs": "4a3209fe0ecbbecc87e78f2d5e9c6f912df0d79ccb9c777dc60888388f8db7e8",
+    "packages/galaxy-official/src/retirement.mjs": "48f0fd3bb575e4d8724d955fbd531861f719437363c19a86063ff8019a0dd651",
+    "packages/galaxy-official/src/runtime-environment.mjs": "33da1d23d5cdbac709eeeb96b20b114fac44ccebdb2d0e0b05d5eb6432db6090",
+    "packages/galaxy-official/src/search-client.mjs": "b999bb0b3228ce51fff94e1e3aa7b7f44d9f2b1239c230ba0a7d0b0401ba9e4a",
+    "packages/galaxy-official/src/search-index.mjs": "45445c3afc361a5c5d3740a4d5eccab52d36c9242e8201c053c0e745f8af36c4",
+    "packages/galaxy-official/src/search-v2.mjs": "9fe392a3bb8f899009164843da4f416233210c81b074b5698b6fbba96fba531c",
+    "packages/galaxy-official/src/search.mjs": "2ce985778161108f9568db8c7747332324e0b8058d785ff4d1858475e26c9d0f",
+    "packages/galaxy-official/src/server.mjs": "a8619d54b89a4b0e40a11bdd1e6d2defb312fdc8fa580412ed48d9794058dcca",
+    "packages/galaxy-official/src/services.mjs": "c175e3aca6741ab0f5fecbea73e0f19ef39f0ce7a54ab47af0b28735a4a3191f",
+    "packages/galaxy-official/src/session-memory.mjs": "d411444130ec10f6f588f1ad9264bdcbffd0a8cc25067fbe8d4584a4909e89af",
+    "packages/galaxy-official/src/shared/assistance-event-draft.mjs": "2c2b4e2c48e31fd37a3e7eca5802128d0f2dfb40d82b2091e81a2c760023c964",
+    "packages/galaxy-official/src/shared/assistance-schema.mjs": "dd722892a3e5257f88a4463af131ac124169cddb28600dc106510e2ae848580d",
+    "packages/galaxy-official/src/shared/audit-schema.mjs": "bcd3d5b0b4c2698a88eb0623ec9542e382d7fd53624c64e3caee55a7ebea119a",
+    "packages/galaxy-official/src/shared/binding-management-schema.mjs": "b21ed686fd82d7a84b2769ac39797ff4d024ab27911b538283973bc71b54c258",
+    "packages/galaxy-official/src/shared/builder-support-v2-schema.mjs": "0de454836059a8b73e53235ab11916e03f61fc21903918206524216c3f970f1a",
+    "packages/galaxy-official/src/shared/builders-schema.mjs": "6bf4c1e0dd2b1a8a4da69d4949fa3daf7dcf8bb6103e3c1f5768b83cf28928f0",
+    "packages/galaxy-official/src/shared/capsule-schema.mjs": "775b651d9de3a22697b4020a41ef388a37242c7662e76a1271b132522ba4fb45",
+    "packages/galaxy-official/src/shared/capsule-v2-schema.mjs": "151dd175fe52c0fb79e959692440339c2cee6f3d60058c99a953ee853bb758cc",
+    "packages/galaxy-official/src/shared/cases-schema.mjs": "01c175fdd6c19c67d2e628482a54eb44fa731c26abae25f9f2d292c4d88acd7c",
+    "packages/galaxy-official/src/shared/chat-attachments-schema.mjs": "237a02eff019a3e3ad745df8172df870f0a176a03d7bba4f41aea44942bbf253",
+    "packages/galaxy-official/src/shared/chat-schema.mjs": "3808dc6f95978914f81b9c2905307e05defb6efee32db8cbb6a605cb090777f2",
+    "packages/galaxy-official/src/shared/chat-shared-summary-schema.mjs": "1eedf882dcb5d147e7999e240ef9ddfb2384970a5d2c6c56aa32d28ee2df6ecf",
+    "packages/galaxy-official/src/shared/choice-snapshot-schema-v2.mjs": "13c2ddeaf6ac5709c53b7f217d953c5792219a7ed9043aff608faf83e83ed161",
+    "packages/galaxy-official/src/shared/ci-observation-v2-schema.mjs": "f8680e80485d71e2d4fa2514affc647408eba6c1c5ce9b99209d40fb95c546dd",
+    "packages/galaxy-official/src/shared/ci-provenance.mjs": "933565d9461b5b22273b43de9fd7613fd7c5431c9bd05fb2befa0c0afea206c4",
+    "packages/galaxy-official/src/shared/configuration-v2-schema.mjs": "19afbb3690a16d68964046e1daa25d99a6509b9720224957afea0e8e6e9f43b2",
+    "packages/galaxy-official/src/shared/conformance-schema.mjs": "6865305e2429e3e1fc173f3bdd0b49397a4c317088ab2aae75879ad21abe8012",
+    "packages/galaxy-official/src/shared/consents-schema.mjs": "d0c7ba47e57f60d8141ac1feb073b87aa89c0f04178a0c8a77621791715fce81",
+    "packages/galaxy-official/src/shared/contacts-schema-v2.mjs": "92be297c093c543349b0c9c4ffaa5da8e26538e12a89092b626245eec86cad98",
+    "packages/galaxy-official/src/shared/context-draft.mjs": "4530154ff86373920889702bb9c4207244ee599737abb6d63f144fbdd5e9cfb7",
+    "packages/galaxy-official/src/shared/context-schema.mjs": "29e6f264328f602c947de1c8af49e4c03a96813fc141fb810eb199e4741c64b9",
+    "packages/galaxy-official/src/shared/context-v2-schema.mjs": "b751930ebbca1befcdab7eaab5f7595a0d3f2b20dc8a88e550d5760f986be614",
+    "packages/galaxy-official/src/shared/contribution-sharing-v2-schema.mjs": "07a7433e6e0deac2ffd761cf26035d23671bc2f772b6c09464245ea5c68f320e",
+    "packages/galaxy-official/src/shared/data-export-schema.mjs": "f711f2e9353c2f6ba86295c0fd5d47f94cfb51f4e3b635c1e8c72f300c315120",
+    "packages/galaxy-official/src/shared/deletion-event-payload.mjs": "2714e3b1c797b8c754272390692a40c1e3c2ed5c1c0bbcc7375027013a05147d",
+    "packages/galaxy-official/src/shared/deletion-minimization-schema.mjs": "acf2d913116c2c21d41ac10178b1271bf30c572c28927f098f49d3ba76225b5b",
+    "packages/galaxy-official/src/shared/deletion-schema.mjs": "57a112ea271ef1a7af9c3439fac5e74dd0a094d3066fa8507a44bf537bff78bf",
+    "packages/galaxy-official/src/shared/digest.mjs": "da3fbd497fb45146289070157ddf35241f9d8b25c5aff7003c26baae0c1f63db",
+    "packages/galaxy-official/src/shared/discovery-schema-v2.mjs": "3e11fddd8db2f378f54000ed9df14cceedf8fb4b8da2ce8a4c10b1b2c442c501",
+    "packages/galaxy-official/src/shared/discovery-schema.mjs": "c0723672e3395d4695877d1cc5142434409f676a7417f714a20da122324b9ebc",
+    "packages/galaxy-official/src/shared/envelope-policy.mjs": "652dddfa39b8c4e6b5f786e8695df3c38584869fc7b3509f105884c46126b88d",
+    "packages/galaxy-official/src/shared/experience-review-schema.mjs": "02255155e9c1af70b3d2d3b1e1a6c26cc9a66c6c0cb2bcf479d09567b688e5ff",
+    "packages/galaxy-official/src/shared/github-evidence-schema.mjs": "607a6c13710a7de86681608106db8fa337bf9afaee1c1df013c87607d62d046a",
+    "packages/galaxy-official/src/shared/help-schema-v2.mjs": "31237481a9544faa98cbf967b7c4a2fb23654f4a867662acf162eae810074208",
+    "packages/galaxy-official/src/shared/history-rebuild.mjs": "9d7007d726341a942e83d0262857e49ecf95d853bd09fa7a13306430f9a67d92",
+    "packages/galaxy-official/src/shared/history-schema.mjs": "637ec53ac5043d6bd4adc74ff5284936cb751771971ea776fdbd64de106ec755",
+    "packages/galaxy-official/src/shared/history-v2-schema.mjs": "2ea496719eb5847d2bb94d8f84c717a52c2b5d9e0ec4a35921663bfeb949ec0b",
+    "packages/galaxy-official/src/shared/honor-schema.mjs": "ffdc9f031b4aee7f908570bfad3351f29d2cc742034728525ec8f9304e4e3b2e",
+    "packages/galaxy-official/src/shared/honor-v2-schema.mjs": "09483cd5419ecf484c94eed516345e7a4c606413256f010748cc598a7c50570c",
+    "packages/galaxy-official/src/shared/http-failure-context.mjs": "65182a63d69a8d56daa00de4bc95d46f7da6ccaf052078ab1986f5160418d263",
+    "packages/galaxy-official/src/shared/hub-peering-v2-schema.mjs": "301ed19babe502e73a073de1cc04691e51500f8e4f3fd3c7ecbf1e680e1466c4",
+    "packages/galaxy-official/src/shared/hubs-v2-schema.mjs": "6b8bb0469fd61be45876b1596f39c4b8bc90a6cab45a348e7ac80c09ba5c2151",
+    "packages/galaxy-official/src/shared/identity-control-schema.mjs": "08d8fe393f6e233ba7866092d407161c325f8f5d6b9220271b9fb02e4aff901b",
+    "packages/galaxy-official/src/shared/identity-group-v2-schema.mjs": "5bb184c8effce02b865b2f763f1d6f8333837884e8f6012c0ade7c9358c8aa31",
+    "packages/galaxy-official/src/shared/identity-link-schema.mjs": "e363146895bb668120ad0d688419975703ab913375aa3a652f5eccb1552bd896",
+    "packages/galaxy-official/src/shared/information-canonical.mjs": "43e7081f5d5104619e72fa2b464801b72befa673ca97d066eecd4211c17438a6",
+    "packages/galaxy-official/src/shared/information-v2-schema.mjs": "b33df1a46abf254bfa32b8ea1299abd13da5d067973b67447704c7dce75d781c",
+    "packages/galaxy-official/src/shared/moderation-schema.mjs": "d07bf63804fa25ec2580eb19114780471dd68761bbe2a60ad7bed5c5c4bcb299",
+    "packages/galaxy-official/src/shared/node-control-proof-schema.mjs": "f57d3d962d5a129803e25b93863e2206e2da08f7369851fd50ce8932aa74d8e9",
+    "packages/galaxy-official/src/shared/notification-inbox-schema.mjs": "a5390a7adbf8bb2d032f85e86ddcd87bd9dea41246cb288d7f2170f837b3138f",
+    "packages/galaxy-official/src/shared/notifications-schema.mjs": "d9542e2432a952cde9d62e7f18aa46d8c1c50422f0ac5210e639ccdd253ec8da",
+    "packages/galaxy-official/src/shared/outcome-material-v2-schema.mjs": "6900c4e9d0feda31b310ad95e8e765927cb547cb2b4c9ac51ea61ef5ee5df885",
+    "packages/galaxy-official/src/shared/personal-summary-schema.mjs": "c3ab8e070816561bf569ebd20f56f1364539cab9cffdb73faafdc8d47f13d29d",
+    "packages/galaxy-official/src/shared/product-v2-export-datasets.mjs": "d77287296943eab82cb0b792bcac63b7997c976ce272218eea549ba67abfb22a",
+    "packages/galaxy-official/src/shared/profile-schema.mjs": "fbb2b4229df611a0b3e5523b038c1f7a5f18266370e5fbc651db7c6c383bc0e1",
+    "packages/galaxy-official/src/shared/projects-schema-v2.mjs": "a372870e37d417742a612985a3c3df0db765e566bc614322e2ff68d1d1cca9c0",
+    "packages/galaxy-official/src/shared/qualification-calculation-schema.mjs": "5a66d7f2e5ca023d1f943c7ae92b3178f205db2a0e94c1fec5c835c6217aa73f",
+    "packages/galaxy-official/src/shared/qualification-requests-v2-schema.mjs": "be719e7f756aa81dbcf724193860c4ca3e5d7f35f4cda3049a2ac7679bda7fc6",
+    "packages/galaxy-official/src/shared/qualification-schema.mjs": "7dda47edde3b4fecbb9fe3d5d21ae6161f094551926d59bfc19f5783d46d301b",
+    "packages/galaxy-official/src/shared/qualification-v2-schema.mjs": "571cdc0c6e5ccd70dd33169b966ab75253571bde3fa4d0b006b26039fcedaa5e",
+    "packages/galaxy-official/src/shared/recruitment-schema-v2.mjs": "c18bef0a144481b581df005664f7d70d7d57c5a62ed6b6fe7cf6f503be2146d0",
+    "packages/galaxy-official/src/shared/requester-history-v2-schema.mjs": "321ea00ee447e9df7a3e2b99babeb27d6795c78eefac6be5c3d98f43d7420b69",
+    "packages/galaxy-official/src/shared/search-feedback-schema.mjs": "2509cf3a5e387693c66b41084eea62fa36cfe4e96302a5ed72b0e6875bb17b5c",
+    "packages/galaxy-official/src/shared/search-schema.mjs": "a8f962d1937148f211c23d99b94c2517984d9c265db9ef27989e3bd776d12143",
+    "packages/galaxy-official/src/shared/search-v2-schema.mjs": "8e2cb242b2f27c1eaebb18a1afa6f9a0548a46bc210a4887e3cc6a2960cb7cc1",
+    "packages/galaxy-official/src/shared/service-error.mjs": "3beb138140e1bc767d0b7afff2011568df5b05ff418448d7e2a0de5dee77bc80",
+    "packages/galaxy-official/src/shared/target-governance-v2-schema.mjs": "dbd7c61001bd0bbccf3be92a162d5ca1c8588abf86924ea83247b9031637df7c",
+    "packages/galaxy-official/src/shared/task-comment-v2-schema.mjs": "e1be5e13c6a492f39f92aad833e3e46390c07c1f3b249b20cab905b65ce1f08a",
+    "packages/galaxy-official/src/shared/task-schema-v2.mjs": "877cd6879f770d07f34a48106916131e211b4442bf01b3ee344dfc7488b1518c",
+    "packages/galaxy-official/src/shared/trust-package-control-chain-engine.mjs": "edfab3545b28204404053b8009206e66a3e58a49a3eff48590b40ce0e8ddfa82",
+    "packages/galaxy-official/src/shared/trust-package-control-schema-factory.mjs": "7a49a0a315a47cf8c484b7178608360a67b405aa1513a5e937b342ca07bc5735",
+    "packages/galaxy-official/src/shared/trust-package-crypto.mjs": "0280508baf5792c33c635b8bc8fe5562e66f90d55a6a92dbce335f9617116a27",
+    "packages/galaxy-official/src/shared/trust-package-schema.mjs": "abb0ef422147974f868b319af7280e98e8013d2ef255802d74d54588580629b9",
+    "packages/galaxy-official/src/shared/verification-record-schema.mjs": "3f1642d409619fd49d87413a88f06c1ba6d1d524ea02dd6b960e8b3aac5cf85d",
+    "packages/galaxy-official/src/shared/watch-control-v2-schema.mjs": "04b1172756feecbbf27c7e6ba220ed3389722e22ee99dd68ad8f383d70762320",
+    "packages/galaxy-official/src/shared/web-primitives.mjs": "dee3e47e8a2271afc04f0b5785fa2648c3a14f30c8f57e64c2fe2850d34bdaf8",
+    "packages/galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs": "818e97708216ec889c8adde26b6d5c35fb78a4ad2a89787a22ce79ae0f07cf60",
+    "packages/galaxy-official/src/shutdown-deadline.mjs": "678eeba9d6a9b79dcd55d8093531e0bd20c116219281e54e9f5f5779ede0db51",
+    "packages/galaxy-official/src/signed-envelope.mjs": "3a72d98550fa7df17c52cf6847b0d0b552696f4a1cb79ebfe6f342ba01a1408d",
+    "packages/galaxy-official/src/signing-service.mjs": "816e0bcd02b4cf095a380787a8036d7a91e9a82606a8eb113c636196063dfc34",
+    "packages/galaxy-official/src/target-governance-client-v2.mjs": "eb446e430b6d8604ba7adb982596d0814978c80286ad4b692449cfb0eb99542c",
+    "packages/galaxy-official/src/target-governance-notifications-v2.mjs": "4be4e68bc182918a2a6a7fe7725931241ba1756aacdea37a244aebe6d269d058",
+    "packages/galaxy-official/src/target-governance-restrictions-v2.mjs": "bb699a176c3646965bedde853e99956746b91a0a37d9ae16544e1785bd14a447",
+    "packages/galaxy-official/src/target-governance-v2.mjs": "f89972cb0ba6aad9b49e6f1b93f8f0b2c8dfc024ee3749e3ceee00005eb5e9da",
+    "packages/galaxy-official/src/task-client-v2.mjs": "c532dbe274edd9ae841dd019dd5a6d46d15def9e5e7ab634e487aefec16dbad0",
+    "packages/galaxy-official/src/task-comment-notifications.mjs": "fdb456705c656ad62f009465114165c91aa381dc320ccd7ed23eb890f69ff584",
+    "packages/galaxy-official/src/task-comments-v2.mjs": "3e3bb0b3d50caf2827d9f3aadef0792eac100ff08fffd03eb19dcc4e09563d38",
+    "packages/galaxy-official/src/tasks-v2.mjs": "cb52b2b989c263145aafee6deaf6862c2f88618990d6dee6ec80059b465ef743",
+    "packages/galaxy-official/src/trust-keyring.mjs": "b19a8a9b7810caa65d161de9e984d5837e8916e300cb18702f6cb993d6b91f67",
+    "packages/galaxy-official/src/trust-package-client.mjs": "80b6ad003fd1055e97973b72e6e9fed53deaab833182b24a8bfd953210947fea",
+    "packages/galaxy-official/src/trust-package-device-adapter.mjs": "8bb0b94f0a7df01a0216e0ef8b9dd82ef13dec62ab4a349c8f5389aa70c0c29e",
+    "packages/galaxy-official/src/trust-package-permissions.mjs": "fba5fe6c83ca27004f87d37b22c86872ebb20bfefb371e9785de577b5ac79d4b",
+    "packages/galaxy-official/src/trust-package-source-reader.mjs": "7c8480ab750e25b3aece5f521222216ff04fe30bb948473dad0cf5b860a76597",
+    "packages/galaxy-official/src/trust-package.mjs": "acc85a795cfec517bb7d68a5748d3cafcf39148e2ae7e2ccf8e2b867a51298ab",
+    "packages/galaxy-official/src/trust-store.mjs": "7750b32c4e0e861be0005d5c44c5f514528468b6f7ae33f1b0691b04d51d9318",
+    "packages/galaxy-official/src/verification-records.mjs": "ba8a09835717b327d3726bac000b0c87fa6b30aa47a07a2f0316357e7b1932c6",
+    "packages/galaxy-official/src/verification/ci-proof.mjs": "dc2f45156f9f701b0d7138a9e6d77ce69b3f3f3990d03835569847679375d6a9",
+    "packages/galaxy-official/src/verification/conformance.mjs": "87cd3d1c93314fd088aa439073ea2452f43c2576fd480dd86622132f47469de3",
+    "packages/galaxy-official/src/verification/connection.mjs": "b074bc12782c23dcfdf9d716ec4193e8ee9d7e464c6d112e2f028f5f659aadb6",
+    "packages/galaxy-official/src/verification/envelope.mjs": "d69126b03d8bfedbd2845927f0d092cfc435a77fbcc0d6d8d1169601f24a858a",
+    "packages/galaxy-official/src/verification/hub-directory.mjs": "a9de73b204d295c379966399334ad69e40628587fc1d1e2a2f9ea506e209f1b7",
+    "packages/galaxy-official/src/verification/hub-peering-v2.mjs": "605d38c51219be59e5efd1528d120aa2f7d0dbd0f22c21b5df7553db33a59bc8",
+    "packages/galaxy-official/src/verification/identity-control.mjs": "20b9da8f3ff83fd4c37a7d8a94596d2893e85753869c1875907d22fba8109ec5",
+    "packages/galaxy-official/src/verification/keyring.mjs": "809309d5539c6cb5abf77d7e896253485631c6150f8e5422b36edd1432c30c80",
+    "packages/galaxy-official/src/verification/manifest.mjs": "b8baa16d012d0baac84579cdf6b0810e075c294b39318374854afced627bc51b",
+    "packages/galaxy-official/src/verification/node-control.mjs": "f47ea62e33d172f910eda9c604595a048affd5be52162c82a6e529e243d33fcc",
+    "packages/galaxy-official/src/watch-control-v2.mjs": "0de75fba3df143386b736a9b92aaf83026928f3fd7d0087d037c316e5b88d6cf",
+    "packages/galaxy-official/src/worker-pack-uses-v2.mjs": "4f424c97f7206853ce68a982528b0ed6f4c6ae113bb8f58851cb37931b22a58f",
+    "packages/galaxy-official/src/worker.mjs": "4301d00edd0086ffc385619c3a4169be3336d641c5822c86029a0ba240724408"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-13",
+  "common": {
+    "runtime": "galaxy-native-v2 0.2.0",
+    "mcpPackage": "@modelcontextprotocol/server 2.0.0",
+    "testedProtocols": ["2025-11-25", "2026-07-28"],
+    "protocolEvidence": "synthetic-host-real-stdio",
+    "browserFallback": "temporary-loopback-user-review",
+    "modelProvider": "user-host",
+    "sidebarImplementation": "unverified",
+    "hostBackgroundLoop": "unverified",
+    "marketplacePublication": "not-performed"
+  },
+  "installedCliObservations": {
+    "checkedAt": "2026-09-13",
+    "configuration": "isolated-synthetic-profile",
+    "modelTurnsStarted": 0,
+    "originalUserConfigurationChanged": false,
+    "codex": {"version": "0.152.1", "surface": "app-server", "mcpInitialize": true, "mcpToolsList": true, "galaxySkillListed": true},
+    "claudeCode": {"version": "2.1.266", "surface": "mcp-get", "mcpInitialize": true, "mcpToolsList": true},
+    "scope": "CLI loading and discovery only; exact candidate and count in separate probe report; no desktop, model or background-loop acceptance"
+  },
+  "hosts": [
+    {"id":"claude-code","product":"Claude Code","modes":["CLI","IDE chat","Desktop local Code tab"],"config":"claude-code/.mcp.json","skill":"claude-code/.claude/skills/galaxy","formatEvidence":"official-document","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://code.claude.com/docs/en/mcp","https://code.claude.com/docs/en/desktop","https://code.claude.com/docs/en/skills"],"note":"Desktop Chat config can also feed local Code sessions; CLI does not read Desktop Chat config."},
+    {"id":"github-copilot","product":"GitHub Copilot","modes":["VS Code Agent chat"],"config":"copilot-vscode/.vscode/mcp.json","skill":"copilot-vscode/.github/skills/galaxy","formatEvidence":"official-document","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp","https://docs.github.com/en/copilot/concepts/agents/about-agent-skills"],"note":"This emitted wrapper targets VS Code; other Copilot modes are separate acceptance scopes."},
+    {"id":"codex","product":"Codex","modes":["CLI","IDE chat","Desktop local task"],"config":"codex/config.fragment.toml","plugin":"codex/galaxy-native-v2","skill":"codex/.agents/skills/galaxy","formatEvidence":"official-document-and-plugin-scaffold-validator","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://developers.openai.com/codex/mcp","https://developers.openai.com/codex/skills"],"note":"Use plugin or direct MCP + Skill once; do not install both as duplicate servers."},
+    {"id":"cursor","product":"Cursor","modes":["local Agent chat"],"config":"cursor/.cursor/mcp.json","skill":"cursor/.cursor/skills/galaxy","formatEvidence":"official-document","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://prod.cursor.com/docs/mcp","https://prod.cursor.com/docs/skills"],"note":"MCP Apps/elicitation documentation is not Galaxy embedded UI acceptance."},
+    {"id":"workbuddy","product":"WorkBuddy","modes":["desktop connector"],"config":"workbuddy/galaxy-native-v2/mcp.json","skill":"workbuddy/galaxy-native-v2/skills/galaxy","formatEvidence":"official-document","minimumMetadataVersion":"4.24.0","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://open.workbuddy.cn/docs/connector"],"note":"Generated absolute paths target local review. Marketplace distribution and globally unique source registration remain separate."},
+    {"id":"trae-desktop","product":"TRAE / TraeWork","modes":["desktop local tasks"],"config":"trae-work/mcp.local.json","skill":"trae-work/.trae/skills/galaxy","formatEvidence":"official-document","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://docs.trae.cn/work_mcp-overview","https://docs.trae.cn/work_remote-mcp-server","https://docs.trae.cn/work_skills"],"note":"Select local, not cloud. Official command field forbids spaces: node must resolve in host PATH or use a verified path without spaces. Docs retrieved using requested model-name User-Agent."},
+    {"id":"hermes","product":"Hermes Agent","modes":["chat"],"config":"hermes/config.fragment.yaml","skill":"hermes/skills/galaxy","formatEvidence":"official-public-document","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp","https://hermes-agent.nousresearch.com/docs/guides/work-with-skills"],"note":"Only new fragment emitted. No local Hermes configuration, archive or credential was read."},
+    {"id":"deepseek-harness","product":"DeepSeek Harness","modes":["local Harness web/chat"],"config":"deepseek-harness/mcp-plugin.fragment.json","skill":"deepseek-harness/.dsh/skills/galaxy","formatEvidence":"official-repository-master","actualHostVersion":null,"runtimeAcceptance":"pending","sources":["https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md","https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/skill-filesystem/README.md"],"note":"Append MCP plugin to actual config composition; reuse existing Skill registry/filesystem/consumer. Floating panel not implemented by this wrapper."}
+  ]
+}

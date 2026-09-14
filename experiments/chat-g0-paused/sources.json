@@ -1,0 +1,10 @@
+{
+  "packages/galaxy-official/src/chat.mjs": "5c8367360f9be16f7a9dc12134aee839f9c7f43f7568dbf94db030a37547233e",
+  "packages/galaxy-official/src/chat-client.mjs": "64e12675d3ee169b87f7e6f17dccfc116189fdc532c9b74f79a168535cc41e1c",
+  "packages/galaxy-official/src/chat-config.mjs": "b714ee635cc428428f4f546fa6192fdd772a91a2b843135dee6026eacc6ebf6d",
+  "packages/galaxy-official/src/shared/chat-schema.mjs": "35606f510790cbd58489d6395ec0f536b721c1681d40e60dc48fdcd6bf3a9ff4",
+  "packages/galaxy-official/src/infrastructure/prosody-chat.mjs": "902f162368eb7d64387c7b5ef656b2541b68b0cc636554c8bf1ac7c3b0227a62",
+  "packages/galaxy-official/deploy/prosody/mod_galaxy_rooms.lua": "e304b31172e3de3131065463c4068615609da3654f5ea352f1bb72a458af2b1f",
+  "packages/galaxy-official/deploy/prosody/prosody.cfg.lua": "e239b5b3200e765437677bd579e10c9b3dcf0c79d9a66f34b568615223ece494",
+  "packages/galaxy-official/test/chat/prosody.test.mjs": "18189b16f7cf93f6c62d7a0ac158d82981ce6c977eb5156dce0916a39221d616"
+}

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Galaxy Integration"
+  short_description: "Guide local Galaxy module selection and initialization."

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "stages": {
+    "local": { "region": "local-development" },
+    "integration": { "region": "ap-kulai-2" },
+    "pilot": { "region": "ap-kulai-2" }
+  }
+}

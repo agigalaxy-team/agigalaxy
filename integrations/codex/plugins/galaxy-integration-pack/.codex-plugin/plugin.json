@@ -1,0 +1,24 @@
+{
+  "name": "galaxy-integration-pack",
+  "version": "0.4.0",
+  "description": "AI-guided local Galaxy ID, Coding Case, consent, and MCP module setup.",
+  "author": {
+    "name": "Galaxy Founding Beta"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Galaxy Integration Pack",
+    "shortDescription": "Set up a Personal Galaxy once, then open Galaxy services with AI guidance.",
+    "longDescription": "A local-first Galaxy integration bundle. It routes /Galaxy to first-run setup only when needed, or to normal local services after setup. It presents Personal Galaxy, Galaxy Worker, and Galaxy Hub as distinct initialization paths while keeping future runtimes clearly unavailable.",
+    "developerName": "Galaxy Founding Beta",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Show me the Galaxy modules I can enable locally.",
+      "Help me choose a Galaxy setup for AI Coding work.",
+      "Preview Galaxy initialization before changing anything."
+    ],
+    "brandColor": "#8B8CFF"
+  },
+  "mcpServers": "./.mcp.json"
+}

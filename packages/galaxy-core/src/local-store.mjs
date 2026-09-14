@@ -1,0 +1,22 @@
+// Stable public surface; implementation modules preserve the existing exports.
+export { DEFAULT_DATA_DIR } from './storage/files.mjs';
+export { resolveDataDir } from './storage/files.mjs';
+export { initializeLocalGalaxyId } from './application/local-operations.mjs';
+export { getLocalSnapshot } from './application/local-operations.mjs';
+export { initializeLocalNode } from './application/local-operations.mjs';
+export { previewGalaxyIntegration } from './application/local-operations.mjs';
+export { listGalaxyIntegrationModules } from './application/local-operations.mjs';
+export { getGalaxyIntegrationStatus } from './application/local-operations.mjs';
+export { resetGalaxyIntegration } from './application/local-operations.mjs';
+export { initializeGalaxyIntegration } from './application/local-operations.mjs';
+export { getGalaxyConsoleContract } from './interaction/console.mjs';
+export { getGalaxyCommandSurface } from './interaction/console.mjs';
+export { assertGalaxyModulesEnabled } from './application/local-operations.mjs';
+export { createCaseDraft } from './application/local-operations.mjs';
+export { createDisclosurePlan } from './application/local-operations.mjs';
+export { issueConsentGrant } from './application/local-operations.mjs';
+export { revokeConsentGrant } from './application/local-operations.mjs';
+export { createLocalProofDraft } from './application/local-operations.mjs';
+export { listLocalHistory } from './application/local-operations.mjs';
+export { exportLocalData } from './application/local-operations.mjs';
+export { disclosurePolicy } from './application/local-operations.mjs';

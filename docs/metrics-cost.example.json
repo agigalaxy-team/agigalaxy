@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "currency": "USD",
+  "kind": "operator-estimate",
+  "amount": 12.5,
+  "budget": 30,
+  "periodStart": "2026-09-01T00:00:00Z",
+  "periodEnd": "2026-10-01T00:00:00Z",
+  "observedAt": "2026-09-10T00:00:00Z"
+}

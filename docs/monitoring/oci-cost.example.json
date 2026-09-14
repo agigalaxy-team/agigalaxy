@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "cli": "/usr/local/bin/oci",
+  "auth": "instance_principal",
+  "region": "ap-kulai-1",
+  "tenantId": "ocid1.tenancy.oc1..replace-with-authorized-tenancy",
+  "scope": {
+    "dimension": "resourceId",
+    "values": ["ocid1.instance.oc1..replace-with-target-resource"]
+  },
+  "currency": "USD",
+  "budget": 30
+}

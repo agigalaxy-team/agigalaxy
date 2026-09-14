@@ -1,0 +1,27 @@
+Galaxy native client
+Copyright 2026 Galaxy contributors
+
+The original Galaxy-authored code, Skill, integration helpers and documentation
+included in this selected native client distribution are provided under the
+Apache License, Version 2.0. This notice applies to this distribution only. It
+does not relicense the entire source repository, user data, private histories,
+service credentials, operational material or unpublished service components.
+
+Third-party packages remain under their respective original licenses. They are
+external dependencies installed from the exact package-lock.json; their code is
+not bundled into the Galaxy JavaScript artifacts. See THIRD_PARTY_NOTICES.md,
+license-inventory.json and third-party-licenses/ for the exact installed package
+versions and unchanged upstream license/NOTICE texts. Package license labels
+are metadata, not substitutes for those texts or for mixed-license conditions.
+
+The Model Context Protocol SDK's upstream license transition and retained MIT
+contributions are preserved; no global relicensing of its contributions occurs.
+This distribution does not modify third-party package files. Any subsequent
+third-party modifications need their own applicable change and notice records.
+
+The Galaxy package is mechanically bundled with esbuild. The build-tool notice
+is separately identified and does not mean the esbuild binary is distributed.
+No additional rights to Galaxy or third-party trademarks are granted. Product
+names describe integration targets only, within their separately stated tested
+versions and acceptance scope. Software licensing does not promise hosted
+services, unlimited resources, model inference or access to private information.

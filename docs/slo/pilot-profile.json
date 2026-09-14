@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "status": "candidate-awaiting-operational-freeze",
+  "windowDays": 30,
+  "http": {
+    "availability": 0.995,
+    "eligibleStatuses": "2xx,3xx,5xx,499",
+    "excludedStatuses": "other4xx including expected quota429",
+    "excludedRoutes": [
+      "GET /healthz",
+      "GET /readyz"
+    ],
+    "latency": {
+      "successfulStatus": "2xx",
+      "fraction": 0.95,
+      "seconds": 1
+    }
+  },
+  "capacity": {
+    "status": "local-baseline-only",
+    "approvedConcurrentSubjects": null,
+    "approvedRequestsPerSecond": null
+  },
+  "cost": {
+    "currency": null,
+    "monthlyBudget": null,
+    "providerBillingSource": null
+  },
+  "degradation": [
+    "preserve revocation and existing authorized reads",
+    "limit optional submissions and worker concurrency",
+    "use quota/budget configuration with measured thresholds",
+    "do not equate revocation with deletion"
+  ],
+  "notAnSla": true
+}

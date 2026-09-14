@@ -1,0 +1,51 @@
+{
+  "global": {
+    "resolve_timeout": "5m"
+  },
+  "route": {
+    "receiver": "unconfigured",
+    "group_by": [
+      "alertname",
+      "job",
+      "instance",
+      "owner_role"
+    ],
+    "group_wait": "30s",
+    "group_interval": "5m",
+    "repeat_interval": "4h",
+    "routes": [
+      {
+        "receiver": "operations",
+        "matchers": [
+          "owner_role=\"operations\""
+        ]
+      },
+      {
+        "receiver": "identity",
+        "matchers": [
+          "owner_role=\"identity\""
+        ]
+      },
+      {
+        "receiver": "data",
+        "matchers": [
+          "owner_role=\"data\""
+        ]
+      }
+    ]
+  },
+  "receivers": [
+    {
+      "name": "unconfigured"
+    },
+    {
+      "name": "operations"
+    },
+    {
+      "name": "identity"
+    },
+    {
+      "name": "data"
+    }
+  ]
+}

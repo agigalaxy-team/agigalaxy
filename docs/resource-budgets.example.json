@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "maxPayloadBytesPerSubject": 1048576,
+  "maxQueuedJobsPerSubject": 32,
+  "maxActiveExportsPerSubject": 3,
+  "maxActiveJobsGlobal": 4,
+  "maxActiveJobsPerSubject": 1
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Galaxy host network metrics (Prometheus Node Exporter)
+After=network.target
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100 --collector.disable-defaults --collector.netdev
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

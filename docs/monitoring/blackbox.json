@@ -1,0 +1,73 @@
+{
+  "modules": {
+    "galaxy_website_https": {
+      "prober": "http",
+      "timeout": "8s",
+      "http": {
+        "valid_status_codes": [
+          200
+        ],
+        "method": "GET",
+        "follow_redirects": false,
+        "fail_if_not_ssl": true,
+        "preferred_ip_protocol": "ip4",
+        "ip_protocol_fallback": true,
+        "tls_config": {
+          "min_version": "TLS12"
+        }
+      }
+    },
+    "galaxy_liveness_https": {
+      "prober": "http",
+      "timeout": "8s",
+      "http": {
+        "valid_status_codes": [
+          200
+        ],
+        "method": "GET",
+        "follow_redirects": false,
+        "fail_if_not_ssl": true,
+        "preferred_ip_protocol": "ip4",
+        "ip_protocol_fallback": true,
+        "tls_config": {
+          "min_version": "TLS12"
+        },
+        "fail_if_body_not_matches_regexp": [
+          "^\\s*\\{\\s*\"status\"\\s*:\\s*\"ok\"\\s*\\}\\s*$"
+        ],
+        "fail_if_header_not_matches": [
+          {
+            "header": "Content-Type",
+            "regexp": "(?i)^application/json(?:\\s*;.*)?$"
+          }
+        ]
+      }
+    },
+    "galaxy_readiness_https": {
+      "prober": "http",
+      "timeout": "8s",
+      "http": {
+        "valid_status_codes": [
+          200
+        ],
+        "method": "GET",
+        "follow_redirects": false,
+        "fail_if_not_ssl": true,
+        "preferred_ip_protocol": "ip4",
+        "ip_protocol_fallback": true,
+        "tls_config": {
+          "min_version": "TLS12"
+        },
+        "fail_if_body_not_matches_regexp": [
+          "^\\s*\\{\\s*\"status\"\\s*:\\s*\"ready\"\\s*\\}\\s*$"
+        ],
+        "fail_if_header_not_matches": [
+          {
+            "header": "Content-Type",
+            "regexp": "(?i)^application/json(?:\\s*;.*)?$"
+          }
+        ]
+      }
+    }
+  }
+}

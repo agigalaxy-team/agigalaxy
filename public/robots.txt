@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Allow: /agent.md
+Allow: /llms.txt
+Sitemap: /sitemap.xml

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "synthetic-exit-example",
+  "endpoint": "https://official.example.org",
+  "operator": "示例运营者；部署前替换",
+  "reason": "仅演示配置结构，不是实际停服安排。以下时间和链接都必须由运营填写。",
+  "announcedAt": 2000000000,
+  "stopWritesAt": 2000086400,
+  "takeoutUntil": 2000172800,
+  "statusUntil": 2000259200,
+  "contactUrl": "https://official.example.org/contact",
+  "deletionPolicyUrl": "https://official.example.org/deletion"
+}

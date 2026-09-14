@@ -1,0 +1,19 @@
+{
+  "name": "galaxy-native-v2",
+  "version": "0.2.0",
+  "description": "Galaxy collaboration through local Skill, MCP and browser rooms.",
+  "author": {
+    "name": "银河技术团队"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "银河",
+    "shortDescription": "聊天中获取协助、任务和房间入口。",
+    "longDescription": "用户模型通过本机 Skill 与 MCP 使用银河的数据及协作服务；完整房间在浏览器打开，个人摘要默认保存在本机。",
+    "developerName": "银河技术团队",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": "打开银河，查看主动匹配、发布与参与任务入口。"
+  },
+  "mcpServers": "./.mcp.json"
+}

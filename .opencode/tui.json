@@ -1,0 +1,3 @@
+{
+  "plugin": ["../integrations/host-adapters/opencode-stable/galaxy.tui.ts"]
+}

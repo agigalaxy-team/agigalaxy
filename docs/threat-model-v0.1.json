@@ -1,0 +1,148 @@
+{
+  "version": 2,
+  "status": "current-source-controls-reviewed-shared-operational-gates-pending",
+  "timestamp": "2026-09-11T06:35:03.479279+08:00",
+  "boundaries": [
+    "本地私钥与Core数据→可信宿主",
+    "客户端→公网端点",
+    "HTTP认证→业务授权事务",
+    "API数据库角色→Worker角色",
+    "来源响应→观察→Proof→公开投影",
+    "原始内容→AI/人类评估，内容无权限"
+  ],
+  "threats": [
+    {
+      "id": "T01",
+      "name": "密钥接管",
+      "attack": "本地私钥或服务签名键被盗，攻击者伪装主体/端点",
+      "current_control": "用途限定签名、独立信任根/撤销与事故暂停恢复；integration实际非root身份和密钥分离已验证",
+      "gap": "公开根独立分发、真实泄露场景和运营恢复责任仍待落实",
+      "tasks": "C00-04,C01-04,C18-01",
+      "source": "packages/galaxy-official/src/operations/incident.mjs",
+      "test": "packages/galaxy-official/test/incident.test.mjs",
+      "documentation": "docs/incident-trust-recovery-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T02",
+      "name": "恶意Manifest",
+      "attack": "恶意端点替换根、能力或有效期诱导连接",
+      "current_control": "严格schema/版本/签名、外部pin、序号防回退和过期拒绝；发现不自动授权",
+      "gap": "正式发行/初始根分发和真实宿主信任确认待落实",
+      "tasks": "C00-02,C00-04",
+      "source": "packages/galaxy-official/src/verification/manifest.mjs",
+      "test": "packages/galaxy-official/test/manifest.test.mjs",
+      "documentation": "docs/version-compatibility.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T03",
+      "name": "重放",
+      "attack": "重复挑战/旧确认产生额外权限或延长期限",
+      "current_control": "旧挑战一次消费与事务幂等；OIDC登录与可选OAuth资源入口独立校验，不能回退尝试其他令牌",
+      "gap": "真实AS配置、第三方客户端及正式认证服务运行仍待验收",
+      "tasks": "C00-04,C00-06",
+      "source": "packages/galaxy-official/src/oauth-resource-access.mjs",
+      "test": "packages/galaxy-official/test/personal-mcp.test.mjs",
+      "documentation": "docs/personal-mcp-oauth-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T04",
+      "name": "跨主体授权",
+      "attack": "替换subject、binding、object或接收方访问他人数据",
+      "current_control": "事务内重查binding/credential/Consent；搜索候选、导出、Profile、Honor和Context继续按当前受众/来源过滤",
+      "gap": "真实宿主跨用户流程及外部副本不能以单元证据代替",
+      "tasks": "C00-04,C00-05",
+      "source": "packages/galaxy-official/src/data-export.mjs",
+      "test": "packages/galaxy-official/test/data-export.test.mjs",
+      "documentation": "docs/data-lifecycle-v0.1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T05",
+      "name": "恶意证据URL",
+      "attack": "重定向、DNS混合地址或内网地址导致SSRF",
+      "current_control": "共享公网HTTPS限制、固定解析地址、重定向/大小/超时与取消；仅允许受约束来源适配器",
+      "gap": "新增来源须明确注册和验证；未提供任意远程代码适配器",
+      "tasks": "C00-04",
+      "source": "packages/galaxy-official/src/public-fetch.mjs",
+      "test": "packages/galaxy-official/test/public-transport.test.mjs",
+      "documentation": "docs/source-adapter-acceptance.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T06",
+      "name": "伪造验证/来源自证",
+      "attack": "提交者控制CI并将其包装成独立任务成功或通用能力",
+      "current_control": "CI明确有限来源强度；参与者验证声明、Case纠正和独立角色复核分别存储，Proof读时重新核对",
+      "gap": "声明验证不证明独立性；真实任务效果、外部证据与独立验证者仍需人工/业务验收",
+      "tasks": "C00-04",
+      "source": "packages/galaxy-official/src/proofs.mjs",
+      "test": "packages/galaxy-official/test/case-moderation.test.mjs",
+      "documentation": "docs/case-moderation-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T07",
+      "name": "关联方互证",
+      "attack": "同一控制者多账号相互背书制造信誉",
+      "current_control": "当前可见范围发现声明关联方、重复来源、互相接受环与集中参与；输出复核提示，不自动惩罚或授予能力",
+      "gap": "不能推断隐蔽共同控制者或串谋；未扫描不可见材料，运营争议处理仍需责任人",
+      "tasks": "C00-04",
+      "source": "packages/galaxy-official/src/domain/contribution-risk.mjs",
+      "test": "packages/galaxy-official/test/contribution-risk.test.mjs",
+      "documentation": "docs/contribution-risk-v2.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T08",
+      "name": "内容滥用",
+      "attack": "公开内容夹带秘密、恶意指令或侵权骚扰材料",
+      "current_control": "敏感字段政策、精确预览和脱敏日志；Case/自述/资格举报、隔离、补证与申诉已接入追加处置",
+      "gap": "自由文本不能保证自动识别全部秘密或滥用；公开运营审核/处理时限仍未指定",
+      "tasks": "C00-04,C00-05,C16-06",
+      "source": "packages/galaxy-official/src/moderation.mjs",
+      "test": "packages/galaxy-official/test/case-moderation.test.mjs",
+      "documentation": "docs/moderation-statements-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T09",
+      "name": "资源耗尽",
+      "attack": "多IP、高频写入、证据队列堆积或大请求耗尽内存/存储",
+      "current_control": "分类限额、事务资源预算、有限作业重试/停止和监控规则；目标机器负载已有实测",
+      "gap": "仍为单进程请求计数；完整生产拓扑/费用预算和长期容量未验收",
+      "tasks": "C00-04,C01-06",
+      "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
+      "test": "packages/galaxy-official/test/resource-budgets.test.mjs",
+      "documentation": "docs/resource-budgets-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T10",
+      "name": "信任材料提示注入",
+      "attack": "Manifest/证据/历史正文要求AI提升权限或执行指令",
+      "current_control": "权限仍由确定性代码和精确Consent检查，外部文本/历史/能力声明均不是控制指令",
+      "gap": "未实现自主AI评估器；没有证明任意外部模型在端到端场景均能抵抗提示注入",
+      "tasks": "C00-04",
+      "source": "packages/galaxy-official/src/domain/consent-policy.mjs",
+      "test": null,
+      "documentation": "docs/typed-source-search-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    },
+    {
+      "id": "T11",
+      "name": "过期离线状态",
+      "attack": "复用旧会话、过期证明或迟到响应恢复已撤销权限",
+      "current_control": "来源周期重验、授权依赖失效、搜索触发器与有界新鲜度、原生过期/撤销展示已实现",
+      "gap": "外部源变化须被观察；在途响应、已下载副本和跨实例正式时限仍有限制",
+      "tasks": "C00-04",
+      "source": "packages/galaxy-official/src/worker.mjs",
+      "test": "packages/galaxy-official/test/evidence-revalidation.test.mjs",
+      "documentation": "docs/evidence-revalidation-v1.md",
+      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+    }
+  ],
+  "release_gate": "每个适用威胁的剩余风险需有处置与证据；本文件不证明试点安全已验收"
+}

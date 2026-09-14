@@ -1,0 +1,20 @@
+# Example only; assumes API=9464 and Worker=9465 on this same host.
+# Does not deploy Prometheus or provide independent-failure-domain monitoring.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 12s
+rule_files:
+  - alerts/galaxy.rules.json
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['127.0.0.1:9093']
+scrape_configs:
+  - job_name: galaxy-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:9464']
+  - job_name: galaxy-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:9465']
