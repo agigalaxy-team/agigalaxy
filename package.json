@@ -7,9 +7,9 @@
   },
   "scripts": {
     "check:requirements": "node scripts/check-requirements.mjs",
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "wrangler dev --config dist/server/wrangler.json",
+    "dev": "vite --config packages/galaxy-web/vite.config.mjs",
+    "build": "node scripts/build-product.mjs",
+    "start": "node scripts/serve-product.mjs",
     "internal:galaxy-id": "node packages/galaxy-node/src/cli.mjs",
     "mcp": "node packages/galaxy-edge-mcp/src/index.mjs",
     "integration:mcp": "node packages/galaxy-edge-mcp/src/index.mjs",
@@ -26,7 +26,12 @@
     "test:tls": "node --test packages/galaxy-official/test/tls/public-tls.test.mjs",
     "test:client-install": "node scripts/test-client-install.mjs",
     "check:layers": "node scripts/verify-layers.mjs --layers=all",
-    "prepare:client": "node scripts/prepare-client-candidate.mjs"
+    "prepare:client": "node scripts/prepare-client-candidate.mjs",
+    "dev:demo": "vinext dev",
+    "build:web": "vite build --config packages/galaxy-web/vite.config.mjs",
+    "build:site": "node scripts/build-product.mjs --site-only",
+    "build:demo": "vinext build",
+    "start:demo": "wrangler dev --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

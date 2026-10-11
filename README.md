@@ -14,24 +14,29 @@
 
 | 范围 | 实现 |
 |---|---|
+| 官网 | [galaxy-site](apps/galaxy-site/README.md)：页面、共享导航、公开下载与版本资料 |
 | 产品网页 | [galaxy-web](packages/galaxy-web/README.md)，入口为 [main.tsx](packages/galaxy-web/src/main.tsx) |
 | 业务服务与权限 | [galaxy-official](packages/galaxy-official/README.md) |
 | Core 与主体身份 | [galaxy-core](packages/galaxy-core)、[galaxy-node](packages/galaxy-node) |
 | AI 与客户端 | [Native](integrations/native-v2)、[宿主适配](integrations/host-adapters/README.md)、[MCP](packages/galaxy-edge-mcp)、[A2A](packages/galaxy-a2a) |
 | 实现参考 | [文档入口](docs/README.md)、[版本技术参考](docs/TECHNICAL_REFERENCE_INDEX.md) |
 
-根目录 app 中保留的是早期演示；正常产品网页使用 galaxy-web。统一的开发启动入口仍在整合，不能把单独启动根目录演示等同于启动整个银河。
+`npm run build` 构建官网与实际网页工作区，`npm start` 提供二者的本地预览。`npm run dev` 为网页工作区启用热更新，并提供已构建的官网页面。根目录 `app` 是保留的早期演示，通过带 `:demo` 后缀的命令单独运行。
 
 ## 开发检查
 
-要求 Node.js ≥ 22.13.0。从仓库根目录安装依赖后，可运行：
+要求 Node.js ≥ 22.13.0、Python ≥ 3.11。从仓库根目录安装依赖后，可运行：
 
 ```sh
 npm ci
-node node_modules/vite/bin/vite.js build --config packages/galaxy-web/vite.config.mjs
+npm run build
+npm start
+# 独立检查
 node node_modules/typescript/bin/tsc --noEmit
 npm run lint
 ```
+
+官网首次构建读取并校验已公开的历史文档和下载，后续可使用缓存。API 操作需要配置 `GALAXY_WEB_CONFIG_FILE`，指向所选服务提供的公开 `galaxy-web-config.json`（服务地址与公开签名验证钥），并在该服务的浏览器策略中明确允许本地网站 origin。缺少配置时仍可看官网，网页会明确说明尚未配置业务服务；预览不创建虚构账号或业务数据。
 
 运行检查应结合修改范围；测试、构建、实际页面操作和宿主验证各说明自己的边界。
 

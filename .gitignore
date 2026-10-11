@@ -43,3 +43,6 @@ __pycache__/
 /.wrangler/
 /outputs/
 /work/
+
+# Verified public website download cache
+/apps/galaxy-site/.cache/
