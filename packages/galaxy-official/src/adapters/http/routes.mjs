@@ -185,17 +185,19 @@ export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerCont
     if (chat && request.method === 'POST' && url.pathname.startsWith('/v2/chat/')) {
       const actor = { ...await authenticate(request, access, 'binding'), httpRequestId: requestId };
       const input = await body(request, null);
-      const globalMethod = { '/v2/chat/rooms/create': 'create', '/v2/chat/rooms/query': 'list',
+      const globalMethod = { '/v2/chat/rooms/create': 'create', '/v2/chat/rooms/query': 'list', '/v2/chat/rooms/directory':'directory',
         '/v2/chat/invitations/query': 'invitations', '/v2/chat/export/owned': 'exportOwned' }[url.pathname];
       if (globalMethod) return send(200, await chat[globalMethod](actor, input));
-      const roomRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/(read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|cursor|agent-grants|agent-participants|agent-grant|agent-revoke|join-preview|join)$/.exec(url.pathname);
+      const roomRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/(read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|operation-receipt|cursor|agent-grants|agent-participants|agent-grant|agent-revoke|join-preview|join)$/.exec(url.pathname);
       if (roomRoute) {
         const method = { read: 'get', history: 'history', decisions: 'decisions', propose: 'proposeDecision', vote: 'voteDecision', accept: 'acceptInvite',
-          leave: 'leave', dismiss: 'dismissDecision', send: 'send', receipt: 'messageStatus', cursor: 'cursor', 'agent-grants': 'queryAgentGrants', 'agent-participants':'queryAgentParticipants', 'agent-grant': 'grantAgent', 'agent-revoke': 'revokeAgent', 'join-preview':'joinPreview',join:'join' }[roomRoute[2]];
+          leave: 'leave', dismiss: 'dismissDecision', send: 'send', receipt: 'messageStatus', 'operation-receipt':'operationStatus', cursor: 'cursor', 'agent-grants': 'queryAgentGrants', 'agent-participants':'queryAgentParticipants', 'agent-grant': 'grantAgent', 'agent-revoke': 'revokeAgent', 'join-preview':'joinPreview',join:'join' }[roomRoute[2]];
         return send(200, await chat[method](actor, roomRoute[1], input));
       }
       const messageRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/messages\/([0-9a-f-]{36})\/(edit|retract|hide)$/.exec(url.pathname);
       if (messageRoute) return send(200, await chat[messageRoute[3]](actor, messageRoute[1], messageRoute[2], input));
+      const contextRoute=/^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/messages\/([0-9a-f-]{36})\/context$/.exec(url.pathname);
+      if(contextRoute)return send(200,await chat.messageContext(actor,contextRoute[1],contextRoute[2],input));
       throw new ServiceError('not_found', 404);
     }
     const controlRoute = /^\/v2\/identity\/control\/(challenges|commit|status|cancel)$/.exec(url.pathname);

@@ -112,7 +112,9 @@ module:hook("iq-set/host/" .. ns .. ":command", function(event)
   for _, id in ipairs(x.ids) do
    local item = archive:get(x.roomId, id); local m = metadata(item);
    if m and m.expires_at > os.time() and not erased(x.roomId, id) and (x.action ~= "export-own" or m.subject == x.subjectId) then
-    table.insert(messages, { archiveId = id; text = item:get_child_text("body"); revision = m.revision });
+    local current = { archiveId = id; revision = m.revision };
+    if x.action ~= "read" or x.metadataOnly ~= true then current.text = item:get_child_text("body"); end
+    table.insert(messages, current);
    elseif m and m.expires_at <= os.time() then erase(x.roomId, id); end
   end
   return reply({ messages = messages });

@@ -5,7 +5,8 @@ import { ServiceError } from './shared/service-error.mjs';
 import { transaction } from './database.mjs';
 import { bindingControl } from './infrastructure/identity-control-repository.mjs';
 import { targetRestrictionsWithin, assertTargetOperation } from './target-governance-restrictions-v2.mjs';
-import { chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema,chatPageSchema,chatMessageStatusSchema,chatJoinSchema } from './shared/chat-schema.mjs';
+import { chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema,chatPageSchema,chatMessageStatusSchema,chatJoinSchema,
+ chatDirectorySchema,chatDirectoryCursorSchema,chatContextSchema,chatOperationReceiptSchema } from './shared/chat-schema.mjs';
 import {roomRule,roomRuleHash,administrators,assertGovernanceProposal,invitationRule,requireOriginalRule,successionLive} from './chat-room-governance.mjs';
 import {lockControllerMappingsWithin} from './controller-mapping-lock.mjs';
 
@@ -80,6 +81,139 @@ export class ChatService {
    AND ($2='' OR r.room_id::text>$2) ORDER BY r.room_id LIMIT $3`,[actor.subjectId,after,limit+1])).rows;
   const rooms=[];for(const row of rows.slice(0,limit))rooms.push(this.view(await this.requireRoom(db,actor,row.room_id)));
   return {rooms,next:rows.length>limit?rooms.at(-1).roomId:null};
+ });}
+ async directory(actor,input={}){const x=parse(chatDirectorySchema,input);
+  // Only the candidate order is fixed for pagination. Current room/content
+  // permission is checked in one transaction per room, so reading later rooms
+  // does not keep earlier room SHARE locks across more archive I/O.
+  const page=await this.run(actor,false,async db=>{
+  let cursor=null;
+  if(x.cursor){try{cursor=chatDirectoryCursorSchema.parse(JSON.parse(Buffer.from(x.cursor,'base64url').toString('utf8')));}
+   catch{fail('invalid_chat_cursor',400);}
+   if(cursor.subjectId!==actor.subjectId||cursor.endpoint!==this.access.endpoint)fail('invalid_chat_cursor',400);
+   if(cursor.expiresAt<=this.now())fail('chat_directory_cursor_expired',409);
+  }
+  const watermark=cursor?.watermark??String((await db.query('SELECT value FROM chat_directory_clock WHERE singleton=true')).rows[0].value);
+  const asOf=cursor?.asOf??this.now(),expiresAt=cursor?.expiresAt??this.now()+900;
+  const rows=(await db.query(`WITH candidates AS (
+   SELECT r.room_id,COALESCE((SELECT MAX(q.accepted_order) FROM chat_message_refs q WHERE q.room_id=r.room_id AND q.accepted_order<=$2),r.created_order) AS sort_order
+   FROM chat_rooms r JOIN chat_memberships m USING(room_id) WHERE m.subject_id=$1 AND m.left_at IS NULL
+    AND r.created_order<=$2 AND m.joined_order<=$2
+  ) SELECT room_id,sort_order::text FROM candidates WHERE ($3::bigint IS NULL OR sort_order<$3 OR (sort_order=$3 AND room_id::text<$4))
+   ORDER BY sort_order DESC,room_id DESC LIMIT $5`,[actor.subjectId,watermark,cursor?.lastOrder??null,cursor?.lastRoomId??'',x.limit+1])).rows;
+  const last=rows[Math.min(rows.length,x.limit)-1];
+  const nextCursor=rows.length>x.limit?Buffer.from(JSON.stringify({version:1,subjectId:actor.subjectId,endpoint:this.access.endpoint,watermark,asOf,expiresAt,
+   lastOrder:last.sort_order,lastRoomId:last.room_id})).toString('base64url'):null;
+   return{rows:rows.slice(0,x.limit),watermark,nextCursor,asOf};
+  });
+  const rooms=[];
+  for(const row of page.rows){
+   try{rooms.push(await this.run(actor,false,db=>this.directoryRoomWithin(db,actor,row.room_id,page.watermark)));}
+   catch(error){if(error instanceof ServiceError&&['chat_access_denied','chat_room_not_found'].includes(error.code))continue;throw error;}
+  }
+  return{rooms,nextCursor:page.nextCursor,asOf:page.asOf};
+ }
+ directoryReadableCondition(){return `m.state='accepted' AND m.expires_at>$4 AND NOT COALESCE(p.hidden,false)
+  AND NOT (m.subject_id<>$2 AND EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id
+   AND d.state IN ('requested','review-needed','approved','partial','primary-erased')))`;}
+ directoryUnreadCondition(){return `m.actor_kind='human' AND m.subject_id<>$2
+  AND NOT EXISTS(SELECT 1 FROM chat_human_message_reads h WHERE h.room_id=m.room_id AND h.subject_id=$2 AND h.message_id=m.message_id)
+  AND NOT EXISTS(SELECT 1 FROM chat_cursors c WHERE c.room_id=m.room_id AND c.subject_id=$2 AND c.cursor_kind='human' AND c.agent_ref=''
+   AND m.sequence<=c.sequence AND m.accepted_order<=c.accepted_order)`;}
+ async directoryRoomWithin(db,actor,roomId,watermark){
+  const ctx=await this.requireRoom(db,actor,roomId),base={...this.view(ctx),humanReadSequence:'0',readExpiresAt:this.now()+60};
+  const activity=(await db.query('SELECT sent_at,accepted_at FROM chat_message_refs WHERE room_id=$1 AND accepted_order<=$2 ORDER BY accepted_order DESC LIMIT 1',[roomId,watermark])).rows[0];
+  base.lastActivityAt=new Date(activity?.accepted_at??activity?.sent_at??ctx.room.created_at).toISOString();
+  base.activityTimeBasis=activity?.accepted_at?'accepted-time':activity?'legacy-sent-time':'room-created';
+  let projected=false;
+  const metadata=async rows=>{
+   if(!projected){await this.project(ctx);projected=true;}
+   const request={roomId,subjectId:actor.subjectId,ids:rows.map(row=>row.archive_id),roomRevision:ctx.room.revision};
+   const result=await (this.transport.readMetadata?.(request)??this.transport.read(request)),found=new Map(result.map(item=>[item.archiveId,item]));
+   return rows.filter(row=>found.get(row.archive_id)?.revision===row.revision);
+  };
+  const candidates=(before,limit,unread)=>this.messageRowsWithin(db,actor,roomId,
+   `m.accepted_order<=$3 AND ${this.directoryReadableCondition()} AND ($5::bigint IS NULL OR m.accepted_order<$5)${unread?' AND '+this.directoryUnreadCondition():''}`,
+   [watermark,stamp(this.now()),before],'m.accepted_order DESC',limit);
+  try{
+   // Usually only one small batch is needed for the latest visible excerpt.
+   // Missing archive records are skipped without inventing readable content.
+   let latestMessage=null,before=null;
+   while(!latestMessage){
+    const rows=await candidates(before,20,false);if(!rows.length)break;
+    const available=await metadata(rows);
+    for(const latest of available){const reading=await this.readMessagesWithin(db,actor,ctx,[latest],{},{projected:true});
+     latestMessage=reading.messages[0]??null;if(latestMessage){base.readExpiresAt=reading.readExpiresAt;break;}}
+    before=String(rows.at(-1).accepted_order);
+   }
+   if(latestMessage?.text){const text=Array.from(latestMessage.text);latestMessage={...latestMessage,text:text.slice(0,300).join(''),excerptTruncated:text.length>300};}
+   // Count all current unread humans, but never transport already-read history,
+   // own messages or Agent cursors. The batches are not a count-limiting cap.
+   const verified=[];before=null;
+   while(true){
+    const rows=await candidates(before,100,true);if(!rows.length)break;
+    verified.push(...(await metadata(rows)).map(row=>row.message_id));
+    before=String(rows.at(-1).accepted_order);
+   }
+   // Human reading/hiding can change during archive I/O. Recount the verified
+   // IDs against the final current SQL state rather than a pre-I/O cursor.
+   const count=(await db.query(`SELECT count(*)::int AS count,MIN(m.expires_at) AS expires_at FROM chat_message_refs m
+    LEFT JOIN chat_message_preferences p ON p.message_id=m.message_id AND p.subject_id=$2
+    WHERE m.room_id=$1 AND m.accepted_order<=$3 AND ${this.directoryReadableCondition()} AND ${this.directoryUnreadCondition()}
+     AND m.message_id=ANY($5::uuid[])`,[roomId,actor.subjectId,watermark,stamp(this.now()),verified])).rows[0];
+   const current=(await db.query("SELECT sequence::text FROM chat_cursors WHERE room_id=$1 AND subject_id=$2 AND cursor_kind='human' AND agent_ref=''",[roomId,actor.subjectId])).rows[0];
+   base.humanReadSequence=current?.sequence??'0';
+   if(latestMessage){const rows=await this.messageRowsWithin(db,actor,roomId,'m.message_id=$3',[latestMessage.messageId]);
+    if(!this.visibleRows(rows).some(row=>row.state==='accepted'&&row.revision===latestMessage.revision))latestMessage=null;}
+   if(count.expires_at)base.readExpiresAt=Math.min(base.readExpiresAt,Math.floor(new Date(count.expires_at).getTime()/1000));
+   return{...base,latestMessage,unreadHumanCount:count.count};
+  }catch(error){if(!(error instanceof ServiceError))throw error;return{...base,latestMessage:null,unreadHumanCount:null,contentUnavailableReason:error.code};}
+ }
+ async messageRowsWithin(db,actor,roomId,condition='true',values=[],order='m.sequence ASC',limit=null){
+  return(await db.query(`SELECT m.*,COALESCE(p.hidden,false) AS personally_hidden,
+   (m.subject_id<>$2 AND EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id AND d.state IN ('requested','review-needed','approved','partial','primary-erased'))) AS author_quarantined,
+   (SELECT s.share_id FROM room_shared_summaries s WHERE s.room_id=m.room_id AND s.subject_id=m.subject_id AND s.share_id=m.client_message_id AND s.notice_hash=m.payload_hash) AS shared_summary_id
+   FROM chat_message_refs m LEFT JOIN chat_message_preferences p ON p.message_id=m.message_id AND p.subject_id=$2
+   WHERE m.room_id=$1 AND ${condition} ORDER BY ${order}${limit===null?'':' LIMIT $'+(values.length+3)}`,
+   [roomId,actor.subjectId,...values,...(limit===null?[]:[limit])])).rows;
+ }
+ visibleRows(rows){return rows.filter(row=>!row.personally_hidden&&!row.author_quarantined&&['accepted','retracted'].includes(row.state)&&Date.parse(row.expires_at)>this.now()*1000);}
+ async readMessagesWithin(db,actor,ctx,rows,input,{projected=false}={}){
+  const visible=this.visibleRows(rows).filter(row=>(!input.author||row.subject_id===input.author)&&(!input.from||Date.parse(row.sent_at)>=Date.parse(input.from))&&(!input.to||Date.parse(row.sent_at)<=Date.parse(input.to)));
+  let contents=[];const accepted=visible.filter(row=>row.state==='accepted');
+  if(accepted.length){if(!projected)await this.project(ctx);contents=await this.transport.read({roomId:ctx.room.room_id,subjectId:actor.subjectId,ids:accepted.map(row=>row.archive_id),roomRevision:ctx.room.revision});}
+  const bodies=new Map(contents.map(body=>[body.archiveId,body]));
+  // Personal hiding can change while archive I/O is in flight. Recheck the
+  // selected current rows rather than restoring the pre-I/O body projection.
+  const current=rows.length?await this.messageRowsWithin(db,actor,ctx.room.room_id,'m.message_id=ANY($3::uuid[])',[rows.map(row=>row.message_id)]):[];
+  const byId=new Map(this.visibleRows(current).map(row=>[row.message_id,row])),messages=[];
+  for(const row of visible){const r=byId.get(row.message_id);if(!r)continue;const body=bodies.get(r.archive_id);
+   if(r.state==='accepted'&&!body)continue;
+   if(body&&body.revision!==undefined&&body.revision!==r.revision)fail('chat_message_reconciliation_required');
+   if(input.keyword&&!body?.text?.toLocaleLowerCase().includes(input.keyword.toLocaleLowerCase()))continue;
+   messages.push({...this.receipt(r),sequence:String(r.sequence),acceptedOrder:r.accepted_order===null?null:String(r.accepted_order),subjectId:r.subject_id,actorKind:r.actor_kind,agentGrantId:r.agent_grant_id,replyTo:r.reply_to,
+    text:r.state==='retracted'?null:body.text,sharedSummaryId:r.state==='accepted'?r.shared_summary_id:null,editedAt:r.edited_at,retractedAt:r.retracted_at});
+  }
+  if(this.attachments){const files=await this.attachments.forMessagesWithin(db,actor,messages.map(message=>message.messageId));for(const message of messages)if(files.has(message.messageId))message.attachments=files.get(message.messageId);}
+  return{messages,readExpiresAt:Math.min(this.now()+60,...messages.map(message=>Math.floor(Date.parse(message.expiresAt)/1000)))};
+ }
+ async messageContext(actor,roomId,messageId,input={}){uuid(messageId);const x=parse(chatContextSchema,input);return this.run(actor,false,async db=>{
+  const ctx=await this.requireRoom(db,actor,roomId),target=(await this.messageRowsWithin(db,actor,roomId,'m.message_id=$3',[messageId]))[0];
+  if(!target)return{roomId,messageId,target:null,targetState:'unavailable',messages:[],previous:null,next:null,after:'0',scannedThrough:'0',complete:true,readExpiresAt:this.now()+60};
+  const count=Math.floor(x.limit/2);
+  const earlier=await this.messageRowsWithin(db,actor,roomId,'m.sequence<$3',[String(target.sequence)],'m.sequence DESC',count+1);
+  const later=await this.messageRowsWithin(db,actor,roomId,'m.sequence>=$3',[String(target.sequence)],'m.sequence ASC',x.limit-count+1);
+  const page=[...earlier.slice(0,count).reverse(),...later.slice(0,x.limit-count)],result=await this.readMessagesWithin(db,actor,ctx,page,{});
+  const currentTarget=(await this.messageRowsWithin(db,actor,roomId,'m.message_id=$3',[messageId]))[0];
+  const selected=result.messages.find(message=>message.messageId===messageId)??null;
+  const targetState=currentTarget?.personally_hidden?'hidden':currentTarget?.state==='retracted'?'retracted':
+   currentTarget?.state==='expired'||currentTarget&&Date.parse(currentTarget.expires_at)<=this.now()*1000?'expired':selected?.state==='accepted'?'available':'unavailable';
+  // A personal hide may complete after the archive read. A hidden/unavailable
+  // target is not returned through either the focus field or its window.
+  if(!['available','retracted'].includes(targetState))result.messages=result.messages.filter(message=>message.messageId!==messageId);
+  return{roomId,messageId,target:['available','retracted'].includes(targetState)?selected:null,targetState,...result,previous:earlier.length>count?String(page[0].sequence):null,
+   next:later.length>x.limit-count?String(page.at(-1).sequence):null,after:page.length?String(BigInt(page[0].sequence)-1n):'0',
+   scannedThrough:page.length?String(page.at(-1).sequence):'0',complete:earlier.length<=count&&later.length<=x.limit-count};
  });}
  async proposeDecision(actor,roomId,input){const x=parse(chatDecisionSchema,input);return this.run(actor,true,async db=>{
   if(x.action==='join-rule'?x.joinRule===undefined:x.joinRule!==undefined)fail('invalid_chat_request',400);
@@ -349,7 +483,11 @@ export class ChatService {
    const receipt=await this.transport.send({roomId,subjectId:actor.subjectId,messageId:id,text:x.text,payloadHash:r.payload_hash,replyTo:x.replyTo,
     actorKind:r.actor_kind,agentGrantId:r.agent_grant_id,sentAt:r.sent_at,expiresAt:r.expires_at,roomRevision:ctx.room.revision});
    if(receipt.archiveId!==id)fail('chat_archive_receipt_invalid',502);
-   await db.query("UPDATE chat_message_refs SET archive_id=$2,state='accepted' WHERE message_id=$1",[id,receipt.archiveId]);return this.receipt({...r,archive_id:receipt.archiveId,state:'accepted'});
+    // This short global lock is acquired only after external I/O. It survives
+    // through SQL commit, so a larger delivery order cannot commit first.
+    const acceptedOrder=String((await db.query('SELECT public.galaxy_chat_next_directory_order() AS ordinal')).rows[0].ordinal),acceptedAt=stamp(this.now());
+    await db.query("UPDATE chat_message_refs SET archive_id=$2,state='accepted',accepted_order=$3,accepted_at=$4 WHERE message_id=$1",[id,receipt.archiveId,acceptedOrder,acceptedAt]);
+    return this.receipt({...r,archive_id:receipt.archiveId,state:'accepted',accepted_order:acceptedOrder,accepted_at:acceptedAt});
   });
  }
  messageStatus(actor,roomId,input){uuid(roomId);const x=parse(chatMessageStatusSchema,input);return this.run(actor,false,async db=>{
@@ -363,6 +501,14 @@ export class ChatService {
   return{...base,state,messageId:r.message_id,revision:r.revision,sentAt:new Date(r.sent_at).toISOString(),expiresAt:new Date(r.expires_at).toISOString(),
    acceptedByRoom:state==='accepted',historicalAcceptanceRecorded:!!r.archive_id,archiveCleanupState:r.purge_pending?'pending':['retracted','expired'].includes(r.state)?'recorded-complete':'not-requested'};
  });}
+ operationStatus(actor,roomId,input){uuid(roomId);const x=parse(chatOperationReceiptSchema,input);return this.run(actor,false,async db=>{
+  const base={roomId,...x,currentAccessGranted:false,contentReturned:false};
+  const row=(await db.query('SELECT message_id,request_hash,state,result FROM chat_message_operations WHERE room_id=$1 AND operation_id=$2 AND subject_id=$3 AND kind=\'edit\'',[roomId,x.operationId,actor.subjectId])).rows[0];
+  if(!row)return{...base,state:'absent'};
+  if(row.request_hash!==x.requestHash)return{...base,state:'conflict'};
+  return{...base,state:row.state==='complete'?'acknowledged':row.state,messageId:row.message_id,
+   ...(row.state==='complete'?{revision:row.result.revision,editedAt:new Date(row.result.editedAt).toISOString()}:{})};
+ });}
  async history(actor,roomId,input={}){const x=parse(chatPageSchema,input);return this.run(actor,false,async db=>{
   const ctx=await this.requireRoom(db,actor,roomId);await this.agent(db,actor,roomId,x.agentGrantId);
   const rows=(await db.query(`SELECT m.*,COALESCE(p.hidden,false) AS personally_hidden,
@@ -373,18 +519,10 @@ export class ChatService {
   // The newest window uses the same current membership, archive and content
   // checks as forward history. Only its scan direction differs; display order
   // stays chronological, and reading never advances either user's cursor.
-  const page=rows.slice(0,x.limit);if(x.latest)page.reverse();const visible=page.filter(r=>!r.personally_hidden&&!r.author_quarantined&&r.state!=='pending'&&r.state!=='expired'&&Date.parse(r.expires_at)>this.now()*1000&&(!x.author||r.subject_id===x.author)&&(!x.from||Date.parse(r.sent_at)>=Date.parse(x.from))&&(!x.to||Date.parse(r.sent_at)<=Date.parse(x.to)));
-  let contents=[];if(visible.some(r=>r.state==='accepted')){await this.project(ctx);contents=await this.transport.read({roomId,subjectId:actor.subjectId,ids:visible.filter(r=>r.state==='accepted').map(r=>r.archive_id),roomRevision:ctx.room.revision});}
-  const byId=new Map(contents.map(m=>[m.archiveId,m]));const messages=[];
-  for(const r of visible){const content=byId.get(r.archive_id);if(r.state==='accepted'&&!content)continue;
-   if(content&&content.revision!==undefined&&content.revision!==r.revision)fail('chat_message_reconciliation_required');
-   if(x.keyword&&!content?.text?.toLocaleLowerCase().includes(x.keyword.toLocaleLowerCase()))continue;
-   messages.push({...this.receipt(r),sequence:String(r.sequence),subjectId:r.subject_id,actorKind:r.actor_kind,agentGrantId:r.agent_grant_id,replyTo:r.reply_to,
-    text:r.state==='retracted'?null:content.text,sharedSummaryId:r.state==='accepted'?r.shared_summary_id:null,editedAt:r.edited_at,retractedAt:r.retracted_at});}
-  if(this.attachments){const files=await this.attachments.forMessagesWithin(db,actor,messages.map(m=>m.messageId));for(const m of messages)if(files.has(m.messageId))m.attachments=files.get(m.messageId);}
-  if(x.latest)return{messages,next:null,previous:rows.length>x.limit?String(page[0].sequence):null,
+   const page=rows.slice(0,x.limit);if(x.latest)page.reverse();const result=await this.readMessagesWithin(db,actor,ctx,page,x);
+   if(x.latest)return{...result,next:null,previous:rows.length>x.limit?String(page[0].sequence):null,
    after:page.length?String(BigInt(page[0].sequence)-1n):'0',scannedThrough:page.length?String(page.at(-1).sequence):'0',complete:rows.length<=x.limit};
-  return{messages,next:rows.length>x.limit?String(page.at(-1).sequence):null,scannedThrough:page.length?String(page.at(-1).sequence):x.after,complete:rows.length<=x.limit};
+   return{...result,next:rows.length>x.limit?String(page.at(-1).sequence):null,scannedThrough:page.length?String(page.at(-1).sequence):x.after,complete:rows.length<=x.limit};
  });}
  async edit(actor,roomId,messageId,input){uuid(messageId);const x=parse(chatEditSchema,input);
   const reservation=await this.run(actor,true,async db=>{
@@ -432,11 +570,24 @@ export class ChatService {
  }
  hide(actor,roomId,messageId,{hidden=true}={}){uuid(messageId);if(typeof hidden!=='boolean')fail('invalid_chat_request',400);return this.run(actor,true,async db=>{await this.requireRoom(db,actor,roomId);const m=(await db.query('SELECT message_id FROM chat_message_refs WHERE message_id=$1 AND room_id=$2',[messageId,roomId])).rows[0];if(!m)fail('chat_message_unavailable');await db.query(`INSERT INTO chat_message_preferences(room_id,subject_id,message_id,hidden,updated_at) VALUES($1,$2,$3,$4,$5)
   ON CONFLICT(room_id,subject_id,message_id) DO UPDATE SET hidden=$4,updated_at=$5`,[roomId,actor.subjectId,messageId,hidden,stamp(this.now())]);return{hidden};});}
- cursor(actor,roomId,{kind='human',sequence,agentGrantId}){if(!['human','agent'].includes(kind)||typeof sequence!=='string'||!/^\d+$/.test(sequence)||(kind==='agent'&&!agentGrantId)||(kind==='human'&&agentGrantId))fail('invalid_chat_request',400);return this.run(actor,true,async db=>{
+ cursor(actor,roomId,{kind='human',sequence,agentGrantId,visibleMessageIds}){if(!['human','agent'].includes(kind)||typeof sequence!=='string'||!/^\d+$/.test(sequence)||(kind==='agent'&&!agentGrantId)||(kind==='human'&&agentGrantId))fail('invalid_chat_request',400);
+  if(visibleMessageIds!==undefined){if(kind!=='human'||!Array.isArray(visibleMessageIds)||!visibleMessageIds.length||visibleMessageIds.length>100)fail('invalid_chat_request',400);visibleMessageIds.forEach(uuid);}
+  return this.run(actor,true,async db=>{
   await this.requireRoom(db,actor,roomId);await this.agent(db,actor,roomId,agentGrantId);const max=(await db.query('SELECT COALESCE(MAX(sequence),0)::text AS seq FROM chat_message_refs WHERE room_id=$1',[roomId])).rows[0].seq;
   if(BigInt(sequence)>BigInt(max))fail('chat_cursor_out_of_range');const agentRef=agentGrantId??'';
-  const r=(await db.query(`INSERT INTO chat_cursors(room_id,subject_id,cursor_kind,agent_ref,sequence,updated_at) VALUES($1,$2,$3,$4,$5,$6)
-   ON CONFLICT(room_id,subject_id,cursor_kind,agent_ref) DO UPDATE SET sequence=GREATEST(chat_cursors.sequence,$5),updated_at=$6 RETURNING sequence`,[roomId,actor.subjectId,kind,agentRef,sequence,stamp(this.now())])).rows[0];return{kind,sequence:String(r.sequence),agentGrantId:agentGrantId??null};
+   let acceptedOrder='0';
+   if(kind==='human'&&visibleMessageIds!==undefined){
+    const ids=[...new Set(visibleMessageIds)],rows=await this.messageRowsWithin(db,actor,roomId,'m.message_id=ANY($3::uuid[])',[ids]);
+    const readable=this.visibleRows(rows).filter(row=>row.state==='accepted'&&BigInt(row.sequence)<=BigInt(sequence));
+    if(readable.length!==ids.length)fail('chat_message_unavailable');
+    for(const row of readable)await db.query(`INSERT INTO chat_human_message_reads(room_id,subject_id,message_id,read_at) VALUES($1,$2,$3,$4)
+     ON CONFLICT(room_id,subject_id,message_id) DO NOTHING`,[roomId,actor.subjectId,row.message_id,stamp(this.now())]);
+   }else if(kind==='human'){
+    acceptedOrder=String((await db.query('SELECT COALESCE(MAX(accepted_order),0)::text AS ordinal FROM chat_message_refs WHERE room_id=$1 AND sequence<=$2',[roomId,sequence])).rows[0].ordinal);
+   }
+   const r=(await db.query(`INSERT INTO chat_cursors(room_id,subject_id,cursor_kind,agent_ref,sequence,accepted_order,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+    ON CONFLICT(room_id,subject_id,cursor_kind,agent_ref) DO UPDATE SET sequence=GREATEST(chat_cursors.sequence,$5),accepted_order=GREATEST(chat_cursors.accepted_order,$6),updated_at=$7 RETURNING sequence`,
+    [roomId,actor.subjectId,kind,agentRef,sequence,acceptedOrder,stamp(this.now())])).rows[0];return{kind,sequence:String(r.sequence),agentGrantId:agentGrantId??null};
  });}
  async purgeOne(messageId){const r=(await this.db.query('SELECT * FROM chat_message_refs WHERE message_id=$1 AND purge_pending=true',[messageId])).rows[0];if(!r)return;
   if(!this.transport)fail('chat_transport_unavailable',503);const acknowledgement=await this.transport.erase({roomId:r.room_id,messageId:r.message_id});

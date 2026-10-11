@@ -36,6 +36,9 @@ export class ProsodyChatTransport {
  project(x){return this.command('project',x);}
  send(x){return this.command('send',x);}
  async read(x){return(await this.command('read',x)).messages;}
+ // Older compatible components may also return text. Callers only consume
+ // archiveId/revision here; no extra archive permissions are granted.
+ async readMetadata(x){return(await this.command('read',{...x,metadataOnly:true})).messages.map(({archiveId,revision})=>({archiveId,revision}));}
  async exportOwn(x){return(await this.command('export-own',x)).messages;}
  edit(x){return this.command('edit',x);}
  erase(x){return this.command('erase',x);}

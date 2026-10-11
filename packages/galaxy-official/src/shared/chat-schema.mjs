@@ -35,3 +35,17 @@ export const chatPageSchema=z.object({after:z.string().regex(/^\d+$/).default('0
  if(value.before!==undefined&&!value.latest)ctx.addIssue({code:'custom',message:'An earlier window requires latest history mode.'});
  if(value.latest&&value.after!=='0')ctx.addIssue({code:'custom',message:'Latest history cannot also select a forward cursor.'});
 });
+export const chatDirectorySchema=z.strictObject({cursor:z.string().max(8192).nullable().optional(),limit:z.number().int().min(1).max(100).default(30)});
+export const chatDirectoryCursorSchema=z.strictObject({version:z.literal(1),subjectId:z.string().regex(/^GUID[A-Z0-9]{28}$/),
+ endpoint:z.string(),watermark:z.string().regex(/^\d+$/),asOf:z.number().int().positive(),expiresAt:z.number().int().positive(),
+ lastOrder:z.string().regex(/^\d+$/),lastRoomId:id});
+export const chatContextSchema=z.strictObject({limit:z.number().int().min(3).max(100).default(41)});
+export const chatOperationReceiptSchema=z.strictObject({operationId:id,requestHash});
+export const chatOperationReceiptResultSchema=chatOperationReceiptSchema.extend({roomId:id,state:z.enum(['absent','conflict','pending','acknowledged','cancelled']),
+ currentAccessGranted:z.literal(false),contentReturned:z.literal(false),messageId:id.optional(),revision:z.number().int().positive().optional(),
+ editedAt:z.iso.datetime().optional()}).superRefine((value,ctx)=>{
+ if(['absent','conflict'].includes(value.state)&&['messageId','revision','editedAt'].some(key=>Object.hasOwn(value,key)))
+  ctx.addIssue({code:'custom',message:'An absent or conflicting edit cannot expose operation metadata.'});
+ if(value.state==='acknowledged'&&['messageId','revision','editedAt'].some(key=>!Object.hasOwn(value,key)))
+  ctx.addIssue({code:'custom',message:'A completed edit requires its exact result metadata.'});
+});

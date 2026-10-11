@@ -18,13 +18,14 @@ type AttachmentsClient={
  pending:(roomId:string)=>Promise<PendingUpload|null>;
  reconcile:(roomId:string)=>Promise<unknown>;
  query:(roomId:string,after?:string)=>Promise<{items:OwnedAttachment[];nextAfter:string|null}>;
+ read:(attachmentId:string)=>Promise<OwnedAttachment&{roomId:string}>;
  config:()=>Promise<AttachmentLimits>;
  retry:(roomId:string,file:File,options:UploadOptions)=>Promise<unknown>;
  send:(roomId:string,file:File,options:UploadOptions)=>Promise<unknown>;
  abandon:(roomId:string)=>Promise<unknown>;
  revoke:(roomId:string,attachmentId:string)=>Promise<unknown>;
 };
-type ComposerProps={runtime:AttachmentRuntime;roomId:string;disabled:boolean;selected:AttachmentReference[];onChange:(value:AttachmentReference[])=>void};
+type ComposerProps={runtime:AttachmentRuntime;roomId:string;disabled:boolean;selected:AttachmentReference[];onChange:(value:AttachmentReference[])=>void;onValidityChange?:(ready:boolean)=>void};
 type RevokeChoice=OwnedAttachment&{pending?:false}|{pending:true;name:string;attachmentId?:undefined};
 const uploadErrors:Record<string,string>={attachment_storage_quota_exceeded:'临时文件空间不足，请撤销不再需要的附件，等待清理后重试。',attachment_media_type_mismatch:'文件内容与声明类型不一致。',attachment_upload_in_progress:'原上传仍在处理中，请稍后查询。',attachment_unavailable:'暂时无法读取原附件，请保留待恢复记录；可以选择原文件恢复或明确撤销。'};
 const uploadError=(reason:unknown)=>{const value=reason&&typeof reason==='object'?reason:null,code=value&&'code'in value&&typeof value.code==='string'?value.code:null,name=value&&'name'in value?value.name:null,message=value&&'message'in value&&typeof value.message==='string'?value.message:'操作暂未完成。';return code?uploadErrors[code]??'操作暂未完成，可按原文件恢复，或撤销此上传。':name==='AbortError'?'本机传输已中止，服务器结果仍需查询；原上传记录保留。':message;};
@@ -48,10 +49,10 @@ function ChatAttachmentFilesSession({runtime,items}:{runtime:AttachmentRuntime;i
 export function ChatAttachmentComposer(props:ComposerProps){
  return <ChatAttachmentComposerSession key={JSON.stringify([props.roomId,props.runtime.api.endpoint,props.runtime.api.snapshot()?.subjectId,props.runtime.api.snapshot()?.bindingId,props.runtime.api.snapshot()?.generation])} {...props}/>;
 }
-function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChange}:ComposerProps){
+function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChange,onValidityChange}:ComposerProps){
  const client:AttachmentsClient=useMemo(()=>createAttachmentsClient(runtime),[runtime]),[file,setFile]=useState<File|null>(null),[items,setItems]=useState<OwnedAttachment[]>([]),[pending,setPending]=useState<PendingUpload|null>(null);
  const [limits,setLimits]=useState<AttachmentLimits|null>(null),[after,setAfter]=useState<string|null>(null),[busy,setBusy]=useState(false),[stage,setStage]=useState(''),[error,setError]=useState(''),[confirmRevoke,setConfirmRevoke]=useState<RevokeChoice|null>(null);
- const [open,setOpen]=useState(false);
+ const [open,setOpen]=useState(false),[clock,setClock]=useState(()=>Date.now());
  const dialog=useRef<HTMLDialogElement>(null),revokeDialog=useRef<HTMLDialogElement>(null),fileInput=useRef<HTMLInputElement>(null),reconciling=useRef<Promise<unknown>|null>(null);
  const epoch=useRef(0),control=useRef<AbortController|null>(null),working=useRef(false),reading=useRef(false),request=useRef(0);
  const pages=useRef<Array<string|undefined>>([undefined]),currentSelection=useRef({selected,onChange});
@@ -63,12 +64,12 @@ function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChang
   const loaded=await Promise.all(cursors.map(cursor=>client.query(roomId,cursor)));
   if(e!==epoch.current||seq!==request.current)return;
   const rows=loaded.flatMap(page=>page.items),latest=loaded[loaded.length-1];
+  const chosen=currentSelection.current.selected;
+  const restored=await Promise.all(chosen.filter(item=>!rows.some(row=>row.attachmentId===item.id)).map(async item=>{try{const result=await client.read(item.id);if(result.roomId!==roomId||result.sha256!==item.sha256)throw Error('attachment_unavailable');return result;}catch{return{attachmentId:item.id,name:'已选附件',sha256:item.sha256,size:0,state:'unavailable'};}}));
+  if(e!==epoch.current||seq!==request.current)return;rows.push(...restored);
   setItems(old=>[...new Map((append?[...old,...rows]:rows).map(item=>[item.attachmentId,item])).values()]);
   if(append&&!pages.current.includes(append))pages.current.push(append);
-  setAfter(latest.nextAfter);setPending(saved);
-  const selection=currentSelection.current;
-  const unavailable=new Set(rows.filter(item=>item.state!=='available'||item.messageId).map(item=>item.attachmentId));
-  if(selection.selected.some(item=>unavailable.has(item.id)))selection.onChange(selection.selected.filter(item=>!unavailable.has(item.id)));
+  setAfter(latest.nextAfter);setPending(saved);setClock(Date.now());
  },[client,roomId]);
  async function run(fn:()=>Promise<unknown>,refresh=true){
   if(working.current)return;const e=epoch.current;working.current=true;request.current++;setBusy(true);setError('');let completed=false;
@@ -78,15 +79,21 @@ function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChang
  }
  useEffect(()=>{const generation=epoch,transfer=control;generation.current++;let active=true;
   client.config().then(value=>{if(active)setLimits(value);}).catch(()=>{if(active)setError('无法取得附件设置。');});reload().catch(()=>{});
-  const refreshOnVisible=()=>{if(active&&!working.current&&!reading.current&&!document.hidden){reading.current=true;reload().catch(()=>{}).finally(()=>{reading.current=false;});}};
+  const refreshOnVisible=()=>{if(active&&!working.current&&!reading.current&&!document.hidden&&navigator.onLine!==false){reading.current=true;reload().catch(()=>{if(active)setItems([]);}).finally(()=>{reading.current=false;});}};
+  const offline=()=>{request.current++;setItems([]);};
   document.addEventListener('visibilitychange',refreshOnVisible);
+  window.addEventListener('online',refreshOnVisible);window.addEventListener('offline',offline);
   const timer=setInterval(refreshOnVisible,5000);
-  return()=>{active=false;generation.current++;clearInterval(timer);document.removeEventListener('visibilitychange',refreshOnVisible);transfer.current?.abort();};},[client,reload]);
+  return()=>{active=false;generation.current++;clearInterval(timer);document.removeEventListener('visibilitychange',refreshOnVisible);window.removeEventListener('online',refreshOnVisible);window.removeEventListener('offline',offline);transfer.current?.abort();};},[client,reload]);
+ const usable=(value:AttachmentReference)=>items.some(item=>item.attachmentId===value.id&&item.sha256===value.sha256&&item.state==='available'&&!item.messageId&&(!item.expiresAt||Date.parse(item.expiresAt)>clock));
+ const selectionReady=selected.every(usable);
+ useEffect(()=>{onValidityChange?.(selectionReady);},[selectionReady,onValidityChange]);
+ useEffect(()=>{const expiry=items.flatMap(item=>item.expiresAt&&Date.parse(item.expiresAt)>clock?[Date.parse(item.expiresAt)]:[]);if(!expiry.length)return;const timer=window.setTimeout(()=>setClock(Date.now()),Math.min(2147483647,Math.max(0,Math.min(...expiry)-Date.now())));return()=>window.clearTimeout(timer);},[items,clock]);
  useEffect(()=>{if(open)dialog.current?.showModal();else dialog.current?.close();},[open]);
  useEffect(()=>{if(confirmRevoke)revokeDialog.current?.showModal();else revokeDialog.current?.close();},[confirmRevoke]);
  return <div className="chat-attachment-picker">
   <button type="button" className="attachment-entry text-link" disabled={disabled} onClick={()=>setOpen(true)}><Paperclip size={16}/>附件{selected.length?' · 已选 '+selected.length:''}</button>
-  {selected.length>0&&<span className="attachment-selected-summary">{selected.map(value=>items.find(item=>item.attachmentId===value.id)?.name??'已选文件').join('、')}</span>}
+  {selected.length>0&&<div className="attachment-selected-summary">{selected.map(value=>{const item=items.find(item=>item.attachmentId===value.id);return <span className="attachment-selected-item" key={value.id}><span>{item?.name??'已选附件'}{!usable(value)?' · 当前尚不能发送':''}</span><button type="button" disabled={disabled} aria-label={'移除'+(item?.name??'已选附件')} onClick={()=>onChange(selected.filter(other=>other.id!==value.id))}>移除</button></span>;})}</div>}
   <dialog ref={dialog} className="galaxy-dialog attachment-dialog" onCancel={event=>{if(busy)event.preventDefault();else setOpen(false);}}>
    <header className="dialog-heading"><div><h3>添加附件</h3><p>选择检查完成的文件，随下一条消息发送。</p></div><button type="button" className="text-link" disabled={busy} onClick={()=>setOpen(false)}>完成</button></header>
    {error&&<p className="message error" role="alert">{error}</p>}{stage&&<output className="message">{stage}{file?' · '+file.name:''}</output>}

@@ -13,6 +13,10 @@ test('real stable Prosody persists, corrects and erases Galaxy messages through 
  try{const{chat,people:[a,b,c]}=f,roomId=randomUUID();rooms.push(roomId);await chat.create(a,{roomId,operationId:randomUUID(),title:'Synthetic real transport'});await invite(chat,a,roomId,b);
   const input={clientMessageId:randomUUID(),text:'original transport content'},first=await chat.send(a,roomId,input);assert.equal(first.acceptedByRoom,true);
   assert.equal((await chat.send(a,roomId,input)).messageId,first.messageId);const h=await chat.history(b,roomId);assert.equal(h.messages[0].text,input.text);assert.equal(h.messages.length,1);
+  const projected=await chat.get(b,roomId),metadataInput={roomId,subjectId:b.subjectId,ids:[first.archiveId],roomRevision:projected.revision};
+  const rawMetadata=await transport.command('read',{...metadataInput,metadataOnly:true});
+  assert.deepEqual(rawMetadata.messages,[{archiveId:first.archiveId,revision:1}],'The current isolated component returns no body in a metadata-only reply');
+  assert.deepEqual(await transport.readMetadata(metadataInput),rawMetadata.messages);
   await assert.rejects(chat.history(c,roomId),/access_denied/);
   const edit={operationId:randomUUID(),expectedRevision:1,text:'corrected transport content'};await chat.edit(a,roomId,first.messageId,edit);await chat.edit(a,roomId,first.messageId,edit);
   assert.equal((await chat.history(b,roomId)).messages[0].text,edit.text);

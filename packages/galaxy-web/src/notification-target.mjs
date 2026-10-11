@@ -11,15 +11,16 @@ export function notificationTarget(item) {
       if (object.versionId != null && !uuid(object.versionId)) return null;
       return `/app/capsules/${object.id}${object.versionId ? `/versions/${object.versionId}` : ''}`;
     case 'qualification-request': return `/app/qualification-permissions/${object.id}`;
-    case 'room': return `/app/rooms/${object.id}`;
+    case 'room':
+      if (object.messageId != null && !uuid(object.messageId)) return null;
+      return `/app/rooms/${object.id}${object.messageId ? `?message=${object.messageId}` : ''}`;
     case 'task': return `/app/tasks/${object.id}`;
     case 'information-watch': return `/app/information/${object.id}`;
     case 'project': return `/app/projects/${object.id}`;
     case 'target-governance': return `/app/governance/${object.id}`;
     case 'moderation': return `/app/reviews/${object.id}`;
-    // These current pages have no exact object deep-link contract yet. The
-    // directory rechecks its visible records; invitations still require consent.
-    case 'room-invitation': return '/app/rooms';
+    // The directory rereads the invitation; opening it never accepts it.
+    case 'room-invitation': return `/app/rooms?invitation=${object.id}`;
     case 'builder': case 'worker-pack': return '/app/builders';
     case 'hub': return '/app/hubs';
     default: return null;

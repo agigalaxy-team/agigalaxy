@@ -79,6 +79,10 @@ GRANT UPDATE(version,state) ON verification_objects TO galaxy_api;
 -- CUR-35 chat metadata and erasure receipts. Message bodies stay in Prosody.
 GRANT SELECT,INSERT,UPDATE ON chat_rooms,chat_memberships,chat_decisions,chat_message_refs,chat_message_operations,chat_cursors,chat_message_preferences,chat_agent_grants TO galaxy_api;
 GRANT USAGE,SELECT ON SEQUENCE chat_message_refs_sequence_seq TO galaxy_api;
+GRANT SELECT,UPDATE ON chat_directory_clock TO galaxy_api;
+GRANT SELECT,INSERT ON chat_human_message_reads TO galaxy_api;
+REVOKE ALL ON FUNCTION public.galaxy_chat_next_directory_order() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.galaxy_chat_next_directory_order() TO galaxy_api;
 GRANT SELECT ON lifecycle_erasure_records TO galaxy_api;
 GRANT SELECT,INSERT ON capsule_permissions,capsule_uses_v2 TO galaxy_api;
 GRANT UPDATE(revoked_at,revoke_id,revoke_consent_id,revoke_payload_text,revoke_payload_hash) ON capsule_permissions TO galaxy_api;

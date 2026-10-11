@@ -79,7 +79,7 @@ function draftFeedbackTitle(feedback:DraftFeedback){
  return feedback.stage==='read'?'本机稿尚未读取完成。':'这次本机稿保存未完成。';
 }
 
-type Props={runtime:TaskEntryRuntime|null;subjectId?:string;connected:boolean;navigate:(path:string)=>void;onNeedIdentity?:()=>void;registerShellNavigation?:(scopeKey:string,handler:(path:string)=>void)=>()=>void};
+type Props={runtime:TaskEntryRuntime|null;subjectId?:string;connected:boolean;navigate:(path:string)=>void;onNeedIdentity?:()=>void;registerShellNavigation?:(scopeKey:string,handler:(path:string)=>void,leaveAction:(action:()=>void)=>void)=>()=>void};
 export function TaskPublishWorkspace(props:Props){
  const scope=props.runtime?.taskDraftScope();
  if(!props.runtime||!scope||scope.closed||scope.subjectId!==(props.subjectId??null))return <section aria-busy="true"><h1 className="small">发起一个请求</h1><p>正在读取当前身份的本机稿。</p></section>;
@@ -136,9 +136,9 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  const recoveringPublication=useRef(false);
  const epoch=useRef(0),working=useRef(false);
  const current=()=>{try{draftClient.check();return true;}catch{return false;}};
- const navigationHandler=useRef<(path:string)=>void>(()=>{});
+ const navigationHandler=useRef<(destination:string|(()=>void))=>void>(()=>{});
  useLayoutEffect(()=>{navigationHandler.current=navigateWithSavedDraft;});
- useLayoutEffect(()=>registerShellNavigation?.(sessionKey,path=>navigationHandler.current(path)),[registerShellNavigation,sessionKey]);
+ useLayoutEffect(()=>registerShellNavigation?.(sessionKey,path=>navigationHandler.current(path),action=>navigationHandler.current(action)),[registerShellNavigation,sessionKey]);
  const loadInitialDraft=useEffectEvent(()=>readLocalDraft());
  const observePublication=useEffectEvent((token:number)=>Promise.all([runtime.getLocal('task-publication',draftClient.ownerKey),runtime.getLocal('task-publication-receipt',draftClient.ownerKey)]).then(([pending,receipt])=>{if(token===epoch.current&&current()){setPending(pending);setLastReceipt(receipt==null?null:readOperationReceipt(receipt));}}).catch((reason:unknown)=>{if(token===epoch.current&&current())setError(reason);}));
  const readPublication=useEffectEvent((token:number)=>{if(document.visibilityState!=='visible'||working.current||recoveringPublication.current||!current())return;recoveringPublication.current=true;void runtime.getLocal('task-publication',draftClient.ownerKey).then((pending:unknown)=>{if(token===epoch.current&&current())setPending(pending);}).catch((reason:unknown)=>{if(token===epoch.current&&current())setError(reason);}).finally(()=>{if(token===epoch.current)recoveringPublication.current=false;});});
@@ -202,7 +202,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
   finally{if(token===epoch.current&&current()&&ticket===draftReadEpoch.current){draftReading.current=false;setReadingDraft(false);}}}
  async function flushDraft(){if(draftReading.current||draftReloadRequired.current)throw markDraftFailure(Error('本页输入尚未安全保存，请先处理本机稿提示。'),'gate');try{await draftClient.flush();}catch(reason){throw markDraftFailure(reason,'save');}}
  async function run(fn:(valid:()=>boolean)=>Promise<void>){if(working.current)return;const token=epoch.current,valid=()=>token===epoch.current&&current(),previousBusinessFeedback=businessFeedbackRef.current;working.current=true;setBusy(true);setError('');setNotice('');try{await fn(valid);}catch(e){if(valid()){if(localFailureStage(e)&&!businessFeedbackRef.current.message&&previousBusinessFeedback.message)showBusinessFeedback(previousBusinessFeedback);setError(e);}}finally{if(valid()){try{const p=await runtime.getLocal('task-publication',draftClient.ownerKey);if(valid())setPending(p);}catch{}if(valid()){working.current=false;setBusy(false);}}}}
- function navigateWithSavedDraft(path:string){void run(async valid=>{await flushDraft();if(valid())navigate(path);});}
+ function navigateWithSavedDraft(destination:string|(()=>void)){void run(async valid=>{await flushDraft();if(valid()){if(typeof destination==='string')navigate(destination);else destination();}});}
  function saveInput(next:PublishDraft){if(working.current)return;const revision=++inputRevision.current,ticket=draftReadEpoch.current,token=epoch.current;draftRef.current=next;setDraft(next);setPreview(null);setPreviewBodies([]);setOriginPreview(null);setOriginReview(null);
   if(draftReading.current||draftReloadRequired.current){setSaveMessage('本页新输入尚未保存。');return;}
   setSaveMessage('正在保存到此浏览器…');void draftClient.save(next).then(saved=>{if(token!==epoch.current||!current()||ticket!==draftReadEpoch.current)return;draftSnapshot.current=saved;draftHead.current=saved.head;if(revision===inputRevision.current){savedInputRevision.current=revision;setSaveMessage('已保存到此浏览器。');showDraftFeedback(null);}}).catch((reason:unknown)=>{if(token===epoch.current&&current()&&ticket===draftReadEpoch.current){draftReloadRequired.current=true;showDraftFailure('save',reason);setSaveMessage('本页新输入尚未保存，仍保留在编辑框中。');}});}

@@ -13,6 +13,7 @@ test('browser chat retains stable send and edit operations across lost replies a
     api: { snapshot: () => ({ subjectId: 'test-viewer' }), call: async (path, input) => {
       calls.push({ path, input });
       if (path.endsWith('/receipt')) return exactReceipt(roomId,input,accepted?'accepted':'pending');
+      if (path.endsWith('/operation-receipt')) return {roomId,...input,state:'pending',messageId,currentAccessGranted:false,contentReturned:false};
       if (drop) { drop = false; accepted = true; throw new Error('lost reply'); }
       return { messageId, state: 'accepted', revision: 2 };
     } } };

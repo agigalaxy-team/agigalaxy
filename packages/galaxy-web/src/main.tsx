@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { createWebRuntime, loadWebConfiguration } from './runtime.mjs';
 import {requesterFeedbackAvailable} from './requester-feedback-client.mjs';
 import type {DeviceControlState} from './device-management';
+import type {ChoiceViewLease} from './choice-retained-operations';
 const IdentityOperationQuery = lazy(() => import('./identity-operation-query').then(module => ({default: module.IdentityOperationQuery})));
 const ChatWorkspace = lazy(() => import('./chat-workspace').then(module => ({default: module.ChatWorkspace})));
 const ContactOriginWorkspace = lazy(() => import('./contact-origin-workspace').then(module => ({default: module.ContactOriginWorkspace})));
@@ -201,11 +202,11 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const displayedRecovery=useRef<{runtime:Runtime;owner:string;operationId:string;code:string;recovered:boolean}|null>(null);
   const identityWorking=useRef(false),recoveryConnecting=useRef(false),identityRuntime=useRef(runtime);
   useEffect(()=>{identityRuntime.current=runtime;return()=>{identityRuntime.current=null;};},[runtime]);
-  const taskShellNavigation = useRef<{runtime:Runtime;scopeKey:string;route:string;handler:(target:string)=>void}|null>(null);
-  const registerTaskShellNavigation = useMemo(() => (scopeKey:string,handler:(target:string)=>void) => {
+  const taskShellNavigation = useRef<{runtime:Runtime;scopeKey:string;route:string;handler:(target:string)=>void;leaveAction:(action:()=>void)=>void}|null>(null);
+  const registerTaskShellNavigation = useMemo(() => (scopeKey:string,handler:(target:string)=>void,leaveAction:(action:()=>void)=>void) => {
     const scope=runtime?.taskDraftScope();
     if(!runtime||!scope||scope.closed||scope.key!==scopeKey||location.pathname!=='/app/publish')return()=>{};
-    const registration={runtime,scopeKey,route:location.pathname+location.search+location.hash,handler};
+    const registration={runtime,scopeKey,route:location.pathname+location.search+location.hash,handler,leaveAction};
     taskShellNavigation.current=registration;
     const page=location.pathname+location.search;
     const skipAnchorChanged=(event:HashChangeEvent)=>{
@@ -217,6 +218,22 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     };
     addEventListener('hashchange',skipAnchorChanged);
     return()=>{removeEventListener('hashchange',skipAnchorChanged);if(taskShellNavigation.current===registration)taskShellNavigation.current=null;};
+  },[runtime]);
+  const chatShellNavigation = useRef<{runtime:Runtime;lease:ChoiceViewLease;route:string;handler:(target:string)=>void;leaveAction:(action:()=>void)=>void}|null>(null);
+  const registerChatShellNavigation = useMemo(() => (lease:ChoiceViewLease,handler:(target:string)=>void,leaveAction:(action:()=>void)=>void) => {
+    if(!runtime||!/^\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(location.pathname))return()=>{};
+    try{lease.assertCurrent();}catch{return()=>{};}
+    const registration={runtime,lease,route:location.pathname+location.search+location.hash,handler,leaveAction};
+    chatShellNavigation.current=registration;
+    const page=location.pathname+location.search;
+    const skipAnchorChanged=(event:HashChangeEvent)=>{
+      if(chatShellNavigation.current!==registration||location.pathname+location.search!==page||location.hash!=='#main-content'
+        ||event.oldURL!==new URL(registration.route,location.origin).href||event.newURL!==location.href)return;
+      try{lease.assertCurrent();}catch{return;}
+      registration.route=location.pathname+location.search+location.hash;
+    };
+    addEventListener('hashchange',skipAnchorChanged);
+    return()=>{removeEventListener('hashchange',skipAnchorChanged);if(chatShellNavigation.current===registration)chatShellNavigation.current=null;};
   },[runtime]);
   function clearRecoveryCode() { cancelRecoveryDisplay(); displayedRecovery.current=null;setNewCode('');setNewCodeOwner('');setNewCodeOperationId('');setCodePanelOpen(false);setCodeVisible(false); }
   function showRecoveryCode(code:string,isRecovered:boolean,operationId:string,identity=status?.identity) {
@@ -331,6 +348,11 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     setPath(location.pathname); setRouteSearch(location.search); setRouteHash(location.hash); setError(''); setNotice(''); window.scrollTo(0, 0);
   };
   const navigateFromShell = (target:string) => {
+    const chatRegistration=chatShellNavigation.current;
+    if(runtime&&chatRegistration?.runtime===runtime&&chatRegistration.route===location.pathname+location.search+location.hash){
+      try{chatRegistration.lease.assertCurrent();}catch{navigate(target);return;}
+      chatRegistration.handler(target);return;
+    }
     if(location.pathname!=='/app/publish'||!runtime){navigate(target);return;}
     const registration=taskShellNavigation.current,scope=runtime.taskDraftScope();
     const taskSessionExpected=!scope.closed&&scope.subjectId===(status?.identity?.subjectId??null);
@@ -379,6 +401,22 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if(busy)return;const origin=location.pathname;setBusy(true);setError('');setNotice('');
     try{await action();}catch(reason){if(location.pathname===origin)setError(readable(reason));}
     finally{try{if(runtime)setStatus(await runtime.status());}catch(reason){if(location.pathname===origin)setError(readable(reason));}finally{setBusy(false);}}
+  }
+  function disconnectFromShell() {
+    if(!runtime)return;
+    const selected=runtime,origin=location.pathname+location.search+location.hash;
+    const disconnect=()=>{if(identityRuntime.current!==selected||location.pathname+location.search+location.hash!==origin)return;void run(async()=>{await selected.disconnect();setNotice('已退出本次连接。');});};
+    const chatRegistration=chatShellNavigation.current;
+    if(chatRegistration?.runtime===selected&&chatRegistration.route===origin){
+      try{chatRegistration.lease.assertCurrent();}catch{disconnect();return;}
+      chatRegistration.leaveAction(()=>{if(chatShellNavigation.current===chatRegistration)disconnect();});return;
+    }
+    if(location.pathname==='/app/publish'){
+      const registration=taskShellNavigation.current,scope=selected.taskDraftScope();
+      if(registration?.runtime===selected&&!scope.closed&&registration.scopeKey===scope.key&&registration.route===origin){registration.leaveAction(()=>{if(taskShellNavigation.current===registration)disconnect();});return;}
+      if(!scope.closed&&scope.subjectId===(status?.identity?.subjectId??null))return;
+    }
+    disconnect();
   }
   useEffect(()=>{if(!runtime)return;let active=true;const timer=setInterval(()=>runtime.resumeConnection().catch(()=>null).then(()=>runtime.status()).then(value=>{if(active)setStatus(value);}).catch(()=>{}),15000);return()=>{active=false;clearInterval(timer);};},[runtime]);
   const taskDetails=useCallback(async(id:string,quiet=false)=>{const loaded=await taskPage.refresh(id,quiet);if(loaded)setError('');},[taskPage]);
@@ -448,7 +486,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const savingRecoveryCode=hasDisplayedCode&&codePanelOpen;
   const enteringRecoveryCode=identityMethod==='recovery'&&!savingRecoveryCode&&!recoveryConnectReady;
   const recoveryFlow=savingRecoveryCode||enteringRecoveryCode||recoveryConnectReady;
-  return <SiteShell path={path} search={routeSearch} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigateFromShell} onDisconnect={()=>run(async()=>{await runtime?.disconnect();setNotice("已退出本次连接。");})}>
+  return <SiteShell path={path} search={routeSearch} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigateFromShell} onDisconnect={disconnectFromShell}>
         {busy && <output className="operation-progress"><span/>正在处理当前操作，请稍候…</output>}
         {configError && <section className="connection-unavailable" role="alert"><h1 className="small">暂时连不上银河</h1><p>可以重试，或先浏览介绍与使用文档。</p><div className="button-row"><Button onClick={retryConfiguration}>重新连接</Button><a className="text-link" href="/docs/">阅读使用文档</a></div><details className="technical-details"><summary>连接问题详情</summary><p>{configError}</p></details></section>}
         {error && (task||!/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)) && <div className="message error" role="alert">{error}</div>}{notice && <output className="message">{notice}</output>}
@@ -485,7 +523,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
           {task.schemaVersion===2&&<CommunityTaskReturn key={`forum-return:${task.taskId}:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}`} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} task={task} navigate={navigate}/>}
           <details className="return-note"><summary>在自己的 AI 中继续这项任务</summary><p>让你的模型按同一任务链接刷新当前状态。关闭网页不会取消任务。</p></details></section>}
         {/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path) && task && <Button variant="outline" disabled={!connected} onClick={() => navigate('/app/governance?targetType=task&targetId=' + task.taskId)}>举报与处理</Button>}
-        {/\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(path) && <ChatWorkspace key={path + (status?.identity?.subjectId ?? '')} runtime={runtime} roomId={/^\/app\/rooms\/([0-9a-f-]{36})$/.exec(path)?.[1]} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} needIdentity={needIdentity}/> }
+        {/\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(path) && <ChatWorkspace key={path + (status?.identity?.subjectId ?? '')} runtime={runtime} roomId={/^\/app\/rooms\/([0-9a-f-]{36})$/.exec(path)?.[1]} search={location.search} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} needIdentity={needIdentity} registerShellNavigation={registerChatShellNavigation}/> }
         {path === '/app/notifications' && <NotificationWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/projects' && !['projects','contacts','recruitment','willingness','discover'].includes(projectParameters.get('section')??'') && <ProjectDirectoryWorkspace runtime={runtime} navigate={navigate}/>}
         {path === '/app/projects' && ['projects','contacts','recruitment','willingness','discover'].includes(projectParameters.get('section')??'') && <ProjectContactWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} initialTab={projectParameters.get('section') ?? undefined} initialProjectId={projectParameters.get('projectId') ?? undefined} initialContactId={projectParameters.get('contactId') ?? undefined}/>}
