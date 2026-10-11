@@ -26,7 +26,7 @@ async function input(request){let text='';for await(const chunk of request){text
 // Shared normal UI and production services. No API response replacement, no
 // verified-state injection, and no message transport double. Only identities,
 // the OIDC interaction account and declared work samples are synthetic.
-export async function createReconstructionFlowPreview({directory,certificate,key,reportDirectory,ports=[5240,5241,5242],chatTransport=null}={}){
+export async function createReconstructionFlowPreview({directory,certificate,key,reportDirectory,ports=[5240,5241,5242],chatTransport=null,attachmentConfiguration=null}={}){
  if(!isAbsolute(directory??'')||!isAbsolute(certificate??'')||!isAbsolute(key??'')||!isAbsolute(reportDirectory??''))throw Error('local_scene_absolute_paths_required');
  const origins=ports.slice(0,2).map(port=>'https://127.0.0.1:'+port),endpoint='https://127.0.0.1:'+ports[2];
  const metadataFile=join(reportDirectory,'shared-scene-status.json');
@@ -42,7 +42,7 @@ export async function createReconstructionFlowPreview({directory,certificate,key
  const previousPins=prior?JSON.parse(await readFile(prior.publicConfiguration,'utf8')).signingKeys:[];
  const signer=generateKeyPairSync('ed25519'),kid='local-reconstruction-'+randomUUID(),trustedKeys=new Map([...previousPins.map(pin=>[pin.kid,pin]),[kid,{publicKeyPem:signer.publicKey.export({type:'spki',format:'pem'}),notBefore:seconds()-1,notAfter:seconds()+7*86400,revoked:false}]]);
  const services=createServices({db,endpoint,signingKey:signer.privateKey,kid,trustedKeys,operator:'本地合成共享现场',region:'local',now:seconds,
-  identityProviders:[provider],allowedScopes:browserScopes,chatTransport});
+  identityProviders:[provider],allowedScopes:browserScopes,chatTransport,attachmentConfiguration});
  const api=createApi({...services,browserOrigins:origins,rateLimit:1000,releaseId:'local-reconstruction-20261012'});
  const tls={cert:await readFile(certificate),key:await readFile(key)},dispatch=api.listeners('request')[0];
  const authority=createHttpsServer(tls,(request,response)=>{
@@ -136,10 +136,11 @@ export async function createReconstructionFlowPreview({directory,certificate,key
   const chatRooms=(await db.query('SELECT room_id,title,revision,member_revision,created_order FROM chat_rooms ORDER BY created_order')).rows;
   const chatMessages=(await db.query('SELECT message_id,room_id,subject_id,client_message_id,payload_hash,sequence,state,revision,accepted_order,accepted_at FROM chat_message_refs ORDER BY sequence')).rows;
   const chatOperations=(await db.query('SELECT operation_id,room_id,message_id,subject_id,kind,request_hash,state FROM chat_message_operations ORDER BY created_at')).rows;
+  const chatAttachments=(await db.query('SELECT id,room_id,subject_id,request_hash,byte_size,sha256,state,message_id,scan_result,revoked_at,purged_at,uploaded_at,expires_at FROM chat_attachments ORDER BY created_at,id')).rows;
   return{checkedAt:new Date().toISOString(),endpoint,origins,roles:people.map(({name,role,origin,subjectId})=>({name,role,origin,subjectId})),seeds:publications,
-   tasks,events,profileStatements,chatRooms,chatMessages,chatOperations,trace:[...trace],lostResponseArmed:{...lost},attachmentsSupported:false,chatTransportAvailable:chatTransport?.available===true};
+   tasks,events,profileStatements,chatRooms,chatMessages,chatOperations,chatAttachments,trace:[...trace],lostResponseArmed:{...lost},attachmentsSupported:services.attachments.specification().supported,chatTransportAvailable:chatTransport?.available===true};
  }
- function landing(person){const chatControls=chatTransport?'<p><a href="/app/rooms">消息与对话</a></p><p>聊天正文由独立真实 Prosody MUC/MAM 保存；附件扫描与上传未配置。</p><button data-loss="chatSend">下一条聊天消息成功后断开一次回应</button><button data-loss="chatEdit">下一次消息编辑成功后断开一次回应</button>':'';
+ function landing(person){const chatControls=chatTransport?'<p><a href="/app/rooms">消息与对话</a></p><p>聊天正文由独立真实 Prosody MUC/MAM 保存；'+(attachmentConfiguration?'附件由任务隔离代理接入真实私有加密存储与 ClamAV 检查，仅用于明确的合成文件。':'附件扫描与上传未配置。')+'</p><button data-loss="chatSend">下一条聊天消息成功后断开一次回应</button><button data-loss="chatEdit">下一次消息编辑成功后断开一次回应</button>':'';
   return '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河共享本地体验</title><style>body{font:16px system-ui;line-height:1.7;max-width:800px;margin:40px auto;padding:0 20px}button,a{font:inherit;margin:6px 10px 6px 0}button{padding:10px 16px}output{display:block;white-space:pre-wrap}</style>'+
   '<h1>共享本地体验 · '+person.name+'</h1><p>本页仅提供明确标记的合成账号及故障控制。点击连接后进入正常银河页面；公开材料、当前许可、签名、设备控制、参与与事实仍由实际服务检查。不会自动发布或伪造工作结果。</p>'+chatControls+
   '<button type="button" id="connect">用这个合成主体进入银河</button><output id="status"></output><p><a href="/app/publish">发起新求助</a><a href="/app/tasks/'+task.taskId+'?section=collaboration">原工作与准确尝试</a><a href="/app/community/posts/'+post.postId+'/versions/'+post.versionId+'">原讨论材料</a><a href="/app/people/'+person.subjectId+'">本人资料</a><a href="/app/account">个人中心</a><a href="/app/settings/identity">身份与设置</a></p><details><summary>本地故障与核对</summary><button data-loss="publication">下一次发布成功后丢一次回应</button><button data-loss="event">下一次工作或回应成功后丢一次回应</button><button data-loss="profile">下一次资料保存成功后丢一次回应</button><a href="/__local__/verify">无密只读当前记录</a></details><script>const status=document.getElementById("status");document.getElementById("connect").onclick=async()=>{try{status.textContent="正在准备原合成主体的真实连接选择…";const response=await fetch("/__local__/connect",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});const value=await response.json();if(!response.ok)throw Error(value.error);status.textContent="请在原设备选择页核对并批准网页连接。";location.href=value.url;}catch(reason){status.textContent=reason.message;}};for(const button of document.querySelectorAll("[data-loss]"))button.onclick=async()=>{await fetch("/__local__/lose-response",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({family:button.dataset.loss})});status.textContent="已设置：下一次该操作实际成功后仅丢失一次HTTP回应，服务记录不撤销。";};</script></html>';}
@@ -166,6 +167,8 @@ export async function createReconstructionFlowPreview({directory,certificate,key
   seed:publications[0],forumSource:{postId:post.postId,versionId:post.versionId},...(prior?.seedConversation?{seedConversation:prior.seedConversation}:{}),boundary:'Production createServices/createApi/Consent/current identity control and Native website bridge, real HTTPS and persisted PGlite SQL. Synthetic identities, OIDC interaction account and labeled work samples only. No user browser, model, remote account, message-archive double or attachment scanner. New work and results must come from normal UI actions.'};
  if(chatTransport){metadata.chatTransport={kind:'real-Prosody-MUC-MAM',available:chatTransport.available===true};
   metadata.boundary+=' Chat content is delivered, versioned and stored by an independently isolated real Prosody component; no Map transport. The visible fault control closes one successful HTTP response after actual SQL/MAM acknowledgement, not a production outage.';}
+ if(attachmentConfiguration){metadata.attachments={supported:services.attachments.specification().supported,kind:'private-adapters-via-isolated-SSH-proxy'};
+  metadata.boundary=metadata.boundary.replace(' or attachment scanner','');metadata.boundary+=' Attachment storage/scanning use configured real private adapters through a run-scoped SSH loopback proxy; no production credentials or storage URLs reach the browser or local preview. Synthetic files only.';}
  await writeFile(metadataFile,JSON.stringify(metadata,null,2));
  return{metadata,services,people,verification,close:async()=>{if(stopped)return;stopped=true;for(const person of people){await person.bridge.close();person.runtime.close();}for(const server of servers){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}api.closeAllConnections();await issuer.close();await db.close();}};
 }

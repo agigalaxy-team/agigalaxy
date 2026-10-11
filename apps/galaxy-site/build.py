@@ -11,6 +11,7 @@ import urllib.request
 
 import chrome
 from product_pages import render_product_pages
+from guide_pages import render_versioned_guides
 
 ROOT = Path(__file__).resolve().parent
 
@@ -108,13 +109,33 @@ def main():
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(copy_archive, catalog['files'].items()))
 
+    public = ROOT / 'public'
+    if public.is_symlink():
+        raise ValueError('Authored public documents must stay in the repository')
+    for source in sorted(public.rglob('*')):
+        if source.is_symlink():
+            raise ValueError('Authored public document symlink rejected')
+        if not source.is_file():
+            continue
+        name = source.relative_to(public).as_posix()
+        if not name.startswith('docs/') or source.suffix != '.md' or name in catalog['files']:
+            raise ValueError('Authored documents must use a new versioned documentation path')
+        target = output / name
+        if target.is_symlink() or not resolved_file_path(target).is_relative_to(output):
+            raise ValueError('Authored document destination escaped the selected output')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+
     chrome.OUT = output
     chrome.PREVIEW = preview
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
     for name in ('site.css', 'navigation.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
-    render_product_pages({'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview})
+    site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview}
+    guide_pages = render_versioned_guides(site, metadata)
+    render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
     pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/network/', '/docs/', '/privacy/', '/status/']
+    pages.extend(guide_pages.values())
     chrome.write('robots.txt', 'User-agent: *\nDisallow: /\n' if preview else
                  'User-agent: *\nAllow: /\nSitemap: https://agigalaxy.org/sitemap.xml\n')
     chrome.write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'

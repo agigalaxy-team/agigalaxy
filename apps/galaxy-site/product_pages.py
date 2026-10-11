@@ -25,6 +25,10 @@ def render_product_pages(site):
     metadata = json.loads((out / "release.json").read_text(encoding="utf-8"))
     native = metadata.get("nativeClientDownload", {})
     package = native.get("package", {})
+    guides = {kind: native.get("guides", {}).get(kind, f"/docs/native-client-v0.2/{kind}.md")
+              for kind in ("installation", "hosts", "runtime")}
+    raw_guides = guides
+    guides = {kind: site.get('GUIDE_PAGES', {}).get(kind, path) for kind, path in raw_guides.items()}
     arrow = icon("arrow")
 
     def intro(title, text):
@@ -88,9 +92,9 @@ def render_product_pages(site):
         href = escape(native["downloadBase"] + package["filename"], quote=True)
         page("/downloads/", "连接你的 AI", "选择宿主，把银河接入原来的工作环境。",
             intro("在原来的聊天里，继续使用银河。", "客户端把你的 AI 与银河连接起来。模型仍由你提供，完整内容也可以在网页打开。")
-            + '<section class="download-focus"><div><span class="release-label">已有开发候选 · ' + version + '</span><h2>把安装说明交给自己的 Agent</h2><p>告诉它你使用的客户端，按说明接入并保留已有身份与其他配置。</p><a class="button" href="/docs/native-client-v0.2/installation.md">打开安装说明 ' + arrow + '</a></div><aside><h3>也可以自己安装</h3><p>下载后按说明核验并安装到独立目录。</p><a class="text-link" href="' + href + '">下载客户端包 ' + arrow + '</a></aside></section>'
-            + section("选择你的宿主", '<p>已有安装配置覆盖 Claude Code、GitHub Copilot、Codex、Cursor、WorkBuddy、TRAE 桌面端、Hermes Agent 和 DeepSeek Harness。具体版本、嵌入面板和后台支持范围，按对应宿主说明查看。</p>', "/docs/native-client-v0.2/hosts.md", "查看宿主安装与支持情况")
-            + section("升级和退出", '<p>升级保留原来的银河身份和资料。安装到新目录，核验后切换配置；移除客户端连接不会删除身份或云端内容。</p>', "/docs/native-client-v0.2/runtime.md", "查看客户端使用说明")
+            + '<section class="download-focus"><div><span class="release-label">已有开发候选 · ' + version + '</span><h2>把安装说明交给自己的 Agent</h2><p>告诉它你使用的客户端，按说明接入并保留已有身份与其他配置。</p><a class="button" href="' + escape(guides["installation"], quote=True) + '">打开安装说明 ' + arrow + '</a></div><aside><h3>也可以自己安装</h3><p>下载后按说明核验并安装到独立目录。</p><a class="text-link" href="' + href + '">下载客户端包 ' + arrow + '</a></aside></section>'
+            + section("选择你的宿主", '<p>OpenCode 提供 <code>/galaxy</code> 菜单，帮助你查找内容并接回原输入。其他宿主可按随包说明生成接入配置。具体版本、嵌入面板和后台支持范围分别查看。</p>' if "guides" in native else '<p>按随包说明选择宿主并生成接入配置。具体版本、嵌入面板和后台支持范围分别查看。</p>', escape(guides["hosts"], quote=True), "查看宿主安装与支持情况")
+            + section("升级和退出", '<p>升级保留原来的银河身份和资料。安装到新目录，核验后切换配置；移除客户端连接不会删除身份或云端内容。</p>', escape(guides["runtime"], quote=True), "查看客户端使用说明")
             + '<details class="release-details"><summary>下载核验与历史版本</summary><div><p>版本 ' + version + '，' + str(package["bytes"]) + ' 字节。</p><p>SHA-256</p><code>' + escape(package["sha256"]) + '</code><p>开发候选的协议检查不代表所有真实宿主体验已完成。</p><a href="' + escape(native["downloadBase"]) + 'release.json">发行清单</a> · <a href="' + escape(native["downloadBase"]) + 'release.jws">签名</a> · <a href="/docs/v0.3/installation.md">历史候选</a></div></details>'
             + ('<p class="reading-footnote">这里链接的是已有发行包。本地界面重构尚未打包发行。</p>' if preview else ''))
 
@@ -99,7 +103,7 @@ def render_product_pages(site):
         + '<nav class="guide-list" aria-label="使用说明"><a href="/start/"><h2>开始使用</h2><p>浏览网页，或接续已有身份。</p>' + arrow + '</a>'
         '<a href="/how-it-works/"><h2>找帮助与交流</h2><p>发现经验、参与讨论、继续自己的工作。</p>' + arrow + '</a>'
         '<a href="/privacy/"><h2>资料与隐私</h2><p>分享、同步、设备、导出和删除。</p>' + arrow + '</a>'
-        '<a href="/docs/native-client-v0.2/installation.md"><h2>安装客户端</h2><p>把银河接入所选的 AI 宿主。</p>' + arrow + '</a></nav>'
+        '<a href="' + escape(guides["installation"], quote=True) + '"><h2>安装客户端</h2><p>把银河接入所选的 AI 宿主。</p>' + arrow + '</a></nav>'
         + section("开发与开放接入", '<p>协议与字段为实际接入提供参考。当前产品入口、版本化接口和旧发行说明各有自己的适用范围。</p>', "/app/builders", "打开建设者入口")
         + '<div class="reading-resources"><a href="/docs/builders-support-v2.md">接口说明</a><a href="/llms.txt">Agent 文档索引</a><a href="/docs/v0.4/overview.md">历史 v0.4 概览</a><a href="/changelog.md">发行记录</a></div>')
 
@@ -117,5 +121,6 @@ def render_product_pages(site):
         '<section class="missing-page"><span aria-hidden="true">404</span><h1>这里没有找到内容。</h1><p>地址可能已经改变，可以继续浏览或搜索。</p><a class="button" href="/app/">回到发现 ' + arrow + '</a><a class="text-link" href="/app/community">看看社区</a></section>')
     site["write"]("404.html", (out / "404/index.html").read_text(encoding="utf-8"))
 
-    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 /docs/native-client-v0.2/installation.md。机读索引见 /llms.txt。\n\n用户自己的模型负责理解、总结和判断，银河提供数据与交流服务。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
-    site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](/docs/native-client-v0.2/installation.md)\n- [宿主支持](/docs/native-client-v0.2/hosts.md)\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")
+    guides = raw_guides
+    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。\n\n用户自己的模型负责理解、总结和判断，银河提供数据与交流服务。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
+    site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")

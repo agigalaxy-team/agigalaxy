@@ -18,6 +18,7 @@ function fixture({ subjectId = null, draft } = {}) {
   let state = { endpoint: 'https://official.example.test', subjectId,
     deviceId: subjectId ? crypto.randomUUID() : null, bindingId: null, generation: null };
   const rows = new Map(), hooks = {}, calls = [];
+  const rowKey = (name, key) => name === 'task-draft' ? key : JSON.stringify([name, key]);
   if (draft !== undefined) rows.set(subjectId ?? 'visitor', copy(draft));
   let tail = Promise.resolve();
   async function hook(kind, input) { if (hooks[kind]) await hooks[kind](input); }
@@ -30,21 +31,23 @@ function fixture({ subjectId = null, draft } = {}) {
     },
     async getLocal(name, key) {
       calls.push({ method: 'read', name, key });
-      const value = copy(rows.get(key)); await hook('read', { key, value }); return value;
+      const value = copy(rows.get(rowKey(name, key))); await hook('read', { name, key, value }); return value;
     },
     updateLocal(name, updater, key) {
       calls.push({ method: 'update', name, key });
       const run = tail.then(async () => {
-        await hook('beforeUpdater', { key });
-        const value = updater(copy(rows.get(key)));
+        await hook('beforeUpdater', { name, key });
+        const value = updater(copy(rows.get(rowKey(name, key))));
         assert.equal(!!value && typeof value.then === 'function', false, 'updater must stay synchronous');
-        rows.set(key, copy(value)); await hook('afterUpdater', { key, value }); return copy(value);
+        rows.set(rowKey(name, key), copy(value)); await hook('afterUpdater', { name, key, value }); return copy(value);
       });
       tail = run.then(() => undefined, () => undefined); return run;
     },
   };
   return { hooks, calls, adapter, client: () => createTaskLocalDraftClient(adapter),
     raw: (key = subjectId ?? 'visitor') => copy(rows.get(key)),
+    local: (name, key = subjectId ?? 'visitor') => copy(rows.get(rowKey(name, key))),
+    externalLocal: (name, value, key = subjectId ?? 'visitor') => rows.set(rowKey(name, key), copy(value)),
     external: (value, key = subjectId ?? 'visitor') => rows.set(key, copy(value)),
     change: patch => { state = { ...state, ...patch }; } };
 }
@@ -306,4 +309,162 @@ test('first write after read-only legacy inspect still detects every concurrent 
   f.external({ title: '旧稿' });
   await rejects(client.save({ summary: '普通编辑也不能覆盖' }), 'task_draft_conflict');
   assert.deepEqual(f.raw(), { title: '旧稿' });
+});
+
+test('recovery resaves original input and base after quota failure without loading or replacing the base', async () => {
+  for (const draft of [stored({title:'原稿',opaque:new Map([['keep',1]])}),{title:'旧原稿',opaque:undefined}]) {
+    const f=fixture({draft}),client=f.client(),base=await client.inspect(),input={title:'配额失败时留在本页的文字'};
+    f.hooks.beforeUpdater=async()=>{throw fail('QuotaExceededError');};
+    await rejects(client.save(input),'QuotaExceededError');
+    delete f.hooks.beforeUpdater;
+    const reads=f.calls.filter(call=>call.method==='read').length;
+    const result=await client.recover(input,{expected:base,assertCurrent(){}});
+    await client.flush();
+    assert.equal(result.value.title,input.title);assert.deepEqual(result.value.opaque,draft.value?.opaque??draft.opaque);
+    assert.equal(f.calls.filter(call=>call.method==='read').length,reads,'recovery cannot adopt an intervening read as a new base');
+    assert.equal(f.local('task-draft-recovery-copies'),undefined,'ordinary recovery creates no additional drafts');
+  }
+});
+
+test('recovery exposes actual conflict as an isolated snapshot and never overwrites another page', async () => {
+  const original=stored({title:'共同原稿'}),f=fixture({draft:original}),a=f.client(),b=f.client();
+  const base=await a.inspect();await b.inspect();const other=await b.save({title:'另一页真正保存的内容'});
+  const input={title:'本页仍未保存的内容'};let failure;
+  try{await a.recover(input,{expected:base,assertCurrent(){}});}catch(error){failure=error;}
+  assert.equal(failure.code,'task_draft_conflict');assert.deepEqual(failure.current,other);
+  failure.current.value.title='不能由错误对象改存储';
+  assert.deepEqual(taskLocalDraftView(f.raw()),other);assert.equal(input.title,'本页仍未保存的内容');
+  await rejects(a.flush(),'task_draft_conflict');
+});
+
+test('a failed local acknowledgement recovers only the exact own commit without another revision', async () => {
+  const f=fixture({draft:stored({title:'原稿'})}),client=f.client(),base=await client.inspect();
+  f.hooks.afterUpdater=async()=>{delete f.hooks.afterUpdater;throw fail('local_callback_lost');};
+  const input={title:'已经实际存入的原输入'};
+  await rejects(client.save(input),'local_callback_lost');const committed=f.raw();
+  const saved=await client.recover(input,{expected:base,assertCurrent(){}});
+  assert.deepEqual(saved,taskLocalDraftView(committed));assert.deepEqual(f.raw(),committed);await client.flush();
+  const later=stored({title:'另一页后来改的原文'}, {id:committed.head.id,revision:committed.head.revision+1});
+  f.external(later);
+  await rejects(client.recover({title:'不能借原丢回应覆盖新稿'},{expected:base,assertCurrent(){}}),'task_draft_conflict');
+  assert.deepEqual(f.raw(),later);
+});
+
+test('recovery recognizes the exact own commit before revision limits and safely continues later input', async () => {
+  for (const revision of [1, Number.MAX_SAFE_INTEGER - 1]) {
+    const f=fixture({draft:stored({title:'旧基底',opaque:true},{id:crypto.randomUUID(),revision})}),client=f.client(),base=await client.inspect();
+    f.hooks.afterUpdater=async()=>{delete f.hooks.afterUpdater;throw fail('local_callback_lost');};
+    await rejects(client.save({title:'第一次实际保存的内容'}),'local_callback_lost');
+    const record=f.raw();
+    const same=await client.recover({title:'第一次实际保存的内容'},{expected:base,assertCurrent(){}});
+    assert.deepEqual(same,taskLocalDraftView(record));assert.equal(same.head.revision,revision+1);
+    if(revision===1){
+      f.hooks.afterUpdater=async()=>{delete f.hooks.afterUpdater;throw fail('second_callback_lost');};
+      await rejects(client.save({title:'第二次已存但回应未知'}),'second_callback_lost');
+      const next=await client.recover({title:'等待中本人又输入的文字'},{expected:same,assertCurrent(){}});
+      assert.equal(next.head.id,same.head.id);assert.equal(next.head.revision,same.head.revision+2);
+      assert.equal(next.value.title,'等待中本人又输入的文字');assert.equal(next.value.opaque,true);
+    }
+  }
+});
+
+test('explicit conflict replacement durably preserves the full old record and opaque fields', async () => {
+  const raw={...stored({title:'另一页已保存的版本',future:{labels:new Set(['x'])}}),opaqueHeader:{keep:true}};
+  const f=fixture({subjectId:ownerA,draft:raw}),client=f.client(),current=await client.inspect();
+  const next=await client.recover({title:'明确继续本页内容'},{expected:current,preserveReplaced:true,assertCurrent(){}});
+  const copies=await f.client().readRecoveryCopies();
+  assert.equal(copies.length,1);assert.equal(copies[0].kind,'replaced');assert.deepEqual(copies[0].snapshot,current);
+  assert.deepEqual(copies[0].raw,raw);assert.deepEqual(f.raw().opaqueHeader,raw.opaqueHeader);
+  assert.equal(next.head.revision,current.head.revision+1);
+  assert.ok(f.calls.every(call=>call.key===ownerA),'backup and canonical share the exact owner key');
+  copies[0].snapshot.value.title='不能改本机副本';
+  assert.equal((await client.readRecoveryCopies())[0].snapshot.value.title,current.value.title);
+  assert.equal(await client.clear(next.head),true);
+  assert.equal((await client.readRecoveryCopies()).length,1,'exact publication ACK does not erase an explicitly preserved input');
+});
+
+test('adopting saved content preserves unsaved input and retries deduplicate durable copies', async () => {
+  const f=fixture({draft:stored({title:'已保存内容'})}),client=f.client(),current=await client.inspect();
+  const input={title:'采用另一页时仍保留本页内容',opaque:undefined};
+  f.hooks.beforeUpdater=async({name})=>{if(name==='task-draft')throw fail('quota_during_canonical');};
+  await rejects(client.recover(current.value,{expected:current,preserveReplaced:true,preserveInput:input,assertCurrent(){}}),'quota_during_canonical');
+  const retained=await client.readRecoveryCopies();assert.equal(retained.length,2);
+  assert.deepEqual(taskLocalDraftView(f.raw()),current);
+  delete f.hooks.beforeUpdater;
+  await client.recover(current.value,{expected:current,preserveReplaced:true,preserveInput:input,assertCurrent(){}});
+  assert.deepEqual(await client.readRecoveryCopies(),retained,'the same retry must not manufacture more saved copies');
+  assert.deepEqual(retained.find(row=>row.kind==='input').snapshot.value,input);await client.flush();
+});
+
+test('another page writing during backup commit remains protected by the original canonical CAS', async () => {
+  const f=fixture({draft:stored({title:'明确比较的已存稿'})}),client=f.client(),current=await client.inspect();
+  const newer=stored({title:'保存副本期间另一页的新稿'},{id:current.head.id,revision:current.head.revision+1});
+  f.hooks.afterUpdater=async({name})=>{if(name==='task-draft-recovery-copies'){f.external(newer);delete f.hooks.afterUpdater;}};
+  await rejects(client.recover({title:'本页修改'},{expected:current,preserveReplaced:true,assertCurrent(){}}),'task_draft_conflict');
+  assert.deepEqual(f.raw(),newer);assert.deepEqual((await client.readRecoveryCopies())[0].snapshot,current);
+});
+
+test('recovery and saved-copy reads fence device, identity and generation changes without leaking either scope', async () => {
+  for(const changed of [{subjectId:ownerB},{deviceId:crypto.randomUUID()},{generation:5},{endpoint:'https://other.example.test'}]){
+    const raw=stored({title:'原主体资料'}),f=fixture({subjectId:ownerA,draft:raw}),client=f.client(),base=await client.inspect(),hold=gate();
+    f.hooks.beforeUpdater=async()=>{hold.entered();await hold.wait;};
+    const operation=client.recover({title:'不得晚写'},{expected:base,preserveReplaced:true,assertCurrent(){}});
+    await hold.hit;f.change(changed);hold.release();await rejects(operation,'task_draft_test_scope_changed');
+    assert.deepEqual(f.raw(ownerA),raw);assert.equal(f.raw(ownerB),undefined);
+    assert.equal(f.local('task-draft-recovery-copies',ownerA),undefined);
+  }
+  const f=fixture({subjectId:ownerA,draft:stored({title:'原稿'})}),client=f.client(),base=await client.inspect();
+  await client.recover({title:'当前稿'},{expected:base,preserveReplaced:true,assertCurrent(){}});
+  const hold=gate();f.hooks.read=async({name})=>{if(name==='task-draft-recovery-copies'){hold.entered();await hold.wait;}};
+  const reading=client.readRecoveryCopies();await hold.hit;f.change({subjectId:ownerB});hold.release();
+  await rejects(reading,'task_draft_test_scope_changed');
+});
+
+test('backup failure or unrecognized saved-copy format keeps the canonical draft and input intact', async () => {
+  const original=stored({title:'保存对照前的原稿'}),f=fixture({draft:original}),client=f.client(),base=await client.inspect();
+  f.hooks.beforeUpdater=async({name})=>{if(name==='task-draft-recovery-copies')throw fail('backup_quota');};
+  await rejects(client.recover({title:'本页内容'},{expected:base,preserveReplaced:true,assertCurrent(){}}),'backup_quota');
+  assert.deepEqual(f.raw(),original);
+  delete f.hooks.beforeUpdater;
+  const future={format:'galaxy-task-draft-recovery-copies',version:2,copies:[],opaque:true};
+  f.externalLocal('task-draft-recovery-copies',future);
+  await rejects(client.recover({title:'不能默盖未来副本'},{expected:base,preserveReplaced:true,assertCurrent(){}}),'task_draft_recovery_copies_invalid');
+  assert.deepEqual(f.raw(),original);assert.deepEqual(f.local('task-draft-recovery-copies'),future);
+});
+
+test('confirmed unavailable material bodies are absent from both replaced raw and snapshot while independent input and locators remain',async()=>{
+ const erased=crypto.randomUUID(),unknown=crypto.randomUUID(),descriptor={materialId:erased,source:{id:'exact-source',version:2},expiresAt:100};
+ const value={title:'另一页独立字',summary:{format:'task-text-v1',segments:[{kind:'literal',text:'原独立说明'},{kind:'material',materialId:erased}]},
+  materials:[descriptor],materialBodies:[{materialId:erased,text:'已确认失效的正文'},{materialId:unknown,text:'未知状态，保留但UI应隐藏'}],
+  opaque:{future:new Map([['original',undefined]])}};
+ for(const raw of [value,{...stored(value),opaqueHeader:{versionHint:'retain'}}]){
+  const f=fixture({draft:raw}),client=f.client(),base=await client.inspect(),own={title:'本页独立字',materialBodies:[value.materialBodies[1]]};
+  const selected=await client.recover(own,{expected:base,preserveReplaced:true,eraseReplacedMaterialIds:[erased],assertCurrent(){}});
+  const [copy]=await client.readRecoveryCopies();
+  assert.equal(copy.snapshot.value.title,'另一页独立字');assert.deepEqual(copy.snapshot.value.materials,[descriptor]);assert.deepEqual(copy.snapshot.value.summary,value.summary);
+  assert.deepEqual(copy.snapshot.value.opaque,value.opaque);assert.deepEqual(copy.snapshot.value.materialBodies,[value.materialBodies[1]]);
+  const retained=taskLocalDraftView(copy.raw);assert.deepEqual(retained.value,copy.snapshot.value);
+  if(raw.format)assert.deepEqual(copy.raw.opaqueHeader,raw.opaqueHeader);
+  assert.equal(selected.value.title,'本页独立字');assert.deepEqual(selected.value.materialBodies,[value.materialBodies[1]]);
+  assert.deepEqual(base.value.materialBodies,value.materialBodies,'the reviewed original snapshot is never mutated');
+ }
+});
+test('material cleanup never bypasses changed original CAS or synchronous expiry and owner guards',async()=>{
+ const erased=crypto.randomUUID(),value={title:'独立原输入',materialBodies:[{materialId:erased,text:'原缓存'}]},raw=stored(value);
+ const f=fixture({draft:raw}),client=f.client(),base=await client.inspect(),next=stored({title:'另一页新版本'},{id:raw.head.id,revision:2});
+ f.external(next);
+ await rejects(client.recover({title:'本页内容'},{expected:base,preserveReplaced:true,eraseReplacedMaterialIds:[erased],assertCurrent(){}}),'task_draft_conflict');
+ assert.deepEqual(f.raw(),next);assert.equal(f.local('task-draft-recovery-copies'),undefined);
+ const g=fixture({draft:raw}),current=g.client(),head=await current.inspect();let valid=true;
+ g.hooks.beforeUpdater=async({name})=>{if(name==='task-draft-recovery-copies')valid=false;};
+ await rejects(current.recover({title:'本人修改'},{expected:head,preserveReplaced:true,eraseReplacedMaterialIds:[erased],
+  assertCurrent(){if(!valid)throw fail('material_read_lease_changed');}}),'material_read_lease_changed');
+ assert.deepEqual(g.raw(),raw);assert.equal(g.local('task-draft-recovery-copies'),undefined);
+});
+test('invalid cleanup selections or an opaque unrecognized body container are not silently overwritten',async()=>{
+ const f=fixture({draft:stored({title:'原文',materialBodies:new Map([['opaque','retain']])})}),client=f.client(),base=await client.inspect(),raw=f.raw();
+ await rejects(client.recover({title:'输入'},{expected:base,preserveReplaced:true,eraseReplacedMaterialIds:['not-an-exact-material-id'],assertCurrent(){}}),'task_draft_recovery_cleanup_invalid');
+ await rejects(client.recover({title:'输入'},{expected:base,eraseReplacedMaterialIds:[crypto.randomUUID()],assertCurrent(){}}),'task_draft_recovery_cleanup_invalid');
+ await rejects(client.recover({title:'输入'},{expected:base,preserveReplaced:true,eraseReplacedMaterialIds:[crypto.randomUUID()],assertCurrent(){}}),'task_draft_recovery_cleanup_invalid');
+ assert.deepEqual(f.raw(),raw);assert.equal(f.local('task-draft-recovery-copies'),undefined);
 });

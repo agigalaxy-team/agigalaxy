@@ -1,0 +1,22 @@
+.galaxy-site .chat-message-attachments{margin-top:12px}
+.galaxy-site .chat-message-attachment{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:start;gap:10px;padding:12px 0;border-top:1px solid var(--g-line)}
+.galaxy-site .chat-message-attachment>svg{margin-top:4px;color:var(--g-muted)}
+.galaxy-site .chat-message-attachment-info{min-width:0}
+.galaxy-site .chat-message-attachment-info>strong{display:block;font-size:14px;line-height:1.65;font-weight:600;overflow-wrap:anywhere}
+.galaxy-site .message-bubble .chat-message-attachment-info>p{margin:4px 0 0;font-size:13px;line-height:1.6;color:var(--g-muted)}
+.galaxy-site .chat-message-attachment-info>small{display:block;margin-top:4px;font-size:12px;line-height:1.65;color:var(--g-muted);overflow-wrap:anywhere}
+.galaxy-site .chat-message-attachment>button{min-height:42px;align-self:center;white-space:nowrap}
+.galaxy-site .attachment-dialog .attachment-selection-note{display:block;margin:14px 0;font-size:14px;line-height:1.75;color:var(--g-ink)}
+.galaxy-site .attachment-dialog .attachment-upload-choice>strong{overflow-wrap:anywhere}
+.galaxy-site .conversation-compose .chat-attachment-picker .attachment-selected-summary{max-width:100%;margin-top:8px;white-space:normal;overflow:visible;font-size:13px;line-height:1.7}
+.galaxy-site .chat-attachment-picker .attachment-selected-item>span{min-width:0;overflow-wrap:anywhere}
+.galaxy-site .chat-attachment-picker .attachment-selected-item>button{flex:none;min-height:32px}
+@media(max-width:650px){
+ .galaxy-site .chat-message-attachment{grid-template-columns:18px minmax(0,1fr)}
+ .galaxy-site .chat-message-attachment>button{grid-column:2;justify-self:start;min-height:44px}
+ .galaxy-site .chat-message-attachment-info>strong{font-size:15px}
+ .galaxy-site .chat-message-attachment-info>small{font-size:13px}
+ .galaxy-site .attachment-dialog .attachment-file-input input{font-size:16px}
+ .galaxy-site .conversation-compose .chat-attachment-picker .attachment-selected-summary{font-size:14px}
+ .galaxy-site .chat-attachment-picker .attachment-selected-item>button{min-height:44px}
+}

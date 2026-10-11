@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.17",
-  "releaseId": "0.1.17",
+  "version": "0.1.18",
+  "releaseId": "0.1.18",
   "component": "site",
-  "backendRelease": "0.1.12",
+  "backendRelease": "0.1.13",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -36,39 +36,45 @@
     "stableRelease": false
   },
   "completeBusinessAcceptance": false,
-  "publicApiObservedAt": "2026-10-11T19:41:05.666568+00:00",
+  "publicApiObservedAt": "2026-10-11T22:12:07.163909+00:00",
   "nativeClientDownload": {
-    "revision": "0.1.9",
+    "revision": "0.1.10",
     "channel": "development-candidate",
-    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.9/",
+    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.10/",
     "keysUrl": "https://agigalaxy.org/releases/keys.json",
     "kid": "galaxy-release-20260911",
     "jwkThumbprint": "mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4",
-    "signatureExpiresAt": "2026-11-07T21:29:53.000Z",
+    "signatureExpiresAt": "2026-11-10T21:45:28.000Z",
     "actualHostAcceptance": false,
     "humanAcceptance": false,
     "stableRelease": false,
     "package": {
       "name": "@galaxy/native-client",
-      "version": "0.1.9",
-      "filename": "galaxy-native-client-0.1.9.tgz",
-      "sha256": "012dec450b274d58624f95da3d4088f11202102a9c56b6fd031136fe4046f8b1",
-      "bytes": 432346,
+      "version": "0.1.10",
+      "filename": "galaxy-native-client-0.1.10.tgz",
+      "sha256": "60a8064170bf9d69b16b9ef0201e3df5be05a651d5653619d85401af46854286",
+      "bytes": 641792,
       "exports": [
         "./runtime",
-        "./server"
+        "./server",
+        "./opencode"
       ],
       "dependencies": {
-        "@modelcontextprotocol/server": "2.0.0",
         "zod": "4.5.4",
+        "@modelcontextprotocol/server": "2.0.0",
         "@a2a-js/sdk": "1.1.0",
         "jose": "6.2.12",
         "ipaddr.js": "2.5.0",
         "canonicalize": "4.0.0",
         "@modelcontextprotocol/ext-apps": "2.0.0"
       },
-      "lockSha256": "9751d2faaa267565653aa14ee2a99bd1c67f517775c778c114bccab3f7a36a26",
-      "sourceHashesSha256": "f50a190e7dc61eec36e2e55ff35b6c19e6135d4be73f2a5056f6016f1f560613"
+      "lockSha256": "9c38332cc4153d1d11d0c4c82a4cd66ba5ace5865dcf22aeb4740a568ecdcdd8",
+      "sourceHashesSha256": "28d29013ead57ca53632b03c6c955abc3c3ef2615f22d3639a716b8251e7a792"
+    },
+    "guides": {
+      "installation": "/docs/native-client/0.1.10/installation.md",
+      "hosts": "/docs/native-client/0.1.10/hosts.md",
+      "runtime": "/docs/native-client/0.1.10/runtime.md"
     }
   },
   "historicalAccountObservation": {
@@ -79,28 +85,28 @@
     "verifiedIdentityProviderCount": 0
   },
   "observedDeployment": {
-    "releaseId": "0.1.12",
-    "observedAt": "2026-10-11T19:41:05.666568+00:00",
-    "schema": 80,
+    "releaseId": "0.1.13",
+    "observedAt": "2026-10-11T22:12:07.163909+00:00",
+    "schema": 81,
     "checks": {
       "healthz": {
         "status": 200,
-        "release": "0.1.12"
+        "release": "0.1.13"
       },
       "readyz": {
         "status": 200,
-        "release": "0.1.12"
+        "release": "0.1.13"
       },
       ".well-known/galaxy-network.json": {
         "status": 200,
-        "release": "0.1.12"
+        "release": "0.1.13"
       }
     },
-    "reportSha256": "0257586cab85545a015e248503698ad2e1e62388244f773903681043eb9512a7"
+    "reportSha256": "cc000f1438accceb951e1b32554ac70011d30a9a572acee0d90bf69a0365f8df"
   },
   "targetCompatibility": {
-    "apiRelease": "0.1.12",
-    "serviceArtifactSha256": "575496d42f73f92f1cd30f2676100b9e204e39d02aca8dc3a73d99d191e7738e",
+    "apiRelease": "0.1.13",
+    "serviceArtifactSha256": "7ae906b05388fbe8cb1a7409b41d74656169724532f6db779e7a6099b9f10d45",
     "publicationProved": true
   },
   "currentAccountAvailability": {
@@ -231,6 +237,26 @@
         }
       },
       "reportSha256": "74f51cd895d7df36300194604cc20cbc55b9feaf37fc2d6b5ec5d1901f5ac641"
+    },
+    {
+      "releaseId": "0.1.12",
+      "observedAt": "2026-10-11T19:41:05.666568+00:00",
+      "schema": 80,
+      "checks": {
+        "healthz": {
+          "status": 200,
+          "release": "0.1.12"
+        },
+        "readyz": {
+          "status": 200,
+          "release": "0.1.12"
+        },
+        ".well-known/galaxy-network.json": {
+          "status": 200,
+          "release": "0.1.12"
+        }
+      },
+      "reportSha256": "0257586cab85545a015e248503698ad2e1e62388244f773903681043eb9512a7"
     }
   ],
   "webGuides": {

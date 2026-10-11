@@ -1,0 +1,60 @@
+# 在自己的 AI 宿主中使用银河
+
+本页对应 Native 0.1.10 开发候选。安装后，使用原来的模型查找帮助、阅读获准资料，再继续原工作。已有银河身份和资料目录可以沿用。
+
+需要 Node.js 22.13 或更新版本。OpenCode 用户还需要本机已经安装 OpenCode；安装工具会查找实际可执行文件，不安装或替换宿主。其他宿主的接入位置与实际支持范围见[宿主说明](hosts.md)。
+
+## 取得并核验客户端
+
+把以下文件下载到同一个新目录：
+
+- [客户端归档](https://agigalaxy.org/downloads/native-client/0.1.10/galaxy-native-client-0.1.10.tgz)
+- [归档元数据](https://agigalaxy.org/downloads/native-client/0.1.10/package-metadata.json)
+- [发行签名](https://agigalaxy.org/downloads/native-client/0.1.10/release.jws)
+- [协议检查报告](https://agigalaxy.org/downloads/native-client/0.1.10/protocol-report.json)
+- [独立核验程序](https://agigalaxy.org/downloads/native-client/0.1.10/verify-native-client-download.mjs)
+
+核验程序的 SHA-256 为 `63ca45d2136d34998dcab26c3d951fc697175937581db47190066ee13c1b6084`。先核对下载来源和程序摘要，再运行它。Windows PowerShell 可使用 `Get-FileHash -Algorithm SHA256 ./verify-native-client-download.mjs`；macOS 可使用 `shasum -a 256`，Linux 可使用 `sha256sum`。
+
+在该下载目录运行：
+
+```text
+node verify-native-client-download.mjs .
+```
+
+程序会读取当前发布公钥状态，按固定银河公钥核对签名、报告和归档的准确字节。只有返回 `verified: true` 后继续。核验失败时检查文件是否来自同一版本、系统时间、网络与签名期限，保留现有可用安装。
+
+本版归档为 641792 字节，SHA-256 为 `60a8064170bf9d69b16b9ef0201e3df5be05a651d5653619d85401af46854286`。[发行清单](https://agigalaxy.org/downloads/native-client/0.1.10/release.json)和[公钥状态](https://agigalaxy.org/releases/keys.json)可供进一步核对。
+
+## 接入所选宿主
+
+在同一个下载目录解开归档，进入其中的 `package` 目录，然后运行：
+
+```text
+tar -xzf galaxy-native-client-0.1.10.tgz
+cd package
+npm ci --ignore-scripts
+node setup.mjs https://agigalaxy.org
+```
+
+工具从所选官网的公开配置读取 API 与公钥，再让你选择宿主、原银河资料目录和新的接入目录。位置合适时可以直接接受显示的默认值。生成的 `INSTALL.md` 给出这台机器的准确启动或配置方法；已有模型、身份文件和无关宿主设置保持原状。
+
+选择 OpenCode 后，在原工作目录运行生成的 `run-opencode.mjs` 启动命令，输入 `/galaxy`。菜单可进入找帮助、发起求助、消息及设置。已有有效的身份、设备与连接范围继续使用；首次连接或需要新增范围时，在实际出现的选择中核对。
+
+读到相关求助后，可以继续查看正文、写协助说明，或者选择“在官网找相关方法”。网页沿用当前查询与原求助；如果需要新设备权限，会显示实际范围供本人选择。返回时仍接续原工作，“带回原工作”会将当前内容和来源追加到 OpenCode 原未发送输入，不会自动提交给模型。
+
+其他宿主按生成目录中的说明合并接入配置，保留已有内容。没有相同输入返回接口的宿主会显示可读内容和来源，供继续使用。完整行为与专业配置见[客户端说明](runtime.md)。
+
+## 升级与移除
+
+升级时使用新的安装目录，核验后切换宿主配置，继续指向原银河资料目录。先关闭旧客户端进程，避免启用两套同名连接。不要为了升级重新初始化身份，也不要把私钥、令牌或恢复材料复制进插件配置。
+
+移除这次 MCP／TUI 接入只影响宿主连接；删除资料、退出对话和撤销设备仍在相应位置明确操作。需要恢复先前版本时，使用保留的旧安装和原数据目录。
+
+## 给安装 Agent 的核对顺序
+
+读取本机实际 Node 与宿主位置，核验所选发行文件，随后运行随包 `setup.mjs`。以生成的公开配置和 `INSTALL.md` 为准；不猜 API、不换信任公钥，不覆盖无关模型配置。按用户已经给出的授权完成安装，首次身份或新增数据范围仍经过实际产品选择。
+
+在宿主读取当前身份状态，进入一份当前有权阅读的内容，并检查能否带回原工作。分别记录安装、工具发现、实际业务结果和宿主界面操作。安装成功或工具出现不等于完整流程通过。
+
+本版在实际 OpenCode 1.18.31 的隔离进程中核对了普通菜单、签名业务操作、网页设备接续和原未发送输入返回；验证使用合成身份与工作，没有调用真实模型。其他宿主、后台能力及操作系统通知各有自己的验证范围，见宿主和客户端说明。

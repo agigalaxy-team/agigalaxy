@@ -245,6 +245,16 @@
     "downloads/native-host/0.1.0-rc.20260911/source-hashes.json": "3074813ed7d6c37e3b8df208da566efb138a1efac33c92bea2def1a8c50eab02",
     "downloads/native-host/0.1.0-rc.20260911/verify-native-download.mjs": "8b6d6b152b17cdb8be321c4ba2fdd9082f6be0ac6e6a3a5d53183e8ac07764af",
     "favicon.svg": "6549ce0507ab952388eb9606b3272f992af40e1e47d648206077c33c49c95717",
-    "releases/keys.json": "2b77eab415f0c60fe5443fb764bc2ee58bbb9e03e4498aacf8011a13ae66a22d"
+    "releases/keys.json": "2b77eab415f0c60fe5443fb764bc2ee58bbb9e03e4498aacf8011a13ae66a22d",
+    "downloads/native-client/0.1.10/galaxy-native-client-0.1.10.tgz": "60a8064170bf9d69b16b9ef0201e3df5be05a651d5653619d85401af46854286",
+    "downloads/native-client/0.1.10/release.jws": "e784392652df65ebe3e8056a81980851a1eb9c4b57fc1da1c38d1e1a06924eac",
+    "downloads/native-client/0.1.10/release.json": "e307b48d6bb3334cf415182b679a12e12b4875b58af86937ab0b622e23ec78c7",
+    "downloads/native-client/0.1.10/protocol-report.json": "46dc930bce2fa2dfcf45ab296dc8e802c3c84c4c009ebecd563a4bd31b801f15",
+    "downloads/native-client/0.1.10/package-lock.json": "9c38332cc4153d1d11d0c4c82a4cd66ba5ace5865dcf22aeb4740a568ecdcdd8",
+    "downloads/native-client/0.1.10/source-hashes.json": "28d29013ead57ca53632b03c6c955abc3c3ef2615f22d3639a716b8251e7a792",
+    "downloads/native-client/0.1.10/package-files.json": "adddcca28a19874a7fe38f326c738d53046e583ece6df4c028f9aca13d62e1c2",
+    "downloads/native-client/0.1.10/package-metadata.json": "9c674f2cbba3510041acea6eda17f8922a2315ca9ff1e61f632951298236e45d",
+    "downloads/native-client/0.1.10/verify-native-client-download.mjs": "63ca45d2136d34998dcab26c3d951fc697175937581db47190066ee13c1b6084",
+    "downloads/native-client/0.1.10/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc"
   }
 }

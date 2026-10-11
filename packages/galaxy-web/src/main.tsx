@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowRight, Compass, Plus, Handshake, MessagesSquare, Fingerprint, ArrowLeft, Copy, Download, Bell, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ const InformationWorkspace = lazy(() => import('./information-workspace').then(m
 const TargetGovernanceWorkspace = lazy(() => import('./target-governance-workspace').then(module => ({default: module.TargetGovernanceWorkspace})));
 const ModerationReviewWorkspace = lazy(() => import('./moderation-review-workspace').then(module => ({default: module.ModerationReviewWorkspace})));
 import { closeSummaryRuntime } from './summary-runtime.mjs';
+import {createDraftHistoryNavigation,draftNavigationBrowser} from './draft-history-navigation.mjs';
 import '@/app/globals.css';
 import './workspace.css';
 import './identity-recovery.css';
@@ -163,6 +164,8 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const {task:taskRecord,loading:taskLoading}=useSyncExternalStore(taskPage.subscribe,taskPage.read,taskPage.read);
   const task=useCurrentTaskProjection(runtime,taskRecord);
   const readingPositions = useRef(new Map<string, number>());
+  const draftHistory = useRef<ReturnType<typeof createDraftHistoryNavigation>|null>(null);
+  const [historySavePending,setHistorySavePending]=useState<'native'|'fallback'|null>(null);
   const restoreReading = useRef<{ route: string; y: number } | null>(location.hash ? {route:location.pathname+location.search,y:0} : null);
   const taskSection=taskReadingSection(task,readTaskSection(routeSearch));
   const selectedIdentityMethod=new URLSearchParams(routeSearch).get('method');
@@ -202,12 +205,16 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const displayedRecovery=useRef<{runtime:Runtime;owner:string;operationId:string;code:string;recovered:boolean}|null>(null);
   const identityWorking=useRef(false),recoveryConnecting=useRef(false),identityRuntime=useRef(runtime);
   useEffect(()=>{identityRuntime.current=runtime;return()=>{identityRuntime.current=null;};},[runtime]);
+  const shellStatus=useRef(status);
+  useLayoutEffect(()=>{shellStatus.current=status;},[status]);
   const taskShellNavigation = useRef<{runtime:Runtime;scopeKey:string;route:string;handler:(target:string)=>void;leaveAction:(action:()=>void)=>void}|null>(null);
   const registerTaskShellNavigation = useMemo(() => (scopeKey:string,handler:(target:string)=>void,leaveAction:(action:()=>void)=>void) => {
     const scope=runtime?.taskDraftScope();
-    if(!runtime||!scope||scope.closed||scope.key!==scopeKey||location.pathname!=='/app/publish')return()=>{};
-    const registration={runtime,scopeKey,route:location.pathname+location.search+location.hash,handler,leaveAction};
+    const route=draftHistory.current?.editorRoute()??location.pathname+location.search+location.hash;
+    if(!runtime||!scope||scope.closed||scope.key!==scopeKey||new URL(route,location.origin).pathname!=='/app/publish')return()=>{};
+    const registration={runtime,scopeKey,route,handler,leaveAction};
     taskShellNavigation.current=registration;
+    draftHistory.current?.resume();
     const page=location.pathname+location.search;
     const skipAnchorChanged=(event:HashChangeEvent)=>{
       const currentScope=runtime.taskDraftScope();
@@ -221,10 +228,12 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   },[runtime]);
   const chatShellNavigation = useRef<{runtime:Runtime;lease:ChoiceViewLease;route:string;handler:(target:string)=>void;leaveAction:(action:()=>void)=>void}|null>(null);
   const registerChatShellNavigation = useMemo(() => (lease:ChoiceViewLease,handler:(target:string)=>void,leaveAction:(action:()=>void)=>void) => {
-    if(!runtime||!/^\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(location.pathname))return()=>{};
+    const route=draftHistory.current?.editorRoute()??location.pathname+location.search+location.hash;
+    if(!runtime||!/^\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(new URL(route,location.origin).pathname))return()=>{};
     try{lease.assertCurrent();}catch{return()=>{};}
-    const registration={runtime,lease,route:location.pathname+location.search+location.hash,handler,leaveAction};
+    const registration={runtime,lease,route,handler,leaveAction};
     chatShellNavigation.current=registration;
+    draftHistory.current?.resume();
     const page=location.pathname+location.search;
     const skipAnchorChanged=(event:HashChangeEvent)=>{
       if(chatShellNavigation.current!==registration||location.pathname+location.search!==page||location.hash!=='#main-content'
@@ -343,11 +352,13 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     const toObject=/^\/app\/(tasks|capsules|projects|community|rooms|people)\/[^/]+/.test(targetPath);
     const browseReturn=fromDirectory&&toObject?from:(enteringIdentity||toObject?history.state?.browseReturn:undefined);
     history.pushState({from,...profileNavigationState(from,target,history.state??{}),...(identityReturn?{identityReturn}:{}),...(browseReturn?{browseReturn}:{})}, '', target);
+    draftHistory.current?.changed();
     const route=destination.pathname+destination.search;
     restoreReading.current={route,y:readingPositions.current.get(route)??0};
     setPath(location.pathname); setRouteSearch(location.search); setRouteHash(location.hash); setError(''); setNotice(''); window.scrollTo(0, 0);
   };
   const navigateFromShell = (target:string) => {
+    if(draftHistory.current?.leave(()=>navigate(target)))return;
     const chatRegistration=chatShellNavigation.current;
     if(runtime&&chatRegistration?.runtime===runtime&&chatRegistration.route===location.pathname+location.search+location.hash){
       try{chatRegistration.lease.assertCurrent();}catch{navigate(target);return;}
@@ -360,8 +371,63 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if(registration?.runtime===runtime&&!scope.closed&&registration.scopeKey===scope.key
       &&registration.route===location.pathname+location.search+location.hash)registration.handler(target);
   };
-  useEffect(() => { const changed = () => { restoreReading.current={route:location.pathname+location.search,y:history.state?.scrollY??readingPositions.current.get(location.pathname+location.search)??0};setPath(location.pathname); setRouteSearch(location.search); setRouteHash(location.hash); if (location.pathname === '/app/settings/identity') setReturnPath(readIdentityReturnTarget()); }; addEventListener('popstate', changed); return () => removeEventListener('popstate', changed); }, []);
-  useEffect(() => { const changed=()=>{setRouteSearch(location.search);setRouteHash(location.hash);};addEventListener('galaxy:route-view-changed',changed);return()=>removeEventListener('galaxy:route-view-changed',changed); }, []);
+  const selectHistoryLeave=useCallback((origin:string)=>{
+    const selected=identityRuntime.current,chatRegistration=chatShellNavigation.current,view=shellStatus.current;
+    if(selected&&chatRegistration?.runtime===selected&&chatRegistration.route===origin){
+      if(!view?.connection||!view.identity)return null;
+      try{chatRegistration.lease.assertCurrent();}catch{return null;}
+      const isCurrent=()=>{if(identityRuntime.current!==selected||chatShellNavigation.current!==chatRegistration)return false;try{chatRegistration.lease.assertCurrent();return true;}catch{return false;}};
+      return{leave:chatRegistration.leaveAction,isCurrent};
+    }
+    if(new URL(origin,location.origin).pathname==='/app/publish'&&selected){
+      const registration=taskShellNavigation.current,scope=selected.taskDraftScope();
+      if(scope.closed||scope.subjectId!==(view?.identity?.subjectId??null))return null;
+      if(registration?.runtime===selected&&registration.scopeKey===scope.key&&registration.route===origin){
+        const isCurrent=()=>{const latest=selected.taskDraftScope();return identityRuntime.current===selected&&taskShellNavigation.current===registration&&!latest.closed&&latest.key===registration.scopeKey;};
+        return{leave:registration.leaveAction,isCurrent};
+      }
+      // An editor still mounting cannot be discarded by browser traversal.
+      return{leave:()=>{},isCurrent:()=>identityRuntime.current===selected&&!selected.taskDraftScope().closed&&selected.taskDraftScope().key===scope.key};
+    }
+    if(/^\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(new URL(origin,location.origin).pathname)&&selected){
+      if(!view?.connection||!view.identity)return null;
+      try{
+        const lease=selected.receiptStatus.captureLease();
+        if(!lease.bindingId||lease.subjectId!==view.identity.subjectId||lease.bindingId!==view.connection.bindingId||lease.generation!==view.connection.generation)return null;
+        return{leave:()=>{},isCurrent:()=>{try{lease.assertCurrent();const latest=shellStatus.current;return identityRuntime.current===selected&&latest?.identity?.subjectId===lease.subjectId&&latest?.connection?.bindingId===lease.bindingId;}catch{return false;}}};
+      }catch{return null;}
+    }
+    return null;
+  },[]);
+  const acceptHistoryLocation=useCallback(()=>{
+    const route=location.pathname+location.search+location.hash;
+    const taskRegistration=taskShellNavigation.current,chatRegistration=chatShellNavigation.current;
+    if(taskRegistration&&taskRegistration.route.split('#')[0]===route.split('#')[0]){
+      const scope=taskRegistration.runtime.taskDraftScope();
+      if(!scope.closed&&scope.key===taskRegistration.scopeKey&&identityRuntime.current===taskRegistration.runtime)taskRegistration.route=route;
+    }
+    if(chatRegistration&&chatRegistration.route.split('#')[0]===route.split('#')[0]){
+      try{chatRegistration.lease.assertCurrent();if(identityRuntime.current===chatRegistration.runtime)chatRegistration.route=route;}catch{/* A stale registration cannot adopt the new location. */}
+    }
+    restoreReading.current={route:location.pathname+location.search,y:history.state?.scrollY??readingPositions.current.get(location.pathname+location.search)??0};
+    setPath(location.pathname);setRouteSearch(location.search);setRouteHash(location.hash);
+    setError('');setNotice('');
+    if(location.pathname==='/app/settings/identity')setReturnPath(readIdentityReturnTarget());
+  },[]);
+  const browserNavigation=useMemo(()=>draftNavigationBrowser(window),[]);
+  useLayoutEffect(()=>{
+    const navigation=createDraftHistoryNavigation({
+      origin:location.origin,read:()=>({route:location.pathname+location.search+location.hash,key:browserNavigation?.key()??null}),
+      traverseTo:browserNavigation?(key,info)=>browserNavigation.traverseTo(key,info):null,
+      selectLeave:selectHistoryLeave,accept:acceptHistoryLocation,held:setHistorySavePending,
+      failed:()=>setError('输入仍保留在本页。暂时未能继续返回，可以再试一次。'),
+    });
+    draftHistory.current=navigation;navigation.start();
+    const changed=()=>navigation.pop(),unlisten=browserNavigation?.listen(event=>navigation.navigate(event));
+    addEventListener('popstate',changed);addEventListener('hashchange',changed);
+    return()=>{removeEventListener('popstate',changed);removeEventListener('hashchange',changed);navigation.stop(()=>unlisten?.());if(draftHistory.current===navigation)draftHistory.current=null;};
+  },[browserNavigation,selectHistoryLeave,acceptHistoryLocation]);
+  useEffect(() => { const changed=()=>{draftHistory.current?.changed();setRouteSearch(location.search);setRouteHash(location.hash);};addEventListener('galaxy:route-view-changed',changed);return()=>removeEventListener('galaxy:route-view-changed',changed); }, []);
   useEffect(()=>{
     const requested=restoreReading.current;
     if(!requested||requested.route!==path+routeSearch)return;
@@ -406,6 +472,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if(!runtime)return;
     const selected=runtime,origin=location.pathname+location.search+location.hash;
     const disconnect=()=>{if(identityRuntime.current!==selected||location.pathname+location.search+location.hash!==origin)return;void run(async()=>{await selected.disconnect();setNotice('已退出本次连接。');});};
+    if(draftHistory.current?.leave(disconnect))return;
     const chatRegistration=chatShellNavigation.current;
     if(chatRegistration?.runtime===selected&&chatRegistration.route===origin){
       try{chatRegistration.lease.assertCurrent();}catch{disconnect();return;}
@@ -490,6 +557,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {busy && <output className="operation-progress"><span/>正在处理当前操作，请稍候…</output>}
         {configError && <section className="connection-unavailable" role="alert"><h1 className="small">暂时连不上银河</h1><p>可以重试，或先浏览介绍与使用文档。</p><div className="button-row"><Button onClick={retryConfiguration}>重新连接</Button><a className="text-link" href="/docs/">阅读使用文档</a></div><details className="technical-details"><summary>连接问题详情</summary><p>{configError}</p></details></section>}
         {error && (task||!/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)) && <div className="message error" role="alert">{error}</div>}{notice && <output className="message">{notice}</output>}
+        {historySavePending&&<div className="message"><output>先保存当前输入，再继续离开。保存失败时，输入会留在本页。</output><Button variant="outline" onClick={()=>draftHistory.current?.resume()}>保存并继续</Button></div>}
         <Suspense fallback={<PageLoading label="正在打开页面…"/>}>
         {!knownPath && <section><h1 className="small">找不到这个页面</h1><p>链接没有对应的银河页面。可以回到首页选择入口，或让原聊天中的模型核对对象地址。</p><Button onClick={() => navigate('/app/')}>回到首页</Button></section>}
         {(path === '/app/' || path === '/app') && <StartPage runtime={runtime} navigate={navigate}/>}
@@ -523,7 +591,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
           {task.schemaVersion===2&&<CommunityTaskReturn key={`forum-return:${task.taskId}:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}`} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} task={task} navigate={navigate}/>}
           <details className="return-note"><summary>在自己的 AI 中继续这项任务</summary><p>让你的模型按同一任务链接刷新当前状态。关闭网页不会取消任务。</p></details></section>}
         {/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path) && task && <Button variant="outline" disabled={!connected} onClick={() => navigate('/app/governance?targetType=task&targetId=' + task.taskId)}>举报与处理</Button>}
-        {/\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(path) && <ChatWorkspace key={path + (status?.identity?.subjectId ?? '')} runtime={runtime} roomId={/^\/app\/rooms\/([0-9a-f-]{36})$/.exec(path)?.[1]} search={location.search} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} needIdentity={needIdentity} registerShellNavigation={registerChatShellNavigation}/> }
+        {/\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(path) && <ChatWorkspace key={path + (status?.identity?.subjectId ?? '')} runtime={runtime} roomId={/^\/app\/rooms\/([0-9a-f-]{36})$/.exec(path)?.[1]} search={routeSearch} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} needIdentity={needIdentity} registerShellNavigation={registerChatShellNavigation}/> }
         {path === '/app/notifications' && <NotificationWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/projects' && !['projects','contacts','recruitment','willingness','discover'].includes(projectParameters.get('section')??'') && <ProjectDirectoryWorkspace runtime={runtime} navigate={navigate}/>}
         {path === '/app/projects' && ['projects','contacts','recruitment','willingness','discover'].includes(projectParameters.get('section')??'') && <ProjectContactWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} initialTab={projectParameters.get('section') ?? undefined} initialProjectId={projectParameters.get('projectId') ?? undefined} initialContactId={projectParameters.get('contactId') ?? undefined}/>}

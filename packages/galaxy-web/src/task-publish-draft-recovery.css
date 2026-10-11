@@ -1,0 +1,32 @@
+.galaxy-site .request-draft-recovery{border-left:3px solid #c8ab77;background:#faf8f2;padding:18px 22px;margin:0 0 26px;color:var(--g-ink)}
+.galaxy-site .request-draft-recovery h2{font-size:18px;line-height:1.55;margin:0 0 8px}
+.galaxy-site .request-draft-recovery p{font-size:14px;line-height:1.8;margin:8px 0;overflow-wrap:anywhere}
+.galaxy-site .request-draft-recovery .button-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.galaxy-site .request-draft-recovery .button-row button{min-height:42px}
+.galaxy-site .request-draft-recovery>details{margin-top:15px;font-size:13px}
+.galaxy-site .request-draft-recovery summary{cursor:pointer;min-height:36px;display:list-item;align-content:center}
+.galaxy-site .request-draft-comparison{margin:20px 0}
+.galaxy-site .request-draft-comparison>section{padding:0 0 18px;margin:18px 0;border-bottom:1px solid var(--g-line)}
+.galaxy-site .request-draft-comparison h3{font-size:15px;line-height:1.6;margin:0 0 12px}
+.galaxy-site .request-draft-comparison>section>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.galaxy-site .request-draft-comparison h4{font-size:13px;color:var(--g-muted);font-weight:500;margin:0 0 8px}
+.galaxy-site .request-draft-comparison p{font-size:14px;line-height:1.8;margin:8px 0;overflow-wrap:anywhere}
+.galaxy-site .request-draft-comparison .request-draft-text{white-space:pre-wrap}
+.galaxy-site .request-draft-comparison .request-draft-text-full{display:block;width:100%;min-height:15rem;max-height:32rem;resize:vertical;overflow:auto;scrollbar-gutter:stable;font-family:inherit;font-size:14px;line-height:1.8;padding:12px;background:var(--g-surface,#fff);border:1px solid var(--g-line);border-radius:4px;color:var(--g-ink)}
+.galaxy-site .request-draft-comparison .request-draft-source-note{color:var(--g-muted);font-size:13px}
+.galaxy-site .request-draft-comparison ul{list-style:none;padding:0;margin:0}
+.galaxy-site .request-draft-comparison li{font-size:13px;line-height:1.8;margin:0 0 12px}
+.galaxy-site .request-draft-comparison a{display:inline-block;margin-left:6px;min-height:32px;color:var(--g-accent)}
+.galaxy-site .request-draft-copies{border-top:1px solid var(--g-line);margin:0 0 24px;padding-top:10px;font-size:14px}
+.galaxy-site .request-draft-copies>summary{cursor:pointer;padding:8px 0;min-height:40px;color:var(--g-muted)}
+.galaxy-site .request-draft-copies>div{padding:14px 0}
+.galaxy-site .request-draft-copies label{font-size:13px;display:grid;gap:8px;max-width:100%}
+.galaxy-site .request-draft-copies select{font:inherit;width:100%;min-width:0;max-width:100%;padding:9px 12px;border:1px solid var(--g-line);border-radius:6px;background:var(--g-surface,#fff);color:var(--g-ink)}
+@media(max-width:650px){
+ .galaxy-site .request-draft-recovery{padding:16px;margin-bottom:22px}
+ .galaxy-site .request-draft-comparison>section>div{grid-template-columns:minmax(0,1fr);gap:16px}
+ .galaxy-site .request-draft-recovery .button-row button{min-height:44px}
+ .galaxy-site .request-draft-copies select{font-size:16px}
+ .galaxy-site .request-draft-comparison .request-draft-text-full{font-size:16px}
+ .galaxy-site .request-compose-page .request-compose-form input,.galaxy-site .request-compose-page .request-compose-form textarea{font-size:16px}
+}
