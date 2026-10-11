@@ -13,6 +13,7 @@ import {createHelpRuntimeV2} from '../../../galaxy-official/src/help-runtime-v2.
 import {verifyGalaxyGenesis} from '../../../galaxy-core/src/galaxy-guid.mjs';
 import {createNativeStore} from './store.mjs';
 import {createNativeNavigation} from './navigation.mjs';
+import {createConfiguredHelpEndpointValidator} from './configured-help-endpoint.mjs';
 import {isWebIdentityTargetPath,webIdentityProtocol,webIdentityProofType,webIdentityTtlSeconds} from './web-identity-handoff.mjs';
 import {createTrustPackageClient} from '../../../galaxy-official/src/trust-package-client.mjs';
 import {createTrustPackageDeviceAdapter} from '../../../galaxy-official/src/trust-package-device-adapter.mjs';
@@ -23,11 +24,30 @@ import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/id
 // Same pinned current-control browser protocol, with a native local signer.
 // No token, PEM or recovery seed is exposed through the returned public methods.
 export async function createNativeRuntime({dataDirectory,endpoint,website,trustedKeys,fetch,now=()=>Math.floor(Date.now()/1000),openBrowser}){
- const store=createNativeStore(dataDirectory),activeKey='native-active:'+endpoint,permissionKey='native-connection:'+endpoint;
- let active=await store.get(activeKey),connecting=null,closed=false;
+ const store=createNativeStore(dataDirectory),activeKey='native-active:'+endpoint;
+ let selection=await store.readConnection(endpoint),active=selection.active,connecting=null,closed=false;
+ const authorityChanged=()=>{throw Object.assign(new Error('native_connection_selection_changed'),{code:'native_connection_selection_changed'});};
+ async function syncSelection(){
+  const current=await store.readConnection(endpoint);
+  if(current.revision!==selection.revision||JSON.stringify(current)!==JSON.stringify(selection)){
+   api.disconnect();
+   if(JSON.stringify(active)!==JSON.stringify(current.active))active=current.active;
+   selection=current;
+  }
+  return selection;
+ }
+ async function sharedLease(){
+  const current=await syncSelection(),revision=current.revision,owner=active;
+  const assertCurrent=async()=>{
+   if(closed)throw new Error('native_runtime_closed');
+   const latest=await syncSelection();if(latest.revision!==revision||active!==owner)authorityChanged();
+  };
+  return{revision,owner,assertCurrent};
+ }
  const sign=async(payload,type)=>{if(!active)throw new Error('native_identity_required');
-  const device=await store.get('device:'+active.subjectId+':'+active.deviceId);if(!device?.privateKey)throw new Error('native_device_key_unavailable');
-  return signIdentityPayload(payload,device.privateKey,{type});};
+  const lease=await sharedLease(),device=await store.get('device:'+lease.owner.subjectId+':'+lease.owner.deviceId);await lease.assertCurrent();
+  if(!device?.privateKey)throw new Error('native_device_key_unavailable');
+  const signature=await signIdentityPayload(payload,device.privateKey,{type});await lease.assertCurrent();return signature;};
  // Fence a connection/close ABA even when both ordinary snapshots are null.
  // Numeric generation remains owned by the canonical browser API.
  let receiptLifecycle={};
@@ -38,9 +58,22 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   close:()=>{receiptLifecycle={};return browserApi.close();}});
  const send=(url,o={})=>{if(!url.startsWith(endpoint+'/'))throw new Error('native_origin_changed');
   return api.call(url.slice(endpoint.length),o.bodyJson===undefined?undefined:JSON.parse(o.bodyJson),{method:o.method??'POST',authenticated:false,...(o.signal?{signal:o.signal}:{})});};
- const saveActive=async value=>{api.disconnect();await store.put(activeKey,value);active=value;};
- const handoff=createIdentityDeviceHandoff({endpoint,send,store,getActive:()=>active,activate:saveActive,allowedScopes:browserScopes,now,createDevice:store.createDevice});
- const fetchPublicControl=subjectId=>api.call('/v2/identity/'+subjectId+'/control',undefined,{method:'GET',authenticated:false});
+ const saveActive=async(value,options={})=>{
+  const lease=await sharedLease();api.disconnect();
+  const saved=await store.updateConnection(endpoint,current=>{
+   if(current.revision!==lease.revision||JSON.stringify(current.active)!==JSON.stringify(lease.owner))authorityChanged();
+   if(Object.hasOwn(options,'expectedOwner')&&JSON.stringify(current.active)!==JSON.stringify(options.expectedOwner))authorityChanged();
+   if(Object.hasOwn(options,'expectedRevision')&&current.revision!==options.expectedRevision)authorityChanged();
+   return{active:value,permission:{enabled:false}};
+  });
+  active=value;selection=saved;
+ };
+ const handoff=createIdentityDeviceHandoff({endpoint,send,store,getActive:async()=>{await syncSelection();return active;},activate:saveActive,allowedScopes:browserScopes,now,createDevice:store.createDevice});
+ const fetchPublicControl=async subjectId=>{
+  const lease=await sharedLease();
+  try{const result=await api.call('/v2/identity/'+subjectId+'/control',undefined,{method:'GET',authenticated:false});await lease.assertCurrent();return result;}
+  catch(error){await lease.assertCurrent();throw error;}
+ };
  const trustDevice=createTrustPackageDeviceAdapter({endpoint,now,getBinding:api.snapshot,
   getMaterial:async()=>{if(closed)throw new Error('native_runtime_closed');const selected=active;
    if(selected){const material=await store.get('device:'+selected.subjectId+':'+selected.deviceId);
@@ -51,17 +84,17 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   writeIdentity:(subjectId,value)=>store.put('native-trust-identity:'+endpoint+':'+subjectId,value),fetchIdentity:fetchPublicControl});
  async function publicControl(subjectId){const state=await fetchPublicControl(subjectId);await trustDevice.remember(state);return state;}
  function captureReceiptLease(requireOwner=true){
-  const owner=active,lifecycle=receiptLifecycle,binding=api.snapshot();
+  const owner=active,lifecycle=receiptLifecycle,binding=api.snapshot(),revision=selection.revision;
   const changed=()=>{throw Object.assign(new Error('receipt_status_authority_changed'),{code:'receipt_status_authority_changed'});};
   const check=()=>{const current=api.snapshot();
-   if(closed||requireOwner&&!owner||active!==owner||receiptLifecycle!==lifecycle||(binding===null)!==(current===null)
+   if(closed||requireOwner&&!owner||active!==owner||selection.revision!==revision||receiptLifecycle!==lifecycle||(binding===null)!==(current===null)
     ||binding&&['subjectId','endpoint','bindingId','generation'].some(k=>binding[k]!==current?.[k]))changed();};
   check();return Object.freeze({subjectId:owner?.subjectId??null,deviceId:owner?.deviceId??null,endpoint,
    bindingId:binding?.bindingId??null,generation:binding?.generation??null,assertCurrent:check});
  }
  const deviceManagement=createIdentityDeviceManagement({endpoint,send,store,getActive:()=>active,captureLease:()=>captureReceiptLease(),now});
  const receiptStatus=Object.freeze({captureLease:()=>captureReceiptLease(),query:async(input,options={})=>{
-  const owner=active,lease=captureReceiptLease(),check=lease.assertCurrent;
+  const shared=await sharedLease(),owner=active,lease=captureReceiptLease(),check=lease.assertCurrent;
   const getContext=async()=>{check();const current=await trustDevice.current();check();
    if(current.identity.subjectId!==owner.subjectId)throw new Error('receipt_status_authority_changed');
    return{subjectId:owner.subjectId,endpoint,control:{deviceId:current.epoch===0?null:owner.deviceId,keyId:current.keyId,epoch:current.epoch},
@@ -69,28 +102,29 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   const signReceiptStatus=createReceiptStatusDeviceSigner({endpoint,trustedKeys,now,getContext,
    getPrivateKey:async()=>{check();const material=await store.get('device:'+owner.subjectId+':'+owner.deviceId);check();
     if(!material?.privateKey)throw new Error('receipt_status_device_key_unavailable');return material.privateKey;}});
-  check();const result=await createReceiptStatusClient({endpoint,trustedKeys,now,fetch,getContext,signReceiptStatus}).query(input,options);check();return result;
+  check();const result=await createReceiptStatusClient({endpoint,trustedKeys,now,fetch,getContext,signReceiptStatus}).query(input,options);await shared.assertCurrent();check();return result;
  }});
  // Trusted Worker composition reuses the canonical signer and saved-Consent
  // protocol. It cannot establish a connection or approve a model-supplied action.
  const workerAuthorization=Object.freeze(Object.fromEntries(['call','prepareAuthorization','submitAuthorization','reconcileAuthorization'].map(method=>[method,async(...args)=>{
-  const lease=captureReceiptLease();
+  const shared=await sharedLease(),lease=captureReceiptLease();
   if(!lease.bindingId||api.snapshot()?.subjectId!==lease.subjectId)throw new Error('native_connection_choice_required');
-  lease.assertCurrent();const result=await api[method](...args);lease.assertCurrent();return result;
+  lease.assertCurrent();const result=await api[method](...args);await shared.assertCurrent();lease.assertCurrent();return result;
  }])));
  async function localIdentity(){const s=await getLocalSnapshot(dataDirectory);if(s.recoveryRequired)throw new Error('local_initialization_requires_recovery');
   if(!s.identity||!verifyGalaxyGenesis(s.identity.id,s.identity.genesisProof))throw new Error('local_identity_required');return s.identity;}
- async function initialize(input,{confirmed=false}={}){if(!confirmed)throw new Error('local_initialization_choice_required');
+ async function initialize(input,{confirmed=false}={}){if(!confirmed)throw new Error('local_initialization_choice_required');await syncSelection();
   const before=await getLocalSnapshot(dataDirectory);
   if(active&&before.identity?.id!==active.subjectId){const plan=resolveGalaxyInitialization(input);
    await store.put('native-modules:'+endpoint+':'+active.subjectId,{plan,selectedAt:now()});
    return{initialized:true,localOnly:true,identity:active.subjectId,connectionCreated:false,result:plan,existingIdentityPreserved:true};}
   const r=await initializeGalaxyIntegration(dataDirectory,{...input,source:'native-v2'});
   return{initialized:true,localOnly:true,identity:(await localIdentity()).id,connectionCreated:false,result:r};}
- async function bootstrap(){const identity=await localIdentity();
+ async function bootstrap(){const original=await sharedLease(),identity=await localIdentity();await original.assertCurrent();
   if(active&&active.subjectId!==identity.id)throw new Error('native_identity_selection_required');
   if(!active){const device=await store.genesisDevice(identity.genesisProof.publicKeyPem);await store.put('device:'+identity.id+':'+device.deviceId,device);
-   await saveActive({subjectId:identity.id,genesisProof:identity.genesisProof,deviceId:device.deviceId,installationId:randomUUID(),bootstrapOperationId:randomUUID()});}
+   await saveActive({subjectId:identity.id,genesisProof:identity.genesisProof,deviceId:device.deviceId,installationId:randomUUID(),bootstrapOperationId:randomUUID()},
+    {expectedOwner:original.owner,expectedRevision:original.revision});}
   const device=await store.get('device:'+active.subjectId+':'+active.deviceId);
   let state;try{state=await publicControl(active.subjectId);}catch(e){if(e.code!=='identity_not_registered')throw e;}
   if(state?.epoch>0){if(!state.devices.some(d=>d.device_id===active.deviceId&&d.status==='active'&&d.epoch===state.epoch&&d.public_key===device.publicKeyPem))throw new Error('old_device_approval_or_browser_recovery_required');return state;}
@@ -105,29 +139,45 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
    newDevice:{deviceId:device.deviceId,publicKeyPem:device.publicKeyPem,scopes:['manage-identity',...browserScopes]}});await control.confirm(preview,{confirmed:true});}
   return publicControl(active.subjectId);
  }
- async function connect({confirmed=false}={}){if(!confirmed)throw new Error('native_connection_choice_required');if(closed)throw new Error('native_runtime_closed');
+ async function connect({confirmed=false,restore=false}={}){if(!confirmed)throw new Error('native_connection_choice_required');if(closed)throw new Error('native_runtime_closed');
   if(connecting)return connecting;
-  connecting=(async()=>{let state;if(active){state=await publicControl(active.subjectId).catch(e=>{if(e.code==='identity_not_registered')return null;throw e;});}
+  connecting=(async()=>{const original=await sharedLease();
+   if(restore&&(!selection.permission?.enabled||selection.permission.subjectId!==active?.subjectId||selection.permission.deviceId!==active?.deviceId))throw new Error('native_connection_choice_required');
+   let state;if(active){state=await publicControl(active.subjectId).catch(e=>{if(e.code==='identity_not_registered')return null;throw e;});}
+   await original.assertCurrent();
    if(!state?.epoch)state=await bootstrap();
+   const lease=await sharedLease();
    const device=await store.get('device:'+active.subjectId+':'+active.deviceId),current=state.devices.find(d=>d.device_id===active.deviceId&&d.status==='active'&&d.epoch===state.epoch);
+   await lease.assertCurrent();
    if(!current||current.public_key!==device.publicKeyPem)throw new Error('current_device_control_required');
-   const scopes=browserScopes.filter(s=>current.scopes.includes(s)||current.scopes.includes('*'));
+   const selectedScopes=restore?selection.permission.scopes:browserScopes;
+   if(!Array.isArray(selectedScopes))throw new Error('native_connection_choice_required');
+   const scopes=browserScopes.filter(s=>selectedScopes.includes(s)&&(current.scopes.includes(s)||current.scopes.includes('*')));
    const result=await api.connect({subjectId:active.subjectId,genesisProof:active.genesisProof,installationId:active.installationId,scopes,
     control:{deviceId:active.deviceId,keyId:await identityKeyId(device.publicKeyPem),epoch:state.epoch}},{confirmed:true});
-   await store.put(permissionKey,{enabled:true,subjectId:active.subjectId,deviceId:active.deviceId,scopes,selectedAt:now()});return result;
-  })();try{return await connecting;}finally{connecting=null;}}
- async function ensure(){if(api.snapshot())return;
-  const permission=await store.get(permissionKey);if(!permission?.enabled||permission.subjectId!==active?.subjectId||permission.deviceId!==active?.deviceId)throw new Error('native_connection_choice_required');
-  await connect({confirmed:true});}
- async function call(path,input,options){await ensure();return api.call(path,input,options);}
+   await lease.assertCurrent();
+   if(!restore){const saved=await store.updateConnection(endpoint,selected=>{
+    if(selected.revision!==lease.revision||JSON.stringify(selected.active)!==JSON.stringify(lease.owner))authorityChanged();
+    return{active:selected.active,permission:{enabled:true,subjectId:active.subjectId,deviceId:active.deviceId,scopes,selectedAt:now()}};
+   });selection=saved;}
+   return result;
+  })().catch(error=>{api.disconnect();throw error;});try{return await connecting;}finally{connecting=null;}}
+ async function ensure(){await syncSelection();
+  const permission=selection.permission;if(!permission?.enabled||permission.subjectId!==active?.subjectId||permission.deviceId!==active?.deviceId)throw new Error('native_connection_choice_required');
+  if(api.snapshot())return;await connect({confirmed:true,restore:true});}
+ async function call(path,input,options){await ensure();const lease=await sharedLease();
+  try{const result=await api.call(path,input,options);await lease.assertCurrent();return result;}
+  catch(error){await lease.assertCurrent();throw error;}}
  async function authorize(input,{confirmed=false}={}){
   const key='native-authorization:'+endpoint+':'+input.requestId;let saved=await store.get(key);
   if(saved&&JSON.stringify(saved.input)!==JSON.stringify(input))throw new Error('native_authorization_request_changed');
-  if(!saved&&!confirmed)throw new Error('native_authorization_choice_required');await ensure();
+  if(!saved&&!confirmed)throw new Error('native_authorization_choice_required');await ensure();const lease=await sharedLease();
   if(!saved){const prepared=await api.prepareAuthorization(input.payloadJson,{action:input.action,objectId:input.objectId,visibility:input.visibility,
-    viewers:input.viewers,expiresAt:input.expiresAt,id:input.requestId,confirmed:true});saved={input,prepared,state:'prepared'};await store.put(key,saved);}
-  try{const result=await api.submitAuthorization(saved.prepared,{confirmed:true,reconcile:true});await store.put(key,{...saved,state:'active'});return{requestId:input.requestId,...result,state:'active'};}
-  catch(error){await store.put(key,{...saved,state:'result-unknown'});throw error;}
+    viewers:input.viewers,expiresAt:input.expiresAt,id:input.requestId,confirmed:true});await lease.assertCurrent();
+   saved=await store.update(key,prior=>{if(prior){if(JSON.stringify(prior.input)!==JSON.stringify(input))throw new Error('native_authorization_request_changed');return prior;}return{input,prepared,state:'prepared'};});}
+  await lease.assertCurrent();
+  try{const result=await api.submitAuthorization(saved.prepared,{confirmed:true,reconcile:true});await lease.assertCurrent();await store.put(key,{...saved,state:'active'});return{requestId:input.requestId,...result,state:'active'};}
+  catch(error){await lease.assertCurrent();await store.update(key,prior=>prior?.state==='active'?prior:{...saved,state:'result-unknown'});throw error;}
  }
  const navigation=createNativeNavigation({website,store,openBrowser,now,captureLease:async()=>{
   const lease=captureReceiptLease(false),current=await status();lease.assertCurrent();
@@ -142,9 +192,14 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   if(object.kind==='project')return call('/v2/projects/'+object.id,undefined,{method:'GET'});
   if(object.kind==='capsule')return call('/v2/capsules/read',{capsuleId:object.id,...(object.versionId?{versionId:object.versionId}:{})});
   return{state:'browser-detail-required',object};}});
- async function status(){const local=await getLocalSnapshot(dataDirectory),modules=active?await store.get('native-modules:'+endpoint+':'+active.subjectId):null;
+ async function status({restoreSelected=false}={}){await syncSelection();let connectionError=null;
+  if(restoreSelected&&!api.snapshot()&&selection.permission?.enabled===true){
+   try{await ensure();}catch(reason){connectionError=/^[a-z0-9_-]{1,100}$/.test(reason.code??reason.message)?reason.code??reason.message:'native_connection_unavailable';}
+   await syncSelection();
+  }
+  const local=await getLocalSnapshot(dataDirectory),modules=active?await store.get('native-modules:'+endpoint+':'+active.subjectId):null;
   return{version:2,endpoint,website,identity:active?.subjectId??local.identity?.id??null,
-  connected:!!api.snapshot(),connection:api.snapshot(),localInitialized:active&&local.identity?.id!==active.subjectId?!!modules:!!local.state?.integration,modelService:'user-host',backgroundModel:'not-started',embeddedUi:'unverified',activeEntries:['match','publish','participate'],
+  connected:!!api.snapshot(),connection:api.snapshot(),...(connectionError?{connectionError}:{}),connectionChoice:{revision:selection.revision,enabled:selection.permission?.enabled===true,subjectId:active?.subjectId??null,deviceId:active?.deviceId??null},localInitialized:active&&local.identity?.id!==active.subjectId?!!modules:!!local.state?.integration,modelService:'user-host',backgroundModel:'not-started',embeddedUi:'unverified',activeEntries:['match','publish','participate'],
   helpPaths:['continue-current-ai','capsule-or-history','open-assistance','bounty-or-expert']};}
  async function command(name,options){const local=await getLocalSnapshot(dataDirectory);
   if(active&&local.identity?.id!==active.subjectId)return{...(await status()),command:name,interface:'chat',identityAlreadyAdopted:true,
@@ -158,7 +213,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
  const helpRead=(url,options)=>{if(!url.startsWith(endpoint+'/'))throw new Error('native_origin_changed');return call(url.slice(endpoint.length),undefined,{method:'GET',signal:options.signal});};
  const helpFlow=Object.freeze(Object.fromEntries(['start','get','query','compose','select','pause','publish','reconcile','refresh','returnToTask','forget','review','actionPreview','prepareAction','executeAction','reconcileAction'].map(method=>[method,async(...args)=>{
   if(closed)throw new Error('native_runtime_closed');const subjectId=(await status()).identity;if(!subjectId)throw new Error('native_identity_required');
-  if(helpSubject!==subjectId){helpInstance=createHelpRuntimeV2({dataDirectory,endpoint,subjectId,now,sessions:helpSessions,send:helpSend,read:helpRead,authorize:input=>authorize(input,{confirmed:true}),
+  if(helpSubject!==subjectId){helpInstance=createHelpRuntimeV2({dataDirectory,endpoint,subjectId,now,sessions:helpSessions,send:helpSend,read:helpRead,authorize:input=>authorize(input,{confirmed:true}),validateEndpoint:createConfiguredHelpEndpointValidator(endpoint),
    readIdentityWithin:async directory=>{const current=await store.readWithin(directory,activeKey);return current?{id:current.subjectId,genesisProof:current.genesisProof}:readJson(localPaths(directory).identity,null);}});helpSubject=subjectId;}
   return helpInstance[method](...args);
  }])));
@@ -218,10 +273,12 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   }
   return{context,assertCurrent:lease.assertCurrent,assertControl,readControl,signContext,...(openBrowser?{openBrowser}:{})};
  }
- return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,get identityGroups(){return identityGroups();},
+ return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,get identityGroups(){return identityGroups();},
   authorizationExists:async input=>{const r=await store.get('native-authorization:'+endpoint+':'+input.requestId);return !!r&&JSON.stringify(r.input)===JSON.stringify(input);},
   device:{pending:handoff.pending,offer:handoff.createOffer,approve:handoff.approveOffer,accept:handoff.acceptApproval,reconcile:handoff.reconcile,cancel:handoff.cancel,
    previewOffer:handoff.previewOffer,previewApproval:handoff.previewApproval},
-  disconnect:async()=>{await store.put(permissionKey,{enabled:false});api.disconnect();return{connected:false,remoteBindingRevoked:false};},
+  disconnect:async()=>{const lease=await sharedLease();const saved=await store.updateConnection(endpoint,current=>{
+   if(current.revision!==lease.revision)authorityChanged();return{active:current.active,permission:{enabled:false}};
+  });selection=saved;api.disconnect();return{connected:false,remoteBindingRevoked:false};},
   close:()=>{closed=true;api.close();},now});
 }

@@ -4,7 +4,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {registerHelpTools} from '../src/help-tools-v2.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
 
-const value=result=>JSON.parse(result.content[0].text);
+const value=result=>result.structuredContent??JSON.parse(result.content[0].text);
 function fixture(){let calls=0;const sessionId=randomUUID(),operationId=randomUUID(),payload={event:{kind:'invite',recipientId:'GUID'+'B'.repeat(28),message:'isolated exact invitation'}};
  const payloadJson=JSON.stringify(payload),payloadHash=createHash('sha256').update(payloadJson).digest('hex');
  const preview={operationId,payloadHash,state:'prepared',recipientIds:[payload.event.recipientId],visibility:'Private',materials:[],payload};
@@ -39,6 +39,7 @@ test('native ordinary MCP fallback reviews exact recipients and content, then re
   const input={sessionId:f.sessionId,operationId:f.operationId,payloadHash:f.payloadHash};
   const wrong=await transport.call('tools/call',{name:'galaxy_help_execute_action',arguments:{...input,payloadHash:'b'.repeat(64)}});
   assert.equal(value(wrong.result).error,'help_action_preview_changed');assert.equal(f.calls(),0);
+  assert.match(wrong.result.content[0].text,/内容或范围已变化/);
   const first=value((await transport.call('tools/call',{name:'galaxy_help_execute_action',arguments:input})).result);
   assert.equal(first.state,'user-choice-needs-browser');assert.equal(f.calls(),0);
   const html=await(await fetch(first.url)).text();assert.ok(html.includes(f.preview.recipientIds[0]));assert.ok(html.includes('isolated exact invitation'));

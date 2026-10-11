@@ -256,6 +256,28 @@ test('lost identity ACK reopens the same operation, then expired transfer proof 
  const after=x.calls.filter(row=>row.path==='/v1/consents').length;await assert.rejects(again.runtime.publishTask(draft(x.f),{confirmed:true}));assert.equal(x.calls.filter(row=>row.path==='/v1/consents').length,after);
 });
 
+test('a delayed browser handoff cannot overwrite the identity selected by another runtime sharing its local store',async t=>{
+ const x=await fixture(t),shared=memoryStore(),stale=await x.web(shared),other=await x.web(shared),request=await x.offer(stale);
+ await stale.runtime.putLocal('task-draft',{title:'Original unsent browser draft'});
+ await other.runtime.createIdentity({confirmed:true});
+ const selected=(await other.runtime.status()).identity,activeKey=`galaxy-web:${x.config.endpoint}:active`,before=await shared.get(activeKey);
+ assert.notEqual(selected.subjectId,x.genesis.id);
+ await assert.rejects(stale.runtime.deviceHandoff.acceptApproval(request.approval,{confirmed:true}),error=>error.code==='device_handoff_owner_changed');
+ assert.deepEqual(await shared.get(activeKey),before);
+ assert.deepEqual((await other.runtime.status()).identity,selected);
+ assert.equal((await stale.runtime.status()).identity,null);
+ assert.equal((await stale.runtime.getLocal('task-draft')).title,'Original unsent browser draft');
+ const pending=await stale.runtime.deviceHandoff.pending();assert.equal(pending.operationId,request.offer.operationId);assert.equal(pending.state,'awaiting-result');
+ assert.ok(await shared.get(`device:${x.genesis.id}:${request.offer.deviceId}`));
+ assert.ok(await shared.get(`device:${selected.subjectId}:${selected.deviceId}`));
+ const writes=x.calls.filter(row=>row.path==='/v2/identity/control/commit'&&JSON.parse(row.body).operationId===request.offer.operationId);
+ assert.equal(writes.length,1);
+ const current=await x.f.identityControl.publicState(x.genesis.id);
+ assert.equal(current.devices.filter(row=>row.device_id===request.offer.deviceId&&row.status==='active').length,1);
+ const reopened=await x.web(shared);assert.deepEqual((await reopened.runtime.status()).identity,selected);
+ await assert.rejects(reopened.runtime.deviceHandoff.pending(),error=>error.code==='device_identity_switch_required');
+});
+
 test('existing-device proof binds exact web key; historical signatures survive native revocation but tampering never becomes current proof',async t=>{
  const x=await fixture(t),browser=await x.web(),request=await x.offer(browser),joined=await browser.runtime.deviceHandoff.acceptApproval(request.approval,{confirmed:true});await browser.runtime.agentContinuity.retainReceipt(joined.receipt);await browser.runtime.connect({confirmed:true});
  const descriptor={subjectId:x.genesis.id,deviceId:request.offer.deviceId,keyId:await identityKeyId(request.offer.publicKeyPem)},signed=await x.signedContext({existingDevice:descriptor});

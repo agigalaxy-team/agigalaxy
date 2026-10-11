@@ -28,6 +28,8 @@ export function nativeHttpDefinitions(api){
  const services={
   assistance:{queryTasks:post('/v2/tasks/query'),getTask:get('/v2/tasks/'),createTask:post('/v2/tasks'),
    submitTaskEvent:dynamic('/v2/tasks/','/events'),proposeParticipation:dynamic('/v2/tasks/','/participations'),submitParticipationEvent:dynamic('/v2/participations/','/events'),taskReceipt:post('/v2/tasks/receipt')},
+  taskMaterials:{prepare:post('/v2/task-materials/prepare'),
+   status:(_actor,id)=>api.call('/v2/tasks/'+id+'/materials/status',undefined,{method:'GET'})},
   taskOwnerRead:{prepare:(_actor,{taskId,...input})=>api.call('/v2/tasks/'+taskId+'/owner-read/prepare',input),
    read:dynamic('/v2/tasks/','/owner-read')},
   taskOwnerControl:{prepare:(_actor,{taskId,...input})=>api.call('/v2/tasks/'+taskId+'/owner-control/prepare',input),

@@ -30,6 +30,7 @@ export function createIdentityDeviceHandoff({endpoint,send,store,getActive,activ
  const key=id=>`identity-handoff:${endpoint}:${id}`,pendingKey=`identity-handoff:${endpoint}:pending`;
  const opKey=id=>`identity-operation:${endpoint}:${id}`;
  if(!handoffQueues.has(store))handoffQueues.set(store,new Map());const queues=handoffQueues.get(store);
+ const localSelections=new WeakMap();
  async function ownerLease(approvalLease=null){
   const runtimeLease=captureLease?.(),checkRuntime=()=>{
    for(const value of [approvalLease,runtimeLease])if(value){const check=value.assertCurrent??value.check;if(typeof check!=='function')fail('device_handoff_lease_invalid');check.call(value);}
@@ -94,7 +95,14 @@ export function createIdentityDeviceHandoff({endpoint,send,store,getActive,activ
   if(!device||device.status!=='active'||device.epoch!==current.epoch||device.public_key!==record.offer.publicKeyPem
    ||record.approval?.request.expectedEpoch!==current.epoch||receipt.epoch!==current.epoch
    ||!device.scopes.some(scope=>scope==='binding'||scope==='*'))fail('device_authorization_no_longer_current');
-  const active=lease.owner;if(active&&(active.subjectId!==record.offer.subjectId||active.deviceId!==record.offer.deviceId))fail('device_identity_switch_required');
+  const active=lease.owner;if(active&&active.subjectId!==record.offer.subjectId)fail('device_identity_switch_required');
+  if(active&&active.deviceId!==record.offer.deviceId){
+   // Remote authorization did not select a different device on this browser.
+   // Keep the exact operation pending until its owner makes that local choice.
+   if(record.state!=='committed')await lease.wait(()=>store.put(key(record.offer.operationId),{...record,state:'awaiting-result',receipt}));
+   return{receipt,identity:{subjectId:record.offer.subjectId,deviceId:record.offer.deviceId},activated:false,
+    needsLocalDeviceSelection:true,connectionRequired:false,dataRecovery:'separate/not-performed'};
+  }
   const identity={subjectId:record.offer.subjectId,genesisProof:current.genesisProof,deviceId:record.offer.deviceId,installationId:record.installationId};
   if(record.state==='committed'){
    // A completed receipt is history, not a selection of the browser's current
@@ -181,6 +189,86 @@ export function createIdentityDeviceHandoff({endpoint,send,store,getActive,activ
    ||receipt.state==='committed'&&(!Number.isSafeInteger(receipt.epoch)||receipt.epoch<1||!/^[a-f0-9]{64}$/.test(receipt.chainHead)))fail('device_handoff_receipt_invalid');
   return receipt;
  }
+ const selectionOriginal=(record,saved)=>JSON.stringify([record.offer,record.approval,record.installationId,saved.request,saved.challenge,saved.commit],sort);
+ async function inspectLocalDeviceSelection(operationId,lease){
+  if(!uuid(operationId))fail('device_request_not_owned');
+  const record=await lease.wait(()=>store.get(key(operationId)));
+  if(!record?.approval)fail('device_handoff_not_submitted');
+  if(['canceled','expired'].includes(record.state))fail(record.state==='canceled'?'device_request_canceled':'device_approval_expired');
+  const {value,material}=await localRecord(record.approval,lease),saved=await lease.wait(()=>store.get(opKey(operationId)));
+  if(!saved?.commit||operationId!==value.offer.operationId||!same(saved.request,value.request)||saved.challenge!==value.challenge
+   ||saved.commit.operationId!==operationId||saved.commit.controllerSignature!==value.controllerSignature||typeof saved.commit.newDeviceProof!=='string')fail('device_handoff_original_changed');
+  if(!uuid(record.installationId)||material.deviceId!==value.offer.deviceId||material.privateKey?.type!=='private'
+   ||material.privateKey.algorithm?.name!=='Ed25519'||!material.privateKey.usages?.includes('sign'))fail('device_key_unavailable');
+  const original=selectionOriginal(record,saved);
+  const checkOriginal=async()=>{
+   const local=await lease.wait(()=>store.get(key(operationId))),operation=await lease.wait(()=>store.get(opKey(operationId)));
+   if(!local||!operation||selectionOriginal(local,operation)!==original)fail('device_handoff_original_changed');
+   if(['canceled','expired'].includes(local.state))fail(local.state==='canceled'?'device_request_canceled':'device_approval_expired');
+   const currentMaterial=await lease.wait(()=>store.get(`device:${value.offer.subjectId}:${value.offer.deviceId}`));
+   if(currentMaterial?.deviceId!==material.deviceId||currentMaterial.publicKeyPem!==material.publicKeyPem
+    ||currentMaterial.privateKey?.type!=='private'||currentMaterial.privateKey.algorithm?.name!=='Ed25519'
+    ||!currentMaterial.privateKey.usages?.includes('sign'))fail('device_key_unavailable');
+  };
+  // Read the original signed commit. Local adoption creates no new signature,
+  // authorization, commit, subject, or device material.
+  await lease.wait(()=>verifySignature(saved.commit.newDeviceProof,value.challenge,value.offer.publicKeyPem,crypto));
+  await checkOriginal();
+  const receipt=checkOriginalReceipt(await call(lease,'status',saved.commit),operationId,value.offer.subjectId);
+  if(receipt.state!=='committed')fail(receipt.state==='canceled'?'device_request_canceled':receipt.state==='expired'?'device_approval_expired':'device_handoff_not_completed');
+  await checkOriginal();
+  const current=await state(value.offer.subjectId,lease),device=current.devices.find(row=>row.device_id===value.offer.deviceId);
+  if(current.epoch!==value.request.expectedEpoch||receipt.epoch!==current.epoch||!device||device.status!=='active'
+   ||device.epoch!==current.epoch||device.public_key!==value.offer.publicKeyPem||!same(device.scopes,value.request.newDevice.scopes)
+   ||!device.scopes.some(scope=>scope==='binding'||scope==='*'))fail('device_authorization_no_longer_current');
+  await checkOriginal();
+  return{record,value,saved,receipt,current,original,checkOriginal};
+ }
+ async function previewLocalDeviceSelection(operationId,lease){
+  const inspected=await inspectLocalDeviceSelection(operationId,lease),{value,current,original}=inspected;
+  if(!lease.owner||lease.owner.subjectId!==value.offer.subjectId)fail('device_identity_switch_required');
+  if(lease.owner.deviceId===value.offer.deviceId)fail('device_local_selection_not_required');
+  const view=Object.freeze({endpoint,subjectId:value.offer.subjectId,operationId,previousDeviceId:lease.owner.deviceId,
+   deviceId:value.offer.deviceId,scopes:Object.freeze([...value.request.newDevice.scopes]),
+   fingerprint:await lease.wait(()=>identityKeyId(value.offer.publicKeyPem,{crypto}))});
+  localSelections.set(view,{lease,owner:JSON.stringify(lease.owner,sort),original,epoch:current.epoch,chainHead:current.chainHead,
+   completed:null,inFlight:null});return view;
+ }
+ async function selectLocalDevice(view,token,lease){
+  await (token.completed??token.lease).check();
+  const inspected=await inspectLocalDeviceSelection(view.operationId,lease),{record,value,receipt,current,original}=inspected;
+  if(original!==token.original)fail('device_handoff_original_changed');
+  if(token.completed){
+   await token.completed.check();
+   if(lease.owner?.subjectId!==value.offer.subjectId||lease.owner.deviceId!==value.offer.deviceId)fail('device_handoff_owner_changed');
+   await lease.wait(()=>store.put(key(value.offer.operationId),{...record,state:'committed',receipt}));
+   return{receipt,identity:{subjectId:value.offer.subjectId,deviceId:value.offer.deviceId},activated:false,alreadyActivated:true,
+    localDeviceSelected:true,needsLocalDeviceSelection:false,connectionRequired:false,dataRecovery:'separate/not-performed'};
+  }
+  await token.lease.check();
+  if(JSON.stringify(lease.owner,sort)!==token.owner)fail('device_handoff_owner_changed');
+  if(current.epoch!==token.epoch||current.chainHead!==token.chainHead)fail('device_local_selection_changed');
+  await inspected.checkOriginal();await lease.check();await token.lease.check();
+  await activate({subjectId:value.offer.subjectId,genesisProof:current.genesisProof,deviceId:value.offer.deviceId,installationId:record.installationId},{expectedOwner:lease.owner});
+  const completed=await ownerLease();
+  if(completed.owner?.subjectId!==value.offer.subjectId||completed.owner.deviceId!==value.offer.deviceId)fail('device_handoff_owner_changed');
+  // Retain the completed owner lease before saving the local completion. A lost
+  // local ACK can be resumed without activating again; a later owner/binding
+  // transition invalidates this token rather than reviving its old selection.
+  token.completed=completed;
+  await completed.wait(()=>store.put(key(value.offer.operationId),{...record,state:'committed',receipt}));
+  return{receipt,identity:{subjectId:value.offer.subjectId,deviceId:value.offer.deviceId},activated:true,alreadyActivated:false,
+   localDeviceSelected:true,needsLocalDeviceSelection:false,connectionRequired:true,dataRecovery:'separate/not-performed'};
+ }
+ function confirmLocalDeviceSelection(view,{confirmed=false}={}){
+  if(!confirmed)return Promise.reject(Object.assign(new Error('device_join_confirmation_required'),{code:'device_join_confirmation_required'}));
+  const token=localSelections.get(view);
+  if(!token)return Promise.reject(Object.assign(new Error('device_local_selection_preview_required'),{code:'device_local_selection_preview_required'}));
+  if(token.inFlight)return token.inFlight;
+  const result=serial(lease=>selectLocalDevice(view,token,lease));token.inFlight=result;
+  void result.then(()=>{if(token.inFlight===result)token.inFlight=null;},()=>{if(token.inFlight===result)token.inFlight=null;});
+  return result;
+ }
  async function resumeLocalIdentity(operationId,{confirmed=false}={},lease){
   if(!confirmed)fail('device_join_confirmation_required');
   if(lease.owner)fail('device_identity_switch_required');
@@ -253,6 +341,8 @@ export function createIdentityDeviceHandoff({endpoint,send,store,getActive,activ
  async function pending(lease){const id=await lease.wait(()=>store.get(pendingKey));if(!id)return null;const record=await lease.wait(()=>store.get(key(id)));if(!record)return null;
   if(lease.owner&&lease.owner.subjectId!==record.offer.subjectId)fail('device_identity_switch_required');
   const saved=await lease.wait(()=>store.get(opKey(id)));return{operationId:id,offer:record.offer,state:record.state,approval:record.approval??null,receipt:record.receipt??null,
+   needsLocalDeviceSelection:!!lease.owner&&lease.owner.subjectId===record.offer.subjectId&&lease.owner.deviceId!==record.offer.deviceId
+    &&record.receipt?.state==='committed'&&!!saved?.commit&&!['canceled','expired'].includes(record.state),
    ...metadata(record,saved,record.receipt??{registered:!!saved?.commit})};}
  return Object.freeze({
   createOffer:(subjectId,options={})=>serial(lease=>createOffer(subjectId,options,lease)),
@@ -264,6 +354,8 @@ export function createIdentityDeviceHandoff({endpoint,send,store,getActive,activ
   reconcile:(operationId,options={})=>serial(lease=>reconcile(operationId,options,lease)),
   resumePending:operationId=>serial(lease=>reconcile(operationId,{retry:true,confirmed:true},lease)),
   resumeLocalIdentity:(operationId,options={})=>serial(lease=>resumeLocalIdentity(operationId,options,lease)),
+  previewLocalDeviceSelection:operationId=>serial(lease=>previewLocalDeviceSelection(operationId,lease)),
+  selectLocalDevice:confirmLocalDeviceSelection,
   cancel:(operationId,options={})=>serial(lease=>cancel(operationId,options,lease)),
   pending:()=>serial(pending),
  });

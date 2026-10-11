@@ -40,8 +40,11 @@ test('stable TUI Native bridge reads actual signed messages, uses an existing re
   const enter=async()=>{assert.equal(page.kind,'alert');page.onConfirm();await delay(15);};
   const viewText=()=>[page?.title,page?.message,...(page?.options??[]).flatMap(option=>[option.title,option.description])].filter(Boolean).join('\n');
   commands.get('galaxy.open').run();await wait(()=>page?.kind==='select');assert.match(viewText(),/当前工作/);
-  await choose('我的与设置');await choose('身份与设备');await wait(()=>page?.kind==='select'&&viewText().includes(subjectId));
-  assert.match(viewText(),/当前设备已连接/);assert.equal(page.options.some(o=>o.title==='创建本机身份'),false);await assert.rejects(stat(unusedHostDirectory),{code:'ENOENT'});
+  await choose('我的与设置');await choose('身份与设备');await wait(()=>page?.kind==='select'&&viewText().includes('身份与设备 · 已连接'));
+  assert.equal(page.options.some(o=>o.title.endsWith('在本机准备身份')||o.title.endsWith('创建本机身份')),false);
+  await choose('当前身份与服务');await wait(()=>page?.kind==='alert'&&viewText().includes(subjectId));
+  assert.match(viewText(),/当前设备已连接/);await assert.rejects(stat(unusedHostDirectory),{code:'ENOENT'});
+  await enter();await wait(()=>page?.kind==='select'&&viewText().includes('身份与设备 · 已连接'));
   commands.get('galaxy.zero').run();await wait(()=>page?.kind==='select'&&page.title.includes('我的与设置'));commands.get('galaxy.zero').run();await wait(()=>page?.kind==='select'&&page.title.startsWith('✧ 银河'));
   await choose('消息');await wait(()=>page?.options?.some(o=>o.title.includes('继续原解析工作')));
   await choose('合成：继续原解析工作');await wait(()=>page?.kind==='alert'&&page.message.includes('解析片段'));

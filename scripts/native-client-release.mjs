@@ -9,6 +9,9 @@ import {verifyNativeLicenseNotices} from './native-license-notices.mjs';
 import {parseComponentRelease} from './release-identifiers.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),sha=x=>createHash('sha256').update(x).digest('hex'),json=x=>JSON.stringify(x,null,2)+'\n';
 const suites=['packages/galaxy-official/test/native-client-v2.test.mjs','packages/galaxy-edge-mcp/test/native-v2-stdio.test.mjs'];
+const originalExports={'./runtime':'./runtime.js','./server':'./server.js'};
+const openCodeExports={...originalExports,'./opencode':'./opencode.js'};
+const copiedHelpers=['host-configs.mjs','host-capabilities.json','prepare-service-config.mjs','setup.mjs'];
 const fail=message=>{throw new Error(message);};
 function inside(directory,name){const path=resolve(directory,name),r=relative(directory,path);if(!r||isAbsolute(r)||r==='..'||r.startsWith('..'+sep))fail('Invalid package member');return path;}
 async function bytes(path){const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink())fail('Regular release input required');return readFile(path);}
@@ -21,12 +24,14 @@ export async function inspectNativeClientCandidate({source,sourceDirectory=root}
  const packageJson=await object(join(source,'package.json')),manifest=await object(join(source,'native-v2.json')),sourceBytes=await bytes(join(source,'source-hashes.json')),
   lockBytes=await bytes(join(source,'package-lock.json')),hashes=JSON.parse(sourceBytes),lock=JSON.parse(lockBytes);
  if(packageJson.name!=='@galaxy/native-client'||!parseComponentRelease(packageJson.version)||packageJson.private!==true||
-  JSON.stringify(packageJson.exports)!==JSON.stringify({'./runtime':'./runtime.js','./server':'./server.js'})||
+  (!isDeepStrictEqual(packageJson.exports,originalExports)&&!isDeepStrictEqual(packageJson.exports,openCodeExports))||
   !isDeepStrictEqual(packageJson.dependencies,lock.packages?.['']?.dependencies)||
   manifest.kind!=='galaxy-native-v2-local-candidate'||manifest.containsPrivateKeys!==false||manifest.containsConfiguredAuthority!==false||
   manifest.sourceFiles!==Object.keys(hashes).length||manifest.releaseId&&manifest.releaseId!==packageJson.version)fail('Native client metadata differs');
  for(const[name,digest]of Object.entries(hashes))if(sha(await bytes(inside(sourceDirectory,name)))!==digest)fail('Native client source is stale');
- for(const[name,digest]of Object.entries(manifest.artifacts))if((!/^[a-zA-Z0-9_-]+\.js$/.test(name)&&name!=='windows-notify-icon.ps1')||sha(await bytes(inside(source,name)))!==digest)fail('Native bundle differs');
+ for(const[name,digest]of Object.entries(manifest.artifacts))if((!/^[a-zA-Z0-9_-]+\.js$/.test(name)&&name!=='windows-notify-icon.ps1'&&!copiedHelpers.includes(name))||sha(await bytes(inside(source,name)))!==digest)fail('Native bundle differs');
+ if(isDeepStrictEqual(packageJson.exports,openCodeExports)&&(!Object.hasOwn(manifest.artifacts,'opencode.js')||!Object.hasOwn(manifest.artifacts,'setup.mjs')))fail('Native OpenCode installation entry missing');
+ for(const name of copiedHelpers)if(Object.hasOwn(manifest.artifacts,name)&&manifest.artifacts[name]!==hashes['integrations/native-v2/'+name])fail('Native installation helper source differs');
  const helperSource='packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1';
  if(manifest.artifacts['windows-notify-icon.ps1']!==undefined&&manifest.artifacts['windows-notify-icon.ps1']!==hashes[helperSource])fail('Native notification helper source differs');
  for(const[name,version]of Object.entries(packageJson.dependencies)){
@@ -87,7 +92,7 @@ export async function prepareNativeClientRelease({source,destination,nodeExecuta
  const report=protocolReport({version:1,profile:'galaxy-native-client/1',scope:'local-stdio-http-fixtures',status:'passed',checkedAt:new Date().toISOString(),
   packageSha256:sha(artifact),sourceSha256,artifactsSha256,runs,
   protocols:['2025-11-25','2026-07-28'],noElicitationSurface:'temporary-loopback-form-HTTP-fixture',actualHostAcceptance:false,humanAcceptance:false,
-  cloudModelsCalled:false,hostCoverage:'Shared protocol only; eight product versions, UI loading and background loops remain unverified.'});
+  cloudModelsCalled:false,hostCoverage:'Shared protocol only; actual product UIs, model use and background loops require separate evidence.'});
  const packageMetadata={name:candidate.packageJson.name,version:candidate.packageJson.version,filename,sha256:sha(artifact),bytes:artifact.length,exports:Object.keys(candidate.packageJson.exports),
   dependencies:candidate.packageJson.dependencies,lockSha256:sha(candidate.lockBytes),sourceHashesSha256:sourceSha256};
  const reportBytes=Buffer.from(json(report));

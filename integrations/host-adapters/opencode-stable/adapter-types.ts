@@ -5,9 +5,18 @@ export type MenuOption = { number: string; title: string; description?: string; 
 export type ModuleEntry = { id: string; title?: string };
 export type Menu = { title: string; options: MenuOption[]; routes: Routes; onBack: Action; onEscape?: Action };
 export type Prompt = { title: string; placeholder: string; value?: string; onConfirm: (value: string) => unknown; onCancel?: Action };
+export type HostWorkResult = { title: string; content: string; sourceUrl?: string };
+export type HostWorkContext = { query?: string; origin?: { host: string; workRef: string }; caseId?: string; taskId?: string;
+  a2a?: { peerId: string; attemptId: string; attemptVersion: number; text: string } };
 type Command = { name: string; title: string; run: Action; desc?: string; category?: string; namespace?: string; slashName?: string; slashAliases?: string[] };
 export interface StableHostApi {
   lifecycle?: { readonly signal: AbortSignal; onDispose(handler: Action): Action };
+  // Public OpenCode TUI SDK. Appending keeps the host's unsent input and does
+  // not submit it or select/start a model.
+  client?: { tui: { appendPrompt(input: { text: string }): Promise<{ data?: boolean; error?: unknown }> } };
+  route?: { readonly current: { name: string; params?: { sessionID?: string } } };
+  state?: { session: { messages(sessionId: string): readonly { id: string; role: string }[] };
+    part(messageId: string): readonly { type: string; text?: string }[] };
   keymap: { registerLayer(layer: { mode?: string; commands: Command[]; bindings?: { key: string; cmd: string; desc: string }[] }): Action };
   ui: {
     dialog: { setSize(size: 'medium' | 'xlarge'): void; clear(): void; replace(factory: Action, dispose?: Action): void };

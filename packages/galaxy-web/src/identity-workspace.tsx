@@ -10,7 +10,7 @@ import {identityTransferLink,readIdentityTransfer} from './identity-transfer.mjs
 import {identityPermissionGroups as scopeGroups,identityPermissionLabel as scopeLabel} from './identity-permission-labels.mjs';
 import './identity-device.css';
 import {initialDeviceInput as initial,savedDeviceInput,approvalDeadline} from './identity-workspace-types';
-import type {DeviceRuntime,DeviceInput,DeviceOffer,OfferPreview,ApprovalPreview,DevicePending,DeviceResult,DeviceReceipt,VisitorDraftPreview,PublicApproval} from './identity-workspace-types';
+import type {DeviceRuntime,DeviceInput,DeviceOffer,OfferPreview,ApprovalPreview,DevicePending,DeviceResult,DeviceReceipt,VisitorDraftPreview,PublicApproval,DeviceSelectionPreview} from './identity-workspace-types';
 
 type Props={showControls?:boolean;controlsOpen?:boolean;runtime:DeviceRuntime|null;subjectId?:string;deviceId?:string;connected?:boolean;navigate:(path:string)=>void;onChange?:()=>void|Promise<void>;onConnected?:()=>void|Promise<void>;onManagementChange?:(canManage:boolean)=>void;onDeviceStateChange?:(current:DeviceControlState|null)=>void};
 const readable=(error:unknown)=>{const reason=error&&typeof error==='object'?error as Record<string,unknown>:{};return ({
@@ -24,6 +24,8 @@ const readable=(error:unknown)=>{const reason=error&&typeof error==='object'?err
  device_authorization_no_longer_current:'这台设备的授权已经失效，不能凭旧记录重新启用。',
  device_handoff_owner_changed:'当前身份已经变化，原设备申请仍保留。',
  device_handoff_not_completed:'这次原连接尚未完成，不能凭本机旧记录接回。',
+ device_local_selection_changed:'当前设备或原批准已改变，请重新查看这次连接后继续。',
+ local_atomic_update_unavailable:'本机存储暂不能安全切换设备，原身份和申请仍保留。',
  device_key_unavailable:'此浏览器缺少原设备材料，请使用已有管理设备或恢复码接续。',
  local_draft_changed:'另一处已修改草稿，请重新查看两份内容后选择。'
 } as Record<string,string>)[typeof reason.code==='string'?reason.code:'']??(typeof reason.message==='string'&&/[\u3400-\u9fff]/.test(reason.message)?reason.message:'暂时无法继续，原申请仍保留。');};
@@ -44,6 +46,7 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
  const requestPreview=requestRead?.source===input.request?requestRead.value:null,requestError=requestRead?.source===input.request?requestRead.error:'';
  const approvalPreview=approvalRead?.source===input.approval?approvalRead.value:null,approvalError=approvalRead?.source===input.approval?approvalRead.error:'';
  const [pending,setPending]=useState<DevicePending|null>(null),[draftPreview,setDraftPreview]=useState<VisitorDraftPreview|null>(null),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
+ const [localSelection,setLocalSelection]=useState<DeviceSelectionPreview|null>(null);
  const [error,setError]=useState(''),[readError,setReadError]=useState(''),[notice,setNotice]=useState('');
  const [manualLink,setManualLink]=useState('');
  const [approvalStatus,setApprovalStatus]=useState<{original:PublicApproval;receipt:DeviceReceipt|null;error:string}|null>(null);
@@ -60,7 +63,7 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
  async function copyTransfer(value:unknown){try{const link=identityTransferLink(location.origin,value);setManualLink(link);await navigator.clipboard.writeText(link);setNotice('链接已复制，请在自己的另一台设备打开或粘贴。');}catch{setError('复制未完成，请展开“手动复制链接”，把链接带到自己的另一台设备。');}}
  function draftKey(value:VisitorDraftPreview|null){return JSON.stringify([value?.visitorDraft,value?.existingDraft]);}
  async function finishConnection(result:DeviceResult,valid:()=>boolean){
-  if(!result?.activated||!valid())return;
+  if((!result?.activated&&!result?.alreadyActivated)||!valid())return;
   const selected=await runtime.status();if(!valid())return;
   if(selected.identity?.subjectId!==result.identity?.subjectId||selected.identity?.deviceId!==result.identity?.deviceId)throw Object.assign(new Error('device_handoff_owner_changed'),{code:'device_handoff_owner_changed'});
   try{await runtime.connect({confirmed:true});}catch(reason){
@@ -81,12 +84,13 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
     if(!valid())return;
     if(result.activated&&!attempted.current.has(operation.operationId)){attempted.current.add(operation.operationId);await finishConnection(result,valid);if(!valid())return;}
     const current:DevicePending|null=await handoff.pending();if(!valid())return;
-    operation=current?{...current,needsReview:result.needsReview||result.receipt?.registered===false,receipt:result.receipt??null}:null;
+    operation=current?{...current,needsReview:result.needsReview||result.receipt?.registered===false,needsLocalDeviceSelection:result.needsLocalDeviceSelection,receipt:result.receipt??null}:null;
    }
    const shown=operation?{...operation,fingerprint:(await handoff.previewOffer(operation.offer)).fingerprint}:null;
+   const selection=operation?.needsLocalDeviceSelection?await handoff.previewLocalDeviceSelection(operation.operationId):null;if(!valid())return;
    const draft:VisitorDraftPreview|null=await runtime.visitorDrafts.preview();if(!valid())return;
-   setPending(shown);setDraftPreview(draft?.visitorDraft&&draftKey(draft)!==dismissedDraft.current?draft:null);setReadError('');setLoading(false);
-  }catch(reason){if(valid()){setReadError(readable(reason));setLoading(false);}}
+   setPending(shown);setLocalSelection(selection);setDraftPreview(draft?.visitorDraft&&draftKey(draft)!==dismissedDraft.current?draft:null);setReadError('');setLoading(false);
+  }catch(reason){if(valid()){setLocalSelection(null);setReadError(readable(reason));setLoading(false);}}
   finally{if(valid())reading.current=false;}
  }
  const resumeConnection=useEffectEvent(()=>refresh(true));
@@ -154,9 +158,13 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
  const tab=input.tab==='approve'&&canApprove?'approve':'invite';
  const originalIsCurrent=pending?.offer.subjectId===subjectId&&pending?.offer.deviceId===deviceId;
  const approveDisabled=busy||!canApprove||!requestPreview||!!input.approved;
- const pendingContent=pending&&<article className="device-transfer-step"><h3>{pending.needsReview?'连接尚待你确认':stateNames[pending.state]??'正在确认上次的连接'}</h3>
+ const pendingContent=pending&&<article className="device-transfer-step"><h3>{pending.needsLocalDeviceSelection?'新设备已获准，选择后继续':pending.needsReview?'连接尚待你确认':stateNames[pending.state]??'正在确认上次的连接'}</h3>
   {pending.state==='offered'&&<><p>把申请链接交给自己的已有设备，在那里核对并批准。</p><Button disabled={busy} onClick={()=>copyTransfer(pending.offer)}><Copy size={16}/>复制申请链接</Button></>}
-  {pending.state==='awaiting-result'&&!pending.needsReview&&<p>连接恢复后，会继续处理这次原申请。</p>}
+  {pending.state==='awaiting-result'&&!pending.needsReview&&!pending.needsLocalDeviceSelection&&<p>连接恢复后，会继续处理这次原申请。</p>}
+  {localSelection?.operationId===pending.operationId&&<><p>这次连接已由自己的管理设备批准。继续后，本浏览器改用获准的新设备；银河身份、原设备记录与草稿保留。</p>
+   <ul className="device-permission-summary">{scopeGroups.map(group=>{const values=group.items.filter(([key])=>localSelection.scopes.includes(key));return values.length?<li key={group.title}>{values.map(([,name])=>name).join('、')}</li>:null;})}</ul>
+   <Button disabled={busy||loading} onClick={()=>void run(async valid=>{const result=await handoff.selectLocalDevice(localSelection,{confirmed:true});await finishConnection(result,valid);})}>使用这个设备继续</Button>
+  </>}
   {pending.needsReview&&!!pending.approval&&<Button disabled={busy} onClick={()=>change({approval:JSON.stringify(pending.approval)})}>继续这次连接</Button>}
   {pending.state==='committed'&&<>
    <p>{!subjectId?'原申请已完成。接回前会核对这台设备当前仍可使用原身份。':!originalIsCurrent?'这是此前设备接入的记录，当前身份与设备不会因此切换。':currentControl&&!canConnectCurrent?'原申请已完成，但当前设备已无法继续原连接。请使用其他管理设备或恢复码接续。':connected?'这是本机此前接入身份的记录。当前设备状态见“我的设备”。':'这是本机此前接入身份的记录。需要连接时，使用上方当前身份的连接入口。'}</p>
@@ -183,7 +191,7 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
      <label htmlFor="device-identity-input">连接链接或已有银河 ID<Input id="device-identity-input" value={input.identity} onChange={event=>change({identity:event.target.value})} placeholder="粘贴已有设备的连接链接" maxLength={48000}/></label>
      <Button type="submit" disabled={busy||loading||!enteredIdentity}><Monitor size={16}/>为这台设备建立连接申请</Button>
     </form>}
-    {pendingContent&&(pending.state==='committed'&&subjectId?<details className="device-transfer-details"><summary>以前的设备接入</summary>{pendingContent}</details>:pendingContent)}
+    {pendingContent&&(pending.state==='committed'&&subjectId&&!pending.needsLocalDeviceSelection?<details className="device-transfer-details"><summary>以前的设备接入</summary>{pendingContent}</details>:pendingContent)}
     {!subjectId&&pending&&activePending&&<div className="device-transfer-form">
      {!approvalPreview?<label htmlFor="device-approval-input">已有设备返回的批准<Textarea id="device-approval-input" value={input.approval} maxLength={48000} onChange={event=>change({approval:event.target.value})} placeholder="粘贴批准链接，内容会自动读取"/></label>:<section className="device-transfer-step"><h3>已有设备已批准这台设备</h3><p>接入后可使用：</p><ul className="device-permission-summary">{scopeGroups.map(group=>{const values=group.items.filter(([key])=>approvalPreview.scopes.includes(key));return values.length?<li key={group.title}>{values.map(([,name])=>name).join('、')}</li>:null;})}</ul><p>批准有效至 {new Date(approvalPreview.expiresAt*1000).toLocaleTimeString('zh-CN')}。</p><div className="button-row"><Button disabled={busy} onClick={()=>void run(async valid=>{const result=await handoff.acceptApproval(approvalPreview.packet,{confirmed:true});await finishConnection(result,valid);if(valid()&&!result.activated)setNotice('正在确认这次连接的结果。');})}><ShieldCheck size={16}/>连接这台设备</Button><Button variant="ghost" disabled={busy} onClick={()=>change({approval:''})}>更换批准链接</Button></div></section>}
      {approvalError&&<output className="message error">{approvalError}</output>}

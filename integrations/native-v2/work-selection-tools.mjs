@@ -8,7 +8,7 @@ const attempts=(view,subjectId)=>latest(view.attempts).filter(a=>a.provenance===
 // row is only a locator; the exact selected facts are read again before use.
 export function registerNativeWorkSelectionTools(server,{runtime}){
  const register=(name,schema,description,run)=>server.registerTool(name,{inputSchema:schema,description,annotations:{readOnlyHint:true}},async input=>{
-  const lease=runtime.receiptStatus.captureLease();try{lease.assertCurrent();const result=await run(input,lease);lease.assertCurrent();return nativeResult(result);}
+  await runtime.ensureConnection?.();const lease=runtime.receiptStatus.captureLease();try{lease.assertCurrent();const result=await run(input,lease);lease.assertCurrent();return nativeResult(result);}
   catch(error){return{isError:true,...nativeResult({error:error.code??'current_work_unavailable',originalWorkRetained:true})};}
  });
  register('galaxy_work_sources',z.strictObject({after:z.string().max(2400).optional()}),

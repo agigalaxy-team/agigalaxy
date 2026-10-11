@@ -32,6 +32,110 @@ async function fixture(){
   async close(){instances.forEach(value=>value.close());server.closeAllConnections();await new Promise(done=>server.close(done));await f.db.close();}};
 }
 
+async function authorizeExpandedDevice(x){
+ const joined=await x.runtime(),client=joined.runtime.deviceHandoff;
+ const initial=await client.createOffer(x.subjectId,{scopes:['binding','consent'],confirmed:true});
+ const initialApproval=await x.old.runtime.deviceHandoff.approveOffer(initial,{confirmed:true});
+ await client.acceptApproval(initialApproval,{confirmed:true});await joined.runtime.connect({confirmed:true});
+ const owner=await joined.store.get('galaxy-web:'+x.f.access.endpoint+':active');
+ const offer=await client.createOffer(x.subjectId,{scopes:['binding','consent','history'],confirmed:true});
+ const approval=await x.old.runtime.deviceHandoff.approveOffer(offer,{confirmed:true});
+ const result=await client.acceptApproval(approval,{confirmed:true});
+ assert.equal(result.receipt.state,'committed');assert.equal(result.needsLocalDeviceSelection,true);assert.equal(result.activated,false);
+ return{joined,client,initial,owner,offer,approval};
+}
+
+test('same-GUID authorization retains the old device until one explicit exact local selection; concurrent and repeated selection create no new commit or proof',{timeout:60000},async()=>{
+ const x=await fixture(),subtle=globalThis.crypto.subtle,originalSign=subtle.sign.bind(subtle),descriptor=Object.getOwnPropertyDescriptor(subtle,'sign');let signs=0;
+ try{
+  const {joined,client,initial,owner,offer}=await authorizeExpandedDevice(x),before=x.commits.length;
+  const key='identity-operation:'+x.f.access.endpoint+':'+offer.operationId,original=await joined.store.get(key);
+  const activeKey='galaxy-web:'+x.f.access.endpoint+':active',oldBinding=joined.runtime.api.snapshot();
+  assert.deepEqual(await joined.store.get(activeKey),owner);assert.equal((await client.pending()).needsLocalDeviceSelection,true);
+  assert.equal((await client.createOffer(x.subjectId,{scopes:offer.scopes,confirmed:true})).operationId,offer.operationId);
+  assert.equal((await client.resumePending(offer.operationId)).needsLocalDeviceSelection,true);
+  assert.equal(joined.runtime.api.snapshot().bindingId,oldBinding.bindingId);
+  const preview=await client.previewLocalDeviceSelection(offer.operationId);
+  assert.deepEqual(preview,{endpoint:x.f.access.endpoint,subjectId:x.subjectId,operationId:offer.operationId,
+   previousDeviceId:initial.deviceId,deviceId:offer.deviceId,scopes:offer.scopes,
+   fingerprint:(await x.f.identityControl.publicState(x.subjectId)).devices.find(row=>row.device_id===offer.deviceId).key_id});
+  assert.equal(Object.isFrozen(preview),true);assert.equal(Object.isFrozen(preview.scopes),true);
+  await assert.rejects(client.selectLocalDevice(preview),error=>error.code==='device_join_confirmation_required');
+  await assert.rejects(client.selectLocalDevice({...preview},{confirmed:true}),error=>error.code==='device_local_selection_preview_required');
+  subtle.sign=function(...args){signs++;return originalSign.apply(this,args);};
+  const first=client.selectLocalDevice(preview,{confirmed:true}),second=client.selectLocalDevice(preview,{confirmed:true});
+  assert.equal(first,second,'the same explicit choice shares the in-flight result');
+  const selected=await first;assert.equal(selected.activated,true);assert.equal(selected.localDeviceSelected,true);assert.equal(selected.connectionRequired,true);
+  assert.deepEqual((await joined.runtime.status()).identity,{subjectId:x.subjectId,deviceId:offer.deviceId});assert.equal(joined.runtime.api.snapshot(),null);
+  const repeated=await client.selectLocalDevice(preview,{confirmed:true});assert.equal(repeated.activated,false);assert.equal(repeated.alreadyActivated,true);
+  assert.equal(repeated.connectionRequired,false);assert.equal((await client.pending()).needsLocalDeviceSelection,false);
+  assert.equal(x.commits.length,before);assert.equal(signs,0);assert.deepEqual(await joined.store.get(key),original);
+  assert.equal(JSON.stringify((await joined.store.get(key)).commit),JSON.stringify(original.commit),'the original signed HTTP bytes are unchanged');
+  assert.ok(await joined.store.get('device:'+x.subjectId+':'+initial.deviceId),'old key material remains local');
+  assert.equal((await x.f.identityControl.publicState(x.subjectId)).devices.find(row=>row.device_id===initial.deviceId).status,'active');
+  subtle.sign=originalSign;await joined.runtime.connect({confirmed:true});subtle.sign=function(...args){signs++;return originalSign.apply(this,args);};
+  await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),error=>error.code==='device_handoff_owner_changed');
+  const binding=joined.runtime.api.snapshot(),receipt=await client.resumePending(offer.operationId);
+  assert.equal(receipt.alreadyActivated,true);assert.equal(receipt.activated,false);assert.equal(joined.runtime.api.snapshot().bindingId,binding.bindingId);
+  assert.equal(x.commits.length,before);assert.equal(signs,0);
+ }finally{if(descriptor)Object.defineProperty(subtle,'sign',descriptor);else Reflect.deleteProperty(subtle,'sign');await x.close();}
+});
+
+test('an exact local device choice resumes a lost local completion ACK without a second activation or server commit',{timeout:60000},async()=>{
+ const x=await fixture();
+ try{
+  const {joined,client,offer}=await authorizeExpandedDevice(x),preview=await client.previewLocalDeviceSelection(offer.operationId);
+  const key='identity-handoff:'+x.f.access.endpoint+':'+offer.operationId,originalPut=joined.store.put;
+  const activeKey='galaxy-web:'+x.f.access.endpoint+':active',before=x.commits.length,activations=joined.writes.filter(name=>name===activeKey).length;
+  let loseAck=true;joined.store.put=async(name,value)=>{const result=await originalPut(name,value);
+   if(loseAck&&name===key&&value.state==='committed'){loseAck=false;throw Error('Synthetic local completion ACK lost');}return result;};
+  await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),/local completion ACK lost/);
+  assert.equal((await joined.runtime.status()).identity.deviceId,offer.deviceId);
+  const resumed=await client.selectLocalDevice(preview,{confirmed:true});assert.equal(resumed.activated,false);assert.equal(resumed.alreadyActivated,true);
+  assert.equal(joined.writes.filter(name=>name===activeKey).length,activations+1);assert.equal(x.commits.length,before);
+  assert.equal((await client.pending()).state,'committed');assert.equal((await client.pending()).needsLocalDeviceSelection,false);
+ }finally{await x.close();}
+});
+
+test('local device previews refuse original changes, unreadable status, withdrawn scope, revocation and another page winning the owner CAS',{timeout:60000},async()=>{
+ const x=await fixture();
+ try{
+  const {joined,client,owner,offer}=await authorizeExpandedDevice(x),before=x.commits.length;
+  const key='identity-operation:'+x.f.access.endpoint+':'+offer.operationId,saved=await joined.store.get(key);
+  const preview=await client.previewLocalDeviceSelection(offer.operationId);
+  joined.rows.set(key,{...saved,commit:{...saved.commit,newDeviceProof:saved.commit.newDeviceProof+'A'}});
+  await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),error=>error.code==='device_approval_signature_invalid');joined.rows.set(key,saved);
+  x.setStatusOffline(true);await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),/status unavailable/);x.setStatusOffline(false);
+  const current=await x.f.identityControl.publicState(x.subjectId),device=current.devices.find(row=>row.device_id===offer.deviceId);
+  // This one disposable database change models a current permission withdrawal;
+  // the saved approval, original commit and original deadline remain untouched.
+  await x.f.db.query('UPDATE device_authorizations SET scopes=$2 WHERE device_id=$1',[offer.deviceId,JSON.stringify(['binding','consent'])]);
+  await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),error=>error.code==='device_authorization_no_longer_current');
+  await x.f.db.query('UPDATE device_authorizations SET scopes=$2 WHERE device_id=$1',[offer.deviceId,JSON.stringify(device.scopes)]);
+  assert.deepEqual(await joined.store.get('galaxy-web:'+x.f.access.endpoint+':active'),owner);
+  const otherPage=await x.runtime(joined.rows),otherPreview=await otherPage.runtime.deviceHandoff.previewLocalDeviceSelection(offer.operationId);
+  const winning=await otherPage.runtime.deviceHandoff.selectLocalDevice(otherPreview,{confirmed:true});assert.equal(winning.activated,true);
+  const third=await otherPage.runtime.deviceHandoff.createOffer(x.subjectId,{scopes:['binding','consent','history','context'],confirmed:true});
+  const thirdApproval=await x.old.runtime.deviceHandoff.approveOffer(third,{confirmed:true});
+  const thirdCommit=await otherPage.runtime.deviceHandoff.acceptApproval(thirdApproval,{confirmed:true});assert.equal(thirdCommit.needsLocalDeviceSelection,true);
+  const thirdPreview=await otherPage.runtime.deviceHandoff.previewLocalDeviceSelection(third.operationId);
+  assert.equal((await otherPage.runtime.deviceHandoff.selectLocalDevice(thirdPreview,{confirmed:true})).activated,true);
+  await assert.rejects(client.selectLocalDevice(preview,{confirmed:true}),error=>error.code==='device_local_selection_changed');
+  const currentPreview=await client.previewLocalDeviceSelection(offer.operationId);
+  await assert.rejects(client.selectLocalDevice(currentPreview,{confirmed:true}),error=>error.code==='device_handoff_owner_changed');
+  assert.equal((await joined.store.get('galaxy-web:'+x.f.access.endpoint+':active')).deviceId,third.deviceId);
+  assert.equal((await joined.runtime.status()).identity.deviceId,owner.deviceId,'the losing page does not pretend it adopted the other page’s owner');
+  assert.equal(x.commits.length,before+1);assert.deepEqual((await joined.store.get(key)).commit,saved.commit);
+  const h=createIdentityDeviceHandoff({endpoint:x.f.access.endpoint,send:joined.runtime.api.send,store:joined.store,getActive:async()=>owner,
+   activate:async()=>{assert.fail('a revoked device cannot be adopted');},allowedScopes:browserScopes,now:()=>x.f.now});
+  const revokedPreview=await h.previewLocalDeviceSelection(offer.operationId);
+  const revoked=await x.old.runtime.deviceManagement.confirm(await x.old.runtime.deviceManagement.prepareRevoke({deviceId:offer.deviceId}),{confirmed:true});
+  assert.equal(revoked.receipt.state,'committed');
+  await assert.rejects(h.selectLocalDevice(revokedPreview,{confirmed:true}),error=>error.code==='device_authorization_no_longer_current');
+  assert.equal(x.commits.length,before+2);
+ }finally{await x.close();}
+});
+
 test('saved original device commit resumes exact HTTP bytes with zero new proof and never reactivates a completed device',{timeout:60000},async()=>{
  const x=await fixture(),subtle=globalThis.crypto.subtle,originalSign=subtle.sign.bind(subtle),originalSignDescriptor=Object.getOwnPropertyDescriptor(subtle,'sign');let signs=0;
  try{
@@ -224,7 +328,9 @@ test('local resumption refuses another current owner, missing material, changed 
   subtle.sign=function(...args){signs++;return originalSign.apply(this,args);};
   owner={subjectId:x.subjectId,deviceId:(await x.old.runtime.status()).identity.deviceId};
   await assert.rejects(h.resumeLocalIdentity(offer.operationId,{confirmed:true}),error=>error.code==='device_identity_switch_required');
-  await assert.rejects(h.resumePending(offer.operationId),error=>error.code==='device_identity_switch_required');
+  const awaitingSelection=await h.resumePending(offer.operationId);
+  assert.equal(awaitingSelection.needsLocalDeviceSelection,true);assert.equal(awaitingSelection.activated,false);
+  assert.equal(owner.deviceId,(await x.old.runtime.status()).identity.deviceId);
   owner={subjectId:'GUID1501M4GK4NZ08ZZ04CJ2A4CCHPTS',deviceId:crypto.randomUUID()};
   await assert.rejects(h.resumeLocalIdentity(offer.operationId,{confirmed:true}),error=>error.code==='device_identity_switch_required');owner=null;
   x.setStatusOffline(true);await assert.rejects(h.resumeLocalIdentity(offer.operationId,{confirmed:true}),/status unavailable/);x.setStatusOffline(false);

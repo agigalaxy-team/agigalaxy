@@ -30,18 +30,22 @@ export function createNativeReview({now=()=>Date.now()}={}){
    const rows=choice.rows.map(row=>'<section>'+(row.download?'<a download="galaxy-content.json" href="data:application/json;charset=utf-8,'+escape(encodeURIComponent(row.download))+'">下载本次完整内容</a>':'<h2>'+escape(row.label)+'</h2><p class="content">'+escape(row.text)+'</p>')+'</section>').join('');
    const scope=choice.sections.map(row=>'<div><dt>'+escape(row.label)+'</dt><dd>'+escape(row.text)+'</dd></div>').join('');
    const refs=(choice.recipientRefs.length?'<details><summary>接收方身份</summary><p>这些成员尚未提供可显示的名称。请按已有身份核对。</p>'+choice.recipientRefs.map(ref=>'<p class="ref">'+escape(ref)+'</p>').join('')+'</details>':'')+(choice.identityRefs.length?'<details><summary>身份与设备</summary>'+choice.identityRefs.map(ref=>'<p class="ref">'+escape(ref.label)+'：'+escape(ref.value)+'</p>').join('')+'</details>':'');
-   const choices=entry.state==='pending'?'<form method="post" action="'+escape(path)+'"><button class="primary" type="submit" name="action" value="allow">允许本次操作</button><button type="submit" name="action" value="decline">取消</button></form>':'<p>'+({accepted:'已允许。可以回到原聊天继续。',declined:'已取消，本次操作没有获得授权。',consumed:'这次授权已用于原操作。'}[entry.state]??'请选择后回到原聊天。')+'</p>';
+   const choices=entry.state==='pending'?'<form method="post" action="'+escape(path)+'"><button class="primary" type="submit" name="action" value="allow">允许本次操作</button><button type="submit" name="action" value="decline">取消</button></form>':'<p>'+({accepted:'已允许。可以回到原聊天继续。',declined:'已取消，本次操作没有获得授权。','declined-delivered':'已取消，本次操作没有获得授权。',consumed:'这次授权已用于原操作。'}[entry.state]??'请选择后回到原聊天。')+'</p>';
    return response(res,200,'<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河 · '+escape(choice.title)+'</title><style>body{font:16px/1.65 system-ui;max-width:680px;margin:28px auto;padding:0 20px 48px;background:#faf9f6;color:#25252c}header{color:#686471;font-size:14px}h1{font-size:26px;margin:20px 0}h2{font-size:14px;color:#686471;margin:0 0 5px}section{margin:22px 0}.content{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}dl{background:white;border:1px solid #e7e3ed;border-radius:12px;padding:12px 18px}dl div{padding:7px 0}dt{color:#686471;font-size:14px}dd{margin:0;overflow-wrap:anywhere}button{font:inherit;padding:11px 22px;margin:8px 10px 8px 0;border:1px solid #cec8da;border-radius:9px;background:white;cursor:pointer}.primary{background:#655285;color:white;border-color:#655285}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #b79fdd;outline-offset:3px}.muted,details{font-size:14px;color:#686471}details{margin-top:22px}.ref{overflow-wrap:anywhere}a{color:#655285}</style><header>✧ 银河 · 当前宿主的本机选择</header><h1>'+escape(choice.title)+'</h1>'+rows+(scope?'<dl>'+scope+'</dl>':'')+'<p class="muted">'+escape(choice.note)+'有效至 '+escape(new Date(entry.expiresAt).toLocaleTimeString('zh-CN'))+'。</p>'+choices+refs+'<details><summary>来源与诊断</summary><p>保留本次输入、准确身份与引用，供需要核对或诊断时查看。</p><a href="'+escape(path)+'?download=1" download="galaxy-operation.json">下载本次完整操作</a></details></html>');
   });server.once('error',reject);server.listen(0,'127.0.0.1',()=>{origin='http://127.0.0.1:'+server.address().port;server.unref();resolve();});});
   try{await starting;}finally{starting=null;}
  }
  async function request({key,name,input,identity}){
-  await start();prune();let found=[...entries].find(([,e])=>e.key===key&&e.state!=='consumed');
+  await start();prune();let found=[...entries].find(([,e])=>e.key===key&&e.state!=='consumed'&&e.state!=='declined-delivered');
   if(!found){const until=input?.expiresAt??input?.preview?.expiresAt,deadline=typeof until==='number'?(until<1e12?until*1000:until):Date.parse(until);
    const path='/review/'+randomBytes(24).toString('hex'),entry={key,state:'pending',expiresAt:Math.min(now()+300000,Number.isFinite(deadline)?deadline:Infinity),view:describeNativeChoice(name,input),exact:JSON.stringify({operation:name,identity:identity||'尚未初始化',input},null,2)};entries.set(path,entry);found=[path,entry];}
   const[path,entry]=found;return{state:entry.state,url:origin+path,expiresAt:entry.expiresAt,sideEffect:false,reviewSurface:'temporary-local-browser'};
  }
  function close(){closed=true;entries.clear();server?.closeAllConnections();server?.close();server=null;}
  function consume(key){prune();const entry=[...entries.values()].find(value=>value.key===key&&value.state==='accepted');if(!entry)return false;entry.state='consumed';return true;}
- return{request,consume,close};
+ // Report a cancellation once to the original caller, retaining its exact
+ // local page. A later explicit request may make a new choice, never reuse
+ // this cancellation as permission or revive the canceled business action.
+ function dismiss(key){const entry=[...entries.values()].find(value=>value.key===key&&value.state==='declined');if(entry)entry.state='declined-delivered';}
+ return{request,consume,dismiss,close};
 }

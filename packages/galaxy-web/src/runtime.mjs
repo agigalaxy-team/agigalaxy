@@ -150,8 +150,20 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
   let identityActivationTail = Promise.resolve();
   const saveActive = (value, options = {}) => {
     const operation = identityActivationTail.then(async () => {
-      if (closed || (Object.hasOwn(options, 'expectedOwner') && options.expectedOwner !== active)) throw new Error('当前身份或页面已改变，请重新核对原身份操作。');
-      await store.put(activeKey, value);
+      const checked = Object.hasOwn(options, 'expectedOwner');
+      const changed = () => { throw Object.assign(new Error('当前身份或页面已改变，请重新核对原身份操作。'), { code:'device_handoff_owner_changed' }); };
+      if (closed || checked && options.expectedOwner !== active) changed();
+      if (checked) {
+        if (typeof store.update !== 'function') throw Object.assign(new Error('本机存储暂不能安全切换设备，原身份仍保留。'), { code:'local_atomic_update_unavailable' });
+        await store.update(activeKey, current => {
+          if (closed || options.expectedOwner !== active) changed();
+          // Another window may have completed this same confirmed operation.
+          // Keep its exact result; only a different selection is a conflict.
+          if (equalJson(current ?? null, value ?? null)) return current;
+          if (!equalJson(current ?? null, options.expectedOwner ?? null)) changed();
+          return value;
+        });
+      } else await store.put(activeKey, value);
       if (closed) throw new Error('当前页面已关闭，请重新读取本机身份。');
       if (options.disconnect) api.disconnect();
       active = value; localDraftGeneration++;

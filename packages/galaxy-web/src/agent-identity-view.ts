@@ -8,7 +8,8 @@ type Lease=ReturnType<AgentIdentityRuntime['receiptStatus']['captureLease']>;
 type ConnectedIdentity={subjectId:string;deviceId:string;targetPath:string;operationId:string|null};
 type DraftPreview=NonNullable<Awaited<ReturnType<AgentIdentityRuntime['visitorDrafts']['preview']>>>;
 type DraftChoice=ConnectedIdentity&{preview:DraftPreview;lease:Lease};
-type HandoffState={phase:string;context?:AgentConnectionContext|null;fingerprint?:string|null;code?:string|null;additionalDeviceApproval?:boolean};
+export type LocalDeviceSelection={endpoint:string;subjectId:string;operationId:string;previousDeviceId:string;deviceId:string;scopes:string[];fingerprint:string};
+type HandoffState={phase:string;context?:AgentConnectionContext|null;fingerprint?:string|null;code?:string|null;additionalDeviceApproval?:boolean;localDeviceSelection?:LocalDeviceSelection|null};
 type ViewState={handoff:HandoffState;draft:DraftChoice|null;error:string;busy:boolean};
 type Callbacks={navigate:(path:string)=>void;onChange:()=>void|Promise<void>;onManual:()=>void};
 type Controller=ReturnType<typeof createAgentIdentityHandoff>;
@@ -89,11 +90,18 @@ export function createAgentIdentityView(runtime:AgentIdentityRuntime|null,entry:
   try{const selected=snapshot.draft;if(!alive||!selected)return;checkCompleted(selected,selected.lease);callbacks.navigate(selected.targetPath);}
   catch(reason){publish({draft:null,error:readable(reason)});}
  }
+ async function selectLocalDevice(){
+  if(!alive||!controller||snapshot.busy||snapshot.handoff.phase!=='choose-device')return;
+  const token=generation;publish({busy:true,error:''});
+  try{await controller.selectLocalDevice();}
+  catch(reason){if(alive&&token===generation)publish({error:readable(reason)});}
+  finally{if(alive&&token===generation)publish({busy:false});}
+ }
  return {
   subscribe(this:void,listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
   snapshot:()=>snapshot,
   setCallbacks(value:Callbacks){callbacks=value;},
-  start,close,verifyCurrent,adopt,keep,
+  start,close,verifyCurrent,adopt,keep,selectLocalDevice,
   cancel:()=>controller?.cancel(),
   manual:()=>callbacks.onManual(),
   returnToOrigin:()=>callbacks.navigate(entry.valid?entry.targetPath:'/app/'),

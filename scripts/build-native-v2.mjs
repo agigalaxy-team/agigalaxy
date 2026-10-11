@@ -31,7 +31,7 @@ async function dependencyVersion(name,inputs){
 export async function buildNativeV2({destination,version=INITIAL_VERSION,sourceDirectory=root}){
  if(!isAbsolute(destination)||!isAbsolute(sourceDirectory))throw new Error('Absolute new candidate and source required');
  componentRelease('client',version);
- const result=await build({absWorkingDir:sourceDirectory,entryPoints:{galaxy:'packages/galaxy-edge-mcp/src/native-v2-entry.mjs',runtime:'packages/galaxy-edge-mcp/src/native-v2/runtime.mjs',server:'packages/galaxy-edge-mcp/src/native-v2/server.mjs'},outdir:destination,
+ const result=await build({absWorkingDir:sourceDirectory,entryPoints:{galaxy:'packages/galaxy-edge-mcp/src/native-v2-entry.mjs',runtime:'packages/galaxy-edge-mcp/src/native-v2/runtime.mjs',server:'packages/galaxy-edge-mcp/src/native-v2/server.mjs',opencode:'integrations/host-adapters/opencode-stable/native-galaxy.tui.ts'},outdir:destination,
   bundle:true,splitting:true,platform:'node',format:'esm',target:'node22',packages:'external',external:['bun:sqlite'],metafile:true,write:false,sourcemap:false});
  const names=new Set();for(const output of Object.values(result.metafile.outputs))for(const i of output.imports)if(i.external&&!i.path.startsWith('node:')&&i.path!=='bun:sqlite')names.add(i.path.startsWith('@')?i.path.split('/').slice(0,2).join('/'):i.path.split('/')[0]);
  const dependencies={},dependencyResolution={};for(const name of names){const entry=await dependencyVersion(name,result.metafile.inputs);dependencies[name]=entry.selected;dependencyResolution[name]=entry;}
@@ -40,18 +40,23 @@ export async function buildNativeV2({destination,version=INITIAL_VERSION,sourceD
   sources[source]=sha(await readFile(join(sourceDirectory,source)));}
  const notificationHelper='packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1';
  const helperBytes=await readFile(join(sourceDirectory,notificationHelper));sources[notificationHelper]=sha(helperBytes);
+ const copiedHelpers={};
+ for(const name of ['host-configs.mjs','host-capabilities.json','prepare-service-config.mjs','setup.mjs']){
+  const source='integrations/native-v2/'+name;
+  copiedHelpers[name]=await readFile(join(sourceDirectory,source));sources[source]=sha(copiedHelpers[name]);
+ }
  await mkdir(destination);const artifacts={};for(const output of result.outputFiles){const name=relative(destination,output.path).replaceAll('\\','/');await writeFile(output.path,output.contents,{flag:'wx'});artifacts[name]=sha(output.contents);}
  await writeFile(join(destination,'windows-notify-icon.ps1'),helperBytes,{flag:'wx'});artifacts['windows-notify-icon.ps1']=sha(helperBytes);
+ for(const[name,bytes]of Object.entries(copiedHelpers)){await writeFile(join(destination,name),bytes,{flag:'wx'});artifacts[name]=sha(bytes);}
  const manifest={version:2,kind:'galaxy-native-v2-local-candidate',component:'client',releaseId:version,builder:'esbuild '+esbuildVersion,sourceFiles:Object.keys(sources).length,artifacts,dependencyResolution,
   containsPrivateKeys:false,containsConfiguredAuthority:false,sourceRepositoryRequiredAtRuntime:false,publicRelease:false,actualEightHostAcceptance:'pending',embeddedUi:'unverified',modelProvider:'user-host'};
- const pkg={name:'@galaxy/native-client',version,private:true,license:'Apache-2.0',type:'module',engines:{node:'>=22.13.0'},scripts:{start:'node galaxy.js'},exports:{'./runtime':'./runtime.js','./server':'./server.js'},files:['*.js','*.mjs','windows-notify-icon.ps1','dist','skills','host-templates','host-capabilities.json','native-v2.json','source-hashes.json','README.md','HOSTS.md','LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','license-inventory.json','third-party-licenses'],dependencies};
+ const pkg={name:'@galaxy/native-client',version,private:true,license:'Apache-2.0',type:'module',engines:{node:'>=22.13.0'},scripts:{start:'node galaxy.js',setup:'node setup.mjs'},exports:{'./runtime':'./runtime.js','./server':'./server.js','./opencode':'./opencode.js'},files:['*.js','*.mjs','windows-notify-icon.ps1','dist','skills','host-templates','host-capabilities.json','native-v2.json','source-hashes.json','README.md','HOSTS.md','LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','license-inventory.json','third-party-licenses'],dependencies};
  for(const[name,value]of Object.entries({'package.json':pkg,'native-v2.json':manifest,'source-hashes.json':sources}))await writeFile(join(destination,name),JSON.stringify(value,null,2)+'\n',{flag:'wx'});
  await cp(join(sourceDirectory,'integrations/native-v2/skills'),join(destination,'skills'),{recursive:true,errorOnExist:true});
  await cp(join(sourceDirectory,'docs/native-client-v2.md'),join(destination,'README.md'),{errorOnExist:true});
  await cp(join(sourceDirectory,'docs/native-client-hosts-v2.md'),join(destination,'HOSTS.md'),{errorOnExist:true});
  await cp(join(sourceDirectory,'integrations/native-v2/codex'),join(destination,'host-templates/codex'),{recursive:true,errorOnExist:true});
  await cp(join(sourceDirectory,'integrations/native-v2/compact-app/dist'),join(destination,'dist'),{recursive:true,errorOnExist:true});
- for(const name of ['host-configs.mjs','host-capabilities.json','prepare-service-config.mjs'])await cp(join(sourceDirectory,'integrations/native-v2',name),join(destination,name),{errorOnExist:true});
  for(const name of ['LICENSE','NOTICE'])await cp(join(sourceDirectory,'integrations/native-v2/legal',name),join(destination,name),{errorOnExist:true});
  return{destination,manifest,dependencies};
 }

@@ -1,6 +1,7 @@
 import {createServer} from 'node:http';
 import {randomBytes,createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import {nativeIdentityScopeGroups} from './identity-scope-presentation.mjs';
 
 export const webIdentityProtocol='galaxy-web-identity-handoff';
 export const webIdentityProofType='galaxy-web-identity-handoff-v1+jws';
@@ -15,11 +16,27 @@ const digest=value=>createHash('sha256').update(stable(value)).digest('hex');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const codeOf=error=>/^[a-z0-9_-]{1,100}$/.test(error?.code??error?.message??'')?error.code??error.message:'web_identity_operation_failed';
 const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
+function targetDescription(path){
+ if(path.startsWith('/app/search?'))return '围绕“'+new URLSearchParams(path.slice(path.indexOf('?')+1)).get('q')+'”查找方法，随后返回原求助。';
+ if(path==='/app/publish')return '继续填写求助。';
+ if(path.startsWith('/app/tasks/'))return '继续阅读与处理原求助。';
+ if(path.startsWith('/app/capsules'))return '阅读与使用方法。';
+ if(path.startsWith('/app/rooms/'))return '继续原来的对话。';
+ if(path.startsWith('/app/projects/'))return '继续查看原项目。';
+ return '继续原来选择的银河页面。';
+}
 
 export function isWebIdentityTargetPath(path){
  if(typeof path!=='string'||path.length>1500||!path.startsWith('/app/')||/[\\#]/.test(path))return false;
  if(path.includes('?')){
   const parts=path.split('?');if(parts.length!==2||parts[0].includes('%'))return false;
+  if(parts[0]==='/app/search'){
+   const parameters=new URLSearchParams(parts[1]),query=parameters.get('q'),taskId=parameters.get('sourceTask');
+   if([...parameters.keys()].join(',')!=='q,sourceTask,returnTo'||typeof query!=='string'||!query.trim()||query!==query.trim()||query.length>200
+    ||/[\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(query)||!uuid(taskId)
+    ||parameters.get('returnTo')!=='/app/tasks/'+taskId+'?section=collaboration')return false;
+   return parts[1]===new URLSearchParams({q:query,sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}).toString();
+  }
   const capsule=/^\/app\/capsules\/([^/]+)\/versions\/([^/]+)$/.exec(parts[0]);
   if(!capsule||!uuid(capsule[1])||!uuid(capsule[2]))return false;
   const query=new URLSearchParams(parts[1]),taskId=query.get('sourceTask');
@@ -161,12 +178,12 @@ export async function createWebIdentityHandoff({handoffId,navigationId,context:i
   if(path!==base&&path!==base+'/state'&&path!==base+'/message'&&path!==base+'/choice')return json(res,404,{error:'web_identity_local_path_required'});
   if(req.method==='GET'){
    if(path===base){current();const scriptNonce=randomBytes(18).toString('base64');
-    const boot={protocol:webIdentityProtocol,version:1,handoffId,navigationId,website:context.website,subjectId:context.subjectId,endpoint:context.endpoint,expiresAt,
+    const boot={protocol:webIdentityProtocol,version:1,handoffId,navigationId,website:context.website,subjectId:context.subjectId,endpoint:context.endpoint,expiresAt,scopeGroups:nativeIdentityScopeGroups(context.scopes),
      targetUrl:context.website+'/app/settings/identity?'+new URLSearchParams({agentConnect:handoffId,agentBridgeOrigin:origin,agentNavigation:navigationId,returnTo:targetPath})};
     const script='('+browserBridge.toString()+')('+JSON.stringify(boot).replaceAll('<','\\u003c')+');';
     res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'same-origin','x-content-type-options':'nosniff','x-frame-options':'DENY',
      'content-security-policy':"default-src 'none'; script-src 'nonce-"+scriptNonce+"'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"});
-    res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>银河 · 接续已有身份</title><style>body{font:16px/1.65 system-ui;max-width:760px;margin:32px auto;padding:0 20px;background:#fafafa;color:#171717}button{font:inherit;padding:10px 16px;margin:8px}code{overflow-wrap:anywhere}li{margin:8px}h1{font-size:26px}</style><h1>让官网继续使用当前银河身份</h1><p>当前身份 <code>'+escape(context.subjectId)+'</code></p><p>当前服务 <code>'+escape(context.endpoint)+'</code></p><p>原目标 <code>'+escape(targetPath)+'</code></p><p>本机 Agent 保留私钥与原工作定位。官网生成自己的设备钥，只有你明确批准本次设备和权限后才接续。</p><button id="open">打开官网并接续同一身份</button><p id="progress" role="status">本次接续有效期三分钟。关闭窗口只停止传输，已提交的设备操作需查询原结果。</p><section id="offer" hidden><h2>批准官网本次新设备</h2><p>设备公钥指纹 <code id="fingerprint"></code></p><ul id="scopes"></ul><p>批准后，官网将验证公开批准，用自己的新钥完成同一身份接续并连接，然后回到原目标。此次操作不复制私钥、恢复码或原聊天。</p><button id="approve">批准这次显示的设备与权限</button><button id="decline">停止这次接续</button></section><script nonce="'+scriptNonce+'">'+script+'</script></html>');
+    res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>银河 · 接续已有身份</title><style>body{font:16px/1.65 system-ui;max-width:760px;margin:32px auto;padding:0 20px;background:#fafafa;color:#171717}button{font:inherit;padding:10px 16px;margin:8px}code{overflow-wrap:anywhere}li{margin:8px}h1{font-size:26px}</style><h1>让官网继续使用当前银河身份</h1><p>这次继续使用本机当前银河身份。</p><p>连接后：'+escape(targetDescription(targetPath))+'</p><p>当前服务 <code>'+escape(context.endpoint)+'</code></p><details><summary>准确身份与原目标</summary><p>银河身份 <code>'+escape(context.subjectId)+'</code></p><p>原页面 <code>'+escape(targetPath)+'</code></p></details><p>本机 Agent 保留私钥与原工作定位。官网生成自己的设备钥，只有你明确批准本次设备和权限后才接续。</p><button id="open">打开官网并接续同一身份</button><p id="progress" role="status">本次接续有效期三分钟。关闭窗口只停止传输，已提交的设备操作需查询原结果。</p><section id="offer" hidden><h2>批准官网本次新设备</h2><p>设备公钥指纹 <code id="fingerprint"></code></p><ul id="scopes"></ul><p>批准后，官网将验证公开批准，用自己的新钥完成同一身份接续并连接，然后回到原目标。此次操作不复制私钥、恢复码或原聊天。</p><button id="approve">批准这次显示的设备与权限</button><button id="decline">停止这次接续</button></section><script nonce="'+scriptNonce+'">'+script+'</script></html>');
     return;
    }
    if(path===base+'/state'){current();return json(res,200,publicState());}
@@ -193,8 +210,9 @@ export async function createWebIdentityHandoff({handoffId,navigationId,context:i
  try{await save();}catch(reason){closed=true;server.closeAllConnections();await new Promise(resolve=>server.close(resolve));throw reason;}
  async function close(){if(closePromise)return closePromise;closed=true;clearTimeout(timer);
   if(!['completed','canceled','expired'].includes(state))state='stopped';
-  closePromise=(async()=>{server.closeAllConnections();await new Promise((resolve,reject)=>server.close(reason=>reason?reject(reason):resolve()));
-   await Promise.allSettled(inFlight);await mutation;await save();})();return closePromise;}
+  closePromise=Promise.resolve().then(async()=>{
+   if(server.listening)await new Promise((resolve,reject)=>{server.close(reason=>reason?reject(reason):resolve());server.closeAllConnections();});
+   await Promise.allSettled(inFlight);await mutation;await save();});return closePromise;}
  const timer=setTimeout(()=>{if(!['completed','canceled'].includes(state))state='expired';void close().catch(()=>{});},webIdentityTtlSeconds*1000);timer.unref();
  async function open(){current();const result=await openBrowser(origin+base);current();return{...publicState(),url:origin+base,launch:result??null,approvalRequired:state!=='completed',businessMutation:false,publicPacketsOnly:true};}
  return Object.freeze({open,status:()=>publicState(),close,origin,url:origin+base,envelope});
@@ -210,7 +228,7 @@ async function platformOpen(url){
 function browserBridge(boot){
  let popup=null,lastApproval=null,lastContext=null,lastRevision=-1,ended=false,reading=false;
  const progress=document.getElementById('progress'),offerPanel=document.getElementById('offer');
- const base=location.pathname,labels={binding:'连接所选服务',consent:'仅提交明确许可的数据','case-teaser':'任务简述',history:'获准的经历与事实',assistance:'任务与协作',context:'获准的任务资料'};
+ const base=location.pathname;
  const compareKeys=(a,b)=>a<b?-1:a>b?1:0;
  const exact=(value,keys)=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort(compareKeys).join(',')===[...keys].sort(compareKeys).join(',');
  const envelope=(kind,payload)=>({protocol:boot.protocol,version:boot.version,handoffId:boot.handoffId,navigationId:boot.navigationId,kind,payload});
@@ -223,7 +241,7 @@ function browserBridge(boot){
   if(ended||!Number.isSafeInteger(value.revision)||value.revision<lastRevision)return;lastRevision=value.revision;
   if(value.context&&JSON.stringify(value.context)!==lastContext){lastContext=JSON.stringify(value.context);send('context',value.context);}
   if(value.offer){offerPanel.hidden=value.state!=='offered';document.getElementById('fingerprint').textContent=value.fingerprint??'';
-   const scopes=document.getElementById('scopes');scopes.replaceChildren(...value.offer.scopes.map(scope=>{const li=document.createElement('li');li.textContent=labels[scope]??scope;return li;}));}
+   const scopes=document.getElementById('scopes');scopes.replaceChildren(...boot.scopeGroups.map(group=>{const items=group.items.filter(item=>value.offer.scopes.includes(item.key));if(!items.length)return null;const li=document.createElement('li'),title=document.createElement('strong'),body=document.createElement('span');title.textContent=group.title+'：';body.textContent=items.map(item=>item.label).join('、');li.append(title,body);return li;}).filter(Boolean));}
   if(value.approval&&JSON.stringify(value.approval)!==lastApproval){lastApproval=JSON.stringify(value.approval);send('approval',value.approval);}
   if(value.state==='completed'){ended=true;offerPanel.hidden=true;progress.textContent='同一身份的当前设备授权已核对。官网报告已连接并将返回原目标；请回原 Agent 刷新同一对象。';}
   else if(['stopped','canceled','expired'].includes(value.state)){send('stopped',{state:value.state});ended=true;offerPanel.hidden=true;progress.textContent='本次传输已停止。原设备操作仍需按原编号核对，关闭窗口不会撤销已完成授权。';}

@@ -27,6 +27,12 @@ export function capsuleIdentityContinuation(taskId,capsuleId,versionId){
  return `/app/capsules/${capsuleId}/versions/${versionId}?`+new URLSearchParams({sourceTask:taskId,returnTo:`/app/tasks/${taskId}?section=collaboration`});
 }
 
+export function methodSearchIdentityContinuation(taskId,query){
+ if(!uuid(taskId)||typeof query!=='string'||!query.trim()||query!==query.trim()||query.length>200
+  ||Array.from(query).some(character=>character.charCodeAt(0)<32||character.charCodeAt(0)===127))return null;
+ return '/app/search?'+new URLSearchParams({q:query,sourceTask:taskId,returnTo:`/app/tasks/${taskId}?section=collaboration`});
+}
+
 // Query values locate an already opened local bridge. They never choose the API,
 // a public key, an identity, or a credential destination.
 export function readAgentIdentityEntry(location){
@@ -40,6 +46,8 @@ export function readAgentIdentityEntry(location){
    ||bridge.origin!==bridgeOrigin||bridge.username||bridge.password||bridge.pathname!=='/'||bridge.search||bridge.hash||!targetPath)throw 0;
   const target=new URL(targetPath,location.origin),method=/^\/app\/capsules\/([^/]+)\/versions\/([^/]+)$/.exec(target.pathname);
   if(method&&(target.search||target.hash)&&targetPath!==capsuleIdentityContinuation(target.searchParams.get('sourceTask'),method[1],method[2]))throw 0;
+  if(target.pathname==='/app/search'&&(target.searchParams.has('sourceTask')||target.searchParams.has('returnTo'))
+   &&targetPath!==methodSearchIdentityContinuation(target.searchParams.get('sourceTask'),target.searchParams.get('q')))throw 0;
   return Object.freeze({valid:true,handoffId,navigationId,bridgeOrigin,targetPath,website:location.origin});
  }catch{return Object.freeze({valid:false,code:'agent_handoff_entry_invalid'});}
 }
@@ -95,7 +103,7 @@ async function verifyContextProof(proof,control,endpoint,crypto){
 // scoped native possession proof. The existing device-handoff runtime owns keys,
 // approval validation, exact-operation receipts, and activation.
 export function createAgentIdentityHandoff({runtime,entry,window:host=globalThis.window,now=()=>Math.floor(Date.now()/1000),crypto=globalThis.crypto,onUpdate=()=>{},onConnected=/** @type {(result:{subjectId:string,deviceId:string,targetPath:string,operationId:string|null})=>unknown} */(()=>{})}){
- let alive=true,started=false,done=false,context=null,offer=null,approvedScopes=null,expectedOwner,lease=null;
+ let alive=true,started=false,done=false,context=null,offer=null,approvedScopes=null,expectedOwner,lease=null,localSelection=null;
  let deadline=now()+180,timer=null,serial=Promise.resolve(),contextMessage=null,approvalMessage=null,existingDevice=null,ready=false;
  const source=host?.opener,nonce=crypto.randomUUID();
  let snapshot={phase:'waiting',context:null,operationId:null,fingerprint:null,code:null};
@@ -179,9 +187,28 @@ export function createAgentIdentityHandoff({runtime,entry,window:host=globalThis
   approvedScopes=[...preview.scopes];await status();
   await wait(()=>runtime.agentContinuity.retainHandoff({handoffId:entry.handoffId,navigationId:entry.navigationId,context:contextMessage,offer,approval:payload}));assertLive();lease=null;
   const result=await wait(()=>runtime.deviceHandoff.acceptApproval(payload,{confirmed:true}));
-  if(!result.activated)fail('agent_handoff_original_result_pending');
+  if(result.needsLocalDeviceSelection){
+   await status();
+   const selection=await wait(()=>runtime.deviceHandoff.previewLocalDeviceSelection(offer.operationId));
+   if(selection.endpoint!==runtime.api.endpoint||selection.subjectId!==context.subjectId||selection.operationId!==offer.operationId
+    ||selection.deviceId!==offer.deviceId||`${selection.subjectId}:${selection.previousDeviceId}`!==expectedOwner
+    ||!same(selection.scopes,approvedScopes))fail('agent_handoff_approval_changed');
+   localSelection=selection;capture();update({phase:'choose-device',localDeviceSelection:selection});return;
+  }
+  if(!result.activated&&!result.alreadyActivated)fail('agent_handoff_original_result_pending');
   expectedOwner=`${context.subjectId}:${offer.deviceId}`;await status();capture();await wait(()=>runtime.agentContinuity.retainReceipt(result.receipt));
   return complete(offer.operationId);
+ }
+ function selectLocalDevice(){
+  serial=serial.then(async()=>{
+   if(snapshot.phase!=='choose-device'||!localSelection)return;
+   assertLive();await status();const selection=localSelection;update({phase:'selecting-device'});lease=null;
+   const result=await wait(()=>runtime.deviceHandoff.selectLocalDevice(selection,{confirmed:true}));
+   if((!result.activated&&!result.alreadyActivated)||result.identity?.subjectId!==context.subjectId||result.identity?.deviceId!==offer.deviceId)fail('agent_handoff_browser_identity_changed');
+   expectedOwner=`${context.subjectId}:${offer.deviceId}`;await status();capture();await wait(()=>runtime.agentContinuity.retainReceipt(result.receipt));
+   localSelection=null;update({localDeviceSelection:null});await complete(offer.operationId);
+  }).catch(reason=>{if(alive&&!done)stop(typeof reason?.code==='string'?reason.code:'agent_handoff_failed');});
+  return serial;
  }
  function receive(event){
   if(!alive||done||event.source!==source||event.origin!==entry.bridgeOrigin)return;
@@ -213,5 +240,5 @@ export function createAgentIdentityHandoff({runtime,entry,window:host=globalThis
   })().catch(reason=>stop(reason.code??'agent_handoff_failed'));
   timer=host.setInterval(()=>{try{assertLive();if(ready&&!contextMessage)send('ready',{nonce,existingDevice});}catch(reason){stop(reason.code??'agent_handoff_failed');}},1000);
  }
- return Object.freeze({start,cancel:()=>stop('agent_handoff_stopped',true),close:()=>{if(!done)stop('agent_handoff_stopped',true);else{alive=false;cleanup();}},snapshot:()=>({...snapshot})});
+ return Object.freeze({start,selectLocalDevice,cancel:()=>stop('agent_handoff_stopped',true),close:()=>{if(!done)stop('agent_handoff_stopped',true);else{alive=false;cleanup();}},snapshot:()=>({...snapshot})});
 }

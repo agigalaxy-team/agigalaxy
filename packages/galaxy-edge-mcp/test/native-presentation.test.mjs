@@ -2,7 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNativeReview} from '../src/native-v2/review.mjs';
 import {nativeResult} from '../src/native-v2/choice.mjs';
-import {presentNativeResult,nativeChoiceText,authoredRows} from '../src/native-v2/presentation.mjs';
+import {presentNativeResult,nativeChoiceText,authoredRows,nativeConnectionMessage} from '../src/native-v2/presentation.mjs';
+
+test('connection restoration failures describe the actual recoverable state without exposing transport codes',()=>{
+ const unavailable={identity:'existing-identity',connected:false,connectionError:'native_connection_unavailable'};
+ const shown=presentNativeResult('galaxy_native_status',nativeResult(unavailable),{readOnly:true});
+ assert.match(shown.content[0].text,/暂时无法恢复已选服务/);assert.match(shown.content[0].text,/原身份、使用范围和工作保留/);
+ assert.equal(shown.content[0].text.includes(unavailable.connectionError),false);assert.deepEqual(shown.structuredContent,unavailable);
+ assert.match(nativeConnectionMessage({...unavailable,connectionError:'current_device_control_required'}),/连接权限已变化/);
+ assert.match(nativeConnectionMessage({...unavailable,connected:true}),/已连接银河/);
+ assert.match(nativeConnectionMessage({identity:'existing-identity',connected:false}),/按当前工作需要连接服务/);
+});
 
 test('ordinary tool text shows authored content while exact references remain structured',()=>{
  const data={state:'unknown',operationId:'internal-operation-id',payloadHash:'f'.repeat(64),content:{title:'继续原工作',summary:'实际可用的结果'}};

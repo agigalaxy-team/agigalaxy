@@ -7,9 +7,13 @@ import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.
 
 export const webIdentityDefaultScopes=Object.freeze(['binding','consent','case-teaser','history','assistance','context']);
 export const webIdentityConnectSchema=z.strictObject({...navigationSchema.shape,requestId:z.uuid(),
- continueWith:z.strictObject({kind:z.literal('capsule'),id:z.uuid(),versionId:z.uuid()}).optional(),
+ continueWith:z.discriminatedUnion('kind',[
+  z.strictObject({kind:z.literal('capsule'),id:z.uuid(),versionId:z.uuid()}),
+  z.strictObject({kind:z.literal('method-search'),query:z.string().trim().min(1).max(200).refine(value=>!/[\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(value))})
+ ]).optional(),
  scopes:z.array(z.enum(browserScopes)).min(1).max(browserScopes.length).refine(values=>values.includes('binding')&&new Set(values).size===values.length).default([...webIdentityDefaultScopes])})
- .refine(input=>!input.continueWith||input.object.kind==='task','Capsule continuation requires the original Task');
+ .refine(input=>!input.continueWith||input.object.kind==='task','Method continuation requires the original Task')
+ .refine(input=>input.continueWith?.kind!=='method-search'||input.scopes.includes('capsules'),'Method search requires its requested method-reading scope');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const codeOf=reason=>/^[a-z0-9_-]{1,100}$/.test(reason?.code??reason?.message??'')?reason.code??reason.message:'web_identity_operation_failed';
 const inputHash=input=>createHash('sha256').update(JSON.stringify(input)).digest('hex');
@@ -51,8 +55,10 @@ export function registerNativeIdentityWebConnectTools(server,{runtime}){
    }
    const owner=await runtime.prepareWebIdentityContext(input.scopes);lease.assertCurrent();owner.assertCurrent();
    const navigation=await runtime.navigation.prepare({object:input.object,...(input.origin?{origin:input.origin}:{})});owner.assertCurrent();
-   const targetPath=input.continueWith?'/app/capsules/'+input.continueWith.id+'/versions/'+input.continueWith.versionId+'?'
-    +new URLSearchParams({sourceTask:input.object.id,returnTo:'/app/tasks/'+input.object.id+'?section=collaboration'}).toString():navigation.targetPath;
+   const originalReturn='/app/tasks/'+input.object.id+'?section=collaboration';
+   const targetPath=input.continueWith?.kind==='method-search'?'/app/search?'+new URLSearchParams({q:input.continueWith.query,sourceTask:input.object.id,returnTo:originalReturn}).toString()
+    :input.continueWith?'/app/capsules/'+input.continueWith.id+'/versions/'+input.continueWith.versionId+'?'
+     +new URLSearchParams({sourceTask:input.object.id,returnTo:originalReturn}).toString():navigation.targetPath;
    if(!isWebIdentityTargetPath(targetPath))fail('web_identity_target_required');
    const beforeApprove=async()=>{
     owner.assertCurrent();const original=await runtime.navigation.resume(navigation.navigationId);owner.assertCurrent();
@@ -82,7 +88,7 @@ export function registerNativeIdentityWebConnectTools(server,{runtime}){
  }
  const wrap=run=>async(input)=>{try{return nativeResult(await run(input));}catch(reason){return{isError:true,...nativeResult({error:codeOf(reason),originalOperationPreserved:true})};}};
  server.registerTool('galaxy_identity_web_connect',{inputSchema:webIdentityConnectSchema,
-  description:'Prepare a temporary local user page to connect the website to this existing current Native identity and original object. An original Task may select one exact Capsule/version as continueWith; the tool binds its return to that same Task. The website generates its own device key; only the user can approve the shown device/scopes. Preserve requestId after unknown delivery. No key, recovery code, original workRef or bearer is copied.',
+  description:'Prepare a temporary local user page to connect the website to this existing current Native identity and original object. An original Task may continue with an exact Capsule/version or a method-search query; both return to that same Task. Search uses only the approved query, not a private original workRef. The website generates its own device key; only the user can approve the shown device/scopes. Preserve requestId after unknown delivery. No key, recovery code, original workRef or bearer is copied.',
   annotations:{readOnlyHint:false}},wrap(prepare));
  server.registerTool('galaxy_identity_web_connect_status',{inputSchema:z.strictObject({handoffId:z.uuid()}),
   description:'Read this Native owner’s existing website-connect transport and original operation locator. Does not approve, create another identity, retry a remote operation or prove a website session.',annotations:{readOnlyHint:true}},wrap(status));

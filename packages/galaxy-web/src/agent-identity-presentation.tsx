@@ -14,10 +14,10 @@ export function agentReturnLabel(path:string) {
  return route==='/app/publish'?'继续填写求助':route.startsWith('/app/tasks/')?'回到原工作':route.startsWith('/app/capsules/')?'回到原方法':route.startsWith('/app/rooms/')?'回到原对话':route==='/app/'||route==='/app'?'回到发现':'回到原来的页面';
 }
 
-export function AgentConnectionSummary({context,deviceFingerprint}:{context:AgentConnectionContext;deviceFingerprint?:string|null}) {
+export function AgentConnectionSummary({context,deviceFingerprint,approved=false}:{context:AgentConnectionContext;deviceFingerprint?:string|null;approved?:boolean}) {
  const known=identityPermissionGroups.flatMap(group=>group.items.map(item=>item[0]));
  return <section className="agent-connection-summary" aria-label="本次浏览器连接">
-  <h3>这台浏览器申请的使用范围</h3>
+  <h3>{approved?'这台浏览器已获准的使用范围':'这台浏览器申请的使用范围'}</h3>
   <ul className="agent-permission-summary">{identityPermissionGroups.map(group=>{
    const values=group.items.filter(([key])=>context.scopes.includes(key));
    return values.length>0?<li key={group.title}><strong>{group.title}</strong><span>{values.map(([,label])=>label).join('、')}</span></li>:null;

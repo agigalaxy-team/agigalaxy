@@ -53,9 +53,9 @@ test('native Dialog and keymap route edits projects, signs publication, displays
     command('galaxy.open'); await wait(() => viewText().includes('当前工作'));
     assert.equal(page.options.filter(value => !value.disabled && /^\[?[1-6]/.test(value.title)).length > 0, true);
     command('galaxy.choose.4'); await wait(() => viewText().includes('我的与设置'));
-    command('galaxy.choose.6'); await wait(() => viewText().includes('session-local'));
+    command('galaxy.choose.6'); await wait(() => viewText().includes('本机会话可用；远端状态未核查'));
     command('galaxy.choose.4'); await wait(() => viewText().includes('选择检索来源'));
-    choose('项目／模块机会'); await wait(() => viewText().startsWith('项目／模块机会') && viewText().includes('按功能寻找相关的人；单纯交流也可以。'));
+    choose('寻找同行'); await wait(() => viewText().startsWith('项目／模块机会') && viewText().includes('按功能寻找相关的人；单纯交流也可以。'));
     choose('我的资料与项目介绍'); await wait(() => viewText().includes('我的资料') && page.kind === 'select');
     choose('编辑自述'); choose('项目／模块介绍'); choose('添加项目／模块');
     await fill('名称', 'Python 文档索引'); await fill('功能简介', '本机选取的模块介绍'); await fill('功能标签', '全文搜索, PDF提取'); await fill('技术标签', 'Python');

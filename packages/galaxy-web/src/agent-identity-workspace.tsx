@@ -24,6 +24,10 @@ const messages:Record<string,string>={
  device_approval_expired:'这次设备批准已到期。请核对原申请后再由已有设备批准。',
  device_approval_control_changed:'设备批准所依据的身份控制已变化。请在已有设备重新核对。',
  receipt_status_authority_changed:'当前身份或连接已经改变，本次接续已停止。请核对原申请。',
+ device_handoff_owner_changed:'当前浏览器已选择其他设备。原申请仍保留，请重新查看当前设备后继续。',
+ device_local_selection_changed:'本机设备或原批准已改变。原申请仍保留，请重新查看后继续。',
+ device_authorization_no_longer_current:'这台设备的授权已失效。请回到自己的管理设备核对后继续。',
+ local_atomic_update_unavailable:'本机存储暂不能安全切换设备。原身份和申请仍保留，请稍后重试。',
 };
 const phaseText:Record<string,string>={waiting:'正在等待本机 AI 的连接说明…','verifying-native':'正在核对本机 AI 的身份与当前设备权限…',preparing:'正在准备这台浏览器的连接申请…','awaiting-approval':'请在本机 AI 的连接页面，核对这台浏览器的设备核对码与使用范围后批准。',accepting:'正在确认已有设备的批准，并连接这台浏览器…',connecting:'正在连接原银河身份…',connected:'已连接原银河身份。'};
 const readable=(reason:unknown)=>messages[agentIdentityErrorCode(reason)]??'此次接续未完成。原申请和本机身份材料仍保留，请先查询原结果。';
@@ -40,15 +44,20 @@ export function AgentIdentityWorkspace({runtime,entry,identity,connection,naviga
  useEffect(()=>{view.setCallbacks({navigate,onChange,onManual});},[view,navigate,onChange,onManual]);
  useEffect(()=>{view.start();return view.close;},[view]);
  useEffect(()=>{view.verifyCurrent();},[view,identity?.subjectId,identity?.deviceId,connection?.bindingId,connection?.generation]);
- const stopped=['stopped','expired'].includes(state.phase),context=state.context;
+ const stopped=['stopped','expired'].includes(state.phase),context=state.context,selection=state.localDeviceSelection;
  const draftVisible=draft&&(identity===undefined||identity?.subjectId===draft.subjectId&&identity?.deviceId===draft.deviceId);
  return <section className="identity-device-workspace agent-identity-workspace" aria-labelledby="agent-identity-heading">
   <h2 id="agent-identity-heading">在浏览器继续使用原身份</h2>
   <p>把本机 AI 使用的银河身份接到当前浏览器。需要批准时，请在本机 AI 的连接页面完成；连接后会回到刚才的页面。</p>
   {!runtime&&<output className="message">正在准备当前官网的连接工具…</output>}
   {phaseText[state.phase]&&<output className="message">{phaseText[state.phase]}</output>}
-  {state.additionalDeviceApproval&&<p className="browse-note">当前浏览器设备缺少本次所需的权限。原设备与草稿仍保留；请在本机审阅页明确批准同一银河 ID 的这次新浏览器设备。完成前不会扩大原设备权限。</p>}
-  {context&&<AgentConnectionSummary context={context} deviceFingerprint={state.fingerprint}/>}
+  {state.additionalDeviceApproval&&state.phase==='awaiting-approval'&&<p className="browse-note">当前浏览器设备缺少本次所需的权限。请在本机 AI 的连接页面批准新设备；原身份与草稿会保留。</p>}
+  {context&&<AgentConnectionSummary context={selection?{...context,scopes:selection.scopes}:context} deviceFingerprint={state.fingerprint} approved={!!selection}/>}
+  {selection&&!stopped&&<section className="agent-device-selection" aria-labelledby="agent-device-selection-heading"><h3 id="agent-device-selection-heading">使用已获准的设备继续</h3>
+   <p>本机 AI 已批准这次连接。继续后，这个浏览器会改用获准的新设备，接着打开刚才的页面；银河身份、原设备记录和已有草稿保留。</p>
+   <details className="agent-exact-connection"><summary>查看本次设备变化</summary><dl><dt>原浏览器设备</dt><dd><code>{selection.previousDeviceId}</code></dd><dt>获准的新设备</dt><dd><code>{selection.deviceId}</code></dd></dl></details>
+   <Button disabled={busy||state.phase!=='choose-device'} onClick={()=>void view.selectLocalDevice()}>{state.phase==='selecting-device'?'正在接续…':'使用这个设备继续'}</Button>
+  </section>}
   {stopped&&<p className="message error" role="alert">{messages[state.code??'']??readable({code:state.code})}</p>}
   {error&&<p className="message error" role="alert">{error}</p>}
   {draftVisible&&<article className="agent-draft-choice"><h3>继续连接前的求助草稿</h3><p>原稿继续留在本浏览器。继续这份草稿会把它保存到当前身份下，下一页仍可编辑，不会立即发布。</p>

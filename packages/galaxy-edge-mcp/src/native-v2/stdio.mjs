@@ -1,21 +1,15 @@
-import {readFile} from 'node:fs/promises';
-import {isAbsolute} from 'node:path';
 import {serveStdio,StdioServerTransport} from '@modelcontextprotocol/server/stdio';
-import * as z from 'zod/v4';
 import {createNativeRuntime} from './runtime.mjs';
 import {createNativeToolServer} from './server.mjs';
-import {nativeA2aSchema,createConfiguredNativeA2a} from './a2a.mjs';
+import {createConfiguredNativeA2a} from './a2a.mjs';
 import {loadCompactArtifact} from '../../../../integrations/native-v2/compact-app/server.mjs';
-import {nativeWatchHostConfigSchema} from './watch-host-config.mjs';
-import {nativeWorkerPacksSchema,createConfiguredNativeWorkerHost} from './worker-pack-host.mjs';
-import {nativeNotificationConfigSchema} from './notifications/config.mjs';
-const pin=z.strictObject({publicKeyPem:z.string().min(1).max(4096),notBefore:z.number().int(),notAfter:z.number().int(),revoked:z.boolean()});
-export const nativeConfigSchema=z.strictObject({version:z.literal(2),endpoint:z.url(),website:z.url(),dataDirectory:z.string().refine(isAbsolute),trustedKeys:z.record(z.string().min(1).max(160),pin),a2a:nativeA2aSchema.optional(),watchHost:nativeWatchHostConfigSchema.optional(),workerPacks:nativeWorkerPacksSchema.optional(),hostNotifications:nativeNotificationConfigSchema.optional()}).refine(config=>!config.workerPacks||config.workerPacks.workers.every(worker=>config.a2a?.peers.some(peer=>peer.id===worker.peerId)),'Every Worker requires an explicitly configured A2A peer');
-export async function startNativeStdio({configPath=process.env.GALAXY_NATIVE_CONFIG,transport}={}){
- if(!configPath||!isAbsolute(configPath))throw new Error('GALAXY_NATIVE_CONFIG must name an absolute public configuration file.');
- const raw=await readFile(configPath,'utf8');if(Buffer.byteLength(raw)>65536)throw new Error('Native configuration too large.');
- const config=nativeConfigSchema.parse(JSON.parse(raw));
- const runtime=await createNativeRuntime({...config,trustedKeys:new Map(Object.entries(config.trustedKeys))});
+import {createConfiguredNativeWorkerHost} from './worker-pack-host.mjs';
+import {readNativeConfiguration} from './configuration.mjs';
+export {nativeConfigSchema} from './configuration.mjs';
+/** @param {{configPath?:string,transport?:import('@modelcontextprotocol/server').Transport,openBrowser?:(url:string)=>Promise<unknown>}} [options] */
+export async function startNativeStdio({configPath=process.env.GALAXY_NATIVE_CONFIG,transport,openBrowser}={}){
+ const config=await readNativeConfiguration(configPath);
+ const runtime=await createNativeRuntime({...config,trustedKeys:new Map(Object.entries(config.trustedKeys)),...(openBrowser?{openBrowser}:{})});
  const a2aHost=config.a2a?createConfiguredNativeA2a({runtime,directory:config.dataDirectory,configuration:config.a2a}):undefined;
  let compactArtifact;
  try{compactArtifact=await loadCompactArtifact();}catch(error){runtime.close();throw error;}

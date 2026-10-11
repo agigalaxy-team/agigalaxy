@@ -14,11 +14,9 @@ const origin = value => {
 const exactKeys = (value, names) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).every(name => names.includes(name));
 
-export async function prepareServiceConfiguration({ website, endpoint, dataDirectory, output,
+export async function inspectServiceConfiguration({website,endpoint,
   fetch: fetcher = globalThis.fetch, now = Math.floor(Date.now() / 1000) }) {
-  origin(website); origin(endpoint);
-  if (!isAbsolute(dataDirectory) || !isAbsolute(output) || resolve(dataDirectory) === resolve(output))
-    throw new Error('Separate absolute data directory and new configuration file paths required.');
+  origin(website); if(endpoint!==undefined)origin(endpoint);
   const response = await fetcher(website + '/galaxy-web-config.json', {
     cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000),
   });
@@ -38,13 +36,14 @@ export async function prepareServiceConfiguration({ website, endpoint, dataDirec
   let source;
   try { source = JSON.parse(raw.toString('utf8')); } catch { throw new Error('Invalid public configuration JSON.'); }
   if (!exactKeys(source, ['version', 'endpoint', 'operator', 'signingKeys']) || source.version !== 1
-    || source.endpoint !== endpoint || !Array.isArray(source.signingKeys)
+    || endpoint!==undefined&&source.endpoint !== endpoint || !Array.isArray(source.signingKeys)
     || !source.signingKeys.length || source.signingKeys.length > 32)
     throw new Error('Public configuration does not match the explicitly selected service.');
+  origin(source.endpoint);
   const trustedKeys = Object.create(null), publicFingerprints = [];
   for (const pin of source.signingKeys) {
     if (!exactKeys(pin, ['kid', 'publicKeyPem', 'notBefore', 'notAfter', 'revoked'])
-      || typeof pin.kid !== 'string' || !pin.kid.length || pin.kid.length > 160 || /[\x00-\x1f]/.test(pin.kid)
+      || typeof pin.kid !== 'string' || !pin.kid.length || pin.kid.length > 160 || [...pin.kid].some(character=>character.charCodeAt(0)<32)
       || typeof pin.publicKeyPem !== 'string' || pin.publicKeyPem.length > 4096
       || !Number.isSafeInteger(pin.notBefore) || !Number.isSafeInteger(pin.notAfter)
       || pin.notAfter <= pin.notBefore || typeof pin.revoked !== 'boolean' || Object.hasOwn(trustedKeys, pin.kid))
@@ -62,11 +61,21 @@ export async function prepareServiceConfiguration({ website, endpoint, dataDirec
   }
   if (!publicFingerprints.some(pin => !pin.revoked && pin.notBefore <= now && pin.notAfter > now))
     throw new Error('The selected service has no currently valid signing key.');
-  const config = { version: 2, endpoint, website, dataDirectory: resolve(dataDirectory), trustedKeys };
+  return {version:2,endpoint:source.endpoint,website,trustedKeys,publicFingerprints,
+    publicConfigurationSha256:createHash('sha256').update(raw).digest('hex'),operator:typeof source.operator==='string'?source.operator:null};
+}
+
+export async function prepareServiceConfiguration({ website, endpoint, dataDirectory, output,
+  fetch: fetcher = globalThis.fetch, now = Math.floor(Date.now() / 1000) }) {
+  origin(website); origin(endpoint);
+  if (!isAbsolute(dataDirectory) || !isAbsolute(output) || resolve(dataDirectory) === resolve(output))
+    throw new Error('Separate absolute data directory and new configuration file paths required.');
+  const inspected=await inspectServiceConfiguration({website,endpoint,fetch:fetcher,now});
+  const config = { version: 2, endpoint, website, dataDirectory: resolve(dataDirectory), trustedKeys:inspected.trustedKeys };
   // wx preserves an existing user's endpoint, pins and local data choice.
   await writeFile(output, JSON.stringify(config, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
-  return { configured: true, output: resolve(output), website, endpoint, publicFingerprints,
-    publicConfigurationSha256: createHash('sha256').update(raw).digest('hex'),
+  return { configured: true, output: resolve(output), website, endpoint, publicFingerprints:inspected.publicFingerprints,
+    publicConfigurationSha256: inspected.publicConfigurationSha256,
     trustSource: 'explicitly-selected-website-over-HTTPS', connected: false,
     identityCreated: false, dataDirectoryCreated: false, automaticKeyRefresh: false };
 }

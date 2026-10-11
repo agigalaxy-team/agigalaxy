@@ -9,8 +9,9 @@ export type DeviceOffer={version:number;type:string;endpoint:string;subjectId:st
 export type OfferPreview=DeviceOffer&{fingerprint:string};
 export type ApprovalPreview={subjectId:string;deviceId:string;endpoint:string;scopes:string[];fingerprint:string;expiresAt:number;operationId:string;packet:unknown};
 export type DeviceReceipt={operationId?:string;subjectId?:string;state:string;registered?:boolean};
-export type DeviceResult={activated?:boolean;identity?:{subjectId:string;deviceId:string};needsReview?:boolean;receipt?:DeviceReceipt};
-export type DevicePending={operationId:string;offer:DeviceOffer;state:string;approval:unknown;receipt:DeviceReceipt|null;needsReview?:boolean;fingerprint?:string};
+export type DeviceResult={activated?:boolean;alreadyActivated?:boolean;identity?:{subjectId:string;deviceId:string};needsReview?:boolean;needsLocalDeviceSelection?:boolean;receipt?:DeviceReceipt};
+export type DevicePending={operationId:string;offer:DeviceOffer;state:string;approval:unknown;receipt:DeviceReceipt|null;needsReview?:boolean;needsLocalDeviceSelection?:boolean;fingerprint?:string};
+export type DeviceSelectionPreview={endpoint:string;subjectId:string;operationId:string;previousDeviceId:string;deviceId:string;scopes:string[];fingerprint:string};
 export type DraftText={title?:TaskText;goal?:TaskText;summary?:TaskText;situation?:TaskText};
 export type VisitorDraftPreview={subjectId:string;visitorDraft:DraftText|null;existingDraft:DraftText|null;sourceRetained:boolean};
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);

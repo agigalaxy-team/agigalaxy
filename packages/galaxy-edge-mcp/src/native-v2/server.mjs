@@ -58,6 +58,12 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   // A new room permission must identify the actual authorized room. This is
   // read-only context for the exact choice; the submitted grant stays unchanged.
   let reviewedInput=input;
+  if(name==='galaxy_help_execute_action'&&input.preview?.kind==='task-event'){
+   const task=await runtime.api.call('/v2/tasks/'+input.preview.taskId,undefined,{method:'GET'});
+   const names=await readProfileDisplayNames((path,body)=>runtime.api.call(path,body),input.preview.recipientIds??[]);
+   reviewedInput={...input,preview:{...input.preview,title:task.request.title,
+    recipientNames:names.map(row=>row.displayName??row.subjectId)}};
+  }
   if(name==='galaxy_chat_agent_grant'){
    const room=await runtime.api.call('/v2/chat/rooms/'+input.roomId+'/read',{});
    reviewedInput={...input,reviewRoom:{roomId:input.roomId,title:room.title}};
@@ -97,7 +103,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   },{scopeKey,singleUse:singleUseChoice});}return nativeResult(await run(input));}
   catch(error){const code=/^[a-z0-9_-]{1,100}$/.test(error.code??error.message)?error.code??error.message:'native_operation_failed';
    return{isError:true,...nativeResult({error:code,mayNeedReceiptReconciliation:write})};}});
- register('galaxy_native_status',z.strictObject({}),'Read actual local/native connection and capability state. Does not initialize, connect or start a model.',()=>runtime.status());
+ register('galaxy_native_status',z.strictObject({}),'Read current local/native state and resume an already selected connection within its original saved scope and current device control. Does not create an identity, grant new scope or start a model.',()=>runtime.status({restoreSelected:true}));
  register('galaxy_profile_names',z.strictObject({subjectIds:z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(20)}),
   'Read only current permitted self-declared display names for already known subject references. Missing or withdrawn names stay null; no provider identity or old profile fallback.',async({subjectIds})=>{
    const lease=runtime.receiptStatus.captureLease();lease.assertCurrent();

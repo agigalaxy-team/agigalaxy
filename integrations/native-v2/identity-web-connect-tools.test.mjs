@@ -73,7 +73,8 @@ async function fixture(){
  async function prepare(options={}){
   const input={requestId:randomUUID(),object:{kind:'task',id:task.taskId},origin,scopes:[...webIdentityDefaultScopes],...options};
   const info=await attached.call(connectName,input);assert.equal(info.subjectId,subjectId);
-  const targetPath=input.continueWith?'/app/capsules/'+input.continueWith.id+'/versions/'+input.continueWith.versionId+'?'
+  const targetPath=input.continueWith?.kind==='method-search'?'/app/search?'+new URLSearchParams({q:input.continueWith.query,sourceTask:task.taskId,returnTo:'/app/tasks/'+task.taskId+'?section=collaboration'}).toString()
+   :input.continueWith?'/app/capsules/'+input.continueWith.id+'/versions/'+input.continueWith.versionId+'?'
    +new URLSearchParams({sourceTask:task.taskId,returnTo:'/app/tasks/'+task.taskId+'?section=collaboration'}).toString():'/app/tasks/'+task.taskId;
   assert.equal(info.targetPath,targetPath);assert.equal(info.publicPacketsOnly,true);
   assert.equal(info.originalWorkRef,'native-local-only');assert.equal(info.websiteConnectionIndependentlyVerified,false);
@@ -294,6 +295,11 @@ test('identity bridge target routes require known local app paths and exact UUID
  const taskId=randomUUID(),capsuleId=randomUUID(),versionId=randomUUID(),base='/app/capsules/'+capsuleId+'/versions/'+versionId;
  const query=new URLSearchParams({sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}).toString(),path=base+'?'+query;
  assert.equal(isWebIdentityTargetPath(path),true,path);
+ const methodPath='/app/search?'+new URLSearchParams({q:'原阅读检查：需要相关方法',sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}).toString();
+ assert.equal(isWebIdentityTargetPath(methodPath),true,methodPath);
+ for(const bad of [methodPath+'&q=other',methodPath+'&extra=true',methodPath.replace('q=','%71='),methodPath.replace('sourceTask='+taskId,'sourceTask='+randomUUID()),
+  '/app/search?'+new URLSearchParams({q:'',sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}),
+  '/app/search?'+new URLSearchParams({q:'current query',sourceTask:taskId,returnTo:'https://foreign.example/app/tasks/'+taskId})])assert.equal(isWebIdentityTargetPath(bad),false,bad);
  for(const bad of [path+'&extra=true',path+'&sourceTask='+taskId,path+'&returnTo='+encodeURIComponent('/app/tasks/'+taskId+'?section=collaboration'),
   base+'?'+new URLSearchParams({returnTo:'/app/tasks/'+taskId+'?section=collaboration',sourceTask:taskId}),
   base+'?'+new URLSearchParams({sourceTask:taskId,returnTo:'/app/tasks/'+randomUUID()+'?section=collaboration'}),
@@ -302,6 +308,36 @@ test('identity bridge target routes require known local app paths and exact UUID
   base+'?'+new URLSearchParams({sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=details'}),
   path.replaceAll('%2F','%2f'),path.replace('sourceTask','%73ourceTask'),path.replace('/app/capsules/','/app/%63apsules/'),path+'#work',
   '/app/tasks/'+taskId+'?'+query,base+'?'+query+'?extra=true'])assert.equal(isWebIdentityTargetPath(bad),false,bad);
+});
+
+test('method search signs the actual query and exact original Task return without creating a Capsule or transferring the private work reference',{timeout:60000},async()=>{
+ const x=await fixture();
+ try{
+  const query='原页面说明 阅读方法',scopes=[...webIdentityDefaultScopes,'capsules'],before=x.calls.filter(row=>row.path.endsWith('/commit')).length;
+  const bridge=await x.prepare({scopes,continueWith:{kind:'method-search',query}});
+  const expected='/app/search?'+new URLSearchParams({q:query,sourceTask:x.task.taskId,returnTo:'/app/tasks/'+x.task.taskId+'?section=collaboration'}).toString();
+  assert.equal(bridge.info.targetPath,expected);
+  const html=await(await fetch(bridge.info.url)).text();
+  assert.match(html,/围绕“原页面说明 阅读方法”查找方法，随后返回原求助/);
+  assert.ok(html.includes('<details><summary>准确身份与原目标</summary>'));
+  assert.equal(html.slice(0,html.indexOf('<details>')).includes(x.subjectId),false);
+  const navigation=await x.original.store.get('navigation:'+bridge.info.navigationId);
+  assert.deepEqual(navigation.object,{kind:'task',id:x.task.taskId});assert.deepEqual(navigation.origin,x.origin);
+  const nonce=randomUUID(),ready=await bridge.message('ready',{nonce,existingDevice:null});
+  assert.equal(ready.context.targetPath,expected);await x.verifyProof(ready.context,nonce,null,expected);
+  assert.equal(JSON.stringify(ready.context).includes(x.origin.workRef),false,'private host input stays in the original local navigation');
+  const changed=await x.raw(connectName,{...bridge.input,continueWith:{kind:'method-search',query:query+' altered'}});
+  assert.equal(changed.isError,true);assert.equal(nativeData(changed).error,'web_identity_request_changed');
+  const noScope=await x.raw(connectName,{requestId:randomUUID(),object:{kind:'task',id:x.task.taskId},continueWith:{kind:'method-search',query},scopes:[...webIdentityDefaultScopes]});
+  assert.equal(noScope.isError,true);
+  const back=await x.call('galaxy_return',{navigationId:bridge.info.navigationId});
+  assert.equal(back.object.id,x.task.taskId);assert.deepEqual(back.origin,x.origin);assert.equal(back.data.request.summary,x.task.summary);
+  assert.equal(x.calls.filter(row=>row.path.endsWith('/commit')).length,before);
+  await Promise.all([x.server.close(),x.server.close()]);
+  const retained=await x.original.store.get('web-identity-handoff:'+bridge.info.handoffId);
+  assert.equal(retained.state,'stopped');assert.equal(retained.targetPath,expected);
+  await assert.rejects(fetch(bridge.info.url+'/state'),/fetch failed/);
+ }finally{await x.cleanup();}
 });
 
 test('tool entry lease rejects a real rebind held before retained-request lookup finishes',{timeout:60000},async()=>{
@@ -392,7 +428,16 @@ test('existing default-six website device can explicitly request capsules throug
   await assert.rejects(website.handoff.createOffer(x.subjectId,{scopes:[...webIdentityDefaultScopes],confirmed:true}),/device_pending_request_exists/);
   const bypass=await bridge.post('/message',bridge.envelope('completed',{operationId:null,subjectId:x.subjectId,deviceId:oldOffer.deviceId,epoch:control.epoch,chainHead:control.chainHead,connected:true}));
   assert.equal(bypass.value.error,'web_identity_original_operation_required');
-  await website.handoff.reconcile(offer.operationId);await website.connect();
+  const recovered=await website.handoff.reconcile(offer.operationId);
+  assert.equal(recovered.needsLocalDeviceSelection,true);
+  assert.equal(recovered.activated,false);assert.deepEqual(website.getActive(),oldActive);
+  assert.equal((await website.handoff.pending()).needsLocalDeviceSelection,true);
+  assert.equal((await website.handoff.createOffer(x.subjectId,{scopes,confirmed:true})).operationId,offer.operationId);
+  const selection=await website.handoff.previewLocalDeviceSelection(offer.operationId);
+  assert.equal(selection.previousDeviceId,oldOffer.deviceId);assert.equal(selection.deviceId,offer.deviceId);
+  assert.deepEqual(selection.scopes,scopes);assert.equal(selection.subjectId,x.subjectId);
+  const selected=await website.handoff.selectLocalDevice(selection,{confirmed:true});
+  assert.equal(selected.localDeviceSelected,true);assert.equal(selected.activated,true);await website.connect();
   const fresh=await website.read(),device=fresh.devices.find(d=>d.device_id===offer.deviceId);
   assert.equal(device.source_event_id,offer.operationId);assert.ok(device.scopes.includes('capsules'));
   assert.equal(fresh.devices.find(d=>d.device_id===oldOffer.deviceId).status,'active');
@@ -410,7 +455,7 @@ test('existing default-six website device can explicitly request capsules throug
   assert.equal(revokedReady.value.error,'web_identity_existing_device_control_required');
   console.log(JSON.stringify({actualSameGuidScopeAddition:true,actualUserNativeApproval:true,noImplicitScopeUpgrade:true,unknownAckOriginalOperation:true,
    actualOldKeyMaterialRetained:true,actualOriginalTaskReturn:true,exactCapsuleVersionSigned:true,wrongKeyAndRevokedExistingDeviceRefused:true,
-   nullAndScopeChangeCannotBypassUnknownOperation:true,privateWorkRefOnlyOriginalNavigation:true,
+   nullAndScopeChangeCannotBypassUnknownOperation:true,privateWorkRefOnlyOriginalNavigation:true,explicitLocalDeviceSelection:true,
    browserPopupNotExercised:true,actualCapsuleBodyNotLoaded:true,physicalHostAcceptance:false,modelCalls:0}));
  }finally{await x.cleanup();}
 });

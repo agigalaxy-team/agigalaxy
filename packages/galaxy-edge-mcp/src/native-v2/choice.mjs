@@ -32,6 +32,7 @@ export function createNativeChoice({identity=()=>'',website,store}){
     if(singleUse&&!review.consume(approvalKey))throw Error('native_choice_already_consumed');
     return nativeResult(await execute());
    }
+   if(reviewed.state==='declined')review.dismiss(approvalKey);
    return nativeResult({...reviewed,state:reviewed.state==='pending'?'user-choice-needs-browser':'declined',operation:name,preview:input,
     retryOriginalOperation:true,reason:'host-form-elicitation-unavailable'});
   }

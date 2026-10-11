@@ -33,7 +33,7 @@ const prepareSchema=z.discriminatedUnion('action',[
 // retained locally; the existing Native user-choice gate supplies authority.
 export function createNativeCapsuleWork(runtime){
  const flights=new Map(),storePrefix='native-capsule-work:'+runtime.api.endpoint+':';
- async function lease(){const capture=runtime.receiptStatus.captureLease();capture.assertCurrent();const status=await runtime.status();capture.assertCurrent();
+ async function lease(){await runtime.ensureConnection?.();const capture=runtime.receiptStatus.captureLease();capture.assertCurrent();const status=await runtime.status();capture.assertCurrent();
   if(!status.connected||!status.identity)fail('native_connection_choice_required');const owner=fingerprint(runtime);
   return{subjectId:status.identity,owner,assert(){capture.assertCurrent();if(owner!==fingerprint(runtime))fail('capsule_work_identity_changed');}};}
  async function readWithin(l,path,input){l.assert();try{const data=await runtime.api.call(path,input);l.assert();return data;}catch(e){l.assert();throw e;}}
