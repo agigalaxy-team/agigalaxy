@@ -2,14 +2,15 @@ import React from 'react';
 import {TaskCurrentSourceItem} from './task-material-view';
 import {Button} from '@/components/ui/button';
 import {InterventionOpinions, ResolutionStatus} from './fact-presentation';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
+import {MemberAvatar,MemberLink,memberName,useMemberNames} from './conversation-ui';
 import './history-fact-people.css';
 import {historyObject,type HistoryFactItem,type HistoryParticipation,type HistoryFactsRecord,type HistoryPeopleRuntime} from './history-fact-view-types';
+import {groupHistoryVersions} from './history-versions.mjs';
 
-const HistoryPeople=React.createContext<{subjectId?:string;names:Record<string,string|null>}>({names:{}});
+const HistoryPeople=React.createContext<{subjectId?:string;names:Record<string,string|null>;navigate?:(path:string)=>void}>({names:{}});
 function Author({id}:{id?:string}){
  const people=React.useContext(HistoryPeople);
- return id?<span className="history-fact-author"><MemberAvatar subjectId={id}/><strong>{memberName(id,people.subjectId,people.names[id]??undefined)}</strong></span>:null;
+ return id?<span className="history-fact-author">{people.navigate?<MemberLink subjectId={id} name={people.names[id]??undefined} ownId={people.subjectId} navigate={people.navigate} avatar/>:<><MemberAvatar subjectId={id}/><strong>{memberName(id,people.subjectId,people.names[id]??undefined)}</strong></>}</span>:null;
 }
 function authors(value:unknown):string[]{
  if(!value||typeof value!=='object')return[];
@@ -31,7 +32,7 @@ export function HistoryFields({value}:{value:unknown}):React.ReactElement {
   if(object)return <dl className="fact-details">{Object.entries(object).map(([key,item])=><React.Fragment key={key}><dt>{names[key]??key}</dt><dd style={{overflowWrap:'anywhere'}}>{key==='confirmation'&&historyObject(object.responseCoverage)?.complete===false?<span>当前回应范围不可确认</span>:key==='state'&&object.interventionRef?<span>{({accepted:'认可这项介入',partial:'部分认可',disputed:'有异议'} as Record<string,string>)[String(item)]??'意见状态未提供'}</span>:<HistoryFields value={item}/>}</dd></React.Fragment>)}</dl>;
   return <span>{typeof value==='boolean'?(value?'是':'否'):typeof value==='string'?label(value):typeof value==='number'||typeof value==='bigint'?String(value):'当前格式暂不可显示'}</span>;
 }
-export const historyRoleLabel=(value:string)=>({'capsule-applicant':'实际应用方法','reporter; executor-unknown':'提供记录，执行者未说明',helper:'协助',worker:'参与工作',contributor:'贡献者',owner:'发起人'} as Record<string,string>)[value]??label(value);
+export const historyRoleLabel=(value:string)=>({'capsule-applicant':'实际应用方法','reporter; executor-unknown':'提供记录，执行者未说明',helper:'协助',worker:'参与工作',contributor:'贡献者',contribution:'参与',implementation:'实施',context:'补充背景',tool:'引入工具','main-responsible':'主要负责人',provider:'提供帮助',owner:'发起人'} as Record<string,string>)[value]??label(value);
 const humanTime=(value:unknown)=>{if(typeof value!=='number'&&typeof value!=='string')return null;const date=new Date(typeof value==='number'?value*1000:value);return value&&Number.isFinite(date.getTime())?date.toLocaleString():null;};
 const textValue=(value:unknown):string=>{if(typeof value==='string')return label(value);if(typeof value==='number')return String(value);if(typeof value==='boolean')return value?'是':'否';if(Array.isArray(value))return value.map(textValue).filter(Boolean).join('、');const object=historyObject(value);return object?textValue(object.title??object.summary??object.description??object.name??''):'';};
 function Context({value:input}:{value:unknown}){
@@ -63,6 +64,12 @@ function Participation({items,navigate}:{items:HistoryParticipation[];navigate?:
   {item.taskId&&navigate&&<Button type="button" variant="link" onClick={()=>navigate('/app/tasks/'+item.taskId)}>打开这项工作</Button>}
  </article>)}</>;
 }
+function FactVersions<T extends HistoryFactItem>({items,kind,extra}:{items:T[];kind:string;extra?:(item:T)=>React.ReactNode}){
+ return <>{groupHistoryVersions(items).map(({latest,previous},index)=><div className="history-fact-series" key={latest.id??index}>
+  <Item value={latest} kind={kind}>{extra?.(latest)}</Item>
+  {previous.length>0&&<details className="history-revisions"><summary>此前 {previous.length} 次记录</summary><ol>{previous.map((item,i)=><li key={item.version??i}><Item value={item} kind={kind}>{extra?.(item)}</Item></li>)}</ol></details>}
+ </div>)}</>;
+}
 function StructuredDownload({record}:{record:HistoryFactsRecord}){
  return <button className="history-source-download" type="button" onClick={()=>{const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='galaxy-history-'+String(record.key??'record').replace(/[^a-z0-9-]/gi,'-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>下载当前可见的完整记录</button>;
 }
@@ -77,20 +84,20 @@ function HistoryFactsBody({record,navigate,runtime,connected=false,subjectId}:Hi
  const participation=record.kind==='task-history'?(record.participation??[]):(record.collaborations??[]);
  const hasProcess=attempts.length||interventions.length||participation.length;
  const hasResults=results.length||verification.length||reuse.length||record.proofs?.length||(record.resolution&&record.resolution.status!=='unrecorded');
- return <HistoryPeople.Provider value={{subjectId,names:people}}><div className="history-facts">
+ return <HistoryPeople.Provider value={{subjectId,names:people,navigate}}><div className="history-facts">
   {record.synthetic&&<p className="message">这是一份合成示例。</p>}
   {!!record.subjectRoles?.length&&<p className="history-meta">在这件事中：{record.subjectRoles.map(historyRoleLabel).join('、')}</p>}
   <nav className="history-fact-tabs" aria-label="经历详情">{[['process','过程与参与'],['results','结果与核查'],['sources','来源与记录']].map(([id,title])=><button type="button" key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}>{title}</button>)}</nav>
   {tab==='process'&&<div>
-   {!!attempts.length&&<section className="history-fact-section"><h3>尝试过程</h3><div className="history-timeline">{attempts.map((value,index)=><Item key={`${value.id??index}:${value.version??''}:${index}`} value={value} kind="尝试"/>)}</div></section>}
-   {!!interventions.length&&<section className="history-fact-section"><h3>各方做了什么</h3><div className="history-timeline">{interventions.map((value,index)=><Item key={`${value.id??index}:${value.version??''}:${index}`} value={value} kind="参与"><details><summary>相关方的意见</summary><InterventionOpinions intervention={{...value,confirmation:value.confirmation??''}} subjectId={subjectId} names={people}/></details></Item>)}</div></section>}
+   {!!attempts.length&&<section className="history-fact-section"><h3>尝试过程</h3><div className="history-timeline"><FactVersions items={attempts} kind="尝试"/></div></section>}
+   {!!interventions.length&&<section className="history-fact-section"><h3>各方做了什么</h3><div className="history-timeline"><FactVersions items={interventions} kind="参与" extra={value=><details><summary>相关方的意见</summary><InterventionOpinions intervention={{...value,confirmation:value.confirmation??''}} subjectId={subjectId} names={people}/></details>}/></div></section>}
    {!!participation.length&&<section className="history-fact-section"><h3>参与和交付</h3><Participation items={participation} navigate={navigate}/></section>}
    {!hasProcess&&<p className="history-empty">这份资料还没有可查看的过程记录。</p>}
   </div>}
   {tab==='results'&&<div>
-   {!!results.length&&<section className="history-fact-section"><h3>实际结果</h3>{results.map((value,index)=><Item key={`${value.id??index}:${value.version??''}:${index}`} value={value} kind="结果"/>)}</section>}
+   {!!results.length&&<section className="history-fact-section"><h3>实际结果</h3><FactVersions items={results} kind="结果"/></section>}
    {record.resolution&&record.resolution.status!=='unrecorded'&&<section className="history-fact-section"><h3>问题目前怎样</h3><ResolutionStatus resolution={record.resolution} resolutions={record.resolutions}/></section>}
-   {!!verification.length&&<section className="history-fact-section"><h3>做过的核查</h3>{verification.map((value,index)=><Item key={value.id??index} value={value} kind="核查"/>)}</section>}
+   {!!verification.length&&<section className="history-fact-section"><h3>做过的核查</h3><FactVersions items={verification} kind="核查"/></section>}
    {!!record.proofs?.length&&<section className="history-fact-section"><h3>自动检查的证据</h3><p className="muted">这些证据对应具体的自动检查范围。</p>{record.proofs.map((proof,index)=><article key={proof.proofId??index} className="history-fact-item"><h4>{label(proof.status??'尚未说明检查状态')}</h4><Context value={proof}/></article>)}</section>}
    {!!reuse.length&&<section className="history-fact-section"><h3>方法的应用</h3>{reuse.map((value,index)=><Item key={value.id??index} value={value} kind={value.kind==='reference'?'曾引用的方法':'实际应用方法'}><p className="fact-note">{value.kind==='reference'?'仅引用或阅读，尚未记录实际应用。':value.applicationStatus?label(value.applicationStatus):'以本项所记录的结果和条件为准。'}</p></Item>)}</section>}
    {!hasResults&&<p className="history-empty">还没有可查看的结果或核查记录。</p>}

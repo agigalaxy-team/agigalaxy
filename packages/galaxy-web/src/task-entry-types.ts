@@ -56,8 +56,8 @@ export type ApplicationDraft=Record<string,unknown>&{proposal:string;scope:strin
 export const blankApplication=():ApplicationDraft=>({proposal:'',scope:'',quoteMode:'task',selected:[]});
 export function readApplicationDraft(value:unknown):ApplicationDraft{
  if(value===null||value===undefined)return blankApplication();
- if(!object(value)||typeof value.proposal!=='string'||typeof value.scope!=='string')throw Error('原参与草稿暂时无法读取，原内容仍保留。');
- return{...blankApplication(),...value,proposal:value.proposal,scope:value.scope};
+ if(!object(value)||typeof value.proposal!=='string'||value.scope!==undefined&&typeof value.scope!=='string')throw Error('原参与草稿暂时无法读取，原内容仍保留。');
+ return{...blankApplication(),...value,proposal:value.proposal,scope:value.scope??''};
 }
 export function sameApplication(left:unknown,right:unknown){return object(left)&&object(right)&&left.proposal===right.proposal&&left.scope===right.scope;}
 export function meaningfulApplication(value:unknown){return object(value)&&(typeof value.proposal==='string'&&!!value.proposal.trim()||typeof value.scope==='string'&&!!value.scope.trim());}

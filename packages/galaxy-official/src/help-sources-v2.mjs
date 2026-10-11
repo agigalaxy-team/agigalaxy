@@ -4,8 +4,8 @@ import { postPublicJson, validatePublicUrl } from './public-fetch.mjs';
 
 // These clients run in the user's process and reuse current public services.
 // Legacy source adapters remain separate so existing queries are not reinterpreted.
-export function createHelpSourcesV2({ endpoint, sessions, send = postPublicJson }) {
-  if (validatePublicUrl(endpoint).origin !== endpoint || !sessions) throw new Error('help_source_config_invalid');
+export function createHelpSourcesV2({ endpoint, sessions, send = postPublicJson, validateEndpoint = validatePublicUrl }) {
+  if (validateEndpoint(endpoint).origin !== endpoint || !sessions) throw new Error('help_source_config_invalid');
   function client(kind, schema, path, scope) {
     return { async query(input, { signal } = {}) {
       const request = schema.parse(input); signal?.throwIfAborted();

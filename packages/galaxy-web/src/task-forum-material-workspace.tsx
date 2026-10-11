@@ -12,7 +12,7 @@ type Props = { source: ForumPostView; sourceState: string; draft: PublishDraft; 
   onAdopt: (input: TaskMaterialInput, options: TaskMaterialOptions, assertSelectionCurrent: () => void) => void; onCancel: () => void; onRefresh: () => void };
 const date = (value: number) => new Date(value * 1000).toLocaleString();
 const present = (value: TaskText) => hasMaterialText(value) || !!literalTaskText(value).trim();
-const error = () => Object.assign(new Error('选材预览期间内容或范围已变化，请重新采用；原稿仍保留。'), { code: 'task_material_selection_changed' });
+const error = () => Object.assign(new Error('带入材料期间内容或范围已变化，请重新选择；原稿仍保留。'), { code: 'task_material_selection_changed' });
 
 export function TaskForumMaterialWorkspace({ source, sourceState, draft, states, busy, onAdopt, onCancel, onRefresh }: Props) {
   const revision = useRef(0), alive = useRef(true), initialSource = useRef(source), fieldId=useId();
@@ -62,7 +62,7 @@ export function TaskForumMaterialWorkspace({ source, sourceState, draft, states,
   const previousTitle = localTaskTextView(draft.title, draft.materialBodies, states).text;
   const previousSummary = localTaskTextView(draft.summary, draft.materialBodies, states).text;
   return <section className="task-material-selection" aria-label="选择本人帖子材料" aria-busy={busy}>
-    <header><p className="eyebrow">从社区讨论继续</p><h2>把这段内容带入求助</h2><p>选择需要的标题和说明，修改后即可预览。</p></header>
+    <header><p className="eyebrow">从社区讨论继续</p><h2>把这段内容带入求助</h2><p>选择要使用的文字，带入后可以继续编辑。</p></header>
 
     {!available ? <div className="message"><p>{sourceState === 'reading' ? '正在重新核对准确来源。' : '这版材料当前不能核对，已隐藏来源文字。原任务稿保持原样。'}</p>
       <Button type="button" variant="outline" disabled={busy} onClick={onRefresh}>重新核对这版材料</Button>
@@ -88,14 +88,12 @@ export function TaskForumMaterialWorkspace({ source, sourceState, draft, states,
         <details><summary>从准确原文缩小选区</summary><p>在下列原文中选中文字，选区会直接更新对应的材料；不需要复制粘贴。</p>
           <label htmlFor={fieldId+'-source-title'}>原文标题<Textarea id={fieldId+'-source-title'} aria-label="原文标题" readOnly value={source.payload?.title??''} onSelect={event => range('title', event.currentTarget)}/></label>
           <label htmlFor={fieldId+'-source-body'}>原文正文<Textarea id={fieldId+'-source-body'} aria-label="原文正文" readOnly value={source.payload?.body??''} onSelect={event => range('body', event.currentTarget)}/></label>
-          <p className="muted">标题选区 {titleRange.start}–{titleRange.end}；正文选区 {bodyRange.start}–{bodyRange.end}。选区以 Unicode 字符位置核对。</p>
         </details>
       </fieldset>
       <fieldset disabled={busy}>
-        <legend>核对这次任务的范围</legend>
+        <legend>这次材料的使用范围</legend>
         <label>谁可以看到<select value={visibility} onChange={event => edit(() => setVisibility(event.target.value))}>
           <option value="Public">公开求助</option><option value="Private">仅自己</option></select></label>
-        <p>{draft.collaboration === 'basic-bounty' ? '沿用原稿的赏金协助条件。' : '开放协助，新参与者可以开始。'}征集截止：{new Date(draft.enrollmentLocal).toLocaleString()}。</p>
         <p>本次材料使用至 {date(expiresAt)}。到期或原材料撤回后，相应文字停止展示，独立说明继续保留。</p>
         <details><summary>缩短材料使用期限</summary><label htmlFor={fieldId+'-expires'}>材料使用截止<Input id={fieldId+'-expires'} type="datetime-local" value={Number.isFinite(expiresAt)?localDateTime(expiresAt):''}
           max={localDateTime(source.publishedUntil??0)} onChange={event => edit(() => setExpiresAt(Math.floor(Date.parse(event.target.value) / 1000)))}/></label></details>
@@ -103,9 +101,9 @@ export function TaskForumMaterialWorkspace({ source, sourceState, draft, states,
         <label><input type="checkbox" checked={declared} onChange={event => edit(() => setDeclared(event.target.checked))}/>
           选中的内容是我可用于这份任务的材料；我已排除无权再发布的第三方内容。</label>
       </fieldset>
-      <div className="button-row"><Button type="button" disabled={busy || !declared || !titleValid || !bodyValid || !untilValid || !useTitle && !useBody} onClick={adopt}>采用并预览求助</Button>
+      <div className="button-row"><Button type="button" disabled={busy || !declared || !titleValid || !bodyValid || !untilValid || !useTitle && !useBody} onClick={adopt}>带入求助草稿</Button>
         <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>返回自己的草稿</Button></div>
-      <p className="muted">采用后会保存到当前草稿，预览后再发布。</p>
+      <p className="muted">带入后仍是你的草稿，由你点击发布。</p>
     </>}
   </section>;
 }
@@ -125,13 +123,13 @@ export function TaskMaterialDraftField({ field, label, value, draft, states, clo
       <h3>{label} · 来源材料段</h3>
       {visible ? <label htmlFor={field+'-'+segment.materialId}>编辑这段{label}材料{field === 'title'
         ? <Input id={field+'-'+segment.materialId} disabled={busy} value={body?.text??''} maxLength={maximum} onChange={event => onEdit(segment.materialId, event.target.value)}/>
-        : <Textarea id={field+'-'+segment.materialId} disabled={busy} value={body?.text??''} maxLength={maximum} onChange={event => onEdit(segment.materialId, event.target.value)}/>}</label>
+        : <Textarea aria-label={'编辑这段'+label+'材料'} id={field+'-'+segment.materialId} disabled={busy} value={body?.text??''} maxLength={maximum} onChange={event => onEdit(segment.materialId, event.target.value)}/>}</label>
         : <output>这段材料当前不可用或仍待核对，文字已隐藏。独立内容可以继续编辑。</output>}
       <p className="muted">编辑后的文字继续受原材料限制。{material && '材料使用至 ' + date(material.expiresAt) + '。'}</p>
       <div className="button-row">{path && <Button type="button" variant="link" disabled={busy} onClick={() => navigate(path)}>查看准确来源版本</Button>}
         <Button type="button" variant="ghost" disabled={busy} onClick={() => onRemove(field, segment.materialId)}>移除这一材料段</Button></div>
     </div>;
   })}
-    {Object.hasOwn(draft.materialRestore ?? {}, field) && <Button type="button" variant="ghost" disabled={busy} onClick={() => onRestore(field)}>恢复替换前的{label}（仅本机原稿）</Button>}
+    {Object.hasOwn(draft.materialRestore ?? {}, field) && present(draft.materialRestore[field]) && <Button type="button" variant="ghost" disabled={busy} onClick={() => onRestore(field)}>恢复替换前的{label}（仅本机原稿）</Button>}
   </>;
 }

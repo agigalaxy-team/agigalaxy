@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AccountVerificationPrompt, needsAccountVerification } from './account-verification-prompt';
 import { createCommunityForumClient, forumDraftPayload, forumError, forumScopeKey, newForumDraft } from './community-forum-client.mjs';
 import { forumReplyPath, forumTaskPath, forumVersionPath, normalizeForumOrigin } from './community-forum-origin.mjs';
-import { MemberAvatar, memberName, useMemberNames } from './conversation-ui';
+import { MemberAvatar, MemberLink, memberName, useMemberNames } from './conversation-ui';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {chatErrorCode,type ChatRuntime} from './chat-workspace-types';
 import {availableForumContent,forumPayload,forumPreviewProjection,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumPreviewPayload,type ForumPayload,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPage} from './community-forum-view-types';
@@ -328,14 +328,14 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   function card(value: ForumCardView, owned = false) {
     const locator = value.locator, available = isAvailable(value), path = owned ? `/app/community/posts/${locator.postId}?manage=1` : targetPath(locator) ?? `/app/community/posts/${locator.postId}`;
     return <article className="forum-card" key={locator.postId}>
-      <div className="forum-meta"><MemberAvatar subjectId={value.authorId}/><span>{owned ? '我' : forumName(value.authorId)}</span></div>
+      <div className="forum-meta"><MemberLink subjectId={value.authorId} name={forumName(value.authorId)} ownId={subjectId} navigate={navigate} avatar/></div>
       <h2>{link(path, available ? value.payload.title : '原帖子记录')}</h2>
       {available ? <p className="forum-excerpt">{value.payload.body.replace(/\s+/g,' ').trim()}</p> : <p>{states[value.availability??''] ?? '当前没有可展示的正文。'}</p>}
       <div className="forum-card-footer">{link(path, <><MessageCircle size={14}/>阅读与讨论</>)}{available&&value.payload.links?.length>0&&<span>{value.payload.links.length} 个相关链接</span>}</div>
     </article>;
   }
   const displayReply = (value: ForumReplyView) => <article className="forum-reply" id={'reply-' + value.locator.replyId} key={value.locator.replyId}>
-    <div className="forum-meta"><MemberAvatar subjectId={value.authorId}/><span>{forumName(value.authorId)}</span>{link(forumReplyPath(value.locator.replyId)!, '查看此条')}</div>
+    <div className="forum-meta"><MemberLink subjectId={value.authorId} name={forumName(value.authorId)} ownId={subjectId} navigate={navigate} avatar/>{link(forumReplyPath(value.locator.replyId)!, '查看此条')}</div>
     {isAvailable(value) ? <>{value.payload.replyTo && <p className="reply-context">回复 {link(forumReplyPath(value.payload.replyTo.replyId)!, '先前的讨论')}</p>}<p className="forum-prose">{value.payload.body}</p></> : <p>{states[value.availability] ?? '当前无法读取这条回复。'}</p>}
     {isAvailable(value) && <div className="button-row">{isAvailable(selected) && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
       {value.authorId === subjectId ? <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-reply', value))}>撤回我的回复</Button> : <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => startReport(value))}>私有举报</Button>}</div>}
@@ -360,7 +360,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
 
     {(postId&&detail||replyId&&replyDetail) && <>
       {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<><ArrowLeft size={14}/>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}{!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article className="forum-post">
-        <div className="forum-meta"><MemberAvatar subjectId={detail.authorId}/><span>{forumName(detail.authorId)}</span>{(detail.locator.versionNumber??0)>1&&<span>更新 {detail.locator.versionNumber}</span>}</div>
+        <div className="forum-meta"><MemberLink subjectId={detail.authorId} name={forumName(detail.authorId)} ownId={subjectId} navigate={navigate} avatar/>{(detail.locator.versionNumber??0)>1&&<span>更新 {detail.locator.versionNumber}</span>}</div>
         {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><div className="forum-post-body"><p className="forum-prose">{detail.payload.body}</p><Links links={detail.payload.links} /></div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
         {isAvailable(detail) && <div className="forum-post-actions"><Button disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
           {own && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(()=>startVersion())}>编辑帖子</Button>}

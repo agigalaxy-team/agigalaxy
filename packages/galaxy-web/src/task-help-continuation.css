@@ -1,4 +1,71 @@
-/* Scoped to the existing help publication flow and its original-work return. */
+/* Reading, publishing and collaboration keep their own content layout. */
+.galaxy-site .request-continuous-form{padding-top:8px}
+.galaxy-site .request-continuous-form .request-writing-fields{gap:20px}
+.galaxy-site .request-continuous-form .request-writing-fields>label>textarea{min-height:215px}
+.galaxy-site .request-continuous-form fieldset.request-share-fields{margin-top:30px;padding-top:24px;border-top:1px solid var(--g-line);gap:18px}
+.galaxy-site .request-continuous-form .request-share-fields>legend{float:left;width:100%;font-size:14px;margin:0 0 14px;font-weight:600}
+.galaxy-site .request-continuous-form .request-visibility{clear:both}
+.galaxy-site .request-continuous-form .request-visibility>label{padding:15px;gap:12px}
+.galaxy-site .request-continuous-form .request-visibility strong{margin-bottom:3px}
+.galaxy-site .request-continuous-form .request-visibility small{font-size:12px;color:#786982}
+.galaxy-site .request-continuous-form label.request-enrollment{display:flex;align-items:center;justify-content:space-between;gap:15px;font-size:13px}
+.galaxy-site .request-enrollment>span>small{display:block;margin-top:5px;font-size:12px;font-weight:400;color:#81768c}
+.galaxy-site .request-continuous-form .request-enrollment input{width:auto;max-width:245px;font-size:13px;padding:10px 12px}
+.galaxy-site .request-continuous-form .request-related-help{margin-top:24px;padding-bottom:0}
+.galaxy-site .request-continuous-form .request-form-footer>div:first-child>span{font-size:12px;color:#84728e}
+.galaxy-site .request-reading{max-width:760px;padding-bottom:20px}
+.galaxy-site .request-reading>section{margin:0 0 32px;scroll-margin-top:110px}
+.galaxy-site .request-reading>section h2{font-size:17px;line-height:1.5;margin:0 0 12px;color:var(--g-ink)}
+.galaxy-site .request-reading-prose>p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.95;color:#51485a;margin:0 0 16px}
+.galaxy-site .request-reading-index{display:flex;gap:10px 22px;flex-wrap:wrap;border-block:1px solid var(--g-line);padding:12px 0;margin:0 0 28px}
+.galaxy-site .request-reading-index a{font-size:13px;color:var(--g-accent);min-height:32px;display:inline-flex;align-items:center}
+.galaxy-site .application-compose{max-width:none}
+.galaxy-site .application-compose>fieldset{gap:18px}
+.galaxy-site .application-compose>fieldset>label>small{font-size:12px;font-weight:400;color:#7b8471}
+.galaxy-site .application-compose>fieldset>label:first-child textarea{min-height:175px}
+.galaxy-site .application-discussion{display:flex;align-items:center;gap:12px;margin-top:32px;border-top:1px solid var(--g-line);padding-top:22px;color:#707d65}
+.galaxy-site .application-discussion>svg{flex-shrink:0}
+.galaxy-site .application-discussion>p{flex:1;font-size:13px;line-height:1.8;margin:0}
+.galaxy-site .application-discussion>button{white-space:nowrap}
+.galaxy-site .collaboration-overview-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:8px}
+.galaxy-site .collaboration-overview-heading>h2{font-size:20px;margin:0;line-height:1.6}
+.galaxy-site .collaboration-overview-heading>.button-row{margin:0}
+.galaxy-site .collaboration-overview-heading button{font-size:13px}
+.galaxy-site .collaboration-discussion-entry{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:15px;padding:20px 0 25px;border-bottom:1px solid var(--g-line)}
+.galaxy-site .collaboration-discussion-entry>svg{color:#6e8576}
+.galaxy-site .collaboration-discussion-entry strong{font-size:15px;font-weight:550}
+.galaxy-site .collaboration-discussion-entry p{font-size:13px;color:#738074;line-height:1.8;margin:6px 0 0}
+.galaxy-site .collaboration-person .collaboration-role{font-size:12px;color:#6d7f73;margin:9px 0 0}
+.galaxy-site .collaboration-person p{overflow-wrap:anywhere}
+.galaxy-site .collaboration-person header>.member-link{font-size:15px;font-weight:550}
+.galaxy-site .collaboration-person .button-row button{min-height:38px}
+.galaxy-site .collaboration-empty h3{font-size:17px;font-weight:500;color:#5c725d;margin:16px 0 8px}
+.galaxy-site .collaboration-empty p{line-height:1.85;margin:9px 0 18px}
+.galaxy-site .collaboration-history{border-top:1px solid var(--g-line);padding-top:18px;margin-top:30px}
+.galaxy-site .collaboration-history>.text-action{min-height:40px}
+.galaxy-site .collaboration-dialog small{font-size:12px;line-height:1.8;color:#72816d}
+@media(max-width:600px){
+ .galaxy-site .request-continuous-form .request-writing-fields>label>textarea{min-height:190px}
+ .galaxy-site .request-continuous-form .request-visibility>label{padding:14px;min-height:77px}
+ .galaxy-site .request-continuous-form label.request-enrollment{display:grid;gap:10px}
+ .galaxy-site .request-continuous-form .request-enrollment input{width:100%;max-width:none;min-width:0}
+ .galaxy-site .request-continuous-form .request-form-footer{align-items:stretch;flex-direction:column;gap:18px}
+ .galaxy-site .request-continuous-form .request-form-footer>div:first-child{max-width:none;display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .galaxy-site .request-continuous-form .request-form-footer .button-row{justify-content:flex-end;flex-wrap:wrap}
+ .galaxy-site .request-continuous-form .request-form-footer .button-row button{min-height:44px;font-size:14px;padding-inline:17px}
+ .galaxy-site .request-reading-prose>p{font-size:15px;line-height:1.95}
+ .galaxy-site .request-reading>section{margin-bottom:28px}
+ .galaxy-site .application-discussion{flex-wrap:wrap;gap:8px 12px}
+ .galaxy-site .application-discussion>p{min-width:210px}
+ .galaxy-site .application-discussion>button{margin-left:28px}
+ .galaxy-site .collaboration-overview-heading{display:block;margin-bottom:13px}
+ .galaxy-site .collaboration-overview-heading>.button-row{margin-top:9px;gap:0;justify-content:flex-start}
+ .galaxy-site .collaboration-discussion-entry{grid-template-columns:23px minmax(0,1fr);gap:10px 13px}
+ .galaxy-site .collaboration-discussion-entry>button{grid-column:2;justify-self:start;min-height:40px}
+ .galaxy-site .collaboration-person .button-row button{min-height:42px;font-size:13px}
+ .galaxy-site .collaboration-person p{font-size:14px}
+ .galaxy-site .collaboration-tabs button{min-height:46px;padding-inline:12px}
+}
 .galaxy-site .request-work-origin{min-width:0;padding-top:20px;margin-top:3px;border-top:1px solid var(--g-line)}
 .galaxy-site .request-work-origin>header{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}
 .galaxy-site .request-work-origin>header h2{font-size:17px;line-height:1.5;margin:0}

@@ -52,7 +52,8 @@ export function evidenceFromSelection(items){
  return qualificationEvidenceV2Schema.parse(combined);
 }
 export function applicationFromDraft(d,task){
- const event={kind:'apply',expectedTaskVersion:task.version,proposal:d.proposal.trim(),scope:d.scope.trim(),
+ const scope=typeof d.scope==='string'?d.scope.trim():undefined;
+ const event={kind:'apply',expectedTaskVersion:task.version,proposal:d.proposal.trim(),...(scope?{scope}:{}),
   ...(task.request.collaboration==='basic-bounty'&&d.quoteMode==='own'?{quote:formBudget(d)}:{}),
   ...(task.request.qualification?{qualificationEvidence:task.request.qualification.profile==='facts-v2'?evidenceFromSelection(d.selected??[]):legacyEvidenceFromSelection(d.selected??[])}:{})};
  // Shape validation only: runtime creates and persists the real ID exactly once.

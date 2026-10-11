@@ -70,9 +70,11 @@ test('current profile overview and shared names preserve viewer permissions, dec
  const f=await fixture(t),viewer=f.runtime(f.f),visitor=f.runtime(),owner=f.runtime(f.p);
  const selected=createProfileClient(viewer,{subjectId:f.f.actor.subjectId,targetSubjectId:f.p.actor.subjectId,authenticated:true}),
   publicProfile=createProfileClient(visitor,{targetSubjectId:f.p.actor.subjectId}),mine=createProfileClient(owner,{subjectId:f.p.actor.subjectId,authenticated:true});
- await f.publish(f.p,0,{displayName:'当前可见名字',about:'自述介绍',claimedCapabilities:['自述编译器调试']});
+ const project={id:randomUUID(),kind:'project',title:'隔离资料页验证',summary:'仅用于检验当前允许阅读的自述项目。',functions:['协作'],technologies:[],sourceUrl:'https://example.org/profile-project',discoverable:false};
+ await f.publish(f.p,0,{displayName:'当前可见名字',about:'自述介绍',claimedCapabilities:['自述编译器调试'],projects:[project]});
  let card=await selected.overview();assert.equal(card.subjectId,f.p.actor.subjectId);assert.equal(card.displayName,'当前可见名字');
  assert.equal(card.about,'自述介绍');assert.deepEqual(card.tags,['自述编译器调试']);assert.equal(card.profileSource.classification,'self-declared');
+ assert.deepEqual(card.projects,[project]);
  assert.equal(card.profileRevision,undefined,'a selected other subject does not acquire the owner revision');assert.deepEqual(card.honors,[]);
  assert.equal((await mine.overview()).profileRevision,1);assert.equal((await publicProfile.overview()).displayName,'当前可见名字');
  const accepted=await f.publicWork();card=await publicProfile.overview();assert.equal(card.honors.length,1);
@@ -80,6 +82,7 @@ test('current profile overview and shared names preserve viewer permissions, dec
  assert.equal((await publicProfile.honor(card.honors[0])).card.acceptedCases,1);
  const privateGrant=await f.publish(f.p,1,{displayName:'现在仅本人可见',about:'私有替换'},{visibility:'Private',viewers:[]});
  assert.equal((await selected.overview()).displayName,null);assert.equal((await publicProfile.overview()).displayName,null);
+ assert.deepEqual((await selected.overview()).projects,[],'a new private declaration removes previously public projects too');
  assert.equal((await mine.overview()).displayName,'现在仅本人可见');
  assert.deepEqual(await readProfileDisplayNames(viewer.api.call.bind(viewer.api),[f.p.actor.subjectId,f.p.actor.subjectId]),
   [{subjectId:f.p.actor.subjectId,displayName:null}]);

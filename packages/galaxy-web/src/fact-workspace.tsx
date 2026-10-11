@@ -3,17 +3,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { exactFactRef, getFactClient, latestFacts } from './fact-client.mjs';
+import {exactReadableResult,isResultReference,readTaskResult,taskResultPath,taskResultReturn} from './task-result-navigation.mjs';
+import {WorkResultReading} from './work-result-reading';
 import { ciSourceMetadata } from '../../galaxy-official/src/shared/ci-observation-v2-schema.mjs';
 import { githubReference } from '../../galaxy-official/src/shared/github-evidence-schema.mjs';
 import { CiWorkspace } from './ci-workspace';
 import {ConfigurationPicker} from './configuration-picker';
 import {InterventionOpinions, ResolutionStatus} from './fact-presentation';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
-import {Plus,ArrowRight,X} from 'lucide-react';
+import {MemberAvatar,MemberLink,memberName,useMemberNames} from './conversation-ui';
+import {Plus,ArrowRight,ArrowLeft,X} from 'lucide-react';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {errorField,readOperationReceipt} from './task-operation-state';
 import {readWorkCompose,requireWorkCompose,readWorkRecordLocators,recordText,isWorkRecordView,isWorkEvidence,readQueuedParticipation,workFormBlank as blank} from './work-fact-types';
-import type {WorkFactAction,WorkFactActionKind,WorkFactClient,WorkFactPending,WorkFactReceipt,WorkFactRetry,WorkFacts,WorkForm,WorkTextField,WorkComposeValue,WorkComposeDraft,WorkRecordReading,WorkRecordView,WorkRecordLocator,WorkRecordType,WorkEditorTarget,WorkViewAuthority} from './work-fact-types';
+import type {WorkFactAction,WorkFactActionKind,WorkFactClient,WorkFactPending,WorkFactReceipt,WorkFactRetry,WorkFacts,WorkResult,WorkForm,WorkTextField,WorkComposeValue,WorkComposeDraft,WorkRecordReading,WorkRecordView,WorkRecordLocator,WorkRecordType,WorkEditorTarget,WorkViewAuthority} from './work-fact-types';
 import type {WorkProps,WorkRuntime} from './work-task-types';
 import type {FactReference} from './work-fact-presentation-types';
 import type {CapsuleSourceItem} from './capsule-authoring-types';
@@ -139,13 +141,14 @@ export function FactWorkspace(props:WorkProps){
  const view=useChoiceViewLease(props.runtime,props.subjectId);
  return props.connected&&props.task.schemaVersion===2&&props.subjectId&&view.lease?<FactSession key={JSON.stringify([props.task.taskId,props.task.caseId,view.key])} {...props} subjectId={props.subjectId} lease={view.lease}/>:null;
 }
-function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&{subjectId:string;lease:ChoiceViewLease}) {
+function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:WorkProps&{subjectId:string;lease:ChoiceViewLease}) {
   const requester=task.requesterId===subjectId,own=useMemo(()=>(task.participations??[]).filter(p=>p.subjectId===subjectId&&['active','delivered','accepted','disputed'].includes(p.state)),[task.participations,subjectId]);
   const generation = useRef(0),active=useRef(true);
   const working=useRef(false),editor=useRef<HTMLDialogElement>(null);
-  const [workView,setWorkViewState]=useState(readWorkView);
-  function setWorkView(value:string){setWorkViewState(value);const url=new URL(location.href);url.searchParams.set('record',value);window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);window.dispatchEvent(new Event('galaxy:route-view-changed'));}
-  useEffect(()=>{const read=()=>setWorkViewState(readWorkView());window.addEventListener('popstate',read);return()=>window.removeEventListener('popstate',read);},[task.taskId]);
+  const [workView,setWorkViewState]=useState(readWorkView),[resultSelection,setResultSelection]=useState(()=>readTaskResult(location.search));
+  const routeSearch=location.search;
+  function setWorkView(value:string){setWorkViewState(value);const url=new URL(location.href);url.searchParams.set('record',value);for(const key of ['result','resultVersion','delivery'])url.searchParams.delete(key);window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);setResultSelection(readTaskResult(url.search));window.dispatchEvent(new Event('galaxy:route-view-changed'));}
+  useEffect(()=>{const read=()=>{setWorkViewState(readWorkView());setResultSelection(readTaskResult(location.search));};read();window.addEventListener('popstate',read);window.addEventListener('galaxy:route-view-changed',read);return()=>{window.removeEventListener('popstate',read);window.removeEventListener('galaxy:route-view-changed',read);};},[task.taskId,routeSearch]);
   const client = useMemo<WorkFactClient>(
     () => getFactClient(runtime, subjectId),
     [runtime, subjectId],
@@ -222,6 +225,8 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
   const attempts = latestFacts(facts?.attempts ?? []),
     interventions = latestFacts(facts?.interventions ?? []),
     results = latestFacts(facts?.results ?? []);
+  const selectedResult=exactReadableResult(facts?.results??[],resultSelection.reference),resultDetail=workView==='results'&&resultSelection.selected;
+  const sourceDelivery=task.participations?.flatMap(item=>item.deliveries??[]).find(item=>item.deliveryId===resultSelection.deliveryId),deliveredVersion=sourceDelivery?.resultRef?.id===selectedResult?.id&&sourceDelivery?.resultRef?.version===selectedResult?.version;
   const verificationTargets:[string,WorkEditorTarget[]][]=[['attempt',attempts],['intervention',interventions],['result',results]];
   const ownOrigins = [
     ...attempts.map(x => ({ ...x, kind: 'attempt' as const })),
@@ -436,8 +441,11 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
     setNotice('');
     setConfigurationConditions([]);
     setConfigurationSources([...(target?.sourceRefs??[]),...(target?.deliverableRefs??[])].filter(x=>x.kind==='configuration').map(ref=>({ref:{kind:'configuration' as const,id:ref.id,version:ref.version},label:'原版本明确配置来源'})));
-    setRelated(target?.affectsAttemptIds ?? []);
-    setRecordSelected((target?.record?.evidenceRefs ?? []).map(refsKey));
+    const delivering=kind==='deliver'?eligibleResults.find(item=>refsKey(item)===(values.resultChoice??''))??eligibleResults[0]:null;
+    const nextRelated=delivering?.origin.kind==='intervention'?[refsKey(delivering.origin)]:target?.affectsAttemptIds??[];
+    const nextRecords=delivering?delivering.deliverableRefs.filter(ref=>ref.kind==='evidence').map(refsKey):(target?.record?.evidenceRefs??[]).map(refsKey);
+    setRelated(nextRelated);
+    setRecordSelected(nextRecords);
     if (target?.record) setParticipationId(target.record.participationId ?? '');
     const nextForm={
       ...blank,
@@ -509,7 +517,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
         : {}),
       ...(kind === 'deliver'
         ? {
-            resultChoice: eligibleResults[0] ? refsKey(eligibleResults[0]) : '',
+            resultChoice: delivering ? refsKey(delivering) : '',summary:delivering?.summary??'',
           }
         : {}),
       ...(kind === 'verification'
@@ -525,7 +533,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
     };
     setForm(nextForm);
     const nextParticipationId=target?.record?target.record.participationId??'':participationId;
-    composeBaseline.current=JSON.stringify({ui:'work-editor-v1',kind,targetRef:target?{id:target.id,version:target.version,type:target.type??null}:null,participationId:nextParticipationId,participationScopeVersion:own.find(item=>item.participationId===nextParticipationId)?.scopeVersion??null,form:nextForm,viewers,related:target?.affectsAttemptIds??[],recordSelected:(target?.record?.evidenceRefs??[]).map(refsKey),configurationConditions:[],configurationSources:[...(target?.sourceRefs??[]),...(target?.deliverableRefs??[])].filter(x=>x.kind==='configuration').map(ref=>({ref,label:'原版本明确配置来源'}))});
+    composeBaseline.current=JSON.stringify({ui:'work-editor-v1',kind,targetRef:target?{id:target.id,version:target.version,type:target.type??null}:null,participationId:nextParticipationId,participationScopeVersion:own.find(item=>item.participationId===nextParticipationId)?.scopeVersion??null,form:nextForm,viewers,related:nextRelated,recordSelected:nextRecords,configurationConditions:[],configurationSources:[...(target?.sourceRefs??[]),...(target?.deliverableRefs??[])].filter(x=>x.kind==='configuration').map(ref=>({ref,label:'原版本明确配置来源'}))});
   }
   function draft(kind: WorkFactActionKind) {
     const fields: Record<string,unknown> = { kind };
@@ -743,7 +751,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
     scope.check();
     setAction(null);
     await readCompose(true);scope.check();
-    setNotice(action.kind==='deliver'?'交付已提交，等待发起者验收。':'这条工作记录已保存。');
+    setNotice(action.kind==='deliver'?'结果已分享给发起者。':'这条工作记录已保存。');
     await refresh();
     scope.check();
     if (task.caseId) await load();
@@ -752,6 +760,25 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
       scope.check();
       setFacts(current);
     }
+    if(kind==='result-recorded')navigate(taskResultPath(task.taskId,isResultReference(receipt.objectRef)?receipt.objectRef:null));
+  }
+  async function sendResult(item:WorkResult){
+    if(!participant||hasSavedDraft||!composeReady||pending)return;
+    const scope=captureView(),current=await client.readCase(task);scope.check();
+    const result=exactReadableResult(current?.results??[],item),latest=latestFacts(current?.results??[]).find(value=>value.id===item.id);
+    if(!result||latest?.version!==item.version||result.actorId!==subjectId||result.participationId!==participant.participationId||result.participationScopeVersion!==participant.scopeVersion)throw Error('这份结果已有变化或目前不可读取，请重新打开后再分享。');
+    const interventionRefs=result.origin.kind==='intervention'?[exactFactRef(result.origin)]:[],evidenceRefs=result.deliverableRefs.filter(ref=>ref.kind==='evidence').map(exactFactRef);
+    const value:WorkComposeValue={ui:'work-editor-v1',kind:'deliver',targetRef:null,participationId:participant.participationId,participationScopeVersion:participant.scopeVersion,form:{...blank,summary:result.summary,resultChoice:refsKey(result)},viewers:[task.requesterId],related:interventionRefs.map(refsKey),recordSelected:evidenceRefs.map(refsKey),configurationConditions:[],configurationSources:[]};
+    const saved=await persistCompose(value);scope.check();
+    await runtime.participationEvent(task.taskId,participant.participationId,{kind:'deliver',expectedParticipationVersion:participant.version,resultRef:exactFactRef(result),interventionRefs,evidenceRefs,summary:result.summary},{viewers:[task.requesterId],confirmed:true,composeRevision:saved.revision??undefined});
+    scope.check();await readCompose(true);scope.check();await refresh();scope.check();
+    setNotice('结果已分享给发起者。');navigate('/app/tasks/'+task.taskId+'?section=collaboration&view=people');
+  }
+  function resultActions(item:WorkResult){
+    if(item.actorId!==subjectId||item.participationId!==(participant?.participationId??null))return null;
+    const latest=results.find(result=>result.id===item.id),delivered=participant?.deliveries?.some(delivery=>delivery.resultRef?.id===item.id&&delivery.resultRef.version===item.version),canShare=participant&&eligibleResults.some(result=>refsKey(result)===refsKey(item));
+    if(latest?.version!==item.version)return null;
+    return <footer className="result-actions">{canShare&&!delivered?<><Button disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>void run(()=>sendResult(item))}>交给发起者<ArrowRight size={14}/></Button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('deliver',undefined,{resultChoice:refsKey(item)})}>补充说明或资料后再分享</button><p className="permission-line">将这份结果和已附来源分享给发起者。</p></>:delivered?<p className="muted">这份结果已分享给发起者。</p>:null}<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',item)}>更正结果</button></footer>;
   }
   const field = (
     title: string,
@@ -762,11 +789,13 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
     <label htmlFor={inputId+'-'+key}>
       {title}
       {maxLength<=300?<Input id={inputId+'-'+key}
+        aria-label={title}
         required={required}
         maxLength={maxLength}
         value={form[key]}
         onChange={(e)=>setForm({...form,[key]:e.target.value})}
       />:<Textarea id={inputId+'-'+key}
+        aria-label={title}
         required={required}
         maxLength={maxLength}
         value={form[key]}
@@ -803,8 +832,8 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
   ) : null;
   if (!connected || task.schemaVersion !== 2) return null;
   return (
-    <section className="work-facts">
-      <header className="work-facts-heading"><h2>工作记录</h2></header>
+    <section className={'work-facts'+(resultDetail?' is-result-detail':'')}>
+      <header className="work-facts-heading">{resultDetail?<><button className="text-action" onClick={()=>navigate(taskResultReturn(task.taskId,resultSelection.deliveryId))}><ArrowLeft size={15}/>{resultSelection.deliveryId?'返回原交付':'返回结果列表'}</button><h1 className="small">工作结果</h1></>:<h2>工作记录</h2>}</header>
       {!action&&composeDrafts.map(saved=><WorkComposeCard key={saved.revision??saved.value.kind} saved={saved} busy={busy} pending={!!pending} sourceUnavailable={!!task.caseId&&!facts} composeError={composeError} onResume={resumeCompose} onDiscard={discardSavedCompose}/>)}
       {composeError&&!action&&<p role="alert" className="message error">{composeError}</p>}
       {error && (
@@ -815,7 +844,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
       {notice && (
         <div className="message"><output>{notice}</output></div>
       )}
-      <nav className="work-facts-tabs" aria-label="工作记录分类">{[['progress','做过的事'],['results','结果'],['evidence','来源与检查']].map(([id,title])=><button key={id} aria-current={workView===id?'page':undefined} onClick={()=>setWorkView(id)}>{title}</button>)}</nav>
+      {!resultDetail&&<nav className="work-facts-tabs" aria-label="工作记录分类">{[['progress','做过的事'],['results','结果'],['evidence','来源与检查']].map(([id,title])=><button key={id} aria-current={workView===id?'page':undefined} onClick={()=>setWorkView(id)}>{title}</button>)}</nav>}
       {pending && (
         <div className="message">
           <p>{['authorization-expired','original-binding-changed','original-binding-unavailable','original-signature-expired','authorization-review-required'].includes(recoveryState?.reason??'')?'上次提交需要重新确认阅读范围，原内容已保留。':pending.localRetryStopped?'已停止继续发送，仍会确认上次提交是否收到。':'正在确认上次提交，原内容已保留。'}</p>
@@ -847,7 +876,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
           部分工作内容当前不可读。
         </p>
       )}
-      {(requester || !!own.length) && (
+      {!resultDetail&&(requester || !!own.length) && (
         <>
           {(own.length>1||(requester&&own.length>0))&&<label>
             这次的参与安排
@@ -875,14 +904,14 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
       )}
       {facts&&workView==='progress'&&<div className="work-reading-list">
         {attempts.map(item=><article className="work-entry" key={refsKey(item)}>
-          <header><MemberAvatar subjectId={item.actorId}/><div><strong title={item.actorId}>{person(item.actorId)}</strong><span>{attemptStates[item.status]??'尝试'}</span></div></header>
+          <header><MemberAvatar subjectId={item.actorId}/><div><MemberLink subjectId={item.actorId} ownId={subjectId} name={memberNames[item.actorId]??undefined} navigate={navigate}/><span>{attemptStates[item.status]??'尝试'}</span></div></header>
           <p className="reading-prose work-entry-body">{item.strategy}</p>
           {item.summary&&<div className="work-observation"><small>这次尝试的结果</small><p className="reading-prose">{item.summary}</p></div>}
           <details className="work-context"><summary>输入与工作环境</summary>{item.inputScopeSummary&&<p className="reading-prose">{item.inputScopeSummary}</p>}{typeof item.environment==='object'&&<p>{item.environment.name==='unknown'?'环境未提供':item.environment.name}{item.environment.version&&item.environment.version!=='unknown'?' · '+item.environment.version:''}</p>}{item.configurationCondition&&<p>{item.configurationCondition.record?item.configurationCondition.record.title+' · 第 '+item.configurationCondition.version+' 版':item.configurationCondition.sourceStatus==='not-recorded'?'当时未记录配置，具体条件仍未知。':item.configurationCondition.sourceStatus==='revoked'?'当时的配置已撤回，详情当前不可读。':'配置详情当前不可读。'}</p>}{!!item.permissionScope?.length&&<p>操作范围：{item.permissionScope.join('；')}</p>}</details>
           <footer>{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose(item.status==='running'?'attempt-end':'attempt-correct',item)}>{item.status==='running'?'写下尝试结果':'更正记录'}</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果<ArrowRight size={14}/></button></>}<details className="work-record-file"><summary>记录信息</summary><p>第 {item.version} 版</p><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></details></footer>
         </article>)}
         {interventions.map(item=><article className="work-entry" key={refsKey(item)}>
-          <header><MemberAvatar subjectId={item.actorId}/><div><strong title={item.actorId}>{person(item.actorId)}</strong><span>{item.types.map((x:string)=>names[x]??x).join('、')} · 本人记录</span></div></header>
+          <header><MemberAvatar subjectId={item.actorId}/><div><MemberLink subjectId={item.actorId} ownId={subjectId} name={memberNames[item.actorId]??undefined} navigate={navigate}/><span>{item.types.map((x:string)=>names[x]??x).join('、')} · 本人记录</span></div></header>
           <p className="reading-prose work-entry-body">{item.description}</p>
           {item.observedEffect&&<div className="work-observation"><small>观察到的作用</small><p className="reading-prose">{item.observedEffect}</p></div>}
           {((item.responses?.length??0)>0||item.responseCoverage?.complete===false)&&<InterventionOpinions intervention={item} subjectId={subjectId} names={memberNames}/>}
@@ -890,13 +919,14 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
         </article>)}
         {!attempts.length&&!interventions.length&&<p className="empty-state">还没有可读的工作内容。</p>}
       </div>}
-      {facts&&workView==='results'&&<div className="work-reading-list">
+      {resultDetail&&<div className="work-reading-list">{!resultSelection.reference?<p className="message">这份结果的地址不完整，请从原交付重新打开。</p>:!facts?<p><output>{error?'这份结果目前无法读取。':'正在读取这份结果…'}</output></p>:!selectedResult?<p className="message">这份结果目前不可读取。可以返回原处继续交流。</p>:<><p className="result-reading-context">{deliveredVersion?'正在查看交付时的结果。':sourceDelivery?'正在查看原交付之后的修订。':'正在查看这份工作结果。'}{results.some(item=>item.id===selectedResult.id&&item.version>selectedResult.version)&&<button className="text-action" onClick={()=>navigate(taskResultPath(task.taskId,results.find(item=>item.id===selectedResult.id)??null,resultSelection.deliveryId))}>查看后续修订</button>}</p><WorkResultReading item={selectedResult} {...{facts,client,subjectId,navigate}} names={memberNames} download={()=>downloadRecord(selectedResult)}>{resultActions(selectedResult)}</WorkResultReading></>}</div>}
+      {facts&&workView==='results'&&!resultDetail&&<div className="work-reading-list">
         {results.map(item=>{const origin=(item.origin.kind==='intervention'?facts.interventions:facts.attempts)?.find(source=>source.id===item.origin.id&&source.version===item.origin.version);return <article className="work-entry" key={refsKey(item)}>
           <header><MemberAvatar subjectId={item.actorId}/><div><strong title={item.actorId}>{person(item.actorId)}</strong><span>{outcomes[item.reportedOutcome]??'结果'} · 本人记录</span></div></header>
           <p className="reading-prose work-entry-body">{item.summary}</p>
           {item.limitations&&<div className="work-observation"><small>适用范围与未完成的部分</small><p className="reading-prose">{item.limitations}</p></div>}
           <details className="work-context"><summary>这份结果来自哪项工作</summary><p className="reading-prose">{origin?.description??origin?.strategy??'该版本的来源正文当前不可读。'}</p><small>来源第 {item.origin.version} 版 · 结果第 {item.version} 版</small><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录与来源编号</button></details>
-          {item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<footer><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',item)}>更正结果</button>{participant&&eligibleResults.some(result=>refsKey(result)===refsKey(item))&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('deliver',undefined,{resultChoice:refsKey(item)})}>交给发起者<ArrowRight size={14}/></button>}</footer>}
+          <button className="text-action" onClick={()=>navigate(taskResultPath(task.taskId,item))}>打开完整结果<ArrowRight size={14}/></button>{resultActions(item)}
         </article>;})}
         {!results.length&&<p className="empty-state">还没有可读的结果。{!ownOrigins.length&&'先在“做过的事”写下实际工作，再补充由此得到的结果。'}</p>}
         {(facts.resolution?.status&&facts.resolution.status!=='unrecorded'||requester)&&<section className="work-resolution"><h3>问题解决了吗</h3><ResolutionStatus resolution={facts.resolution} resolutions={facts.resolutions}/>{requester&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>{setParticipationId('');choose('resolution-recorded');}}>说明解决情况</button>}</section>}
@@ -1156,7 +1186,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,lease}:WorkProps&
                   ))}
                 </select>
               </label>
-              {field('本次交付说明与希望验收的范围', 'summary')}
+              {field('给发起者的说明', 'summary')}
               {chooseRecords(
                 interventions,
                 related,

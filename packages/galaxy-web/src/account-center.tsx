@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowRight,ArrowUpRight,Award,BookOpen,BriefcaseBusiness,ChevronLeft,FileText,KeyRound,MessageSquare,Settings,ShieldCheck,UserRound} from 'lucide-react';
 import {createProfileClient} from './profile-client.mjs';
 import {HomeContinuityWorkspace} from './home-continuity-workspace';
+import {profilePath} from './profile-navigation.mjs';
 import './profile-settings.css';
 import type {AccountRuntime,ProfileOverview,HonorBadge,HonorDetail,HonorResponse} from './account-workspace-types';
 
@@ -49,6 +50,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
    <h2>{profile?.displayName??(hasIdentity?'我的个人资料':'欢迎来到银河')}</h2>
    {profile?.about?<p className="profile-about">{profile.about}</p>:<p>{hasIdentity?'在这里继续自己的交流与工作。':'浏览经验、参与讨论，遇到问题时找到帮助。'}</p>}
    {!!profile?.tags?.length&&<ul className="profile-tags" aria-label="自我介绍中的方向">{profile.tags.slice(0,6).map((tag:string)=><li key={tag}>{tag}</li>)}</ul>}
+   {subjectId&&<NavLink to={profilePath(subjectId)!} navigate={navigate} className="profile-self-view">查看完整个人资料<ArrowRight size={15}/></NavLink>}
    {!connected&&<NavLink to="/app/settings/identity" navigate={navigate} className="primary-action">{hasIdentity?'继续使用我的身份':'开始使用'}<ArrowRight size={15}/></NavLink>}
   </div></div>
   {error&&<p role="alert" className="profile-inline-error">{error}<button type="button" onClick={()=>{setBusy(!!client);setRefresh(n=>n+1);}}>重试</button></p>}

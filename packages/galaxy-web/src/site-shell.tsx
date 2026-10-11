@@ -17,7 +17,7 @@ function workRoute(path:string,search:string){
   ||path==='/app/participate'&&['requested','participating'].includes(params.get('view')??'')
   ||path==='/app/projects'&&['projects','contacts','recruitment','willingness'].includes(params.get('section')??'')
   ||path==='/app/capsules'&&params.get('mode')==='author'
-  ||/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)&&params.get('records')==='mine';
+  ||/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)&&(params.get('records')==='mine'||params.get('section')==='collaboration');
 }
 export function GalaxyMark(){return <span className="galaxy-mark" aria-hidden="true"><svg width="31" height="31" viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="16" rx="13" ry="6" transform="rotate(-36 16 16)" stroke="currentColor" strokeWidth="1.65"/><ellipse cx="16" cy="16" rx="6" ry="13" transform="rotate(-36 16 16)" stroke="currentColor" strokeWidth="1.65"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/><circle cx="26" cy="7" r="2.2" fill="var(--g-accent)" stroke="var(--g-canvas)" strokeWidth="1.5"/></svg></span>;}
 export function SiteShell({path,search='',connected,subjectId,navigate,onDisconnect,children}:Props){

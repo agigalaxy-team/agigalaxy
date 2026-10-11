@@ -2,7 +2,7 @@ import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {FactDetails} from './fact-details';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
+import {MemberLink,memberName,useMemberNames} from './conversation-ui';
 import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
 import {browseReturnPath,browseReturnLabel} from './public-browse-workspace';
 import {isDiscoveryPurpose,object,projectErrorText} from './project-workspace-types';
@@ -63,7 +63,7 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
   {error&&<p className="message error" role="alert">{error}</p>}{loaded&&!project&&<Button type="button" variant="outline" disabled={busy||!client} onClick={()=>run(load)}>重新读取</Button>}
   {!loaded&&!error&&<p><output>正在读取项目介绍…</output></p>}
   {project&&<article className="project-public-reading">
-   <div className="person-line"><MemberAvatar subjectId={project.ownerId}/><span>{name(project.ownerId)} 分享的{projectDocument?.kind==='module'?'模块':'项目'}</span></div>
+   <div className="person-line"><MemberLink subjectId={project.ownerId} name={name(project.ownerId)} ownId={subjectId??undefined} navigate={navigate} avatar/><span>分享的{projectDocument?.kind==='module'?'模块':'项目'}</span></div>
    <p className="record-meta">{project.state==='active'?'进行中':project.state==='archived'?'已归档':project.state} · {project.visibility==='Public'?'公开介绍':'按所选范围分享'}</p>
    {projectDocument?<><p className="lead reading-prose">{projectDocument.summary}</p><h2>可以做什么</h2><p className="reading-prose">{projectDocument.functions.join('、')}</p>{projectDocument.technologies.length>0&&<><h2>使用的技术</h2><p>{projectDocument.technologies.join('、')}</p></>}
     {projectDocument.sourceUrl&&/^https?:\/\//.test(projectDocument.sourceUrl)&&<p><a href={projectDocument.sourceUrl} target="_blank" rel="noopener noreferrer">查看项目来源 ↗</a></p>}
@@ -90,7 +90,7 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
   </section>}
   <dialog ref={detailDialog} className="galaxy-dialog project-opportunity-dialog" onCancel={event=>{if(event.target===event.currentTarget)setDetail(null);}}>
    {detail&&<><header className="dialog-heading"><h2>{detail.opportunity.sourceUnavailable?'项目资料已变化':detail.opportunity.project.title}</h2><button type="button" className="text-link" onClick={()=>setDetail(null)}>关闭</button></header>
-    {!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberAvatar subjectId={detail.opportunity.subjectId}/><span>{name(detail.opportunity.subjectId)}</span></div><p className="reading-prose">{detail.opportunity.project.summary}</p><p>{detail.opportunity.help?.statement}</p>
+    {!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={name(detail.opportunity.subjectId)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><p className="reading-prose">{detail.opportunity.project.summary}</p><p>{detail.opportunity.help?.statement}</p>
      {(detail.experience?.items?.length??0)>0&&<h3>分享的工作经历</h3>}{detail.experience?.items?.map(item=><article className="reading-list-item" key={item.key}><h4>{item.title??'工作记录'}</h4><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId??undefined} navigate={navigate}/>{item.taskId&&<button type="button" className="text-link" onClick={()=>navigate('/app/tasks/'+item.taskId)}>阅读关联工作 →</button>}</article>)}
      {(detail.experience?.nextCursor??detail.experience?.nextAfter)&&<Button type="button" variant="outline" disabled={busy} onClick={()=>run(async commit=>{try{if(!query||!client||!detail.experience)throw Error('请先读取当前项目的查找范围。');const value=await client.detail(query,detail.opportunity.opportunityRef,detail.experience.nextCursor??detail.experience.nextAfter);commit(()=>setDetail(value));}catch(reason){if(opportunityUnavailable(reason))commit(()=>hideSource(detail.opportunity));throw reason;}})}>更多工作经历</Button>}
     </>}

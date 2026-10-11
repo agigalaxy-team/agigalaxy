@@ -4,8 +4,8 @@ export { projectDescriptionSchema, discoveryPreferencesSchema } from './shared/d
 
 // The existing discovery client finds service Manifests. This client queries
 // project opportunities after an explicitly established Galaxy session.
-export function createProjectDiscoveryClient({ endpoint, sessions, send = postPublicJson }) {
-  if (validatePublicUrl(endpoint).origin !== endpoint || !sessions) throw new Error('Invalid project discovery configuration.');
+export function createProjectDiscoveryClient({ endpoint, sessions, send = postPublicJson, validateEndpoint = validatePublicUrl }) {
+  if (validateEndpoint(endpoint).origin !== endpoint || !sessions) throw new Error('Invalid project discovery configuration.');
   async function invoke(path, input, scope, schema, signal) {
     signal?.throwIfAborted(); const actor = await sessions.readAuthorization(endpoint);
     if (!actor?.scopes.includes(scope)) throw new Error('Project discovery authorization required.');

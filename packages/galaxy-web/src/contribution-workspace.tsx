@@ -26,7 +26,7 @@ function projectedText(value:ContributionProjection,key:DisplayField){
  return name(field);
 }
 function FactSnippet({value}:{value:ContributionProjection}){return <div className="contribution-snippet">{value.title&&<h3>{value.title}</h3>}{value.summary&&<p>{value.summary}</p>}<dl>{displayFields.filter(key=>!['title','summary'].includes(key)&&value[key]!=null).map(key=><div key={key}><dt>{fieldNames[key]}</dt><dd>{projectedText(value,key)}</dd></div>)}</dl></div>;}
-function RequesterRecords({runtime,connected,subjectId,viewerId}:{runtime:RecordRuntime;connected:boolean;subjectId:string;viewerId?:string}){
+export function RequesterRecords({runtime,connected,subjectId,viewerId}:{runtime:RecordRuntime;connected:boolean;subjectId:string;viewerId?:string}){
  const [readPageValue,setPage]=useState<RequesterPage|null>(null),[readSelected,setSelected]=useState<RequesterRecord|null>(null),[readDetail,setDetail]=useState<RequesterRecord|null>(null),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const page=useCurrentTaskMaterialTree(runtime,readPageValue),selected=useCurrentTaskMaterialTree(runtime,readSelected),detail=useCurrentTaskMaterialTree(runtime,readDetail);
  const lifecycle=useRef({token:0,active:true});

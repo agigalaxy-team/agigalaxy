@@ -9,8 +9,8 @@ import {sha256Hex} from './shared/web-primitives.mjs';
 
 // Existing signed Consent is the payload authorization, not an input boolean.
 // A transport/session lease is checked both before and after every request.
-export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, read = fetchAssistanceJson }) {
-  if (validatePublicUrl(endpoint).origin !== endpoint || !sessions) throw new Error('Invalid Task client configuration.');
+export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, read = fetchAssistanceJson, validateEndpoint = validatePublicUrl }) {
+  if (validateEndpoint(endpoint).origin !== endpoint || !sessions) throw new Error('Invalid Task client configuration.');
   async function invoke(path, body, { signal, method = 'POST', scope = 'assistance',validate=null } = {}) {
     signal?.throwIfAborted();
     const auth = await sessions.readAuthorization(endpoint);

@@ -4,7 +4,7 @@ import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {TaskOperationRecovery} from './task-operation-recovery';
 import {ordinaryPublicationFromDraft,taskWriteError,taskFieldPresent} from './task-bounty-client.mjs';
-import {ArrowLeft,ArrowRight,BookOpen,Check,Globe,Lock,Search} from 'lucide-react';
+import {ArrowLeft,ArrowRight,BookOpen,Eye,Globe,Lock,Search} from 'lucide-react';
 import {createTaskPreparationClient} from './task-preparation-client.mjs';
 import {TaskPreparationWorkspace} from './task-preparation-workspace';
 import {contactCandidates} from './task-contact-client.mjs';
@@ -15,7 +15,7 @@ import {TaskOriginPicker} from './task-origin-workspace';
 import {TaskAgentIdentityPrompt} from './task-agent-identity-prompt';
 import {createCommunityForumClient} from './community-forum-client.mjs';
 import {forumTaskLocator,forumTaskMaterialSelection} from './community-forum-origin.mjs';
-import {createTaskMaterialClient,hasMaterialText,literalTaskText,localTaskTextView,replaceLiteralTaskText,removeMaterialTaskText,adoptPreparedTaskMaterials} from './task-material-client.mjs';
+import {createTaskMaterialClient,draftMaterialIds,hasMaterialText,literalTaskText,localTaskTextView,replaceLiteralTaskText,removeMaterialTaskText,adoptPreparedTaskMaterials} from './task-material-client.mjs';
 import {TaskForumMaterialWorkspace,TaskMaterialDraftField} from './task-forum-material-workspace';
 import {availableForumContent,type ForumClient,type ForumPostView} from './community-forum-view-types';
 import type {TaskText,TaskTextField,TaskMaterialBody,TaskMaterialStates,TaskMaterialInput,TaskMaterialOptions} from './task-material-types';
@@ -66,7 +66,8 @@ async function readPreparation(client:TaskEntryPreparationClient,runtime:TaskEnt
 
 type DraftFeedbackStage='read'|'save'|'read-input'|'gate';
 type DraftFeedback={stage:DraftFeedbackStage;reason:unknown;blocked:boolean};
-type BusinessFeedback={message:string;verificationRequired:boolean};
+type BusinessFeedback={message:string;verificationRequired:boolean;code?:string};
+type PublicationSelection={publication:TaskPublication;head:TaskDraftHead;revision:number;materialBodies:TaskMaterialBody[];origin:HelpOriginSelection|null};
 function draftFeedbackTitle(feedback:DraftFeedback){
  if(feedback.stage==='read-input')return '读取期间又有新输入，尚未保存。';
  const known:Record<string,string>={task_draft_conflict:'本机稿已在另一页面更改或清空。',task_draft_record_invalid:'本机稿的格式、版本或编号无法核对。',task_draft_legacy_comparison_unavailable:'旧稿中的数据无法完整核对，尚未安全转换。',task_draft_id_unavailable:'暂时无法准备本机稿件编号。',task_draft_revision_limit:'本机稿的修订次数已到上限。',task_draft_value_invalid:'本机稿的编辑字段无法保存。',task_draft_reload_required:'需要重新核对当前已保存的本机稿。',task_draft_adapter_required:'当前环境尚不能安全更新本机稿。',local_atomic_update_unavailable:'当前环境尚不能安全更新本机稿。',task_draft_lease_invalid:'当前本机稿的身份范围无法核对。'};
@@ -95,6 +96,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  const forumClient:ForumClient|null=useMemo(()=>runtime&&forumLocator?createCommunityForumClient(runtime,{subjectId:subjectId??null}):null,[runtime,forumLocator,subjectId]);
  const [forumSourceState,setForumSourceState]=useState('reading'),[forumSource,setForumSource]=useState<ForumPostView|null>(null);
  const [selectMaterials,setSelectMaterials]=useState(()=>forumTaskMaterialSelection(location.pathname+location.search+location.hash));
+ function selectForumMaterials(open:boolean){const url=new URL(location.href);if(open)url.searchParams.set('forumMaterial','select');else url.searchParams.delete('forumMaterial');history.replaceState(history.state,'',url.pathname+url.search+url.hash);setSelectMaterials(open);}
  const forumReadEpoch=useRef(0);
  async function refreshForumSource(){
   if(!forumClient||!forumLocator)return;const token=++forumReadEpoch.current;setForumSourceState('reading');
@@ -113,8 +115,8 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  const [draft,setDraft]=useState(()=>readPublishDraft()),[loaded,setLoaded]=useState(false);
  const draftRef=useRef(draft),draftHead=useRef<TaskDraftHead|null>(null),draftSnapshot=useRef<Awaited<ReturnType<typeof draftClient.inspect>>>(null),inputRevision=useRef(0),draftReadEpoch=useRef(0),draftReading=useRef(true),draftReloadRequired=useRef(true);
  const [materialStates,setMaterialStates]=useState<TaskMaterialStates>({}),[materialClock,setMaterialClock]=useState(()=>Math.floor(Date.now()/1000)),[previewBodies,setPreviewBodies]=useState<TaskMaterialBody[]>([]);
- const materialReadEpoch=useRef(0),previewRevision=useRef<number|null>(null);
- const [draftFeedback,setDraftFeedback]=useState<DraftFeedback|null>(null),[saveMessage,setSaveMessage]=useState(''),[readingDraft,setReadingDraft]=useState(true),[previewHead,setPreviewHead]=useState<TaskDraftHead|null>(null);
+ const materialReadEpoch=useRef(0);
+ const [draftFeedback,setDraftFeedback]=useState<DraftFeedback|null>(null),[saveMessage,setSaveMessage]=useState(''),[readingDraft,setReadingDraft]=useState(true);
  const draftFeedbackRef=useRef<DraftFeedback|null>(null),draftErrorOrigins=useRef(new WeakMap<object,DraftFeedbackStage>()),savedInputRevision=useRef(0);
  const [preview,setPreview]=useState<TaskPublication|null>(null),[pending,setPending]=useState<unknown>(null),[busy,setBusy]=useState(false),[error,setErrorMessage]=useState(''),[notice,setNotice]=useState('');
  const [verificationRequired,setVerificationRequired]=useState(false);
@@ -126,11 +128,10 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
   if(prior&&(stage==='gate'||taskEntryError(reason,'code')==='task_draft_reload_required')){showDraftFeedback({...prior,blocked:prior.blocked||blocked});return;}
   showDraftFeedback({stage,reason,blocked:blocked||!!(prior&&prior.reason===reason&&prior.blocked)});}
  function showBusinessFeedback(value:BusinessFeedback){businessFeedbackRef.current=value;setErrorMessage(value.message);setVerificationRequired(value.verificationRequired);}
- function setError(reason:unknown){const stage=localFailureStage(reason);if(stage){showDraftFailure(stage,reason,true);return;}showBusinessFeedback({message:typeof reason==='string'?reason:taskWriteError(reason),verificationRequired:needsAccountVerification(reason)});}
- const [step,setStep]=useState(()=>new URLSearchParams(location.search).get('step')==='review'?1:0),[lastReceipt,setLastReceipt]=useState<OperationReceipt|null>(null),[backgroundOpen,setBackgroundOpen]=useState(false),[referenceSearchOpen,setReferenceSearchOpen]=useState(false),[agentReady,setAgentReady]=useState(false);
- const restoredReview=useRef(false);
+ function setError(reason:unknown){const stage=localFailureStage(reason);if(stage){showDraftFailure(stage,reason,true);return;}showBusinessFeedback({message:typeof reason==='string'?reason:taskWriteError(reason),verificationRequired:needsAccountVerification(reason),code:taskEntryError(reason,'code')});}
+ const [lastReceipt,setLastReceipt]=useState<OperationReceipt|null>(null),[backgroundOpen,setBackgroundOpen]=useState(false),[referenceSearchOpen,setReferenceSearchOpen]=useState(false),[agentReady,setAgentReady]=useState(false);
  const flowTop=useRef<HTMLElement>(null),lastFlowPhase=useRef<string|null>(null);
- const flowPhase=preview?'preview':String(step);
+ const flowPhase=preview?'preview':'edit';
  useEffect(()=>{const phase=flowPhase;if(lastFlowPhase.current!==null&&phase!==lastFlowPhase.current)flowTop.current?.scrollIntoView({block:'start'});lastFlowPhase.current=phase;},[flowPhase]);
  const recoveringPublication=useRef(false);
  const epoch=useRef(0),working=useRef(false);
@@ -156,6 +157,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
   try{
    const result=await materialClient.sanitize(original);if(token!==materialReadEpoch.current||!current()||signature!==JSON.stringify(draftRef.current.materials))return;
    setMaterialStates(result.states);
+   if(businessFeedbackRef.current.code==='task_material_unavailable'&&original.materials.every(material=>result.states[material.materialId]?.status==='available')){showBusinessFeedback({message:'',verificationRequired:false});setNotice('材料已重新核对，可以继续发布。');}
    if(result.erased.length&&!working.current&&!draftReading.current&&!draftReloadRequired.current){
     await flushDraft();if(token!==materialReadEpoch.current||!current()||signature!==JSON.stringify(draftRef.current.materials))return;
     const revision=inputRevision.current,expected=structuredClone(draftSnapshot.current),next=structuredClone(draftRef.current);
@@ -163,7 +165,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
     if(next.materialBodies.length===draftRef.current.materialBodies.length)return;
     const saved=await draftClient.compareAndSave(next,{expected,assertCurrent:()=>{draftClient.check();if(revision!==inputRevision.current||signature!==JSON.stringify(draftRef.current.materials))throw Object.assign(Error('清理期间原稿已变化。'),{code:'task_draft_input_changed'});}});
     if(token!==materialReadEpoch.current||!current()||revision!==inputRevision.current)return;
-    draftSnapshot.current=saved;draftHead.current=saved.head;draftRef.current=readPublishDraft(saved.value);setDraft(draftRef.current);setPreview(null);setPreviewHead(null);setPreviewBodies([]);previewRevision.current=null;
+    draftSnapshot.current=saved;draftHead.current=saved.head;draftRef.current=readPublishDraft(saved.value);setDraft(draftRef.current);setPreview(null);setPreviewBodies([]);
     setNotice('来源已撤回或到期，对应材料文字已从本机稿清理；独立说明仍保留。');
    }
   }catch(reason:unknown){if(token===materialReadEpoch.current&&current()&&taskEntryError(reason,'code')==='task_draft_conflict'){draftReloadRequired.current=true;showDraftFailure('save',reason);}}
@@ -190,61 +192,68 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  useEffect(()=>{const read=()=>readRelated();const timer=setInterval(read,20000);document.addEventListener('visibilitychange',read);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',read);};},[preparationClient]);
  function rememberPreparation(selected:string[]){const choice=selectedPreparation(preparationRef.current,selected,draftRef.current.helpPreparation);change('helpPreparation',choice);if(preparationRef.current){const next={...preparationRef.current,selected};setPreparation(next);preparationRef.current=next;}}
  function toggleRelated(){const open=!referenceSearchOpen;setReferenceSearchOpen(open);change('helpPreparation',{...preparationChoice(draftRef.current.helpPreparation),open});}
- function prepareNext(){setStep(1);}
  function independentKeyword(value:PublishDraft){return typeof value.searchKeyword==='string'?value.searchKeyword:value.searchKeyword===undefined&&!hasMaterialText(value.title)?literalTaskText(value.title):'';}
  function findRelated(){const input={keyword:independentKeyword(draftRef.current).trim(),functions:(draftRef.current.searchFunctions??'').split(/[,，\n]/).map((value:string)=>value.trim()).filter(Boolean),capabilityId:draftRef.current.capabilityId.trim()};confirmedQuery.current=input;change('helpPreparation',{...preparationChoice(draftRef.current.helpPreparation),input,open:true});void searchPreparation(input);}
  async function readLocalDraft(){const token=epoch.current,ticket=++draftReadEpoch.current,revision=inputRevision.current;draftReading.current=true;draftReloadRequired.current=true;
   try{const value=await(selectMaterials?draftClient.inspect():draftClient.load());if(token!==epoch.current||!current()||ticket!==draftReadEpoch.current)return;
    if(revision!==inputRevision.current){showDraftFailure('read-input',null);setSaveMessage('本页新输入尚未保存。');return;}
-   const next=readPublishDraft(value?.value??{});draftRef.current=next;draftSnapshot.current=value;draftHead.current=value?.head??null;savedInputRevision.current=revision;setDraft(next);setMaterialStates({});setPreview(null);setPreviewHead(null);setOriginPreview(null);setOriginReview(null);setLoaded(true);draftReloadRequired.current=false;showDraftFeedback(null);setSaveMessage(value?'本机稿已读取。':'输入后会自动保存到此浏览器。');queryEpoch.current++;queryWorking.current=false;setPreparation(null);preparationRef.current=null;setSearching(false);setSearchError('');const preparation=preparationChoice(next.helpPreparation);setReferenceSearchOpen(preparation.open);confirmedQuery.current=preparation.input;if(preparation.input)void searchPreparation(preparation.input);
+   const next=readPublishDraft(value?.value??{});draftRef.current=next;draftSnapshot.current=value;draftHead.current=value?.head??null;savedInputRevision.current=revision;setDraft(next);setBackgroundOpen([next.goal,next.situation,next.expectedOutcome].some(taskFieldPresent));setMaterialStates({});setPreview(null);setOriginPreview(null);setOriginReview(null);setLoaded(true);draftReloadRequired.current=false;showDraftFeedback(null);setSaveMessage(value?'本机稿已读取。':'输入后会自动保存到此浏览器。');queryEpoch.current++;queryWorking.current=false;setPreparation(null);preparationRef.current=null;setSearching(false);setSearchError('');const preparation=preparationChoice(next.helpPreparation);setReferenceSearchOpen(preparation.open);confirmedQuery.current=preparation.input;if(preparation.input)void searchPreparation(preparation.input);
   }catch(reason:unknown){if(token===epoch.current&&current()&&ticket===draftReadEpoch.current){showDraftFailure('read',reason);setSaveMessage('尚未读取本机版本。');}}
   finally{if(token===epoch.current&&current()&&ticket===draftReadEpoch.current){draftReading.current=false;setReadingDraft(false);}}}
  async function flushDraft(){if(draftReading.current||draftReloadRequired.current)throw markDraftFailure(Error('本页输入尚未安全保存，请先处理本机稿提示。'),'gate');try{await draftClient.flush();}catch(reason){throw markDraftFailure(reason,'save');}}
  async function run(fn:(valid:()=>boolean)=>Promise<void>){if(working.current)return;const token=epoch.current,valid=()=>token===epoch.current&&current(),previousBusinessFeedback=businessFeedbackRef.current;working.current=true;setBusy(true);setError('');setNotice('');try{await fn(valid);}catch(e){if(valid()){if(localFailureStage(e)&&!businessFeedbackRef.current.message&&previousBusinessFeedback.message)showBusinessFeedback(previousBusinessFeedback);setError(e);}}finally{if(valid()){try{const p=await runtime.getLocal('task-publication',draftClient.ownerKey);if(valid())setPending(p);}catch{}if(valid()){working.current=false;setBusy(false);}}}}
- function navigateWithSavedDraft(path:string){void run(async valid=>{await flushDraft();if(valid()){if(preview&&path.startsWith('/app/settings/identity')){const current=new URL(location.href);current.searchParams.set('step','review');history.replaceState(history.state,'',current.pathname+current.search+current.hash);}navigate(path);}});}
- function saveInput(next:PublishDraft){if(working.current)return;const revision=++inputRevision.current,ticket=draftReadEpoch.current,token=epoch.current;draftRef.current=next;setDraft(next);setPreview(null);setPreviewHead(null);setPreviewBodies([]);previewRevision.current=null;setOriginPreview(null);setOriginReview(null);
+ function navigateWithSavedDraft(path:string){void run(async valid=>{await flushDraft();if(valid())navigate(path);});}
+ function saveInput(next:PublishDraft){if(working.current)return;const revision=++inputRevision.current,ticket=draftReadEpoch.current,token=epoch.current;draftRef.current=next;setDraft(next);setPreview(null);setPreviewBodies([]);setOriginPreview(null);setOriginReview(null);
   if(draftReading.current||draftReloadRequired.current){setSaveMessage('本页新输入尚未保存。');return;}
   setSaveMessage('正在保存到此浏览器…');void draftClient.save(next).then(saved=>{if(token!==epoch.current||!current()||ticket!==draftReadEpoch.current)return;draftSnapshot.current=saved;draftHead.current=saved.head;if(revision===inputRevision.current){savedInputRevision.current=revision;setSaveMessage('已保存到此浏览器。');showDraftFeedback(null);}}).catch((reason:unknown)=>{if(token===epoch.current&&current()&&ticket===draftReadEpoch.current){draftReloadRequired.current=true;showDraftFailure('save',reason);setSaveMessage('本页新输入尚未保存，仍保留在编辑框中。');}});}
 
  function change<K extends keyof PublishDraft>(field:K,value:PublishDraft[K]){const original=draftRef.current[field];saveInput(readPublishDraft({...draftRef.current,[field]:typeof value==='string'&&hasMaterialText(original)?replaceLiteralTaskText(original,value):value}));}
  function editMaterial(materialId:string,text:string){saveInput({...draftRef.current,materialBodies:draftRef.current.materialBodies.map(body=>body.materialId===materialId?{...body,text}:body)});}
  function removeMaterial(field:TaskTextField,materialId:string){saveInput({...draftRef.current,[field]:removeMaterialTaskText(draftRef.current[field],materialId)});}
- function restoreMaterial(field:TaskTextField){const next=structuredClone(draftRef.current);if(!Object.hasOwn(next.materialRestore,field))return;next[field]=next.materialRestore[field];delete next.materialRestore[field];saveInput(next);}
+ function restoreMaterial(field:TaskTextField){const next=structuredClone(draftRef.current);if(!Object.hasOwn(next.materialRestore,field))return;next[field]=next.materialRestore[field];delete next.materialRestore[field];saveInput(next);void refreshMaterials();}
 
- async function finish(receipt:OperationReceipt){const id=receipt.taskId??receipt.result?.taskId;if(!id)return;const token=epoch.current,revision=inputRevision.current;let unsaved=draftReading.current||draftReloadRequired.current;try{await draftClient.flush();}catch{unsaved=true;}if(token!==epoch.current||!current())return;unsaved=unsaved||revision!==inputRevision.current;setPreview(null);setPreviewHead(null);
-  if(unsaved||receipt.localDraftCleanup?.state==='failed'){setLastReceipt({taskId:id});setNotice(unsaved?'任务已被服务接受。':'任务已被服务接受。本机草稿暂未清理，原内容仍保留；可以再次核对回执，或直接打开已创建的任务。');return;}navigate(`/app/tasks/${id}?section=collaboration`);}
- async function reviewOrigin(selection:HelpOriginSelection|null,valid:()=>boolean){if(!selection)return null;if(!originClient)throw Error('请先连接原身份，再核对所选原工作。');try{const value=await originClient.validate(selection);return valid()?value:null;}catch(error){if(valid()){setOriginReview(null);setOriginPreview(null);setPreview(null);setStep(0);setSourceRevision(value=>value+1);}throw error;}}
- function assertDraftRevision(revision:number,valid:()=>boolean,selection:()=>void=()=>{}){draftClient.check();materialClient.check();selection();if(!valid()||revision!==inputRevision.current)throw Object.assign(Error('预览期间本页输入已变化，请重新核对。'),{code:'task_draft_input_changed'});}
+ async function finish(receipt:OperationReceipt){const id=receipt.taskId??receipt.result?.taskId;if(!id)return;const token=epoch.current,revision=inputRevision.current;let unsaved=draftReading.current||draftReloadRequired.current;try{await draftClient.flush();}catch{unsaved=true;}if(token!==epoch.current||!current())return;unsaved=unsaved||revision!==inputRevision.current;setPreview(null);
+  if(unsaved||receipt.localDraftCleanup?.state==='failed'){setLastReceipt({taskId:id});setNotice(unsaved?'求助已经发布，后来输入的内容仍保留在这里。':'求助已经发布。本机草稿暂未清理，原内容仍保留；可以直接打开上次发布的求助。');return;}navigate(`/app/tasks/${id}`);}
+ async function reviewOrigin(selection:HelpOriginSelection|null,valid:()=>boolean){if(!selection)return null;if(!originClient)throw Error('请先连接原身份，再核对所选原工作。');try{const value=await originClient.validate(selection);return valid()?value:null;}catch(error){if(valid()){setOriginReview(null);setOriginPreview(null);setPreview(null);setSourceRevision(value=>value+1);}throw error;}}
+ function assertDraftRevision(revision:number,valid:()=>boolean,selection:()=>void=()=>{}){draftClient.check();materialClient.check();selection();if(!valid()||revision!==inputRevision.current)throw Object.assign(Error('核对期间本页输入已变化，原稿仍保留。'),{code:'task_draft_input_changed'});}
  const sameHead=(left:TaskDraftHead|null,right:TaskDraftHead|null)=>!!left&&!!right&&left.id===right.id&&left.revision===right.revision;
- async function commitPreview(candidate:PublishDraft,expected:Awaited<ReturnType<typeof draftClient.inspect>>,revision:number,valid:()=>boolean,selection:()=>void=()=>{}){
-  assertDraftRevision(revision,valid,selection);const prepared=await materialClient.prepareDraft(candidate);assertDraftRevision(revision,valid,selection);
-  const preparedDraft=readPublishDraft(prepared.draft),origin=preparedDraft.helpOrigin?structuredClone(preparedDraft.helpOrigin):null,reviewed=await reviewOrigin(origin,valid);assertDraftRevision(revision,valid,selection);
-  const publication=ordinaryPublicationFromDraft(preparedDraft),guard=()=>{assertDraftRevision(revision,valid,selection);if((publication.materials??[]).some(material=>material.expiresAt<=Math.floor(Date.now()/1000)))throw Object.assign(Error('选定材料已到期，原稿仍保留。'),{code:'task_material_expired'});};
-  let saved;try{saved=await draftClient.compareAndSave(preparedDraft,{expected,assertCurrent:guard});}catch(reason){draftReloadRequired.current=true;throw markDraftFailure(reason,'save');}
-  if(!valid()||revision!==inputRevision.current)return;
+ async function savePreparedDraft(candidate:PublishDraft,expected:Awaited<ReturnType<typeof draftClient.inspect>>,revision:number,valid:()=>boolean,selection:()=>void=()=>{}){
+  const activeIds=new Set<string>(draftMaterialIds(candidate)),activeMaterials=candidate.materials.filter(material=>activeIds.has(material.materialId));
+  const guard=()=>{assertDraftRevision(revision,valid,selection);if(activeMaterials.some(material=>material.expiresAt<=Math.floor(Date.now()/1000)))throw Object.assign(Error('选定材料已到期，原稿仍保留。'),{code:'task_material_expired'});};
+  guard();let saved;
+  try{saved=await draftClient.compareAndSave(candidate,{expected,assertCurrent:guard});}catch(reason){draftReloadRequired.current=true;throw markDraftFailure(reason,'save');}
+  if(!valid()||revision!==inputRevision.current)return null;
   const adoptedRevision=++inputRevision.current;draftSnapshot.current=saved;draftHead.current=saved.head;draftRef.current=readPublishDraft(saved.value);savedInputRevision.current=adoptedRevision;setDraft(draftRef.current);showDraftFeedback(null);setSaveMessage('已保存到此浏览器。');
-  setMaterialStates(Object.fromEntries(preparedDraft.materials.map(material=>[material.materialId,{status:'available',availableUntil:material.expiresAt,checkedAt:Math.floor(Date.now()/1000)}])));
-  previewRevision.current=adoptedRevision;setPreviewHead(saved.head);setPreviewBodies(prepared.materialBodies);setOriginPreview(origin);setOriginReview(reviewed);setPreview(publication);setStep(1);setSelectMaterials(false);
+  setMaterialStates(Object.fromEntries(activeMaterials.map(material=>[material.materialId,{status:'available',availableUntil:material.expiresAt,checkedAt:Math.floor(Date.now()/1000)}])));
+  return{head:saved.head,revision:adoptedRevision};
  }
  async function adoptMaterials(input:TaskMaterialInput,options:TaskMaterialOptions,selection:()=>void,valid:()=>boolean){
   const revision=inputRevision.current;await flushDraft();assertDraftRevision(revision,valid,selection);const expected=structuredClone(draftSnapshot.current),original=structuredClone(draftRef.current);
-  const prepared=await materialClient.prepare(input);assertDraftRevision(revision,valid,selection);await commitPreview(readPublishDraft(adoptPreparedTaskMaterials(original,prepared,options)),expected,revision,valid,selection);
+  const prepared=await materialClient.prepare(input);assertDraftRevision(revision,valid,selection);
+  const candidate=readPublishDraft(adoptPreparedTaskMaterials(original,prepared,options)),ready=await materialClient.prepareDraft(candidate);assertDraftRevision(revision,valid,selection);
+  const saved=await savePreparedDraft(readPublishDraft(ready.draft),expected,revision,valid,selection);if(!saved)return;
+  setPreview(null);setPreviewBodies([]);setOriginPreview(null);setOriginReview(null);selectForumMaterials(false);setNotice('所选文字已带入草稿，可以继续编辑后发布。');
  }
- async function preparePreview(valid:()=>boolean){const revision=inputRevision.current;await flushDraft();assertDraftRevision(revision,valid);await commitPreview(structuredClone(draftRef.current),structuredClone(draftSnapshot.current),revision,valid);}
+ async function preparePublication(valid:()=>boolean):Promise<(PublicationSelection&{reviewed:HelpOriginView|null})|null>{
+  const revision=inputRevision.current;await flushDraft();assertDraftRevision(revision,valid);
+  const expected=structuredClone(draftSnapshot.current),prepared=await materialClient.prepareDraft(structuredClone(draftRef.current));assertDraftRevision(revision,valid);
+  const candidate=readPublishDraft(prepared.draft),origin=candidate.helpOrigin?structuredClone(candidate.helpOrigin):null,reviewed=await reviewOrigin(origin,valid);assertDraftRevision(revision,valid);
+  const publication=ordinaryPublicationFromDraft(candidate),saved=await savePreparedDraft(candidate,expected,revision,valid);if(!saved)return null;
+  return{publication,...saved,materialBodies:prepared.materialBodies,origin,reviewed};
+ }
+ async function preparePreview(valid:()=>boolean){const selected=await preparePublication(valid);if(!selected||!valid())return;setPreviewBodies(selected.materialBodies);setOriginPreview(selected.origin);setOriginReview(selected.reviewed);setPreview(selected.publication);}
  async function submit(valid:()=>boolean){
-  if(!preparationClient)throw Error('请先连接当前身份。');if(!preview)throw Error('请先预览这份求助。');
-  const selectedPreview=structuredClone(preview),selectedHead=structuredClone(previewHead),revision=previewRevision.current,selectedBodies=structuredClone(previewBodies);
-  if(!selectedHead||revision===null)throw Error('本机稿修订尚未核对，请重新预览。');
-  const guard=()=>{assertDraftRevision(revision,valid);if(!sameHead(selectedHead,draftHead.current))throw Object.assign(Error('原稿已变化，请重新预览。'),{code:'task_draft_conflict'});};
+  if(!preparationClient)throw Error('请先连接当前身份。');
+  const selected=await preparePublication(valid);if(!selected||!valid())return;
+  const selectedPreview=selected.publication,selectedHead=selected.head,revision=selected.revision,selectedBodies=selected.materialBodies,selectedOrigin=selected.origin;
+  const guard=()=>{assertDraftRevision(revision,valid);if(!sameHead(selectedHead,draftHead.current))throw Object.assign(Error('原稿已变化，请核对当前内容。'),{code:'task_draft_conflict'});};
   await flushDraft();guard();const observed=await draftClient.inspect();guard();
   if(!sameHead(observed?.head??null,selectedHead)){draftReloadRequired.current=true;throw markDraftFailure(Object.assign(Error('另一页面已改变原稿，请重新核对后发布。'),{code:'task_draft_conflict'}),'gate');}
-  if(originPreview){const current=await reviewOrigin(originPreview,valid);guard();const refs=helpOriginPayload(originPreview);if(selectedPreview.caseId!==refs.caseId||selectedPreview.parentTaskId!==refs.parentTaskId||JSON.stringify(selectedPreview.workContext.attemptRefs)!==JSON.stringify(refs.attemptRefs))throw Error('原工作引用与待发布预览不一致，请重新预览。');setOriginReview(current);}
+  if(selectedOrigin){const current=await reviewOrigin(selectedOrigin,valid);guard();const refs=helpOriginPayload(selectedOrigin);if(selectedPreview.caseId!==refs.caseId||selectedPreview.parentTaskId!==refs.parentTaskId||JSON.stringify(selectedPreview.workContext.attemptRefs)!==JSON.stringify(refs.attemptRefs))throw Error('原工作引用与当前求助不一致，请核对所选来源。');setOriginReview(current);}
   const choice=preparationChoice(draftRef.current.helpPreparation),prepared=choice.input&&choice.selected.length?await readPreparation(preparationClient,runtime,choice.input,choice,valid):preparationRef.current;guard();
-  await preparationClient.freeze(selectedPreview,prepared,originPreview?{taskId:originPreview.taskId,returnTo:originPreview.returnTo??'/app/tasks/'+originPreview.taskId+'?section=collaboration'}:null);guard();
+  await preparationClient.freeze(selectedPreview,prepared,selectedOrigin?{taskId:selectedOrigin.taskId,returnTo:selectedOrigin.returnTo??'/app/tasks/'+selectedOrigin.taskId+'?section=collaboration'}:null);guard();
   const receipt=readOperationReceipt(await runtime.publishTask(selectedPreview,{confirmed:true,forumOrigin:forumLocator,draftHead:selectedHead,materialBodies:selectedBodies,assertCurrent:guard}));if(valid())await finish(receipt);
  }
- const restoreReview=useEffectEvent(()=>{if(loaded&&!restoredReview.current&&new URLSearchParams(location.search).get('step')==='review'){restoredReview.current=true;void run(preparePreview);}});
- useEffect(()=>{restoreReview();},[loaded]);
  const fieldId=useId();
  const fieldMaterial=(field:TaskTextField,label:string)=><TaskMaterialDraftField {...{field,label,draft,busy}} value={draft[field]} states={materialStates} clock={materialClock} onEdit={editMaterial} onRemove={removeMaterial} onRestore={restoreMaterial} navigate={navigateWithSavedDraft}/>;
  const previewText=(value:TaskText|undefined)=>localTaskTextView(value,previewBodies,materialStates,materialClock);
@@ -256,33 +265,46 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  const draftDiagnostic=draftFeedback?.reason,diagnosticText=taskEntryError(draftDiagnostic)?taskEntryError(draftDiagnostic):typeof draftDiagnostic==='string'?draftDiagnostic:'',diagnosticCode=[taskEntryError(draftDiagnostic,'code'),taskEntryError(draftDiagnostic,'name')].filter(Boolean).join(' · ');
  return <section ref={flowTop} className="request-compose-page" aria-busy={busy}>
   <header className="request-compose-heading"><div><p className="eyebrow">一起推进一件事</p><h1 className="small">发起求助</h1></div>{!pending&&lastReceipt&&<a href={`/app/tasks/${lastReceipt.taskId}`} onClick={event=>{event.preventDefault();navigateWithSavedDraft(`/app/tasks/${lastReceipt.taskId}`);}}>上次发布 <ArrowRight size={14}/></a>}</header>
-  {forumLocator&&<div className="request-origin"><BookOpen size={17}/><a href={forumLocator.returnTo} onClick={event=>{event.preventDefault();navigateWithSavedDraft(forumLocator.returnTo);}}>来自一段社区讨论</a>{forumSourceState==='unavailable'&&<span>原帖暂不可读</span>}{forumAvailable&&!selectMaterials&&<button className="text-action" type="button" disabled={busy||!!pending} onClick={()=>{setPreview(null);setSelectMaterials(true);}}>从这版选择我的材料</button>}</div>}
-  {error&&<div className="message error" role="alert">{error}<AccountVerificationPrompt required={verificationRequired} navigate={navigateWithSavedDraft}/></div>}{notice&&<output className="message">{notice}</output>}
+  {forumLocator&&<div className="request-origin"><BookOpen size={17}/><a href={forumLocator.returnTo} onClick={event=>{event.preventDefault();navigateWithSavedDraft(forumLocator.returnTo);}}>来自一段社区讨论</a>{forumSourceState==='unavailable'&&<span>原帖暂不可读</span>}{forumAvailable&&!selectMaterials&&<button className="text-action" type="button" disabled={busy||!!pending} onClick={()=>{setPreview(null);selectForumMaterials(true);}}>从这版选择我的材料</button>}</div>}
+  {error&&<div className="message error" role="alert">{error}{businessFeedbackRef.current.code==='task_material_unavailable'&&<Button type="button" variant="outline" disabled={busy} onClick={()=>void refreshMaterials()}>重新核对材料</Button>}<AccountVerificationPrompt required={verificationRequired} navigate={navigateWithSavedDraft}/></div>}{notice&&<output className="message">{notice}</output>}
   {draftFeedback&&<div className="message error" role="alert" aria-label="本机稿提示"><p><strong>{draftFeedbackTitle(draftFeedback)}</strong>{hasUnsavedInput&&' 未保存的文字仍在编辑框中。'}</p><p>先保留需要的文字，再读取这台设备上的最新草稿。</p><Button type="button" disabled={busy||readingDraft} onClick={()=>{setReadingDraft(true);showDraftFeedback(null);void readLocalDraft();}}>读取已保存的草稿</Button>{(diagnosticCode||diagnosticText)&&<details><summary>错误详情</summary><p style={{overflowWrap:'anywhere'}}>{diagnosticCode}{diagnosticCode&&diagnosticText?'：':''}{diagnosticText}</p></details>}</div>}
   <TaskOperationRecovery runtime={runtime} connected={connected} onComplete={finish} onStopped={()=>{setPending(null);setPreview(null);setNotice('已停止本机重试，草稿仍保留。');}}/>
-  {loaded&&selectMaterials&&forumSource&&<TaskForumMaterialWorkspace key={forumSource.locator.versionId} source={forumSource} sourceState={forumAvailable?'available':forumSourceState==='reading'?'reading':'unavailable'} draft={draft} states={materialStates} busy={busy} onAdopt={(input,options,selection)=>void run(valid=>adoptMaterials(input,options,selection,valid))} onCancel={()=>setSelectMaterials(false)} onRefresh={()=>void refreshForumSource()}/>}
-  {loaded&&selectMaterials&&!forumSource&&<div className="message"><output>正在读取所选准确版本。</output><Button variant="ghost" disabled={busy} onClick={()=>setSelectMaterials(false)}>先继续自己的求助</Button></div>}
-  {loaded&&!selectMaterials&&<><nav className="request-steps" aria-label="求助发布步骤"><button type="button" aria-current={step===0&&!preview?'step':undefined} onClick={()=>{setStep(0);setPreview(null);}}><span>{step>0||preview?<Check size={13}/>:1}</span>说明目标</button><button type="button" aria-current={step===1&&!preview?'step':undefined} disabled={!taskFieldPresent(draft.title)||!taskFieldPresent(draft.summary)} onClick={()=>{setStep(1);setPreview(null);}}><span>{preview?<Check size={13}/>:2}</span>选择范围</button><span aria-current={preview?'step':undefined}><span>3</span>预览发布</span></nav>
-  {!preview&&<form className="request-compose-form" onSubmit={event=>{event.preventDefault();if(step===0){prepareNext();return;}void run(preparePreview);}}>
-   {step===0&&<fieldset disabled={busy}>{!hasMaterialText(draft.title)&&<label htmlFor={fieldId+'-title'}>想做什么？<Input id={fieldId+'-title'} required maxLength={120} value={literalTaskText(draft.title)} onChange={event=>change('title',event.target.value)} placeholder="用一句话说说你的目标"/></label>}{fieldMaterial('title','标题')}<label htmlFor={fieldId+'-summary'}>需要怎样的帮助？<Textarea id={fieldId+'-summary'} required={!hasMaterialText(draft.summary)} maxLength={10000} value={literalTaskText(draft.summary)} onChange={event=>change('summary',event.target.value)} placeholder="可以说说现在的进展、遇到的问题，或想邀请大家一起尝试的事。"/></label>{fieldMaterial('summary','说明')}
-    <button className="text-action" type="button" aria-expanded={backgroundOpen} onClick={()=>setBackgroundOpen(value=>!value)}>{backgroundOpen?'收起补充内容':'添加背景或预期结果'}</button>
-    {backgroundOpen&&<div className="request-extra-fields"><label htmlFor={fieldId+'-goal'}>更具体的目标<Textarea id={fieldId+'-goal'} maxLength={10000} value={literalTaskText(draft.goal)} onChange={event=>change('goal',event.target.value)} placeholder="可选"/></label>{fieldMaterial('goal','目标')}<label htmlFor={fieldId+'-situation'}>当前情况与环境<Textarea id={fieldId+'-situation'} maxLength={10000} value={literalTaskText(draft.situation)} onChange={event=>change('situation',event.target.value)} placeholder="可选，写下理解这项工作需要的背景"/></label>{fieldMaterial('situation','当前情况')}<label htmlFor={fieldId+'-expectedOutcome'}>希望得到的结果<Textarea id={fieldId+'-expectedOutcome'} maxLength={1500} value={literalTaskText(draft.expectedOutcome)} onChange={event=>change('expectedOutcome',event.target.value)} placeholder="可选，例如一份建议、可以运行的修改或一次复核"/></label>{fieldMaterial('expectedOutcome','预期结果')}<label htmlFor={fieldId+'-intent'}>帮助方式<select id={fieldId+'-intent'} value={draft.intent} onChange={event=>change('intent',event.target.value)}><option value="collaboration">一起完成</option><option value="stuck">解决困难</option><option value="proactive-review">评审建议</option><option value="diagnosis">诊断问题</option><option value="delegation">委托一项工作</option></select></label></div>}
+  {loaded&&selectMaterials&&forumSource&&<TaskForumMaterialWorkspace key={forumSource.locator.versionId} source={forumSource} sourceState={forumAvailable?'available':forumSourceState==='reading'?'reading':'unavailable'} draft={draft} states={materialStates} busy={busy} onAdopt={(input,options,selection)=>void run(valid=>adoptMaterials(input,options,selection,valid))} onCancel={()=>selectForumMaterials(false)} onRefresh={()=>void refreshForumSource()}/>}
+  {loaded&&selectMaterials&&!forumSource&&<div className="message"><output>正在读取所选准确版本。</output><Button variant="ghost" disabled={busy} onClick={()=>selectForumMaterials(false)}>先继续自己的求助</Button></div>}
+  {loaded&&!selectMaterials&&<>
+  {!preview&&<form className="request-compose-form request-continuous-form" onSubmit={event=>{event.preventDefault();if(connected&&agentReady)void run(submit);}}>
+   <fieldset disabled={busy||!!pending} className="request-writing-fields">
+    {!hasMaterialText(draft.title)&&<label htmlFor={fieldId+'-title'}>想做什么？<Input id={fieldId+'-title'} required maxLength={120} value={literalTaskText(draft.title)} onChange={event=>change('title',event.target.value)} placeholder="用一句话说说你的目标"/></label>}{fieldMaterial('title','标题')}
+    <label htmlFor={fieldId+'-summary'}>需要怎样的帮助？<Textarea aria-label="需要怎样的帮助？" id={fieldId+'-summary'} required={!hasMaterialText(draft.summary)} maxLength={10000} value={literalTaskText(draft.summary)} onChange={event=>change('summary',event.target.value)} placeholder="现在在做什么、遇到什么问题，或想一起尝试什么？"/></label>{fieldMaterial('summary','说明')}
+    <button className="text-action" type="button" aria-expanded={backgroundOpen} aria-controls={fieldId+'-background'} onClick={()=>setBackgroundOpen(value=>!value)}>{backgroundOpen?'收起补充内容':'补充背景或期待的结果'}</button>
+    {backgroundOpen&&<div id={fieldId+'-background'} className="request-extra-fields">
+     {taskFieldPresent(draft.goal)&&<><label htmlFor={fieldId+'-goal'}>具体目标<Textarea aria-label="具体目标" id={fieldId+'-goal'} maxLength={10000} value={literalTaskText(draft.goal)} onChange={event=>change('goal',event.target.value)}/></label>{fieldMaterial('goal','目标')}</>}
+     <label htmlFor={fieldId+'-situation'}>背景资料 <small>可选</small><Textarea aria-label="背景资料" id={fieldId+'-situation'} maxLength={10000} value={literalTaskText(draft.situation)} onChange={event=>change('situation',event.target.value)} placeholder="理解这件事需要的环境、已有尝试或其他背景"/></label>{fieldMaterial('situation','背景')}
+     <label htmlFor={fieldId+'-expectedOutcome'}>期待的结果 <small>可选</small><Textarea aria-label="期待的结果" id={fieldId+'-expectedOutcome'} maxLength={1500} value={literalTaskText(draft.expectedOutcome)} onChange={event=>change('expectedOutcome',event.target.value)} placeholder="例如一份建议、可以运行的修改或一次复核"/></label>{fieldMaterial('expectedOutcome','期待的结果')}
+    </div>}
     <TaskOriginPicker {...{runtime,connected,busy,sourceRevision}} navigate={navigateWithSavedDraft} locator={originLocator} selection={draft.helpOrigin??null} onChange={(value:HelpOriginSelection|null)=>change('helpOrigin',value)}/>
-   </fieldset>}
-   {step===1&&<fieldset disabled={busy}><legend>谁可以看到这份求助？</legend><div className="request-visibility">{visibilityOptions.map(([value,title,description,Icon])=><label htmlFor={fieldId+value} className={draft.visibility===value?'selected':''} key={value}><input id={fieldId+value} type="radio" name="request-visibility" checked={draft.visibility===value} onChange={()=>change('visibility',value)}/><Icon size={23}/><span><strong>{title}</strong><small>{description}</small></span><span className="choice-indicator"/></label>)}</div><p className="request-field-note">这里只包含你在本页填写的内容。共享其他资料时，另行选择。</p><label htmlFor={fieldId+'-enrollment'}>接受新回应直到<Input id={fieldId+'-enrollment'} required type="datetime-local" value={draft.enrollmentLocal} onChange={event=>change('enrollmentLocal',event.target.value)}/><small>已有的交流与参与可以继续。</small></label></fieldset>}
-   {step===0&&<section className="request-related request-related-help"><button type="button" className="text-action" disabled={busy} aria-expanded={referenceSearchOpen} onClick={toggleRelated}><Search size={16}/>看看已有的相关帮助{preparationChoice(draft.helpPreparation).selected.length?' · 已记下 '+preparationChoice(draft.helpPreparation).selected.length+' 位':''}</button>{referenceSearchOpen&&<>
+   </fieldset>
+   <fieldset disabled={busy||!!pending} className="request-share-fields"><legend>分享范围</legend>
+    <div className="request-visibility">{visibilityOptions.map(([value,title,description,Icon])=><label htmlFor={fieldId+value} className={draft.visibility===value?'selected':''} key={value}><input id={fieldId+value} type="radio" name="request-visibility" checked={draft.visibility===value} onChange={()=>change('visibility',value)}/><Icon size={20}/><span><strong>{title}</strong><small>{description}</small></span><span className="choice-indicator"/></label>)}</div>
+    <label className="request-enrollment" htmlFor={fieldId+'-enrollment'}><span>接受新回应直到<small>已有交流可以继续</small></span><Input id={fieldId+'-enrollment'} required type="datetime-local" value={draft.enrollmentLocal} onChange={event=>change('enrollmentLocal',event.target.value)}/></label>
+   </fieldset>
+   <section className="request-related request-related-help"><button type="button" className="text-action" disabled={busy} aria-expanded={referenceSearchOpen} onClick={toggleRelated}><Search size={16}/>看看已有的相关帮助{preparationChoice(draft.helpPreparation).selected.length?' · 已记下 '+preparationChoice(draft.helpPreparation).selected.length+' 位':''}</button>{referenceSearchOpen&&<>
     <div className="request-help-search"><label htmlFor="request-help-keyword">搜索关键词<Input id="request-help-keyword" disabled={busy} maxLength={200} value={independentKeyword(draft)} onChange={event=>change('searchKeyword',event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(connected&&!busy&&!searching)findRelated();}}} placeholder="目标、方法或环境"/></label><Button type="button" variant="outline" onClick={findRelated} disabled={busy||!connected||searching||!independentKeyword(draft).trim()}>查找</Button></div>
     {hasMaterialText(draft.title)&&<p className="request-help-note">来源材料不会自动用于搜索，可以单独填写关键词。</p>}{hasMaterialText(draft.searchKeyword)&&<p>旧检索字段含来源材料。<Button type="button" variant="ghost" onClick={()=>saveInput({...draftRef.current,searchKeyword:''})}>重新填写独立关键词</Button></p>}<details className="request-help-directions"><summary>也看看愿意交流的人</summary><label htmlFor="request-help-functions">想交流的方向<Input id="request-help-functions" disabled={busy} maxLength={1200} value={draft.searchFunctions??''} onChange={event=>change('searchFunctions',event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(connected&&!busy&&!searching)findRelated();}}} placeholder="例如：代码复核、手机端交互"/></label><p className="request-help-note">填入方向后再次查找，可以一并读取对方表达的交流意愿。</p></details>
     {!connected&&<p className="request-help-note">连接身份后可以查找，草稿会继续保留。</p>}
     {(preparation||searching||searchError||preparationChoice(draft.helpPreparation).selected.length>0)&&<TaskPreparationWorkspace {...{runtime,subjectId,connected}} value={preparation} selected={preparationChoice(draft.helpPreparation).selected} busy={searching} disabled={busy} error={searchError} onChange={rememberPreparation} onRetry={()=>void searchPreparation()}/>}
-   </>}</section>}
-   <footer className="request-form-footer"><div><span aria-live="polite" aria-label="本机稿状态">{readingDraft?'正在读取草稿…':saveMessage}</span><button type="button" className="text-action" disabled={busy} onClick={()=>navigateWithSavedDraft(forumLocator?.returnTo??originLocator?.returnTo??'/app/')}>保存并离开</button></div><div className="button-row">{step===1&&<Button type="button" variant="ghost" onClick={()=>setStep(0)}><ArrowLeft size={15}/>上一步</Button>}<Button type="submit" disabled={busy||!!pending}>{step===0?'继续':'预览求助'}<ArrowRight size={15}/></Button></div></footer>
+   </>}</section>
+   {connected&&<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>}
+   <footer className="request-form-footer"><div><span aria-live="polite" aria-label="本机稿状态">{readingDraft?'正在读取草稿…':saveMessage}</span><button type="button" className="text-action" disabled={busy} onClick={()=>navigateWithSavedDraft(forumLocator?.returnTo??originLocator?.returnTo??'/app/')}>保存并离开</button></div><div className="button-row">
+    <Button type="button" variant="ghost" disabled={busy||!!pending||!taskFieldPresent(draft.title)||!taskFieldPresent(draft.summary)} onClick={()=>void run(preparePreview)}><Eye size={16}/>预览</Button>
+    {!connected?<Button type="button" disabled={busy||!!pending} onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>登录并继续<ArrowRight size={15}/></Button>:agentReady&&<Button type="submit" disabled={busy||!!pending}>{busy?'正在发布…':draft.visibility==='Public'?'发布求助':'保存这项工作'}<ArrowRight size={15}/></Button>}
+   </div></footer>
   </form>}
 
   {preview&&<article className="request-publication-preview"><div className="request-preview-meta">{preview.visibility==='Public'?<><Globe size={16}/>公开求助</>:<><Lock size={16}/>仅自己</>}<span>接受新回应至 {new Date(preview.enrollmentExpiresAt*1000).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div><h2>{displayPreview(preview.title,true)}</h2><p className="request-main-text">{displayPreview(preview.summary)}</p>{displayPreview(preview.workContext.goal)&&displayPreview(preview.workContext.goal)!==displayPreview(preview.title)&&<section><h3>具体目标</h3><p>{displayPreview(preview.workContext.goal)}</p></section>}{displayPreview(preview.workContext.currentSituation)!=='未另行提供当前情况。'&&displayPreview(preview.workContext.currentSituation)!==displayPreview(preview.summary)&&<section><h3>背景</h3><p>{displayPreview(preview.workContext.currentSituation)}</p></section>}{preview.expectedOutcome&&<section><h3>预期结果</h3><p>{displayPreview(preview.expectedOutcome)}</p></section>}{originPreview&&<div className="request-origin"><BookOpen size={17}/><span>关联：{originReview?.task.request.title??'原工作'}{originPreview.attemptRefs.length>0?` · ${originPreview.attemptRefs.length} 条已有尝试`:''}</span></div>}
    {!!preview.materials?.length&&<div className="message"><p>其中 {preview.materials.length} 段使用了你选定的帖子材料，撤回或到期后会停止展示相应文字。</p>{previewBlocked&&<p><output>部分材料正在核对或当前不可用，请核对来源后继续。</output></p>}<Button variant="ghost" disabled={busy} onClick={()=>void refreshMaterials()}>核对材料当前状态</Button></div>}
    {connected?<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>:<div className="request-login"><p>登录后发布，当前草稿会保留。</p><Button onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>登录并继续</Button></div>}
-   <footer className="request-form-footer"><Button type="button" variant="ghost" disabled={busy} onClick={()=>{setPreview(null);setStep(0);}}><ArrowLeft size={15}/>继续修改</Button>{connected&&agentReady&&<Button type="button" disabled={busy||!!pending||previewBlocked} onClick={()=>void run(submit)}>{busy?'正在发布…':preview.visibility==='Public'?'发布求助':'保存这项工作'}<ArrowRight size={15}/></Button>}</footer>
+   <footer className="request-form-footer"><Button type="button" variant="ghost" disabled={busy} onClick={()=>setPreview(null)}><ArrowLeft size={15}/>继续修改</Button>{connected&&agentReady&&<Button type="button" disabled={busy||!!pending||previewBlocked} onClick={()=>void run(submit)}>{busy?'正在发布…':preview.visibility==='Public'?'发布求助':'保存这项工作'}<ArrowRight size={15}/></Button>}</footer>
   </article>}
   </>}
  </section>;

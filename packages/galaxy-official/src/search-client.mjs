@@ -1,8 +1,8 @@
 import { searchQuerySchema,searchScope } from './shared/search-schema.mjs';
 import { postPublicJson,validatePublicUrl } from './public-fetch.mjs';
 
-export function createSearchClient({endpoint,sessions,send=postPublicJson}){
-  if(validatePublicUrl(endpoint).origin!==endpoint||!sessions)throw new Error('Invalid search client configuration.');
+export function createSearchClient({endpoint,sessions,send=postPublicJson,validateEndpoint=validatePublicUrl}){
+  if(validateEndpoint(endpoint).origin!==endpoint||!sessions)throw new Error('Invalid search client configuration.');
   async function query(input,{signal}={}){
     const request=searchQuerySchema.parse(input);signal?.throwIfAborted();
     const authorization=await sessions.readAuthorization(endpoint);

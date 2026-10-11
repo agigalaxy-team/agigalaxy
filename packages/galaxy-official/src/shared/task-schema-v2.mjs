@@ -5,6 +5,9 @@ import {taskTextSchema,taskMaterialDescriptorSchema,taskMaterialReferenceIssue} 
 
 const subject = z.string().regex(/^GUID[0-9A-Z]{28}$/);
 const note = z.string().trim().min(1).max(1500);
+// Retain both parts of an existing help proposal without truncation or a
+// second request for the same description (1500 + two newlines + 1500).
+const workDescription = z.string().trim().min(1).max(3002);
 const positive = z.number().int().positive();
 export const taskFactRefSchema = z.strictObject({ id: z.uuid(), version: positive });
 const amount = z.string().regex(/^(0|[1-9][0-9]{0,11})(\.[0-9]{1,8})?$/);
@@ -37,7 +40,7 @@ export const taskEventV2Schema = z.discriminatedUnion('kind', [
   z.strictObject({ ...taskCommon, kind: z.literal('invite'), recipientId: subject, note, expiresAt: positive }),
   z.strictObject({ ...taskCommon, kind: z.literal('invitation-reply'), invitationId: z.uuid(), response: z.enum(['question', 'interested', 'declined']), message: note }),
   z.strictObject({ ...taskCommon, kind: z.literal('revoke-invitation'), invitationId: z.uuid(), reason: note }),
-  z.strictObject({ ...taskCommon, kind: z.literal('apply'), proposal: note, scope: note, quote: budget.optional(), qualificationEvidence: z.union([qualificationEvidenceSchema,qualificationEvidenceV2Schema]).optional() }),
+  z.strictObject({ ...taskCommon, kind: z.literal('apply'), proposal: note, scope: note.optional(), quote: budget.optional(), qualificationEvidence: z.union([qualificationEvidenceSchema,qualificationEvidenceV2Schema]).optional() }),
   z.strictObject({ ...taskCommon, kind: z.literal('withdraw-application'), applicationId: z.uuid(), reason: note }),
   z.strictObject({ ...taskCommon, kind: z.literal('cancel'), reason: note }),
   z.strictObject({ ...taskCommon, kind: z.literal('close'), reason: note }),
@@ -46,8 +49,8 @@ export const taskEventV2Schema = z.discriminatedUnion('kind', [
 export const taskEnvelopeV2Schema = z.strictObject({ taskId: z.uuid(), event: taskEventV2Schema });
 export const participationProposalV2Schema = z.strictObject({ ...taskCommon,
   kind: z.literal('propose'), participationId: z.uuid(), subjectId: subject,
-  role: z.enum(['diagnosis', 'advice', 'context', 'tool', 'patch', 'review', 'verification', 'takeover', 'main-responsible']),
-  scopeVersion: z.literal(1), agreedScope: note, applicationId: z.uuid().optional(),
+  role: z.enum(['contribution', 'diagnosis', 'advice', 'context', 'tool', 'patch', 'review', 'verification', 'takeover', 'main-responsible']),
+  scopeVersion: z.literal(1), agreedScope: workDescription, applicationId: z.uuid().optional(),
 });
 const participationCommon = { eventId: z.uuid(), expectedParticipationVersion: positive };
 export const participationEventV2Schema = z.discriminatedUnion('kind', [
@@ -56,7 +59,7 @@ export const participationEventV2Schema = z.discriminatedUnion('kind', [
   z.strictObject({ ...participationCommon, kind: z.literal('confirm'), scopeVersion: positive }),
   z.strictObject({ ...participationCommon, kind: z.literal('decline'), reason: note }),
   z.strictObject({ ...participationCommon, kind: z.literal('withdraw'), reason: note }),
-  z.strictObject({ ...participationCommon, kind: z.literal('propose-scope'), scopeVersion: positive, agreedScope: note, reason: note }),
+  z.strictObject({ ...participationCommon, kind: z.literal('propose-scope'), scopeVersion: positive, agreedScope: workDescription, reason: note }),
   z.strictObject({ ...participationCommon, kind: z.literal('confirm-scope'), proposalId: z.uuid() }),
   z.strictObject({ ...participationCommon, kind: z.literal('decline-scope'), proposalId: z.uuid(), reason: note }),
   z.strictObject({ ...participationCommon, kind: z.literal('deliver'), resultRef: taskFactRefSchema,

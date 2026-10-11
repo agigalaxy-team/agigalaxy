@@ -36,7 +36,7 @@ export type WorkViewAuthority={check:()=>void;isCurrent:()=>boolean};
 export type WorkFactActionKind='attempt-start'|'attempt-end'|'attempt-correct'|'intervention'|'intervention-response'|'result-recorded'|'resolution-recorded'|'evidence'|'verification'|'revoke'|'deliver';
 export type WorkFactAction={kind:WorkFactActionKind;target?:WorkEditorTarget;authority?:WorkViewAuthority;pendingOperation?:{taskId:string;participationId:string;eventId:string;payloadHash:string}};
 export type WorkFactPending={kind:'case-link'|'fact'|'verification';taskId:string;caseId:string;operationId:string;payloadHash:string;state:string;localRetryStopped?:boolean;receiptState?:string};
-export type WorkFactReceipt=Partial<WorkFactPending>&{state?:string;reason?:string;caseVersion?:number;type?:WorkRecordType;id?:string};
+export type WorkFactReceipt=Partial<WorkFactPending>&{state?:string;reason?:string;caseVersion?:number;type?:WorkRecordType;id?:string;objectRef?:FactReference};
 export type WorkFactRetry=WorkFactPending&{state:'absent';previewId:string;expiresAt:number;subjectId:string;endpoint:string;visibility:'Private';viewers:string[];items:{action:string;objectId:string;payloadJson:string;payloadHash:string}[]};
 export const workFormBlank = {
   summary: '',

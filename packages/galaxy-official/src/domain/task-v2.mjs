@@ -51,7 +51,7 @@ export function applyTaskV2(state, actorId, input, now) {
       rule(!state.applications.some(a => a.subjectId === actorId && a.state === 'pending'), 'task_application_pending');
       rule(!event.quote || state.request.collaboration === 'basic-bounty');
       next.applications.push({ applicationId: event.eventId, subjectId: actorId, proposal: event.proposal,
-        scope: event.scope, quote: event.quote ?? null, qualificationEvidence: event.qualificationEvidence ?? { proofIds: [], assistanceIds: [] },
+        ...(event.scope === undefined ? {} : {scope: event.scope}), quote: event.quote ?? null, qualificationEvidence: event.qualificationEvidence ?? { proofIds: [], assistanceIds: [] },
         state: 'pending', at: now }); break;
     case 'withdraw-application': {
       const application = next.applications.find(a => a.applicationId === event.applicationId);

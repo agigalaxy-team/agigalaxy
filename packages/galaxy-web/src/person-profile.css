@@ -1,0 +1,35 @@
+.member-profile-link{display:inline-flex;align-items:center;gap:9px;color:inherit;text-decoration:none;max-width:100%;border-radius:4px}
+.member-profile-link>span:last-child{overflow-wrap:anywhere}.member-profile-link:hover>span:last-child{text-decoration:underline;text-underline-offset:4px}
+.member-profile-link:focus-visible{outline:2px solid var(--g-accent,#7656a1);outline-offset:5px}
+.task-author{display:flex;align-items:center;gap:8px;font-size:14px;margin:18px 0 25px}.task-author>span{color:var(--g-muted)}
+.galaxy-site .person-profile{max-width:960px;margin:0 auto;min-width:0}
+.person-return{display:inline-flex;align-items:center;gap:8px;font-size:14px;margin-bottom:30px;color:var(--g-muted)}
+.person-identity{display:flex;align-items:center;gap:22px;margin:3px 0 26px}
+.person-identity>.person-portrait{display:flex;align-items:center;justify-content:center;flex:none;width:76px;height:76px;border-radius:50%;background:#eee7f5;color:var(--g-accent);font-size:30px}
+.person-portrait .member-avatar{width:76px;height:76px}.person-portrait .member-avatar svg{width:32px;height:32px}
+.galaxy-site .person-identity h1{font-size:32px;line-height:1.35;margin:6px 0 0;letter-spacing:-.02em;overflow-wrap:anywhere}
+.person-identity .eyebrow{margin:0}.person-identity>div{min-width:0}.person-identity .person-self-link{font-size:13px;margin-left:auto;flex:none}
+.person-tabs{display:flex;gap:28px;overflow-x:auto;border-bottom:1px solid var(--g-line);margin:0 0 32px;padding:0}
+.person-tabs a{flex:none;display:block;padding:15px 0;font-size:15px;text-decoration:none;border-bottom:2px solid transparent;color:var(--g-muted)}
+.person-tabs a[aria-current=page]{color:var(--g-ink);border-color:var(--g-accent);font-weight:600}
+.person-overview{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:50px}.person-main{min-width:0}
+.galaxy-site .person-section{padding:0 0 32px;margin:0 0 30px;border-bottom:1px solid var(--g-line)}
+.person-section>header{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-bottom:18px}
+.galaxy-site .person-section h2{font-size:20px;margin:0;line-height:1.5}.person-section>header a{display:inline-flex;align-items:center;gap:7px;font-size:13px;white-space:nowrap}
+.person-prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.95;font-size:16px;margin:0;color:var(--g-ink)}
+.person-prose>p{margin:0 0 1em}.person-prose>p:last-child{margin-bottom:0}.person-full-intro{margin-top:16px}.person-full-intro summary{cursor:pointer;font-size:14px;color:var(--g-accent)}.person-full-intro[open] summary{margin-bottom:18px}.profile-self-view{display:inline-flex;align-items:center;gap:8px;font-size:14px;margin-top:15px}
+.person-muted{font-size:14px;line-height:1.8;color:var(--g-muted);margin:0}.person-directions{display:flex;flex-wrap:wrap;gap:9px 16px;padding:0;margin:18px 0 0;list-style:none;font-size:14px;color:var(--g-accent)}
+.person-experience-list{list-style:none;margin:0;padding:0}.person-experience-list li+li{border-top:1px solid var(--g-line)}
+.person-experience-list a{display:block;padding:18px 0;color:inherit;text-decoration:none}.person-experience-list h3{font-size:17px!important;line-height:1.65!important;margin:0 0 9px!important}
+.person-experience-list a:hover h3{text-decoration:underline;text-underline-offset:4px}.person-experience-list p{font-size:14px;line-height:1.8;color:var(--g-muted);margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.person-experience-list .history-meta{margin-top:11px;font-size:12px}.person-experience-list h3>svg{display:inline;vertical-align:middle;margin-left:8px;color:var(--g-muted)}
+.person-projects article{padding:23px 0;border-bottom:1px solid var(--g-line)}.person-projects article:first-child{padding-top:0}.person-projects article:last-child{border-bottom:0}
+.galaxy-site .person-projects h3{font-size:19px;margin:0 0 12px;line-height:1.5}.person-projects p{font-size:15px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 14px}
+.person-projects .person-project-functions{font-size:13px;color:var(--g-muted);white-space:normal}.person-projects a{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.person-projects.is-preview article>p:not(.person-project-functions){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.person-recognition-list{display:flex;flex-wrap:wrap;align-items:start;gap:12px;margin:0 0 16px}.person-recognition-list button{display:flex;align-items:center;gap:10px;text-align:left;font-size:14px;padding:12px 14px;border:1px solid #e4d8ef;border-radius:8px;background:#faf7fd;color:var(--g-ink);cursor:pointer;max-width:100%;overflow-wrap:anywhere}
+.person-recognition-list svg{flex:none;color:#8961a6}.person-recognition-list button[aria-expanded=true]{border-color:var(--g-accent);background:#eee7f5}
+.person-recognition-detail{border-left:3px solid #d8c6e7;padding:6px 0 6px 22px;margin:25px 0}.galaxy-site .person-recognition-detail h3{font-size:18px;margin:0 0 15px}.person-recognition-detail>p{font-size:14px;line-height:1.8;color:var(--g-muted)}
+.person-recognition-detail ul{padding:0;list-style:none}.person-recognition-detail li{padding:15px 0;border-top:1px solid var(--g-line)}.person-recognition-detail strong{font-weight:550;font-size:15px}.person-recognition-detail li p{font-size:14px;line-height:1.8;white-space:pre-wrap}.person-recognition-detail time{display:block;font-size:12px;color:var(--g-muted);margin:8px 0}
+.person-read-error{font-size:14px;line-height:1.8;color:#8a423d}.person-read-error button{margin-left:10px;text-decoration:underline}.person-profile>output{display:block;margin:24px 0}
+@media(max-width:760px){.person-overview{display:block}.person-side{margin-top:25px}.person-identity{gap:16px;flex-wrap:wrap}.galaxy-site .person-identity h1{font-size:28px}.person-identity>.person-portrait,.person-portrait .member-avatar{width:62px;height:62px}.person-identity .person-self-link{margin-left:78px;margin-top:-5px}.person-tabs{gap:24px;margin-bottom:26px}.person-tabs a{font-size:14px}.person-return{margin-bottom:24px}.person-prose{font-size:15px}.person-section>header{gap:12px}.galaxy-site .person-section h2{font-size:19px}.person-recognition-detail{padding-left:15px}}

@@ -10,8 +10,8 @@ import { validatePublicUrl } from './public-fetch.mjs';
 
 // Selected references and brief user-visible explanations stay on the user's
 // device. No credentials, signed payloads, raw search pages or private reasoning.
-export function createLocalHelpStoreV2({ dataDirectory, endpoint, subjectId, now = () => Math.floor(Date.now() / 1000), readIdentityWithin }) {
-  if (validatePublicUrl(endpoint).origin !== endpoint || !/^GUID[0-9A-Z]{28}$/.test(subjectId)) throw new Error('help_scope_invalid');
+export function createLocalHelpStoreV2({ dataDirectory, endpoint, subjectId, now = () => Math.floor(Date.now() / 1000), readIdentityWithin, validateEndpoint = validatePublicUrl }) {
+  if (validateEndpoint(endpoint).origin !== endpoint || !/^GUID[0-9A-Z]{28}$/.test(subjectId)) throw new Error('help_scope_invalid');
   const scope = createHash('sha256').update(JSON.stringify([endpoint, subjectId])).digest('hex');
   const folder = directory => join(directory, 'help-v2', scope);
   const path = (directory, id) => join(folder(directory), z.uuid().parse(id) + '.json');
