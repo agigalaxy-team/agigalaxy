@@ -15,6 +15,22 @@ from product_pages import render_product_pages
 ROOT = Path(__file__).resolve().parent
 
 
+def windows_filesystem_path(value):
+    # GetFinalPathNameByHandle can add an extended namespace to an ordinary
+    # drive/UNC path. Compare the same resolved filesystem path consistently.
+    if value.startswith('\\\\?\\UNC\\'):
+        return '\\\\' + value[8:]
+    if (value.startswith('\\\\?\\') and len(value) > 6
+            and value[4].isascii() and value[4].isalpha() and value[5:7] == ':\\'):
+        return value[4:]
+    return value
+
+
+def resolved_file_path(path):
+    resolved = path.resolve()
+    return Path(windows_filesystem_path(str(resolved))) if os.name == 'nt' else resolved
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
@@ -25,7 +41,7 @@ def main():
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
     args = parser.parse_args()
-    output = args.output.resolve()
+    output = resolved_file_path(args.output)
     if output == ROOT or output in ROOT.parents or output.is_symlink():
         raise ValueError('Choose a generated output directory, separate from source')
     preview = args.preview or not args.site_release
@@ -49,7 +65,7 @@ def main():
     if origin != 'https://agigalaxy.org':
         raise ValueError('Unexpected public archive origin')
     cache = ROOT / '.cache' / 'public-archive'
-    archive_source = args.archive_source.resolve() if args.archive_source else None
+    archive_source = resolved_file_path(args.archive_source) if args.archive_source else None
     cache.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -66,7 +82,7 @@ def main():
             raise ValueError('Archive cache must contain regular files')
         source = archive_source.joinpath(*relative.parts) if archive_source else None
         if source and source.exists():
-            if source.is_symlink() or not source.resolve().is_relative_to(archive_source):
+            if source.is_symlink() or not resolved_file_path(source).is_relative_to(archive_source):
                 raise ValueError('Captured public asset escaped the selected source')
             raw = source.read_bytes()
             if hashlib.sha256(raw).hexdigest() != digest:
@@ -83,8 +99,9 @@ def main():
                 raise ValueError('Published archive bytes changed: ' + name)
             cached.write_bytes(raw)
         target = output.joinpath(*relative.parts)
-        if not target.resolve().is_relative_to(output) or target.is_symlink():
-            raise ValueError('Archive destination escaped the selected output')
+        resolved_target = resolved_file_path(target)
+        if not resolved_target.is_relative_to(output) or target.is_symlink():
+            raise ValueError('Archive destination escaped the selected output: ' + name)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
 

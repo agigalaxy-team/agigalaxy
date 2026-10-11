@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.16",
-  "releaseId": "0.1.16",
+  "version": "0.1.17",
+  "releaseId": "0.1.17",
   "component": "site",
-  "backendRelease": "0.1.11",
+  "backendRelease": "0.1.12",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -36,7 +36,7 @@
     "stableRelease": false
   },
   "completeBusinessAcceptance": false,
-  "publicApiObservedAt": "2026-10-11T18:01:11.667701+00:00",
+  "publicApiObservedAt": "2026-10-11T19:41:05.666568+00:00",
   "nativeClientDownload": {
     "revision": "0.1.9",
     "channel": "development-candidate",
@@ -79,28 +79,28 @@
     "verifiedIdentityProviderCount": 0
   },
   "observedDeployment": {
-    "releaseId": "0.1.11",
-    "observedAt": "2026-10-11T18:01:11.667701+00:00",
+    "releaseId": "0.1.12",
+    "observedAt": "2026-10-11T19:41:05.666568+00:00",
     "schema": 80,
     "checks": {
       "healthz": {
         "status": 200,
-        "release": "0.1.11"
+        "release": "0.1.12"
       },
       "readyz": {
         "status": 200,
-        "release": "0.1.11"
+        "release": "0.1.12"
       },
       ".well-known/galaxy-network.json": {
         "status": 200,
-        "release": "0.1.11"
+        "release": "0.1.12"
       }
     },
-    "reportSha256": "74f51cd895d7df36300194604cc20cbc55b9feaf37fc2d6b5ec5d1901f5ac641"
+    "reportSha256": "0257586cab85545a015e248503698ad2e1e62388244f773903681043eb9512a7"
   },
   "targetCompatibility": {
-    "apiRelease": "0.1.11",
-    "serviceArtifactSha256": "9b148ab13fd44f7a062a1433514cf7c4e028ec1f5de6a27fe9b8981cdc13137c",
+    "apiRelease": "0.1.12",
+    "serviceArtifactSha256": "575496d42f73f92f1cd30f2676100b9e204e39d02aca8dc3a73d99d191e7738e",
     "publicationProved": true
   },
   "currentAccountAvailability": {
@@ -211,6 +211,26 @@
           "release": "0.1.9"
         }
       }
+    },
+    {
+      "releaseId": "0.1.11",
+      "observedAt": "2026-10-11T18:01:11.667701+00:00",
+      "schema": 80,
+      "checks": {
+        "healthz": {
+          "status": 200,
+          "release": "0.1.11"
+        },
+        "readyz": {
+          "status": 200,
+          "release": "0.1.11"
+        },
+        ".well-known/galaxy-network.json": {
+          "status": 200,
+          "release": "0.1.11"
+        }
+      },
+      "reportSha256": "74f51cd895d7df36300194604cc20cbc55b9feaf37fc2d6b5ec5d1901f5ac641"
     }
   ],
   "webGuides": {
