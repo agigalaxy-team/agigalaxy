@@ -1,5 +1,6 @@
 import { createCapsuleWebClient } from './capsule-workspace-client.mjs';
 import {qualificationCalculationSchema} from '../../galaxy-official/src/shared/qualification-calculation-schema.mjs';
+import {taskMaterialDerivedView} from './task-material-client.mjs';
 export function createQualificationPermissionClient({
   runtime,
   subjectId,
@@ -30,7 +31,7 @@ export function createQualificationPermissionClient({
     if(payload.kind==='revoke'||payload.id!==grant.id)throw Error('qualification_grant_reference_mismatch');
     const short=value=>typeof value==='string'?value.slice(0,320):null;
     const targetPromise=(async()=>{try{const task=await query('/v2/tasks/'+payload.taskId,undefined,{method:'GET'}),title=task.request?.title??task.snapshot?.request?.title;
-      return typeof title==='string'?{taskId:payload.taskId,title}:null;
+      return typeof title==='string'?taskMaterialDerivedView(task,{taskId:payload.taskId,title}):null;
     }catch(error){lease?.assertCurrent();if(!unavailable(error))throw error;return null;}})().then(value=>({value}),error=>({error}));
     const materials=[];
     for(let offset=0;offset<payload.sourceRefs.length;offset+=4){
@@ -43,7 +44,7 @@ export function createQualificationPermissionClient({
           // independent current original projection; the API checks it afresh.
           if(current.publicationIds?.length)return{...empty,reason:'independent-source-read-required'};
           if(current.sourceState!=='currently-authorized-projection')return{...empty,reason:'current-source-unavailable'};
-          const value=current.projection;return{ref,available:true,label:value.eventType??null,title:short(value.title),summary:short(value.summary??value.scope)};
+          const value=current.projection;return taskMaterialDerivedView(value,{ref,available:true,label:value.eventType??null,title:short(value.title),summary:short(value.summary??value.scope)});
         }catch(error){lease?.assertCurrent();if(!unavailable(error))throw error;return{...empty,reason:'current-source-unavailable'};}
       }));lease?.assertCurrent();materials.push(...page);
     }

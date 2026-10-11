@@ -2,11 +2,12 @@ import type * as z from 'zod/v4';
 import type {discoveryQueryV2Schema} from '../../galaxy-official/src/shared/discovery-schema-v2.mjs';
 import type {GovernanceDraftRuntime} from './governance-draft-state';
 import type {capsuleVersionSchema} from '../../galaxy-official/src/shared/capsule-schema.mjs';
-import type {taskRequestV2Schema,taskEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
+import type {taskEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 import type {createTaskContactClient} from './task-contact-client.mjs';
-import type {ProjectRuntime,ProjectViewClient,ContactView,VisibleOpportunity,ProjectOperationReview,ProjectContinuation,ContactWriteReceipt,RecruitmentView,DiscoveryQuery,DiscoveryPurpose,OpportunityRef} from './project-workspace-types';
+import type {ProjectRuntime,ProjectViewClient,ContactView,Opportunity,VisibleOpportunity,ProjectOperationReview,ProjectContinuation,ContactWriteReceipt,RecruitmentView,DiscoveryQuery,DiscoveryPurpose,OpportunityRef} from './project-workspace-types';
 import {object,projectErrorText} from './project-workspace-types';
 import type {HistoryRecord} from './record-workspace-types';
+import type {WorkRequest} from './work-task-types';
 
 export type SearchType='history'|'case'|'capsule'|'task'|'opportunity'|'proof'|'worker'|'hub';
 export type SearchRequest={type:Exclude<SearchType,'opportunity'>;query:{query?:string;limit?:number;after?:string;capabilityId?:string;[key:string]:unknown}}|{type:'opportunity';query:z.input<typeof discoveryQueryV2Schema>};
@@ -17,7 +18,7 @@ export type SearchRecord={
  attempts?:{id:string;version:number;strategy:string;reportedOutcome?:string;status:string;summary?:string;failureReason?:string;actorId?:string;environment?:{name:string;version:string}}[];
  interventions?:{id:string;version:number;types:string[];description:string;observedEffect:string;actorId?:string}[];
  results?:{id:string;version:number;reportedOutcome:string;summary:string;limitations:string;supersededInVisibleHistory?:boolean}[];
- request?:z.infer<typeof taskRequestV2Schema>;enrollmentOpen?:boolean;
+ request?:WorkRequest;enrollmentOpen?:boolean;
  help?:{functions:string[]};newApplicationAllowed?:boolean;
  data?:{source:{owner:string;repository:string;runId:number|string;attempt:number};conclusion:string};
 };
@@ -33,7 +34,7 @@ export type ChoiceReference={type:SearchType;id:string;version:string};
 export type ChoiceVersion={id:string;version:number;localTaskRef:string;visibleRationale:string;candidateRefs:ChoiceReference[];selectedRefs:ChoiceReference[];resultRefs:ResultRef[];hash:string;recordedAt:string};
 export type LocalChoice={id:string;versions:ChoiceVersion[]};
 export type HelpLocal={choices:LocalChoice[];referenceStates:Record<string,{state:string;priorRationaleCurrent?:boolean|null}>};
-export type HelpDetail={capsuleId?:string;versionId?:string;version?:z.infer<typeof capsuleVersionSchema>;sourceStatus?:string;
+export type HelpDetail={capsuleId?:string;versionId?:string;version?:z.infer<typeof capsuleVersionSchema>;sourceStatus?:string;opportunity?:Opportunity;
  experience?:{items:HistoryRecord[];nextCursor:string|null;rebuild:{sourceHash:string}}};
 export type HelpSearchClient={
  query:(search:SearchRequest)=>Promise<SearchPage>;local:()=>Promise<HelpLocal>;
@@ -61,7 +62,7 @@ export type OpportunityClient=Omit<ProjectViewClient,'send'>&{
  resumePending:(operationId:string)=>Promise<ProjectContinuation>;
  reviewPending:(operationId:string)=>Promise<ProjectOperationReview|null>;
 };
-export type TaskContactTask={taskId:string;requesterId:string;request:z.infer<typeof taskRequestV2Schema>;
+export type TaskContactTask={taskId:string;requesterId:string;request:WorkRequest;
  contacts?:{suggestions:{items:Extract<z.infer<typeof taskEventV2Schema>,{kind:'suggest-contacts'}>['items']};responses:{applications:{state:string;subjectId:string}[];invitations:{state:string;recipientId:string}[]}};
  participations?:{subjectId:string;state:string}[]};
 export type ContactCandidate={subjectId:string;displayName?:string;willingness?:string;roles:string[];sources:{item:SearchItem;search:SearchRequest}[];help:string;basis:string;conditions:string};

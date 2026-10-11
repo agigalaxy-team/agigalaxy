@@ -42,3 +42,11 @@
 .privacy-page output{display:block}.privacy-page output.privacy-notice{margin:1em 0}.data-progress output{font-size:14px;color:#7e6890;margin:1em 0}
 
 .account-settings>output,.honor-detail>output,.work-continuity>output{display:block;margin:1em 0;line-height:1.7}
+
+.work-overview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px}.work-overview-grid .continuity-section{min-width:0;margin-top:30px}
+.work-overview-grid .continuity-section>header{align-items:start;gap:15px}.work-continuity .continuity-section>header>a{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px}
+.work-continuity .continuity-empty{font-size:13px;line-height:1.85}.work-continuity .continuity-empty p{margin:0 0 12px}.work-continuity .continuity-empty a{display:inline-flex;align-items:center;gap:6px}
+.work-item-state{display:block;font-size:11px;color:var(--g-muted);margin-top:9px}.continuity-responses{margin-top:34px}.continuity-responses .continuity-list>li>a{padding:17px 0;font-size:14px}
+.personal-work .work-library>nav{display:grid;grid-template-columns:1fr 1fr;gap:0 40px}.personal-work .work-library>nav>a{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:18px 0;border-bottom:1px solid var(--g-line)}
+.work-library strong{font-size:14px;font-weight:550}.work-library small{display:block;font-size:12px;color:var(--g-muted);margin-top:5px;line-height:1.65}
+@media(max-width:650px){.work-overview-grid{display:block}.work-overview-grid .continuity-section{margin-top:27px}.personal-work .work-library>nav{grid-template-columns:1fr;gap:0}.continuity-responses{margin-top:29px}}

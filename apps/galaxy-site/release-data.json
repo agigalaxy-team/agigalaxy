@@ -3,7 +3,7 @@
   "version": "0.1.16",
   "releaseId": "0.1.16",
   "component": "site",
-  "backendRelease": "0.1.9",
+  "backendRelease": "0.1.11",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -36,7 +36,7 @@
     "stableRelease": false
   },
   "completeBusinessAcceptance": false,
-  "publicApiObservedAt": "2026-10-08T18:30:56.106989+00:00",
+  "publicApiObservedAt": "2026-10-11T18:01:11.667701+00:00",
   "nativeClientDownload": {
     "revision": "0.1.9",
     "channel": "development-candidate",
@@ -79,34 +79,37 @@
     "verifiedIdentityProviderCount": 0
   },
   "observedDeployment": {
-    "releaseId": "0.1.9",
-    "reportSha256": "c3539309dad6441ed291d192ae6e350de0a981236a9d35b24d8f7c82ab3d9fdd",
-    "observedAt": "2026-10-08T18:30:56.106989+00:00",
-    "schema": 79,
+    "releaseId": "0.1.11",
+    "observedAt": "2026-10-11T18:01:11.667701+00:00",
+    "schema": 80,
     "checks": {
       "healthz": {
         "status": 200,
-        "release": "0.1.9"
+        "release": "0.1.11"
       },
       "readyz": {
         "status": 200,
-        "release": "0.1.9"
+        "release": "0.1.11"
       },
       ".well-known/galaxy-network.json": {
         "status": 200,
-        "release": "0.1.9"
+        "release": "0.1.11"
       }
-    }
+    },
+    "reportSha256": "74f51cd895d7df36300194604cc20cbc55b9feaf37fc2d6b5ec5d1901f5ac641"
   },
   "targetCompatibility": {
-    "apiRelease": "0.1.9",
-    "serviceArtifactSha256": "6668fbeac56b4aa894940b4d4e219a25f28a6788649ef2808e0f6b5ad9da8b28",
+    "apiRelease": "0.1.11",
+    "serviceArtifactSha256": "9b148ab13fd44f7a062a1433514cf7c4e028ec1f5de6a27fe9b8981cdc13137c",
     "publicationProved": true
   },
   "currentAccountAvailability": {
     "source": "https://agigalaxy.org/app/account",
-    "registrationObserved": null,
-    "publicEmailDeliveryVerified": false
+    "registrationObserved": true,
+    "publicEmailDeliveryVerified": false,
+    "registrationFormObserved": true,
+    "observedAt": "2026-10-11T17:50:11.359929+00:00",
+    "observation": "Public sign-in and registration form inspected with an isolated headless browser; no registration submitted."
   },
   "observedDeploymentHistory": [
     {
@@ -186,6 +189,26 @@
         ".well-known/galaxy-network.json": {
           "status": 200,
           "release": "0.1.8"
+        }
+      }
+    },
+    {
+      "releaseId": "0.1.9",
+      "reportSha256": "c3539309dad6441ed291d192ae6e350de0a981236a9d35b24d8f7c82ab3d9fdd",
+      "observedAt": "2026-10-08T18:30:56.106989+00:00",
+      "schema": 79,
+      "checks": {
+        "healthz": {
+          "status": 200,
+          "release": "0.1.9"
+        },
+        "readyz": {
+          "status": 200,
+          "release": "0.1.9"
+        },
+        ".well-known/galaxy-network.json": {
+          "status": 200,
+          "release": "0.1.9"
         }
       }
     }

@@ -1,13 +1,15 @@
 import type {z} from 'zod/v4';
 import type {taskEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
-import type {WorkRuntime,WorkRequest,WorkTask} from './work-task-types';
+import type {WorkRuntime,WorkSignedRequest,WorkTask} from './work-task-types';
 import type {WorkAttempt,WorkFacts} from './work-fact-types';
 import type {ContactCandidate,SearchRequest,SearchItem,SearchType} from './help-contact-view-types';
 import {object,projectErrorText} from './project-workspace-types';
 import {taskDraft} from './task-bounty-client.mjs';
+import {isDraftTaskText,isDraftMaterials,isDraftMaterialBodies} from './task-material-types';
+import type {TaskText,TaskMaterial,TaskMaterialBody} from './task-material-types';
 
 export type TaskEntryRuntime=WorkRuntime;
-export type TaskPublication=Omit<WorkRequest,'operationId'|'taskId'>;
+export type TaskPublication=Omit<WorkSignedRequest,'operationId'|'taskId'>;
 export type TaskDraftHead={id:string;revision:number};
 export type AttemptRef={id:string;version:number};
 export type HelpOriginSelection={ownerId:string;endpoint:string;taskId:string;caseId:string|null;attemptRefs:AttemptRef[];returnTo:string|null};
@@ -22,11 +24,13 @@ export type PreparationView={ownerId:string;endpoint:string;input:PreparationInp
 export type TaskEntryPreparationClient={check:()=>void;query:(input:PreparationInput)=>Promise<PreparationView>;freeze:(payload:TaskPublication,preparation:PreparationView|null,originReturn:{taskId:string;returnTo:string}|null)=>Promise<string>;attach:(task:WorkTask)=>Promise<{originReturn?:{taskId:string;returnTo:string}}|null>;close:()=>void};
 
 export type PublishDraft=Record<string,unknown>&{
- title:string;summary:string;goal:string;situation:string;visibility:string;intent:string;expectedOutcome:string;
+ title:TaskText;summary:TaskText;goal:TaskText;situation:TaskText;visibility:string;intent:string;expectedOutcome:TaskText;
  collaboration:string;budgetMode:string;amount:string;minimum:string;maximum:string;unit:string;policyKey:string;capabilityId:string;enrollmentLocal:string;
- helpOrigin?:HelpOriginSelection|null;helpPreparation?:unknown;searchKeyword?:string;searchFunctions?:string;
+ materials:TaskMaterial[];materialBodies:TaskMaterialBody[];materialRestore:Record<string,TaskText>;
+ helpOrigin?:HelpOriginSelection|null;helpPreparation?:unknown;searchKeyword?:TaskText;searchFunctions?:string;
 };
-const draftStrings=['title','summary','goal','situation','visibility','intent','expectedOutcome','collaboration','budgetMode','amount','minimum','maximum','unit','policyKey','capabilityId','enrollmentLocal'] as const;
+const draftStrings=['visibility','intent','collaboration','budgetMode','amount','minimum','maximum','unit','policyKey','capabilityId','enrollmentLocal'] as const;
+const draftTexts=['title','summary','goal','situation','expectedOutcome'] as const;
 export function isHelpOriginSelection(value:unknown):value is HelpOriginSelection{
  return object(value)&&typeof value.ownerId==='string'&&typeof value.endpoint==='string'&&typeof value.taskId==='string'
   &&(value.caseId===null||typeof value.caseId==='string')&&(value.returnTo===null||typeof value.returnTo==='string')
@@ -34,9 +38,10 @@ export function isHelpOriginSelection(value:unknown):value is HelpOriginSelectio
 }
 export function readPublishDraft(value:Record<string,unknown>={}):PublishDraft{
  const result:Record<string,unknown>=taskDraft(value);
- function valid(raw:Record<string,unknown>):raw is PublishDraft{return draftStrings.every(key=>typeof raw[key]==='string')
+ function valid(raw:Record<string,unknown>):raw is PublishDraft{return draftStrings.every(key=>typeof raw[key]==='string')&&draftTexts.every(key=>isDraftTaskText(raw[key]))
+  &&isDraftMaterials(raw.materials)&&isDraftMaterialBodies(raw.materialBodies)&&object(raw.materialRestore)&&Object.values(raw.materialRestore).every(isDraftTaskText)
   &&(raw.helpOrigin===undefined||raw.helpOrigin===null||isHelpOriginSelection(raw.helpOrigin))
-  &&(raw.searchKeyword===undefined||typeof raw.searchKeyword==='string')&&(raw.searchFunctions===undefined||typeof raw.searchFunctions==='string');}
+  &&(raw.searchKeyword===undefined||isDraftTaskText(raw.searchKeyword))&&(raw.searchFunctions===undefined||typeof raw.searchFunctions==='string');}
  if(!valid(result))throw Object.assign(Error('本机稿的编辑字段或原工作引用暂时无法核对，原稿仍保留。'),{code:'task_draft_value_invalid'});
  return result;
 }

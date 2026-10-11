@@ -1,4 +1,4 @@
-import {caseEventV2Schema,caseTaskLinkSchema,taskCaseContainerSummary} from '../../galaxy-official/src/shared/cases-schema.mjs';
+import {caseEventV2Schema,caseTaskLinkSchema,taskCaseContainerSummary,taskMaterialCaseContainerTitle} from '../../galaxy-official/src/shared/cases-schema.mjs';
 import {verificationEventSchema,verificationOperationReceiptResultSchema} from '../../galaxy-official/src/shared/verification-record-schema.mjs';
 import {equalJson,sha256Hex,stableJson} from '../../galaxy-official/src/shared/web-primitives.mjs';
 
@@ -375,7 +375,7 @@ export function getFactClient(runtime,subjectId,{now=()=>Math.floor(Date.now()/1
         taskScopeVersion:common.taskScopeVersion,
         ...(participant?{participationId:participant.participationId,participationScopeVersion:participant.scopeVersion}:{}),
         localRef: task.taskId,
-        title: task.request.title,
+        title: task.textView?.format==='task-text-view-v1'?taskMaterialCaseContainerTitle:task.request.title,
         summary: participant ? taskCaseContainerSummary : caseSummary?.trim()?caseSummary:taskCaseContainerSummary,
         source: { kind: 'active-task', reference: task.taskId },
         synthetic,

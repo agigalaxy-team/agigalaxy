@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {createHistoryClient,prepareHistoryQuery} from './history-client.mjs';
 import {HistoryFacts,historyRoleLabel} from './history-facts';
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import {recordErrorField} from './record-workspace-types';
 import type {HistoryClient,HistoryPage,HistoryQuery,HistoryRecord,RecordRuntime} from './record-workspace-types';
 import './profile-settings.css';
@@ -20,7 +21,8 @@ export function HistoryWorkspace(props:Props){
 function HistorySession({runtime,connected,subjectId,targetSubjectId,navigate,form,setForm}:SessionProps){
  const target=targetSubjectId??subjectId??null;
  const client=useMemo<HistoryClient|null>(()=>runtime&&target?createHistoryClient(runtime,{authenticated:connected,subjectId:subjectId??null,targetSubjectId:target}):null,[runtime,connected,subjectId,target]);
- const [page,setPage]=useState<HistoryPage|null>(null),[request,setRequest]=useState<HistoryQuery|null>(null),[selected,setSelected]=useState<string|null>(null),[busy,setBusy]=useState(!!client),[error,setError]=useState('');
+ const [readPage,setPage]=useState<HistoryPage|null>(null),[request,setRequest]=useState<HistoryQuery|null>(null),[selected,setSelected]=useState<string|null>(null),[busy,setBusy]=useState(!!client),[error,setError]=useState('');
+ const page=useCurrentTaskMaterialTree(runtime,readPage);
  const lifecycle=useRef({epoch:0,working:false}),listScroll=useRef(0),heading=useRef<HTMLHeadingElement>(null),savedQuery=useRef<HistoryQuery|null>(null);
  const searchId=useId(),fromId=useId(),beforeId=useId(),own=!!target&&target===subjectId;
  async function requestRead(after:string|null=null,input?:HistoryQuery){
@@ -43,7 +45,7 @@ function HistorySession({runtime,connected,subjectId,targetSubjectId,navigate,fo
  function openRecord(key:string){listScroll.current=window.scrollY;setSelected(key);window.scrollTo({top:0,behavior:'auto'});requestAnimationFrame(()=>heading.current?.focus());}
  function back(){setSelected(null);requestAnimationFrame(()=>window.scrollTo({top:listScroll.current,behavior:'auto'}));}
  if(!target)return <section className="history-empty"><BookOpen size={32}/><h2>经历与贡献</h2><p>从个人资料查看完整经历，或使用自己的身份查看本人记录。</p><Button onClick={()=>navigate('/app/settings/identity')}>查看我的经历</Button></section>;
- if(record)return <section aria-busy={busy}><header className="history-detail-header"><button className="history-back" type="button" onClick={back}><ArrowLeft size={17}/>返回经历</button><h2 ref={heading} tabIndex={-1}>{record.title??'工作经历'}</h2>{record.summary&&<p>{record.summary}</p>}</header><HistoryFacts key={record.key} record={record} navigate={navigate}/></section>;
+ if(record)return <section aria-busy={busy}><header className="history-detail-header"><button className="history-back" type="button" onClick={back}><ArrowLeft size={17}/>返回经历</button><h2 ref={heading} tabIndex={-1}>{record.title??'工作经历'}</h2>{record.summary&&<p>{record.summary}</p>}</header><HistoryFacts key={record.key} runtime={runtime} record={record} navigate={navigate}/></section>;
  return <section aria-busy={busy} className="history-workspace"><header className="history-heading"><div><h2>{own?'我的经历':'工作经历'}</h2><p>做过的事、遇到的问题，以及实际结果。</p></div></header>
   <form className="history-search" onSubmit={event=>{event.preventDefault();void read();}}>
    <label className="history-search-field" htmlFor={searchId}><span className="sr-only">搜索经历</span><Search size={17}/><Input id={searchId} maxLength={200} placeholder="搜索经历中的内容" value={form.query} onChange={event=>setForm(old=>({...old,query:event.target.value}))}/></label>

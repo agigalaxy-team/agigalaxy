@@ -10,6 +10,7 @@ import {cleanupIdentityGroupsWithin} from './identity-group-retention-v2.mjs';
 import {cleanupWatchControlsWithin} from './watch-control-retention-v2.mjs';
 import {cleanupOutcomeMaterialsWithin} from './outcome-material-retention-v2.mjs';
 import {cleanupForumWithin} from './community-forum-retention-v1.mjs';
+import {cleanupTaskMaterialsWithin} from './task-material-retention-v1.mjs';
 
 const day = 86400;
 // Bounded worker maintenance, never a backup or an inference loop. Original
@@ -19,6 +20,7 @@ export async function cleanupProductV2Retention(database, { now = () => Math.flo
   const iso = seconds => new Date(seconds * 1000).toISOString();
   return transaction(database, async db => {
     const removed = {};
+    Object.assign(removed,await cleanupTaskMaterialsWithin(db,at,{endpoint,forumPolicy}));
     Object.assign(removed,await cleanupForumWithin(db,at,{policy:forumPolicy,endpoint}));
     Object.assign(removed,await cleanupWatchControlsWithin(db,at));
     Object.assign(removed,await cleanupIdentityGroupsWithin(db,at));

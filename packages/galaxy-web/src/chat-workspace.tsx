@@ -1,3 +1,4 @@
+import {independentTaskLabel} from './task-material-client.mjs';
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,7 +96,7 @@ function ChatWorkspaceSession({ runtime, roomId, connected, subjectId, navigate,
       const [currentRoom, choices, saved]: [ChatRoom,{decisions:ChatDecision[]},ChatPending|null] = await Promise.all([runtime.api.call(roomPath + '/read', {}), runtime.api.call(roomPath + '/decisions', {}), runtime.chat.pending(roomId)]).catch(reason => { if (current(lease) && ticket === readEpoch.current) { setRoom(null); setMessageReading([]); setLinkedTasks([]); } throw reason; });
       if (!current(lease) || ticket!==readEpoch.current) return;
       setRoom(currentRoom); setDecisions(choices.decisions); setPending(saved);
-      const links = await Promise.all<ChatLinkedTask>((currentRoom.taskRefs ?? []).map(async (id: string) => { try { const task = await runtime.api.call(`/v2/tasks/${id}`, null, { method: 'GET', authenticated: true }); return { id, title: task.request.title, caseId:task.caseId, available: true }; } catch { return { id, available: false }; } }));
+      const links = await Promise.all<ChatLinkedTask>((currentRoom.taskRefs ?? []).map(async (id: string) => { try { const task = await runtime.api.call(`/v2/tasks/${id}`, null, { method: 'GET', authenticated: true }); return { id, title: independentTaskLabel(task), caseId:task.caseId, available: true }; } catch { return { id, available: false }; } }));
       if (!current(lease) || ticket!==readEpoch.current) return;
       setLinkedTasks(links);
       if (!filter && !locatedMessage && runtime.chat.latestHistory) {

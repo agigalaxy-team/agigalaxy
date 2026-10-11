@@ -5,6 +5,8 @@ DO $$ BEGIN
   END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO galaxy_evidence_worker;
+GRANT SELECT,DELETE ON task_materials_v1 TO galaxy_evidence_worker;
+GRANT UPDATE(body_text,erased_at,check_sequence) ON task_materials_v1 TO galaxy_evidence_worker;
 GRANT SELECT ON chat_attachments TO galaxy_evidence_worker;
 GRANT SELECT,UPDATE,DELETE ON outcome_materials_v2 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT ON outcome_material_events_v2 TO galaxy_evidence_worker;

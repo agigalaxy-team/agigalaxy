@@ -1,6 +1,9 @@
 import * as z from 'zod/v4';
 import type {createWebRuntime} from './runtime.mjs';
-import {participationEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
+import {participationEventV2Schema,taskRequestV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
+import {draftMaterialBodySchema} from './task-material-types';
+import type {TaskMaterialBody,TaskMaterialStates} from './task-material-types';
+import {localTaskTextView} from './task-material-client.mjs';
 
 export type OperationRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,
  'api'|'receiptStatus'|'getLocal'|'putLocal'|'updateLocal'|'participationEvent'|'resumeTaskEvent'|'resumePublication'|
@@ -41,6 +44,13 @@ const authorizationPreviewSchema=locatorSchema.extend({state:z.literal('reauthor
  payload:z.unknown(),visibility:z.enum(['Private','Public']),viewers:z.array(z.string()),expiresAt:z.number(),action:z.string(),objectId:z.string()});
 export type OperationAuthorizationPreview=z.infer<typeof authorizationPreviewSchema>;
 export const readAuthorizationPreview=(value:unknown)=>authorizationPreviewSchema.parse(value);
+const publicationMaterialReadSchema=z.object({payloadHash:z.string(),payload:taskRequestV2Schema,
+ materialBodies:z.array(draftMaterialBodySchema).default([]),materialStates:z.record(z.string(),z.object({status:z.string(),availableUntil:z.number().optional(),checkedAt:z.number().optional()})).default({})});
+export type PublicationMaterialRead=z.infer<typeof publicationMaterialReadSchema>;
+export function publicationMaterialIds(payload:unknown){const parsed=taskRequestV2Schema.safeParse(payload);return parsed.success?(parsed.data.materials??[]).map(material=>material.materialId):[];}
+export function readPublicationMaterial(value:unknown,preview:OperationAuthorizationPreview):PublicationMaterialRead|null{
+ const result=publicationMaterialReadSchema.safeParse(value);return result.success&&result.data.payloadHash===preview.payloadHash&&result.data.payload.operationId===preview.eventId&&result.data.payload.taskId===preview.taskId?result.data:null;
+}
 
 export type FeedbackEvent=Extract<z.infer<typeof participationEventV2Schema>,{kind:'requester-feedback'}>;
 export type FeedbackRecord=Pick<FeedbackEvent,'eventId'|'descriptionClarity'|'scopeMatched'|'note'|'supersedes'|'reason'>;
@@ -68,10 +78,10 @@ function fields(value:unknown):Record<string,unknown> {
  if(typeof value!=='object'||value===null||Array.isArray(value))return {};
  return Object.fromEntries(Object.entries(value));
 }
-export function submittedContent(payload:unknown) {
+export function submittedContent(payload:unknown,materialBodies:TaskMaterialBody[]=[],materialStates:TaskMaterialStates={},clock=Math.floor(Date.now()/1000)) {
  const outer=fields(payload),body=fields(outer.event??payload),context=fields(body.workContext);
  const strings=[body.title,body.proposal,body.summary,context.goal,context.currentSituation,body.expectedOutcome,body.agreedScope,body.scope,body.note,body.message,body.reason];
- const texts=strings.filter((value):value is string=>typeof value==='string'&&value.length>0);
+ const texts=strings.map(value=>localTaskTextView(value,materialBodies,materialStates,clock).text).filter((value):value is string=>typeof value==='string'&&value.length>0);
  return {kind:typeof body.kind==='string'?body.kind:'publish-task',texts:[...new Set(texts)],
   enrollmentExpiresAt:typeof body.enrollmentExpiresAt==='number'?body.enrollmentExpiresAt:null,
   expiresAt:typeof body.expiresAt==='number'?body.expiresAt:null};

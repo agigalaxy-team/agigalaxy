@@ -1,6 +1,7 @@
 import {taskRequestV2Schema,taskEnvelopeV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 import {qualificationEvidenceV2Schema} from '../../galaxy-official/src/shared/qualification-v2-schema.mjs';
 import {helpOriginPayload} from './help-origin-client.mjs';
+import {hasMaterialText,isTaskText,localTaskTextView,activeDraftMaterials} from './task-material-client.mjs';
 
 export const budgetText=b=>!b?'未单独报价':b.mode==='quote'?`待报价 · ${b.unit}`:b.mode==='range'?`${b.minimum}—${b.maximum} ${b.unit}`:`${b.amount} ${b.unit}`;
 export const policyKey=p=>`${p.id}@${p.version}`;
@@ -9,8 +10,11 @@ export function taskDraft(value={},now=Math.floor(Date.now()/1000)){
  // Keep unknown legacy/local fields rather than replacing the user's draft.
  return {title:'',summary:'',goal:'',situation:'',visibility:'Public',intent:'collaboration',expectedOutcome:'',
   collaboration:'open-assistance',budgetMode:'fixed',amount:'',minimum:'',maximum:'',unit:'CNY',policyKey:'',capabilityId:'',
-  enrollmentLocal:localDateTime(now+7*86400),...value};
+  enrollmentLocal:localDateTime(now+7*86400),materials:[],materialBodies:[],materialRestore:{},...value};
 }
+const taskField=value=>typeof value==='string'?value.trim():structuredClone(value);
+export const taskFieldPresent=value=>hasMaterialText(value)||(typeof value==='string'?!!value.trim():isTaskText(value)&&value.segments.some(segment=>segment.kind==='literal'&&segment.text.trim()));
+const fieldPresent=taskFieldPresent;
 export function formBudget(d){const unit=d.unit.trim();return d.budgetMode==='quote'?{mode:'quote',unit}:
  d.budgetMode==='range'?{mode:'range',minimum:d.minimum.trim(),maximum:d.maximum.trim(),unit}:{mode:'fixed',amount:d.amount.trim(),unit};}
 export function publicationFromDraft(d,policies,now=Math.floor(Date.now()/1000)){
@@ -19,11 +23,18 @@ export function publicationFromDraft(d,policies,now=Math.floor(Date.now()/1000))
  const paid=d.collaboration==='basic-bounty',policy=policies.find(p=>policyKey(p)===d.policyKey&&p.collaboration==='basic-bounty'&&p.notBefore<=now&&p.notAfter>now);
  if(paid&&!policy)throw Error('请选择服务当前启用的赏金资格规则；目录为空时可以先保留本地草稿。');
  const origin=helpOriginPayload(d.helpOrigin);
- const input={title:d.title.trim(),summary:d.summary.trim(),intent:d.intent,visibility:d.visibility,collaboration:d.collaboration,
-  caseId:origin.caseId,...(origin.parentTaskId?{parentTaskId:origin.parentTaskId}:{}),workContext:{goal:d.goal.trim(),currentSituation:d.situation.trim(),attemptRefs:origin.attemptRefs},enrollmentExpiresAt:expires,
-  ...(d.expectedOutcome.trim()?{expectedOutcome:d.expectedOutcome.trim()}:{}),
+ const goal=fieldPresent(d.goal)?d.goal:d.title,situation=fieldPresent(d.situation)?d.situation:hasMaterialText(d.summary)?d.summary:'未另行提供当前情况。';
+ const active=activeDraftMaterials({...d,goal,situation});
+ const input={title:taskField(d.title),summary:taskField(d.summary),intent:d.intent,visibility:d.visibility,collaboration:d.collaboration,
+  caseId:origin.caseId,...(origin.parentTaskId?{parentTaskId:origin.parentTaskId}:{}),workContext:{goal:taskField(goal),currentSituation:taskField(situation),attemptRefs:origin.attemptRefs},enrollmentExpiresAt:expires,
+  ...(fieldPresent(d.expectedOutcome)?{expectedOutcome:taskField(d.expectedOutcome)}:{}),
+  ...(active.materials.length?{materials:active.materials}:{}),
   ...(paid?{budget:formBudget(d),capabilityId:policy.capabilityId,qualification:{policyId:policy.id,policyVersion:policy.version,profile:'facts-v2'}}:
    d.capabilityId.trim()?{capabilityId:d.capabilityId.trim()}:{})};
+ for(const [label,value,maximum] of [['标题',input.title,120],['说明',input.summary,10000],['目标',input.workContext.goal,10000],['当前情况',input.workContext.currentSituation,10000],...(input.expectedOutcome?[['预期交付',input.expectedOutcome,1500]]:[])]){
+  const projected=localTaskTextView(value,active.materialBodies);
+  if(projected.state!=='available'||!projected.text.trim()||projected.text.length>maximum)throw Error(`${label}的当前可用文字须为1至${maximum}字，请核对选定材料。`);
+ }
  const {operationId:_operationId,taskId:_taskId,...validated}=taskRequestV2Schema.parse({...input,operationId:'00000000-0000-4000-8000-000000000001',taskId:'00000000-0000-4000-8000-000000000002'});
  return validated;
 }

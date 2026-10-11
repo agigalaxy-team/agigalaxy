@@ -1,3 +1,4 @@
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {mergeNotificationItems,notificationRows,markNotificationRowRead} from './notification-merge.mjs';
@@ -32,9 +33,11 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
    const created=crypto.randomUUID(); window.localStorage.setItem(key,created); return created;
   } catch { return crypto.randomUUID(); }
  },[runtime?.api.endpoint,subjectId]);
- const [items,setItems]=useState<Item[]>([]),[next,setNext]=useState<string|null>(null),[options,setOptions]=useState<Options|null>(null);
+ const [readItems,setItems]=useState<Item[]>([]),[next,setNext]=useState<string|null>(null),[options,setOptions]=useState<Options|null>(null);
+ const projectedItems=useCurrentTaskMaterialTree(runtime,readItems),items=useMemo(()=>projectedItems??[],[projectedItems]);
  const [savedPrompt,setPrompt]=useState<Prompt|null>(null);
- const prompt=savedPrompt&&items.some(item=>item.id===savedPrompt.item.id&&!item.read&&!item.quiet)?savedPrompt:null;
+ const currentPrompt=useCurrentTaskMaterialTree(runtime,savedPrompt);
+ const prompt=currentPrompt&&items.some(item=>item.id===currentPrompt.item.id&&!item.read&&!item.quiet)?currentPrompt:null;
  const [settingsOpen,setSettingsOpen]=useState(false),loadedPages=useRef(1);
  const [unread,setUnread]=useState(true),[busy,setBusy]=useState(false),[loading,setLoading]=useState(permitted),[error,setError]=useState(''),[notice,setNotice]=useState(''),[checked,setChecked]=useState<string|null>(null);
  const active=useRef({epoch:0,open:true}),working=useRef(false),presentedIds=useRef(new Set<string>()),titleBase=useRef(document.title.replace(/^\(\d+\)\s*/,''));

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.13.0"
   },
   "scripts": {
     "check:requirements": "node scripts/check-requirements.mjs",
@@ -31,7 +31,8 @@
     "build:web": "vite build --config packages/galaxy-web/vite.config.mjs",
     "build:site": "node scripts/build-product.mjs --site-only",
     "build:demo": "vinext build",
-    "start:demo": "wrangler dev --config dist/server/wrangler.json"
+    "start:demo": "wrangler dev --config dist/server/wrangler.json",
+    "setup": "node scripts/setup-development.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

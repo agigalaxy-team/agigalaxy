@@ -8,7 +8,7 @@ export type HonorEvidence={id?:string;assistanceId?:string;title?:string;summary
   projections?:{projection?:{title?:string;summary?:string}}[];sourceEvents?:{kind:string}[]};
 export type HonorResponse={card:{issuer:string;status:string;rule:{title:string;version:string};sourceFingerprint?:string};items?:HonorEvidence[];contributions?:HonorEvidence[];nextAfter?:string|null;pagination?:{contributions?:{nextAfter?:string|null}};sourceFingerprint?:string};
 export type HonorDetail=HonorResponse&{items:HonorEvidence[];nextAfter:string|null};
-export type WorkItem={taskId:string;request?:{title?:string;summary?:string}};
+export type WorkItem={taskId:string;state?:string;request?:{title?:string;summary?:string}};
 export type HomeNotification={id:string;title:string;object:{type:string;id:string}};
 type HomePage<T>={page?:{items:T[]};error?:string};
-export type HomeContinuity={participating?:HomePage<WorkItem>;notifications?:HomePage<HomeNotification>};
+export type HomeContinuity={requested?:HomePage<WorkItem>;participating?:HomePage<WorkItem>;notifications?:HomePage<HomeNotification>};

@@ -1,3 +1,5 @@
+import {TaskCurrentSourceItem,TaskDerivedTitle} from './task-material-view';
+import {independentMaterialLabel} from './task-material-client.mjs';
 import React, { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -786,7 +788,7 @@ function InformationSession({
         sources: [selection],
       });
     if (valid())
-      setDetail({ selection, page: value, title: item.title ?? '资料内容' });
+      setDetail({ selection, page: value, title: independentMaterialLabel(item,'资料内容') });
   }
   function selectScope(selection: InformationSelection, title: string) {
     if (!connected) {
@@ -1195,10 +1197,10 @@ function InformationSession({
                   void run((valid) => openItem(scope, item, valid))
                 }
               >
-                {item.title ?? '查看资料'}
+                <TaskDerivedTitle runtime={runtime} source={item} fallback="查看资料"/>
               </button>
             </h3>
-            <FactSummary item={item} />
+            <TaskCurrentSourceItem runtime={runtime} item={item}>{current=><FactSummary item={current}/>}</TaskCurrentSourceItem>
             <footer>
               <button
                 className="text-action"
@@ -1217,7 +1219,7 @@ function InformationSession({
                   onClick={() =>
                     selectScope(
                       exactSelection(scope, item),
-                      item.title ?? scopeTitle(scope),
+                      independentMaterialLabel(item,scopeTitle(scope)),
                     )
                   }
                 >
@@ -1663,7 +1665,7 @@ function InformationSession({
                   {!scope.items.length && <p>当前无法读取这份资料。</p>}
                   {scope.items.map((item) => (
                     <article key={item.id}>
-                      <FactSummary item={item} full />
+                      <TaskCurrentSourceItem runtime={runtime} item={item}>{current=><FactSummary item={current} full/>}</TaskCurrentSourceItem>
                       {item.type === 'history' && (
                         <HistoryFacts
                           record={item.record}
@@ -1685,7 +1687,7 @@ function InformationSession({
                         onClick={() =>
                           selectScope(
                             exactSelection(scope, item),
-                            item.title ?? detail.title,
+                            independentMaterialLabel(item,detail.title),
                           )
                         }
                       >

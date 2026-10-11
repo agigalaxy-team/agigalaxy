@@ -88,6 +88,9 @@ export async function prepareProductV2Deletion(db, { subjectId, requestId, at, r
   // external Garage/S3 object.
   await db.query("UPDATE outcome_materials_v2 SET state=CASE WHEN state='erased' THEN state ELSE 'revoked' END,purge_pending=true WHERE purged_at IS NULL AND (subject_id=$1 OR author_id=$1)",[subjectId]);
   const info = { subjectId, requestId, at, retainedUntil };
+  const materialRows=(await db.query("SELECT material_id,text_hash FROM task_materials_v1 WHERE subject_id=$1 AND body_text<>''",[subjectId])).rows;
+  for(const row of materialRows)await recordContentErasure(db,{table:'task_materials_v1',key:row.material_id,subjectId,originalHash:row.text_hash,requestId,at,retainedUntil,reason:'subject-deletion'});
+  await db.query("UPDATE task_materials_v1 SET body_text='',erased_at=COALESCE(erased_at,$2) WHERE subject_id=$1",[subjectId,iso(at)]);
   await prepareForumDeletionWithin(db,info);
   await db.query("UPDATE hub_heads_v2 SET state='suspended' WHERE owner_id=$1",[subjectId]);
   await db.query("UPDATE hub_intake_v2 SET state='closed' WHERE subject_id=$1",[subjectId]);

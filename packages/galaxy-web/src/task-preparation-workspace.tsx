@@ -1,3 +1,4 @@
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
@@ -26,8 +27,9 @@ function CandidateSource({source,subjectId}:{source:PreparationSource;subjectId:
 export function TaskPreparationWorkspace(props:PreparationProps){
  return <PreparationResults key={JSON.stringify(props.value?.input??null)} {...props}/>;
 }
-function PreparationResults({runtime,subjectId,connected,value,selected,busy,disabled=false,error,onChange,onRetry}:PreparationProps){
+function PreparationResults({runtime,subjectId,connected,value:readValue,selected,busy,disabled=false,error,onChange,onRetry}:PreparationProps){
  const [shown,setShown]=useState(8);
+ const value=useCurrentTaskMaterialTree(runtime,readValue);
  const candidates=value?.candidates??[],names=useMemberNames(runtime,subjectId,connected,[...selected,...candidates.map(item=>item.subjectId)]);
  const missing=selected.filter(id=>!candidates.some(candidate=>candidate.subjectId===id));
  const rows=candidates.filter((candidate,index)=>index<shown||selected.includes(candidate.subjectId)),failed=value?.pages.filter(page=>page.error)??[];

@@ -1,4 +1,5 @@
 import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
+import {taskMaterialV1MigrationSql} from './task-material-v1-schema.mjs';
 import { searchIndexMigrationSql } from './search-index-schema-v1.mjs';
 import {identityGroupV2MigrationSql} from './identity-group-v2-schema.mjs';
 import {watchControlV2MigrationSql} from './watch-control-v2-schema.mjs';
@@ -529,7 +530,7 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
   // immutable published 0.1.1/schema76 release and await focused acceptance.
   {version:77,sql:moderationNotificationsV2MigrationSql},
   {version:78,sql:chatRoomGovernanceV2MigrationSql},
-  {version:79,sql:communityForumV1MigrationSql});
+  {version:79,sql:communityForumV1MigrationSql},{version:80,sql:taskMaterialV1MigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

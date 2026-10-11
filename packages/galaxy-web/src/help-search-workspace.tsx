@@ -4,11 +4,16 @@ import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {createHelpSearchClient} from './help-search-client.mjs';
 import {ChoiceSyncWorkspace} from './choice-sync-workspace';
+import {DiscoveryTabs,discoveryTarget} from './discovery-navigation';
+import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
+import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
 import {HistoryFacts} from './history-facts';
+import {useCurrentTaskMaterialTree,TaskCurrentSourceItem,TaskMaterialNotice} from './task-material-view';
 import {useGovernanceDraft} from './governance-presentation';
 import {useChoiceViewLease} from './choice-retained-operations';
 import {carryHelpOrigin,helpOriginLocator} from './help-origin-client.mjs';
 import {searchV2Scope} from '../../galaxy-official/src/shared/search-v2-schema.mjs';
+import {discoveryQueryV2Schema} from '../../galaxy-official/src/shared/discovery-schema-v2.mjs';
 import type {ProjectRuntime} from './project-workspace-types';
 import {contactDraftRuntime} from './help-contact-view-types';
 import {projectErrorText} from './project-workspace-types';
@@ -23,32 +28,43 @@ const labels:Record<string,string>={history:'经历',case:'案例',capsule:'方�
   current:'当前来源一致',changed:'来源已更新，原理由需要复看','unavailable-in-current-query':'当前查询中已不可取得','check-failed':'本次核对失败，状态未确认'};
 const label=(v:string)=>labels[v]??v;
 const candidateKey=(item:Pick<SearchItem,'type'|'ref'>)=>`${item.type}:${item.ref.id}:${item.ref.version}`;
+type ReadingLocator=Pick<SearchRef,'type'|'id'|'version'>;
+function readingLocator():ReadingLocator|null{
+ try{const raw:unknown=JSON.parse(new URLSearchParams(location.search).get('reading')??'null');if(!raw||typeof raw!=='object')return null;const value=raw as Partial<ReadingLocator>;return [...searchTypes,'case'].includes(value.type??'')&&typeof value.id==='string'&&value.id.length<=300&&typeof value.version==='string'&&value.version.length<=512?{type:value.type!,id:value.id,version:value.version}:null;}catch{return null;}
+}
+function rememberReading(value:ReadingLocator|null){const url=new URL(location.href);if(value)url.searchParams.set('reading',JSON.stringify(value));else url.searchParams.delete('reading');history.replaceState(history.state,'',url.pathname+url.search+url.hash);}
 const failure=(e:unknown)=>({history_sources_changed_retry:'来源有变化，请从第一页重新查询。',discovery_sources_changed_retry:'机会已更新，请从第一页重新查询。',search_identity_changed:'身份已变化，请重新打开本页。',choice_version_conflict:'这份选择记录已有新版本，请刷新后编辑。',choice_source_not_read_in_this_client:'先读取当前候选，再保存选择。',comparison_input_changed:'你刚才修改了判断，内容已保留；请确认后再保存。',comparison_source_changed:'参考来源已经变化，请查看当前状态后再决定。',comparison_result_changed:'此前关联的结果版本当前无法读取；原判断仍保留，请核对或明确移除这个引用。'} as Record<string,string>)[projectErrorText(e,'code')||projectErrorText(e)]??'这项操作未完成。请检查当前连接后重试。';
 type FactsItem={record:SearchRecord;type?:SearchType;ref?:SearchItem['ref'];source?:SearchItem['source'];sourceVersion?:string;limitations?:SearchItem['limitations']};
-function Facts({item}:{item:FactsItem}) {
+function Facts({item:record,runtime}:{item:FactsItem;runtime?:ProjectRuntime|null}) {
+  const item=useCurrentTaskMaterialTree(runtime,record);if(!item)return <p>正在核对当前可读来源。</p>;
   const r=item.record;
-  if(r?.kind==='case-history'||r?.kind==='task-history')return <HistoryFacts record={r}/>;
+  if(r?.kind==='case-history'||r?.kind==='task-history')return <HistoryFacts record={r} runtime={runtime??undefined}/>;
   return <div className="fact-details">
     {r.attempts?.map(a=><p key={`${a.id}:${a.version}`}><strong>{a.strategy}</strong> · {label(a.reportedOutcome??a.status??'')}<br/>{a.summary??a.failureReason}<br/><small>{a.environment?`${a.environment.name} ${a.environment.version}`:'环境未提供'} · 版本 {a.version}</small></p>)}
     {r.interventions?.map(v=><p key={`${v.id}:${v.version}`}><strong>{v.types.map(label).join('、')}</strong>：{v.description}<br/>{v.observedEffect}</p>)}
     {r.results?.map(v=><p key={`${v.id}:${v.version}`}><strong>{label(v.reportedOutcome)}</strong>：{v.summary}<br/>适用限制：{v.limitations}</p>)}
-    {r.request&&<p>目标：{r.request.workContext?.goal}<br/>当前情况：{r.request.workContext?.currentSituation}<br/>{r.enrollmentOpen?'当前仍在征集参与者':'当前已不再征集'}；发布任务不表示有人已承接。</p>}
-    {r.help&&<p>可交流的功能：{r.help.functions?.join('、')}<br/>对方当前欢迎接触；尚未发送邀请，也未加入房间。项目内容来自本人声明，相关经历可继续展开。</p>}
+    {r.request&&<><section><h3>想完成的事</h3><p>{r.request.workContext?.goal}</p></section>{r.request.workContext?.currentSituation&&<section><h3>目前的情况</h3><p>{r.request.workContext.currentSituation}</p></section>}<p className="help-read-note">{r.enrollmentOpen?'正在寻找帮助':'已结束征集'}</p></>}
+    {r.help&&<p>交流方向：{r.help.functions?.join('、')}</p>}
     {r.data&&<p>仓库：{r.data.source.owner}/{r.data.source.repository}<br/>运行：{r.data.source.runId}，第 {r.data.source.attempt} 次<br/>观测结论：{r.data.conclusion}。仓库控制的运行，不代表独立专家认证。</p>}
-    {item.type==='capsule'&&<p>{r.newApplicationAllowed?'当前允许尝试应用':'当前不宜开始新的应用'}。阅读不算应用成功，请先查看方法、许可和版本。</p>}
+    {item.type==='capsule'&&!r.newApplicationAllowed&&<p>这份方法当前不宜开始新的应用。</p>}
     {['worker','hub'].includes(item.type??'')&&<p>目录内容来自所有者声明；尚不据此证明远程连接或真实能力。</p>}
     {item.limitations&&item.limitations.length>0&&<section><h4>使用前留意</h4><ul>{item.limitations.map((value,index)=><li key={index}>{typeof value==='string'?value:value.message??value.description??value.reason}</li>)}</ul></section>}
-    <dl className="source-reference"><dt>来源</dt><dd>{item.ref?.id??item.source?.key??'当前所选记录'}</dd><dt>版本</dt><dd>{item.ref?.version??item.sourceVersion??'随当前来源读取'}</dd></dl>
+    <details className="help-source-reference"><summary>来源与版本</summary><dl className="source-reference"><dt>来源</dt><dd>{item.ref?.id??item.source?.key??'当前所选记录'}</dd><dt>版本</dt><dd>{item.ref?.version??item.sourceVersion??'随当前来源读取'}</dd></dl></details>
   </div>;
 }
 
-function SourceDetail({item,client,readReference,navigate,onCurrent,onInclude,included}:{item:SearchItem;client:HelpSearchClient|null;readReference:(item:SearchItem)=>Promise<SearchReference>;navigate:(path:string)=>void;onCurrent:(item:SearchItem)=>void;onInclude:(item:SearchItem)=>void;included:boolean}) {
-  const [detail,setDetail]=useState<HelpDetail|null>(null),[fresh,setFresh]=useState<SearchItem|null>(null),[busy,setBusy]=useState(true),[error,setError]=useState(''),epoch=useRef(0),reading=useRef(false);
+function SourceDetail({item,client,readReference,navigate,onCurrent,onInclude,included,runtime,connected,subjectId,search}:{item:SearchItem;client:HelpSearchClient|null;readReference:(item:SearchItem)=>Promise<SearchReference>;navigate:(path:string)=>void;onCurrent:(item:SearchItem)=>void;onInclude:(item:SearchItem)=>void;included:boolean;runtime:ProjectRuntime|null;connected:boolean;subjectId?:string;search:SearchRequest|null}) {
+  const [readDetail,setDetail]=useState<HelpDetail|null>(null),[readFresh,setFresh]=useState<SearchItem|null>(null),[busy,setBusy]=useState(true),[error,setError]=useState(''),epoch=useRef(0),reading=useRef(false);
+  const detail=useCurrentTaskMaterialTree(runtime,readDetail),fresh=useCurrentTaskMaterialTree(runtime,readFresh);
+  const names=useMemberNames(runtime,subjectId,connected,[detail?.opportunity?.subjectId]);
+  const parsed=search?.type==='opportunity'?discoveryQueryV2Schema.safeParse(search.query):null;
+  const opportunityQuery=parsed?.success?{context:parsed.data.context,purposes:parsed.data.purposes}:null;
+  function hideSource(){setFresh(null);setDetail(null);setError('这份介绍或交流意愿已经变化，请返回结果重新查找。联系草稿仍保留。');}
   function read(after:string|null=null):Promise<void>{
     if(reading.current||!client)return Promise.resolve();const token=epoch.current;reading.current=true;
     return readReference(item).then(async current=>{
       if(token!==epoch.current)return;
-      if(current.state!=='current'||!current.item){setFresh(null);setDetail(null);setError(current.state==='changed'?'来源已经更新。请回到比较中查看当前版本，再决定是否改用。':'这份来源当前无法读取，已收起原内容。');return;}
+      if(current.state!=='current'||!current.item){setFresh(null);setDetail(null);setError(current.state==='changed'?'这份内容已有更新。返回查找后，可以打开当前版本。':'这份来源当前无法读取，已收起原内容。');return;}
       const value:HelpDetail=['capsule','opportunity'].includes(item.type)?await client.detail(current.item,{after}):{};
       if(token!==epoch.current)return;
       if(item.type==='capsule'&&(value.capsuleId!==item.id||value.versionId!==item.source.versionId))throw Error('capsule_version_mismatch');
@@ -59,24 +75,30 @@ function SourceDetail({item,client,readReference,navigate,onCurrent,onInclude,in
   const readCurrent=useEffectEvent(()=>read());
   useEffect(()=>{const currentEpoch=epoch;currentEpoch.current++;void readCurrent();const observe=()=>{if(!document.hidden)void readCurrent();};const timer=window.setInterval(observe,30000);document.addEventListener('visibilitychange',observe);return()=>{currentEpoch.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',observe);};},[item,client]);
   const capsuleTarget=detail?.version&&detail.capsuleId&&detail.versionId?carryHelpOrigin('/app/capsules/'+detail.capsuleId+'/versions/'+detail.versionId,location.pathname+location.search+location.hash):null;
+  const opportunity=detail?.opportunity;
   return <div>
+    {opportunity&&<div className="person-line help-source-person"><MemberAvatar subjectId={opportunity.subjectId}/><span>{memberName(opportunity.subjectId,subjectId,names[opportunity.subjectId]??undefined)}</span></div>}
     <h2 id="help-detail-title">{fresh?.title??'读取参考内容'}</h2>
     {busy&&!fresh&&<output>正在读取当前可见内容…</output>}
     {error&&<p role="alert">{error}<Button type="button" variant="ghost" disabled={busy} onClick={()=>{setBusy(true);setError('');void read();}}>重试</Button></p>}
     {fresh&&<><p className="help-detail-summary">{fresh.summary}</p>
-      {detail?.version&&<div><h3>{detail.version.title} · 版本 {detail.version.version}</h3><p>环境：{detail.version.environment.name} {detail.version.environment.version}</p>
-        <p>{detail.version.solutionStrategy}</p><p>工具：{detail.version.tools.join('、')||'未要求'}；Skill：{detail.version.skills.join('、')||'未要求'}；MCP：{detail.version.mcpRefs.join('、')||'未要求'}</p>
-        <p>适用范围：{detail.version.applicableScope}<br/>验证方法：{detail.version.verificationMethod}<br/>许可：{detail.version.license}</p><ul>{detail.version.limitations.map((v:string)=><li key={v}>{v}</li>)}</ul>
-        <p>本次只读取，没有记录成功复用。开始应用时应在实际工作中留下尝试及结果。</p>
-        {capsuleTarget&&<a href={capsuleTarget} onClick={e=>{e.preventDefault();navigate(capsuleTarget);}}>{helpOriginLocator(location.pathname+location.search+location.hash)?'打开这个版本并带回原工作':'打开这个精确版本'}</a>}
+      {detail?.version&&<article className="help-method-reading"><section><h3>具体做法</h3><p className="reading-prose">{detail.version.solutionStrategy}</p></section><section><h3>适用条件</h3><p className="reading-prose">{detail.version.applicableScope}</p><p className="help-read-note">{detail.version.environment.name} {detail.version.environment.version}</p></section>
+        {!!detail.version.limitations.length&&<section><h3>使用时留意</h3><ul>{detail.version.limitations.map((value:string)=><li key={value}>{value}</li>)}</ul></section>}
+        <section><h3>怎样检查结果</h3><p className="reading-prose">{detail.version.verificationMethod}</p></section>
+        {!!(detail.version.tools.length||detail.version.skills.length||detail.version.mcpRefs.length)&&<section className="help-method-tools"><h3>需要的工具</h3>{detail.version.tools.length>0&&<p>{detail.version.tools.join('、')}</p>}{detail.version.skills.length>0&&<p>Skill：{detail.version.skills.join('、')}</p>}{detail.version.mcpRefs.length>0&&<p>MCP：{detail.version.mcpRefs.join('、')}</p>}</section>}
+        <p className="help-read-note">版本 {detail.version.version} · 许可：{detail.version.license}</p>
+        {capsuleTarget&&<a className="primary-action" href={capsuleTarget} onClick={event=>{event.preventDefault();navigate(capsuleTarget);}}>{helpOriginLocator(location.pathname+location.search+location.hash)?'阅读全文并带回原工作':'阅读全文与使用'} <ArrowRight size={14}/></a>}
+      </article>}
+      {opportunity&&<div className="help-opportunity-reading">{opportunity.project.summary!==fresh.summary&&<p className="reading-prose">{opportunity.project.summary}</p>}<p className="help-read-note">{opportunity.help.functions.join(' · ')}</p>
+       <OpportunityContactWorkspace runtime={runtime} connected={connected} subjectId={subjectId} query={opportunityQuery} opportunity={opportunity} navigate={navigate} onSourceUnavailable={hideSource} onNeedIdentity={()=>navigate('/app/settings/identity')}/>
       </div>}
-      {detail?.experience&&<div><p>以下是对方当前可见的实际经历，是否与本次功能相关仍由你或自己的模型判断；没有经历也可以交流或开放协助。</p>
-        {detail.experience.items.length===0&&<p>这一页没有可见经历。</p>}
-        {detail.experience.items.map(record=><details key={record.key}><summary>{record.title??'授权工作事实'}</summary><Facts item={{record,source:{key:record.key},sourceVersion:detail.experience?.rebuild.sourceHash}}/></details>)}
-        {detail.experience.nextCursor&&<Button type="button" variant="outline" disabled={busy} onClick={()=>{setBusy(true);void read(detail.experience!.nextCursor);}}>下一页经历</Button>}
-      </div>}
-      {!['capsule','opportunity'].includes(item.type)&&<Facts item={fresh}/>}
-      <footer>{fresh.type==='task'&&<Button onClick={()=>navigate('/app/tasks/'+fresh.id)}>查看求助 <ArrowRight size={14}/></Button>}{fresh.type==='opportunity'&&<Button onClick={()=>navigate('/app/match')}>继续交流 <ArrowRight size={14}/></Button>}<Button variant="outline" onClick={()=>onInclude(fresh)}>{included?'移出比较':'加入比较'}</Button></footer>
+      {detail?.experience&&<section className="help-source-experience"><h3>相关经历</h3>
+        {detail.experience.items.length===0&&<p className="help-read-note">对方暂未分享可读的工作经历。</p>}
+        {detail.experience.items.map(record=><details key={record.key}><summary>{record.title??'工作经历'}</summary><Facts runtime={runtime} item={{record,source:{key:record.key},sourceVersion:detail.experience?.rebuild.sourceHash}}/></details>)}
+        {detail.experience.nextCursor&&<Button type="button" variant="outline" disabled={busy} onClick={()=>{setBusy(true);void read(detail.experience!.nextCursor);}}>更多经历</Button>}
+      </section>}
+      {!['capsule','opportunity'].includes(item.type)&&<><TaskMaterialNotice task={fresh.record}/><Facts item={fresh} runtime={runtime}/></>}
+      <footer>{fresh.type==='task'&&<Button onClick={()=>navigate('/app/tasks/'+fresh.id)}>查看求助 <ArrowRight size={14}/></Button>}{fresh.type==='opportunity'&&!opportunity&&<Button onClick={()=>navigate(discoveryTarget('/app/match',fresh.title))}>查找相关同行 <ArrowRight size={14}/></Button>}<Button variant="outline" onClick={()=>onInclude(fresh)}>{included?'移出比较':'加入比较'}</Button></footer>
     </>}
   </div>;
 }
@@ -108,9 +130,11 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
   const draft=useGovernanceDraft(contactDraftRuntime(runtime),subjectId,!!lease,'help-search-input:v1:'+JSON.stringify([runtime?.api.endpoint,subjectId??null,origin?.taskId??null]),initial);
   const input=useMemo(()=>({...initial,...draft.value}),[initial,draft.value]),inputRef=useRef(input),draftRef=useRef(draft);useEffect(()=>{inputRef.current=input;draftRef.current=draft;},[input,draft]);
   const active:ComparisonDraft=input.drafts[input.activeId]??initial.drafts[initial.activeId],activeRef=useRef(active);useEffect(()=>{activeRef.current=active;},[active]);
-  const [sources,setSources]=useState<HelpSource[]>([]),[extraItems,setExtraItems]=useState<SearchItem[]>([]),[referenceStates,setReferenceStates]=useState<Record<string,ReferenceState>>({});
+  const [sources,setSources]=useState<HelpSource[]>([]),[extraItems,setExtraItems]=useState<SearchItem[]>([]),[readReferenceStates,setReferenceStates]=useState<Record<string,ReferenceState>>({});
+  const referenceStates=useCurrentTaskMaterialTree(runtime,readReferenceStates)??{};
   const [busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[local,setLocal]=useState<HelpLocal>({choices:[],referenceStates:{}});
   const [savedLimit,setSavedLimit]=useState(8),[opened,setOpened]=useState<SearchItem|null>(null),[restored,setRestored]=useState(false),detailDialog=useRef<HTMLDialogElement>(null);
+  const [openedSearch,setOpenedSearch]=useState<SearchRequest|null>(null);
   const fieldId=useId();
   const generation=useRef(0),working=useRef(false),background=useRef(false),sourceSerial=useRef(0),booted=useRef(false),positionTimer=useRef<number|undefined>(undefined),positionRestoring=useRef(false),positionRestoreSerial=useRef(0);
   const lookup=useRef<Record<string,SearchRequest>>({});
@@ -123,6 +147,9 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
   function restorePosition(value:HelpInput){positionRestoring.current=true;const y=value.positions[positionKey(value)]??0,token=generation.current,serial=++positionRestoreSerial.current,href=location.href;requestAnimationFrame(()=>requestAnimationFrame(()=>{if(serial!==positionRestoreSerial.current)return;positionRestoring.current=false;if(isCurrent(token)&&location.href===href)window.scrollTo({top:y,behavior:'auto'});}));}
   function goView(view:HelpView,comparing=false){rememberPosition();const next={...inputRef.current,view,comparing};change({view,comparing});route(next);restorePosition(next);}
   function leave(target:string){rememberPosition();navigate(target);}
+  function openSource(item:SearchItem){rememberReading({type:item.type,...item.ref});setOpenedSearch(sourceSearch(item));setOpened(item);}
+  function closeSource(){rememberReading(null);setOpened(null);setOpenedSearch(null);}
+  function sourceSearch(item:SearchItem){return lookup.current[candidateKey(item)]??activeRef.current.refs.find(ref=>refKey(ref)===candidateKey(item))?.search??inputRef.current.searches.find(search=>search.type===item.type)??null;}
   async function run(fn:(valid:()=>boolean)=>Promise<void>){if(working.current||!client)return;const token=generation.current,valid=()=>isCurrent(token);working.current=true;setBusy(true);setError('');setNotice('');
     try{await fn(valid);}catch(e){if(valid())setError(failure(e));}finally{working.current=false;if(valid())setBusy(false);}
   }
@@ -131,7 +158,9 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
   async function readContent(value:HelpInput,valid:()=>boolean) {
     if(!client)return null;const serial=++sourceSerial.current,context=currentContext(value),selected:ComparisonDraft=value.drafts[value.activeId]??activeRef.current,groups=new Map<string,SearchGroup>();
     for(const search of value.searches){const clean=cleanSearch(search),key=JSON.stringify(clean);groups.set(key,{key,search:clean,pages:Math.max(1,value.pageCounts[search.type]??1),base:true,refs:[]});}
-    for(const ref of selected.refs){if(!ref.search)continue;const search=cleanSearch(ref.search),key=JSON.stringify(search),group=groups.get(key)??{key,search,pages:1,base:false,refs:[]};group.refs.push(ref);groups.set(key,group);}
+    const retainedRefs=[...selected.refs],reading=readingLocator();
+    if(reading&&!retainedRefs.some(ref=>ref.type===reading.type&&ref.id===reading.id&&ref.version===reading.version)){const search=value.searches.find(search=>search.type===reading.type);if(search)retainedRefs.push({...reading,search});}
+    for(const ref of retainedRefs){if(!ref.search)continue;const search=cleanSearch(ref.search),key=JSON.stringify(search),group=groups.get(key)??{key,search,pages:1,base:false,refs:[]};group.refs.push(ref);groups.set(key,group);}
     const allowed=()=>valid()&&serial===sourceSerial.current&&context===currentContext(inputRef.current);
     const rows:SearchGroupResult[]=[];const entries=[...groups.values()];
     // Re-run original queries. Source bodies are held only in memory, and old
@@ -189,7 +218,9 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
       if(!value.searches.length&&(patch.query??value.query).trim())patch.searches=requests({...value,...patch});
       if(Object.keys(patch).length){change(patch);value=inputRef.current;}
       if(result.data)setLocal(result.data);
-      if(value.view==='search')await readContent(value,valid);if(!valid())return;setRestored(true);route(value);restorePosition(value);
+      const content=value.view==='search'?await readContent(value,valid):null;if(!valid())return;
+      const reading=readingLocator();if(reading&&content){const item=content.items.find(item=>item.type===reading.type&&item.ref.id===reading.id&&item.ref.version===reading.version);if(item){setOpenedSearch(sourceSearch(item));setOpened(item);}else setNotice('刚才查看的内容暂未读到，可以重新查找当前可用的版本。');}
+      setRestored(true);route(value);restorePosition(value);
     }).catch(reason=>{if(valid())setError(failure(reason));});
   });
   useEffect(()=>{void restoreInput();},[draft.ready,client]);
@@ -238,6 +269,7 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
   const allEmpty=sources.length>0&&sources.every(source=>source.state!=='failed'&&source.page?.sourceState!=='disabled'&&source.page?.items?.length===0&&!source.page?.nextCursor),shownSources=sources.filter(source=>input.sourceFilter==='all'||source.type===input.sourceFilter);
   const unsaved=Object.values(input.drafts).filter(isUnsaved),unavailable=active.refs.some(ref=>referenceStates[refKey(ref)]?.state!=='current');
   return <section className="help-search-page">
+    <DiscoveryTabs path="/app/search" query={input.query} navigate={leave}/>
     <header className="help-page-heading"><div>{originReturn&&<a className="back-link" href={originReturn} onClick={event=>{event.preventDefault();leave(originReturn);}}><ArrowLeft size={14}/>回到原工作</a>}<h1 className="small">找帮助</h1><p>从做过的事、可用的方法和正在发生的交流开始。</p></div><a href={publishTarget} onClick={event=>{event.preventDefault();leave(publishTarget);}}>发起求助 <ArrowRight size={15}/></a></header>
     <nav className="help-view-tabs" aria-label="查找与参考"><button aria-current={input.view==='search'?'page':undefined} onClick={()=>{goView('search');if(!sources.length&&input.searches.length)void run(valid=>readContent(inputRef.current,valid).then(()=>{}));}}><Search size={15}/>查找</button><button aria-current={input.view==='saved'?'page':undefined} onClick={()=>goView('saved')}><Bookmark size={15}/>我的参考{local.choices.length>0&&<span>{local.choices.length}</span>}</button>{input.view==='sync'&&<span aria-current="page">跨设备使用</span>}</nav>
     {error&&<p role="alert" className="message error">{error}</p>}{notice&&<output className="message">{notice}</output>}
@@ -253,7 +285,7 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
       {!allEmpty&&shownSources.map(source=><section key={source.type} className="help-results-group" aria-label={label(source.type)}>
         {source.state==='failed'?<div className="help-source-error"><p>{label(source.type)}暂时无法读取。</p><Button variant="ghost" disabled={busy} onClick={()=>void run(valid=>readContent(inputRef.current,valid).then(()=>{}))}>重试</Button></div>:<>
           {source.page.sourceState==='disabled'?<p className="help-read-note">交流发现已暂停。<a href="/app/match" onClick={event=>{event.preventDefault();leave('/app/match');}}>调整偏好</a></p>:source.page.items.length===0&&input.sourceFilter!=='all'?<p className="help-read-note">这一类暂时没有匹配内容。</p>:null}
-          <div className="help-results">{source.page.items.map(item=><article key={candidateKey(item)}><div className="help-result-type"><span>{label(item.type)}</span>{candidateKeys.includes(candidateKey(item))&&<span><Check size={12}/>已加入比较</span>}</div><h2><button onClick={()=>setOpened(item)}>{item.title}</button></h2><p>{item.summary}</p><footer><button className="text-action" onClick={()=>setOpened(item)}>{item.type==='capsule'?'了解这份方法':item.type==='opportunity'?'了解对方的工作':'查看内容'}<ArrowRight size={13}/></button><button className="text-action" disabled={busy} aria-pressed={candidateKeys.includes(candidateKey(item))} onClick={()=>include(item)}><Layers size={13}/>{candidateKeys.includes(candidateKey(item))?'移出比较':'加入比较'}</button></footer></article>)}</div>
+          <div className="help-results">{source.page.items.map(sourceItem=><TaskCurrentSourceItem key={candidateKey(sourceItem)} runtime={runtime} item={sourceItem}>{item=><article><div className="help-result-type"><span>{label(item.type)}</span>{candidateKeys.includes(candidateKey(item))&&<span><Check size={12}/>已加入比较</span>}</div><h2><button onClick={()=>openSource(item)}>{item.title}</button></h2><p>{item.summary}</p><footer><button className="text-action" onClick={()=>openSource(item)}>{item.type==='capsule'?'了解这份方法':item.type==='opportunity'?'了解对方的工作':'查看内容'}<ArrowRight size={13}/></button><button className="text-action" disabled={busy} aria-pressed={candidateKeys.includes(candidateKey(item))} onClick={()=>include(item)}><Layers size={13}/>{candidateKeys.includes(candidateKey(item))?'移出比较':'加入比较'}</button></footer></article>}</TaskCurrentSourceItem>)}</div>
           {source.page.nextCursor&&<button className="load-more" disabled={busy} onClick={()=>void run(valid=>more(source.type,valid))}>更多{label(source.type)}</button>}
         </>}
       </section>)}
@@ -265,7 +297,7 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
       <div className="help-comparison-list">{active.refs.map(ref=>{const key=refKey(ref),state=referenceStates[key],item=state?.item,current=state?.state==='current';return <article key={key}>
         <label><input type="checkbox" disabled={!current||busy} checked={selected.includes(key)} onChange={event=>changeActive({selected:event.target.checked?[...active.selected,key]:active.selected.filter(value=>value!==key)})}/><span><small>{label(ref.type)}{state&&!current?' · '+label(state.state):''}</small><strong>{item?.title??'此前加入的'+label(ref.type)}</strong>{current&&item?<p>{item.summary}</p>:<p>{state?.state==='changed'?'来源有新版本，原来的选择与理由仍保留。':state?.state==='unavailable-in-current-query'?'当前查询已无法取得这份内容。你可以保留判断草稿，或明确移除此引用。':state?.state==='check-failed'?'本次未能核对来源，正文暂时收起。':'正在读取当前来源…'}</p>}</span></label>
         <button className="icon-button" disabled={busy} aria-label={'移出比较：'+(item?.title??label(ref.type))} onClick={()=>removeReference(ref)}><X size={16}/></button>
-        {item&&<button className="text-action" disabled={busy} onClick={()=>setOpened(item)}>{current?'查看内容':'查看当前版本'}</button>}{state?.state==='changed'&&item&&<button className="text-action" disabled={busy} onClick={()=>selectCurrent(ref,item)}>改用当前版本</button>}{state?.state==='check-failed'&&<button className="text-action" disabled={busy} onClick={()=>void run(valid=>readContent(inputRef.current,valid).then(()=>{}))}>重新读取</button>}
+        {item&&<button className="text-action" disabled={busy} onClick={()=>openSource(item)}>{current?'查看内容':'查看当前版本'}</button>}{state?.state==='changed'&&item&&<button className="text-action" disabled={busy} onClick={()=>selectCurrent(ref,item)}>改用当前版本</button>}{state?.state==='check-failed'&&<button className="text-action" disabled={busy} onClick={()=>void run(valid=>readContent(inputRef.current,valid).then(()=>{}))}>重新读取</button>}
       </article>;})}</div>
       {!active.refs.length&&<p className="help-read-note">还没有加入参考。返回查找后可以继续选择，下面的文字会保留。</p>}
       <form className="workspace-form" onSubmit={event=>{event.preventDefault();void run(saveComparison);}}>
@@ -286,6 +318,6 @@ function HelpSearchSession({runtime,connected,subjectId,navigate,lease}:Props&{l
     </section>}
     {input.view==='sync'&&<section className="help-sync"><button className="back-link" onClick={()=>goView('saved')}><ArrowLeft size={15}/>返回我的参考</button><ChoiceSyncWorkspace runtime={runtime} subjectId={subjectId} connected={connected} localChoices={local.choices}/></section>}
     </>}
-    <dialog ref={detailDialog} className="help-detail-dialog conversation-panel" aria-labelledby="help-detail-title" onClose={()=>setOpened(null)}><header><span>{opened?label(opened.type):''}</span><button className="icon-button" aria-label="关闭内容" onClick={()=>setOpened(null)}><X size={20}/></button></header>{opened&&<div className="help-detail-body"><SourceDetail key={candidateKey(opened)} item={opened} client={client} readReference={readReference} onCurrent={item=>setReferenceStates(old=>({...old,[candidateKey(item)]:{state:'current',item}}))} navigate={target=>{setOpened(null);leave(target);}} included={candidateKeys.includes(candidateKey(opened))} onInclude={include}/></div>}</dialog>
+    <dialog ref={detailDialog} className="help-detail-dialog conversation-panel" aria-labelledby="help-detail-title" onClose={closeSource}><header><span>{opened?label(opened.type):''}</span><button className="icon-button" aria-label="关闭内容" onClick={closeSource}><X size={20}/></button></header>{opened&&<div className="help-detail-body"><SourceDetail key={candidateKey(opened)} item={opened} client={client} readReference={readReference} onCurrent={item=>setReferenceStates(old=>({...old,[candidateKey(item)]:{state:'current',item}}))} runtime={runtime} connected={connected} subjectId={subjectId} search={openedSearch} navigate={leave} included={candidateKeys.includes(candidateKey(opened))} onInclude={include}/></div>}</dialog>
   </section>;
 }

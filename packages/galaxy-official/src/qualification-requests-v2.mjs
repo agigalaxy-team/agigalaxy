@@ -325,8 +325,10 @@ export class QualificationRequestServiceV2 {
     let target = null;
     try {
       const t = await this.tasks.requireTaskWithin(db, actor, row.task_id);
+      const current=await this.tasks.readTaskWithin(db,actor,row.task_id);
       target = {
-        title: t.snapshot.request.title,
+        title: current.request.title,
+        ...(current.textView?{textView:{title:current.textView.fields.title}}:{}),
         capabilityId: t.snapshot.request.capabilityId,
         qualification: t.snapshot.request.qualification,
       };

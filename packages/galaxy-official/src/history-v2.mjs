@@ -47,6 +47,7 @@ export class HistoryV2Service {
     return {
       kind: 'task-history', key: `task:${taskId}`, taskId, taskIds: [taskId], caseId: task.caseId,
       title: task.request.title, summary: task.request.summary, subjectId, requesterId: task.requesterId,
+      ...(task.textView?{textView:{format:task.textView.format,checkedAt:task.textView.checkedAt,fields:{title:task.textView.fields.title,summary:task.textView.fields.summary}}}:{}),
       subjectRoles: [...(!subjectId || task.requesterId === subjectId ? ['requester'] : []), ...new Set(participations.filter(p => !subjectId || p.subjectId === subjectId).map(p => p.role))],
       capabilityIds: task.request.capabilityId ? [task.request.capabilityId] : [],
       participation: participations, publication: { eventId: root.id, reportedBy: root.subject_id, recordedAt: timestamp(root.created_at) },

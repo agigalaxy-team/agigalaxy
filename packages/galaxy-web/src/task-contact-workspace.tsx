@@ -1,3 +1,4 @@
+import {TaskCurrentSourceItem} from './task-material-view';
 import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -316,10 +317,10 @@ function TaskContactSession({
         <div className="contact-candidate-list">{candidates.map(candidate=><article className="contact-candidate" key={candidate.subjectId}>
           <label className="contact-choice"><input type="checkbox" checked={selected.includes(candidate.subjectId)} onChange={()=>setSelected(toggled(selected,candidate.subjectId))}/><MemberAvatar subjectId={candidate.subjectId}/><span><strong>{name(candidate.subjectId)}</strong><small>{candidate.willingness??'是否愿意参加这次工作，需要本人回应。'}</small></span></label>
           {(task.contacts?.responses.applications??[]).some(item=>item.subjectId===candidate.subjectId)&&<p className="record-meta">已经申请参与这次求助，可以在参与申请中查看。</p>}
-          <div className="contact-source-list">{candidate.sources.map(source=><section key={source.item.type+source.item.id}>
-            <h4>{source.item.title}</h4><p className="reading-prose">{source.item.summary}</p>
-            <details className="technical-details"><summary>查看原始记录与版本</summary><p>来源中的角色：{candidate.roles.map((role:string)=>(roleLabels[role]??role)).join('、')}</p><p>{source.item.ref.id} · 第 {source.item.ref.version} 版</p><pre className="code-block">{JSON.stringify(source.item.record,null,2)}</pre></details>
-          </section>)}</div>
+          <div className="contact-source-list">{candidate.sources.map(source=><TaskCurrentSourceItem key={source.item.type+source.item.id} runtime={runtime} item={source.item}>{item=><section>
+            <h4>{item.title}</h4><p className="reading-prose">{item.summary}</p>
+            <details className="technical-details"><summary>查看原始记录与版本</summary><p>来源中的角色：{candidate.roles.map((role:string)=>(roleLabels[role]??role)).join('、')}</p><p>{source.item.ref.id} · 第 {source.item.ref.version} 版</p><pre className="code-block">{JSON.stringify(item.record,null,2)}</pre></details>
+          </section>}</TaskCurrentSourceItem>)}</div>
           {selected.includes(candidate.subjectId)&&<div className="workspace-form contact-note-editor">
             <label htmlFor={fieldId+'-help-'+candidate.subjectId}>想请对方帮什么<Textarea id={fieldId+'-help-'+candidate.subjectId} maxLength={1500} value={candidate.help} onChange={event=>update(candidate.subjectId,'help',event.target.value)}/></label>
             <label htmlFor={fieldId+'-basis-'+candidate.subjectId}>为什么选择这个人<Textarea id={fieldId+'-basis-'+candidate.subjectId} maxLength={1500} value={candidate.basis} onChange={event=>update(candidate.subjectId,'basis',event.target.value)}/></label>

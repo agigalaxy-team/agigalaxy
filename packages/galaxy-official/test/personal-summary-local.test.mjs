@@ -136,7 +136,8 @@ for(const method of ['pull','reconcile'])test(`${method} withholds a cloud body 
  const subjectId='GUID'+'A'.repeat(28),base=storeFixture(),endpoint='https://galaxy.example.org',roomId=randomUUID(),summaryId=randomUUID();let hold=false,release,entered;
  const gate=new Promise(resolve=>{entered=resolve;}),store={read:base.read,update:async(k,fn)=>{const result=await base.update(k,fn);if(hold){hold=false;entered();await new Promise(resolve=>{release=resolve;});}return result;}};
  const content={generator:{kind:'manual'},coverage:{fromSequence:'0',throughSequence:'0',complete:true},fragments:[{id:randomUUID(),kind:'personal-note',text:'cloud body under original binding',sourceRefs:[]}],keyMessageRefs:[]};
- const remote={summaryId,roomId,revision:1,conflicts:[],current:{content,updatedAt:new Date().toISOString()}},connection={subjectId,endpoint,bindingId:'original-binding',generation:1,
+ const remote={summaryId,roomId,revision:1,audience:'owner-only',sharedToRoom:false,conflicts:[],
+  current:{summaryId,roomId,versionId:randomUUID(),revision:1,state:'current',content,updatedAt:new Date().toISOString()}},connection={subjectId,endpoint,bindingId:'original-binding',generation:1,
   client:{get:async()=>remote,receipt:async input=>({state:'committed',operationVersionId:input.versionId,operation:{summaryId,versionId:input.versionId,revision:1,state:'current'},summary:remote})}};
  const local=createPersonalSummaryLocal({subjectId,store,getConnection:()=>connection});await local.choose({enabled:true,endpoint},{confirmed:true});await local.save({summaryId,roomId,endpoint,content});
  const original=await base.update('personal-summary:'+subjectId,s=>{s.queue[0].state='unknown';return s;});hold=true;

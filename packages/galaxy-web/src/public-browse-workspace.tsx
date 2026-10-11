@@ -1,6 +1,9 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowRight,ArrowUpRight,BookOpen,Compass,Layers,Search} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,BookOpen,Layers,MessagesSquare,Search,UsersRound} from 'lucide-react';
 import type {createWebRuntime} from './runtime.mjs';
+import {discoveryTarget} from './discovery-navigation';
+import {TaskCurrentCard,TaskMaterialNotice,taskViewTitle} from './task-material-view';
+import './discovery-home.css';
 
 type Props={runtime:Awaited<ReturnType<typeof createWebRuntime>>|null;navigate:(path:string)=>void};
 type Kind='tasks'|'capsules'|'projects';
@@ -9,20 +12,23 @@ type CapsuleBrowseItem={capsuleId:string;versionId:string;sourceVersion:number;t
 type ProjectBrowseItem={projectId:string;document:{title:string;summary:string;kind:string;functions:string[]};synthetic?:boolean};
 export type BrowsePage<T>={items:T[];nextAfter:string|null};
 type ContentEntry={kind:'tasks';item:TaskBrowseItem}|{kind:'capsules';item:CapsuleBrowseItem}|{kind:'projects';item:ProjectBrowseItem};
-const directories={tasks:{title:'开放任务',subtitle:'看看哪些真实目标正在寻找协助。',path:'/app/participate',endpoint:'/v2/tasks/query'},capsules:{title:'可复用的方法',subtitle:'阅读做法、适用环境和实际来源。',path:'/app/capsules',endpoint:'/v2/capsules/query'},projects:{title:'项目与模块',subtitle:'了解当前愿意交流与协作的项目。',path:'/app/projects',endpoint:'/v2/projects/directory/query'}};
+const directories={tasks:{title:'正在找帮助',subtitle:'看看有哪些你能参与的事。',path:'/app/participate',endpoint:'/v2/tasks/query'},capsules:{title:'方法与经验',subtitle:'读一份做法，带回自己的工作。',path:'/app/capsules',endpoint:'/v2/capsules/query'},projects:{title:'项目与模块',subtitle:'了解大家正在做什么。',path:'/app/projects',endpoint:'/v2/projects/directory/query'}};
 const labels:Record<string,string>={open:'正在征集',closed:'已结束',canceled:'已取消',current:'来源当前可用','source-unavailable':'来源目前不可用','source-result-superseded':'来源已有纠正版本','source-currentness-unavailable':'来源结果的当前支持状态未知'};
 export function browseReturnPath(fallback:string){
  const value=history.state?.browseReturn;if(typeof value!=='string')return fallback;
- try{const url=new URL(value,location.origin);return url.origin===location.origin&&['/app/','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information'].includes(url.pathname)?url.pathname+url.search+url.hash:fallback;}catch{return fallback;}
+ try{const url=new URL(value,location.origin);return url.origin===location.origin&&['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information'].includes(url.pathname)?url.pathname+url.search+url.hash:fallback;}catch{return fallback;}
 }
-export function browseReturnLabel(fallback:string){const path=new URL(browseReturnPath(fallback),location.origin).pathname;return ({'/app/':'发现','/app/participate':'求助目录','/app/capsules':'方法目录','/app/projects':'项目目录','/app/community':'社区','/app/rooms':'对话列表','/app/notifications':'通知','/app/information':'资料与关注'} as Record<string,string>)[path]??'上一页';}
+export function browseReturnLabel(fallback:string){const url=new URL(browseReturnPath(fallback),location.origin),path=url.pathname;if(path==='/app/participate'&&url.searchParams.get('view')==='requested')return '我发布的求助';if(path==='/app/participate'&&url.searchParams.get('view')==='participating')return '我参与的工作';return ({'/app/':'发现','/app/work':'我的工作','/app/search':'查找结果','/app/match':'寻找同行','/app/history':'经历与贡献','/app/participate':'求助目录','/app/capsules':'方法目录','/app/projects':'项目目录','/app/community':'社区','/app/rooms':'对话列表','/app/notifications':'通知','/app/information':'资料与关注'} as Record<string,string>)[path]??'上一页';}
 function contentKey(entry:ContentEntry){return entry.kind==='tasks'?entry.item.taskId:entry.kind==='capsules'?entry.item.capsuleId:entry.item.projectId;}
-export function ContentCard(props:ContentEntry&{navigate:(path:string)=>void}){
+export function ContentCard(props:ContentEntry&{navigate:(path:string)=>void;runtime?:Props['runtime']}){
+ return props.kind==='tasks'?<TaskCurrentCard runtime={props.runtime} task={props.item}>{item=><ReadableContentCard {...props} item={item}/>}</TaskCurrentCard>:<ReadableContentCard {...props}/>;
+}
+function ReadableContentCard(props:ContentEntry&{navigate:(path:string)=>void}){
  const {navigate}=props;
- const data=props.kind==='tasks'?{title:props.item.request.title,description:props.item.request.summary,url:`/app/tasks/${props.item.taskId}`,meta:labels[props.item.state]??props.item.state}
+ const data=props.kind==='tasks'?{title:taskViewTitle(props.item),description:props.item.request.summary,url:`/app/tasks/${props.item.taskId}`,meta:labels[props.item.state]??props.item.state}
   :props.kind==='capsules'?{title:props.item.title,description:props.item.problemPattern,url:`/app/capsules/${props.item.capsuleId}/versions/${props.item.versionId}`,meta:'Capsule · v'+props.item.sourceVersion}
   :{title:props.item.document.title,description:props.item.document.summary,url:`/app/projects/${props.item.projectId}`,meta:props.item.document.kind==='module'?'功能模块':'项目'};
- return <article className="content-card"><div className="content-card-meta"><span>{data.meta}</span>{props.item.synthetic&&<span>合成演示</span>}</div><h3><a href={data.url} onClick={e=>{e.preventDefault();navigate(data.url);}}>{data.title}<ArrowUpRight size={16}/></a></h3><p>{data.description}</p>{props.kind==='capsules'&&<span className="content-card-foot">{labels[props.item.sourceStatus]??props.item.sourceStatus}{props.item.deprecated?' · 已停用':''}{props.item.securityIssue?' · 有安全事项':''}</span>}{props.kind==='projects'&&<div className="content-tags">{props.item.document.functions.slice(0,3).map(f=><span key={f}>{f}</span>)}</div>}<a className="content-read" href={data.url} onClick={e=>{e.preventDefault();navigate(data.url);}}>阅读详情 <ArrowRight size={14}/></a></article>;
+ return <article className="content-card"><div className="content-card-meta"><span>{data.meta}</span>{props.item.synthetic&&<span>合成演示</span>}</div><h3><a href={data.url} onClick={e=>{e.preventDefault();navigate(data.url);}}>{data.title}<ArrowUpRight size={16}/></a></h3><p>{data.description}</p>{props.kind==='tasks'&&<TaskMaterialNotice task={props.item}/>}{props.kind==='capsules'&&<span className="content-card-foot">{labels[props.item.sourceStatus]??props.item.sourceStatus}{props.item.deprecated?' · 已停用':''}{props.item.securityIssue?' · 有安全事项':''}</span>}{props.kind==='projects'&&<div className="content-tags">{props.item.document.functions.slice(0,3).map(f=><span key={f}>{f}</span>)}</div>}<a className="content-read" href={data.url} onClick={e=>{e.preventDefault();navigate(data.url);}}>阅读详情 <ArrowRight size={14}/></a></article>;
 }
 function BrowseSection({runtime,navigate,kind}:Props&{kind:Kind}){
  const [attempt,setAttempt]=useState(0);
@@ -34,12 +40,50 @@ async function readHighlights(runtime:NonNullable<Props['runtime']>,kind:Kind):P
  if(kind==='capsules'){const page:BrowsePage<CapsuleBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};}
  const page:BrowsePage<ProjectBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};
 }
+function BrowseHighlight(props:ContentEntry&{navigate:(path:string)=>void;runtime:Props['runtime']}){
+ return props.kind==='tasks'?<TaskCurrentCard runtime={props.runtime} task={props.item}>{item=><ReadableBrowseHighlight {...props} item={item}/>}</TaskCurrentCard>:<ReadableBrowseHighlight {...props}/>;
+}
+function ReadableBrowseHighlight(props:ContentEntry&{navigate:(path:string)=>void}){
+ const {navigate}=props;
+ const title=props.kind==='tasks'?taskViewTitle(props.item):props.kind==='capsules'?props.item.title:props.item.document.title;
+ const summary=props.kind==='tasks'?props.item.request.summary:props.kind==='capsules'?props.item.problemPattern:props.item.document.summary;
+ const target=props.kind==='tasks'?'/app/tasks/'+props.item.taskId:props.kind==='capsules'?'/app/capsules/'+props.item.capsuleId+'/versions/'+props.item.versionId:'/app/projects/'+props.item.projectId;
+ return <article className={'browse-highlight browse-highlight-'+props.kind}>
+  {props.kind==='capsules'&&<BookOpen className="method-bookmark" size={21} aria-hidden="true"/>}
+  <div>{props.kind==='tasks'&&<p className="browse-highlight-meta">{labels[props.item.state]??props.item.state}</p>}<h3><a href={target} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(target);}}}>{title}<ArrowUpRight size={15}/></a></h3><p className="browse-highlight-summary">{summary}</p>{props.kind==='tasks'&&<TaskMaterialNotice task={props.item}/>}
+   {props.kind==='projects'&&!!props.item.document.functions.length&&<p className="browse-highlight-meta">{props.item.document.functions.slice(0,3).join(' · ')}</p>}
+   {props.kind==='capsules'&&(props.item.sourceStatus!=='current'||props.item.deprecated||props.item.securityIssue)&&<p className="browse-highlight-meta">{props.item.deprecated?'已停用':props.item.securityIssue?'有安全事项':labels[props.item.sourceStatus]??props.item.sourceStatus}</p>}
+   {props.item.synthetic&&<span className="browse-highlight-meta">合成演示</span>}
+  </div>
+ </article>;
+}
 function BrowseSectionRead({runtime,navigate,kind,retry}:Props&{kind:Kind;retry:()=>void}){
  const d=directories[kind],[items,setItems]=useState<ContentEntry[]>([]),[state,setState]=useState('loading'),[hasMore,setHasMore]=useState(false);
  useEffect(()=>{let current=true;if(runtime)void readHighlights(runtime,kind).then(value=>{if(current){setItems(value.items);setHasMore(!!value.nextAfter);setState('ready');}}).catch(()=>{if(current)setState('error');});return()=>{current=false;};},[runtime,kind]);
- return <section className="browse-section" aria-labelledby={'browse-'+kind}><header><div><h2 id={'browse-'+kind}>{d.title}</h2><p>{d.subtitle}</p></div><a href={d.path} onClick={e=>{e.preventDefault();navigate(d.path);}}>全部浏览 <ArrowRight size={15}/></a></header>{state==='loading'?<div className="browse-loading"><output>正在读取公开内容…</output></div>:state==='error'?<div className="browse-empty"><p><output>暂时无法读取{d.title}。</output></p><button onClick={retry}>重新读取</button></div>:items.length?<div className="content-grid">{items.map(entry=><ContentCard key={contentKey(entry)} {...entry} navigate={navigate}/>)}</div>:<div className="browse-empty"><BookOpen size={23}/><div><h3>{hasMore?'这一范围暂未发现可浏览内容。':<>这里还没有可浏览的{kind==='tasks'?'开放任务':kind==='capsules'?'公开方法':'公开项目'}。</>}</h3><p>{kind==='tasks'?'你可以发起自己的目标，也可以先了解协作如何进行。':kind==='capsules'?'方法在作者整理并公开后出现。现在可以先了解它如何保留做法与来源。':'当前目录只展示资料和参与意愿都允许被发现的项目。'}</p></div><a href={kind==='tasks'?'/app/publish':'/how-it-works/'} onClick={kind==='tasks'?e=>{e.preventDefault();navigate('/app/publish');}:undefined}>{kind==='tasks'?'发起请求':'了解如何协作'} <ArrowRight size={14}/></a></div>}</section>;
+ const emptyText=kind==='tasks'?'当前还没有公开的求助。':kind==='capsules'?'当前还没有公开的方法。':'当前还没有可浏览的公开项目。';
+ return <section className={'browse-section browse-section-'+kind} aria-labelledby={'browse-'+kind}><header><div><h2 id={'browse-'+kind}>{d.title}</h2><p>{d.subtitle}</p></div><a href={d.path} onClick={event=>{event.preventDefault();navigate(d.path);}}>查看全部 <ArrowRight size={15}/></a></header>
+  {state==='loading'?<div className="browse-loading"><output>正在读取公开内容…</output></div>:state==='error'?<div className="browse-empty"><p>暂时无法读取这部分内容。</p><button onClick={retry}>重新读取</button></div>:items.length?<div className={'browse-highlights browse-highlights-'+kind}>{items.map(entry=><BrowseHighlight key={contentKey(entry)} {...entry} navigate={navigate} runtime={runtime}/>)}</div>:<div className="browse-empty"><p>{hasMore?'这一范围暂未发现可浏览内容。':emptyText}</p>{kind==='tasks'?<a href="/app/publish" onClick={event=>{event.preventDefault();navigate('/app/publish');}}>发起自己的求助 <ArrowRight size={14}/></a>:<a href={kind==='projects'?'/app/match':'/app/search'} onClick={event=>{event.preventDefault();navigate(kind==='projects'?'/app/match':'/app/search');}}>{kind==='projects'?'按方向寻找同行':'查找其他经验'} <ArrowRight size={14}/></a>}</div>}
+ </section>;
 }
-export function PublicBrowseWorkspace({runtime,navigate}:Props){return <section className="explore-page"><header className="explore-intro"><p className="eyebrow">从真实工作中，找到下一步</p><h1>探索银河</h1><p>浏览正在推进的目标、可借鉴的方法，以及愿意交流的项目。</p><div className="explore-actions"><a className="primary-action" href="/app/search" onClick={e=>{e.preventDefault();navigate('/app/search');}}><Search size={16}/>找具体帮助</a><a href="/app/publish" onClick={e=>{e.preventDefault();navigate('/app/publish');}}>发起自己的请求 <ArrowUpRight size={15}/></a></div></header><nav className="explore-index" aria-label="浏览内容类别">{([['tasks','开放任务','参与真实协作',Compass],['capsules','方法与经验','了解可复用做法',BookOpen],['projects','项目与模块','发现共同方向',Layers]] as const).map(([id,title,desc,Icon])=><a key={id} href={'#browse-'+id}><Icon size={22}/><div><strong>{title}</strong><span>{desc}</span></div><ArrowRight size={16}/></a>)}</nav><BrowseSection {...{runtime,navigate}} kind="tasks"/><BrowseSection {...{runtime,navigate}} kind="capsules"/><BrowseSection {...{runtime,navigate}} kind="projects"/><section className="reading-guides"><div><p className="eyebrow">先读一点，再决定下一步</p><h2>每一份帮助，都有来处。</h2><p>你可以直接使用网页，也可以连接正在使用的 AI。选择何时参与、分享多少资料，始终由你决定。</p></div><nav><a href="/how-it-works/"><span>01</span><div><h3>一次协作如何开始</h3><p>从目标、回应到实际交付。</p></div><ArrowUpRight size={18}/></a><a href="/privacy/"><span>02</span><div><h3>分享之前，了解你的控制权</h3><p>身份、授权和数据范围。</p></div><ArrowUpRight size={18}/></a><a href="/downloads/"><span>03</span><div><h3>把银河连接到自己的 AI</h3><p>在熟悉的工作中继续。</p></div><ArrowUpRight size={18}/></a></nav></section></section>;}
+export function PublicBrowseWorkspace({runtime,navigate}:Props){
+ const [query,setQuery]=useState(()=>{try{return sessionStorage.getItem('galaxy-discovery-query')??'';}catch{return '';}});
+ const requestedQuery=new URLSearchParams(location.search).get('q');
+ useEffect(()=>{if(requestedQuery?.trim())navigate(discoveryTarget('/app/search',requestedQuery));},[requestedQuery,navigate]);
+ const go=(event:React.MouseEvent<HTMLAnchorElement>,target:string)=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(target);}};
+ if(requestedQuery?.trim())return <output className="reading-status">正在打开这次查找…</output>;
+ const peopleTarget=discoveryTarget('/app/match',query);
+ return <section className="explore-page">
+  <header className="explore-intro"><p className="eyebrow">从感兴趣的事开始</p><h1>发现内容，也发现同行。</h1><p>找一份可借鉴的经验，认识同路的人，或继续一件具体的事。</p>
+   <search><form className="explore-search" onSubmit={event=>{event.preventDefault();navigate(discoveryTarget('/app/search',query));}}><label className="sr-only" htmlFor="explore-query">查找银河内容</label><Search size={20}/><input id="explore-query" type="search" maxLength={200} placeholder="搜索目标、做法或感兴趣的方向" value={query} onChange={event=>{setQuery(event.target.value);try{sessionStorage.setItem('galaxy-discovery-query',event.target.value);}catch{/* Typing remains available without browser storage. */}}}/><button type="submit">查找内容 <ArrowRight size={16}/></button></form></search>
+   <div className="explore-next"><span>想从人开始？</span><a href={peopleTarget} onClick={event=>go(event,peopleTarget)}>寻找同行与项目 <ArrowRight size={14}/></a></div>
+  </header>
+  <nav className="explore-places" aria-label="浏览内容类别">{([['/app/community','社区讨论',MessagesSquare],['/app/capsules','方法与经验',BookOpen],['/app/participate','正在找帮助',UsersRound],['/app/projects','项目与模块',Layers]] as const).map(([target,title,Icon])=><a key={target} href={target} onClick={event=>go(event,target)}><Icon size={19}/>{title}<ArrowUpRight size={14}/></a>)}</nav>
+  <div className="explore-content"><BrowseSection {...{runtime,navigate}} kind="tasks"/><BrowseSection {...{runtime,navigate}} kind="capsules"/></div>
+  <BrowseSection {...{runtime,navigate}} kind="projects"/>
+  <aside className="explore-continue"><div><h2>带着自己的问题来，也可以。</h2><p>利用已有的背景找帮助，收到回应后继续交流和工作。</p></div><a href="/app/publish" onClick={event=>go(event,'/app/publish')}>发起求助 <ArrowRight size={16}/></a></aside>
+  <nav className="explore-reading-links" aria-label="了解银河"><a href="/how-it-works/">怎样使用银河 <ArrowUpRight size={14}/></a><a href="/downloads/">在自己的 AI 中继续 <ArrowUpRight size={14}/></a><a href="/privacy/">资料与隐私 <ArrowUpRight size={14}/></a></nav>
+ </section>;
+}
 
 const readProjectQuery=()=>new URLSearchParams(location.search).get('q')??'';
 export function ProjectDirectoryWorkspace({runtime,navigate}:Props){

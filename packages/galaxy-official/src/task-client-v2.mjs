@@ -4,12 +4,14 @@ import { taskRequestV2Schema, taskReceiptV2Schema, taskQueryV2Schema, taskEnvelo
 import { contextGrantV2Schema, contextEventV2Schema, contextReceiptV2Schema } from './shared/context-v2-schema.mjs';
 import { caseEventV2Schema, caseTaskLinkSchema, caseEventReceiptSchema, caseTaskLinkReceiptSchema } from './shared/cases-schema.mjs';
 import { caseTaskLinkPayloadHash, legacyCaseTaskLinkPayloadHash } from './shared/case-operation-hash.mjs';
+import {taskCreationSubmissionSchema,taskMaterialPrepareSchema,taskMaterialPrepareResultSchema,taskMaterialDescriptorSchema,hasTaskMaterials,taskMaterialBodyIssue,taskMaterialLimits} from './shared/task-material-v1-schema.mjs';
+import {sha256Hex} from './shared/web-primitives.mjs';
 
 // Existing signed Consent is the payload authorization, not an input boolean.
 // A transport/session lease is checked both before and after every request.
 export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, read = fetchAssistanceJson }) {
   if (validatePublicUrl(endpoint).origin !== endpoint || !sessions) throw new Error('Invalid Task client configuration.');
-  async function invoke(path, body, { signal, method = 'POST', scope = 'assistance' } = {}) {
+  async function invoke(path, body, { signal, method = 'POST', scope = 'assistance',validate=null } = {}) {
     signal?.throwIfAborted();
     const auth = await sessions.readAuthorization(endpoint);
     if (!auth?.scopes.includes(scope)) throw new Error('Task authorization required.');
@@ -22,7 +24,7 @@ export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, 
       await check();
       const options = { credential: auth.credential, signal, maxBytes: 1048576 };
       const result = method === 'GET' ? await read(endpoint + path, options) : await send(endpoint + path, { ...options, bodyJson: JSON.stringify(body) });
-      await check(); return result;
+      await check();if(validate)await validate(result,check);await check(); return result;
     } catch (error) { if (error.code === 'GALAXY_REMOTE_REJECTED') sessions.invalidateAuthorization(auth, 'remote-rejected'); throw error; }
   }
   function task(result, id) {
@@ -33,13 +35,35 @@ export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, 
     return result;
   }
   async function createTask(submission, options) {
-    z.strictObject({ consentId: z.uuid(), payloadJson: z.string().min(1).max(24000) }).parse(submission);
+    taskCreationSubmissionSchema.parse(submission);
     const request = taskRequestV2Schema.parse(JSON.parse(submission.payloadJson));
+    if(hasTaskMaterials(request)!==Object.hasOwn(submission,'signedIntent')||hasTaskMaterials(request)&&taskMaterialBodyIssue(request,submission.materialBodies))throw new Error('Invalid Task material submission.');
+    if(new TextEncoder().encode(JSON.stringify(submission)).length>(hasTaskMaterials(request)?taskMaterialLimits.envelopeBytes:taskMaterialLimits.legacyEnvelopeBytes))throw new Error('Task request byte limit exceeded.');
     const result = await invoke('/v2/tasks', submission, options);
     if (result?.taskId !== request.taskId || result.eventId !== request.operationId || result.version !== 1) throw new Error('Unknown Task creation outcome; query original receipt.');
     return result;
   }
   async function getTask(id, options) { z.uuid().parse(id); return task(await invoke(`/v2/tasks/${id}`, null, { ...options, method: 'GET' }), id); }
+  async function prepareTaskMaterials(input,options={}){
+    const request=taskMaterialPrepareSchema.parse(input);
+    return invoke('/v2/task-materials/prepare',request,{...options,validate:async(result,check)=>{
+      const value=taskMaterialPrepareResultSchema.parse(result);
+      if(value.source.endpoint!==endpoint||value.source.postId!==request.source.postId||value.source.versionId!==request.source.versionId||value.descriptors.length!==request.selections.length||value.materialBodies.length!==request.selections.length)throw new Error('Invalid Task material preview.');
+      for(let i=0;i<request.selections.length;i++){
+        const selection=request.selections[i],descriptor=value.descriptors[i],body=value.materialBodies[i];
+        if(descriptor.materialId!==selection.materialId||body.materialId!==selection.materialId||descriptor.expiresAt!==request.expiresAt||descriptor.source.field!==selection.field||descriptor.source.start!==selection.start||descriptor.source.end!==selection.end
+          ||descriptor.source.endpoint!==endpoint||descriptor.source.postId!==request.source.postId||descriptor.source.versionId!==request.source.versionId||descriptor.source.permissionId!==value.source.permissionId||descriptor.source.payloadHash!==value.source.payloadHash||selection.text!==undefined&&body.text!==selection.text)throw new Error('Invalid Task material preview.');
+        await check();const textHash=await sha256Hex(body.text);await check();if(textHash!==descriptor.textHash)throw new Error('Invalid Task material body.');
+      }
+    }});
+  }
+  async function taskMaterialStatus(taskId,options){
+    z.uuid().parse(taskId);
+    return invoke(`/v2/tasks/${taskId}/materials/status`,null,{...options,method:'GET',validate:async result=>{
+      if(result?.taskId!==taskId||!Number.isInteger(result.checkedAt)||!Array.isArray(result.items)||result.items.length>8)throw new Error('Invalid Task material status.');
+      for(const item of result.items){taskMaterialDescriptorSchema.parse(item.descriptor);if(item.materialId!==item.descriptor.materialId||!['available','unavailable'].includes(item.status)||typeof item.permanent!=='boolean'||!Array.isArray(item.reasons)||Object.hasOwn(item,'text'))throw new Error('Invalid Task material status.');}
+    }});
+  }
   async function taskReceipt(input, options) {
     const query = taskReceiptV2Schema.parse(input), result = await invoke('/v2/tasks/receipt', query, options);
     if (!result || Object.entries(query).some(([key, value]) => result[key] !== value) || !['absent', 'acknowledged', 'conflict'].includes(result.state)
@@ -125,7 +149,7 @@ export function createTaskClientV2({ endpoint, sessions, send = postPublicJson, 
       throw new Error('Unknown Task Case link outcome; query original receipt.');
     return result;
   }
-  return { createTask, getTask, taskReceipt, queryTasks, submitTaskEvent, proposeParticipation, submitParticipationEvent,
+  return { createTask, getTask, taskReceipt, queryTasks,prepareTaskMaterials,taskMaterialStatus,submitTaskEvent, proposeParticipation, submitParticipationEvent,
     getContext, contextReceipt, caseReceipt, taskCaseLinkReceipt, submitCaseFact, createTaskCaseLink,
     createContextGrant: (submission, options) => contextSubmit(submission, true, options),
     submitContextEvent: (submission, options) => contextSubmit(submission, false, options) };

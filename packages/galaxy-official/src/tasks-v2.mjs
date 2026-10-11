@@ -9,6 +9,7 @@ import { taskRequestV2Schema, taskEnvelopeV2Schema, participationProposalV2Schem
   participationEventV2Schema, taskReceiptV2Schema, taskQueryV2Schema } from './shared/task-schema-v2.mjs';
 import { createTaskV2, applyTaskV2, proposeParticipationV2, applyParticipationV2, legacyAssistanceTaskV2 } from './domain/task-v2.mjs';
 import { targetRestrictionsWithin, assertTargetOperation } from './target-governance-restrictions-v2.mjs';
+import {hasTaskMaterials,hasTaskText,taskMaterialSubmissionSchema,taskMaterialLimits} from './shared/task-material-v1-schema.mjs';
 
 const uuid = value => z.uuid().safeParse(value).success;
 function parse(payloadJson, schema) {
@@ -89,15 +90,24 @@ export class TaskServiceV2 {
     if (!this.publicWrites?.consumeWithin) throw new ServiceError('public_write_verification_unavailable', 503);
     return this.publicWrites.consumeWithin(db, actor, { kind, operationId, payloadHash: digest(payloadJson), ...extra });
   }
-  async createTask(actor, { consentId, payloadJson }) {
+  async createTask(actor, submission) {
+    let {consentId}=submission;const {payloadJson}=submission;
     const input = parse(payloadJson, taskRequestV2Schema);
+    const material=hasTaskMaterials(input);
+    if(material){if(!taskMaterialSubmissionSchema.safeParse(submission).success||!this.taskMaterials)throw new ServiceError('invalid_task_material_request');
+      if(Buffer.byteLength(JSON.stringify(submission))>taskMaterialLimits.envelopeBytes)throw new ServiceError('request_too_large',413);}
+    else if(submission.signedIntent!==undefined||submission.materialBodies!==undefined)throw new ServiceError('invalid_task_payload');
     return this.access.runResourceWrite(actor, 'assistance', {}, async (db, authorization) => {
       await this.taskRepository.lockId(db, input.taskId);
-      const replay = await this.taskReplay(db, actor, input.taskId, input.operationId, consentId, payloadJson);
+      // An accepted material operation remains a fact after source loss. Prior
+      // receipt lookup neither creates a new Consent nor grants current text.
+      const prior=material?await this.taskRepository.event(db,input.operationId):null;
+      const replay = await this.taskReplay(db, actor, input.taskId, input.operationId, material&&prior?prior.consent_id:consentId, payloadJson);
       if (replay) return replay;
       if (await this.taskRepository.get(db, input.taskId)
         || (await db.query('SELECT id FROM assistance_requests WHERE id=$1', [input.taskId])).rows.length)
         throw new ServiceError('task_conflict', 409);
+      if(material)consentId=(await this.consents.createWithin(db,actor,submission.signedIntent,authorization,{taskMaterial:true})).consentId;
       const grant = await this.grant(db, actor.subjectId, consentId, input.operationId, payloadJson);
       if (grant.visibility !== input.visibility) throw new ServiceError('task_visibility_mismatch', 403);
       if (input.caseId) await this.caseLive(db, input.caseId, actor.subjectId);
@@ -113,10 +123,12 @@ export class TaskServiceV2 {
         if (!this.qualification) throw new ServiceError('qualification_unavailable', 503);
         await this.qualification.policyWithin(db, input.qualification.policyId, input.qualification.policyVersion, input.capabilityId, input.collaboration);
       }
+      const materialRows=material?await this.taskMaterials.validateWithin(db,actor,input,submission.materialBodies,grant):[];
       const state = createTaskV2(actor.subjectId, input, this.access.now());
       const quota = input.visibility === 'Public' ? await this.taskQuota(db, actor, 'task', input.operationId, payloadJson, { taskId: input.taskId }) : null;
       await db.query('INSERT INTO task_requests(id,case_id,requester_id,root_event_id,version,snapshot) VALUES($1,$2,$3,$4,1,$5)',
         [input.taskId, input.caseId, actor.subjectId, input.operationId, JSON.stringify(state)]);
+      if(material)await this.taskMaterials.insertWithin(db,actor,input,consentId,materialRows);
       const receipt = await this.recordTaskEvent(db, actor, authorization, state, { eventId: input.operationId, kind: 'task-created', consentId, payloadJson });
       return { ...receipt, caseId: input.caseId, requestPublished: true, contactSuggestionsState: 'not-requested', paymentExecuted: false, quota };
     });
@@ -236,6 +248,10 @@ export class TaskServiceV2 {
       version: state.version, state: state.state, enrollmentOpen: state.state === 'open' && state.request.enrollmentExpiresAt > this.access.now()&&!governance.scopes.includes('new-participation-paused'),
       paused, governance, paymentExecuted: false, contextAccessGranted: false, roomMembershipGranted: false,
       compatibility: { writableApiVersion: 2, legacyWrites: false }, view: requester ? 'requester' : actor ? 'participant-or-reader' : 'public' };
+    if(hasTaskMaterials(state.request)||hasTaskText(state.request)){
+      if(!this.taskMaterials)throw new ServiceError('task_material_reader_unavailable',503);
+      Object.assign(result,await this.taskMaterials.projectWithin(db,actor,row));
+    }
     if (!actor) return result;
     const visibleIds = new Set(), events = await this.taskRepository.events(db, id);
     for (const event of events) {

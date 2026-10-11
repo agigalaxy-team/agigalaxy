@@ -53,12 +53,12 @@ export class ConsentService extends ConsentReader {
   // Uses the caller's fresh business transaction; failed forum writes cannot
   // leave unused grants or their audit behind. Existing non-forum calls keep
   // their original authorization and mandatory signature/policy checks.
-  async createWithin(db,actor,signedIntent,authorization,{forum=false}={}) {
+  async createWithin(db,actor,signedIntent,authorization,{forum=false,taskMaterial=false}={}) {
       if (typeof signedIntent !== 'string' || signedIntent.length > 16384) throw new ServiceError('invalid_consent');
-      if(forum&&!authorization.credentialScopes.includes('consent'))throw new ServiceError('consent_scope_required',403);
+      if((forum||taskMaterial)&&!authorization.credentialScopes.includes('consent'))throw new ServiceError('consent_scope_required',403);
       let control=authorization.identityControl??await currentControlKey(db,actor.subjectId,{scope:'consent'});
-      if(forum&&!control.scopes.includes('*')&&!control.scopes.includes('consent'))throw new ServiceError('consent_scope_required',403);
-      if(forum)control=await currentControlKey(db,actor.subjectId,{deviceId:control.deviceId,keyId:control.keyId,epoch:control.epoch,scope:'consent'});
+      if((forum||taskMaterial)&&!control.scopes.includes('*')&&!control.scopes.includes('consent'))throw new ServiceError('consent_scope_required',403);
+      if(forum||taskMaterial)control=await currentControlKey(db,actor.subjectId,{deviceId:control.deviceId,keyId:control.keyId,epoch:control.epoch,scope:'consent'});
       let intent,payloadText;
       try {
         const signed = await compactVerify(signedIntent, await importSPKI(control.publicKey, 'Ed25519'), { algorithms: ['Ed25519'] });
@@ -69,6 +69,9 @@ export class ConsentService extends ConsentReader {
       } catch { throw new ServiceError('invalid_consent', 400); }
       if(intent.action.startsWith('forum.')&&!forum)throw new ServiceError('forum_atomic_write_required',403);
       if(forum&&!intent.action.startsWith('forum.'))throw new ServiceError('forum_permission_mismatch',403);
+      const materialIntent=intent.action==='assistance.publish'&&intent.fields.includes('materials');
+      if(materialIntent&&!taskMaterial)throw new ServiceError('task_material_atomic_write_required',403);
+      if(taskMaterial&&!materialIntent)throw new ServiceError('task_material_reuse_consent_required',403);
       const context = { actor, endpoint: this.endpoint, now: this.now() };
       assertConsentPolicy(intent, context);
       // Extension policies can narrow access, never bypass the mandatory rules.

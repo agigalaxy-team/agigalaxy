@@ -1,3 +1,4 @@
+import {independentTaskLabel} from './task-material-client.mjs';
 import { taskEnvelopeV2Schema } from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 
@@ -183,7 +184,7 @@ export function createTaskContactClient(sourceRuntime, taskId) {
       requests.push({
         type: 'opportunity',
         query: {
-          context: { kind: 'ephemeral', title: task.request.title, functions },
+          context: { kind: 'ephemeral', title: independentTaskLabel(task,'关联任务'), functions },
           purposes: ['conversation', 'collaboration'],
           limit: 8,
           after: after.opportunity ?? null,
@@ -551,7 +552,7 @@ export function createTaskContactClient(sourceRuntime, taskId) {
         input: {
           roomId: crypto.randomUUID(),
           operationId: crypto.randomUUID(),
-          title: task.request.title,
+          title: independentTaskLabel(task,'关联任务'),
           taskRefs: [taskId],
           retentionDays: 90,
         },

@@ -5,6 +5,7 @@ import {contributionProofs} from './domain/contribution-risk.mjs';
 import {transaction} from './database.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {digest} from './shared/digest.mjs';
+import {sourceFingerprint} from './domain/history-v2.mjs';
 const rule=(ok,code,status=409)=>{if(!ok)throw new ServiceError(code,status);};
 const absent=e=>e instanceof ServiceError&&[403,404,409,422,503].includes(e.status);
 export class HonorV2Service{
@@ -38,8 +39,9 @@ export class HonorV2Service{
         // No visible participant fact means no public disclosure that this
         // private participation exists. Task root alone is insufficient.
         if(![...permitted.values()].some(p=>p.kind==='task-event'&&p.row.participation_id===candidate.id&&p.row.subject_id===subjectId))continue;
-        const projections=[...permitted.values()].map(p=>({source:this.sharing.reference(p.row,p.kind,p.permission),
-          projection:this.sharing.project(p.row,p.permission.fields),publicationIds:p.permission.publicationIds}));
+        const projections=[];
+        for(const p of permitted.values())projections.push({source:this.sharing.reference(p.row,p.kind,p.permission),
+          projection:await this.sharing.projectWithin(db,actor,p.row,p.permission.fields,p.permission),publicationIds:p.permission.publicationIds});
         // Retain every authorized observation in the policy repository scope.
         // A failure/different commit for the same numeric run/attempt must reach
         // the source conflict reducer, even when only success could grant Honor.
@@ -64,7 +66,7 @@ export class HonorV2Service{
     const active=selected.configured&&!policy.revoked&&policy.notBefore<=now&&policy.notAfter>now;
     const status=!active?'inactive-rule':cases.size>=policy.minAcceptedCases&&proofs.length>=policy.minProofs?'active':'insufficient-evidence';
     const publicItems=sources.map(({_caseId,_eligible,_synthetic,...s})=>s),definitionHash=honorDefinition(policy).definitionHash;
-    const fingerprint=digest(JSON.stringify({publicItems,definitionHash,status}));
+    const fingerprint=sourceFingerprint({publicItems,definitionHash,status});
     if(input.expectedFingerprint)rule(input.expectedFingerprint===fingerprint,'honor_sources_changed_retry');
     const start=input.after?publicItems.findIndex(s=>s.id===input.after)+1:0;rule(!input.after||start>0,'invalid_honor_cursor');
     const items=publicItems.slice(start,start+input.limit);

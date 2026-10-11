@@ -1,5 +1,6 @@
 import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSummaryFields} from '../../galaxy-official/src/shared/hub-peering-v2-schema.mjs';
 import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
 import {useGovernanceDraft} from './governance-presentation';
@@ -74,7 +75,8 @@ export function HubPeeringWorkspace({client,runtime,hubId,owner,subjectId,member
   const draft=useGovernanceDraft<PeeringInput,HubLocator>(runtime,subjectId,true,'hub-peering-input:v1:'+JSON.stringify([runtime.api.endpoint,subjectId,hubId]),blank),input=draft.value;
   const inputRef=useRef(input);useEffect(()=>{inputRef.current=input;},[input]);
   const [connections,setConnections]=useState<PeeringConnection[]>([]),[connectionAfter,setConnectionAfter]=useState<string|null>(null),[connectionsReady,setConnectionsReady]=useState(false);
-  const [works,setWorks]=useState<PeeringWork[]>([]),[workMore,setWorkMore]=useState<Record<string,string|null>>({}),[worksReady,setWorksReady]=useState(false),[workError,setWorkError]=useState('');
+  const [readWorks,setWorks]=useState<PeeringWork[]>([]),[workMore,setWorkMore]=useState<Record<string,string|null>>({}),[worksReady,setWorksReady]=useState(false),[workError,setWorkError]=useState('');
+ const works=useCurrentTaskMaterialTree(runtime,readWorks)??[];
   const [contacts,setContacts]=useState<string[]>([]),[contactAfter,setContactAfter]=useState<string|null>(null),[peopleReady,setPeopleReady]=useState(false),[peopleError,setPeopleError]=useState('');
   const [sources,setSources]=useState<{source:PeeringSource;eventType:string;synthetic:boolean|null}[]>([]),[sourceAfter,setSourceAfter]=useState<string|null>(null),[sourcesReady,setSourcesReady]=useState(false);
   const [agreements,setAgreements]=useState<PeeringOwned<Extract<PeeringEvent,{kind:'peer-approve'}>>[]>([]),[agreementAfter,setAgreementAfter]=useState<string|null>(null),[agreementsReady,setAgreementsReady]=useState(false);

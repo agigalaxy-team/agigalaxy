@@ -248,3 +248,62 @@ test('invalid input save remains a flush error until explicit load or a correcte
   await client.save({ title: '修正后的真实输入' }); await client.flush();
   assert.equal(f.raw().value.title, '修正后的真实输入');
 });
+
+test('selection inspect is read-only for legacy drafts and first accepted edit preserves opaque fields', async () => {
+  const original = { title: '已有独立标题', summary: '独立说明', future: { data: new Map([['k', 1]]) }, id: 'legacy-content-id' };
+  const f = fixture({ draft: original }), client = f.client();
+  const preview = await client.inspect();
+  assert.equal(preview.head, null); assert.deepEqual(preview.value, original);
+  assert.equal(f.calls.filter(call => call.method === 'update').length, 0);
+  assert.deepEqual(f.raw(), original, 'opening and cancelling selection cannot migrate the original');
+  const adopted = await client.compareAndSave({ summary: '明确采用后的说明' }, { expected: preview, assertCurrent() {} });
+  assert.equal(adopted.head.revision, 1); assert.equal(adopted.value.title, original.title);
+  assert.deepEqual(adopted.value.future, original.future); assert.equal(adopted.value.id, original.id);
+  const later = await client.save({ title: '采用后继续编辑' });
+  assert.equal(later.head.revision, 2, 'the same client follows its own accepted Head');
+});
+
+test('preview cannot follow a newer internal Head or resurrect a draft cleared after preview', async () => {
+  const f = fixture({ draft: stored({ title: '预览时原稿', opaque: 42 }) }), client = f.client();
+  const preview = await client.inspect();
+  const newer = await client.save({ title: '预览后本人继续输入' });
+  await rejects(client.compareAndSave({ title: '过期预览' }, { expected: preview, assertCurrent() {} }), 'task_draft_conflict');
+  assert.deepEqual(taskLocalDraftView(f.raw()), newer);
+  const current = await client.inspect(), other = f.client(); await other.inspect(); await other.clear(current.head);
+  await rejects(client.compareAndSave({ title: '不准复活' }, { expected: current, assertCurrent() {} }), 'task_draft_conflict');
+  assert.equal(f.raw(), null);
+});
+
+test('selection apply compares the complete original legacy snapshot even if an intervening inspect observes another headless draft', async () => {
+  const f = fixture({ draft: { title: '旧稿', keep: undefined } }), client = f.client(), preview = await client.inspect();
+  f.external({ title: '另一个窗口的新稿', keep: undefined }); await client.inspect();
+  await rejects(client.compareAndSave({ title: '旧选材预览' }, { expected: preview, assertCurrent() {} }), 'task_draft_conflict');
+  assert.deepEqual(f.raw(), { title: '另一个窗口的新稿', keep: undefined });
+});
+
+test('same-page revision and source-expiry guards run inside the mutation, after queued waits', async () => {
+  for (const code of ['task_draft_input_changed', 'task_material_expired']) {
+    const original = stored({ title: '原稿不可被晚到预览替换' }), f = fixture({ draft: original }), client = f.client(), preview = await client.inspect();
+    const hold = gate(); let valid = true, checks = 0;
+    f.hooks.beforeUpdater = async () => { hold.entered(); await hold.wait; };
+    const operation = client.compareAndSave({ title: '应拒绝的材料' }, { expected: preview, assertCurrent() { checks++; if (!valid) throw fail(code); } });
+    await hold.hit; valid = false; hold.release();
+    await rejects(operation, code); assert.ok(checks >= 2);
+    assert.deepEqual(f.raw(), original);
+  }
+});
+
+test('selection apply rejects asynchronous or missing guards without mutating storage', async () => {
+  const f = fixture(), client = f.client(); await client.inspect();
+  await rejects(client.compareAndSave({ title: '缺少guard' }, { expected: null }), 'task_draft_preview_guard_invalid');
+  await client.inspect();
+  await rejects(client.compareAndSave({ title: '异步guard' }, { expected: null, assertCurrent: async () => {} }), 'task_draft_preview_guard_invalid');
+  assert.equal(f.raw(), undefined);
+});
+
+test('first write after read-only legacy inspect still detects every concurrent opaque change', async () => {
+  const original = { title: '旧稿', future: undefined }, f = fixture({ draft: original }), client = f.client(); await client.inspect();
+  f.external({ title: '旧稿' });
+  await rejects(client.save({ summary: '普通编辑也不能覆盖' }), 'task_draft_conflict');
+  assert.deepEqual(f.raw(), { title: '旧稿' });
+});

@@ -28,11 +28,16 @@ export function normalizeForumOrigin(value) {
   return { postId: value.postId, versionId: value.versionId, returnTo };
 }
 
-export function forumTaskPath(value) {
+export function forumTaskPath(value, { selectMaterial = false } = {}) {
   const origin = normalizeForumOrigin(value);
   if (!origin) return null;
   const query = new URLSearchParams({ forumPost: origin.postId, forumVersion: origin.versionId, forumReturn: origin.returnTo });
+  if(selectMaterial)query.set('forumMaterial','select');
   return '/app/publish?' + query;
+}
+
+export function forumTaskMaterialSelection(value) {
+  try { const target=new URL(value,base);return !!forumTaskLocator(value)&&target.searchParams.get('forumMaterial')==='select'; } catch { return false; }
 }
 
 export function forumTaskLocator(value) {

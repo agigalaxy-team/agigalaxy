@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import { taskQueryV2Schema, taskReceiptV2Schema } from './shared/task-schema-v2.mjs';
 import {taskOwnerReadPrepareV2Schema,taskOwnerReadRequestV2Schema} from './shared/task-owner-read-v2-schema.mjs';
 import {taskOwnerControlPrepareV2Schema,taskOwnerControlRequestV2Schema} from './shared/task-owner-control-v2-schema.mjs';
+import {taskCreationSubmissionSchema,taskMaterialPrepareSchema} from './shared/task-material-v1-schema.mjs';
 
 // Transport grants permit the operation category; mutations still require an
 // existing locally signed exact Consent, checked by the persistent M11 service.
@@ -13,8 +14,12 @@ export function taskToolDefinitions(services, actor) {
       'Find open tasks, owner requests or current participation. Active match, publish and participation remain separate available entries.', input => services.assistance.queryTasks(actor, input)),
     galaxy_task_v2_get: tool(z.strictObject({ taskId: z.uuid() }),
       'Read a real Task, private authorized suggestions, separate invitations/applications and multiple Participation records. A receipt never grants current access.', input => services.assistance.getTask(actor, input.taskId)),
-    galaxy_task_v2_create: tool(z.strictObject(submission),
-      'Publish exact reviewed Task bytes with existing signed Consent. A proactive Task needs no invented Case or failure. Public Account quotas and paid eligibility remain enforced.', input => services.assistance.createTask(actor, input), true),
+    galaxy_task_material_prepare: tool(taskMaterialPrepareSchema,
+      'Read exact selected own forum version spans for Task context. Returns descriptors and current controlled bodies without publishing, writing Consent or granting independent reproduction.', input => services.taskMaterials.prepare(actor,input)),
+    galaxy_task_material_status: tool(z.strictObject({taskId:z.uuid()}),
+      'Read own exact Task material currentness metadata. No material body is disclosed by this status or restored by an operation receipt.', input => services.taskMaterials.status(actor,input.taskId,services.assistance)),
+    galaxy_task_v2_create: tool(taskCreationSubmissionSchema,
+      'Publish exact reviewed Task bytes. Ordinary input uses existing signed Consent; typed controlled material uses locally reviewed signedIntent and exact matching materialBodies atomically. A proactive Task needs no invented Case or failure. Public Account quotas remain enforced.', input => services.assistance.createTask(actor, input), true),
     galaxy_task_v2_event: tool(z.strictObject({ taskId: z.uuid(), ...submission }),
       'Submit a Task event covered by exact signed Consent: private suggestions, invitations, responses, applications or enrollment changes. Suggestions do not send invitations.',
       ({ taskId, ...signed }) => services.assistance.submitTaskEvent(actor, taskId, signed), true),

@@ -1,4 +1,6 @@
 import React from 'react';
+import {literalTaskText,hasMaterialText} from './task-material-client.mjs';
+import type {TaskText} from './task-material-types';
 import {identityPermissionGroups,identityPermissionLabel} from './identity-permission-labels.mjs';
 import './agent-identity-workspace.css';
 
@@ -6,7 +8,7 @@ const helpModes:Record<string,string> = {collaboration:'一起完成',stuck:'解
 const visibilityNames:Record<string,string> = {Public:'公开求助',Private:'仅自己'};
 const fingerprint = (value:string) => value.match(/.{1,4}/g)?.join(' ') ?? value;
 export type AgentConnectionContext={scopes:string[];endpoint:string;targetPath:string;expiresAt:number;subjectId:string};
-export type AgentDraftContent={title?:string;summary?:string;goal?:string;situation?:string;expectedOutcome?:string;intent?:string;visibility?:string};
+export type AgentDraftContent={title?:TaskText;summary?:TaskText;goal?:TaskText;situation?:TaskText;expectedOutcome?:TaskText;intent?:string;visibility?:string};
 export function agentReturnLabel(path:string) {
  const route=path.split(/[?#]/)[0];
  return route==='/app/publish'?'继续填写求助':route.startsWith('/app/tasks/')?'回到原工作':route.startsWith('/app/capsules/')?'回到原方法':route.startsWith('/app/rooms/')?'回到原对话':route==='/app/'||route==='/app'?'回到发现':'回到原来的页面';
@@ -27,11 +29,12 @@ export function AgentConnectionSummary({context,deviceFingerprint}:{context:Agen
 }
 
 export function AgentDraftSummary({value,title}:{value:AgentDraftContent;title:string}) {
- return <section className="agent-draft-reading"><p className="agent-draft-origin">{title}</p><h4>{value.title||'尚未填写标题'}</h4>
-  {value.summary&&<p className="agent-draft-body">{value.summary}</p>}
-  {value.goal&&value.goal!==value.title&&<><h5>具体目标</h5><p className="agent-draft-body">{value.goal}</p></>}
-  {value.situation&&<><h5>当前情况</h5><p className="agent-draft-body">{value.situation}</p></>}
-  {value.expectedOutcome&&<><h5>希望得到的结果</h5><p className="agent-draft-body">{value.expectedOutcome}</p></>}
+ return <section className="agent-draft-reading"><p className="agent-draft-origin">{title}</p><h4>{literalTaskText(value.title)||'尚未填写独立标题'}</h4>
+  {value.summary&&<p className="agent-draft-body">{literalTaskText(value.summary)}</p>}
+  {value.goal&&value.goal!==value.title&&<><h5>具体目标</h5><p className="agent-draft-body">{literalTaskText(value.goal)}</p></>}
+  {value.situation&&<><h5>当前情况</h5><p className="agent-draft-body">{literalTaskText(value.situation)}</p></>}
+  {value.expectedOutcome&&<><h5>希望得到的结果</h5><p className="agent-draft-body">{literalTaskText(value.expectedOutcome)}</p></>}
+  {[value.title,value.summary,value.goal,value.situation,value.expectedOutcome].some(hasMaterialText)&&<p>这里显示独立说明，选定的来源材料请回原求助稿核对。</p>}
   <dl className="agent-draft-scope"><dt>帮助方式</dt><dd>{helpModes[value.intent??'']??'尚未选择'}</dd><dt>计划可见范围</dt><dd>{visibilityNames[value.visibility??'']??'尚未选择'}</dd></dl>
  </section>;
 }

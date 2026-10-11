@@ -24,6 +24,7 @@ export const caseEventSchema = z.discriminatedUnion('kind', [
 // an Attempt for advice-only interventions. References identify immutable versions.
 const subject = z.string().regex(/^GUID[0-9A-Z]{28}$/);
 export const taskCaseContainerSummary='任务协作记录，仅保存各参与者报告的实际工作。';
+export const taskMaterialCaseContainerTitle='这次求助的工作记录';
 export const factReferenceSchema = z.strictObject({ id: z.uuid(), version: z.number().int().positive() });
 const outcome = z.enum(['succeeded', 'partial', 'failed', 'inconclusive', 'conflicting']);
 const terminal = z.enum(['completed', 'abandoned', 'canceled', 'inconclusive']);

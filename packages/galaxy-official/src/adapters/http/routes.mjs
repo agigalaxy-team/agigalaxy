@@ -6,6 +6,7 @@ import {dispatchIdentityGroups} from './identity-group-http.mjs';
 import {dispatchWatchControls} from './watch-control-http.mjs';
 import { ServiceError } from '../../shared/service-error.mjs';
 import { body, authenticate } from './request.mjs';
+import {taskMaterialBody} from './task-material-http.mjs';
 import {dispatchAttachments} from './attachment-http.mjs';
 import {dispatchOutcomeMaterials} from './outcome-material-http.mjs';
 import {dispatchTrustPackages} from './trust-package-http.mjs';
@@ -274,6 +275,13 @@ export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerCont
       }
       return send(200, await taskOwnerRead.read(actor, ownerRead[1], await body(request, ['consentId','payloadJson'])));
     }
+    if(assistance?.taskMaterials&&route==='POST /v2/task-materials/prepare'){
+      const actor={...await authenticate(request,access,'assistance'),httpRequestId:requestId};
+      return send(200,await assistance.taskMaterials.prepare(actor,await taskMaterialBody(request,{prepare:true})));
+    }
+    const taskMaterialStatus=/^\/v2\/tasks\/([0-9a-f-]{36})\/materials\/status$/.exec(url.pathname);
+    if(assistance?.taskMaterials&&request.method==='GET'&&taskMaterialStatus)
+      return send(200,await assistance.taskMaterials.status(await authenticate(request,access,'assistance'),taskMaterialStatus[1],assistance));
     if (assistance && request.method === 'GET' && url.pathname === '/v2/tasks')
       return send(200, await assistance.queryPublicTasks());
     const taskRead = /^\/v2\/tasks\/([0-9a-f-]{36})$/.exec(url.pathname);
@@ -289,7 +297,7 @@ export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerCont
       return send(200, await assistance.taskReceipt(await authenticate(request, access, 'assistance'), await body(request,null)));
     if (assistance && route === 'POST /v2/tasks') {
       const actor = { ...await authenticate(request, access, 'assistance'), httpRequestId: requestId };
-      return send(200, await assistance.createTask(actor, await body(request,['consentId','payloadJson'])));
+      return send(200, await assistance.createTask(actor, await taskMaterialBody(request)));
     }
     const taskAction = /^\/v2\/tasks\/([0-9a-f-]{36})\/(events|participations|case)$/.exec(url.pathname);
     if (assistance && request.method === 'POST' && taskAction) {

@@ -1,3 +1,4 @@
+import type {TaskText} from './task-material-types';
 import type {AccountRuntime} from './account-workspace-types';
 
 export type DeviceRuntime=AccountRuntime;
@@ -10,7 +11,7 @@ export type ApprovalPreview={subjectId:string;deviceId:string;endpoint:string;sc
 export type DeviceReceipt={operationId?:string;subjectId?:string;state:string;registered?:boolean};
 export type DeviceResult={activated?:boolean;identity?:{subjectId:string;deviceId:string};needsReview?:boolean;receipt?:DeviceReceipt};
 export type DevicePending={operationId:string;offer:DeviceOffer;state:string;approval:unknown;receipt:DeviceReceipt|null;needsReview?:boolean;fingerprint?:string};
-export type DraftText={title?:string;goal?:string;summary?:string;situation?:string};
+export type DraftText={title?:TaskText;goal?:TaskText;summary?:TaskText;situation?:TaskText};
 export type VisitorDraftPreview={subjectId:string;visitorDraft:DraftText|null;existingDraft:DraftText|null;sourceRetained:boolean};
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const approval=(value:unknown):value is PublicApproval=>record(value)&&typeof value.challenge==='string';

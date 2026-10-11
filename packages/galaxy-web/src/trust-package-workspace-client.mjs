@@ -96,6 +96,6 @@ export function createTrustPackageWorkspaceClient(runtime,{subjectId,connected=t
 /** Merge only explicit service relationships; a missing Case is never invented. */
 export function mergeTrustWorks(previous,incoming){const all=[...previous,...incoming],map=new Map();
  for(const item of all){const key=item.taskId?'task:'+item.taskId:item.caseId?'case:'+item.caseId:null;if(!key)continue;const old=map.get(key);
-  map.set(key,{...old,...item,request:old?.request??item.request,caseId:item.caseId??old?.caseId,title:item.request?.title??old?.request?.title??item.title??old?.title});}
+  map.set(key,{...old,...item,request:item.request??old?.request,caseId:item.caseId??old?.caseId,title:item.request?.title??old?.request?.title??item.title??old?.title});}
  return[...map.values()];
 }

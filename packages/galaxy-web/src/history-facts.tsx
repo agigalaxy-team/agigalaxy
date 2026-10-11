@@ -1,4 +1,5 @@
 import React from 'react';
+import {TaskCurrentSourceItem} from './task-material-view';
 import {Button} from '@/components/ui/button';
 import {InterventionOpinions, ResolutionStatus} from './fact-presentation';
 import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
@@ -65,7 +66,11 @@ function Participation({items,navigate}:{items:HistoryParticipation[];navigate?:
 function StructuredDownload({record}:{record:HistoryFactsRecord}){
  return <button className="history-source-download" type="button" onClick={()=>{const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='galaxy-history-'+String(record.key??'record').replace(/[^a-z0-9-]/gi,'-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>下载当前可见的完整记录</button>;
 }
-export function HistoryFacts({record,navigate,runtime,connected=false,subjectId}:{record:HistoryFactsRecord;navigate?:(path:string)=>void;runtime?:HistoryPeopleRuntime;connected?:boolean;subjectId?:string}){
+type HistoryFactsProps={record:HistoryFactsRecord;navigate?:(path:string)=>void;runtime?:HistoryPeopleRuntime;connected?:boolean;subjectId?:string};
+export function HistoryFacts(props:HistoryFactsProps){
+ return <TaskCurrentSourceItem runtime={props.runtime} item={props.record}>{record=><HistoryFactsBody {...props} record={record}/>}</TaskCurrentSourceItem>;
+}
+function HistoryFactsBody({record,navigate,runtime,connected=false,subjectId}:HistoryFactsProps){
  const [tab,setTab]=React.useState('process');
  const people=useMemberNames(runtime??null,subjectId,connected,authors(record));
  const attempts=record.attempts??[],interventions=record.interventions??[],results=record.results??[],verification=record.verificationRecords??[],reuse=record.capsuleReuse?.items??[];

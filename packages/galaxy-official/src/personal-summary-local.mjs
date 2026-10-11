@@ -2,6 +2,26 @@ import {summaryContentSchema} from './shared/personal-summary-schema.mjs';
 const clone=x=>structuredClone(x);
 const failure=code=>Object.assign(new Error(code),{code});
 const validOrigin=endpoint=>{const u=new URL(endpoint);if(u.protocol!=='https:'||u.origin!==endpoint||u.username||u.password)throw failure('invalid_summary_target');return endpoint;};
+const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
+const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const sameHead=(a,b)=>a===null?b===null:!!a&&!!b&&Object.keys(a).length===2&&a.draftId===b.draftId&&a.revision===b.revision;
+const draftIdentity=({endpoint,roomId,summaryId})=>{validOrigin(endpoint);if(!uuid(roomId)||!uuid(summaryId))throw failure('invalid_summary_id');return JSON.stringify([endpoint,roomId,summaryId]);};
+
+export function validatePersonalSummaryCloudView(value,{summaryId,roomId,listed=false}={}){
+ if(!value||!uuid(value.summaryId)||summaryId&&value.summaryId!==summaryId||!Number.isSafeInteger(value.revision)||value.revision<0
+   ||value.audience!=='owner-only'||value.sharedToRoom!==false||!Array.isArray(value.conflicts)||value.conflicts.some(version=>!version||typeof version!=='object'||Array.isArray(version))
+   ||value.current===undefined||value.current!==null&&(typeof value.current!=='object'||Array.isArray(value.current))
+   ||(listed||value.current||value.conflicts.length)&&!uuid(value.roomId)||value.roomId!==undefined&&!uuid(value.roomId)||roomId&&value.roomId!==roomId)
+  throw failure('summary_cloud_response_mismatch');
+ for(const version of [value.current,...value.conflicts].filter(Boolean)){
+  if(version.summaryId!==value.summaryId||version.roomId!==undefined&&version.roomId!==value.roomId||!uuid(version.versionId)||!Number.isSafeInteger(version.revision)||version.revision<0
+    ||!['current','conflict','expired','deleted','superseded'].includes(version.state))throw failure('summary_cloud_response_mismatch');
+  if(['current','conflict'].includes(version.state)){if(!summaryContentSchema.safeParse(version.content).success)throw failure('summary_cloud_response_mismatch');}
+  else if(!version.content||Object.keys(version.content).length)throw failure('summary_cloud_response_mismatch');
+ }
+ if(value.conflicts.some(version=>version.state!=='conflict')||value.current&&value.current.state==='conflict')throw failure('summary_cloud_response_mismatch');
+ return value;
+}
 
 // One IDB record per identity; atomic update prevents two tabs silently replacing
 // local revisions. No external requests or credentials are stored in this DB.
@@ -10,9 +30,20 @@ export async function openPersonalSummaryStore({indexedDB=globalThis.indexedDB,n
  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore('owners');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
  function update(key,updater,mode='readwrite'){return new Promise((resolve,reject)=>{const tx=db.transaction('owners',mode),store=tx.objectStore('owners'),r=store.get(key);let result;
   r.onsuccess=()=>{try{const next=updater(clone(r.result));result=clone(next);if(mode==='readwrite')store.put(next,key);}catch(e){reject(e);tx.abort();}};
-  tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error??failure('local_summary_transaction_aborted'));
+  tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error??failure('local_summary_transaction_aborted'));tx.onabort=()=>reject(tx.error??failure('local_summary_transaction_aborted'));
  });}
- return Object.freeze({read:key=>update(key,x=>x,'readonly'),update,close:()=>db.close()});
+  // A legacy room-only draft and its new per-summary destination must move in
+  // one real IDB transaction. The updater is synchronous, as for update().
+  function updateMany(keys,updater){return new Promise((resolve,reject)=>{
+   if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length){reject(failure('invalid_local_summary_transaction'));return;}
+   const tx=db.transaction('owners','readwrite'),ownerStore=tx.objectStore('owners'),values={};let remaining=keys.length,result;
+   for(const key of keys){const request=ownerStore.get(key);request.onsuccess=()=>{values[key]=clone(request.result);if(--remaining)return;
+    try{const next=updater(clone(values));if(!next||!next.values)throw failure('invalid_local_summary_transaction');
+     for(const target of Object.keys(next.values)){if(!keys.includes(target))throw failure('invalid_local_summary_transaction');ownerStore.put(next.values[target],target);}result=clone(next.result);
+    }catch(error){reject(error);tx.abort();}};}
+   tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error??failure('local_summary_transaction_aborted'));tx.onabort=()=>reject(tx.error??failure('local_summary_transaction_aborted'));
+  });}
+  return Object.freeze({read:key=>update(key,x=>x,'readonly'),update,updateMany,close:()=>db.close()});
 }
 
 export function createPersonalSummaryLocal({subjectId,store,getConnection=()=>null,sourceCheck=null,now=()=>Math.floor(Date.now()/1000),crypto=globalThis.crypto}){
@@ -160,13 +191,79 @@ export function createPersonalSummaryLocal({subjectId,store,getConnection=()=>nu
   }
   return{state:'checked',completed};
  }
- async function pull({summaryId}){const s=await read(),c=current();if(!c||c.endpoint!==s.preference.endpoint)throw failure('matching_binding_required');
-  const check=connectionGuard(c);check();const remote=await c.client.get({summaryId});check();if(!remote.current?.content?.fragments||remote.current.sourcesTemporarilyUnavailable||remote.conflicts?.some(v=>v.sourcesTemporarilyUnavailable))return remote;
-  await update(t=>{const local=t.summaries[summaryId];if(local&&(t.queue.some(q=>q.summaryId===summaryId)||local.syncState==='local')){
-   local.remoteCurrent=clone(remote.current);local.conflicts=clone(remote.conflicts??[]);local.cloudRevision=remote.revision;local.syncState='conflict';return t;}
-   t.summaries[summaryId]={summaryId,roomId:remote.roomId,endpoint:c.endpoint,content:clone(remote.current.content),createdAt:Date.parse(remote.current.updatedAt)/1000,updatedAt:now(),
-    localRevision:(local?.localRevision??0)+1,cloudRevision:remote.revision,syncState:'synced',conflicts:clone(remote.conflicts??[])};return t;});check();return remote;
- }
+  async function pull(input){const{summaryId,expectedRoomId,expectedDraftHead}=input;if(!uuid(summaryId))throw failure('invalid_summary_id');
+   const s=await read(),c=current();if(!c)throw failure('matching_binding_required');
+   // Reading an owned replica is separate from permission to upload. A fresh
+   // browser and a browser that declined new uploads may both read this owner.
+   const check=connectionGuard(c),before=s.summaries[summaryId],expectedLocalRevision=input.expectedLocalRevision??before?.localRevision??0;
+   if(before&&before.endpoint!==c.endpoint)throw failure('summary_target_mismatch');
+   if(!Number.isSafeInteger(expectedLocalRevision)||expectedLocalRevision<0||(before?.localRevision??0)!==expectedLocalRevision)throw failure('local_summary_conflict');
+   check();const remote=await c.client.get({summaryId});check();
+   validatePersonalSummaryCloudView(remote,{summaryId,roomId:expectedRoomId});
+   if(!remote.current?.content?.fragments||remote.current.sourcesTemporarilyUnavailable||remote.conflicts?.some(v=>v.sourcesTemporarilyUnavailable))return remote;
+   const parsed=summaryContentSchema.parse(remote.current.content);
+   await update(t=>{check();const local=t.summaries[summaryId];if((local?.localRevision??0)!==expectedLocalRevision)throw failure('local_summary_conflict');
+    if(local&&(local.roomId!==remote.roomId||local.endpoint!==c.endpoint))throw failure('summary_room_conflict');
+    if(Object.hasOwn(input,'expectedDraftHead')){const entry=t.drafts?.[draftIdentity({endpoint:c.endpoint,roomId:remote.roomId,summaryId})];if(!sameHead(expectedDraftHead,entry?.head??null))throw failure('local_summary_draft_conflict');}
+    if(local&&(t.queue.some(q=>q.summaryId===summaryId)||!equal(local.content,parsed)||local.syncState==='local'||local.syncState==='conflict')){
+     local.remoteCurrent=clone(remote.current);local.conflicts=clone(remote.conflicts??[]);local.cloudRevision=remote.revision;local.syncState='conflict';return t;}
+    t.summaries[summaryId]={summaryId,roomId:remote.roomId,endpoint:c.endpoint,content:clone(parsed),createdAt:local?.createdAt??Date.parse(remote.current.updatedAt)/1000,updatedAt:now(),
+     localRevision:expectedLocalRevision+1,cloudRevision:remote.revision,syncState:'synced',conflicts:clone(remote.conflicts??[])};return t;});check();
+   // Keep the existing Native MCP result shape. Web observes the adopted local
+   // state separately; no tool protocol or service envelope is replaced.
+   return remote;
+  }
+  // Drafts share the owner's atomic record with saved summaries. Receiving a
+  // cloud version can therefore compare both heads before any local mutation.
+  function draftView(entry){return{value:entry?.value?clone(entry.value):null,head:entry?.head?clone(entry.head):null};}
+  async function migrateDraft(context,legacyKey){const id=draftIdentity(context),s=await read();if(s.drafts?.[id]||!legacyKey)return;
+   const legacy=await store.read(legacyKey);if(!legacy||legacy.summaryId!==context.summaryId)return;
+   if(typeof store.updateMany!=='function')throw failure('local_atomic_migration_unavailable');
+   await store.updateMany([key,legacyKey],values=>{const t=values[key]??initial(),currentLegacy=values[legacyKey];
+    if(t.drafts?.[id])return{values:{},result:null};if(!equal(currentLegacy,legacy))throw failure('local_summary_draft_conflict');
+    t.drafts??={};t.drafts[id]={...context,head:{draftId:crypto.randomUUID(),revision:1},value:clone(legacy),updatedAt:now()};
+    return{values:{[key]:t,[legacyKey]:null},result:null};});
+  }
+  async function readDraft(context){const id=draftIdentity(context);await migrateDraft(context,context.legacyKey);
+   const s=await read(),entry=s.drafts?.[id];if(!entry?.value?.content)return draftView(entry);
+   const safe=await sanitise({roomId:context.roomId,endpoint:context.endpoint,content:entry.value.content});
+   const visible={...clone(entry.value),content:safe.record.content,blockedSources:safe.changed,sourcesTemporarilyUnavailable:safe.unavailable};let head=entry.head;
+   if(safe.changed&&!safe.unavailable){const t=await update(state=>{
+     const live=state.drafts?.[id];if(!equal(live,entry))throw failure('local_summary_draft_conflict');
+     live.value={...clone(entry.value),content:clone(safe.record.content)};live.head={draftId:entry.head.draftId,revision:entry.head.revision+1};live.updatedAt=now();return state;
+    });head=t.drafts[id].head;}
+   return{value:visible,head:clone(head),...(safe.changed&&!safe.unavailable?{cleanedFromHead:clone(entry.head)}:{})};
+  }
+  async function saveDraft(context,value,{expectedHead,preserveSources=false}={}){const id=draftIdentity(context);
+   if(expectedHead===undefined||expectedHead!==null&&(!uuid(expectedHead?.draftId)||!Number.isSafeInteger(expectedHead.revision)||expectedHead.revision<1))throw failure('summary_draft_head_required');
+   if(value!==null){if(!value||value.summaryId!==context.summaryId)throw failure('summary_room_conflict');summaryContentSchema.parse(value.content);}
+   const state=await update(t=>{const prior=t.drafts?.[id];if(!sameHead(expectedHead,prior?.head??null))throw failure('local_summary_draft_conflict');const nextValue=clone(value);
+    if(preserveSources&&value!==null){const saved=t.summaries[context.summaryId],base=prior?.value?.content??(saved?.endpoint===context.endpoint&&saved.roomId===context.roomId?saved.content:null);
+     if(!base)throw failure('summary_sources_retry_required');const own=fragment=>fragment.kind==='personal-note'&&fragment.sourceRefs.length===0;
+     nextValue.content={...clone(base),fragments:[...base.fragments.filter(fragment=>!own(fragment)),...value.content.fragments.filter(own).map(clone)],keyMessageRefs:clone(base.keyMessageRefs)};summaryContentSchema.parse(nextValue.content);
+    }
+    t.drafts??={};t.drafts[id]={endpoint:context.endpoint,roomId:context.roomId,summaryId:context.summaryId,
+     head:{draftId:prior?.head.draftId??crypto.randomUUID(),revision:(prior?.head.revision??0)+1},value:nextValue,updatedAt:now()};return t;});
+   return draftView(state.drafts[id]);
+  }
+  async function listDrafts({endpoint,roomId}={}){validOrigin(endpoint);if(roomId&&!uuid(roomId))throw failure('invalid_summary_id');
+   const s=await read();return Object.values(s.drafts??{}).filter(entry=>entry.endpoint===endpoint&&(!roomId||entry.roomId===roomId)&&entry.value&&(entry.value.dirty||entry.value.note||entry.value.importText))
+    .map(entry=>({summaryId:entry.summaryId,roomId:entry.roomId,endpoint,updatedAt:entry.updatedAt,localRevision:s.summaries[entry.summaryId]?.localRevision??0,syncState:s.summaries[entry.summaryId]?.syncState??'draft',hasDraft:true}));}
+  const roomKey=({endpoint,roomId})=>{validOrigin(endpoint);if(!uuid(roomId))throw failure('invalid_summary_id');return JSON.stringify([endpoint,roomId]);};
+  async function roomSelection(context){return(await read()).roomSelections?.[roomKey(context)]??null;}
+  async function selectRoomSummary(context){const index=roomKey(context),draftId=draftIdentity(context);
+   return(await update(t=>{const record=t.summaries[context.summaryId],draft=t.drafts?.[draftId];
+    if(!(record?.endpoint===context.endpoint&&record.roomId===context.roomId)&&!draft?.value)throw failure('summary_missing');
+    t.roomSelections??={};t.roomSelections[index]=context.summaryId;return t;})).roomSelections[index];}
+  async function reserveRoomSummary(context){const index=roomKey(context);return(await update(t=>{
+    t.roomSelections??={};if(!t.roomSelections[index])t.roomSelections[index]=crypto.randomUUID();return t;})).roomSelections[index];}
+  async function migrateRoomSelection(context,legacyKey){const index=roomKey(context),s=await read();if(s.roomSelections?.[index]||!legacyKey)return;
+   const legacy=await store.read(legacyKey);if(!uuid(legacy))return;if(typeof store.updateMany!=='function')throw failure('local_atomic_migration_unavailable');
+   await store.updateMany([key,legacyKey],values=>{const t=values[key]??initial();if(t.roomSelections?.[index])return{values:{},result:null};
+    if(values[legacyKey]!==legacy)throw failure('local_summary_draft_conflict');const record=t.summaries[legacy];
+    if(record&&(record.endpoint!==context.endpoint||record.roomId!==context.roomId))throw failure('summary_room_conflict');
+    t.roomSelections??={};t.roomSelections[index]=legacy;return{values:{[key]:t,[legacyKey]:null},result:null};});
+  }
  async function resolve({summaryId,expectedLocalRevision,content},{confirmed=false}={}){if(!confirmed)throw failure('summary_resolution_choice_required');
   const parsed=summaryContentSchema.parse(content);
   const state=await update(t=>{const r=t.summaries[summaryId];if(!r)throw failure('summary_missing');
@@ -174,7 +271,7 @@ export function createPersonalSummaryLocal({subjectId,store,getConnection=()=>nu
    // A lost receipt may already have committed. Resolve it before replacing its
    // stable operation; an editor choice cannot cancel an in-flight upload.
    if(t.queue.some(q=>q.summaryId===summaryId&&['unknown','sending'].includes(q.state)))throw failure('summary_original_receipt_required');
-   const next={...r,content:clone(parsed),localRevision:r.localRevision+1,updatedAt:now(),syncState:'local'};
+    const next={...r,content:clone(parsed),localRevision:r.localRevision+1,updatedAt:now(),syncState:'local',conflicts:[]};delete next.remoteCurrent;delete next.sourceInvalidated;
    t.summaries[summaryId]=next;t.queue=t.queue.filter(q=>q.summaryId!==summaryId);
    if(allowed(t.preference,next)){const q=queueRecord(next);q.resolveVersionIds=(r.conflicts??[]).map(v=>v.versionId);t.queue.push(q);next.syncState='queued';}return t;});
   return clone(state.summaries[summaryId]);}
@@ -188,8 +285,8 @@ export function createPersonalSummaryLocal({subjectId,store,getConnection=()=>nu
   validOrigin(c.endpoint);const check=connectionGuard(c),p=await c.client.preferences();check();if(!p.revision)return{state:'unset',promptNeeded:true};
   await update(t=>{if(t.preference.state!=='unset')return t;t.preference={state:p.enabled?'enabled':'declined',endpoint:c.endpoint,roomIds:p.roomIds,
    includeExisting:p.includeExisting,selectedAt:Date.parse(p.enabledSince)/1000,cloudRevision:p.revision,needsPreferenceSync:false};
-   if(p.enabled)for(const r of Object.values(t.summaries))if(allowed(t.preference,r))t.queue.push(queueRecord(r));return t;});
+    if(p.enabled)for(const r of Object.values(t.summaries))if(r.syncState==='local'&&allowed(t.preference,r)&&!t.queue.some(q=>q.summaryId===r.summaryId))t.queue.push(queueRecord(r));return t;});
   return status();
  }
- return Object.freeze({choose,save,get,list,status,synchronize,reconcile,pull,resolve,deleteCloud,onBinding});
+  return Object.freeze({choose,save,get,list,status,synchronize,reconcile,pull,resolve,deleteCloud,onBinding,readDraft,saveDraft,listDrafts,roomSelection,selectRoomSummary,reserveRoomSummary,migrateRoomSelection});
 }

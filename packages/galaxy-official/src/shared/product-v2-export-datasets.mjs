@@ -1,6 +1,7 @@
 // Client-safe names for Product v2 export datasets. Server SQL projections live
 // in infrastructure/lifecycle-export-v2.mjs and must never ship in the client.
 export const productV2ExportDatasets = Object.freeze([
+  'task-materials',
   'forum-post-heads','forum-version-locators','forum-reply-locators','forum-events','forum-permissions','forum-report-locators','forum-governance-events','forum-write-receipts','forum-daily-usage',
   'outcome-materials-v2',
   'watch-controls','watch-control-operations','identity-group-heads','identity-group-operations','identity-group-approvals',

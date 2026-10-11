@@ -6,7 +6,8 @@ import { assertCaseReview, projectCaseReviews } from './domain/case-review.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
 import { projectCaseFacts, factAt, latestFact, publicFactView, currentResolutionView } from './domain/intervention.mjs';
 
-import { caseEventSchema, caseEventV2Schema, caseTaskLinkSchema, factReferenceSchema, caseEventReceiptSchema, caseTaskLinkReceiptSchema,taskCaseContainerSummary } from './shared/cases-schema.mjs';
+import { caseEventSchema, caseEventV2Schema, caseTaskLinkSchema, factReferenceSchema, caseEventReceiptSchema, caseTaskLinkReceiptSchema,taskCaseContainerSummary,taskMaterialCaseContainerTitle } from './shared/cases-schema.mjs';
+import {hasTaskMaterials,hasTaskText} from './shared/task-material-v1-schema.mjs';
 import { caseTaskLinkPayloadHash, legacyCaseTaskLinkPayloadHash } from './shared/case-operation-hash.mjs';
 export { caseEventSchema, caseEventV2Schema } from './shared/cases-schema.mjs';
 
@@ -327,7 +328,9 @@ export class CaseService {
         rule(!participation.paused&&!['canceled','closed'].includes(participation.taskState),'participation_paused',403);
         rule(root.participationScopeVersion===participation.scopeVersion&&initial.participationScopeVersion===participation.scopeVersion,'participation_scope_changed');
         rule(root.taskScopeVersion===task.snapshot.scopeVersion&&initial.taskScopeVersion===task.snapshot.scopeVersion,'invalid_scope_version',422);
-        rule(root.title===task.snapshot.request.title&&root.summary===taskCaseContainerSummary,'invalid_task_case_root',422);
+        const containerTitle=hasTaskMaterials(task.snapshot.request)||hasTaskText(task.snapshot.request)
+          ?taskMaterialCaseContainerTitle:task.snapshot.request.title;
+        rule(root.title===containerTitle&&root.summary===taskCaseContainerSummary,'invalid_task_case_root',422);
         const rootGrant=await this.consents.require(db,{id:command.case.consentId,subjectId:actor.subjectId,action:'case.teaser.publish',objectId:root.eventId,recipient:this.endpoint,payloadJson:command.case.payloadJson}),
           initialGrant=await this.consents.require(db,{id:command.initialFact.consentId,subjectId:actor.subjectId,action:'case.teaser.publish',objectId:initial.eventId,recipient:this.endpoint,payloadJson:command.initialFact.payloadJson});
         rule(rootGrant.visibility==='Private'&&initialGrant.visibility==='Private'

@@ -1,9 +1,9 @@
 import * as z from 'zod/v4';
 import { capabilityIdSchema, qualificationEvidenceSchema } from './qualification-schema.mjs';
 import {qualificationEvidenceV2Schema} from './qualification-v2-schema.mjs';
+import {taskTextSchema,taskMaterialDescriptorSchema,taskMaterialReferenceIssue} from './task-material-v1-schema.mjs';
 
 const subject = z.string().regex(/^GUID[0-9A-Z]{28}$/);
-const text = z.string().trim().min(1).max(10000);
 const note = z.string().trim().min(1).max(1500);
 const positive = z.number().int().positive();
 export const taskFactRefSchema = z.strictObject({ id: z.uuid(), version: positive });
@@ -19,14 +19,15 @@ export const taskRequestV2Schema = z.strictObject({
   operationId: z.uuid(), taskId: z.uuid(), caseId: z.uuid().nullable().default(null),
   parentTaskId: z.uuid().optional(),
   intent: z.enum(['stuck', 'proactive-review', 'diagnosis', 'collaboration', 'delegation']),
-  workContext: z.strictObject({ goal: text, currentSituation: text, attemptRefs: z.array(taskFactRefSchema).max(32).default([]) }),
-  title: z.string().trim().min(1).max(120), summary: text, expectedOutcome: note.optional(),
+  workContext: z.strictObject({ goal: taskTextSchema(10000), currentSituation: taskTextSchema(10000), attemptRefs: z.array(taskFactRefSchema).max(32).default([]) }),
+  title: taskTextSchema(120,{single:true}), summary: taskTextSchema(10000), expectedOutcome: taskTextSchema(1500).optional(),
+  materials: z.array(taskMaterialDescriptorSchema).min(1).max(8).optional(),
   visibility: z.enum(['Public', 'Private']), collaboration: z.enum(['open-assistance', 'basic-bounty']),
   budget: budget.optional(), capabilityId: capabilityIdSchema.optional(),
   qualification: z.strictObject({ policyId: z.string().min(1).max(80), policyVersion: z.string().min(1).max(32),profile:z.literal('facts-v2').optional() }).optional(),
   enrollmentExpiresAt: positive,
 }).refine(v => (v.collaboration === 'basic-bounty' ? !!v.budget && !!v.capabilityId && !!v.qualification : v.budget === undefined)
-  && (!v.qualification || !!v.capabilityId));
+  && (!v.qualification || !!v.capabilityId)).refine(v=>taskMaterialReferenceIssue(v)===null,{message:'Task material references must match descriptors.'});
 
 const taskCommon = { eventId: z.uuid(), expectedTaskVersion: positive };
 export const taskEventV2Schema = z.discriminatedUnion('kind', [

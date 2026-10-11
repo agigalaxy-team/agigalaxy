@@ -5,6 +5,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 /** @typedef {{id:string,revision:number}} DraftHead */
 /** @typedef {Record<string,unknown>} DraftValue */
 /** @typedef {{head:DraftHead,value:DraftValue}} DraftRecord */
+/** @typedef {{head:DraftHead|null,value:DraftValue}} DraftSnapshot */
 /** @typedef {{endpoint:string,subjectId:string|null,deviceId:string|null,bindingId:string|null,generation:number|null,assertCurrent:()=>void}} LocalDraftLease */
 
 const error = (code, message) => Object.assign(new Error(message), { code });
@@ -107,6 +108,8 @@ export function createTaskLocalDraftClient({ captureLease, getLocal, updateLocal
   let closed = false, loaded = false, reloadRequired = false;
   /** @type {DraftHead|null} */
   let head = null;
+  /** @type {DraftValue|null} */
+  let legacySnapshot = null;
   /** @type {Promise<unknown>} */
   let tail = Promise.resolve();
   /** @type {Promise<DraftRecord>|null} */
@@ -144,30 +147,71 @@ export function createTaskLocalDraftClient({ captureLease, getLocal, updateLocal
     return id;
   }
 
+  /** @param {unknown} current @param {DraftSnapshot|null} view @param {DraftHead|null} expected @param {DraftValue|null} legacy */
+  function matches(current, view, expected, legacy) {
+    if (legacy !== null) return expected === null && !!view && view.head === null && sameLegacy(current, legacy);
+    return (!view || !!view.head) && sameHead(view?.head ?? null, expected);
+  }
+
+  /** @param {boolean} migrate @returns {Promise<DraftSnapshot|null>} */
+  function read(migrate) {
+    const earlierSave = lastSave;
+    return serial(async () => {
+      const original = await wait(() => getLocal(name, ownerKey));
+      let view = taskLocalDraftView(original);
+      if (migrate && view && !view.head) {
+        const legacy = clone(original), legacyValue = clone(view.value), nextHead = { id: nextId(), revision: 1 };
+        const migrated = await wait(() => updateLocal(name, current => {
+          check();
+          if (!sameLegacy(current, legacy)) throw error('task_draft_conflict', '另一页面已改变本机任务稿，请重新读取；本页输入仍保留。');
+          return wrap(legacyValue, nextHead);
+        }, ownerKey));
+        view = taskLocalDraftView(migrated);
+      }
+      check();
+      const currentHead = view?.head ?? null;
+      if (migrate && view && !currentHead) throw error('task_draft_record_invalid', '本机稿转换结果无法核对；请重新读取原稿。');
+      legacySnapshot = view && !currentHead ? clone(view.value) : null;
+      head = currentHead; loaded = true; reloadRequired = false; observe(head);
+      if (lastSave === earlierSave) lastSave = null;
+      return view ? { head: clone(currentHead), value: clone(view.value) } : null;
+    });
+  }
+
+  /** @param {DraftValue} selected @param {DraftHead|null} expected @param {DraftValue|null} legacy @param {()=>void} [guard] @returns {Promise<DraftRecord>} */
+  async function write(selected, expected, legacy, guard) {
+    if (!loaded || reloadRequired) throw error('task_draft_reload_required', '请先重新读取本机任务稿；本页未保存的输入仍保留。');
+    const guarded = () => {
+      check();
+      const result = guard?.();
+      if (result && typeof result.then === 'function') throw error('task_draft_preview_guard_invalid', '预览的本机核对必须同步完成，原稿仍保留。');
+    };
+    try {
+      guarded();
+      const saved = await wait(() => updateLocal(name, current => {
+        guarded();
+        const view = taskLocalDraftView(current);
+        if (!matches(current, view, expected, legacy))
+          throw error('task_draft_conflict', '预览后原稿已改变或清空，请重新核对；本页输入和选择仍保留。');
+        const revision = expected ? expected.revision + 1 : 1;
+        if (!Number.isSafeInteger(revision)) throw error('task_draft_revision_limit', '本机稿修订编号已达到上限，原稿仍保留。');
+        const nextValue = view?.value ?? {};
+        for (const key of Object.keys(selected)) Object.defineProperty(nextValue, key,
+          { value: selected[key], enumerable: true, configurable: true, writable: true });
+        return wrap(nextValue, { id: expected?.id ?? nextId(), revision }, current);
+      }, ownerKey));
+      const view = taskLocalDraftView(saved);
+      if (!view?.head) throw error('task_draft_record_invalid', '本机保存结果无法核对，请重新读取。');
+      head = view.head; legacySnapshot = null; observe(head);
+      return { head: clone(head), value: clone(view.value) };
+    } catch (failure) { reloadRequired = true; throw failure; }
+  }
+
   return Object.freeze({
     /** @returns {Promise<DraftRecord|null>} */
-    load() {
-      const earlierSave = lastSave;
-      return serial(async () => {
-        const original = await wait(() => getLocal(name, ownerKey));
-        let view = taskLocalDraftView(original);
-        if (view && !view.head) {
-          const legacy = clone(original), legacyValue = clone(view.value), nextHead = { id: nextId(), revision: 1 };
-          const migrated = await wait(() => updateLocal(name, current => {
-            check();
-            if (!sameLegacy(current, legacy)) throw error('task_draft_conflict', '另一页面已改变本机任务稿，请重新读取；本页输入仍保留。');
-            return wrap(legacyValue, nextHead);
-          }, ownerKey));
-          view = taskLocalDraftView(migrated);
-        }
-        check();
-        const currentHead = view?.head ?? null;
-        if (view && !currentHead) throw error('task_draft_record_invalid', '本机稿转换结果无法核对；请重新读取原稿。');
-        head = currentHead; loaded = true; reloadRequired = false; observe(head);
-        if (lastSave === earlierSave) lastSave = null;
-        return view ? { head: clone(currentHead), value: clone(view.value) } : null;
-      });
-    },
+    load() { return read(true); },
+    /** Read without migrating or writing; opening/cancelling selection leaves the original byte structure intact. */
+    inspect() { return read(false); },
     /** @param {DraftValue} value @returns {Promise<DraftRecord>} */
     save(value) {
       let selected;
@@ -179,29 +223,34 @@ export function createTaskLocalDraftClient({ captureLease, getLocal, updateLocal
         lastSave = rejected; return rejected;
       }
       const run = serial(async () => {
-        if (!loaded || reloadRequired) throw error('task_draft_reload_required', '请先重新读取本机任务稿；本页未保存的输入仍保留。');
-        const expected = clone(head);
-        try {
-          const saved = await wait(() => updateLocal(name, current => {
-            check();
-            const view = taskLocalDraftView(current);
-            if (view && !view.head || !sameHead(view?.head ?? null, expected))
-              throw error('task_draft_conflict', '另一页面已改变或清空本机任务稿，请重新读取；本页输入仍保留。');
-            const revision = expected ? expected.revision + 1 : 1;
-            if (!Number.isSafeInteger(revision)) throw error('task_draft_revision_limit', '本机稿修订编号已达到上限，原稿仍保留。');
-            const nextValue = view?.value ?? {};
-            for (const key of Object.keys(selected)) Object.defineProperty(nextValue, key,
-              { value: selected[key], enumerable: true, configurable: true, writable: true });
-            return wrap(nextValue, { id: expected?.id ?? nextId(), revision }, current);
-          }, ownerKey));
-          const view = taskLocalDraftView(saved);
-          if (!view?.head) throw error('task_draft_record_invalid', '本机保存结果无法核对，请重新读取。');
-          head = view.head; observe(head);
-          return { head: clone(head), value: clone(view.value) };
-        } catch (failure) { reloadRequired = true; throw failure; }
+        return write(selected, clone(head), clone(legacySnapshot));
       });
       lastSave = run;
       return run;
+    },
+    /**
+     * Apply exactly the snapshot the user previewed. Unlike ordinary save, the
+     * expected Head is captured at invocation and never follows our newer Head.
+     * The UI revision/selection/expiry guard runs inside the same IDB updater.
+     * @param {DraftValue} value
+     * @param {{expected:DraftSnapshot|null,assertCurrent:()=>void}} options
+     * @returns {Promise<DraftRecord>}
+     */
+    compareAndSave(value, { expected, assertCurrent } = {}) {
+      let selected, snapshot;
+      try {
+        if (!object(value)) throw error('task_draft_value_invalid', '本机任务稿编辑字段无效，尚未保存。');
+        if (expected !== null && (!object(expected) || !(expected.head === null || validHead(expected.head)) || !object(expected.value)))
+          throw error('task_draft_head_invalid', '没有准确的预览稿件，原稿仍保留。');
+        if (typeof assertCurrent !== 'function') throw error('task_draft_preview_guard_invalid', '尚未核对当前预览输入，原稿仍保留。');
+        selected = clone(value); snapshot = clone(expected);
+      } catch (failure) {
+        const rejected = serial(async () => { throw failure; });
+        lastSave = rejected; return rejected;
+      }
+      const run = serial(() => write(selected, snapshot?.head ?? null,
+        snapshot && !snapshot.head ? snapshot.value : null, assertCurrent));
+      lastSave = run; return run;
     },
     flush() {
       const pending = lastSave;
@@ -221,7 +270,7 @@ export function createTaskLocalDraftClient({ captureLease, getLocal, updateLocal
           if (!sameHead(view.head, selected)) return current;
           cleared = true; return null;
         }, ownerKey));
-        if (cleared) { head = null; loaded = true; reloadRequired = false; }
+        if (cleared) { head = null; legacySnapshot = null; loaded = true; reloadRequired = false; }
         else if (!knownCurrent) reloadRequired = true;
         return cleared;
       });

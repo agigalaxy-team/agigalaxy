@@ -20,6 +20,8 @@ import { createNotificationInboxClient } from '../../galaxy-official/src/persona
 import { createAccountVerificationClient } from './account-verification-client.mjs';
 import { normalizeForumOrigin } from './community-forum-origin.mjs';
 import { createTaskLocalDraftClient, taskLocalDraftView } from './task-local-draft-client.mjs';
+import { createTaskMaterialClient } from './task-material-client.mjs';
+import { taskMaterialBodySchema, taskMaterialSubmissionSchema, hasTaskMaterials } from '../../galaxy-official/src/shared/task-material-v1-schema.mjs';
 
 export async function loadWebConfiguration(fetcher = globalThis.fetch) {
   const response = await fetcher('/galaxy-web-config.json', { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000) });
@@ -56,7 +58,28 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
   let receiptLifecycle = {}, localDraftGeneration = 0;
   const invalidateReceiptLifecycle = () => { receiptLifecycle = {}; localDraftGeneration++; };
   const browserApi = createBrowserClient({ ...config, sign: signDevice, fetch, now, waitForClock });
+  function markTaskRead(value, scope, seen = new WeakSet(), inheritedTaskId = null, projectionRead = null, purpose = null) {
+    if (!value || typeof value !== 'object' || seen.has(value)) return false;
+    seen.add(value); let found = false;
+    const taskId=value.taskId??value.record?.taskId??(value.object?.type==='task'?value.object.id:value.type==='task'||value.recordKind==='task'?value.ref?.id??value.id:inheritedTaskId);
+    const source=value.source??value.ref;
+    if(purpose&&source){
+      if(source.kind&&source.id&&source.payloadHash)projectionRead={source:{kind:source.kind,id:source.id,eventVersion:source.eventVersion,payloadHash:source.payloadHash},purpose};
+      else if(source.publicationId&&source.sourceKey)projectionRead={publicationId:source.publicationId,sourceKey:source.sourceKey,purpose};
+    }
+    if (value.taskId && value.request || value.textView) {
+      Object.defineProperty(value, '_webTaskScope', { value: scope, enumerable: false, configurable: true });
+      if(taskId)Object.defineProperty(value,'_webTaskId',{value:taskId,enumerable:false,configurable:true}); found = true;
+      if(projectionRead)Object.defineProperty(value,'_webTaskRead',{value:projectionRead,enumerable:false,configurable:true});
+    }
+    for (const nested of Object.values(value)) if (markTaskRead(nested, scope, seen, taskId, projectionRead, purpose)) found = true;
+    return found;
+  }
   const api = Object.freeze({ ...browserApi,
+    async call(...args) { const scope = taskDraftScope().key, result = await browserApi.call(...args);
+      const purpose=args[0].startsWith('/v2/requester-history/')?'requester-history':args[0].startsWith('/v2/contributions/')?args[1]?.purpose??'honor':null;
+      if (markTaskRead(result, scope, new WeakSet(), null, null, purpose) && scope !== taskDraftScope().key) throw Object.assign(new Error('任务读取期间身份或连接已改变。'), { code: 'task_material_scope_changed' });
+      return result; },
     async connect(...args) { const result = await browserApi.connect(...args); invalidateReceiptLifecycle(); return result; },
     disconnect() { invalidateReceiptLifecycle(); return browserApi.disconnect(); },
     close() { invalidateReceiptLifecycle(); return browserApi.close(); },
@@ -680,6 +703,13 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
       participationDraftIssue('participation_receipt_mismatch');
     return receipt;
   }
+  function preserveTaskQueue(current,next) {
+    if(next===null)return null;
+    const value=structuredClone(next),erased=[...new Set([...(current.materialErasedIds??[]),...(value.materialErasedIds??[])])];
+    if(erased.length){value.materialErasedIds=erased;value.materialBodies=(value.materialBodies??[]).filter(body=>!erased.includes(body.materialId));}
+    if(current.automaticRetryBlock)value.automaticRetryBlock=current.automaticRetryBlock;
+    return value;
+  }
   async function updateTaskQueue(key, operation, next, lease = null) {
     return withTaskQueue(async () => {
       if(typeof store.update==='function'){
@@ -690,8 +720,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
             if(next===null)return current;
             throw new Error('原操作已停止本机重试或队列已改变；不会重新放回发送队列。');
           }
-          matched=true;return next === null ? null : { ...next,
-            ...(current.automaticRetryBlock ? { automaticRetryBlock: current.automaticRetryBlock } : {}) };
+          matched=true;return preserveTaskQueue(current,next);
         });
         if(lease)await taskAwait(lease,update);else await update();return matched;
       }
@@ -700,11 +729,44 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
         if (next === null) return false;
         throw new Error('原操作已停止本机重试或队列已改变；不会重新放回发送队列。');
       }
-      const preserved = next === null ? null : { ...next,
-        ...(current.automaticRetryBlock ? { automaticRetryBlock: current.automaticRetryBlock } : {}) };
+      const preserved = preserveTaskQueue(current,next);
       if (lease) await taskAwait(lease, () => store.put(key, preserved)); else await store.put(key, preserved);
       return true;
     });
+  }
+  function materialClientFor(lease) {
+    return createTaskMaterialClient({ api, taskDraftScope, receiptStatus }, { subjectId: lease.subjectId, now });
+  }
+  async function currentPublicationMaterials(record, lease, { rebuild = false, requireAvailable = false } = {}) {
+    if (!record || !hasTaskMaterials(record.payload)) return record;
+    checkOperationLease(lease);
+    const client = materialClientFor(lease), key = prefix + lease.subjectId + ':task-publication';
+    try {
+      const result = await taskAwait(lease, () => client.verifySubmission(record.payload, record.materialBodies ?? [], { rebuild }));
+      let current = record;
+      if (result.changed || result.erased.length) {
+        if (typeof store.update !== 'function') throw new Error('local_atomic_update_unavailable');
+        current = await taskAwait(lease, () => store.update(key, previous => {
+          checkOperationLease(lease);
+          if (!sameTaskOperation(previous, record)) throw new Error('原发布队列已变化，请重新核对。');
+          const erased = [...new Set([...(previous.materialErasedIds ?? []), ...result.erased])];
+          const bodies = (previous.materialBodies ?? []).filter(body => !erased.includes(body.materialId));
+          for (const body of result.value.materialBodies) if (!erased.includes(body.materialId) && !bodies.some(item => item.materialId === body.materialId)) bodies.push(body);
+          const next = { ...previous, materialBodies: bodies, materialErasedIds: erased };
+          if (next.submission?.materialBodies) { next.submission = { ...next.submission }; delete next.submission.materialBodies; }
+          return next;
+        }));
+      }
+      if (requireAvailable && (!result.allowed || (current.materialErasedIds ?? []).some(id => record.payload.materials.some(material => material.materialId === id))))
+        throw Object.assign(new Error('原发布材料当前不可用或编辑文字已清理。可以继续查询原回执，或明确停止本机重试；不会替换原内容、编号或期限。'), { code: 'task_material_unavailable' });
+      return { ...current, materialBodies: result.view.materialBodies.filter(body => !(current.materialErasedIds ?? []).includes(body.materialId)), materialStates: result.states };
+    } finally { client.close(); }
+  }
+  async function readTaskPublication(originalSubjectId) {
+    const lease = captureTaskDraftLease(), owner = originalSubjectId ?? lease.subjectId ?? 'visitor';
+    if (owner !== (lease.subjectId ?? 'visitor')) throw new Error('本机发布记录不属于当前身份。');
+    const record = await taskAwait(lease, () => store.get(prefix + owner + ':task-publication'));
+    return currentPublicationMaterials(record, lease);
   }
   function taskBusinessRejected(record) {
     const publication = !!record.payload, block = record.automaticRetryBlock;
@@ -739,7 +801,11 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
         throw taskBusinessRejected(current);
       const next = { ...current, state: 'result-unknown' }; delete next.automaticRetryBlock; return next;
     });
-    try { return await taskAwait(lease, () => api.call(path, sending.submission)); }
+    try {
+      const current=sending.payload&&hasTaskMaterials(sending.payload)?await currentPublicationMaterials(sending,lease,{rebuild:true,requireAvailable:true}):sending;
+      const submission=current.payload&&hasTaskMaterials(current.payload)?taskMaterialSubmissionSchema.parse({...current.submission,materialBodies:current.materialBodies}):current.submission;
+      return await taskAwait(lease, () => api.call(path, submission));
+    }
     catch (error) {
       // HTTP 5xx, timeouts and network failures cannot prove non-acceptance.
       // They keep the existing unknown-result automatic continuation.
@@ -852,23 +918,39 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     });
   }
   /** @param {unknown} draft
-   * @param {{confirmed?:boolean,forumOrigin?:{postId:string,versionId:string,returnTo:string}|null,draftHead?:{id:string,revision:number}|null}} [options] */
-  async function publishTask(draft, { confirmed = false, forumOrigin = null, draftHead = null } = {}) {
+   * @param {{confirmed?:boolean,forumOrigin?:{postId:string,versionId:string,returnTo:string}|null,draftHead?:{id:string,revision:number}|null,materialBodies?:{materialId:string,text:string}[],assertCurrent?:(()=>unknown)|null}} [options] */
+  async function publishTask(draft, { confirmed = false, forumOrigin = null, draftHead = null, materialBodies = [], assertCurrent = null } = {}) {
     if (!confirmed) throw new Error('请确认发布内容和可见范围。');
     const selectedForumOrigin = forumOrigin === null ? null : normalizeForumOrigin(forumOrigin);
     if (forumOrigin !== null && !selectedForumOrigin) throw new Error('原帖子返回位置不完整，请重新核对。');
-    const lease = taskLease(), selectedDraft = structuredClone(draft), key = prefix + lease.subjectId + ':task-publication';
+    const lease = taskLease(), selectedDraft = structuredClone(draft), selectedBodies = materialBodies.map(body => taskMaterialBodySchema.parse(body)), key = prefix + lease.subjectId + ':task-publication';
+    const guard = () => { checkTaskLease(lease); if (assertCurrent) { const result = assertCurrent(); if (result?.then) throw new Error('task_publication_guard_must_be_synchronous'); } };
     const selectedHead = draftHead === null ? null : taskLocalDraftView({ format: 'galaxy-task-local-draft', version: 1,
       head: draftHead, value: {} }).head;
     const operation = await withTaskQueue(async () => {
       if (await taskAwait(lease, () => store.get(key))) throw Object.assign(new Error('请先查询上一次发布的结果。'), { code: 'pending_task_publication' });
-      await taskAwait(lease, () => agentContinuity.requireCurrent());
+      guard(); await taskAwait(lease, () => agentContinuity.requireCurrent()); guard();
+      if (hasTaskMaterials(selectedDraft)) {
+        const client = materialClientFor(lease);
+        try { const checked = await taskAwait(lease, () => client.verifySubmission(selectedDraft, selectedBodies)); guard();
+          if (!checked.allowed) throw Object.assign(new Error('选定材料当前不可用，请重新核对原稿后发布。'), { code: 'task_material_unavailable' });
+        } finally { client.close(); }
+      } else if (selectedBodies.length) throw new Error('未关联的材料不能随任务发布。');
       const payload = taskRequestV2Schema.parse({ ...selectedDraft, taskId: crypto.randomUUID(), operationId: crypto.randomUUID() });
       const payloadJson = JSON.stringify(payload);
       const prepared = { payload, payloadJson, payloadHash: await taskAwait(lease, () => sha256Hex(payloadJson)), state: 'prepared', authorizationExpiresAt: now() + 2591900, authorizationBindingId:lease.bindingId,
+        ...(hasTaskMaterials(payload) ? { materialBodies: selectedBodies } : {}),
         ...(selectedForumOrigin ? { forumOrigin: selectedForumOrigin } : {}),
         ...(selectedHead ? { draftHead: { id: selectedHead.id, revision: selectedHead.revision } } : {}) };
-      await taskAwait(lease, () => store.put(key, prepared)); return prepared;
+      guard();
+      if (selectedHead) {
+        const current = taskLocalDraftView(await taskAwait(lease, () => store.get(prefix + lease.subjectId + ':task-draft'))); guard();
+        if (!current?.head || current.head.id !== selectedHead.id || current.head.revision !== selectedHead.revision)
+          throw Object.assign(new Error('发布前原稿已在另一页面改变，请重新预览。'), { code: 'task_draft_conflict' });
+      }
+      if (typeof store.update === 'function') await taskAwait(lease, () => store.update(key, current => { guard(); if (current) throw Object.assign(new Error('请先查询上一次发布的结果。'), { code: 'pending_task_publication' }); return prepared; }));
+      else { guard(); await taskAwait(lease, () => store.put(key, prepared)); }
+      return prepared;
     });
     return submitPublication(operation, lease);
   }
@@ -900,6 +982,8 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     checkTaskLease(lease);
     await taskAwait(lease, () => agentContinuity.requireCurrent());
     const key = prefix + lease.subjectId + ':task-publication';
+    const materialBearing=hasTaskMaterials(operation.payload);
+    if(materialBearing)operation=await currentPublicationMaterials(operation,lease,{rebuild:true,requireAvailable:true});
     if (operation.forumOrigin) {
       const origin = normalizeForumOrigin(operation.forumOrigin);
       if (!origin || typeof store.update !== 'function') throw new Error('当前本机存储不能安全接续原帖子位置。');
@@ -920,8 +1004,17 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
           visibility: operation.payload.visibility, ...(operation.authorizationExpiresAt ? {expiresAt:operation.authorizationExpiresAt} : {}), confirmed: true }));
         await updateTaskQueue(key, operation, operation, lease);
       }
-      operation.submission = await taskAwait(lease, () => api.submitAuthorization(operation.preparedConsent, { confirmed: true, reconcile }));
+      operation.submission = materialBearing ? {signedIntent:operation.preparedConsent.signedIntent,payloadJson:operation.payloadJson}
+        : await taskAwait(lease, () => api.submitAuthorization(operation.preparedConsent, { confirmed: true, reconcile }));
       await updateTaskQueue(key, operation, operation, lease);
+    }
+    if (materialBearing) {
+      const intent = operation.preparedConsent?.intent, binding = api.snapshot();
+      if (!intent || intent.bindingId !== binding?.bindingId || intent.issuedAt < now() - 300 || intent.expiresAt <= now())
+        throw Object.assign(new Error('consent_reauthorization_required'), { code: 'consent_reauthorization_required' });
+      if (operation.preparedConsent.payloadJson !== operation.payloadJson || intent.payloadHash !== operation.payloadHash
+        || operation.submission.signedIntent !== operation.preparedConsent.signedIntent) throw new Error('原材料操作的授权与内容承诺不一致，请查询原回执。');
+      operation = await currentPublicationMaterials(operation, lease, { rebuild: true, requireAvailable: true });
     }
     const result = await dispatchTaskBusiness(key, operation, lease, '/v2/tasks', { explicitRetry });
     if (result.taskId !== operation.payload.taskId || result.eventId !== operation.payload.operationId || result.version !== 1) throw new Error('任务提交结果待查询。');
@@ -937,6 +1030,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     if (operation && receipt.state === 'acknowledged') return acknowledgePublication(key, operation, receipt, lease);
     if (!operation && receipt.state === 'acknowledged') return { ...receipt, localDraftCleanup: await clearAcknowledgedTaskDraft(ref, lease) };
     else if (operation && receipt.state === 'absent' && retry) return submitPublication(operation, lease, { explicitRetry });
+    if(operation&&hasTaskMaterials(operation.payload))await currentPublicationMaterials(operation,lease);
     return receipt;
   }
   let resumingPublication = null;
@@ -967,6 +1061,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
       await taskAwait(lease, () => agentContinuity.requireCurrent());
       const deadline=operation.authorizationExpiresAt??operation.preparedConsent?.intent?.expiresAt;
       if(!Number.isSafeInteger(deadline)||deadline<=now())throw Object.assign(new Error('原发布许可已到期。内容仍保留，请重新决定是否发布。'),{code:'publication_authorization_expired'});
+      const materialBearing=hasTaskMaterials(operation.payload);
       if (operation.preparedConsent) {
         const intent = operation.preparedConsent.intent;
         if (intent.subjectId !== lease.subjectId || intent.endpoint !== config.endpoint || intent.action !== 'assistance.publish'
@@ -975,9 +1070,12 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
           || intent.recipient!==config.endpoint || intent.purpose!==(intent.visibility==='Public'?'public-profile':'operational')
           || JSON.stringify(intent.fields)!==JSON.stringify(Object.keys(operation.payload)) || intent.expiresAt!==deadline
           || operation.preparedConsent.payloadJson !== operation.payloadJson || operation.preparedConsent.endpoint !== config.endpoint
-          || operation.submission && (operation.submission.payloadJson !== operation.payloadJson || operation.submission.consentId !== intent.id))
+          || operation.submission && (operation.submission.payloadJson !== operation.payloadJson || (materialBearing?operation.submission.signedIntent!==operation.preparedConsent.signedIntent:operation.submission.consentId !== intent.id)))
           throw Object.assign(new Error('原请求的发布范围已改变。'), {code:'publication_authorization_changed'});
-        if (!operation.submission) {
+        if(materialBearing){
+          if(intent.bindingId!==lease.bindingId)throw Object.assign(new Error('原材料发布的连接依据已改变，请核对原内容后明确确认。'),{code:'publication_authorization_review_required'});
+          if(intent.issuedAt<now()-300)await renewTaskTransportAuthorization(operation,key,lease,deadline);
+        }else if (!operation.submission) {
           const authorization = await taskAwait(lease, () => api.reconcileAuthorization(operation.preparedConsent));
           if(authorization.state==='acknowledged'){
             operation.submission={consentId:authorization.consentId,payloadJson:operation.payloadJson};await updateTaskQueue(key,operation,operation,lease);
@@ -1112,6 +1210,13 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
       return acknowledgeTaskEvent(key, record, receipt, eventLease);
     }
     if (receipt.state !== 'absent') throw new Error('原操作状态存在冲突，不能另建授权。');
+    if(publicationLease&&hasTaskMaterials(record.payload)){
+      const materials=await currentPublicationMaterials(record,publicationLease),intent=record.preparedConsent?.intent,current=api.snapshot();
+      if(intent&&intent.bindingId===current?.bindingId&&intent.issuedAt>=now()-300&&intent.expiresAt>now())return{state:'retry-original',taskId:resolvedTaskId};
+      return{state:'reauthorization-required',taskId:resolvedTaskId,eventId,payloadHash:record.payloadHash,consentId:intent?.id??null,
+        payload:JSON.parse(record.payloadJson),visibility:record.payload.visibility,viewers:[],expiresAt:now()+2591900,
+        action:'assistance.publish',objectId:eventId,materialBodies:materials.materialBodies,materialStates:materials.materialStates};
+    }
     if (!record.preparedConsent) return { state: 'reauthorization-required', taskId: resolvedTaskId, eventId, payloadHash: record.payloadHash, consentId: null,
       payload: JSON.parse(record.payloadJson), visibility: taskId === null ? record.payload.visibility : 'Private', viewers: record.viewers ?? [],
       expiresAt: now() + 2591900, action: 'assistance.publish', objectId: eventId };
@@ -1152,6 +1257,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     const key = localKey(taskId ? `task-event:${taskId}` : 'task-publication'), record = await store.get(key);
     checkTaskLease(lease);
     if ((record?.preparedConsent?.intent.id ?? null) !== current.consentId || record.payloadHash !== current.payloadHash) throw new Error('本机原操作已改变。');
+    if(publicationLease&&hasTaskMaterials(record.payload))await currentPublicationMaterials(record,publicationLease,{rebuild:true,requireAvailable:true});
     const previous = record.preparedConsent, intent = previous?.intent ?? current;
     const original = JSON.parse(record.payloadJson), kind = original.event?.kind ?? original.kind;
     if (taskId === null || kind === 'apply' || kind === 'confirm') await agentContinuity.requireCurrent();
@@ -1244,7 +1350,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     }});
   }
   const privacy = createPrivacyClient({ api, now, captureLease: captureReceiptLease,
-    getLocal: (name, originalSubjectId) => store.get(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name),
+    getLocal: (name, originalSubjectId) => name === 'task-publication' ? readTaskPublication(originalSubjectId) : store.get(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name),
     putLocal: (name, value, originalSubjectId) => store.put(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name, value),
     identity: async () => active ? { subjectId: active.subjectId, deviceId: active.deviceId } : null,
     sign: async (payload, type, deviceId) => {
@@ -1269,7 +1375,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     taskEvent, reconcileTaskEvent, resumeTaskEvent, reviewTaskAuthorization, reauthorizeTaskOperation, proposeParticipation, participationEvent,
     readParticipationComposeDraft, saveParticipationComposeDraft, clearParticipationComposeDraft,
     reviewTaskStop, stopTaskOperation, stoppedTaskOperations, queryStoppedTaskOperation, onTaskOperationStopped,
-    getLocal: (name, originalSubjectId) => store.get(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name),
+    getLocal: (name, originalSubjectId) => name === 'task-publication' ? readTaskPublication(originalSubjectId) : store.get(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name),
     putLocal: (name, value, originalSubjectId) => store.put(originalSubjectId === undefined ? localKey(name) : prefix + originalSubjectId + ':' + name, value),
     updateLocal: (name, updater, originalSubjectId) => {
       if (typeof store.update !== 'function') throw new Error('local_atomic_update_unavailable');

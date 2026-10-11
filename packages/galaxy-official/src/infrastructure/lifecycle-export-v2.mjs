@@ -1,5 +1,14 @@
 import { productV2Retention } from './lifecycle-registry-v2.mjs';
+import {ServiceError} from '../shared/service-error.mjs';
 const row = (table, owner, fields, key = 't.id::text', cutoff = 't.created_at') => ({ from: `${table} t`, owner: `t.${owner}`, fields, key, cutoff });
+async function taskMaterialExport(item,_now,{db,actor,viewServices}){
+ let allowed=false;
+ try{
+  await viewServices.assistance.requireTaskWithin(db,actor,item.task_id);
+  allowed=(await viewServices.assistance.taskMaterials.statusWithin(db,item)).available;
+ }catch(error){if(!(error instanceof ServiceError)||![403,404].includes(error.status))throw error;}
+ return {...item,body_text:allowed?item.body_text:'',contentAvailable:allowed,authority:'current-task-and-source-permission; original descriptor/hash are historical'};
+}
 async function forumEventExport(item,_now,{db,actor,viewServices}){
  const forum=viewServices.forum;let allowed=false;
  if(forum&&item.payload_text){
@@ -16,6 +25,7 @@ async function forumGovernanceExport(item,_now,{db,actor,viewServices}){
 // Owner submissions do not include the mixed-author Task/Participation snapshot.
 // Those composites are exported only through a fresh authorized-view read.
 export const productV2ExportSources = {
+  'task-materials':{...row('task_materials_v1','subject_id','t.material_id,t.task_id,t.subject_id,t.root_event_id,t.consent_id,t.descriptor,t.body_text,t.text_hash,t.created_at,t.expires_at,t.erased_at','t.material_id::text'),transform:taskMaterialExport},
   'forum-post-heads':row('forum_posts_v1','subject_id','t.id,t.subject_id,t.head_version,t.current_version_id,t.state,t.created_at,t.updated_at,t.erased_at'),
   'forum-version-locators':row('forum_versions_v1','subject_id','t.id,t.post_id,t.version_number,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at'),
   'forum-reply-locators':row('forum_replies_v1','subject_id','t.id,t.post_id,t.post_version_id,t.reply_to_id,t.content_revision,t.revision,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at'),

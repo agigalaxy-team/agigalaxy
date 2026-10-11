@@ -28,6 +28,7 @@ const AgentIdentityWorkspace = lazy(() => import('./agent-identity-workspace').t
 import {readAgentIdentityEntry} from './agent-identity-handoff.mjs';
 import {TaskAgentIdentityPrompt} from './task-agent-identity-prompt';
 import {createTaskPageView,type TaskPageTask} from './task-page-view';
+import {useCurrentTaskProjection,taskViewTitle,TaskMaterialNotice} from './task-material-view';
 import {TaskRequestReading,taskReadingSection,taskRequestIntro} from './task-request-reading';
 const IdentityGroupWorkspace = lazy(() => import('./identity-group-workspace').then(module => ({default: module.IdentityGroupWorkspace})));
 const PrivacyWorkspace = lazy(() => import('./privacy-workspace').then(module => ({default: module.PrivacyWorkspace})));
@@ -50,7 +51,7 @@ import { closeSummaryRuntime } from './summary-runtime.mjs';
 import '@/app/globals.css';
 import './workspace.css';
 import './identity-recovery.css';
-import { SiteShell, StartPage, PageLoading, DiscoveryTabs } from './site-shell';
+import { SiteShell, StartPage, PageLoading } from './site-shell';
 const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));
 const WorkOverview = lazy(() => import('./account-center').then(module => ({default: module.WorkOverview})));
 import {ProjectDirectoryWorkspace,browseReturnPath,browseReturnLabel} from './public-browse-workspace';
@@ -149,7 +150,8 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const taskId=/^\/app\/tasks\/([0-9a-f-]{36})$/.exec(path)?.[1]??null;
   const taskReadScope=JSON.stringify([taskId,status?.connection?.bindingId,status?.connection?.generation]);
   const taskPage=useMemo(()=>createTaskPageView<Task>({taskId,scope:taskReadScope,read:runtime&&taskId?()=>runtime.api.call(`/v2/tasks/${taskId}`,null,{method:'GET',authenticated:!!runtime.api.snapshot()}):null,isCurrent:()=>location.pathname===`/app/tasks/${taskId}`}),[runtime,taskId,taskReadScope]);
-  const {task,loading:taskLoading}=useSyncExternalStore(taskPage.subscribe,taskPage.read,taskPage.read);
+  const {task:taskRecord,loading:taskLoading}=useSyncExternalStore(taskPage.subscribe,taskPage.read,taskPage.read);
+  const task=useCurrentTaskProjection(runtime,taskRecord);
   const readingPositions = useRef(new Map<string, number>());
   const restoreReading = useRef<{ route: string; y: number } | null>(location.hash ? {route:location.pathname+location.search,y:0} : null);
   const taskSection=taskReadingSection(task,readTaskSection(routeSearch));
@@ -311,7 +313,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if (enteringIdentity && new URL(target, location.origin).searchParams.get('section') === 'account') setAccountVerificationVisit(value => value + 1);
     const targetPath=new URL(target,location.origin).pathname;
     const fromParameters=new URLSearchParams(location.search);
-    const fromDirectory=['/app/','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)&&!fromParameters.has('mode')&&!fromParameters.has('compose');
+    const fromDirectory=['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)&&!fromParameters.has('mode')&&!fromParameters.has('compose');
     const toObject=/^\/app\/(tasks|capsules|projects|community|rooms)\/[^/]+/.test(targetPath);
     const browseReturn=fromDirectory&&toObject?from:(enteringIdentity||toObject?history.state?.browseReturn:undefined);
     history.pushState({from,...(identityReturn?{identityReturn}:{}),...(browseReturn?{browseReturn}:{})}, '', target);
@@ -453,8 +455,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
           </>:<><h1 className="small">暂时无法打开这项求助</h1><p>{connected?'可以重试，或返回任务目录。':'如果这项求助分享给了你，请先登录。'}</p><div className="button-row"><Button disabled={busy} onClick={()=>run(()=>taskDetails(path.split('/').at(-1)!))}>重新读取</Button>{!connected&&<Button variant="outline" onClick={needIdentity}>登录并继续</Button>}<button className="text-link" onClick={()=>navigate('/app/participate')}>返回任务目录</button></div>{error&&<details className="technical-details"><summary>读取问题详情</summary><p>{error}</p></details>}{connected&&<button className="text-link" onClick={()=>setRecoverTaskRecords(true)}>查看我在这里留下的记录</button>}</>}
           <FactReceiptRecovery key={`fact-receipt:${path}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}:${status?.connection?.generation??''}`} runtime={runtime} subjectId={status?.identity?.subjectId} taskId={path.split('/').at(-1)!} connected={connected}/>
         </section>}
-        {['/app/search','/app/match'].includes(path)&&<DiscoveryTabs path={path} navigate={navigate}/>}
-        {path === '/app/match' && <DiscoveryWorkspace runtime={runtime} connected={connected} navigate={navigate}/>}
+        {path === '/app/match' && <DiscoveryWorkspace key={routeSearch} runtime={runtime} connected={connected} navigate={navigate}/>}
         {path === '/app/search' && <HelpSearchWorkspace key={routeSearch} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate}/>}
         {qualificationPermissionRoute && <QualificationPermissionWorkspace key={`${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}:${qualificationPermissionRoute[1] ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} initialRequestId={qualificationPermissionRoute[1]} onNeedIdentity={needIdentity}/>}
         {capsuleRoute && <CapsuleWorkspace key={`${status?.endpoint ?? ''}:${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? 'disconnected'}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} capsuleId={capsuleRoute[1]} versionId={capsuleRoute[2]}/>}
@@ -462,9 +463,9 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {path === '/app/settings/trust-package' && <TrustPackageWorkspace key={`${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/participate' && <TaskDirectoryWorkspace key={`task-directory:${status?.identity?.subjectId ?? 'anonymous'}:${status?.connection?.bindingId ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} needIdentity={needIdentity}/> }
         {path === '/app/publish' && <TaskPublishWorkspace key={`${routeSearch}:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${status?.localDraftGeneration ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} onNeedIdentity={needIdentity} registerShellNavigation={registerTaskShellNavigation}/>}
-        {task && <section className="task-page"><a className="back-link" href={browseReturnPath('/app/participate')} onClick={e=>{e.preventDefault();navigate(browseReturnPath('/app/participate'));}}><ArrowLeft size={16}/>{browseReturnLabel('/app/participate')}</a><span className="tag">{stateNames[task.state] ?? task.state}</span><h1 className="small">{task.request.title}</h1><p className="lead">{taskRequestIntro(task)}</p>
+        {task && <section className="task-page"><a className="back-link" href={browseReturnPath('/app/participate')} onClick={e=>{e.preventDefault();navigate(browseReturnPath('/app/participate'));}}><ArrowLeft size={16}/>{browseReturnLabel('/app/participate')}</a><span className="tag">{stateNames[task.state] ?? task.state}</span><h1 className="small">{taskViewTitle(task)}</h1><p className="lead">{taskRequestIntro(task)}</p>
           {task.schemaVersion===2&&<nav className="task-tabs" aria-label="当前求助">{[['overview','详情'],['collaboration','协作'],['comments','讨论']].map(([id,title])=><button key={id} aria-current={taskSection===id?'page':undefined} onClick={()=>navigate(`/app/tasks/${task.taskId}?section=${id}`)}>{title}</button>)}</nav>}
-          {taskSection==='overview'&&<section className="request-detail-body" aria-label="求助详情"><TaskRequestReading task={task}/><footer className="task-read-actions"><TaskTerms request={task.request}/>{task.view!=='requester'&&task.schemaVersion===2&&<Button onClick={()=>navigate(`/app/tasks/${task.taskId}?section=apply`)}>{task.state==='open'?'我可以提供帮助':'查看参与情况'}<ArrowRight size={15}/></Button>}</footer></section>}
+          {taskSection==='overview'&&<section className="request-detail-body" aria-label="求助详情"><TaskMaterialNotice task={task}/><TaskRequestReading task={task}/><footer className="task-read-actions"><TaskTerms request={task.request}/>{task.view!=='requester'&&task.schemaVersion===2&&<Button onClick={()=>navigate(`/app/tasks/${task.taskId}?section=apply`)}>{task.state==='open'?'我可以提供帮助':'查看参与情况'}<ArrowRight size={15}/></Button>}</footer></section>}
           {taskSection==='apply'&&<section className="task-apply"><button className="back-link" onClick={()=>navigate(`/app/tasks/${task.taskId}`)}><ArrowLeft size={16}/>返回任务详情</button><TaskApplication key={`${task.taskId}:${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} refresh={() => taskDetails(task.taskId)} onNeedIdentity={needIdentity}/></section>}
           {taskSection==='collaboration'&&task.schemaVersion===2&&<div role="tabpanel" aria-label="参与与交付"><TaskCollaboration key={`${task.taskId}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} refresh={() => taskDetails(task.taskId)}/></div>}
           {taskSection==='comments'&&<div role="tabpanel" aria-label="讨论"><TaskCommentsWorkspace key={`comments:${task.taskId}:${status?.endpoint}:${status?.identity?.subjectId ?? "anonymous"}:${status?.identity?.deviceId??""}:${status?.connection?.bindingId??""}:${status?.connection?.generation??""}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/></div>}

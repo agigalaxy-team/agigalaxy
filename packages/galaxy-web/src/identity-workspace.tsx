@@ -1,3 +1,4 @@
+import {literalTaskText} from './task-material-client.mjs';
 import React,{useCallback,useEffect,useEffectEvent,useLayoutEffect,useRef,useState} from 'react';
 import {Copy,Link2,Monitor,ShieldCheck} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -199,7 +200,7 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
     </div>}
    </div>
   </details>
-  {draftPreview&&<section className="device-draft-choice"><h3>继续登录前写的求助</h3>{draftPreview.existingDraft?<><p>这个身份也有一份草稿，请选择接下来编辑的内容。</p><div className="device-draft-comparison">{[{value:draftPreview.visitorDraft,label:'登录前的草稿'},{value:draftPreview.existingDraft,label:'当前身份的草稿'}].map(({value,label})=><div key={label}><h4>{label}</h4><strong>{value?.title||'尚未填写标题'}</strong><p>{value?.goal||value?.summary||value?.situation||'还没有填写正文'}</p></div>)}</div></>:<><strong>{draftPreview.visitorDraft?.title||'尚未填写标题'}</strong><p>{draftPreview.visitorDraft?.goal||draftPreview.visitorDraft?.summary||'可以继续补充内容。'}</p></>}
+  {draftPreview&&<section className="device-draft-choice"><h3>继续登录前写的求助</h3>{draftPreview.existingDraft?<><p>这个身份也有一份草稿，请选择接下来编辑的内容。</p><div className="device-draft-comparison">{[{value:draftPreview.visitorDraft,label:'登录前的草稿'},{value:draftPreview.existingDraft,label:'当前身份的草稿'}].map(({value,label})=><div key={label}><h4>{label}</h4><strong>{literalTaskText(value?.title)||'尚未填写标题'}</strong><p>{literalTaskText(value?.goal)||literalTaskText(value?.summary)||literalTaskText(value?.situation)||'还没有填写独立说明'}</p></div>)}</div></>:<><strong>{literalTaskText(draftPreview.visitorDraft?.title)||'尚未填写标题'}</strong><p>{literalTaskText(draftPreview.visitorDraft?.goal)||literalTaskText(draftPreview.visitorDraft?.summary)||'可以继续补充独立说明，来源材料回原稿核对。'}</p></>}
    <div className="button-row"><Button disabled={busy} onClick={()=>void run(async()=>{const result=await runtime.visitorDrafts.adopt(draftPreview,{confirmed:true});if(result.currentIdentityChanged)throw Error('草稿已放入原身份，当前身份已变化，请重新查看。');navigate('/app/publish');})}>{draftPreview.existingDraft?'用登录前的草稿继续':'继续编辑'}</Button><Button variant="ghost" onClick={()=>{dismissedDraft.current=draftKey(draftPreview);setDraftPreview(null);if(draftPreview.existingDraft)navigate('/app/publish');}}>{draftPreview.existingDraft?'继续当前身份的草稿':'稍后处理'}</Button></div>{draftPreview.existingDraft&&<p className="device-muted">采用登录前的草稿会替换当前身份的这份草稿；登录前的原稿保留。</p>}
   </section>}
  </section>;

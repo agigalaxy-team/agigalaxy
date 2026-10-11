@@ -1,4 +1,5 @@
 import { CommunityForumV1 } from './community-forum-v1.mjs';
+import {TaskMaterialServiceV1} from './task-material-v1.mjs';
 import { CommunityForumGovernanceV1 } from './community-forum-governance-v1.mjs';
 import { BuilderService } from './builders.mjs';
 import { BuilderSupportV2Service } from './builder-support-v2.mjs';
@@ -104,6 +105,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const capsules = new CapsuleService(access, consents, proofs);
   const cases = new CaseService(access, consents); cases.capsules = capsules;
   const assistance = new AssistanceService(access, consents);
+  const taskMaterials=new TaskMaterialServiceV1(access,consents,{forum});assistance.taskMaterials=taskMaterials;
   const taskOwnerRead = new TaskOwnerReadServiceV2(access, consents);
   const taskOwnerControl = new TaskOwnerControlServiceV2(access, consents, {tasks:assistance,ownerRead:taskOwnerRead});
   assistance.publicWrites = publicWrites;
@@ -128,7 +130,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const qualificationCalculations = new QualificationCalculationService(access, consents, assistance);
   qualification.v2 = new QualificationV2Service(qualification, { cases, assistance, experienceReviews, capsules, calculations: qualificationCalculations });
   assistance.qualification = qualification;
-  const contributionSharing = new ContributionSharingV2Service(access, consents);
+  const contributionSharing = new ContributionSharingV2Service(access, consents,{taskMaterials});
   const honor = new HonorService(access, assistance, proofs, honorRules);
   honor.v2 = new HonorV2Service(honor, { qualification: qualification.v2, sharing: contributionSharing, ciV2 });
   const requesterHistoryV2 = new RequesterHistoryV2Service(access, assistance, contributionSharing);
@@ -195,7 +197,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   inbox.informationWatches=informationWatches;
   const contacts = new ContactV2Service(access, { consents, discovery: discovery.v2, inbox, publicWrites,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor), createRoomWithin: createChatContactAdapter(chat) });
-  return { forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
+  return { taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
     identity: new IdentityLinkService(access, identityProviders, { accountRegistry: communityAccounts }), communityAccounts, publicWrites, verificationRecords, chat,
     receiptStatus,watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
     proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { forum,forumGovernance, choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),

@@ -16,7 +16,18 @@ export function visibleFactVersions(facts) {
   return facts.map(fact => ({ ...historyVisibleValue(fact), currentVisibleVersion: versions.get(fact.id),
     supersededInVisibleHistory: fact.version < versions.get(fact.id), capabilityVerified: false }));
 }
-export function sourceFingerprint(value) { return digest(JSON.stringify(historyVisibleValue(value))); }
+function fingerprintValue(value,materialView=false){
+  if(Array.isArray(value))return value.map(item=>fingerprintValue(item,materialView));
+  if(value&&typeof value==='object'){
+    const controlled=materialView||value.format==='task-text-view-v1';
+    return Object.fromEntries(Object.entries(value).filter(([key])=>!controlled||key!=='checkedAt')
+      .map(([key,item])=>[key,fingerprintValue(item,controlled)]));
+  }
+  return value;
+}
+// A reader's check time is not a new Task source fact. Only the finite new
+// material view ignores it; actual text/state/deadline and old objects persist.
+export function sourceFingerprint(value) { return digest(JSON.stringify(fingerprintValue(historyVisibleValue(value)))); }
 export function matchesHistoryWindow(occurredAt, window, now) {
   if (window.kind === 'all-visible') return true;
   const time = Date.parse(occurredAt);

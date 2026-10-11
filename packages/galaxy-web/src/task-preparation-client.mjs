@@ -1,3 +1,4 @@
+import {withholdTaskMaterialTree} from './task-material-client.mjs';
 import {sha256Hex} from '../../galaxy-official/src/shared/web-primitives.mjs';
 import {contactCandidates} from './task-contact-client.mjs';
 import {taskOriginReturn} from './help-origin-client.mjs';
@@ -23,15 +24,15 @@ export function createTaskPreparationClient(runtime){
  /** @param {any} payload @param {any} preparation @param {{taskId:string,returnTo:string}|null} originReturn */
  async function freeze(payload,preparation,originReturn=null){
   if(originReturn&&(originReturn.taskId!==payload.parentTaskId||!taskOriginReturn(originReturn.taskId,originReturn.returnTo)))throw Error('原工作返回位置与这份请求不一致。');
-  const hash=await fingerprint(payload);const record={ownerId:owner.subjectId,endpoint,payloadHash:hash,preparation:preparation?structuredClone(own(preparation)):null,
+  const hash=await fingerprint(payload);const record={ownerId:owner.subjectId,endpoint,payloadHash:hash,preparation:preparation?withholdTaskMaterialTree(own(preparation),undefined,{all:true}):null,
    ...(originReturn?{originReturn:{taskId:originReturn.taskId,returnTo:taskOriginReturn(originReturn.taskId,originReturn.returnTo)}}:{})};
   await wait(()=>runtime.putLocal(`task-preparation-payload:${hash}`,record));return hash;
  }
  async function attach(task){
   check();if(task.requesterId!==owner.subjectId)throw Error('只能接续本人发布的协助准备。');
-  const hash=await fingerprint(task.request),record=own(await wait(()=>runtime.getLocal(`task-preparation-payload:${hash}`)));
+  const hash=await fingerprint(task.rootRequest??task.request),record=own(await wait(()=>runtime.getLocal(`task-preparation-payload:${hash}`)));
   if(!record||record.payloadHash!==hash)return null;
-  const fixed={...record,taskId:task.taskId};await wait(()=>runtime.putLocal(`task-preparation:${task.taskId}`,fixed));return fixed;
+  const fixed={...record,taskId:task.taskId,preparation:record.preparation?withholdTaskMaterialTree(record.preparation,undefined,{all:true}):null};await wait(()=>runtime.putLocal(`task-preparation:${task.taskId}`,fixed));return fixed;
  }
  async function resume(task){
   check();let record=own(await wait(()=>runtime.getLocal(`task-preparation:${task.taskId}`)));
@@ -41,7 +42,7 @@ export function createTaskPreparationClient(runtime){
   const prepared=record.preparation,pages=[];let withheld=0;
   // Recheck every exact version before private source bodies reach the page.
   for(const page of prepared.pages){const items=[];for(const item of page.items){
-    try{const current=await call('/v2/search/reference',{search:page.search,ref:item.ref});if(current.state==='current')items.push(item);else withheld++;}catch{check();withheld++;}
+    try{const current=await call('/v2/search/reference',{search:page.search,ref:item.ref});if(current.state==='current'&&current.item)items.push(current.item);else withheld++;}catch{check();withheld++;}
    }pages.push({...page,items});}
   const candidates=contactCandidates(pages,owner.subjectId).map(candidate=>{const old=prepared.candidates.find(item=>item.subjectId===candidate.subjectId);return{...candidate,help:old?.help??'',basis:old?.basis??'',conditions:old?.conditions??candidate.conditions};});
   return{...prepared,pages,candidates,selected:prepared.selected.filter(id=>candidates.some(item=>item.subjectId===id)),withheld};

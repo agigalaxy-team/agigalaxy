@@ -1,3 +1,4 @@
+import {controlledTaskTitle,independentTaskLabel,withholdTaskMaterialProjection} from './task-material-client.mjs';
 const base='https://galaxy.invalid';
 /** @param {unknown} value @returns {value is string} */
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
@@ -47,7 +48,9 @@ export function createHelpOriginClient(runtime){
   if(task.taskId!==taskId||task.schemaVersion!==2||task.requesterId!==owner.subjectId)fail('只能关联当前身份自己发起的原工作。');
   const facts=task.caseId?await wait(()=>runtime.api.call(`/v2/cases/${task.caseId}/read`,{taskId},{authenticated:true})):null;
   if(facts&&facts.caseId!==task.caseId)fail('原工作与案例不一致，请重新读取。');
-  return{ownerId:owner.subjectId,endpoint,task,facts,attempts:facts?.attempts??[]};
+  const locatorTask=withholdTaskMaterialProjection(task,undefined,{all:true});
+  if(controlledTaskTitle(task))locatorTask.request.title=independentTaskLabel(task,'原任务');
+  return{ownerId:owner.subjectId,endpoint,task:locatorTask,facts,attempts:facts?.attempts??[]};
  }
  async function validate(selection){
   helpOriginPayload(selection);check();

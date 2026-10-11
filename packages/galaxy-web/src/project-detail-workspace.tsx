@@ -1,3 +1,4 @@
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {FactDetails} from './fact-details';
@@ -17,7 +18,8 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
  const client=useMemo<ProjectViewClient|null>(()=>runtime?createProjectViewClient(runtime,{connected,subjectId}):null,[runtime,connected,subjectId]);
  const [project,setProject]=useState<ProjectView|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [selected,setSelected]=useState<DiscoveryPurpose[]>(()=>{const saved:unknown=projectQueryMemory(runtime,connected,'project:'+projectId);return object(saved)&&Array.isArray(saved.purposes)?saved.purposes.filter(isDiscoveryPurpose):['conversation','collaboration'];});
- const [query,setQuery]=useState<DiscoveryQuery|null>(null),[items,setItems]=useState<VisibleOpportunity[]>([]),[next,setNext]=useState<string|null>(null),[searched,setSearched]=useState(false),[coverage,setCoverage]=useState<{windowLimited:boolean}|null>(null),[detail,setDetail]=useState<OpportunityDetail|UnavailableOpportunityDetail|null>(null);
+ const [query,setQuery]=useState<DiscoveryQuery|null>(null),[items,setItems]=useState<VisibleOpportunity[]>([]),[next,setNext]=useState<string|null>(null),[searched,setSearched]=useState(false),[coverage,setCoverage]=useState<{windowLimited:boolean}|null>(null),[readDetail,setDetail]=useState<OpportunityDetail|UnavailableOpportunityDetail|null>(null);
+ const detail=useCurrentTaskMaterialTree(runtime,readDetail);
  const wantsContact=new URLSearchParams(location.search).get('action')==='contact';
  const [direct,setDirect]=useState<{project:ProjectView;query:DiscoveryQuery;detail:OpportunityDetail|{opportunity:UnavailableOpportunityDetail['opportunity']}}|null>(null),[directError,setDirectError]=useState('');
  const [relatedOpen,setRelatedOpen]=useState(false);

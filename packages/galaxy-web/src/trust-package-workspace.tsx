@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {createTrustPackageWorkspaceClient,mergeTrustWorks,trustReferenceKey,matchingTrustPermission} from './trust-package-workspace-client.mjs';
@@ -73,7 +74,8 @@ function TrustPackageSession({runtime,subjectId,connected,navigate}:Omit<Props,'
  useEffect(()=>{formRef.current=form;permissionRef.current=permissionForm;},[form,permissionForm]);
  const [draftReady,setDraftReady]=useState(!workspace),[permissionReady,setPermissionReady]=useState(!workspace),[draftError,setDraftError]=useState(''),[permissionDraftError,setPermissionDraftError]=useState('');
  const savedForm=useRef(''),savedPermission=useRef(''),previewDraft=useRef<TrustDraftBinding|null>(null);
- const [viewMode,setViewMode]=useState(routePurpose),[protocolMode,setProtocolMode]=useState('export'),[sourcePanel,setSourcePanel]=useState(false),[sourceNext,setSourceNext]=useState<Record<string,string|null>>({}),[works,setWorks]=useState<TrustWork[]>([]),[selectedWork,setSelectedWork]=useState(''),[materials,setMaterials]=useState<TrustMaterial[]>([]),[sourceError,setSourceError]=useState('');
+ const [viewMode,setViewMode]=useState(routePurpose),[protocolMode,setProtocolMode]=useState('export'),[sourcePanel,setSourcePanel]=useState(false),[sourceNext,setSourceNext]=useState<Record<string,string|null>>({}),[readWorks,setWorks]=useState<TrustWork[]>([]),[selectedWork,setSelectedWork]=useState(''),[materials,setMaterials]=useState<TrustMaterial[]>([]),[sourceError,setSourceError]=useState('');
+ const works=useCurrentTaskMaterialTree(runtime,readWorks)??[];
  const [readings,setReadings]=useState<Record<string,TrustReading>>({}),[permissionReading,setPermissionReading]=useState<TrustReading|null>(null),[sourceLoading,setSourceLoading]=useState(false);
  const [licenses,setLicenses]=useState<TrustLicense[]>([]),[received,setReceived]=useState<TrustLicense[]>([]),[pending,setPending]=useState<TrustPending[]>([]),[pendingReasons,setPendingReasons]=useState<Record<string,string>>({}),[authorNext,setAuthorNext]=useState<string|null>(null),[recipientNext,setRecipientNext]=useState<string|null>(null),[selectedLicense,setSelectedLicense]=useState<TrustLicense|null>(null),[licenseReading,setLicenseReading]=useState<TrustReading|null>(null),[licenseCurrent,setLicenseCurrent]=useState<TrustPermissionStatus|null>(null);
  const [preview,setPreview]=useState<TrustPrepared|null>(null),[container,setContainer]=useState<TrustContainer|null>(null),[imported,setImported]=useState<TrustContainer|null>(null),[report,setReport]=useState<TrustReport|null>(null),[online,setOnline]=useState<TrustOnline|null>(null),[original,setOriginal]=useState<TrustOriginal|null>(null),[originalReading,setOriginalReading]=useState<TrustReading|null>(null);

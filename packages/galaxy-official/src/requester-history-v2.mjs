@@ -60,7 +60,7 @@ export class RequesterHistoryV2Service{
         feedbackState=p.snapshot.feedback?.eventId===item.row.id?'current':'superseded';
       }
       facts.push({source:{kind:'task-event',id:item.row.id,eventVersion:1,payloadHash:item.row.payload_hash},
-        projection:this.sharing.project(item.row,item.permission.fields),publicationIds:item.permission.publicationIds,
+        projection:await this.sharing.projectWithin(db,actor,item.row,item.permission.fields,item.permission),publicationIds:item.permission.publicationIds,
         authority:item.row.kind==='requester-feedback'?'provider-reported':'signed-participant-event',
         ...(feedbackState?{feedbackState}:{}),independentQualityRating:false});
     }
@@ -70,7 +70,7 @@ export class RequesterHistoryV2Service{
     for(const accepted of acceptances){const payload=JSON.parse(accepted.row.payload_text),delivery=allowed.find(i=>i.row.id===(payload.event??payload).deliveryId);
       if(delivery)acceptanceIntervals.push({seconds:accepted.event.at-delivery.event.at,deliverySourceId:delivery.row.id,acceptanceSourceId:accepted.row.id});}
     return{schemaVersion:2,id:digest(JSON.stringify([this.access.endpoint,'requester-history',id])),requesterId:task.requester_id,
-      source:{kind:'task-event',id:root.id,eventVersion:1,payloadHash:root.payload_hash},projection:this.sharing.project(root,rootPermission.fields),
+      source:{kind:'task-event',id:root.id,eventVersion:1,payloadHash:root.payload_hash},projection:await this.sharing.projectWithin(db,actor,root,rootPermission.fields,rootPermission),
       facts,counts:{acceptances:acceptances.length,cancellations:allowed.filter(i=>i.row.kind==='cancel').length,disputes:allowed.filter(i=>i.row.kind==='dispute').length,
         currentFeedback:facts.filter(f=>f.feedbackState==='current').length},
       responseSeconds:response?response.event.at-offer.event.at:null,

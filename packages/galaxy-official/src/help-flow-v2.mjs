@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod/v4';
 import { helpQuerySchema, helpOfferDraftSchema, helpBasisSchema, helpPaths } from './shared/help-schema-v2.mjs';
 import { taskRequestV2Schema } from './shared/task-schema-v2.mjs';
+import {hasTaskMaterials} from './shared/task-material-v1-schema.mjs';
 import { createHelpActionFlowV2 } from './help-action-flow-v2.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -179,6 +180,7 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, authorize,
   async function publish(id, submission) {
     z.strictObject({ consentId: z.uuid(), payloadJson: z.string().min(1).max(24000) }).parse(submission);
     const request = taskRequestV2Schema.parse(JSON.parse(submission.payloadJson));
+    if(hasTaskMaterials(request))throw Error('task_material_atomic_route_required');
     if (!actions.createTask) throw new Error('help_task_client_unavailable');
     const payloadHash = digest(submission.payloadJson);
     await store.update(id, row => {

@@ -5,7 +5,12 @@ import type {FeedbackParticipant} from './task-operation-state';
 import type {FactReference} from './work-fact-presentation-types';
 
 export type WorkRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
-export type WorkRequest=z.infer<typeof taskRequestV2Schema>;
+export type WorkSignedRequest=z.infer<typeof taskRequestV2Schema>;
+// Task reads contain the service's current permission-aware projection. The
+// signed root request remains a separate typed value and is never render text.
+export type WorkRequest=Omit<WorkSignedRequest,'title'|'summary'|'workContext'|'expectedOutcome'>&{
+ title:string;summary:string;workContext:Omit<WorkSignedRequest['workContext'],'goal'|'currentSituation'>&{goal:string;currentSituation:string};expectedOutcome?:string;
+};
 type TaskEvent=z.infer<typeof taskEventV2Schema>;
 export type WorkRole=z.infer<typeof participationProposalV2Schema>['role'];
 export type WorkApplication=Pick<Extract<TaskEvent,{kind:'apply'}>,'proposal'|'scope'|'qualificationEvidence'>&{applicationId:string;subjectId:string;state:string;quote?:WorkRequest['budget']|null};

@@ -3,12 +3,13 @@ import {canReadProjection} from './domain/consent-policy.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {digest} from './shared/digest.mjs';
 import {transaction} from './database.mjs';
+import {hasTaskMaterials,hasTaskText} from './shared/task-material-v1-schema.mjs';
 const rule=(ok,code,status=403)=>{if(!ok)throw new ServiceError(code,status);};
 const taskKinds=new Set(['task-created','participation-proposed','confirm','propose-scope','confirm-scope','deliver','accept','withdraw','cancel','close',
   'dispute','propose-resolution','confirm-resolution','requester-feedback']);
 const absent=e=>e instanceof ServiceError&&[403,404,409,422].includes(e.status);
 export class ContributionSharingV2Service{
-  constructor(access,consents){Object.assign(this,{access,consents});}
+  constructor(access,consents,{taskMaterials=null}={}){Object.assign(this,{access,consents,taskMaterials});}
   status(actor,input){const parsed=contributionStatusSchema.safeParse(input);rule(parsed.success,'invalid_contribution_reference',400);
     return this.access.runAuthorized(actor,'history',async db=>{
       const row=(await db.query('SELECT * FROM contribution_publications WHERE id=$1 AND subject_id=$2',[parsed.data.publicationId,actor.subjectId])).rows[0];
@@ -66,9 +67,11 @@ export class ContributionSharingV2Service{
     const original=await this.sourceGrantWithin(db,kind,row);
     if(canReadProjection(original,{viewerId:actor?.subjectId??null,now:this.access.now()}))return{original,publicationIds:[],fields:contributionProjectionFields};
     const ref={kind,id:row.id,eventVersion:1,payloadHash:row.payload_hash};
-    const rows=(await db.query('SELECT * FROM contribution_publications WHERE subject_id=$1 AND source_refs @> $2::jsonb AND revoked_at IS NULL ORDER BY id FOR SHARE',
+    const rows=(await db.query(`SELECT p.*,b.expires_at AS grant_binding_expires FROM contribution_publications p
+      JOIN consents c ON c.id=p.consent_id AND c.subject_id=p.subject_id JOIN bindings b ON b.id=c.binding_id
+      WHERE p.subject_id=$1 AND p.source_refs @> $2::jsonb AND p.revoked_at IS NULL ORDER BY p.id FOR SHARE OF p`,
       [row.subject_id,JSON.stringify([ref])])).rows;
-    const publicationIds=[],fields=new Set();
+    const publicationIds=[],fields=new Set(),fieldExpiresAt={};
     for(const published of rows)try{
       rule(published.payload_text,'contribution_publication_unavailable',404);
       const payload=contributionPublicationSchema.parse(JSON.parse(published.payload_text));
@@ -78,9 +81,10 @@ export class ContributionSharingV2Service{
       rule(!grant.currentVisibility?.deletionPending&&grant.visibility==='Public'&&canReadProjection(grant,{viewerId:actor?.subjectId??null,now:this.access.now()}),'contribution_publication_unavailable',404);
       const selected=payload.sourceRefs.find(r=>r.kind===kind&&r.id===row.id&&r.payloadHash===row.payload_hash);
       rule(selected,'contribution_publication_unavailable',404);
-      publicationIds.push(published.id);for(const field of selected.fields)fields.add(field);
+      const expiresAt=Math.min(Date.parse(payload.expiresAt)/1000,grant.expiresAt,Date.parse(published.grant_binding_expires)/1000);
+      publicationIds.push(published.id);for(const field of selected.fields){fields.add(field);fieldExpiresAt[field]=Math.max(fieldExpiresAt[field]??0,expiresAt);}
     }catch(error){if(!absent(error))throw error;}
-    if(publicationIds.length)return{original,publicationIds,fields:[...fields]};
+    if(publicationIds.length)return{original,publicationIds,fields:[...fields],fieldExpiresAt};
     throw new ServiceError('contribution_source_unavailable',404);
   }
   project(row,fields){
@@ -91,13 +95,30 @@ export class ContributionSharingV2Service{
       caseId:row.case_id??null,taskId:row.task_id??event.taskId??null,participationId:row.participation_id??event.participationId??null};
     return Object.fromEntries(fields.map(field=>[field,values[field]]));
   }
+  async projectWithin(db,actor,row,fields,{fieldExpiresAt={}}={}){
+    const projection=this.project(row,fields),selectedFields=fields.filter(field=>field==='title'||field==='summary');
+    if(row.kind!=='task-created'||!selectedFields.length)return projection;
+    const request=JSON.parse(row.payload_text);
+    if(!hasTaskMaterials(request)&&!hasTaskText(request))return projection;
+    rule(this.taskMaterials,'task_material_reader_unavailable',503);
+    const task=(await db.query('SELECT id,requester_id,root_event_id,snapshot FROM task_requests WHERE id=$1 AND root_event_id=$2',[row.task_id,row.id])).rows[0];
+    rule(task&&!task.snapshot.contentDeleted,'contribution_source_unavailable',404);
+    const {textView}=await this.taskMaterials.projectWithin(db,actor,task,{selectedFields});
+    for(const field of selectedFields){const view=textView.fields[field],expiresAt=fieldExpiresAt[field];
+      if(view.availableUntil!==undefined&&expiresAt!==undefined)view.availableUntil=Math.min(view.availableUntil,expiresAt);
+      projection[field]=view.text;
+    }
+    // Only the already selected fields have current text metadata. This does
+    // not reveal an unselected Task ID, material locator or original request.
+    return {...projection,textView};
+  }
   reference(row,kind,permission){return permission.publicationIds.length
     ?{publicationId:permission.publicationIds[0],sourceKey:digest(JSON.stringify([kind,row.id,row.payload_hash]))}
     :{kind,id:row.id,eventVersion:1,payloadHash:row.payload_hash};}
   preview(actor,input){const parsed=contributionPreviewSchema.safeParse(input);rule(parsed.success,'invalid_contribution_preview',400);
     return this.access.runAuthorized(actor,'history',async db=>{const items=[];for(const ref of parsed.data.sourceRefs){const row=await this.sourceWithin(db,ref);
       await this.sourceGrantWithin(db,ref.kind,row);rule(row.subject_id===actor.subjectId,'contribution_source_author_required');
-      const{fields,...source}=ref;items.push({ref:source,projection:this.project(row,fields),publication:'not-published-by-preview'});}
+      const{fields,...source}=ref;items.push({ref:source,projection:await this.projectWithin(db,actor,row,fields),publication:'not-published-by-preview'});}
       return{items,purposes:parsed.data.purposes,publicationScope:'selected-fields-and-bounded-purpose-conclusions; original-text-permissions-unchanged',originalPermissionsChanged:false,
         derivedDisclosure:'The selected purposes may attribute and count this author’s currently valid scoped contribution; no unselected text or other-party identity is disclosed.'};});}
   readProjection(actor,input){const parsed=contributionProjectionReadSchema.safeParse(input);rule(parsed.success,'invalid_contribution_reference',400);
@@ -106,7 +127,7 @@ export class ContributionSharingV2Service{
         const p=contributionPublicationSchema.parse(JSON.parse(publication.payload_text)),selected=p.kind==='publish'&&p.sourceRefs.find(r=>digest(JSON.stringify([r.kind,r.id,r.payloadHash]))===parsed.data.sourceKey);
         rule(selected,'contribution_source_unavailable',404);const{fields:_fields,...source}=selected;ref=source;}
       const row=await this.sourceWithin(db,ref),permission=await this.authorizeWithin(db,actor,ref.kind,row,{purpose:parsed.data.purpose});
-      return{ref:this.reference(row,ref.kind,permission),projection:this.project(row,permission.fields),publicationIds:permission.publicationIds,
+      return{ref:this.reference(row,ref.kind,permission),projection:await this.projectWithin(db,actor,row,permission.fields,permission),publicationIds:permission.publicationIds,
         sourceState:'currently-authorized-projection',originalTextAccessGranted:false,capabilityVerified:false};};
     return actor?this.access.runAuthorized(actor,'history',read):transaction(this.access.db,read);
   }

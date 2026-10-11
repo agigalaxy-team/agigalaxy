@@ -102,7 +102,8 @@ export class NotificationInboxService {
    const event=JSON.parse(e.payload_text).event;
    if(e.kind==='invite'&&event?.recipientId!==actor.subjectId)return null;
    if(e.kind==='invite'&&t.governance.scopes.includes('new-participation-paused'))return null;
-   return{title:t.snapshot.request.title,eventKind:e.kind,actorId:e.subject_id,object:{type:'task',id:e.task_id,eventId:e.id},serviceReceipt:['dispute','confirm-resolution','propose-resolution'].includes(e.kind)};
+   const current=await this.tasks.readTaskWithin(db,actor,c.task_id);
+   return{title:current.request.title,...(current.textView?{textView:{title:current.textView.fields.title}}:{}),eventKind:e.kind,actorId:e.subject_id,object:{type:'task',id:e.task_id,eventId:e.id},serviceReceipt:['dispute','confirm-resolution','propose-resolution'].includes(e.kind)};
   }
   const v=await this.notifications.visible(db,actor,c);if(!v)return null;const {summary:_summary,...safe}=v;
   return {...safe,object:c.kind==='capsule'&&v.object?v.object:c.assistance_id?{type:'assistance',id:c.assistance_id}:c.kind==='incident'?{type:'incident',id:v.incidentId}:{type:c.kind,id:c.event_id},serviceReceipt:c.kind==='incident'};

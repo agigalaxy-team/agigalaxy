@@ -12,7 +12,7 @@ export function createHomeContinuityClient(runtime) {
   const inbox=createNotificationInboxClient({call});
   return Object.freeze({check,close:()=>{closed=true;},async read(){
     check();const entries=[['open',()=>call('/v2/tasks/query',{view:'open',limit:4},{authenticated:false})]];
-    if(initial)entries.push(['notifications',()=>inbox.query({unreadOnly:true,limit:5},{authenticated:true})],['participating',()=>call('/v2/tasks/query',{view:'participating',limit:4},{authenticated:true})]);
+    if(initial)entries.push(['notifications',()=>inbox.query({unreadOnly:true,limit:5},{authenticated:true})],['requested',()=>call('/v2/tasks/query',{view:'requested',limit:4},{authenticated:true})],['participating',()=>call('/v2/tasks/query',{view:'participating',limit:4},{authenticated:true})]);
     const results=await Promise.all(entries.map(async([kind,action])=>{try{return[kind,{page:await action()}];}catch(error){check();return[kind,{error:error.message}];}}));
     check();return Object.fromEntries(results);
   }});

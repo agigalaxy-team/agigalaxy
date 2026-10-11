@@ -1,3 +1,5 @@
+import {taskMaterialDerivedView} from './task-material-client.mjs';
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +29,8 @@ function TargetGovernanceSession({runtime,subjectId,connected,target,reportId,na
  const client:TargetClient|null=useMemo(()=>connected&&subjectId&&lease?createTargetGovernanceClientV2({api:runtime.api,getLocal:runtime.getLocal,putLocal:runtime.putLocal,subjectId,receiptStatus:runtime.receiptStatus}):null,[runtime,subjectId,connected,lease]);
  const draft=useGovernanceDraft<TargetDraft,TargetLocator>(runtime,subjectId,connected,'governance-input:'+runtime.api.endpoint+':'+(reportId??JSON.stringify(target??'directory')),emptyDraft);
  const fields=draft.value,ruleId=useId();
- const [config,setConfig]=useState<TargetConfig|null>(null),[currentTarget,setCurrentTarget]=useState<TargetInfo|null>(null),[source,setSource]=useState<SourceView|null>(null),[items,setItems]=useState<TargetProjection[]>([]),[next,setNext]=useState<string|null>(null),[record,setRecord]=useState<TargetProjection|null>(null);
+ const [config,setConfig]=useState<TargetConfig|null>(null),[currentTarget,setCurrentTarget]=useState<TargetInfo|null>(null),[readSource,setSource]=useState<SourceView|null>(null),[items,setItems]=useState<TargetProjection[]>([]),[next,setNext]=useState<string|null>(null),[record,setRecord]=useState<TargetProjection|null>(null);
+ const source=useCurrentTaskMaterialTree(runtime,readSource);
  const [stopped,setStopped]=useState<TargetStopped[]>([]),[pending,setPending]=useState<TargetPending[]>([]),[blocked,setBlocked]=useState<Record<string,string>>({}),[preview,setPreview]=useState<TargetPreview|null>(null);
  const [busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[readError,setReadError]=useState(''),[notice,setNotice]=useState('');
  const epoch=useRef(0),sequence=useRef(0),working=useRef(false),reading=useRef(false),pageCount=useRef(1),draftNow=useRef(draft);
@@ -51,7 +54,7 @@ function TargetGovernanceSession({runtime,subjectId,connected,target,reportId,na
   if(!t||!current(gen))return null;
   try{if(t.type==='task'){
     const r:{request:{title:string;summary:string}}=await runtime.api.call('/v2/tasks/'+t.id,null,{method:'GET',authenticated:true});
-    return current(gen)?{kind:'task',title:r.request.title,summary:r.request.summary,path:'/app/tasks/'+t.id}:null;
+    return current(gen)?taskMaterialDerivedView(r,{kind:'task' as const,title:r.request.title,summary:r.request.summary,path:'/app/tasks/'+t.id}):null;
    }
    const r:{title:string;members:{subjectId:string}[]}=await runtime.api.call('/v2/chat/rooms/'+t.id+'/read',{});
    return current(gen)?{kind:'room',title:r.title||'相关对话',memberIds:r.members.map(m=>m.subjectId),path:'/app/rooms/'+t.id}:null;

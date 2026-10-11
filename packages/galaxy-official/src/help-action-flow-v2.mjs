@@ -3,6 +3,7 @@ import * as z from 'zod/v4';
 import { helpActionPrepareSchema, helpActionExecuteSchema } from './shared/help-schema-v2.mjs';
 import { taskRequestV2Schema, taskEnvelopeV2Schema, participationProposalV2Schema, participationEventV2Schema } from './shared/task-schema-v2.mjs';
 import { contextGrantV2Schema, contextEventV2Schema } from './shared/context-v2-schema.mjs';
+import {hasTaskMaterials} from './shared/task-material-v1-schema.mjs';
 
 const hash = text => createHash('sha256').update(text).digest('hex');
 const schemas = { 'publish-task': taskRequestV2Schema, 'task-event': taskEnvelopeV2Schema, 'participation-propose': participationProposalV2Schema,
@@ -25,6 +26,7 @@ function publicationRecipients(values, payload, subjectId) {
 export function createHelpActionFlowV2({ store, actions, authorize, review, now }) {
   async function describe(session, input) {
     const values = helpActionPrepareSchema.parse(input), payload = schemas[values.kind].parse(JSON.parse(values.payloadJson));
+    if(values.kind==='publish-task'&&hasTaskMaterials(payload))fail('task_material_atomic_route_required');
     const initialRecipients = publicationRecipients(values, payload, session.subjectId);
     if (Buffer.byteLength(values.payloadJson) > (values.kind.startsWith('context-') ? 40000 : 24000)) fail('help_action_payload_too_large');
     const event = payload.event ?? payload, operationId = event.operationId ?? event.eventId ?? event.id;
@@ -137,6 +139,7 @@ export function createHelpActionFlowV2({ store, actions, authorize, review, now 
   }
   async function prepareAction(id, input) {
     const values = helpActionPrepareSchema.parse(input), parsed = schemas[values.kind].parse(JSON.parse(values.payloadJson)), event = parsed.event ?? parsed;
+    if(values.kind==='publish-task'&&hasTaskMaterials(parsed))fail('task_material_atomic_route_required');
     const operationId = event.operationId ?? event.eventId ?? event.id;
     const original = await store.readOperation(id, operationId);
     if (original) {

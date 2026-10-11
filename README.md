@@ -25,10 +25,10 @@
 
 ## 开发检查
 
-要求 Node.js ≥ 22.13.0、Python ≥ 3.11。从仓库根目录安装依赖后，可运行：
+完整开发环境要求 Node.js ≥ 24.13.0、Python ≥ 3.11。从仓库根目录安装依赖后，可运行：
 
 ```sh
-npm ci
+npm run setup
 npm run build
 npm start
 # 独立检查
@@ -36,7 +36,7 @@ node node_modules/typescript/bin/tsc --noEmit
 npm run lint
 ```
 
-官网首次构建读取并校验已公开的历史文档和下载，后续可使用缓存。API 操作需要配置 `GALAXY_WEB_CONFIG_FILE`，指向所选服务提供的公开 `galaxy-web-config.json`（服务地址与公开签名验证钥），并在该服务的浏览器策略中明确允许本地网站 origin。缺少配置时仍可看官网，网页会明确说明尚未配置业务服务；预览不创建虚构账号或业务数据。
+`npm run setup` 按各自 lockfile 安装根仓、业务服务、A2A 和 Native 紧凑应用的依赖。官网首次构建读取并校验已公开的历史文档和下载，后续可使用缓存。API 操作需要配置 `GALAXY_WEB_CONFIG_FILE`，指向所选服务提供的公开 `galaxy-web-config.json`（服务地址与公开签名验证钥），并在该服务的浏览器策略中明确允许本地网站 origin。缺少配置时仍可看官网，网页会明确说明尚未配置业务服务；预览不创建虚构账号或业务数据。
 
 运行检查应结合修改范围；测试、构建、实际页面操作和宿主验证各说明自己的边界。
 

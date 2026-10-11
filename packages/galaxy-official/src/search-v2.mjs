@@ -64,6 +64,7 @@ export class SearchV2Service {
     // counter. Hidden writes cannot be inferred through its changing number.
     const sourceVersion = version ?? sourceFingerprint({ record: value, source });
     return { type, id, title, summary, sourceVersion, ref: { id, version: sourceVersion }, source,
+      ...(record.textView?{textView:record.textView}:{}),
       record: value, recordKind: value.kind ?? type, authority, matchReasons, limitations,
       sourceStatus: 'current-readable', capabilityVerified: false, selected: false, applied: false };
   }

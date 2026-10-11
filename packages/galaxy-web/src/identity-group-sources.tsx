@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
+import {useCurrentTaskMaterialTree} from './task-material-view';
 import {Textarea} from '@/components/ui/textarea';
 import {memberName,useMemberNames} from './conversation-ui';
 import {groupRefKey,IdentityGroupSource,identityGroupError} from './identity-group-presentation';
@@ -20,7 +21,8 @@ type SourcePickerProps={runtime:IdentityGroupRuntime;client:IdentityGroupClient;
 /** Candidate bodies are re-read as the current viewer and never enter the input draft. */
 export function IdentityGroupSources({runtime,client,lease,subjectId,input,change,disabled,groupId}:SourcePickerProps){
  const alive=useRef(true),listReading=useRef(false),recordGeneration=useRef(0),selectedGeneration=useRef(0),pages=useRef<Record<ListKind,number>>({history:1,requested:1,participating:1,configuration:1}),versionPages=useRef(1);
- const [works,setWorks]=useState<Work[]>([]),[configs,setConfigs]=useState<Configuration[]>([]),[more,setMore]=useState<Partial<Record<ListKind,boolean>>>({}),[loaded,setLoaded]=useState(false),[listError,setListError]=useState('');
+ const [readWorks,setWorks]=useState<Work[]>([]),[configs,setConfigs]=useState<Configuration[]>([]),[more,setMore]=useState<Partial<Record<ListKind,boolean>>>({}),[loaded,setLoaded]=useState(false),[listError,setListError]=useState('');
+ const works=useCurrentTaskMaterialTree(runtime,readWorks)??[];
  const [recordView,setRecordView]=useState<{key:string;items:IdentityGroupSourceView[];loaded:boolean;error:string;more:boolean}>({key:'',items:[],loaded:false,error:'',more:false});
  const [selectedView,setSelectedView]=useState<{key:string;items:IdentityGroupSourceView[]}>({key:'',items:[]}),[adding,setAdding]=useState<string|null>(null);
  const latest=useRef(input);useLayoutEffect(()=>{latest.current=input;},[input]);

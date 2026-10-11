@@ -1,6 +1,6 @@
 # 当前实现文档导航
 
-产品要求统一从[当前大方案](../../../../02-architecture/current/GALAXY_COMPLETE_PLAN.md)、[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)和[逐界面目录](../../../../02-architecture/current/UI_SURFACE_CATALOG.md)读取。当前恢复本地产品重构，部署、公开发布、生产数据和旧自动任务保持暂停。
+产品要求统一从[当前大方案](../../../../02-architecture/current/GALAXY_COMPLETE_PLAN.md)、[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)和[逐界面目录](../../../../02-architecture/current/UI_SURFACE_CATALOG.md)读取。当前继续整个产品重构；2026年10月12日已追加部署与公开发布授权。
 
 旧版本说明中有用的协议、数据和检查内容集中在[技术参考索引](TECHNICAL_REFERENCE_INDEX.md)。原路径只作导航，不再保存另一套当前产品流程。旧文字中的“当前行为”、模块编号、菜单、部署指令和验收结论必须按其时间与版本解释。
 

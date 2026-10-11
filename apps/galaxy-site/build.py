@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--site-release', default=os.environ.get('GALAXY_SITE_RELEASE'))
     parser.add_argument('--api-release', default=os.environ.get('GALAXY_API_RELEASE'))
     parser.add_argument('--release-data', type=Path, default=ROOT / 'release-data.json')
+    parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
     args = parser.parse_args()
     output = args.output.resolve()
@@ -48,6 +49,7 @@ def main():
     if origin != 'https://agigalaxy.org':
         raise ValueError('Unexpected public archive origin')
     cache = ROOT / '.cache' / 'public-archive'
+    archive_source = args.archive_source.resolve() if args.archive_source else None
     cache.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -62,7 +64,16 @@ def main():
         cached = cache / digest
         if cached.is_symlink():
             raise ValueError('Archive cache must contain regular files')
-        raw = cached.read_bytes() if cached.exists() else None
+        source = archive_source.joinpath(*relative.parts) if archive_source else None
+        if source and source.exists():
+            if source.is_symlink() or not source.resolve().is_relative_to(archive_source):
+                raise ValueError('Captured public asset escaped the selected source')
+            raw = source.read_bytes()
+            if hashlib.sha256(raw).hexdigest() != digest:
+                raise ValueError('Captured public asset differs from its catalog: ' + name)
+            cached.write_bytes(raw)
+        else:
+            raw = cached.read_bytes() if cached.exists() else None
         if raw is None or hashlib.sha256(raw).hexdigest() != digest:
             if args.offline:
                 raise ValueError('Missing verified archive: ' + name)
