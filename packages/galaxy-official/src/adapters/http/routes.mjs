@@ -340,6 +340,12 @@ export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerCont
       const actor={...await authenticate(request,access,'history'),httpRequestId:requestId};
       return send(200,await profiles.publish(actor,await body(request,['consentId','payloadJson'])));
     }
+    if(profiles&&route==='POST /v1/profiles/statements/receipt'){
+      return send(200,await profiles.receipt(await authenticate(request,access,'history'),await body(request,['operationId','payloadHash'])));
+    }
+    if(profiles&&route==='POST /v1/profiles/current'){
+      await body(request,[]);return send(200,await profiles.ownerRead(await authenticate(request,access,'history')));
+    }
     if (discovery && request.method === 'POST' && ['/v1/discovery/query', '/v1/discovery/preferences/read', '/v1/discovery/preferences/save'].includes(url.pathname)) {
       const query = url.pathname.endsWith('/query');
       const actor = { ...await authenticate(request, access, query ? 'history' : 'notifications'), httpRequestId: requestId };

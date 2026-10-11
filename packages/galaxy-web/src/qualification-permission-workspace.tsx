@@ -4,7 +4,7 @@ import React,{useEffect,useEffectEvent,useId,useLayoutEffect,useMemo,useRef,useS
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {QualificationPermissionOperations} from './qualification-permission-operations';
-import {createProfileClient} from './profile-client.mjs';
+import {useMemberNames} from './conversation-ui';
 import {useChoiceViewLease} from './choice-retained-operations';
 import type {ToolRuntime,ToolPending} from './tool-workspace-state';
 import {toolErrorField} from './tool-workspace-state';
@@ -40,11 +40,8 @@ function usePermissionSession({runtime,subjectId,connected}:SessionProps){
  return {client,pending,busy,error,notice,preview,setPreview:(value:QualificationPrepared|null)=>{if(currentClient.current===client)setPreview(value);},setNotice:(value:string)=>{if(currentClient.current===client)setNotice(value);},run};
 }
 function usePeople(runtime:ToolRuntime|null,subjectId:string|undefined,connected:boolean,ids:string[]){
- const [people,setPeople]=useState<{key:string;names:Record<string,string>}>({key:'',names:{}}),key=[...new Set(ids.filter(Boolean))].slice(0,20).sort().join(',');
- const binding=runtime?.api?.snapshot();
- useEffect(()=>{if(!runtime||!subjectId||!connected||!key)return;let active=true;const client=createProfileClient(runtime,{subjectId,authenticated:true});
-  void client.displayNames(key.split(',')).then((values:{subjectId:string;displayName:string|null}[])=>{if(active)setPeople({key,names:Object.fromEntries(values.filter((value):value is {subjectId:string;displayName:string}=>typeof value.displayName==='string').map(value=>[value.subjectId,value.displayName]))});}).catch(()=>{});return()=>{active=false;client.close();};
- },[runtime,subjectId,connected,key,binding?.bindingId,binding?.generation]);return people.key===key?people.names:{};
+ const names=useMemberNames(subjectId&&connected?runtime:null,subjectId,connected,ids);
+ return Object.fromEntries(Object.entries(names).filter((item):item is [string,string]=>typeof item[1]==='string'));
 }
 function saveRecord(value:unknown){const url=URL.createObjectURL(new Blob([JSON.stringify(withholdTaskMaterialTree(value,undefined,{all:true}),null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='galaxy-material-permission.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function MaterialList({items,runtime}:{items?:QualificationMaterial[];runtime:ToolRuntime|null}){return <TaskCurrentSourceItem runtime={runtime} item={items}>{current=><ul className="permission-materials">{current?.map((item,index)=><li key={item.id??index}><strong>{item.title??item.label??(item.available===false?'材料当前不可读取':'所选工作材料')}</strong>{item.summary&&<p>{item.summary}</p>}<small>版本 {item.ref?.eventVersion??item.eventVersion??item.version??1}</small></li>)}</ul>}</TaskCurrentSourceItem>;}

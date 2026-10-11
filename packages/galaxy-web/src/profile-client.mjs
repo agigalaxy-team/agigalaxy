@@ -41,7 +41,8 @@ export function createProfileClient(runtime,{subjectId=null,targetSubjectId=subj
    const declaration=page.selfDeclared??{};
    return{subjectId:selected,displayName:declaration.displayName?.trim()||null,about:declaration.about?.trim()||null,
     tags:declaration.claimedCapabilities??[],projects:declaration.projects??[],profileSource:page.selfDeclaredSource??null,
-    ...(page.selfDeclaredRevision!==undefined?{profileRevision:page.selfDeclaredRevision}:{}),honors,honorsError,checkedAt:page.checkedAt};
+    ...(page.selfDeclaredRevision!==undefined?{profileRevision:page.selfDeclaredRevision}:{}),
+    ...(page.selfDeclaredReadExpiresAt!==undefined?{profileReadExpiresAt:page.selfDeclaredReadExpiresAt}:{}),honors,honorsError,checkedAt:page.checkedAt};
   },
   /** @param {{ruleId:string,ruleVersion:string}} item @param {{after?:string,expectedFingerprint?:string,limit?:number}} options */
   async honor(item,{after,expectedFingerprint,limit=8}={}){

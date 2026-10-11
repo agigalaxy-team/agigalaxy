@@ -13,7 +13,8 @@ export async function readProfileDisplayNames(call,subjectIds,{authenticated=tru
   for(let index=0;index<batch.length;index++){
    const result=read[index];
    if(result.status==='rejected')results.push({subjectId:batch[index],displayName:null,error:result.reason?.code??result.reason?.message??'profile_unavailable'});
-   else results.push({subjectId:batch[index],displayName:result.value.selfDeclared?.displayName?.trim()||null});
+   else results.push({subjectId:batch[index],displayName:result.value.selfDeclared?.displayName?.trim()||null,
+    ...(result.value.selfDeclaredReadExpiresAt!==undefined?{readExpiresAt:result.value.selfDeclaredReadExpiresAt}:{})});
   }
  }
  return results;

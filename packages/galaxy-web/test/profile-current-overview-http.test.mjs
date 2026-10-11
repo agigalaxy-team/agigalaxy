@@ -77,6 +77,8 @@ test('current profile overview and shared names preserve viewer permissions, dec
  assert.deepEqual(card.projects,[project]);
  assert.equal(card.profileRevision,undefined,'a selected other subject does not acquire the owner revision');assert.deepEqual(card.honors,[]);
  assert.equal((await mine.overview()).profileRevision,1);assert.equal((await publicProfile.overview()).displayName,'当前可见名字');
+ assert.deepEqual(await selected.displayNames([f.p.actor.subjectId]),[{subjectId:f.p.actor.subjectId,displayName:'当前可见名字',readExpiresAt:f.f.now+60}],
+  'shared name views receive the same current reading deadline as the profile declaration');
  const accepted=await f.publicWork();card=await publicProfile.overview();assert.equal(card.honors.length,1);
  assert.equal(card.honors[0].title,f.policy.title);assert.equal(card.honors[0].status,'active');assert.equal(card.honorsError,null);
  assert.equal((await publicProfile.honor(card.honors[0])).card.acceptedCases,1);

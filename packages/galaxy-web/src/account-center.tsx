@@ -1,9 +1,10 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowRight,ArrowUpRight,Award,BookOpen,BriefcaseBusiness,ChevronLeft,FileText,KeyRound,MessageSquare,Settings,ShieldCheck,UserRound} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,Award,BookOpen,BriefcaseBusiness,ChevronLeft,FileText,KeyRound,MessageSquare,Pencil,Settings,ShieldCheck,UserRound} from 'lucide-react';
 import {createProfileClient} from './profile-client.mjs';
 import {HomeContinuityWorkspace} from './home-continuity-workspace';
 import {profilePath} from './profile-navigation.mjs';
 import './profile-settings.css';
+import './person-profile.css';
 import type {AccountRuntime,ProfileOverview,HonorBadge,HonorDetail,HonorResponse} from './account-workspace-types';
 
 type Go=(path:string)=>void;
@@ -16,21 +17,26 @@ export function SettingsLayout({path,search,navigate,children}:Props){
  return <div className="settings-layout"><aside className="settings-sidebar"><NavLink to="/app/account" navigate={navigate} className="settings-title"><ChevronLeft size={16}/>我的银河</NavLink><nav aria-label="设置">{settings.map(([url,title])=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}>{title}</NavLink>)}</nav></aside><div className="settings-content">{children}</div></div>;
 }
 type AccountProps={runtime?:AccountRuntime|null;subjectId?:string;connected:boolean;hasIdentity:boolean;navigate:Go};
+type AccountProfile=ProfileOverview&{profileReadExpiresAt?:number};
+const withoutProfileDeclaration=(profile:AccountProfile):AccountProfile=>({...profile,displayName:null,about:null,tags:[],profileReadExpiresAt:undefined});
 export function AccountOverview(props:AccountProps){
  const binding=props.runtime?.api?.snapshot?.();
  return <AccountSession key={`${props.subjectId??'guest'}:${props.connected}:${binding?.bindingId}:${binding?.generation}`} {...props}/>;
 }
 function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:AccountProps){
  const client=useMemo(()=>runtime&&subjectId?createProfileClient(runtime,{subjectId,authenticated:connected}):null,[runtime,subjectId,connected]);
- const [profile,setProfile]=useState<ProfileOverview|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(!!client),[refresh,setRefresh]=useState(0);
+ const [profile,setProfile]=useState<AccountProfile|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(!!client),[refresh,setRefresh]=useState(0),declarationRead=useRef(0);
  const [honor,setHonor]=useState<HonorBadge|null>(null),[honorDetail,setHonorDetail]=useState<HonorDetail|null>(null),[honorError,setHonorError]=useState(''),[honorBusy,setHonorBusy]=useState(false);
  const honorRequest=useRef({sequence:0,active:true,selected:null as HonorBadge|null});
  useEffect(()=>{let active=true;
-  if(client)client.overview().then(value=>{if(active){setProfile(value);setError('');const selection=honorRequest.current;
-   if(selection.selected&&!value.honors.some((item:HonorBadge)=>item.id===selection.selected?.id)){selection.sequence++;selection.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}}).catch(()=>{if(active){setProfile(null);setError('资料暂时没有读到，请稍后重试。');honorRequest.current.sequence++;honorRequest.current.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}).finally(()=>{if(active)setBusy(false);});
+  if(client)client.overview().then(value=>{if(active){declarationRead.current++;const unavailable=navigator.onLine===false||!!value.profileReadExpiresAt&&value.profileReadExpiresAt*1000<=Date.now();setProfile(unavailable?withoutProfileDeclaration(value):value);setError(unavailable?'个人介绍需要重新读取，连接恢复后会继续核对。':'');const selection=honorRequest.current;
+   if(selection.selected&&!value.honors.some((item:HonorBadge)=>item.id===selection.selected?.id)){selection.sequence++;selection.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}}).catch(()=>{if(active){declarationRead.current++;setProfile(null);setError('资料暂时没有读到，请稍后重试。');honorRequest.current.sequence++;honorRequest.current.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}).finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;};
  },[client,refresh]);
- useEffect(()=>{const selection=honorRequest.current;selection.active=true;const reread=()=>{if(document.visibilityState==='visible')setRefresh(n=>n+1);};document.addEventListener('visibilitychange',reread);window.addEventListener('focus',reread);return()=>{document.removeEventListener('visibilitychange',reread);window.removeEventListener('focus',reread);client?.close();selection.active=false;selection.sequence++;};},[client]);
+ useEffect(()=>{const selection=honorRequest.current;selection.active=true;const reread=()=>{if(document.visibilityState==='visible'&&navigator.onLine!==false)setRefresh(n=>n+1);},offline=()=>{declarationRead.current++;setProfile(value=>value?withoutProfileDeclaration(value):null);setError('暂时离线，个人介绍会在连接恢复后重新读取。');};document.addEventListener('visibilitychange',reread);window.addEventListener('focus',reread);window.addEventListener('online',reread);window.addEventListener('offline',offline);return()=>{document.removeEventListener('visibilitychange',reread);window.removeEventListener('focus',reread);window.removeEventListener('online',reread);window.removeEventListener('offline',offline);client?.close();selection.active=false;selection.sequence++;};},[client]);
+ useEffect(()=>{const expiresAt=profile?.profileReadExpiresAt;if(!profile||!expiresAt)return;const remaining=expiresAt*1000-Date.now(),sequence=declarationRead.current,reread=remaining>5000?window.setTimeout(()=>setRefresh(value=>value+1),remaining-5000):null;
+  const expire=window.setTimeout(()=>{if(sequence!==declarationRead.current)return;declarationRead.current++;setProfile(value=>value===profile?withoutProfileDeclaration(value):value);setError('个人介绍需要重新核对当前可见范围。');if(navigator.onLine!==false)setRefresh(value=>value+1);},Math.max(0,remaining));return()=>{if(reread!==null)window.clearTimeout(reread);window.clearTimeout(expire);};
+ },[profile]);
  async function showHonor(item:HonorBadge,after?:string){const selection=honorRequest.current,token=++selection.sequence;selection.selected=item;setHonor(item);setHonorError('');setHonorBusy(true);if(!after)setHonorDetail(null);
   try{const response:HonorResponse=await client!.honor(item,{after,expectedFingerprint:after?honorDetail?.sourceFingerprint:undefined}),detail={...response,items:response.items??response.contributions??[],nextAfter:response.nextAfter??response.pagination?.contributions?.nextAfter??null,sourceFingerprint:response.sourceFingerprint??response.card?.sourceFingerprint};
    if(!selection.active||token!==selection.sequence)return;
@@ -50,7 +56,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
    <h2>{profile?.displayName??(hasIdentity?'我的个人资料':'欢迎来到银河')}</h2>
    {profile?.about?<p className="profile-about">{profile.about}</p>:<p>{hasIdentity?'在这里继续自己的交流与工作。':'浏览经验、参与讨论，遇到问题时找到帮助。'}</p>}
    {!!profile?.tags?.length&&<ul className="profile-tags" aria-label="自我介绍中的方向">{profile.tags.slice(0,6).map((tag:string)=><li key={tag}>{tag}</li>)}</ul>}
-   {subjectId&&<NavLink to={profilePath(subjectId)!} navigate={navigate} className="profile-self-view">查看完整个人资料<ArrowRight size={15}/></NavLink>}
+   {subjectId&&<div className="profile-intro-actions"><NavLink to={profilePath(subjectId)!} navigate={navigate} className="profile-self-view">查看完整个人资料<ArrowRight size={15}/></NavLink><NavLink to={profilePath(subjectId)!+'?edit=1'} navigate={navigate} className="person-edit-link"><Pencil size={14}/>编辑资料</NavLink></div>}
    {!connected&&<NavLink to="/app/settings/identity" navigate={navigate} className="primary-action">{hasIdentity?'继续使用我的身份':'开始使用'}<ArrowRight size={15}/></NavLink>}
   </div></div>
   {error&&<p role="alert" className="profile-inline-error">{error}<button type="button" onClick={()=>{setBusy(!!client);setRefresh(n=>n+1);}}>重试</button></p>}

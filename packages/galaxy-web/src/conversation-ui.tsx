@@ -13,11 +13,28 @@ type MemberRuntime={
 export function useMemberNames(runtime:MemberRuntime|null,subjectId:string|undefined,connected:boolean,subjectIds:Array<string|undefined|null>){
   const idsKey=JSON.stringify([...new Set(subjectIds.filter((id):id is string=>typeof id==='string'&&/^GUID[0-9A-Z]{28}$/.test(id)))].sort());
   const connection=runtime?.api.snapshot(),connectionKey=JSON.stringify([connection?.bindingId,connection?.generation]);
-  const scopeKey=JSON.stringify([subjectId,connected,connectionKey,idsKey]);
+  const scopeKey=JSON.stringify([runtime?.api.endpoint,subjectId,connected,connectionKey,idsKey]);
   const [result,setResult]=useState<{scopeKey:string;names:Record<string,string|null>}>({scopeKey,names:{}});
-  useEffect(()=>{if(!runtime)return;const ids=JSON.parse(idsKey) as string[];if(!ids.length)return;const client=createProfileClient(runtime,{subjectId:subjectId??null,authenticated:connected});let active=true,reading=false;
-    const read=async()=>{if(!active||reading||document.hidden)return;reading=true;try{const result:Record<string,string|null>={};for(let start=0;start<ids.length;start+=20){const batch=await client.displayNames(ids.slice(start,start+20));if(!active)return;for(const item of batch)result[item.subjectId]=item.displayName;}if(active)setResult({scopeKey,names:result});}catch{if(active)setResult({scopeKey,names:{}});}finally{reading=false;}};
-    void read();const timer=window.setInterval(()=>void read(),60000),visible=()=>void read();document.addEventListener('visibilitychange',visible);return()=>{active=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);client.close();};
+  useEffect(()=>{if(!runtime)return;const ids=JSON.parse(idsKey) as string[];if(!ids.length)return;
+    const client=createProfileClient(runtime,{subjectId:subjectId??null,authenticated:connected});
+    let active=true,sequence=0,reading:number|null=null,expiryTimer:number|undefined;
+    let cached:Record<string,{name:string|null;expiresAt:number}>={};
+    const publish=()=>{if(!active)return;if(expiryTimer!==undefined)window.clearTimeout(expiryTimer);
+      const now=Date.now(),names:Record<string,string|null>={};let until=Infinity;
+      for(const [id,item] of Object.entries(cached)){if(navigator.onLine===false||item.expiresAt<=now){delete cached[id];continue;}names[id]=item.name;until=Math.min(until,item.expiresAt);}
+      setResult({scopeKey,names});if(Number.isFinite(until))expiryTimer=window.setTimeout(publish,Math.max(0,until-now));
+    };
+    const read=async()=>{if(!active||reading!==null||document.hidden||navigator.onLine===false)return;
+      const token=++sequence,startedAt=Date.now();reading=token;
+      try{const next:typeof cached={};for(let start=0;start<ids.length;start+=20){const batch=await client.displayNames(ids.slice(start,start+20));if(!active||sequence!==token)return;
+        for(const item of batch){const until='readExpiresAt'in item?item.readExpiresAt:undefined,limit=until===undefined?startedAt+60000:Number.isFinite(until)?Math.min(startedAt+60000,until*1000):0;next[item.subjectId]={name:item.displayName,expiresAt:limit};}}
+        if(active&&sequence===token){cached=next;publish();}
+      }catch{if(active&&sequence===token){cached={};publish();}}finally{if(reading===token)reading=null;}
+    };
+    const visible=()=>{publish();void read();},offline=()=>{sequence++;reading=null;cached={};publish();};
+    void read();const timer=window.setInterval(()=>void read(),45000);
+    document.addEventListener('visibilitychange',visible);window.addEventListener('focus',visible);window.addEventListener('online',visible);window.addEventListener('offline',offline);
+    return()=>{active=false;sequence++;window.clearInterval(timer);if(expiryTimer!==undefined)window.clearTimeout(expiryTimer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',visible);window.removeEventListener('online',visible);window.removeEventListener('offline',offline);client.close();};
   },[runtime,subjectId,connected,connectionKey,idsKey,scopeKey]);
   return result.scopeKey===scopeKey?result.names:{};
 }
