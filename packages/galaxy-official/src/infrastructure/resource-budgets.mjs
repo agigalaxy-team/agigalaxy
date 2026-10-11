@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { lstat,readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../shared/service-error.mjs';
+import {forumSubjectBytesSql} from '../community-forum-budget-v1.mjs';
 
 export const resourceBudgetPolicySchema=z.object({version:z.literal(1),maxPayloadBytesPerSubject:z.number().int().min(0).max(1099511627776),
   maxQueuedJobsPerSubject:z.number().int().min(1).max(100000),maxActiveExportsPerSubject:z.number().int().min(1).max(1000),
@@ -97,7 +98,7 @@ const productBytesSql = [
 ].join(' UNION ALL ');
 export async function lockSubjectResourceBudget(db,subjectId){await db.query('SELECT pg_advisory_xact_lock(734912309,hashtext($1))',[subjectId]);}
 export async function subjectResourceUsage(db,subjectId,now){
-  const bytes=(await db.query(`SELECT coalesce(sum(bytes),0)::text AS bytes FROM (${bytesSql} UNION ALL ${productBytesSql}) AS owned_payloads`,[subjectId])).rows[0].bytes;
+  const bytes=(await db.query(`SELECT coalesce(sum(bytes),0)::text AS bytes FROM (${bytesSql} UNION ALL ${productBytesSql} UNION ALL ${forumSubjectBytesSql}) AS owned_payloads`,[subjectId])).rows[0].bytes;
   const jobs=(await db.query("SELECT count(*)::text AS count FROM jobs j LEFT JOIN evidence_submissions e ON j.payload->>'evidenceId'=e.id::text LEFT JOIN ci_requests_v2 ci ON j.payload->>'ciRequestId'=ci.id::text WHERE (e.subject_id=$1 OR ci.subject_id=$1 OR j.kind='builder-probe' AND j.payload->>'subjectId'=$1) AND j.state IN ('pending','running')",[subjectId])).rows[0].count;
   const exports=(await db.query('SELECT count(*)::text AS count FROM data_exports WHERE subject_id=$1 AND revoked_at IS NULL AND expires_at>$2',[subjectId,new Date(now*1000).toISOString()])).rows[0].count;
   return {payloadBytes:BigInt(bytes),queuedJobs:Number(jobs),activeExports:Number(exports)};

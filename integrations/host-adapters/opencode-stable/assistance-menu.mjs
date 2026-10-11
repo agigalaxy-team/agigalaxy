@@ -4,13 +4,25 @@ import { createHonorMenu } from './honor-menu.mjs';
 import { createAssistanceDraftMenu } from './assistance-draft-menu.mjs';
 import { createContextDraftMenu } from './context-draft-menu.mjs';
 import { publicContributionEventKinds } from '../../../packages/galaxy-official/src/shared/assistance-schema.mjs';
+import {showExactChoice} from './exact-choice.mjs';
+import {createExistingRecordSelection} from './existing-record-selection.mjs';
 // Native host dialog composition; no web view, network access or signing here.
-export function createAssistanceMenu({ controller, select, prompt, info, language, onBack, isCurrent, availableScopes = null }) {
+export function createAssistanceMenu({ controller, select, prompt, info, language, onBack, isCurrent, availableScopes = null, readWorkContext }) {
   const zh = language !== 'en-US', label = (a, b) => zh ? a : b;
   const plain = value => String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').slice(0, 1200);
   let generation = 0, query = '';
   const alive = () => isCurrent();
   const has = scope => !availableScopes || availableScopes.includes(scope);
+  const stateName=value=>({open:label('等待参与','Open for participation'),'awaiting-confirmation':label('等待确认参与','Awaiting participation confirmation'),active:label('协作中','Working together'),'awaiting-scope-confirmation':label('等待确认新范围','Awaiting scope confirmation'),delivered:label('等待验收','Awaiting acceptance'),accepted:label('已验收','Accepted'),canceled:label('已取消','Canceled'),expired:label('招募已结束','Enrollment ended'),disputed:label('有待处理的异议','Dispute raised'),'awaiting-resolution-confirmation':label('等待确认处理方案','Awaiting resolution confirmation'),resolved:label('已处理','Resolved'),pending:label('等待接收','Awaiting acceptance')}[value]??plain(value));
+  const eventName=value=>({invite:label('邀请参与','Invitation'),offer:label('申请协助','Offer'),select:label('选择参与者','Participant selected'),confirm:label('确认参与','Participation confirmed'),'change-scope':label('调整协作范围','Scope changed'),'confirm-scope':label('确认新范围','Scope confirmed'),deliver:label('交付结果','Result delivered'),accept:label('验收交付','Delivery accepted'),cancel:label('取消协作','Collaboration canceled'),expire:label('结束招募','Enrollment ended'),dispute:label('提出异议','Dispute raised'),'propose-resolution':label('提出处理方案','Resolution proposed'),'confirm-resolution':label('确认处理方案','Resolution confirmed'),'requester-feedback':label('评价请求说明','Request description assessment')}[value]??plain(value));
+  const clarityName=value=>({clear:label('清楚','Clear'),'partly-clear':label('部分清楚','Partly clear'),unclear:label('不清楚','Unclear')}[value]??plain(value));
+  const budgetText=budget=>!budget?'':budget.mode==='fixed'?label('报酬','Compensation')+': '+plain(budget.amount)+' '+plain(budget.unit):budget.mode==='range'?label('报酬区间','Compensation range')+': '+plain(budget.minimum)+'–'+plain(budget.maximum)+' '+plain(budget.unit):label('请求报价','Request quote')+' · '+plain(budget.unit);
+  const requestText=req=>[
+    req.problem?label('工作情况','Work context')+'\n'+plain(req.problem):'',
+    req.attemptedApproaches?.length?label('已有尝试','Previous approaches')+'\n'+req.attemptedApproaches.map(plain).join('\n'):'',
+    label('希望得到的协助','Requested help')+'\n'+plain(req.scope),
+    budgetText(req.budget),
+  ].filter(Boolean).join('\n\n');
   const leave = () => { generation++; controller.cancel(); onBack(); };
   const menu = (title, entries, back = home, offset = 0) => {
     if (!alive()) return;
@@ -35,7 +47,7 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     if (!alive()) return;
     if (index === fields.length) { done(draft); return; }
     const [key, name, initial = ''] = fields[index];
-    prompt({ title: `${title} · ${index + 1}/${fields.length}\n${name}`, placeholder: String(draft[key] ?? initial),
+    prompt({ title: `${title} · ${index + 1}/${fields.length}\n${name}`, placeholder:name,value:String(draft[key] ?? initial),
       onCancel: index ? () => form(title, fields, done, back, draft, index - 1) : back,
       onConfirm: value => {
         if (!alive()) return;
@@ -47,17 +59,17 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     void run(() => controller[retry ? context ? 'prepareContextRetry' : 'prepareCollaborationRetry' : context === 'moderation' ? 'prepareModeration' : context ? 'prepareContext' : 'prepareCollaboration'](input), preview => {
       let submitted = false;
       const cancel = () => { generation++; controller.cancel(); back(); };
-      const show = () => prompt({ title: `${label(context === 'moderation' ? '确认举报或处理记录' : context ? '确认材料授权操作' : '确认协作内容与授权', context === 'moderation' ? 'Confirm moderation record' : context ? 'Confirm material operation' : 'Confirm collaboration and Consent')}\n${preview.endpoint}\n${preview.participation?JSON.stringify(preview.participation)+'\n':''}${preview.intentJson}\n${preview.payloadJson}\n${preview.confirmation}`,
-        placeholder: preview.confirmation, onCancel: cancel, onConfirm: async value => {
+      const previewVersion=generation;
+      const show = () => showExactChoice({preview,title:label(context==='moderation'?'保存这次处理记录':context?'调整这份材料的授权':'继续这次协作',context==='moderation'?'Save this handling record':context?'Change this material authorization':'Continue this collaboration'),select,info,language,isCurrent:()=>alive()&&generation===previewVersion&&!submitted,
+        onCancel: cancel, onConfirm: async value => {
           if (!alive() || submitted) return;
-          if (value !== preview.confirmation) return message(label('确认文本不匹配，尚未提交。', 'Confirmation mismatch; nothing submitted.'), show);
           submitted = true; const version = ++generation;
           message(label('正在提交；Esc取消等待。', 'Submitting; Esc cancels waiting.'), cancel);
           try {
             const receipt = await controller[context === 'moderation' ? 'executeModeration' : context ? 'executeContext' : 'executeCollaboration'](preview, value);
-            if (alive() && version === generation) message(`${label('已记录事件', 'Event recorded')}: ${receipt.eventId ?? receipt.grantId}`, context ? back : () => detail(receipt.assistanceId));
+            if (alive() && version === generation) message(label(context === 'moderation' ? '这次处理记录已保存。' : context ? '所选材料的授权已保存。' : '这次协作已保存。', context === 'moderation' ? 'This handling record was saved.' : context ? 'The selected material authorization was saved.' : 'This collaboration was saved.'), context ? back : () => detail(receipt.assistanceId));
           } catch {
-            if (alive() && version === generation) message(`${label('提交未确认。先核对接收结果，避免重复创建。', 'Submission unconfirmed. Check acknowledgement before creating another.')}\n${preview.assistanceId ?? preview.grantId}\n${preview.eventId ?? ''}`, context || controller.listCollaborationOperations ? back : () => detail(preview.assistanceId));
+            if (alive() && version === generation) message(label('结果暂未确认；原内容已保留，继续时会读取同一次操作。', 'The outcome is unconfirmed. The original content is retained; continuing reads this same operation.'), context || controller.listCollaborationOperations ? back : () => detail(preview.assistanceId));
           }
         } }); show();
     }, back);
@@ -74,17 +86,15 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     if (controller.createAssistanceDraft) return drafts().create();
     form(label('发布求助', 'Create request'), [
       ['caseId', label('已发布Case的ID', 'ID of your published Case')], ['title', label('标题', 'Title')],
-      ['problem', label('问题说明', 'Problem')], ['attempts', label('已有尝试（分号分隔，可留空）', 'Previous approaches (semicolon separated, optional)')],
-      ['scope', label('需要协助的范围', 'Requested scope')], ['capabilityId', label('具体能力ID（可留空）', 'Capability ID (optional)')], ['hours', label('招募有效小时数', 'Enrollment hours'), '24']
+      ['problem', label('问题说明', 'Problem')], ['attempts', label('已有尝试（每行一条，可留空）', 'Previous approaches (one per line, optional)')],
+      ['scope', label('希望得到怎样的协助', 'What help would you like')]
     ], draft => {
-      const hours = Number(draft.hours);
-      if (!Number.isFinite(hours) || hours <= 0 || hours > 720) return message(label('有效期为0至720小时（不含0）。', 'Enrollment must be over 0 and at most 720 hours.'), create);
       const request = { caseId: draft.caseId, title: draft.title, problem: draft.problem,
-        attemptedApproaches: draft.attempts.split(/[;；]/).map(s => s.trim()).filter(Boolean), scope: draft.scope,
-        ...(draft.capabilityId ? { capabilityId: draft.capabilityId } : {}),
-        enrollmentExpiresAt: Math.floor(Date.now() / 1000 + hours * 3600) };
-      const visibility = (value, viewers = []) => budget(amount => chooseQualification({ ...request, visibility: value, collaboration: amount ? 'basic-bounty' : 'open-assistance', ...(amount ? { budget: amount } : {}) }, viewers), create);
+        attemptedApproaches: draft.attempts.split(/\r?\n/).map(s => s.trim()).filter(Boolean), scope: draft.scope,
+        collaboration:'open-assistance',enrollmentExpiresAt:Math.floor(Date.now()/1000+86400) };
+      const visibility = (value, viewers = []) => confirm({request:{...request,visibility:value},viewers},create);
       menu(label('请求可见性', 'Request visibility'), [
+        [label('仅自己','Only me'),()=>visibility('Private')],
         [label('私有：指定参与者', 'Private: named participants'), () => form('Private', [['viewers', label('参与者Galaxy ID，逗号分隔；留空仅自己可见', 'Participant Galaxy IDs, comma separated; empty means only you')]], value => visibility('Private', value.viewers.split(/[,，]/).map(s => s.trim()).filter(Boolean)), create)],
         [label('公开请求说明', 'Public request description'), () => visibility('Public')]
       ], create);
@@ -92,9 +102,10 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
   }
   function listing(view, after) {
     void run(() => controller.queryAssistance({ view, query, limit: 8, ...(after ? { after } : {}) }), page => {
-      const entries = page.items.map(item => [plain(item.request.title), () => detail(item.assistanceId, () => listing(view, after)), `${plain(item.state)} · ${plain(item.request.scope)}`]);
+      const entries = [[label('查找','Find'),()=>form(label('查找求助','Find requests'),[['query',label('标题或问题中的文字；留空查看全部','Text in title or problem; empty shows all'),query]],value=>{query=value.query;listing(view);},()=>listing(view,after)),query],
+        ...page.items.map(item => [plain(item.request.title), () => detail(item.assistanceId, () => listing(view, after)), `${stateName(item.state)} · ${plain(item.request.scope)}`])];
       if (page.nextAfter) entries.push([label('下一批', 'Next results'), () => listing(view, page.nextAfter)]);
-      menu(`${label('协作请求', 'Collaboration requests')}\n${page.items.length ? '' : label('暂无匹配请求', 'No matching requests')}`, entries);
+      menu(`${view==='requested'?label('我发起的求助','My requests'):view==='participating'?label('我参与的协作','My participation'):label('找需要帮助的工作','Find requests')}\n${page.items.length ? '' : label('暂无匹配请求', 'No matching requests')}`, entries);
     });
   }
   function grantMaterials(assistanceId, back, record) {
@@ -126,14 +137,15 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
         label('撤销这份材料授权', 'Revoke this material grant'), () => confirm({ kind: 'revoke', grantId }, back, true)]);
       for (const material of grant.materials) entries.push([plain(material.label), () => message(
         grant.contextAccessGranted ? String(material.content).replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').slice(0, 4000)
-          : label('确认接收前正文不可读。', 'Content is unavailable until you accept.'), refresh), plain(material.contentHash)]);
-      menu(`${label('材料授权', 'Material grant')}\n${plain(grant.scope)}\n${plain(grant.participantId)}\n${label('到期', 'Expires')}: ${new Date(grant.expiresAt * 1000).toISOString()}\n${plain(grant.materialsHash)}\n${plain(grant.state)}`, entries, back);
+          : label('确认接收前正文不可读。', 'Content is unavailable until you accept.'), refresh)]);
+      entries.push([label('来源与详细授权','Source and authorization details'),()=>message(JSON.stringify(grant,null,2),refresh)]);
+      menu(`${label('协作材料', 'Collaboration materials')}\n${grant.state==='accepted'?label('已接收','Accepted'):stateName(grant.state)}\n${label('可用范围','Permitted scope')}: ${plain(grant.scope)}\n${label('接收身份','Recipient identity')}: ${plain(grant.participantId)}\n${label('到期', 'Expires')}: ${new Date(grant.expiresAt * 1000).toISOString()}`, entries, back);
     }, back);
   }
-  function detail(id, back = home) {
+  function detail(id, back = home, readFirst = true) {
     void run(() => controller.getAssistance(id), record => {
       const requester = record.view === 'requester', provider = record.view === 'selected-provider';
-      const reload = () => detail(id, back), entries = [];
+      const reload = () => detail(id, back, false), entries = [];
       const command = event => {
         if(controller.createAssistanceEventDraft&&['select','shortlist','confirm','confirm-scope','expire','confirm-resolution'].includes(event.kind)){
           const {kind,...target}=event;return drafts().createEvent({record,eventKind:kind,target});
@@ -152,7 +164,8 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
         if (record.state === 'open' && requester) {
           const offers = record.offers.filter(offer => !offer.withdrawn);
           entries.push([label('邀请参与者', 'Invite participant'), () => fields('invite', [['participantId', 'Galaxy ID'], ['note', label('邀请说明', 'Invitation note')]])]);
-          entries.push([label('查看申请并选择', 'Review and select offer'), () => choice('select', offers)], [label('加入候选列表', 'Shortlist offer'), () => choice('shortlist', offers)]);
+          if(offers.length)entries.push([label('查看申请并选择', 'Review and select offer'), () => choice('select', offers)]);
+          if(offers.length>1)entries.push([label('比较候选人', 'Compare candidates'), () => choice('shortlist', offers)]);
         }
         if (record.state === 'open' && !requester && !record.offers.some(offer => !offer.withdrawn))
           entries.push([label('申请协助', 'Apply'), () => controller.createAssistanceEventDraft ? drafts().createEvent({record,eventKind:'offer'}) : form(label('申请', 'Offer'), [['proposal', label('方案说明', 'Proposal')], ['scope', label('可承担的范围', 'Offered scope')]], values => {
@@ -200,29 +213,43 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
           [['category',label('类别：abuse / privacy / scope / other\nmisrepresentation / malicious-artifact\ndata-extraction / work-fraud / false-verification','Category: abuse / privacy / scope / other\nmisrepresentation / malicious-artifact\ndata-extraction / work-fraud / false-verification')],['summary',label('说明','Summary')]],
           value => confirm({kind:'report',assistanceId:id,...value},reload,'moderation'),reload)]);
       }
-      entries.push([label('查看协作记录', 'View collaboration record'), () => message((record.events ?? []).map(row => `${plain(row.event.kind)} · ${plain(row.actorId)} · ${plain(row.event.summary ?? row.event.reason ?? row.event.scope)}`).join('\n') || label('没有可见事件', 'No visible events'), reload)]);
+      entries.push([label('查看协作记录', 'View collaboration record'), () => message((record.events ?? []).map(row => `${eventName(row.event.kind)}\n${plain(row.event.summary ?? row.event.reason ?? row.event.scope)}`).join('\n\n') || label('没有可见事件', 'No visible events'), reload)]);
       const req = record.request;
+      entries.push([label('阅读全文','Read full request'),()=>detail(id,back)],
+        [label('求助内容与条件','Request content and conditions'),()=>requestDetails(record,reload)],
+        [label('来源与详细记录','Source and detailed record'),()=>message(JSON.stringify(record,null,2),reload)]);
       if(record.deliverySource)entries.push([label('查看当前交付依据','Current delivery source'),()=>message(`Case: ${plain(record.deliverySource.caseId)}\n${label('纠正/复核版本','Correction/review version')}: ${record.deliverySource.reviewVersion}\n${label('文字纠正次数','Text corrections')}: ${record.deliverySource.correctionCount}\n${label('已交付引用版本','Delivered version')}: ${plain(record.delivery?.caseReviewVersion)}\n${label('纠正/复核记录变化后须重新交付；恢复贡献仍需请求者验收。','Correction/review changes require a new delivery; contribution restoration still requires requester acceptance.')}`,reload)]);
       if(record.resolution?.outcome==='resume-work')entries.push([label('方案结果：继续工作','Resolution outcome: resume work'),()=>message(label('双方确认后返回工作中；原交付和验收保留在历史中，不自动恢复为已验收。','Both parties confirm returning to active work; previous delivery and acceptance remain in history and are not automatically restored.'),reload)]);
-      menu(`${plain(req.title)}\n${plain(req.problem)}\n${label('已有尝试', 'Tried')}: ${plain(req.attemptedApproaches.join('; '))}\n${label('请求范围', 'Requested scope')}: ${plain(req.scope)}\n${label('确认范围', 'Agreed scope')}: ${plain(record.agreedScope)}\n${label('待确认范围', 'Pending scope')}: ${plain(record.pendingScope)}\n${record.paused ? label('管理暂停 · ','Moderation paused · ') : ''}${plain(record.state)} · ${plain(record.view)} · v${record.version}\n${plain(JSON.stringify(req.budget ?? ''))}\n${plain(record.delivery?.summary ?? record.resolution?.summary)}`, entries, back);
+      const heading=plain(req.title),state=(record.paused?label('管理暂停 · ','Moderation paused · '):'')+stateName(record.state),showActions=()=>menu(heading+' · '+state,entries,back);
+      const body=`${state}\n\n${requestText(req)}${record.agreedScope?'\n\n'+label('已约定范围','Agreed scope')+'\n'+plain(record.agreedScope):''}${record.pendingScope?'\n\n'+label('待确认的新范围','Pending scope')+'\n'+plain(record.pendingScope):''}${record.delivery?.summary?'\n\n'+label('交付结果','Delivered result')+'\n'+plain(record.delivery.summary):''}${record.resolution?.summary?'\n\n'+label('处理方案','Resolution')+'\n'+plain(record.resolution.summary):''}`;
+      if(readFirst){const visible=generation;info(heading,body,()=>{if(alive()&&generation===visible)showActions();});}else showActions();
     }, back);
   }
-  function qualificationEvidence(done, back) {
-    form(label('资格依据','Qualification evidence'), [['proofIds','Proof IDs (comma separated)'],['assistanceIds',label('相关已验收协作ID，逗号分隔','Related accepted collaboration IDs, comma separated')]],
-      value => done(Object.fromEntries(Object.entries(value).map(([key,text])=>[key,text.split(/[,，]/).map(s=>s.trim()).filter(Boolean)]))),back);
+  function requestDetails(record,back){const req=record.request;
+    const show=policy=>message([
+      plain(req.title),requestText(req),
+      req.visibility==='Public'?label('公开所选说明','Public selected description'):label('私有授权范围','Private authorized audience'),
+      Number.isFinite(req.enrollmentExpiresAt)?label('招募截止','Enrollment closes')+': '+new Date(req.enrollmentExpiresAt*1000).toISOString():'',
+      req.qualification?label('参与条件','Participation requirements')+'\n'+(policy?plain(policy.title):label('须符合原选定政策；当前未取得政策正文。','The original selected policy applies; its text is currently unavailable.')):'',
+    ].filter(Boolean).join('\n\n'),back);
+    if(req.qualification&&controller.qualificationPolicies)return void run(()=>controller.qualificationPolicies(),result=>show(result.policies.find(p=>p.id===req.qualification.policyId&&p.version===req.qualification.policyVersion)),back);
+    show();
   }
-  function chooseQualification(request, viewers) {
-    const submit = qualification => confirm({request:{...request,...(qualification?{qualification}: {})},viewers},create);
-    if (!request.capabilityId || !controller.qualificationPolicies) return submit();
-    void run(()=>controller.qualificationPolicies(), result=>menu(label('参与资格政策','Participation policy'), [
-      [label('不设资格政策','No qualification policy'),()=>submit()],
-      ...result.policies.filter(p=>p.capabilityId===request.capabilityId && p.collaboration===request.collaboration).map(p=>[plain(p.title),()=>submit({policyId:p.id,policyVersion:p.version}),`${plain(p.id)} @ ${plain(p.version)}`])
-    ],create),create);
+  function qualificationEvidence(done, back) {
+    const evidence={proofIds:[],assistanceIds:[]},records=createExistingRecordSelection({controller,menu,message,run,label,plain});
+    const choose=(kind,key)=>void run(()=>controller.status?.(),status=>{if(kind==='proof'&&!status?.subjectId)return message(label('当前未取得本人身份，请先恢复原连接。','Your identity is currently unavailable. Restore the original connection first.'),show);records.select(kind,item=>{if(!evidence[key].includes(item.id))evidence[key].push(item.id);show();},show,{subjectId:status?.subjectId,assistanceView:'participating',filter:record=>kind!=='assistance'||record.state==='accepted'});},show);
+    const show=()=>menu(label('选择已有参与依据','Choose existing participation sources'),[
+      [label('使用已选来源','Use selected sources'),()=>done(evidence),label('CI 来源','CI sources')+': '+evidence.proofIds.length+' · '+label('已验收协作','Accepted collaborations')+': '+evidence.assistanceIds.length],
+      ...(controller.querySearch&&evidence.proofIds.length<16?[[label('选择本人 CI 来源','Choose my CI sources'),()=>choose('proof','proofIds')]]:[]),
+      ...(controller.queryAssistance&&evidence.assistanceIds.length<16?[[label('选择本人已验收协作','Choose my accepted collaborations'),()=>choose('assistance','assistanceIds')]]:[]),
+      [label('使用已掌握的原引用','Use original references you already hold'),()=>form(label('已有来源引用','Existing source references'),[['proofIds',label('已有 CI 来源引用，逗号分隔','Existing CI references, comma separated'),evidence.proofIds.join(',')],['assistanceIds',label('已有验收工作引用，逗号分隔','Existing accepted work references, comma separated'),evidence.assistanceIds.join(',')]],value=>{for(const key of Object.keys(evidence))evidence[key]=[...new Set(value[key].split(/[,，]/).map(s=>s.trim()).filter(Boolean))];show();},show)],
+    ],back);show();
   }
   function qualifications() {
-    void run(()=>controller.qualificationPolicies(), result=>menu(label('能力参与资格','Capability participation'), result.policies.map(p=>[
+    void run(()=>controller.qualificationPolicies(), result=>menu(label('参与条件','Participation requirements'), result.policies.map(p=>[
       plain(p.title),()=>qualificationEvidence(evidence=>void run(()=>controller.evaluateQualification({policyId:p.id,policyVersion:p.version,capabilityId:p.capabilityId,evidence}),
-        result=>message(`${result.eligible?label('符合此政策','Eligible under this policy'):label('尚不符合','Not eligible')}\n${plain(result.capabilityId)}\n${result.reasons.map(plain).join('\n')}\n${label('不同Case／CI来源','Distinct Cases / CI sources')}: ${result.acceptedCollaborations?.length??0} / ${result.proofs?.length??0}\n${label('策略摘要','Policy digest')}: ${plain(result.policyDefinitionHash)}\n${(result.acceptedCollaborations??[]).map(item=>`Case ${plain(item.caseId)} · ${label('当前验收','Current acceptance')} ${plain(item.acceptanceEventId)}`).join('\n')}\n${(result.proofs??[]).map(item=>`${plain(item.sourceKey)} · Proof ${plain(item.proofId)}`).join('\n')}\n${label('不是个人能力认证','Not individual capability certification')}`,qualifications),qualifications),qualifications),`${plain(p.capabilityId)} · ${plain(p.version)}`
+        result=>menu(`${plain(p.title)}\n${result.eligible?label('符合此次参与条件','Eligible for this participation'):label('暂不符合此次参与条件','Not currently eligible for this participation')}\n${result.reasons.map(plain).join('\n')}\n${label('已验收工作','Accepted work')}: ${result.acceptedCollaborations?.length??0} · ${label('CI 来源','CI sources')}: ${result.proofs?.length??0}\n${label('该结论仅适用于这份参与政策，不是个人能力认证。','This conclusion applies to this participation policy; it does not certify individual capability.')}`,
+          [[label('政策与来源详情','Policy and source details'),()=>message(JSON.stringify({policy:p,result},null,2),qualifications)],[label('继续','Continue'),qualifications]],qualifications),qualifications),qualifications),label('版本 ','Version ')+plain(p.version)
     ])));
   }
   function moderationList(target, after, back=home) {
@@ -284,7 +311,7 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     void run(() => controller.queryNotifications({ limit: 8, ...(after ? { after } : {}) }), page => {
       const entries = page.items.map(item => [plain(item.title), () => {
         message(`${plain(item.eventKind)}\n${plain(item.actorId)}\n${plain(item.summary)}\n${plain(item.at)}`, () => {
-          void run(() => controller.markNotificationRead(item.id), () => item.incidentId ? notifications() : item.capsuleId ? createCapsuleMenu({controller,select,prompt,info,language,isCurrent,onBack:()=>notifications(),availableScopes}).openCapsule(item.capsuleId,item.versionId) : detail(item.assistanceId, () => notifications()), () => notifications());
+          void run(() => controller.markNotificationRead(item.id), () => item.incidentId ? notifications() : item.capsuleId ? createCapsuleMenu({controller,select,prompt,info,language,isCurrent,onBack:()=>notifications(),availableScopes,readWorkContext}).openCapsule(item.capsuleId,item.versionId) : detail(item.assistanceId, () => notifications()), () => notifications());
         });
       }, `${item.read ? label('已读', 'Read') : label('未读', 'Unread')} · ${plain(item.category)}`]);
       if (page.nextAfter) entries.push([label('下一批通知', 'Next notifications'), () => notifications(page.nextAfter)]);
@@ -316,46 +343,58 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     void run(()=>controller.queryRequesterHistoryFacts({assistanceId,limit:8,...(after?{after}:{})}),page=>{
       const refresh=()=>requesterFacts(assistanceId,after,back);
       const entries=[[label('查看请求描述与响应来源','Request description and response sources'),()=>message([
-        plain(page.requesterId),plain(page.description.problem),plain(page.description.scope),...page.description.attemptedApproaches.map(plain),
+        label('工作情况','Work context')+'\n'+plain(page.description.problem),label('希望得到的协助','Requested help')+'\n'+plain(page.description.scope),...page.description.attemptedApproaches.map(plain),
         `${label('可见响应间隔（秒）','Visible response interval (seconds)')}: ${page.responseSeconds??label('无可见记录','No visible record')}`,
-        page.responseSources?`${plain(page.responseSources.offerEventId)} → ${plain(page.responseSources.responseEventId)}`:''
-      ].join('\n'),refresh)],...page.facts.map(fact=>[`${plain(fact.kind)} · ${plain(fact.actorId)}`,()=>message([
-        plain(fact.eventId),new Date(fact.at*1000).toISOString(),plain(fact.summary),plain(fact.descriptionClarity),
-        fact.scopeMatched===undefined?'':label(fact.scopeMatched?'符合协作范围':'与协作范围不符',fact.scopeMatched?'Scope matched':'Scope differed'),plain(fact.authority)
-      ].join('\n'),refresh)])];
+      ].join('\n'),refresh)],...page.facts.map(fact=>[`${eventName(fact.kind)} · ${new Date(fact.at*1000).toISOString()}`,()=>menu(`${eventName(fact.kind)}\n${plain(fact.summary)}\n${new Date(fact.at*1000).toISOString()}${fact.descriptionClarity?'\n'+clarityName(fact.descriptionClarity):''}${fact.scopeMatched===undefined?'':'\n'+label(fact.scopeMatched?'符合协作范围':'与协作范围不符',fact.scopeMatched?'Scope matched':'Scope differed')}`,
+        [[label('来源详情','Source details'),()=>message(JSON.stringify(fact,null,2),refresh)],[label('继续查看','Keep reading'),refresh]],refresh)])];
+      entries.push([label('来源与完整可见记录','Source and full visible record'),()=>message(JSON.stringify(page,null,2),refresh)]);
       if(page.nextAfter)entries.push([label('下一批事实','Next facts'),()=>requesterFacts(assistanceId,page.nextAfter,back)]);
       menu(`${plain(page.title)}\n${label('当前可见事实','Currently visible facts')}: ${page.visibleFactCount}\n${label('验收／取消／争议事件','Acceptance / cancellation / dispute events')}: ${page.counts.acceptances} / ${page.counts.cancellations} / ${page.counts.disputes}\n${label('重复验收仍属于同一个请求；提供者反馈是其本人评价。','Repeated acceptance belongs to the same request; provider feedback is their own assessment.')}`,entries,back);
     },back);
   }
   function requesterHistory(subjectId, after) {
-    void run(() => controller.queryRequesterHistory({ limit: 8, ...(subjectId ? { subjectId } : {}), ...(after ? { after } : {}) }), page => {
+    const criteria={limit:8,...(subjectId?{subjectId}:{}),...(after?{after}:{})};
+    void run(() => controller.queryRequesterHistory(criteria), page => {
       const entries = page.items.map(item => [plain(item.title), () => item.factsSupported===1&&controller.queryRequesterHistoryFacts
-        ? requesterFacts(item.assistanceId,undefined,()=>requesterHistory(subjectId,after)) : message([
-        plain(item.requesterId), plain(item.description.problem), plain(item.description.scope),
-        `${label('可见响应间隔（秒）','Visible response interval (seconds)')}: ${item.responseSeconds ?? label('无可见记录','No visible record')}`,
-        ...item.facts.map(fact => `${plain(fact.kind)} · ${plain(fact.actorId)} · ${plain(fact.summary)} · ${plain(fact.descriptionClarity)} · ${plain(fact.authority)}`)
-      ].join('\n'), () => requesterHistory(subjectId, after)), plain(item.assistanceId)]);
+        ? requesterFacts(item.assistanceId,undefined,()=>requesterHistory(subjectId,after)) : void run(()=>controller.queryRequesterHistory(criteria),current=>{
+          const fresh=current.items.find(row=>row.assistanceId===item.assistanceId),back=()=>requesterHistory(subjectId,after);
+          if(!fresh)return message(label('这份记录当前已不可读，请返回查看当前记录。','This record is no longer readable. Return to the current records.'),back);
+          const body=[requestText(fresh.description??{}),...(fresh.facts??[]).map(fact=>[
+            eventName(fact.kind),fact.summary?plain(fact.summary):'',fact.descriptionClarity?label('描述','Description')+'：'+clarityName(fact.descriptionClarity):'',
+            fact.scopeMatched===undefined?'':label(fact.scopeMatched?'符合协作范围':'与协作范围不符',fact.scopeMatched?'Scope matched':'Scope differed')
+          ].filter(Boolean).join('\n'))].filter(Boolean).join('\n\n');
+          const show=()=>menu(plain(fresh.title),[[label('继续查看求助经历','Continue request history'),back],
+            [label('来源与完整记录','Source and full record'),()=>message(JSON.stringify(fresh,null,2),show)]],back);
+          const version=generation;info(plain(fresh.title),body,()=>{if(alive()&&generation===version)show();});
+        },()=>requesterHistory(subjectId,after)),plain(item.description?.scope)]);
       if (page.nextAfter) entries.push([label('下一批记录','Next records'), () => requesterHistory(subjectId, page.nextAfter)]);
-      menu(`${label('请求者履历（仅当前可见事实）','Requester history (visible facts only)')}\n${plain(page.subjectId)}\n${label('提供者反馈不代表独立认证','Provider feedback is not independent certification')}`, entries);
+      entries.push([label('查看其他身份的记录','View another identity’s records'),()=>form(label('原身份引用','Original identity reference'),[['subjectId',label('已掌握的请求者稳定身份','Known requester identity')]],value=>requesterHistory(value.subjectId),()=>requesterHistory(subjectId,after))]);
+      menu(label('求助经历','Request history'), entries,more);
     });
   }
   function home() {
-    menu(label('Galaxy / 协作请求', 'Galaxy / Collaboration'), [
-      [label('寻找协作', 'Find requests'), () => listing('open')], [label('我发布的请求', 'My requests'), () => listing('requested')],
+    menu(label('求助与协作', 'Help and collaboration'), [
+      ...(controller.prepareCollaboration && has('consent') ? [[label('发起求助', 'Ask for help'), create]] : []),
+      [label('我发起的求助', 'My requests'), () => listing('requested')],
       [label('我参与的协作', 'My participation'), () => listing('participating')],
-      ...(controller.prepareCollaboration && has('consent') ? [[label('发布求助或赏金说明', 'Create assistance or bounty request'), create]] : []),
-      [label('按ID打开', 'Open by ID'), () => form('Galaxy', [['id', label('协作请求ID', 'Assistance ID')]], value => detail(value.id))],
-      ...(controller.listAssistanceDrafts && controller.listCollaborationOperations ? [[label('本地草稿与提交恢复', 'Local drafts and submission recovery'), () => drafts().open()]] : []),
-      ...(controller.listContextDrafts && controller.listContextOperations ? [[label('本地材料草稿与提交恢复', 'Local material drafts and recovery'), () => materials().open()]] : []),
-      ...(controller.queryNotifications && has('notifications') ? [[label('站内通知','Inbox'), () => notifications()], [label('通知偏好','Notification preferences'), notificationPreferences]] : []),
-      ...(controller.queryRequesterHistory ? [[label('请求者履历','Requester history'), () => form('Galaxy', [['subjectId',label('请求者Galaxy ID；留空查看自己','Requester Galaxy ID; empty means yourself')]], value => requesterHistory(value.subjectId))]] : []),
-      ...(controller.queryBuilders && has('builders') ? [[label('建设者登记与目录','Builder registry and directory'),()=>createBuilderMenu({controller,select,prompt,info,language,isCurrent,onBack:home,availableScopes}).open()]] : []),
-      ...(controller.queryCapsules && has('capsules') ? [[label('Capsule解决方法库','Capsule solution library'),()=>createCapsuleMenu({controller,select,prompt,info,language,isCurrent,onBack:home,availableScopes}).open()]] : []),
-      ...(controller.honorRules && has('history') ? [[label('贡献与Honor','Contribution and Honor'),()=>createHonorMenu({controller,select,prompt,info,language,isCurrent,onBack:home}).open()]] : []),
-      ...(controller.qualificationPolicies ? [[label('能力参与资格','Capability participation'),qualifications]] : []),
-      ...(controller.queryModeration && has('moderation') ? [[label('举报处理队列','Moderation queue'),()=>moderationList()]] : []),
-      [label('搜索词', 'Search text'), () => form('Galaxy', [['query', label('标题或问题中的文字；留空清除', 'Text in title or problem; empty clears'), query]], value => { query = value.query; home(); })]
+      [label('找需要帮助的工作', 'Find requests'), () => listing('open')],
+      ...(controller.listAssistanceDrafts && controller.listCollaborationOperations ? [[label('继续未完成内容', 'Continue saved work'), () => drafts().open()]] : []),
+      ...(controller.queryNotifications && has('notifications') ? [[label('消息','Messages'), () => notifications()]] : []),
+      [label('更多','More'),more],
     ], leave);
+  }
+  function more(){
+    menu(label('更多协作功能','More collaboration options'),[
+      ...(controller.listContextDrafts && controller.listContextOperations ? [[label('继续准备协作材料','Continue saved materials'), () => materials().open()]] : []),
+      ...(controller.queryNotifications && has('notifications') ? [[label('通知偏好','Notification preferences'), notificationPreferences]] : []),
+      ...(controller.queryRequesterHistory ? [[label('我的求助经历','My request history'), () => requesterHistory()]] : []),
+      ...(controller.queryBuilders && has('builders') ? [[label('建设者登记与目录','Builder registry and directory'),()=>createBuilderMenu({controller,select,prompt,info,language,isCurrent,onBack:home,availableScopes}).open()]] : []),
+      ...(controller.queryCapsules && has('capsules') ? [[label('解决方法','Methods'),()=>createCapsuleMenu({controller,select,prompt,info,language,isCurrent,onBack:home,availableScopes,readWorkContext}).open()]] : []),
+      ...(controller.honorRules && has('history') ? [[label('贡献与Honor','Contribution and Honor'),()=>createHonorMenu({controller,select,prompt,info,language,isCurrent,onBack:home}).open()]] : []),
+      ...(controller.qualificationPolicies ? [[label('参与条件','Participation requirements'),qualifications]] : []),
+      ...(controller.queryModeration && has('moderation') ? [[label('举报处理队列','Moderation queue'),()=>moderationList()]] : []),
+      [label('按原引用打开求助','Open a request by its original reference'), () => form(label('已有求助引用','Existing request reference'), [['id', label('你已掌握的原求助引用', 'Original request reference you already hold')]], value => detail(value.id,more),more)],
+    ], home);
   }
   function caseModeration(source){
     const back=()=>caseModeration(source);
@@ -371,7 +410,7 @@ export function createAssistanceMenu({ controller, select, prompt, info, languag
     menu(`${label('Case独立处理','Case independent review')}\n${plain(source.caseId)} · v${plain(source.sourceVersion)}\n${label('提出争议不等于裁决；原始Case及CI签名事实保留。','A report is not a decision; source Case and signed CI facts are retained.')}`,entries,leave);
   }
   function drafts() {
-    return createAssistanceDraftMenu({controller,select,prompt,info,language,isCurrent,onBack:home,
+    return createAssistanceDraftMenu({controller,select,prompt,info,language,isCurrent,onBack:home,readWorkContext,
       onConfirm:(input,back,retry=false)=>confirm(input,back,false,retry),onOpenRequest:id=>detail(id,()=>drafts().open())});
   }
   function materials(){

@@ -113,9 +113,9 @@ export class HistoryV2Service {
     return {
       kind: 'case-history', key: `case:${parent.id}`, caseId: parent.id, subjectId,
       title: root?.payload.title ?? null, summary: root?.payload.summary ?? null,
-      requesterId: root?.subject_id ?? null, subjectRoles: [...subjectRoles].sort(),
-      taskIds: [...new Set([...linked.map(t => t.taskId), ...rows.map(row => row.payload.taskId).filter(Boolean)])].sort(),
-      capabilityIds: [...new Set(linked.flatMap(t => t.capabilityIds))].sort(),
+      requesterId: root?.subject_id ?? null, subjectRoles: [...subjectRoles].sort((left,right)=>left<right?-1:left>right?1:0),
+      taskIds: [...new Set([...linked.map(t => t.taskId), ...rows.map(row => row.payload.taskId).filter(Boolean)])].sort((left,right)=>left<right?-1:left>right?1:0),
+      capabilityIds: [...new Set(linked.flatMap(t => t.capabilityIds))].sort((left,right)=>left<right?-1:left>right?1:0),
       attempts, interventions, results, responses: historyVisibleValue(view.responses),
       resolutions: historyVisibleValue(view.resolutions), resolution,
       verificationRecords: historyVisibleValue(reports), proofs, collaborations: linked, events, capsuleReuse,
@@ -127,7 +127,10 @@ export class HistoryV2Service {
     };
   }
   async queryWithin(db, actor, options) {
-    const repo = historyV2Repository(db), tasks = [], taskIds = [], items = [];
+    // This metadata gate only avoids materializing wholly invisible candidates.
+    // Task/Case locks and every final grant/dependency check remain canonical.
+    const repo = historyV2Repository(db, { viewerId: actor?.subjectId ?? null,
+      now: this.access.now(), endpoint: this.access.endpoint }), tasks = [], taskIds = [], items = [];
     // Acquire Task locks before any Case locks, including profiles containing
     // more than one Task for a Case. Writers use the same Task -> Case order.
     await scan(after => repo.tasks(options.subjectId, after), row => taskIds.push(row.id));

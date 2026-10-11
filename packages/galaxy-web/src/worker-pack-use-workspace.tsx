@@ -1,976 +1,227 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  createWorkerPackUseClient,
-  preparePackUse,
-} from './worker-pack-use-client.mjs';
-type Props = {
-  runtime: any;
-  subjectId?: string;
-  connected: boolean;
-  navigate?: (path: string) => void;
-  onNeedIdentity?: () => void;
-  builderId?: string;
-  manifestId?: string;
-  useId?: string;
-};
-const same = (a: any, b: any) => a?.id === b?.id && a?.version === b?.version;
-const key = (v: any) => v.id + ':' + v.version;
-const outcomes: Record<string, string> = {
-  succeeded: '报告成功',
-  failed: '报告失败',
-  partial: '报告部分完成',
-  unrecorded: '尚未记录结果',
-  running: '进行中',
-  stopped: '已停止',
-  inconclusive: '结论不足',
-};
-export function WorkerPackUseWorkspace({
-  runtime,
-  subjectId,
-  connected,
-  navigate,
-  onNeedIdentity,
-  builderId,
-  manifestId,
-  useId,
-}: Props) {
-  const client = useMemo(
-    () => (runtime ? createWorkerPackUseClient({ runtime, subjectId, now: () => Date.now() }) : null),
-    [runtime, subjectId],
-  );
-  const [packs, setPacks] = useState<any[]>([]),
-    [packAfter, setPackAfter] = useState<string | null>(null),
-    [query, setQuery] = useState('');
-  const [pack, setPack] = useState<any>(null),
-    [uses, setUses] = useState<any[]>([]),
-    [useAfter, setUseAfter] = useState<string | null>(null),
-    [usesMine, setUsesMine] = useState(false),
-    [selected, setSelected] = useState<any>(null);
-  const [cases, setCases] = useState<any[]>([]),
-    [sourceCase, setSourceCase] = useState<any>(null),
-    [caseAfter, setCaseAfter] = useState<string | null>(null),
-    [caseId, setCaseId] = useState(''),
-    [attemptKey, setAttemptKey] = useState(''),
-    [resultKey, setResultKey] = useState('');
-  const [evidence, setEvidence] = useState<string[]>([]),
-    [verifications, setVerifications] = useState<string[]>([]),
-    [existing, setExisting] = useState<any>(null),
-    [prior, setPrior] = useState<any>(null);
-  const [visibility, setVisibility] = useState('Private'),
-    [preview, setPreview] = useState<any>(null),
-    [pending, setPending] = useState<any[]>([]),
-    [authorizationReview, setAuthorizationReview] = useState<any>(null);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [notice, setNotice] = useState(''),
-    [reason, setReason] = useState('');
-  const epoch = useRef(0),
-    running = useRef(false);
-  const required = () => {
-    if (!client) throw Error('连接配置尚未加载。');
-    return client;
-  };
-  async function run(fn: (valid: () => boolean) => Promise<void>) {
-    if (running.current) return;
-    const token = epoch.current,
-      valid = () => token === epoch.current;
-    running.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      await fn(valid);
-    } catch (e: any) {
-      if (valid()) setError((typeof e?.message==='string'&&e.message.trim()?e.message:'Worker Pack操作暂未完成，请稍后重试。'));
-    } finally {
-      running.current = false;
-      if (valid()) {
-        setBusy(false);
-        if (connected)
-          try {
-            const p = await required().pending();
-            if (valid()) setPending(p);
-          } catch {}
-      }
-    }
-  }
-  useEffect(() => {
-    epoch.current++;
-    setPack(null);
-    setPacks([]);
-    setUses([]);
-    setSelected(null);
-    setSourceCase(null);
-    setCases([]);
-    setExisting(null);
-    setPreview(null);
-    setPending([]);
-    setAuthorizationReview(null);
-    setError('');
-    setBusy(false);
-    if (!client) return;
-    let current = true;
-    const load = async () => {
-      try {
-        if (useId) {
-          const value = await client.get({ id: useId });
-          if (current) {
-            setSelected(value);
-            if (value.sources?.pack) setPack(value.sources.pack);
-          }
-        } else if (builderId) {
-          const value = manifestId
-            ? await client.manifest({ builderId, manifestId })
-            : await client.support(builderId);
-          const p = manifestId
-            ? value
-            : value.pack.record
-              ? await client.manifest({
-                  builderId,
-                  manifestId: value.pack.eventId,
-                })
-              : null;
-          if (current) setPack(p);
-        }
-        if (connected) {
-          const p = await client.pending();
-          if (current) setPending(p);
-        }
-      } catch (e: any) {
-        if (current) setError(typeof e?.message==='string'&&e.message.trim()?e.message:'操作暂未完成，请稍后重试。');
-      }
-    };
-    void load();
-    const refresh = () => {
-      if (document.visibilityState !== 'visible' || !current || running.current || !connected) return;
-      void client.pending().then((p) => { if (current) setPending(p); }).catch(() => {});
-    };
-    const timer = window.setInterval(refresh, 20000);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      current = false;
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [client, connected, builderId, manifestId, useId]);
-  const chosen = cases.find((v) => v.caseId === caseId),
-    attempt = chosen?.attempts.find((v: any) => key(v) === attemptKey),
-    results = (chosen?.results ?? []).filter((r: any) =>
-      same(r.origin, attempt),
-    ),
-    result = results.find((r: any) => key(r) === resultKey),
-    allowedVerifications = (chosen?.verifications ?? []).filter(
-      (v: any) =>
-        (v.record?.target.type === 'attempt' &&
-          same(v.record.target, attempt)) ||
-        (v.record?.target.type === 'result' &&
-          result &&
-          same(v.record.target, result)),
-    );
-  const resetFact = () => {
-    setAttemptKey('');
-    setResultKey('');
-    setEvidence([]);
-    setVerifications([]);
-    setPreview(null);
-  };
-  async function listPacks(after?: string) {
-    await run(async (valid) => {
-      const page = await required().builders({
-        query,
-        ...(after ? { after } : {}),
-        limit: 8,
-      });
-      if (valid()) {
-        setPacks((v) => (after ? [...v, ...page.items] : page.items));
-        setPackAfter(page.nextAfter);
-      }
-    });
-  }
-  async function openPack(id: string, valid: () => boolean) {
-    const support = await required().support(id);
-    if (!support.pack.record) throw Error('这个登记尚无当前可读Pack清单。');
-    const value = await required().manifest({
-      builderId: id,
-      manifestId: support.pack.eventId,
-    });
-    if (valid()) {
-      setPack(value);
-      setExisting(null);
-      setPreview(null);
-      setNotice('已选择准确清单版本，尚未安装或启动任何工具。');
-    }
-  }
-  async function listUses(mine = false, after?: string) {
-    await run(async (valid) => {
-      const page = await required().query({
-        ...(!mine && pack ? { builderId: pack.builderId } : {}),
-        ...(mine ? { subjectId } : {}),
-        ...(after ? { after } : {}),
-        limit: 10,
-      });
-      if (valid()) {
-        setUses((v) => (after ? [...v, ...page.items] : page.items));
-        setUseAfter(page.nextAfter);
-        setUsesMine(mine);
-        setNotice(
-          mine ? '本人使用关联' : '当前可读使用关联；数量不代表能力评分。',
-        );
-      }
-    });
-  }
-  async function loadCases(after?: string) {
-    await run(async (valid) => {
-      const page = await required().candidates({
-        ...(after ? { after } : {}),
-        limit: 5,
-      });
-      if (valid()) {
-        setCases((v) => (after ? [...v, ...page.items] : page.items));
-        setCaseAfter(page.nextAfter);
-      }
-    });
-  }
-  async function editUse(value: any, valid: () => boolean) {
-    const fresh = await required().get({ id: value.id });
-    if (!fresh.record || fresh.subjectId !== subjectId)
-      throw Error('当前关联不可编辑；可使用撤回入口。');
-    const page = await required().candidates({ caseId: fresh.record.caseId });
-    if (valid()) {
-      setExisting(fresh);
-      setPack(fresh.sources.pack);
-      setCases(page.items);
-      setCaseId(fresh.record.caseId);
-      setAttemptKey(key(fresh.record.attempt));
-      setResultKey(fresh.record.result ? key(fresh.record.result) : '');
-      setEvidence(fresh.record.evidenceRefs.map(key));
-      setVerifications(fresh.record.verificationRefs.map(key));
-      setVisibility(fresh.disclosure.visibility);
-      setPreview(null);
-      setPrior(null);
-    }
-  }
-  async function prepare() {
-    await run(async (valid) => {
-      const event = preparePackUse({
-        pack,
-        caseView: chosen,
-        attempt,
-        result: result ?? null,
-        evidence: (chosen?.evidence ?? []).filter((v: any) =>
-          evidence.includes(key(v)),
-        ),
-        verifications: allowedVerifications.filter((v: any) =>
-          verifications.includes(key(v)),
-        ),
-        prior,
-        existing,
-      });
-      const disclosure = {
-          visibility,
-          viewers: visibility==='Public'?[]:existing?.disclosure?.viewers ?? [],
-        },
-        p = await required().prepare(event, disclosure);
-      await required().saveDraft({ event, disclosure });
-      if (valid()) setPreview(p);
-    });
-  }
-  const toggle = (
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
-    id: string,
-  ) => setter((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
-  if (!client)
-    return (
-      <section className="help-intro">
-        <h2>Pack实际使用</h2>
-        <p>正在加载连接配置。</p>
-      </section>
-    );
-  return (
-    <section className="workspace-section">
-      <h1>Pack版本与实际使用</h1>
-      <p>
-        选择作者的版本清单，再关联自己已经发生的配置、尝试和结果。下载、安装、启动和真实使用分别处理；模型仍在用户自己的环境运行。
-      </p>
-      <form
-        className="workspace-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void listPacks();
-        }}
-      >
-        <label>
-          Pack名称或适用范围
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            maxLength={200}
-          />
-        </label>
-        <Button type="submit" disabled={busy}>
-          查找Pack
-        </Button>
-        <Button
-          type="button"
-          disabled={busy || !connected}
-          onClick={() => void listUses(true)}
-        >
-          我的使用与恢复
-        </Button>
-      </form>
-      {packs.map((p) => (
-        <article className="task-card" key={p.builderId}>
-          <strong>{p.name}</strong>
-          <p>
-            {p.scope} · {p.version}
-          </p>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => void run((valid) => openPack(p.builderId, valid))}
-          >
-            选择并核对版本
-          </Button>
-        </article>
-      ))}
-      {packAfter && (
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => void listPacks(packAfter)}
-        >
-          更多Pack
-        </Button>
-      )}
-      {pack && (
-        <article className="task-card">
-          <h2>
-            {pack.manifest.name} {pack.manifest.version}
-          </h2>
-          <p>
-            作者：{pack.authorId} ·{' '}
-            {pack.versionStatus === 'current' ? '当前清单' : '准确历史版本'}
-          </p>
-          <p>
-            许可：{pack.manifest.license}；模型要求：
-            {pack.manifest.modelRequirements}
-          </p>
-          <p>环境：{pack.manifest.environment}</p>
-          <p>配置要求：{pack.manifest.configurationRequirements}</p>
-          <ul>
-            {pack.manifest.dependencies.map((d: any) => (
-              <li key={d.kind + d.name + d.version}>
-                {d.kind} {d.name} {d.version} · {d.license}
-              </li>
-            ))}
-          </ul>
-          <ul>
-            {pack.manifest.permissions.map((d: any) => (
-              <li key={d.resource}>
-                {d.resource}：{d.purpose}（{d.required ? '必要' : '可选'}）
-              </li>
-            ))}
-          </ul>
-          <p>安装：{pack.manifest.installation}</p>
-          <p>
-            升级：{pack.manifest.upgrade}；退出或回退：{pack.manifest.rollback}
-          </p>
-          <a href={pack.manifest.source} target="_blank" rel="noreferrer">
-            查看原发布方来源
-          </a>{' '}
-          ·{' '}
-          <a
-            href={pack.manifest.licenseSource}
-            target="_blank"
-            rel="noreferrer"
-          >
-            查看原许可
-          </a>
-          <p>
-            页面没有安装Pack、启动Agent或开启持续关注。缺少依赖时可以返回原工作，不产生执行失败记录。
-          </p>
-          {(pack.delisted || pack.securityIssue) && (
-            <p role="alert">
-              该登记有下架或安全维护状态。历史事实仍按各自许可可查，不能提交新的使用关联。
-            </p>
-          )}
-          <Button type="button" disabled={busy} onClick={() => void listUses()}>
-            查看这个Pack的可读使用事实
-          </Button>
-        </article>
-      )}
-      {uses.map((u) => (
-        <article className="message" key={u.id}>
-          <strong>
-            {u.sources?.pack.manifest.name ?? '本人保留的关联回执'}
-          </strong>
-          <p>
-            {u.sources
-              ? (outcomes[u.sources.reportedOutcome] ??
-                u.sources.reportedOutcome)
-              : u.sourceStatus}{' '}
-            · 使用者 {u.subjectId}
-          </p>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async (valid) => {
-                const v = await required().get({ id: u.id });
-                if (valid()) setSelected(v);
-              })
-            }
-          >
-            查看当前来源
-          </Button>
-          {u.subjectId === subjectId && u.record && (
-            <>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => void run((valid) => editUse(u, valid))}
-              >
-                补充结果或核验
-              </Button>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setPrior({ id: u.id, kind: 'upgrade' });
-                  setExisting(null);
-                  setPreview(null);
-                  setNotice(
-                    '请另选升级后的Pack、配置版本和新的实际尝试。旧版验证不会自动继承。',
-                  );
-                }}
-              >
-                关联后续升级
-              </Button>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setPrior({ id: u.id, kind: 'retry' });
-                  setExisting(null);
-                  setPreview(null);
-                  setNotice('请选择新发生的实际尝试；旧记录保持原样。');
-                }}
-              >
-                关联另一次尝试
-              </Button>
-            </>
-          )}
-        </article>
-      ))}
-      {useAfter && (
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => void listUses(usesMine, useAfter)}
-        >
-          更多当前可读关联
-        </Button>
-      )}
-      {selected && (
-        <article className="task-card">
-          <h2>使用关联的当前事实</h2>
-          <p>
-            修订 {selected.version} · {selected.sourceStatus} · {selected.state}
-          </p>
-          {selected.sources && (
-            <>
-              <p>
-                使用者：{selected.sources.roles.runnerId}；Pack作者：
-                {selected.sources.roles.packAuthorId}；配置作者：
-                {selected.sources.roles.configurationAuthorId ?? '当前未知'}
-              </p>
-              <p>
-                尝试：{selected.sources.attempt.strategy}（第{' '}
-                {selected.sources.attempt.version} 版，
-                {selected.sources.attemptVersionStatus}）
-              </p>
-              <p>
-                配置：
-                {selected.sources.configuration.record?.title ??
-                  '当前条件未披露或不可用'}
-                ；结果：{selected.sources.result?.summary ?? '未关联结果'}
-              </p>
-              <p>
-                {outcomes[selected.sources.reportedOutcome] ??
-                  selected.sources.reportedOutcome}
-                。这是实际参与者报告；签名关联不证明Pack独立造成了成功。
-              </p>
-              {selected.sources.synthetic && (
-                <p>这些来源明确标记为合成样本，不作为真实能力经历。</p>
-              )}
-              {selected.sources.evidence.map((v: any) => (
-                <p key={key(v)}>
-                  材料 v{v.version}：{v.record?.summary ?? '当前不可用'}；
-                  {v.record?.reportedBy ?? ''}
-                </p>
-              ))}
-              {selected.sources.verifications.map((v: any) => (
-                <p key={key(v)}>
-                  核验 v{v.version}：
-                  {v.record
-                    ? v.record.observation +
-                      ' · ' +
-                      v.record.summary +
-                      ' · 作者 ' +
-                      v.record.reportedBy
-                    : '已不可用或版本已变'}
-                  。核验范围不扩大到整个Pack。
-                </p>
-              ))}
-              {connected && (
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async (valid) => {
-                      const v = await required().caseFacts(
-                        selected.record.caseId,
-                        selected.sources.attempt.taskId,
-                      );
-                      if (valid()) setSourceCase(v);
-                    })
-                  }
-                >
-                  查看原工作允许的完整过程
-                </Button>
-              )}
-              {navigate && selected.sources.attempt.taskId && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    navigate('/app/tasks/' + selected.sources.attempt.taskId)
-                  }
-                >
-                  返回原协作任务
-                </Button>
-              )}
-              {sourceCase?.caseId === selected.record.caseId && (
-                <section>
-                  <h3>原工作当前允许的过程</h3>
-                  <p>
-                    {sourceCase.scopes.at(-1)?.summary}；可见事件{' '}
-                    {sourceCase.coverage.visibleEvents}，
-                    {sourceCase.coverage.complete
-                      ? '已含当前全部允许事件'
-                      : '部分资料未授权或不可用'}
-                    。
-                  </p>
-                  {sourceCase.attempts.map((a: any) => (
-                    <p key={key(a)}>
-                      尝试 v{a.version}：{a.strategy} · {a.status} · 作者{' '}
-                      {a.actorId}
-                    </p>
-                  ))}
-                  {sourceCase.interventions.map((a: any) => (
-                    <p key={key(a)}>
-                      介入 v{a.version}：{a.description} · 作者 {a.actorId}
-                    </p>
-                  ))}
-                  {sourceCase.results.map((a: any) => (
-                    <p key={key(a)}>
-                      结果 v{a.version}：{a.summary} · {a.reportedOutcome} ·
-                      作者 {a.actorId}
-                    </p>
-                  ))}
-                  <p>当前问题状态：{sourceCase.resolution.status}。</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setSourceCase(null)}
-                  >
-                    收起原工作过程
-                  </Button>
-                </section>
-              )}
-            </>
-          )}
-          {connected &&
-            selected.subjectId === subjectId &&
-            selected.state === 'active' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async (valid) => {
-                    const p = await required().prepare(
-                      {
-                        schemaVersion: 2,
-                        kind: 'revoke',
-                        id: selected.id,
-                        operationId: crypto.randomUUID(),
-                        expectedVersion: selected.currentVersion,
-                        reason,
-                      },
-                      { visibility: 'Private' },
-                    );
-                    if (valid()) setPreview(p);
-                  });
-                }}
-              >
-                <label>
-                  撤回此关联的原因
-                  <input
-                    value={reason}
-                    maxLength={1000}
-                    onChange={(e) => setReason(e.target.value)}
-                    required
-                  />
-                </label>
-                <Button type="submit" disabled={busy}>
-                  预览撤回
-                </Button>
-                <p>撤回此关联不会删除原尝试、结果或其他参与者的核验。</p>
-              </form>
-            )}
-        </article>
-      )}
-      {!connected ? (
-        <Button
-          type="button"
-          onClick={() => {
-            if (onNeedIdentity) onNeedIdentity();
-            else navigate?.('/app/identity');
-          }}
-        >
-          连接身份后记录自己的使用
-        </Button>
-      ) : (
-        <article className="task-card">
-          <h2>{existing ? '补充同一次实际使用' : '关联已发生的工作'}</h2>
-          {prior && (
-            <p>
-              正在关联{prior.kind === 'upgrade' ? '升级后的使用' : '新的重试'}。
-              <button type="button" onClick={() => setPrior(null)}>
-                取消前后关联
-              </button>
-            </p>
-          )}
-          <p>
-            只有已经登记配置版本的本人Attempt在此列出。普通无配置任务仍可正常协作。
-          </p>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => void loadCases()}
-          >
-            选择我的实际尝试
-          </Button>
-          {navigate && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/app/configurations')}
-            >
-              管理所选配置条件
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={() =>
-              void run(async (valid) => {
-                const d = await required().loadDraft();
-                if (!d?.event) throw Error('没有未发送的本地草稿。');
-                const p = await required().prepare(d.event, d.disclosure);
-                if (valid()) setPreview(p);
-              })
-            }
-          >
-            恢复本地草稿并预览
-          </Button>
-          {caseAfter && (
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => void loadCases(caseAfter)}
-            >
-              更多本人工作
-            </Button>
-          )}
-          <label>
-            工作
-            <select
-              value={caseId}
-              disabled={!!existing}
-              onChange={(e) => {
-                setCaseId(e.target.value);
-                resetFact();
-              }}
-            >
-              <option value="">请选择</option>
-              {cases.map((v) => (
-                <option key={v.caseId} value={v.caseId}>
-                  {v.summary ?? '可读工作'} {v.synthetic ? '（合成）' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            准确尝试版本
-            <select
-              value={attemptKey}
-              onChange={(e) => {
-                setAttemptKey(e.target.value);
-                setResultKey('');
-                setEvidence([]);
-                setVerifications([]);
-                setPreview(null);
-              }}
-            >
-              <option value="">请选择</option>
-              {(chosen?.attempts ?? [])
-                .filter(
-                  (a: any) => !existing || a.id === existing.record.attempt.id,
-                )
-                .map((a: any) => (
-                  <option key={key(a)} value={key(a)}>
-                    {a.strategy} · v{a.version} · {a.status}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {attempt && (
-            <p>
-              实际关联配置：{attempt.configurationCondition?.record?.title} v
-              {attempt.configurationRef.version}；
-              {attempt.configurationCondition?.record?.conditions?.limitations}
-            </p>
-          )}
-          <label>
-            这个尝试的准确结果
-            <select
-              value={resultKey}
-              onChange={(e) => {
-                setResultKey(e.target.value);
-                setVerifications([]);
-                setPreview(null);
-              }}
-            >
-              <option value="">尚未关联结果</option>
-              {results.map((r: any) => (
-                <option key={key(r)} value={key(r)}>
-                  {r.summary} · v{r.version} · {r.reportedOutcome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset>
-            <legend>相关材料（选择只建立关联，不宣称独立验证）</legend>
-            {(chosen?.evidence ?? []).map((v: any) => (
-              <label key={key(v)}>
-                <input
-                  type="checkbox"
-                  checked={evidence.includes(key(v))}
-                  onChange={() => {
-                    toggle(setEvidence, key(v));
-                    setPreview(null);
-                  }}
-                />
-                {v.record.summary} · v{v.version} · {v.record.reportedBy}
-              </label>
-            ))}
-          </fieldset>
-          <fieldset>
-            <legend>针对所选尝试或结果的核验</legend>
-            {allowedVerifications.map((v: any) => (
-              <label key={key(v)}>
-                <input
-                  type="checkbox"
-                  checked={verifications.includes(key(v))}
-                  onChange={() => {
-                    toggle(setVerifications, key(v));
-                    setPreview(null);
-                  }}
-                />
-                {v.record.summary} · {v.record.observation} · v{v.version} ·{' '}
-                {v.record.reportedBy}
-              </label>
-            ))}
-          </fieldset>
-          <label>
-            关联可见范围
-            <select
-              value={visibility}
-              onChange={(e) => {
-                setVisibility(e.target.value);
-                setPreview(null);
-              }}
-            >
-              <option value="Private">私有</option>
-              <option value="Public">公开这份使用关联</option>
-            </select>
-          </label>
-          <p>
-            公开关联不会公开原Case、配置或他人证据；读者仍须具有各项原权限。执行与所有模型成本仍在用户侧。
-          </p>
-          <Button
-            type="button"
-            disabled={
-              busy || !pack || !attempt || pack.delisted || pack.securityIssue
-            }
-            onClick={() => void prepare()}
-          >
-            预览本人实际使用关联
-          </Button>
-        </article>
-      )}
-      {preview && (
-        <article className="message">
-          <h2>确认选定的关联</h2>
-          <p>
-            {preview.payload.kind === 'revoke'
-              ? '撤回本人关联'
-              : '仅记录所选已经发生的来源关系'}{' '}
-            · {preview.visibility === 'Public' ? '公开关联' : '私有关联'}
-            {preview.visibility!=='Public'&&<>；可读人员：{preview.viewers.join('、')||'仅本人'}</>}
-          </p>
-          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-            {JSON.stringify(preview.payload, null, 2)}
-          </pre>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async (valid) => {
-                const r = await required().execute(preview, {
-                  confirmed: true,
-                });
-                const current = valid()
-                  ? await required().get({ id: r.id })
-                  : null;
-                if (valid()) {
-                  setPreview(null);
-                  setSelected(current);
-                  setNotice(
-                    '原操作已取得准确回执。没有启动Worker或自动增加成功次数。',
-                  );
-                }
-              })
-            }
-          >
-            确认并提交
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setPreview(null)}
-          >
-            暂不提交
-          </Button>
-        </article>
-      )}
-      {pending.map((p) => (
-        <article className="message" key={p.operationId}>
-          <h3>原操作 {p.state}</h3>
-          <p>保留原编号和原内容；未知结果先核对，不重新创建使用记录。</p>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async (valid) => {
-                const r = await required().reconcile(p.operationId);
-                if (valid()) setNotice(r.state);
-              })
-            }
-          >
-            查询原回执
-          </Button>
-          {p.state !== 'stopped-local' && (
-            <>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await required().retry(p.operationId, { confirmed: true });
-                  })
-                }
-              >
-                重试原操作
-              </Button>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void run(async (valid) => {
-                    const r = await required().reviewAuthorization(
-                      p.operationId,
-                    );
-                    if (valid()) {
-                      if (r.state === 'reauthorization-required')
-                        setAuthorizationReview(r);
-                      else setNotice(r.state);
-                    }
-                  })
-                }
-              >
-                检查重连授权
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  void run(async (valid) => {
-                    await required().stopLocalRetry(p.operationId, {
-                      confirmed: true,
-                    });
-                    if (valid())
-                      setNotice('已停止本机重试，服务端取消未确认。');
-                  })
-                }
-              >
-                停止本机重试
-              </Button>
-            </>
-          )}
-        </article>
-      ))}
-      {authorizationReview && (
-        <article className="message">
-          <h3>同一业务内容重新授权</h3>
-          <p>
-            原业务与原授权均未记录，旧授权不适用于当前连接。确认后只更换授权，不改变原业务编号。
-          </p>
-          <p>
-            范围：{authorizationReview.visibility}；受众：
-            {authorizationReview.viewers.join('、') || '本人'}；截止：
-            {new Date(authorizationReview.expiresAt * 1000).toLocaleString()}
-          </p>
-          <pre>{JSON.stringify(authorizationReview.payload, null, 2)}</pre>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async (valid) => {
-                await required().reauthorize(
-                  authorizationReview.operationId,
-                  authorizationReview,
-                  { confirmed: true },
-                );
-                if (valid()) setAuthorizationReview(null);
-              })
-            }
-          >
-            确认相同内容并继续
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setAuthorizationReview(null)}
-          >
-            暂不处理
-          </Button>
-        </article>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
+import React,{useCallback,useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {ArrowLeft,ArrowRight,Search,X} from 'lucide-react';
+import {WorkerPackHostWorkspace} from './worker-pack-host-workspace';
+import {memberName,useMemberNames} from './conversation-ui';
+import {InterventionOpinions,ResolutionStatus} from './fact-presentation';
+import {useGovernanceDraft} from './governance-presentation';
+import {useChoiceViewLease} from './choice-retained-operations';
+import {ToolOperationStatus,toolError,toolReturnPath} from './configuration-workspace';
+import {preparePackUse} from './worker-pack-use-client.mjs';
+import type {ChoiceViewLease} from './choice-retained-operations';
+import type {BuilderDirectoryRow} from './builder-workspace-state';
+import type {ToolRuntime,ToolDraftFlush,ToolManifest,ToolReceipt,ToolLocator,ToolCaseView,ToolCaseCandidate,ToolCandidateAttempt,ToolVerification,ToolOriginWork,VersionRef,PackUseEvent,PackUseView as PackUseRead,PackUseInput,PackUseLegacy,PackUseClient,PackUseRecord} from './tool-workspace-state';
+import {createTypedPackUseClient,sameToolRef as same,toolRef as ref,toolReceiptId,toolPackUsePayload} from './tool-workspace-state';
+import './tool-workspace.css';
+
+type Props={runtime:ToolRuntime|null;subjectId?:string;connected:boolean;navigate?:(path:string)=>void;onNeedIdentity?:()=>void;builderId?:string;manifestId?:string;useId?:string};
+const refKey=(value:VersionRef)=>value.id+':'+value.version;
+const outcomes:Record<string,string>={succeeded:'报告达到目标',failed:'报告未达到目标',partial:'报告部分达到',unrecorded:'尚未记录结果',running:'进行中',stopped:'已停止',inconclusive:'尚无定论'};
+const verificationObservation=(value:string)=>({passed:'本次检查通过',failed:'本次检查未通过',inconclusive:'本次检查尚无定论',accepted:'本次反馈：接受','partially-accepted':'本次反馈：部分接受',rejected:'本次反馈：不接受',comment:'本次反馈意见'} as Record<string,string>)[value]??'本次检查或反馈尚不明确';
+const sourceLabel=(value:string)=>({available:'当前来源可读',unavailable:'原来源目前不可读',revoked:'已撤回'} as Record<string,string>)[value]??'当前来源待核对';
+const ownTaskPath=(taskId?:string|null)=>taskId?'/app/tasks/'+taskId+'?section=collaboration&view=work':null;
+type RouteValues=Record<string,string|number|null|undefined>;
+function toolPath(path:string,values:RouteValues,returnTo?:string|null){const q=new URLSearchParams();for(const [key,value] of Object.entries(values))if(value!==null&&value!==undefined&&value!=='')q.set(key,String(value));if(returnTo)q.set('returnTo',returnTo);return path+(q.size?'?'+q:'');}
+const packPath=(pack:ToolManifest,extra:RouteValues={},returnTo?:string|null)=>toolPath('/app/worker-packs',{builderId:pack.builderId,manifestId:pack.manifestId,...extra},returnTo);
+const usagePath=(id:string,extra:RouteValues={},returnTo?:string|null)=>toolPath('/app/worker-pack-uses/'+id,extra,returnTo);
+export function WorkerPackUseWorkspace(props:Props){
+ const scope=useChoiceViewLease(props.runtime,props.subjectId);
+ if(!props.runtime)return <output>正在读取工具目录…</output>;
+ const q=new URLSearchParams(location.search);
+ return <PackUseView key={JSON.stringify([scope.key,props.runtime.api.endpoint,props.builderId,props.manifestId,props.useId,q.get('record'),q.get('view'),q.get('returnTo'),q.get('prior'),q.get('follow')])} {...props} runtime={props.runtime} lease={scope.lease}/>;
+}
+function PackUseView({runtime,subjectId,connected,navigate,onNeedIdentity,builderId,manifestId,useId,lease}:Omit<Props,'runtime'>&{runtime:ToolRuntime;lease:ChoiceViewLease|null}){
+ const client:PackUseClient=useMemo(()=>createTypedPackUseClient(runtime,subjectId),[runtime,subjectId]);
+ const params=new URLSearchParams(location.search),returnTo=toolReturnPath(params.get('returnTo')),recording=params.get('record')==='1',mine=params.get('view')==='mine',showUses=mine||params.get('view')==='uses';
+ const continuation={prior:params.get('prior')??undefined,follow:params.get('follow')??undefined};
+ const [query,setQuery]=useState(params.get('q')??''),[packs,setPacks]=useState<BuilderDirectoryRow[]>([]),[packAfter,setPackAfter]=useState<string|null>(null),[pack,setPack]=useState<ToolManifest|null>(null),[uses,setUses]=useState<PackUseRead[]>([]),[useAfter,setUseAfter]=useState<string|null>(null),[selected,setSelected]=useState<PackUseRead|null>(null),[sourceCase,setSourceCase]=useState<ToolCaseView|null>(null);
+ const [readLoaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[revoke,setRevoke]=useState(false),[reason,setReason]=useState(''),[recoveryRequest,setRecoveryRequest]=useState(0);
+ const loaded=readLoaded||mine&&!lease;
+ const epoch=useRef(0),working=useRef(false),listRequest=useRef(0),pages=useRef<(string|undefined)[]>([undefined]),searchQuery=useRef(params.get('q')??''),dialog=useRef<HTMLDialogElement>(null),editorFlush=useRef<ToolDraftFlush>(null),currentState=useRef({pack,selected,sourceCase});
+ useLayoutEffect(()=>{currentState.current={pack,selected,sourceCase};},[pack,selected,sourceCase]);
+ const registerFlush=useCallback((flush:ToolDraftFlush)=>{editorFlush.current=flush;},[]);
+ const names=useMemberNames(runtime,subjectId,connected,[pack?.authorId,...uses.map(value=>value.subjectId),selected?.subjectId,...Object.values(selected?.sources?.roles??{}).flat(),...(sourceCase?.attempts??[]).map((value)=>value.actorId),...(sourceCase?.results??[]).map((value)=>value.actorId),...(sourceCase?.interventions??[]).map((value)=>value.actorId),...(selected?.sources?.evidence??[]).map((value)=>value.record?.reportedBy),...(selected?.sources?.verifications??[]).map((value)=>value.record?.reportedBy)].filter((value):value is string=>typeof value==='string'));
+ const valid=(token:number)=>{if(epoch.current!==token)return false;try{lease?.assertCurrent();return !connected||!!lease;}catch{return false;}};
+ const go=(path:string)=>{const token=epoch.current;void (async()=>{if(recording)await editorFlush.current?.();if(!valid(token))return;if(navigate)navigate(path);else{history.pushState(history.state,'',path);dispatchEvent(new PopStateEvent('popstate'));}})().catch(e=>{if(valid(token))setError(toolError(e));});};
+ const directory=toolPath('/app/worker-packs',{q:params.get('q')??'',...continuation},returnTo);
+ async function run(fn:()=>Promise<void>){if(working.current)return;const token=epoch.current;working.current=true;setBusy(true);setError('');try{await fn();}catch(e){if(valid(token))setError(toolError(e));}finally{working.current=false;if(valid(token))setBusy(false);}}
+ const fetchPack=useCallback(async()=>{if(!builderId)throw Error('所选工具缺少原登记位置。');const support=!manifestId?await client.support(builderId):null,id=manifestId??support?.pack.eventId;if(!id||!manifestId&&!support?.pack.record)throw Error('这个工具还没有当前可读的版本清单。');return client.manifest({builderId,manifestId:id});},[builderId,manifestId,client]);
+ async function readPack(){
+  if(!builderId)return;const token=epoch.current;
+  try{const value=await fetchPack();if(valid(token))setPack(value);}
+  catch(e){if(valid(token))setPack(null);throw e;}
+ }
+ async function readUse(){
+  if(!useId)return;const token=epoch.current;
+  try{const value=await client.get({id:useId});if(!valid(token))return;setSelected(value);setPack(value.sources?.pack??null);if(!value.sources&&recording&&builderId&&manifestId){const retainedPack=await client.manifest({builderId,manifestId});if(valid(token))setPack(retainedPack);}if(currentState.current.sourceCase&&value.record&&value.sources){const facts=await client.caseFacts(value.record.caseId,value.sources.attempt.taskId);if(valid(token))setSourceCase(facts);}else if(!value.sources)setSourceCase(null);}
+  catch(e){if(valid(token)){setSelected(null);setPack(null);setSourceCase(null);}throw e;}
+ }
+ async function readList(after?:string,search=searchQuery.current){
+  const token=epoch.current,request=++listRequest.current;let next:string|null=null;
+  try{if(showUses){const rows:PackUseRead[]=[];for(const cursor of after?[after]:pages.current){const page=await client.query({...(mine?{subjectId}:builderId?{builderId}:{}),limit:10,...(cursor?{after:cursor}:{})});if(!valid(token)||request!==listRequest.current)return;rows.push(...page.items);next=page.nextAfter;}setUses(old=>after?[...old,...rows]:rows);setUseAfter(next);}
+  else{const rows:BuilderDirectoryRow[]=[];for(const cursor of after?[after]:pages.current){const page=await client.builders({query:search,limit:8,...(cursor?{after:cursor}:{})});if(!valid(token)||request!==listRequest.current)return;rows.push(...page.items);next=page.nextAfter;}setPacks(old=>after?[...old,...rows]:rows);setPackAfter(next);}if(after)pages.current.push(after);setLoaded(true);
+  }catch(e){if(valid(token)&&request===listRequest.current){if(showUses){setUses([]);setUseAfter(null);}else{setPacks([]);setPackAfter(null);}setLoaded(true);}throw e;}
+ }
+ async function refresh(){if(working.current)return;if(mine&&!lease)return;const token=epoch.current;try{if(useId)await readUse();else if(builderId)await readPack();if(!builderId&&!useId||showUses)await readList();if(valid(token))setLoaded(true);}catch(e){if(valid(token)){setError(toolError(e));setLoaded(true);}}}
+ const refreshCurrent=useEffectEvent(refresh);
+ const acceptPackInitial=useEffectEvent((value:ToolManifest,token:number)=>{if(valid(token)){setPack(value);setLoaded(true);}});
+ const acceptUseInitial=useEffectEvent(async(value:PackUseRead,token:number)=>{if(!valid(token))return;setSelected(value);setPack(value.sources?.pack??null);if(!value.sources&&recording&&builderId&&manifestId){const retained=await client.manifest({builderId,manifestId});if(valid(token))setPack(retained);}if(valid(token))setLoaded(true);});
+ const acceptListInitial=useEffectEvent((value:{kind:'uses';page:{items:PackUseRead[];nextAfter:string|null}}|{kind:'builders';page:{items:BuilderDirectoryRow[];nextAfter:string|null}},token:number)=>{if(!valid(token))return;if(value.kind==='uses'){setUses(value.page.items);setUseAfter(value.page.nextAfter);}else{setPacks(value.page.items);setPackAfter(value.page.nextAfter);}setLoaded(true);});
+ const initialFailure=useEffectEvent((error:unknown,token:number)=>{if(valid(token)){setError(toolError(error));setLoaded(true);}});
+ useEffect(()=>{const token=++epoch.current;
+  if(!(mine&&!lease)){const list=async()=>showUses?{kind:'uses' as const,page:await client.query({...(mine?{subjectId}:builderId?{builderId}:{}),limit:10})}:{kind:'builders' as const,page:await client.builders({query:searchQuery.current,limit:8})};
+   if(useId)void client.get({id:useId}).then(value=>acceptUseInitial(value,token)).then(()=>showUses?list().then(value=>acceptListInitial(value,token)):undefined).catch(error=>initialFailure(error,token));
+   else if(builderId)void fetchPack().then(value=>{acceptPackInitial(value,token);return showUses?list().then(value=>acceptListInitial(value,token)):undefined;}).catch(error=>initialFailure(error,token));
+   else void list().then(value=>acceptListInitial(value,token)).catch(error=>initialFailure(error,token));}
+  return()=>{epoch.current=token+1;};
+ },[client,builderId,fetchPack,lease,mine,showUses,subjectId,useId]);
+ useEffect(()=>{const tick=()=>{if(!document.hidden)void refreshCurrent();};const timer=setInterval(tick,20000);document.addEventListener('visibilitychange',tick);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',tick);};},[]);
+ useEffect(()=>{if(revoke)dialog.current?.showModal();else dialog.current?.close();},[revoke]);
+ async function searchPacks(){searchQuery.current=query;pages.current=[undefined];const url=toolPath('/app/worker-packs',{q:query,...continuation},returnTo);history.replaceState(history.state,'',url);await readList(undefined,query);}
+ async function completed(receipt:ToolReceipt){if(!receipt?.id)return;setNotice('上次使用记录已保存。');if(useId===receipt.id)await readUse();else if(showUses)await readList();}
+ async function withdraw(){
+  if(!selected||!subjectId||!lease)throw Error('请先读取自己的使用记录。');const original=selected,current=await client.get({id:original.id});lease.assertCurrent();
+  if(current.subjectId!==subjectId||current.state!=='active')throw Error('当前不能撤回这条记录。');if(current.currentVersion!==original.currentVersion){setSelected(current);throw Error('记录已有更新，请先核对当前内容。');}
+  if((await client.pending()).some((value)=>value.state!=='stopped-local')){setRecoveryRequest(value=>value+1);throw Error('上一份提交仍在确认。');}
+  const prepared=await client.prepare({schemaVersion:2,kind:'revoke',id:current.id,operationId:crypto.randomUUID(),expectedVersion:current.currentVersion,reason:reason.trim()},{visibility:'Private'});
+  await client.execute(prepared,{confirmed:true});lease.assertCurrent();setRevoke(false);setReason('');setNotice('使用关联已撤回。');await readUse();
+ }
+ const selectedRecord=selected?.record,selectedSources=selected?.sources;
+ const recordPath=pack?packPath(pack,{record:1,q:params.get('q')??'',...continuation},returnTo):null;
+ const recordAction=()=>{if(recordPath)go(recordPath);};
+ return <section className="tool-workspace pack-page">
+  <header className="tool-page-heading"><div><h1>{recording?'关联实际使用':useId?'这次工具使用':showUses?(mine?'我的工具使用':'工具使用记录'):pack?pack.manifest.name:'Worker Pack'}</h1>{!pack&&!useId&&!recording&&<p>{showUses?'从真实工作读取尝试、结果和来源。':'找到合适的工具，了解条件，在自己的环境中使用。'}</p>}{pack&&!recording&&!useId&&<p className="record-meta">{pack.manifest.version} · {memberName(pack.authorId,subjectId,names[pack.authorId]??undefined)} · {pack.versionStatus==='current'?'当前版本':'历史版本'}</p>}</div>{!builderId&&!useId&&!showUses&&connected&&<Button variant="outline" onClick={()=>go(toolPath('/app/worker-packs',{view:'mine'},returnTo))}>我的使用</Button>}</header>
+  {(builderId||useId||showUses)&&<button className="back-link" onClick={()=>recording&&pack?go(packPath(pack,{q:params.get('q')??'',...continuation},returnTo)):go(directory)}><ArrowLeft size={16}/>{recording?'返回工具说明':'工具目录'}</button>}
+  {returnTo&&<a className="tool-return" href={returnTo} onClick={e=>{e.preventDefault();go(returnTo);}}>返回原事</a>}
+  {error&&<p className="message error" role="alert">{error}</p>}{notice&&<output className="message">{notice}</output>}
+  {!recording&&connected&&lease&&<ToolOperationStatus client={client} connected scopeKey={lease.bindingId+':'+lease.generation} paused={busy||revoke} request={recoveryRequest} onComplete={completed} renderContent={payload=><PackSubmittedContent payload={payload} pack={pack} current={selected}/>}/>}
+  {!builderId&&!useId&&!showUses&&<>
+   <form className="tool-search" onSubmit={e=>{e.preventDefault();void run(searchPacks);}}><label htmlFor="tool-query">工具名称或用途</label><div><input id="tool-query" value={query} maxLength={200} onChange={e=>setQuery(e.target.value)} placeholder="想用工具完成什么？"/><Button type="submit" disabled={busy}><Search size={17}/>查找</Button></div></form>
+   {!loaded&&!error&&<output>正在读取工具…</output>}{loaded&&!packs.length&&!error&&<p className="empty-state">{query?'没有找到当前可读的匹配工具。':'目前没有可读的工具登记。'}</p>}
+   <div className="tool-reading-list">{packs.map(value=><article key={value.builderId}><h2><a href={toolPath('/app/worker-packs',{builderId:value.builderId,q:query,...continuation},returnTo)} onClick={e=>{e.preventDefault();go(toolPath('/app/worker-packs',{builderId:value.builderId,q:query,...continuation},returnTo));}}>{value.name}<ArrowRight size={16}/></a></h2><p>{value.scope}</p><p className="record-meta">版本 {value.version}</p></article>)}</div>
+   {packAfter&&<Button variant="outline" disabled={busy} onClick={()=>void run(()=>readList(packAfter))}>更多工具</Button>}
+  </>}
+  {(builderId||useId)&&!loaded&&!error&&<output>正在读取准确版本…</output>}
+  {pack&&!recording&&!useId&&!showUses&&<>
+   <nav className="tool-in-page" aria-label="工具内容"><a href="#tool-conditions">运行条件</a><a href="#tool-host">在自己的环境使用</a><button className="text-link" onClick={()=>go(packPath(pack,{view:'uses'},returnTo))}>使用记录</button></nav>
+   <PackAbout pack={pack}/>
+   <div id="tool-host" className="tool-anchor"><WorkerPackHostWorkspace pack={pack} returnTo={returnTo} onReturn={go} onRecord={recordAction}/></div>
+   <details className="tool-optional"><summary>升级、回退与许可证</summary><h3>升级</h3><p className="reading-prose">{pack.manifest.upgrade}</p><h3>回退</h3><p className="reading-prose">{pack.manifest.rollback}</p><a href={pack.manifest.licenseSource} target="_blank" rel="noreferrer">{pack.manifest.license}</a></details>
+  </>}
+  {showUses&&<>
+   {mine&&!connected&&<section className="empty-state"><p>连接后查看自己的使用记录。</p><Button onClick={()=>onNeedIdentity?onNeedIdentity():go('/app/settings/identity')}>连接身份</Button></section>}
+   {pack&&<p className="record-meta">{pack.manifest.name} · {pack.manifest.version}</p>}
+   {!loaded&&!error&&<output>正在读取使用记录…</output>}{loaded&&!uses.length&&!error&&<p className="empty-state">目前没有可读的使用记录。</p>}
+   <div className="tool-reading-list">{uses.map(value=><article key={value.id}><h2><a href={usagePath(value.id,{},returnTo)} onClick={e=>{e.preventDefault();go(usagePath(value.id,{},returnTo));}}>{value.sources?.pack.manifest.name??'本人保留的使用记录'}</a></h2>{value.sources?.attempt.strategy&&<p>{value.sources.attempt.strategy}</p>}<p className="record-meta">{memberName(value.subjectId,subjectId,names[value.subjectId]??undefined)} · {value.sources?(outcomes[value.sources.reportedOutcome]??value.sources.reportedOutcome):sourceLabel(value.sourceStatus)}</p></article>)}</div>
+   {useAfter&&<Button variant="outline" disabled={busy} onClick={()=>void run(()=>readList(useAfter))}>更多使用记录</Button>}
+  </>}
+  {recording&&(!connected||!lease)?<section className="empty-state"><h2>连接后关联自己的使用</h2><p>工具说明可以直接阅读。这里需要读取你已经记录的实际工作。</p><Button onClick={()=>onNeedIdentity?onNeedIdentity():go('/app/settings/identity')}>连接身份并继续</Button></section>:null}
+  {recording&&connected&&lease&&subjectId&&pack&&<PackUseEditor key={pack.manifestId+':'+(useId??'new')} runtime={runtime} subjectId={subjectId} lease={lease} client={client} pack={pack} existing={useId?selected:null} useId={useId} returnTo={returnTo} go={go} registerFlush={registerFlush} prior={continuation.prior?{id:continuation.prior,kind:params.get('follow')==='upgrade'?'upgrade':'retry'}:null} onSaved={receipt=>go(usagePath(toolReceiptId(receipt),{},returnTo))}/>}
+  {recording&&loaded&&!pack&&!error&&<p className="empty-state">所选工具或来源目前不可读。原稿仍保存在本机，可返回原工作继续。</p>}
+  {useId&&!recording&&selected&&<article className="tool-reading">
+   <p className="record-meta">{memberName(selected.subjectId,subjectId,names[selected.subjectId]??undefined)} · {sourceLabel(selected.sourceStatus)} · 修订 {selected.version}</p>
+   {selectedRecord&&selectedSources?<><h2>{selectedSources.pack.manifest.name} {selectedSources.pack.manifest.version}</h2><section><h3>这次做了什么</h3><p className="reading-prose">{selectedSources.attempt.strategy}</p><p className="record-meta">尝试版本 {selectedSources.attempt.version}{selectedSources.attemptVersionStatus==='historical-version'?' · 后来已有更新记录':''}</p></section>
+    <section><h3>实际结果</h3><p className="reading-prose">{selectedSources.result?.summary??'这次使用尚未关联结果。'}</p><p>{outcomes[selectedSources.reportedOutcome]??selectedSources.reportedOutcome}</p></section>
+    <section><h3>当时的配置</h3><p>{selectedSources.configuration.record?.title??'原配置条件目前不可读'} · 版本 {selectedRecord.configuration.version}</p>{selectedSources.configuration.record?.conditions?.limitations&&<p className="reading-prose">{selectedSources.configuration.record.conditions.limitations}</p>}<a href={toolPath('/app/configurations',{configurationId:selectedRecord.configuration.id,version:selectedRecord.configuration.version},location.pathname+location.search)} onClick={e=>{e.preventDefault();go(toolPath('/app/configurations',{configurationId:selectedRecord.configuration.id,version:selectedRecord.configuration.version},location.pathname+location.search));}}>查看这次引用的配置版本</a></section>
+    {(selectedSources.evidence.length>0||selectedSources.verifications.length>0)&&<section><h3>相关材料与检查</h3>{selectedSources.evidence.map((value)=><div className="tool-source-row" key={refKey(value)}><p>{value.record?.summary??'原材料目前不可读'}</p><p className="record-meta">{value.record?memberName(value.record.reportedBy,subjectId,names[value.record.reportedBy??'']??undefined)+' · ':''}材料版本 {value.version}</p></div>)}{selectedSources.verifications.map((value)=><div className="tool-source-row" key={refKey(value)}><p>{value.record?.summary??'原检查目前不可读'}</p>{value.record&&<p>{verificationObservation(value.record.observation)}</p>}<p className="record-meta">{value.record?memberName(value.record.reportedBy,subjectId,names[value.record.reportedBy??'']??undefined)+' · ':''}检查版本 {value.version}</p></div>)}</section>}
+    <p className="tool-help">{selectedSources.synthetic?'这是明确标记的合成样本。':'这条记录由使用者关联到自己的工作。'}工具执行状态与问题是否解决，以原工作及运行环境的实际记录为准。</p>
+    <div className="tool-actions">{selectedSources.attempt.taskId?<Button onClick={()=>go(returnTo??'/app/tasks/'+selectedSources.attempt.taskId+'?section=collaboration&view=work')}>回到这项工作</Button>:connected&&<Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{const token=epoch.current,facts=await client.caseFacts(selectedRecord.caseId,selectedSources.attempt.taskId);if(valid(token))setSourceCase(facts);})}>读取原工作过程</Button>}<Button variant="outline" onClick={()=>go(packPath(selectedSources.pack,{},returnTo??ownTaskPath(selectedSources.attempt.taskId)))}>查看工具说明</Button></div>
+    {sourceCase&&sourceCase.caseId===selectedRecord.caseId&&<section className="tool-source-process"><h3>原工作当前可读的过程</h3><p>{sourceCase.scopes.at(-1)?.summary}</p>{sourceCase.attempts.map((value)=><div key={refKey(value)}><p>{value.strategy}</p><p className="record-meta">{memberName(value.actorId,subjectId,names[value.actorId]??undefined)} · 尝试版本 {value.version}</p></div>)}{sourceCase.interventions.map((value)=><div key={refKey(value)}><p>{value.description}</p><InterventionOpinions intervention={value}/></div>)}{sourceCase.results.map((value)=><div key={refKey(value)}><p>{value.summary}</p><p>{outcomes[value.reportedOutcome]??value.reportedOutcome}</p></div>)}<ResolutionStatus resolution={sourceCase.resolution} resolutions={sourceCase.resolutions}/><p className="tool-help">{sourceCase.coverage.complete?'已读到当前允许的全部事件。':'部分原资料目前未授权或不可读。'}</p></section>}
+   </>:<p>这条关联保留了原定位，原正文或其中来源目前不可读。</p>}
+   {connected&&selected.subjectId===subjectId&&selected.state==='active'&&<div className="tool-record-management">{selected.record&&pack&&<><Button variant="outline" onClick={()=>go(usagePath(selected.id,{record:1,builderId:pack.builderId,manifestId:pack.manifestId},returnTo))}>补充这次记录</Button><details><summary>关联后续使用</summary><button className="text-link" onClick={()=>go(packPath(pack,{record:1,prior:selected.id,follow:'retry'},returnTo))}>同一工具的另一次尝试</button><button className="text-link" onClick={()=>go(toolPath('/app/worker-packs',{prior:selected.id,follow:'upgrade'},returnTo))}>选择升级后的工具版本</button></details></>}<Button variant="ghost" onClick={()=>{setRevoke(true);setReason('');}}>撤回关联</Button></div>}
+   <details className="tool-reference"><summary>原记录与准确来源引用</summary><p>使用记录 <code>{selected.id}</code> · 修订 {selected.version}</p>{selected.record&&<><p>尝试 <code>{selected.record.attempt.id}</code> · 版本 {selected.record.attempt.version}</p><p>配置 <code>{selected.record.configuration.id}</code> · 版本 {selected.record.configuration.version}</p><p>工具清单 <code>{selected.record.pack.manifestId}</code></p></>}</details>
+  </article>}
+  <dialog ref={dialog} className="workspace-dialog tool-dialog" onCancel={e=>{if(busy)e.preventDefault();else setRevoke(false);}}>{revoke&&<form onSubmit={e=>{e.preventDefault();void run(withdraw);}}><header className="dialog-heading"><h2>撤回使用关联</h2><button className="icon-button" type="button" aria-label="关闭撤回" disabled={busy} onClick={()=>setRevoke(false)}><X size={19}/></button></header><p>只撤回这条工具使用关联。原尝试、结果和其他参与者的检查保留。</p><label>撤回原因<textarea required maxLength={1000} value={reason} onChange={e=>setReason(e.target.value)}/></label>{error&&<p className="message error" role="alert">{error}</p>}<div className="tool-actions"><Button type="submit" disabled={busy}>确认撤回关联</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setRevoke(false)}>保留关联</Button></div></form>}</dialog>
+ </section>;
+}
+function PackAbout({pack}:{pack:ToolManifest}){const p=pack.manifest;return <article className="tool-reading">
+ <section><h2>这个版本能做什么</h2><ul>{(p.capabilities??[]).map((value:string,index:number)=><li key={index}>{value}</li>)}</ul>{p.changes&&<p className="reading-prose">{p.changes}</p>}</section>
+ <section id="tool-conditions" className="tool-anchor"><h2>运行条件</h2><dl className="tool-facts"><dt>模型</dt><dd>{p.modelRequirements}</dd><dt>运行环境</dt><dd>{p.environment}</dd><dt>配置要求</dt><dd>{p.configurationRequirements}</dd></dl></section>
+ {p.permissions?.length>0&&<section><h2>需要的权限</h2><ul className="tool-permissions">{p.permissions.map((value,index)=><li key={index}><div><strong>{value.resource}</strong><span>{value.required?'必需':'可选'}</span></div><p>{value.purpose}</p></li>)}</ul></section>}
+ {p.dependencies?.length>0&&<section><h2>依赖</h2><ul>{p.dependencies.map((value,index)=><li key={index}><a href={value.source} target="_blank" rel="noreferrer">{value.name} {value.version}</a><span className="tool-help"> · {value.license}</span></li>)}</ul></section>}
+ {(pack.delisted||pack.securityIssue)&&<p className="message error" role="alert">这个版本已下架或有待处理的安全事项，当前不能新增使用关联。</p>}
+ </article>;}
+const initialUse=(existing:PackUseRead|null|undefined,prior:PackUseRecord['follows']):PackUseInput=>({caseId:existing?.record?.caseId??'',attempt:existing?.record?.attempt??null,result:existing?.record?.result??null,evidenceRefs:existing?.record?.evidenceRefs??[],verificationRefs:existing?.record?.verificationRefs??[],visibility:existing?.disclosure?.visibility??'Private',viewers:existing?.disclosure?.viewers??[],expectedVersion:existing?.currentVersion??0,prior:existing?.record?.follows??prior??null,query:''});
+type EditorProps={runtime:ToolRuntime;subjectId:string;lease:ChoiceViewLease;client:PackUseClient;pack:ToolManifest;existing?:PackUseRead|null;useId?:string;returnTo:string|null;go:(path:string)=>void;registerFlush:(flush:ToolDraftFlush)=>void;prior:PackUseRecord['follows'];onSaved:(receipt:ToolReceipt)=>void};
+function PackUseEditor({runtime,subjectId,lease,client,pack,existing,useId,returnTo,go,registerFlush,prior,onSaved}:EditorProps){
+ const [initial]=useState(()=>initialUse(existing,prior)),draft=useGovernanceDraft<PackUseInput,ToolLocator>(runtime,subjectId,true,'pack-use-input:v2:'+JSON.stringify([runtime.api.endpoint,subjectId,pack.manifestId,useId??'new']),initial),input=useMemo(()=>({...initial,...draft.value}),[initial,draft.value]);
+ const [cases,setCases]=useState<ToolCaseCandidate[]>([]),[after,setAfter]=useState<string|null>(null),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[oldDraft,setOldDraft]=useState<PackUseLegacy|null>(null),[detectedSource,setSourceChanged]=useState<PackUseRead|null>(null),[recoveryRequest,setRecoveryRequest]=useState(0),[originWork,setOriginWork]=useState<ToolOriginWork|null>(null),[originError,setOriginError]=useState('');
+ const originTaskId=returnTo?/^\/app\/tasks\/([a-f0-9-]{36})$/.exec(new URL(returnTo,location.origin).pathname)?.[1]:null;
+ const working=useRef(false),active=useRef(true),request=useRef(0),pages=useRef<(string|undefined)[]>([undefined]),draftApi=useRef(draft),inputRef=useRef(input);
+ useLayoutEffect(()=>{draftApi.current=draft;inputRef.current=input;},[draft,input]);
+ const current=useCallback(()=>{if(!active.current)return false;try{lease.assertCurrent();return true;}catch{return false;}},[lease]);
+ const chosen=cases.find(value=>value.caseId===input.caseId),attempt=chosen?.attempts.find(value=>same(value,input.attempt)),results=(chosen?.results??[]).filter(value=>same(value.origin,attempt)),result=results.find(value=>same(value,input.result)),checks=(chosen?.verifications??[]).filter((value):value is ToolVerification&{record:NonNullable<ToolVerification['record']>}=>!!value.record&&(value.record.target.type==='attempt'&&same(value.record.target,attempt)||value.record.target.type==='result'&&!!result&&same(value.record.target,result)));
+ const names=useMemberNames(runtime,subjectId,true,[...input.viewers,...(chosen?.evidence??[]).map(value=>value.record?.reportedBy),...checks.map(value=>value.record.reportedBy)].filter((value):value is string=>typeof value==='string'));
+ const sourceChanged=detectedSource&&detectedSource.currentVersion!==input.expectedVersion?(existing?.id===detectedSource.id&&existing.currentVersion>=detectedSource.currentVersion?(existing.currentVersion!==input.expectedVersion?existing:null):detectedSource):null;
+ function change(patch:Partial<PackUseInput>){draft.change(patch);setError('');setSourceChanged(null);}
+ async function run(fn:()=>Promise<void>){if(working.current)return;working.current=true;setBusy(true);setError('');try{await fn();}catch(e){if(current())setError(toolError(e));}finally{working.current=false;if(current())setBusy(false);}}
+ async function readCases(cursor?:string){
+  const ticket=++request.current,rows:ToolCaseCandidate[]=[];let next:string|null=null;
+  try{for(const page of cursor?[cursor]:pages.current){const result=await client.candidates({limit:5,...(useId&&existing?.record?{caseId:existing.record.caseId}:{}),...(page?{after:page}:{})});if(!current()||ticket!==request.current)return;rows.push(...result.items);next=result.nextAfter;}
+   const selectedId=inputRef.current.caseId;if(selectedId&&!rows.some(value=>value.caseId===selectedId)&&!cursor){const exact=await client.candidates({caseId:selectedId,limit:5});if(!current()||ticket!==request.current)return;rows.unshift(...exact.items);}
+   setCases(old=>cursor?[...old,...rows]:rows);setAfter(next);setLoaded(true);if(cursor)pages.current.push(cursor);
+  }catch(e){if(current()&&ticket===request.current){setCases([]);setAfter(null);setLoaded(true);}throw e;}
+ }
+ async function readOrigin(){if(!originTaskId)return;try{const task:ToolOriginWork['task']=await runtime.api.call('/v2/tasks/'+originTaskId,null,{method:'GET',authenticated:true});if(!current())return;if(task.taskId!==originTaskId)throw Error('原工作定位与读取结果不一致。');const facts=task.caseId?await client.caseFacts(task.caseId,originTaskId):null;if(!current())return;setOriginWork({task,facts});setOriginError('');}catch{if(current()){setOriginWork(null);setOriginError('原工作目前不可读，已保留返回位置。');}}}
+ const refreshSources=useEffectEvent(()=>{if(working.current)return;void readCases().catch(e=>{if(current())setError(toolError(e));});void readOrigin();});
+ useEffect(()=>{active.current=true;registerFlush(()=>draftApi.current.snapshot());refreshSources();const tick=()=>{if(!document.hidden)refreshSources();};const timer=setInterval(tick,20000);document.addEventListener('visibilitychange',tick);return()=>{active.current=false;registerFlush(null);clearInterval(timer);document.removeEventListener('visibilitychange',tick);};},[registerFlush]);
+ const readChosenSource=useEffectEvent(()=>{if(input.caseId&&!cases.some(value=>value.caseId===input.caseId))refreshSources();});
+ useEffect(()=>{if(draft.ready)readChosenSource();},[draft.ready]);
+ useEffect(()=>{void client.loadDraft().then((value)=>{if(current()&&value?.event?.pack?.manifestId===pack.manifestId)setOldDraft(value);}).catch(()=>{});},[client,pack.manifestId,current]);
+ const receiptFor=useCallback(async(locator:ToolLocator)=>{if(locator.family!=='worker-pack')return null;const result=await client.receiptFor({operationId:locator.operationId,payloadHash:locator.payloadHash});lease.assertCurrent();return result;},[client,lease]);
+ async function finish(receipt:ToolReceipt){const retired=await draftApi.current.settle(locator=>locator.operationId===receipt.operationId?Promise.resolve(receipt):receiptFor(locator));if(!current())return;if(retired)onSaved(receipt);else setNotice('上次使用记录已保存，当前选择仍保留。');}
+ const restoredReceipt=useEffectEvent(async(receipt:ToolReceipt|null)=>{if(current()&&receipt?.state==='acknowledged')await finish(receipt);});
+ const restoreFailure=useEffectEvent((error:unknown)=>{if(current())setError(toolError(error));});
+ useEffect(()=>{if(!draft.ready||!draft.attempt)return;void receiptFor(draft.attempt).then(restoredReceipt).catch(restoreFailure);},[draft.ready,draft.attempt,receiptFor]);
+ function choose(value:ToolCandidateAttempt,work:ToolCaseCandidate){change({caseId:work.caseId,attempt:ref(value),result:null,evidenceRefs:[],verificationRefs:[]});}
+ function toggle(field:'evidenceRefs'|'verificationRefs',value:VersionRef){const selected=input[field];change({[field]:selected.some(item=>same(item,value))?selected.filter(item=>!same(item,value)):[...selected,ref(value)]});}
+ async function save(){
+  let snapshot=await draft.snapshot();if(!current())return;const chosenInput={...initial,...snapshot.value};if(!snapshot.revision){draft.change(chosenInput);snapshot=await draft.snapshot();if(!current())return;}
+  if(draft.attempt){const receipt=await receiptFor(draft.attempt);if(receipt?.state==='acknowledged'){await finish(receipt);return;}setRecoveryRequest(value=>value+1);throw Error('这份原稿已有提交，先确认原操作的保存结果。');}
+  if((await client.pending()).some((value)=>value.state!=='stopped-local')){setRecoveryRequest(value=>value+1);throw Error('上一条使用关联仍在确认，先继续原提交。');}
+  const exactPack=await client.manifest({builderId:pack.builderId,manifestId:pack.manifestId});if(!current())return;if(exactPack.manifestHash!==pack.manifestHash)throw Error('工具版本内容与原选择不一致，请重新读取。');if(exactPack.delisted||exactPack.securityIssue)throw Error('这个工具版本目前不能新增使用关联。');
+  const page=await client.candidates({caseId:chosenInput.caseId,limit:5});if(!current())return;const source=page.items.find((value)=>value.caseId===chosenInput.caseId),sourceAttempt=source?.attempts.find((value)=>same(value,chosenInput.attempt));if(!source||!sourceAttempt)throw Error('所选尝试或其配置版本目前不可读取，原选择保留。');
+  const sourceResult=chosenInput.result?source.results.find((value)=>same(value,chosenInput.result)&&same(value.origin,sourceAttempt)):null;if(chosenInput.result&&!sourceResult)throw Error('所选结果版本目前不可读取，原选择保留。');
+  const materialUnavailable=()=>Error('选定的材料或检查已有变化，原选择保留。请核对后明确取消不可读项目。');
+  const evidence=chosenInput.evidenceRefs.map(value=>{const item=source.evidence.find(item=>same(item,value));if(!item?.record)throw materialUnavailable();return item;}),verifications=chosenInput.verificationRefs.map(value=>{const item=source.verifications.find(item=>same(item,value)&&item.record&&(item.record.target.type==='attempt'&&same(item.record.target,sourceAttempt)||item.record.target.type==='result'&&sourceResult&&same(item.record.target,sourceResult)));if(!item?.record)throw materialUnavailable();return item;});
+  let currentExisting:PackUseRead|null=null;if(useId){currentExisting=await client.get({id:useId});if(!current())return;if(!currentExisting.record||currentExisting.subjectId!==subjectId||currentExisting.state!=='active')throw Error('这条记录当前不能补充，原选择保留。');if(currentExisting.currentVersion!==chosenInput.expectedVersion){setSourceChanged(currentExisting);throw Error('这条使用记录已有更新，请先核对当前内容。');}}
+  if(chosenInput.prior){const sourcePrior=await client.get({id:chosenInput.prior.id});if(!current())return;if(!sourcePrior.record||sourcePrior.subjectId!==subjectId)throw Error('先前的本人使用目前不可读取。可以保留选择，或明确取消前后关联。');}
+  const payload=preparePackUse({pack:exactPack,caseView:source,attempt:sourceAttempt,result:sourceResult??null,evidence,verifications,prior:chosenInput.prior,existing:currentExisting});
+  if(!toolPackUsePayload(payload))throw Error('所选使用关联内容不符合当前记录格式，原选择保留。');
+  const prepared=await client.prepare(payload,{visibility:chosenInput.visibility,viewers:chosenInput.visibility==='Public'?[]:chosenInput.viewers});if(!current())return;
+  const receipt=await client.execute(prepared,{confirmed:true,onJournal:async()=>{if(!current())throw Error('身份或页面已变化。');await draftApi.current.attach({family:'worker-pack',operationId:prepared.operationId,payloadHash:prepared.payloadHash,id:payload.id},snapshot.revision);}});if(current())await finish(receipt);
+ }
+ const missingEvidence=input.evidenceRefs.filter((value)=>!(chosen?.evidence??[]).some((item)=>same(item,value))),missingChecks=input.verificationRefs.filter((value)=>!checks.some((item)=>same(item,value)));
+ return <section className="tool-editor">
+  <p className="tool-selected-pack"><strong>{pack.manifest.name}</strong><span>版本 {pack.manifest.version}</span></p>
+  <ToolOperationStatus client={client} connected scopeKey={lease.bindingId+':'+lease.generation} paused={busy} request={recoveryRequest} onComplete={finish} renderContent={payload=><PackSubmittedContent payload={payload} pack={pack} caseView={chosen} current={existing}/>}/>
+  {notice&&<output className="message">{notice}</output>}{error&&<p className="message error" role="alert">{error}</p>}
+  {!draft.ready?<output>{draft.status||'正在恢复本机选择…'}</output>:<>
+   {oldDraft?.event&&!input.attempt&&!draft.attempt&&<aside className="resume-note"><p>还有一份以前保留的使用原稿。</p><Button variant="outline" disabled={busy} onClick={()=>{const event=oldDraft.event;if(!event)return;change({caseId:event.caseId,attempt:event.attempt,result:event.result,evidenceRefs:event.evidenceRefs??[],verificationRefs:event.verificationRefs??[],visibility:oldDraft.disclosure?.visibility??'Private',viewers:oldDraft.disclosure?.viewers??[],prior:event.follows??null,expectedVersion:event.expectedVersion??0});setOldDraft(null);void run(()=>readCases());}}>继续原选择</Button></aside>}
+   {input.prior&&<aside className="tool-prior"><p>关联到先前使用之后的{input.prior.kind==='upgrade'?'工具升级':'另一次尝试'}。</p><button className="text-link" disabled={busy} onClick={()=>change({prior:null})}>取消前后关联</button></aside>}
+   {sourceChanged&&<aside className="tool-source-change"><h2>当前修订 {sourceChanged.currentVersion}</h2><p>{sourceChanged.sources?.result?.summary??sourceChanged.sources?.attempt?.strategy??'当前来源未提供正文'}</p><Button variant="outline" onClick={()=>change({expectedVersion:sourceChanged.currentVersion})}>用当前选择补充这个修订</Button></aside>}
+   <form onSubmit={e=>{e.preventDefault();void run(save);}}><fieldset disabled={busy}>
+    <section className="tool-form-section"><h2>用在了哪次工作里？</h2><p className="tool-help">选择本人已经记录的尝试。这里的关联需要当时实际记录的配置版本。</p>
+     {originWork&&<aside className="tool-origin"><p>从“{originWork.task.request.title}”继续。</p>{!(originWork.facts?.attempts??[]).some((value)=>value.actorId===subjectId&&value.configurationRef&&value.configurationCondition?.record)&&<p className="tool-help">原工作当前没有可关联的本人尝试与当时配置版本。工作与结果仍保留，可以回原位置继续使用工具；这里不会补造过去的条件。</p>}<a href={returnTo??undefined} onClick={e=>{if(returnTo){e.preventDefault();go(returnTo);}}}>回到原工作</a></aside>}{originError&&<p className="tool-help">{originError}</p>}
+     {cases.length>1&&<label>查找已读到的工作<input value={input.query} maxLength={200} onChange={e=>change({query:e.target.value})}/></label>}
+     {!loaded?<output>正在读取本人工作…</output>:null}
+     <div className="tool-attempts">{cases.filter(value=>!input.query||[value.summary,...value.attempts.map((item)=>item.strategy)].join(' ').toLowerCase().includes(input.query.toLowerCase())).map(work=><section className="tool-work-choice" key={work.caseId}><h3>{work.summary??'当前可读的工作'}{work.synthetic&&<span className="record-meta"> · 合成</span>}</h3>{work.attempts.filter((value)=>!useId||value.id===existing?.record?.attempt.id).map((value)=><label className="tool-attempt-choice" key={refKey(value)} aria-label={value.strategy}><input type="radio" name="pack-use-attempt" checked={work.caseId===input.caseId&&same(value,input.attempt)} onChange={()=>choose(value,work)}/><span><strong>{value.strategy}</strong><small>尝试版本 {value.version} · {outcomes[value.status]??value.status}{value.configurationCondition?.record?.title?' · '+value.configurationCondition.record.title:''}</small></span></label>)}</section>)}</div>
+     {after&&<Button type="button" variant="outline" onClick={()=>void run(()=>readCases(after))}>更多本人工作</Button>}
+     {loaded&&!cases.length&&<div className="tool-empty"><p>还没有可关联的本人尝试与当时配置版本。</p><p>可以直接按工具说明使用；如果过去没有记录配置，继续保留这部分未知。需要记录新的实际工作时，再回原工作填写已经发生的内容。</p>{returnTo?<a href={returnTo} onClick={e=>{e.preventDefault();go(returnTo);}}>回到原事</a>:<a href="/app/history" onClick={e=>{e.preventDefault();go('/app/history');}}>查看我的工作</a>}</div>}
+     {input.attempt&&!attempt&&loaded&&<p className="message error">原先选择的尝试或配置版本目前不在可读候选中。定位仍保留，可以稍后继续，或明确另选。</p>}
     </section>
-  );
+    {attempt&&<><section className="tool-selected-source"><h2>当时的配置</h2><p>{attempt.configurationCondition?.record?.title??'所选配置'} · 版本 {attempt.configurationRef.version}</p>{attempt.configurationCondition?.record?.conditions?.limitations&&<p className="tool-help">{attempt.configurationCondition.record.conditions.limitations}</p>}<a href={toolPath('/app/configurations',{configurationId:attempt.configurationRef.id,version:attempt.configurationRef.version},location.pathname+location.search)} onClick={e=>{e.preventDefault();go(toolPath('/app/configurations',{configurationId:attempt.configurationRef.id,version:attempt.configurationRef.version},location.pathname+location.search));}}>阅读这个准确版本</a></section>
+     <section className="tool-form-section"><h2>这次的结果</h2>{results.length?<label>选择已经记录的结果<select value={input.result?refKey(input.result):''} onChange={e=>{const value=results.find((item)=>refKey(item)===e.target.value);change({result:ref(value),verificationRefs:input.verificationRefs.filter((selected)=>checks.some((check)=>same(check,selected)&&check.record?.target.type==='attempt'))});}}><option value="">暂不关联结果</option>{results.map((value)=><option key={refKey(value)} value={refKey(value)}>{value.summary} · 版本 {value.version}</option>)}</select></label>:<p className="tool-help">这次尝试还没有可关联的本人结果，可以先保存使用关联。</p>}{input.result&&!result&&<p className="message error">原结果版本目前不可读。<button type="button" className="text-link" onClick={()=>change({result:null,verificationRefs:[]})}>暂不关联该结果</button></p>}</section>
+     {((chosen?.evidence??[]).length+checks.length+input.evidenceRefs.length+input.verificationRefs.length)>0&&<details className="tool-optional"><summary>相关材料与检查{input.evidenceRefs.length+input.verificationRefs.length?' · 已选 '+(input.evidenceRefs.length+input.verificationRefs.length)+' 项':''}</summary>{(chosen?.evidence??[]).map((value)=><label className="checkbox-label" key={refKey(value)}><input type="checkbox" checked={input.evidenceRefs.some((item)=>same(item,value))} onChange={()=>toggle('evidenceRefs',value)}/><span>{value.record?.summary??'原材料不可读'}<small>{memberName(value.record?.reportedBy,subjectId,names[value.record?.reportedBy??'']??undefined)} · 材料版本 {value.version}</small></span></label>)}{checks.map((value)=><label className="checkbox-label" key={refKey(value)}><input type="checkbox" checked={input.verificationRefs.some((item)=>same(item,value))} onChange={()=>toggle('verificationRefs',value)}/><span>{value.record.summary}<small>{verificationObservation(value.record.observation)} · 检查版本 {value.version}</small></span></label>)}{[...missingEvidence.map((value)=>({value,field:'evidenceRefs' as const})),...missingChecks.map((value)=>({value,field:'verificationRefs' as const}))].map(({value,field})=><label className="checkbox-label" key={field+refKey(value)}><input type="checkbox" checked onChange={()=>toggle(field,value)}/><span>原选定{field==='evidenceRefs'?'材料':'检查'}目前不可读 · 版本 {value.version}<small>取消勾选才会从本次关联中移除。</small></span></label>)}</details>}
+     <section className="tool-form-section"><h2>阅读范围</h2><label>谁可以查看这条关联？<select value={input.visibility} onChange={e=>change({visibility:e.target.value==='Public'?'Public':'Private'})}><option value="Private">仅我和原选定协作者</option><option value="Public">公开这条使用关联</option></select></label>{input.visibility==='Private'&&input.viewers.length>0&&<div>{input.viewers.map((id:string)=><label className="checkbox-label" key={id}><input type="checkbox" checked onChange={()=>change({viewers:input.viewers.filter((value:string)=>value!==id)})}/>{memberName(id,subjectId,names[id]??undefined)}</label>)}</div>}<p className="tool-help">原工作、配置及其他人的材料仍按各自权限读取。</p></section>
+    </>}
+    <footer className="tool-form-footer"><Button type="submit" disabled={!attempt||!!draft.attempt||!!pack.delisted||!!pack.securityIssue}>{useId?'保存补充':'保存使用关联'}</Button><Button type="button" variant="ghost" onClick={()=>go(packPath(pack,{},returnTo))}>稍后继续</Button><output>{draft.status}</output></footer>
+   </fieldset></form>
+  </>}
+ </section>;
+}
+function PackSubmittedContent({payload,pack,caseView,current}:{payload:PackUseEvent;pack?:ToolManifest|null;caseView?:ToolCaseCandidate|null;current?:PackUseRead|null}){
+ if(payload.kind==='revoke')return <p className="reading-prose">{payload.reason}</p>;
+ const attempt=caseView?.attempts?.find((value)=>same(value,payload.attempt))??(same(current?.record?.attempt,payload.attempt)?current?.sources?.attempt:null),result=caseView?.results?.find((value)=>same(value,payload.result))??(same(current?.record?.result,payload.result)?current?.sources?.result:null);
+ return <><h3>{pack&&payload.pack.manifestId===pack.manifestId?pack.manifest.name+' '+pack.manifest.version:'原来选择的工具版本'}</h3><dl className="tool-facts"><dt>实际尝试</dt><dd>{attempt?.strategy??'保留原先选定的准确尝试'} · 版本 {payload.attempt.version}</dd><dt>配置</dt><dd>{attempt?.configurationCondition?.record?.title??'原尝试引用的配置'} · 版本 {payload.configuration.version}</dd><dt>结果</dt><dd>{payload.result?(result?.summary??'原来选定的结果')+' · 版本 '+payload.result.version:'未关联结果'}</dd><dt>材料与检查</dt><dd>{payload.evidenceRefs.length} 项材料，{payload.verificationRefs.length} 项检查</dd></dl><p className="tool-help">原资料仍按各自权限读取。这次保存只建立本人使用关联。</p></>;
 }

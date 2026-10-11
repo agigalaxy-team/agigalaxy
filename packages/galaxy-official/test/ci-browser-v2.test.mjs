@@ -10,9 +10,12 @@ import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
 import {inspectGithubRun} from '../src/github-evidence.mjs';
 test('CI browser signed workflow keeps exact operations through lost Consent and publication replies',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();
-  const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>{data.set(k,structuredClone(v));}};let runtime,dropConsent=false,dropPath=null;
+  const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>{data.set(k,structuredClone(v));},
+    update:async(k,change)=>{const value=change(structuredClone(data.get(k)));data.set(k,structuredClone(value));return structuredClone(value);}};let runtime,dropConsent=false,dropPath=null;const writes=[];
   try{await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    const config={endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys};const fetcher=async(url,options)=>{const path=new URL(url).pathname,response=await fetch(origin+path,options);
+    const config={endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys};const fetcher=async(url,options)=>{const path=new URL(url).pathname;
+      if(['/v1/consents','/v2/ci/requests','/v2/ci/proofs/publish'].includes(path))writes.push(path);
+      const response=await fetch(origin+path,options);
       if(dropConsent&&path==='/v1/consents'){dropConsent=false;assert.equal(response.status,200);throw new Error('synthetic lost Consent reply');}
       if(path===dropPath){dropPath=null;assert.equal(response.status,200);throw new Error('synthetic lost write reply');}return response;};
     runtime=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
@@ -43,6 +46,18 @@ test('CI browser signed workflow keeps exact operations through lost Consent and
     assert.equal((await client.reconcile()).state,'recorded');assert.equal((await client.local()).pending,null);
     assert.equal((await runtime.api.call('/v2/ci/proofs/read',{id:proof.id},{authenticated:false})).status,'active');
     assert.equal(Number((await f.db.query('SELECT count(*) FROM ci_proofs_v2 WHERE subject_id=$1',[subjectId])).rows[0].count),1);
-    runtime.api.disconnect();await assert.rejects(client.local(),/身份或连接已变化/);
+    const replacementRequest={...request,id:randomUUID()},bridge={...runtime,api:{...runtime.api,
+      submitAuthorization:async()=>{throw Error('synthetic interruption before original Consent');}}};
+    await assert.rejects(getCiClient(bridge,subjectId).submit('request',replacementRequest,{confirmed:true}),/before original Consent/);
+    const original=structuredClone((await getCiClient(bridge,subjectId).local()).pending);
+    assert.equal((await runtime.api.reconcileAuthorization(original.prepared)).state,'absent');
+    runtime.api.disconnect();await runtime.connect({confirmed:true});const baseline=writes.length;
+    assert.equal((await client.resumePending()).reason,'original-binding-changed');assert.equal(writes.length,baseline,'reading an unaccepted original on a replacement binding writes zero');
+    const renewed=await client.reviewAuthorization();assert.deepEqual(renewed.payload,original.payload);assert.equal(renewed.payloadHash,original.payloadHash);assert.equal(renewed.expiresAt,original.expiresAt);
+    assert.equal((await client.reauthorize(renewed,{confirmed:true})).state,'recorded');
+    assert.deepEqual(writes.slice(baseline),['/v1/consents','/v2/ci/requests']);
+    const exact=(await f.db.query('SELECT r.payload_text,r.payload_hash,c.intent FROM ci_requests_v2 r JOIN consents c ON c.id=r.consent_id WHERE r.id=$1',[replacementRequest.id])).rows[0];
+    assert.equal(exact.payload_text,original.payloadJson);assert.equal(exact.payload_hash,original.payloadHash);assert.equal(exact.intent.expiresAt,original.expiresAt);
+    runtime.api.disconnect();await assert.rejects(async()=>client.local(),/身份或连接已变化/);
   }finally{runtime?.close();api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });

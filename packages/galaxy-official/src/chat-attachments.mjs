@@ -33,13 +33,14 @@ export class ChatAttachmentsService {
   return {row,ctx};
  }
  async readableWithin(db,actor,row,{ownExport=false}={}){
-  if(this.status(row)!=='available')failure('attachment_content_unavailable',404);
+  const available=()=>{if(this.status(row)!=='available')failure('attachment_content_unavailable',404);};available();
   if(row.subject_id!==actor.subjectId&&await this.authorPending(db,row))failure('attachment_content_unavailable',404);
-  if(ownExport){if(row.subject_id!==actor.subjectId)failure('attachment_unavailable',404);return;}
-  if(!row.message_id){if(row.subject_id!==actor.subjectId)failure('attachment_content_unavailable',404);return;}
+  if(ownExport){if(row.subject_id!==actor.subjectId)failure('attachment_unavailable',404);available();return;}
+  if(!row.message_id){if(row.subject_id!==actor.subjectId)failure('attachment_content_unavailable',404);available();return;}
   const message=(await db.query('SELECT * FROM chat_message_refs WHERE message_id=$1 FOR SHARE',[row.message_id])).rows[0];
   if(!message||message.state!=='accepted'||Date.parse(message.expires_at)<=this.now()*1000)failure('attachment_message_unavailable',404);
   if((await db.query('SELECT hidden FROM chat_message_preferences WHERE message_id=$1 AND subject_id=$2',[row.message_id,actor.subjectId])).rows[0]?.hidden)failure('attachment_message_unavailable',404);
+  available();if(Date.parse(message.expires_at)<=this.now()*1000)failure('attachment_message_unavailable',404);
  }
  async prepare(actor,input){const x=parse(attachmentPrepareSchema,input);this.configured();if(x.size>this.policy.maxFileBytes)failure('attachment_too_large',413);
   return this.chat.run(actor,true,async db=>{
@@ -120,6 +121,12 @@ export class ChatAttachmentsService {
    else ({row}=await this.roomRow(db,actor,x.attachmentId,x));
    await this.readableWithin(db,actor,row,{ownExport});const bytes=await this.store.get({key:row.storage_key,keyId:row.encryption_key_id,size:Number(row.byte_size)});
    if(!bytes||hash(bytes)!==row.sha256)failure('attachment_storage_integrity_failed',502);
+   // Row/source locks preserve a current transaction snapshot, but time can
+   // still advance while object storage is read. Re-check the actual room/
+   // Agent and source authorization and expiry before returning any bytes.
+   if(ownExport){row=await this.row(db,x.attachmentId);if(!row||row.subject_id!==actor.subjectId)failure('attachment_unavailable',404);}
+   else ({row}=await this.roomRow(db,actor,x.attachmentId,x));
+   await this.readableWithin(db,actor,row,{ownExport});
    return {bytes,name:row.name,mediaType:row.media_type,sha256:row.sha256,attachmentId:row.id};
   });
  }

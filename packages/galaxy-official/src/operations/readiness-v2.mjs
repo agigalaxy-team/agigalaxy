@@ -36,19 +36,19 @@ export function createReadinessReport(input,{verifiedEvidenceIds=[],now=Date.now
  const evidence=new Map(x.evidence.map(e=>[e.id,e]));
  if(evidence.size!==x.evidence.length)throw new Error('duplicate_readiness_evidence');
  const verified=new Set(verifiedEvidenceIds),issues=[];
- const use=(list,kind=null)=>list.length>0&&list.every(ref=>{
+ const hasVerifiedEvidence=(list,kind=null)=>list.length>0&&list.every(ref=>{
   const e=evidence.get(ref);if(!e)throw new Error('missing_readiness_evidence:'+ref);
   return verified.has(ref)&&(!kind||kind.includes(e.kind));
  });
  const fresh=list=>list.every(ref=>{const e=evidence.get(ref);return e&&Date.parse(e.observedAt)<=now&&now-Date.parse(e.observedAt)<=maxAgeSeconds*1000;});
  const projectFact=(value,{freshRequired=false,kinds=null}={})=>{
   for(const ref of value.evidenceRefs)if(!evidence.has(ref))throw new Error('missing_readiness_evidence:'+ref);
-  const integrity=use(value.evidenceRefs,kinds),current=fresh(value.evidenceRefs);
+  const integrity=hasVerifiedEvidence(value.evidenceRefs,kinds),current=fresh(value.evidenceRefs);
   return {...value,evidenceIntegrityVerified:integrity,sourceObservedAt:value.evidenceRefs.map(ref=>evidence.get(ref).observedAt),
    sufficientlyRecent:current,confirmedInRecordedScope:value.state==='confirmed'&&integrity&&(!freshRequired||current),
    semanticAcceptance:'requires-source-and-scope-review'};
  };
- if(!use(x.policy.basisRefs,['decision']))issues.push('plan-decision-evidence-missing');
+ if(!hasVerifiedEvidence(x.policy.basisRefs,['decision']))issues.push('plan-decision-evidence-missing');
  const resources=x.resources.map(r=>({...r,ownership:projectFact(r.ownership),configuration:projectFact(r.configuration),
   runtime:projectFact(r.runtime,{freshRequired:true,kinds:['runtime']}),verification:projectFact(r.verification,{freshRequired:true,kinds:['runtime','engineering-test']}),
   capacity:projectFact(r.capacity,{freshRequired:true,kinds:['engineering-test','real-pilot']})}));
@@ -59,7 +59,7 @@ export function createReadinessReport(input,{verifiedEvidenceIds=[],now=Date.now
  if(!resources.some(r=>r.requiredForPilot))issues.push('pilot-resources-not-specified');
  const responsibilities=roles.map(role=>{
   const rows=x.operator.responsibilities.filter(r=>r.role===role);if(rows.length>1)throw new Error('duplicate_readiness_role');
-  const r=rows[0],assigned=!!r&&r.state==='assigned'&&!!r.holderRef&&use(r.evidenceRefs,['decision']);
+  const r=rows[0],assigned=!!r&&r.state==='assigned'&&!!r.holderRef&&hasVerifiedEvidence(r.evidenceRefs,['decision']);
   if(!assigned)issues.push('responsibility:'+role);
   return r?{...r,assignmentEvidenceVerified:assigned}:{role,state:'unassigned',holderRef:null,evidenceRefs:[],assignmentEvidenceVerified:false};
  });
@@ -67,12 +67,12 @@ export function createReadinessReport(input,{verifiedEvidenceIds=[],now=Date.now
   if(!resources.some(r=>r.resourceRef===c.resourceRef))throw new Error('cost_resource_not_registered');
   if(c.state==='unknown'&&c.value!==null||c.state!=='unknown'&&c.value===null)throw new Error('readiness_cost_state_mismatch');
   if(c.value?.scope?.attribution==='unallocated'&&c.state!=='unallocated')throw new Error('shared_cost_not_attributed_to_galaxy');
-  if(c.value&&!use(c.evidenceRefs,['billing']))throw new Error('readiness_cost_evidence_missing');
+  if(c.value&&!hasVerifiedEvidence(c.evidenceRefs,['billing']))throw new Error('readiness_cost_evidence_missing');
   return {...c,sourceObservedAt:c.value?.observedAt??null,newProcurementCapDoesNotReplaceAmount:true};
  });
  const scenarios=x.scenarios.map(s=>{
   const kind=s.population==='real'?'real-pilot':'engineering-test';
-  const accepted=s.state==='passed'&&use(s.evidenceRefs,[kind])&&(s.population!=='real'||s.participantRefs.length>0&&!!s.consentScope&&!!s.userFeedback
+  const accepted=s.state==='passed'&&hasVerifiedEvidence(s.evidenceRefs,[kind])&&(s.population!=='real'||s.participantRefs.length>0&&!!s.consentScope&&!!s.userFeedback
    &&(s.scenarioKind!=='help-return'||!!s.helpReceived&&!!s.returnToWork));
   return {...s,evidenceQualifiedInDeclaredScope:accepted,participantCountIsDeclaredNotIdentityVerification:true};
  });

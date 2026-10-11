@@ -1,5 +1,7 @@
 import * as z from 'zod/v4';
 import { taskQueryV2Schema, taskReceiptV2Schema } from './shared/task-schema-v2.mjs';
+import {taskOwnerReadPrepareV2Schema,taskOwnerReadRequestV2Schema} from './shared/task-owner-read-v2-schema.mjs';
+import {taskOwnerControlPrepareV2Schema,taskOwnerControlRequestV2Schema} from './shared/task-owner-control-v2-schema.mjs';
 
 // Transport grants permit the operation category; mutations still require an
 // existing locally signed exact Consent, checked by the persistent M11 service.
@@ -24,5 +26,17 @@ export function taskToolDefinitions(services, actor) {
       ({ participationId, ...signed }) => services.assistance.submitParticipationEvent(actor, participationId, signed), true),
     galaxy_task_v2_receipt: tool(taskReceiptV2Schema,
       'Check the original operation ID and payload hash after an unknown response. Do this before any new publication or dependent invitation.', input => services.assistance.taskReceipt(actor, input)),
+    galaxy_task_v2_owner_read_prepare: tool(taskOwnerReadPrepareV2Schema,
+      'Prepare exact metadata and current device scope for an explicit fresh owner read after same-ID recovery. This does not disclose retained text or restore shared access.',
+      input => services.taskOwnerRead.prepare(actor,input)),
+    galaxy_task_v2_owner_read: tool(z.strictObject({taskId:z.uuid(),...taskOwnerReadRequestV2Schema.shape}),
+      'Read only currently authorized retained authored events with an existing locally signed task.owner-read Consent over the exact prepared descriptor. Returns a partial event set, never a complete Task or Task write permission.',
+      ({taskId,...signed}) => services.taskOwnerRead.read(actor,taskId,signed)),
+    galaxy_task_v2_owner_control_prepare: tool(taskOwnerControlPrepareV2Schema,
+      'Prepare one explicit owner cancel or close after same-ID recovery, with exact event bytes, current version and private authorization scope. Query the original receipt first if an operation may already have been accepted.',
+      input => services.taskOwnerControl.prepare(actor,input)),
+    galaxy_task_v2_owner_control: tool(z.strictObject({taskId:z.uuid(),...taskOwnerControlRequestV2Schema.shape}),
+      'Execute one explicitly reviewed cancel or close using an existing locally signed exact private assistance.publish Consent. A read permit cannot authorize this write. Preserve the original event ID and bytes; after an unknown response query the original receipt before retrying. Ending a Task retains history and does not revoke materials or settle payments.',
+      ({taskId,...signed}) => services.taskOwnerControl.execute(actor,taskId,signed),true),
   };
 }

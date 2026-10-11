@@ -1,3 +1,5 @@
+import {showExactChoice} from './exact-choice.mjs';
+import {nativeStateLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
 export function createIdentityMenu({ controller, select, prompt, info, language, isCurrent, onBack }) {
   const label = (zh,en) => language === 'en-US' ? en : zh;
   let generation = 0;
@@ -53,9 +55,9 @@ export function createIdentityMenu({ controller, select, prompt, info, language,
     void run(()=>controller.prepareIdentity(action,input),preview=>{
       const version=++generation;
       const leave=()=>{if(current(version)){generation++;controller.cancel();back();}};
-      prompt({title:`${preview.previewJson}\n${label('逐字输入确认','Type exactly to confirm')}: ${preview.confirmation}`,placeholder:preview.confirmation,
-        onSubmit:text=>{if(!current(version))return;generation++;
-          void run(()=>controller.executeIdentity(preview,text),result=>message(result.state,()=>list()),back);},onBack:leave});
+      showExactChoice({preview,title:label(action==='link'?'关联这个外部账户':'撤销这个账户关联',action==='link'?'Link this external account':'Unlink this account'),select,info,language,isCurrent:()=>current(version),onCancel:leave,
+        onConfirm:text=>{if(!current(version))return;generation++;
+          void run(()=>controller.executeIdentity(preview,text),result=>message(nativeStateLabel(result.state)??label('账户关联已更新。','Account association updated.'),()=>list()),back);}});
     },back);
   }
   return Object.freeze({open});

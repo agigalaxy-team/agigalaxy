@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import {digest} from './shared/digest.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
-import {summaryPreferenceSchema,summaryPutSchema,summaryPageSchema} from './shared/personal-summary-schema.mjs';
+import {summaryPreferenceSchema,summaryPutSchema,summaryPageSchema,summaryReceiptSchema} from './shared/personal-summary-schema.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),day=86400;
 const fail=(c,s=409)=>{throw new ServiceError(c,s);};
 function parse(schema,x){const v=schema.safeParse(x);if(!v.success)fail('invalid_personal_summary_request',400);return v.data;}
@@ -79,6 +79,15 @@ export class PersonalSummaryService {
   return {summaryId,roomId:h.room_id,revision:h.revision,current,conflicts,audience:'owner-only',sharedToRoom:false};
  }
  get(actor,{summaryId}){parse(z.uuid(),summaryId);return this.run(actor,false,db=>this.getWithin(db,actor,summaryId));}
+ receipt(actor,input){const x=parse(summaryReceiptSchema,input);return this.run(actor,false,async db=>{
+  const row=(await db.query('SELECT version_id,summary_id,revision,base_revision,state FROM personal_summary_versions WHERE subject_id=$1 AND version_id=$2',[actor.subjectId,x.versionId])).rows[0];
+  if(!row)return{state:'absent',operationVersionId:x.versionId,summaryId:x.summaryId,readOnly:true};
+  if(row.summary_id!==x.summaryId)fail('summary_operation_conflict');
+  // The original operation remains identifiable after withdrawal, source
+  // invalidation, supersession or cloud deletion. Never return its old body.
+  return{state:'committed',operationVersionId:x.versionId,operation:{versionId:row.version_id,summaryId:row.summary_id,revision:row.revision,baseRevision:row.base_revision,state:row.state},
+   summary:await this.getWithin(db,actor,x.summaryId),readOnly:true};
+ });}
  async exportOwnedWithin(db,actor,input={}){const x=parse(summaryPageSchema,input);
   const rows=(await db.query(`SELECT summary_id FROM personal_summary_heads WHERE subject_id=$1 AND deleted_at IS NULL
    AND ($2::uuid IS NULL OR summary_id>$2) ORDER BY summary_id LIMIT $3`,[actor.subjectId,x.after??null,x.limit+1])).rows;
@@ -86,7 +95,7 @@ export class PersonalSummaryService {
   return {items,nextAfter:rows.length>x.limit?rows[x.limit-1].summary_id:null,audience:'owner-only'};
  }
  list(actor,input={}){return this.run(actor,false,db=>this.exportOwnedWithin(db,actor,input));}
- put(actor,input){const x=parse(summaryPutSchema,input),{preferenceRevision,...intent}=x,requestHash=digest(canonicalize(intent));return this.run(actor,true,async db=>{
+ put(actor,input){const x=parse(summaryPutSchema,input),{preferenceRevision:_preferenceRevision,...intent}=x,requestHash=digest(canonicalize(intent));return this.run(actor,true,async db=>{
   const p=(await db.query('SELECT * FROM personal_summary_preferences WHERE subject_id=$1 FOR SHARE',[actor.subjectId])).rows[0];
   if(!p?.enabled||p.endpoint!==this.endpoint||p.revision!==x.preferenceRevision||p.room_ids&&!p.room_ids.includes(x.roomId))fail('summary_sync_not_authorized',403);
   if(!this.sourceReader||!(await this.sourceReader(db,actor,{roomId:x.roomId})).available)fail('summary_room_unavailable',403);

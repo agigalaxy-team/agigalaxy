@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { digest } from './shared/digest.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { currentControlKey } from './infrastructure/identity-control-repository.mjs';
+import {lockControllerMappingsWithin} from './controller-mapping-lock.mjs';
 
 const identifier = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
 const idInput = z.strictObject({ id: z.uuid() });
@@ -122,6 +123,7 @@ export class IdentityLinkService {
     const { id, signed } = parse(z.strictObject({ id: z.uuid(), signed: z.string().min(1).max(16384) }), input);
     try {
       return await this.access.runResourceWrite(actor, 'binding', {}, async (db, authorization) => {
+        await lockControllerMappingsWithin(db,this.access.endpoint,[actor.subjectId],{exclusive:true});
         const control=authorization.identityControl??await currentControlKey(db,actor.subjectId,{scope:'binding'});
         let payloadJson;
         try {
@@ -175,6 +177,10 @@ export class IdentityLinkService {
       const row = (await db.query('SELECT * FROM external_identity_links WHERE id=$1 AND subject_id=$2 AND endpoint=$3 FOR UPDATE',
         [id, actor.subjectId, this.access.endpoint])).rows[0];
       if (!row) throw new ServiceError('not_found', 404);
+      // Exact row ownership is checked first. The room reader never locks this
+      // row or an account row, so this writer can wait for its subject key
+      // without a row-lock upgrade against governance.
+      await lockControllerMappingsWithin(db,this.access.endpoint,[actor.subjectId],{exclusive:true});
       if (!row.revoked_at) {
         await db.query('UPDATE external_identity_links SET revoked_at=$2 WHERE id=$1', [id, iso(this.access.now())]);
         await audit(db, actor, authorization, id, 'identity.unlink');

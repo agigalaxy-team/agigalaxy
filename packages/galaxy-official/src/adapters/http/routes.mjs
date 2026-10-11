@@ -1,3 +1,4 @@
+import {dispatchCommunityForum} from './community-forum-http.mjs';
 import {dispatchHubs} from './hub-http.mjs';
 import {dispatchInformation} from './information-http.mjs';
 import {dispatchTargetGovernance} from './target-governance-http.mjs';
@@ -10,10 +11,17 @@ import {dispatchOutcomeMaterials} from './outcome-material-http.mjs';
 import {dispatchTrustPackages} from './trust-package-http.mjs';
 import { searchQuerySchema,searchScope } from '../../shared/search-schema.mjs';
 import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../../shared/search-v2-schema.mjs';
+import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
+import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
+    if(await dispatchCommunityForum({forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
+    if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/challenges')
+      return send(201,await receiptStatus.challenge(await body(request,null)));
+    if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/query')
+      return send(200,await receiptStatus.query(await body(request,['challenge','signature'])));
     if(await dispatchWatchControls({watchControls,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchIdentityGroups({identityGroups,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchTargetGovernance({targetGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
@@ -30,10 +38,10 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       if(method==='query'||method==='versions')consumeSearchPage(actor,input.after??input.afterVersion);
       return send(200,await configurations[method](actor,input));
     }
-    const choiceAction=/^\/v2\/choice-snapshots\/(preferences\/(?:read|save)|put|get|list|delete)$/.exec(url.pathname);
+    const choiceAction=/^\/v2\/choice-snapshots\/(preferences\/(?:read|save)|put|get|list|delete|receipt)$/.exec(url.pathname);
     if(choices&&request.method==='POST'&&choiceAction){
       const actor={...await authenticate(request,access,'binding'),httpRequestId:requestId};
-      const method={'preferences/read':'preferences','preferences/save':'savePreference',put:'put',get:'get',list:'list',delete:'delete'}[choiceAction[1]];
+      const method={'preferences/read':'preferences','preferences/save':'savePreference',put:'put',get:'get',list:'list',delete:'delete',receipt:'receipt'}[choiceAction[1]];
       return send(200,await choices[method](actor,await body(request,choiceAction[1]==='preferences/read'?[]:null)));
     }
     const commentId=/^\/v2\/comments\/([0-9a-f-]{36})$/.exec(url.pathname);
@@ -111,6 +119,14 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       consumeSearchPage(actor, input.after);
       return send(200, await requesterHistoryV2[requesterAction](actor, input));
     }
+    const recruitmentReceipt = /^\/v2\/recruitment\/([0-9a-f-]{36})\/receipt$/.exec(url.pathname);
+    if (recruitment && request.method === 'GET' && recruitmentReceipt) {
+      const entries=[...url.searchParams],keys=entries.map(([key])=>key);
+      if (keys.length!==2 || new Set(keys).size!==2 || keys.some(key=>!['operationId','payloadHash'].includes(key)))
+        throw new ServiceError('invalid_recruitment_receipt_query');
+      const actor=await authenticate(request,access,'history');
+      return send(200,await recruitment.operationReceipt(actor,{recruitmentId:recruitmentReceipt[1],...Object.fromEntries(entries)}));
+    }
     const recruitmentRead = /^\/v2\/recruitment\/([0-9a-f-]{36})$/.exec(url.pathname);
     if (recruitment && request.method === 'GET' && recruitmentRead)
       return send(200, await recruitment.get(await authenticate(request, access, 'history', true), recruitmentRead[1]));
@@ -125,8 +141,8 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       const actor = { ...await authenticate(request, access, 'assistance'), httpRequestId: requestId };
       return send(200, await experienceAction[0][experienceAction[1]](actor, await body(request, experienceAction[2] ? ['consentId', 'payloadJson'] : null)));
     }
-    const summaryMethods = { 'preferences/read': 'preferences', 'preferences/save': 'savePreference', put: 'put', get: 'get', list: 'list', delete: 'delete', sources: 'sources' };
-    const summaryAction = /^\/v2\/personal-summaries\/(preferences\/(?:read|save)|put|get|list|delete|sources)$/.exec(url.pathname);
+    const summaryMethods = { 'preferences/read': 'preferences', 'preferences/save': 'savePreference', put: 'put', get: 'get', receipt: 'receipt', list: 'list', delete: 'delete', sources: 'sources' };
+    const summaryAction = /^\/v2\/personal-summaries\/(preferences\/(?:read|save)|put|get|receipt|list|delete|sources)$/.exec(url.pathname);
     if (summaries && request.method === 'POST' && summaryAction) {
       const actor = { ...await authenticate(request, access, 'binding'), httpRequestId: requestId };
       return send(200, await summaries[summaryMethods[summaryAction[1]]](actor, await body(request, summaryAction[1] === 'preferences/read' ? [] : null)));
@@ -147,6 +163,11 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
     const projectRead = /^\/v2\/projects\/([0-9a-f-]{36})$/.exec(url.pathname);
     if (projects && request.method === 'GET' && projectRead)
       return send(200, await projects.get(await authenticate(request, access, 'history', true), projectRead[1]));
+    if (projects && request.method === 'POST' && url.pathname === '/v2/projects/directory/query') {
+      const actor = await authenticate(request, access, 'history', true), input = await body(request, null);
+      consumeSearchPage(actor, input?.after);
+      return send(200, await projects.publicDirectory(actor, input));
+    }
     const projectPreference = /^\/v2\/projects\/([0-9a-f-]{36})\/preferences\/(read|save)$/.exec(url.pathname);
     if (projects && request.method === 'POST' && (url.pathname === '/v2/projects' || url.pathname === '/v2/projects/query' || projectPreference)) {
       const actor = { ...await authenticate(request, access, 'history'), httpRequestId: requestId };
@@ -155,7 +176,7 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       const input = await body(request, projectPreference[2] === 'read' ? [] : null);
       return send(200, await projects[projectPreference[2] === 'read' ? 'preferences' : 'savePreferences'](actor, projectPreference[1], input));
     }
-    const sharedAction = /^\/v2\/chat\/shared-summaries\/(publish|get|list|retract)$/.exec(url.pathname);
+    const sharedAction = /^\/v2\/chat\/shared-summaries\/(publish|get|list|receipt|retract)$/.exec(url.pathname);
     if (sharedSummaries && request.method === 'POST' && sharedAction) {
       const actor = { ...await authenticate(request, access, 'binding'), httpRequestId: requestId };
       return send(200, await sharedSummaries[sharedAction[1]](actor, await body(request, null)));
@@ -166,10 +187,10 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       const globalMethod = { '/v2/chat/rooms/create': 'create', '/v2/chat/rooms/query': 'list',
         '/v2/chat/invitations/query': 'invitations', '/v2/chat/export/owned': 'exportOwned' }[url.pathname];
       if (globalMethod) return send(200, await chat[globalMethod](actor, input));
-      const roomRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/(read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|cursor|agent-grants|agent-participants|agent-grant|agent-revoke)$/.exec(url.pathname);
+      const roomRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/(read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|cursor|agent-grants|agent-participants|agent-grant|agent-revoke|join-preview|join)$/.exec(url.pathname);
       if (roomRoute) {
         const method = { read: 'get', history: 'history', decisions: 'decisions', propose: 'proposeDecision', vote: 'voteDecision', accept: 'acceptInvite',
-          leave: 'leave', dismiss: 'dismissDecision', send: 'send', receipt: 'messageStatus', cursor: 'cursor', 'agent-grants': 'queryAgentGrants', 'agent-participants':'queryAgentParticipants', 'agent-grant': 'grantAgent', 'agent-revoke': 'revokeAgent' }[roomRoute[2]];
+          leave: 'leave', dismiss: 'dismissDecision', send: 'send', receipt: 'messageStatus', cursor: 'cursor', 'agent-grants': 'queryAgentGrants', 'agent-participants':'queryAgentParticipants', 'agent-grant': 'grantAgent', 'agent-revoke': 'revokeAgent', 'join-preview':'joinPreview',join:'join' }[roomRoute[2]];
         return send(200, await chat[method](actor, roomRoute[1], input));
       }
       const messageRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/messages\/([0-9a-f-]{36})\/(edit|retract|hide)$/.exec(url.pathname);
@@ -206,11 +227,21 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
       if (url.pathname.endsWith('/query')) consumeSearchPage(actor, input.after);
       return send(200, await capsules[capsuleV2Methods[url.pathname]](actor, input));
     }
-    const verificationRoute = /^\/v2\/verification-records\/(submit|read|status)$/.exec(url.pathname);
+    const verificationRoute = /^\/v2\/verification-records\/(submit|read|status|receipt)$/.exec(url.pathname);
     if (verificationRecords && request.method === 'POST' && verificationRoute) {
       const actor = { ...await authenticate(request, access, 'evidence'), httpRequestId: requestId };
       const method = verificationRoute[1] === 'read' ? 'get' : verificationRoute[1];
       return send(200, await verificationRecords[method](actor, await body(request, null)));
+    }
+    if (cases && route === 'POST /v2/cases/events/receipt') {
+      const actor = { ...await authenticate(request, access, 'case-teaser'), httpRequestId: requestId };
+      return send(200, await cases.receipt(actor, await body(request, ['caseId','eventId','payloadHash'])));
+    }
+    const taskCaseLinkReceipt = /^\/v2\/tasks\/([0-9a-f-]{36})\/case-link\/receipt$/.exec(url.pathname);
+    if (cases && request.method === 'POST' && taskCaseLinkReceipt) {
+      const actor = { ...await authenticate(request, access, 'case-teaser'), httpRequestId: requestId };
+      const input = await body(request, ['operationId','payloadHash']);
+      return send(200, await cases.taskLinkReceipt(actor, { ...input, taskId: taskCaseLinkReceipt[1] }));
     }
     if (cases && route === 'POST /v2/cases/events') {
       const actor = { ...await authenticate(request, access, 'case-teaser'), httpRequestId: requestId };
@@ -223,6 +254,26 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
     const caseReadV2 = /^\/v2\/cases\/([0-9a-f-]{36})\/read$/.exec(url.pathname);
     if (cases && request.method === 'POST' && caseReadV2)
       return send(200, await cases.getV2(await authenticate(request, access, 'case-teaser'), caseReadV2[1], await body(request,null)));
+    const ownerControl = /^\/v2\/tasks\/([0-9a-f-]{36})\/owner-control(?:\/(prepare))?$/.exec(url.pathname);
+    if (taskOwnerControl && request.method === 'POST' && ownerControl) {
+      const actor = {...await authenticate(request, access, 'assistance'),httpRequestId:requestId};
+      if (ownerControl[2]) {
+        const parsed = taskOwnerControlPrepareV2Schema.omit({taskId:true}).safeParse(await body(request, null));
+        if (!parsed.success) throw new ServiceError('invalid_task_owner_control');
+        return send(200, await taskOwnerControl.prepare(actor, {...parsed.data,taskId:ownerControl[1]}));
+      }
+      return send(200, await taskOwnerControl.execute(actor, ownerControl[1], await body(request, ['consentId','payloadJson'])));
+    }
+    const ownerRead = /^\/v2\/tasks\/([0-9a-f-]{36})\/owner-read(?:\/(prepare))?$/.exec(url.pathname);
+    if (taskOwnerRead && request.method === 'POST' && ownerRead) {
+      const actor = {...await authenticate(request, access, 'assistance'), httpRequestId: requestId};
+      if (ownerRead[2]) {
+        const parsed = taskOwnerReadPrepareV2Schema.omit({taskId:true}).safeParse(await body(request, null));
+        if (!parsed.success) throw new ServiceError('invalid_task_owner_read');
+        return send(200, await taskOwnerRead.prepare(actor, {...parsed.data, taskId:ownerRead[1]}));
+      }
+      return send(200, await taskOwnerRead.read(actor, ownerRead[1], await body(request, ['consentId','payloadJson'])));
+    }
     if (assistance && request.method === 'GET' && url.pathname === '/v2/tasks')
       return send(200, await assistance.queryPublicTasks());
     const taskRead = /^\/v2\/tasks\/([0-9a-f-]{36})$/.exec(url.pathname);
@@ -360,12 +411,13 @@ export function createRoutes({ watchControls,identityGroups,targetGovernance,inf
         ? {subjectId:parts[3],ruleId:parts[4],ruleVersion:parts[5]} : await body(request, null)));
     }
     if (moderation && request.method === 'POST' && (/^\/v1\/moderation\/(config|reports|reports\/query)$/.test(url.pathname)
-      || /^\/v1\/moderation\/reports\/[0-9a-f-]{36}\/(read|events)$/.test(url.pathname))) {
+      || /^\/v1\/moderation\/reports\/[0-9a-f-]{36}\/(read|events|receipt)$/.test(url.pathname))) {
       const actor = { ...await authenticate(request, access, 'moderation'), httpRequestId: requestId };
       if (url.pathname.endsWith('/config')) { await body(request, []); return send(200, await moderation.config(actor)); }
       if (url.pathname.endsWith('/query')) return send(200, await moderation.query(actor, await body(request, null)));
       const id = url.pathname.split('/')[4];
       if (url.pathname.endsWith('/read')) { await body(request, []); return send(200, await moderation.get(actor, id)); }
+      if (url.pathname.endsWith('/receipt')) return send(200, await moderation.receipt(actor, {reportId:id,...await body(request, ['eventId','payloadHash'])}));
       const input = await body(request, ['consentId', 'payloadJson']);
       return send(200, id ? await moderation.event(actor, id, input) : await moderation.report(actor, input));
     }

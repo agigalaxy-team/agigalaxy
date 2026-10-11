@@ -104,7 +104,7 @@ export class ContributionSharingV2Service{
     const read=async db=>{let ref=parsed.data.source;
       if(!ref){const publication=(await db.query('SELECT payload_text FROM contribution_publications WHERE id=$1',[parsed.data.publicationId])).rows[0];rule(publication?.payload_text,'contribution_source_unavailable',404);
         const p=contributionPublicationSchema.parse(JSON.parse(publication.payload_text)),selected=p.kind==='publish'&&p.sourceRefs.find(r=>digest(JSON.stringify([r.kind,r.id,r.payloadHash]))===parsed.data.sourceKey);
-        rule(selected,'contribution_source_unavailable',404);const{fields,...source}=selected;ref=source;}
+        rule(selected,'contribution_source_unavailable',404);const{fields:_fields,...source}=selected;ref=source;}
       const row=await this.sourceWithin(db,ref),permission=await this.authorizeWithin(db,actor,ref.kind,row,{purpose:parsed.data.purpose});
       return{ref:this.reference(row,ref.kind,permission),projection:this.project(row,permission.fields),publicationIds:permission.publicationIds,
         sourceState:'currently-authorized-projection',originalTextAccessGranted:false,capabilityVerified:false};};

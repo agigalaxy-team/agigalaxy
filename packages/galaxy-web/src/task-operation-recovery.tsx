@@ -1,252 +1,94 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React,{useCallback,useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {X} from 'lucide-react';
+import {memberName,readableTime} from './conversation-ui';
+import {errorField,operationSessionKey,readAuthorizationPreview,readOperationReceipt,readPendingOperation,readStoppedOperations,readStopPreview,submittedContent} from './task-operation-state';
+import type {OperationAuthorizationPreview,OperationReceipt,OperationRuntime,StoppedOperation,StopPreview} from './task-operation-state';
 
-export function TaskOperationRecovery({
-  runtime,
-  connected,
-  taskId = null,
-  onComplete,
-  onStopped,
-}: {
-  runtime: any;
-  connected: boolean;
-  taskId?: string | null;
-  onComplete?: (receipt: any) => void | Promise<void>;
-  onStopped?: (receipt: any) => void | Promise<void>;
-}) {
-  const [preview, setPreview] = useState<any>(null),
-    [message, setMessage] = useState(''),
-    [busy, setBusy] = useState(false);
-  const [stopPreview, setStopPreview] = useState<any>(null),
-    [stopped, setStopped] = useState<any[]>([]);
-  const epoch = useRef(0),
-    working = useRef(false);
-  useEffect(() => {
-    const lease = ++epoch.current;
-    setPreview(null);
-    setStopPreview(null);
-    setStopped([]);
-    setMessage('');
-    runtime?.stoppedTaskOperations(taskId).then((records: any[]) => {
-      if (lease === epoch.current) setStopped(records);
-    });
-    return () => {
-      epoch.current++;
-    };
-  }, [runtime, connected, taskId]);
-  async function run(action: (valid: () => boolean) => Promise<void>) {
-    if (working.current) return;
-    working.current = true;
-    const lease = epoch.current;
-    setBusy(true);
-    setMessage('');
-    try {
-      await action(() => lease === epoch.current);
-    } catch (error: any) {
-      if (lease === epoch.current) setMessage(error.message);
-    } finally {
-      if (lease === epoch.current) {
-        const records = await runtime.stoppedTaskOperations(taskId);
-        if (lease === epoch.current) {
-          setStopped(records);
-          setBusy(false);
-        }
-      }
-      working.current = false;
-    }
-  }
-  return (
-    <section className="operation-recovery">
-      <Button
-        variant="ghost"
-        disabled={!runtime || !connected || busy}
-        onClick={() =>
-          run(async (valid) => {
-            setPreview(null);
-            const result = await runtime.reviewTaskAuthorization(taskId);
-            if (!valid()) return;
-            if (result.state === 'reauthorization-required') setPreview(result);
-            else if (result.state === 'acknowledged') {
-              setMessage('原操作已经完成。');
-              await onComplete?.(result);
-            } else
-              setMessage(
-                result.state === 'none'
-                  ? '没有待恢复的操作。'
-                  : '原授权仍可使用，请点击“重试原操作”或“重试原发布”。',
-              );
-          })
-        }
-      >
-        重连后检查原操作授权
-      </Button>
-      <Button
-        variant="ghost"
-        disabled={!runtime || busy}
-        onClick={() =>
-          run(async (valid) => {
-            setPreview(null);
-            const result = await runtime.reviewTaskStop(taskId);
-            if (!valid()) return;
-            if (result.state === 'acknowledged') {
-              setMessage('原操作已经被服务接受，不把它显示为已取消。');
-              await onComplete?.(result);
-            } else if (result.state === 'none')
-              setMessage('没有当前待停止的操作。');
-            else setStopPreview(result);
-          })
-        }
-      >
-        查看停止本机重试的范围
-      </Button>
-      {message && (
-        <p className="message" role="status">
-          {message}
-        </p>
-      )}
-      {preview && (
-        <div className="message">
-          <h3>确认继续同一项操作</h3>
-          <p>
-            服务未收到原操作及其授权。旧授权不能用于当前连接，确认后会为下列相同内容签署新授权，并保留原操作编号。
-          </p>
-          <p>
-            可见范围：{preview.visibility === 'Public' ? '公开' : '私有'}
-            ；授权有效至 {new Date(preview.expiresAt * 1000).toLocaleString()}。
-          </p>
-          {preview.viewers?.length > 0 && (
-            <p>允许查看的身份：{preview.viewers.join('、')}</p>
-          )}
-          <details>
-            <summary>查看这次继续提交的原内容</summary>
-            <pre>{JSON.stringify(preview.payload, null, 2)}</pre>
-          </details>
-          <div className="button-row">
-            <Button
-              disabled={busy}
-              onClick={() =>
-                run(async (valid) => {
-                  const receipt = await runtime.reauthorizeTaskOperation(
-                    preview,
-                    { taskId, confirmed: true },
-                  );
-                  if (!valid()) return;
-                  setPreview(null);
-                  setMessage('原操作已提交并取得回执。');
-                  await onComplete?.(receipt);
-                })
-              }
-            >
-              确认相同内容并继续
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => setPreview(null)}
-            >
-              暂不处理
-            </Button>
-          </div>
-        </div>
-      )}
-      {stopPreview && (
-        <div className="message">
-          <h3>停止本机重试</h3>
-          <p>
-            操作：{stopPreview.kind}；原任务 {stopPreview.taskId}；原操作{' '}
-            {stopPreview.eventId}。
-          </p>
-          <code>{stopPreview.payloadHash}</code>
-          <p>
-            {stopPreview.receipt.state === 'absent'
-              ? '本次查询没有找到业务接受回执。'
-              : stopPreview.receipt.state === 'conflict'
-                ? '原 ID 与服务回执存在冲突。'
-                : '网络或权限当前不足以确认服务端结果。'}{' '}
-            这不证明在途请求以后不会完成。
-          </p>
-          <p>
-            确认后只清除此浏览器的当前重试队列，先保留原
-            ID、摘要哈希及查询记录。以后不会自动再发；实际撤回邀请、退出参与或取消任务仍需另走对应操作。
-          </p>
-          <div className="button-row">
-            <Button
-              disabled={busy}
-              onClick={() =>
-                run(async (valid) => {
-                  const result = await runtime.stopTaskOperation(stopPreview, {
-                    taskId,
-                    confirmed: true,
-                  });
-                  if (!valid()) return;
-                  setStopPreview(null);
-                  if (result.state === 'acknowledged') {
-                    setMessage('核对时发现原操作已接受。');
-                    await onComplete?.(result);
-                  } else if (result.state === 'stopped-local') {
-                    setMessage(
-                      '已停止本机重试；服务端取消未确认。可以按当前事实准备独立的新操作。',
-                    );
-                    await onStopped?.(result);
-                  } else setMessage('当前没有待停止的原操作。');
-                })
-              }
-            >
-              确认停止本机重试
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setStopPreview(null)}
-            >
-              继续保留原队列
-            </Button>
-          </div>
-        </div>
-      )}
-      {!!stopped.length && (
-        <details>
-          <summary>已停止本机重试的原操作（仅查询）</summary>
-          {stopped.map((record) => (
-            <article className="message" key={record.eventId}>
-              <p>
-                {record.kind} · {record.eventId}
-              </p>
-              <code>{record.payloadHash}</code>
-              <p>
-                {record.receipt.state === 'acknowledged'
-                  ? '服务已经接受原操作；本记录不表示当前仍可读原文。'
-                  : record.receipt.state === 'absent'
-                    ? '最近一次没有找到接受回执，服务端取消仍未确认。'
-                    : record.receipt.state === 'conflict'
-                      ? '精确回执冲突，未自动替换原标识。'
-                      : '当前结果未知。'}
-              </p>
-              <Button
-                variant="outline"
-                disabled={busy || !connected}
-                onClick={() =>
-                  run(async (valid) => {
-                    const result = await runtime.queryStoppedTaskOperation(
-                      record.eventId,
-                      { taskId },
-                    );
-                    if (!valid()) return;
-                    if (result.receipt.state === 'acknowledged') {
-                      setMessage(
-                        '已查询到原操作接受回执。请查看当前业务状态。',
-                      );
-                      await onComplete?.({ ...result, ...result.receipt });
-                    } else setMessage('已更新原回执状态，没有重新发送。');
-                  })
-                }
-              >
-                只查询这个原操作
-              </Button>
-            </article>
-          ))}
-        </details>
-      )}
-    </section>
-  );
+const actions:Record<string,string>={'requester-feedback':'合作反馈','publish-task':'发布求助',apply:'申请帮助',invite:'发送邀请','invitation-reply':'回应邀请','propose-participation':'提出参与安排',confirm:'开始参与',decline:'婉拒参与',withdraw:'退出参与',accept:'记录交付反馈',deliver:'提交交付','propose-scope':'更新参与内容','confirm-scope':'接受新的参与内容','decline-scope':'保持原参与内容',dispute:'记录问题','propose-resolution':'回应问题','confirm-resolution':'确认处理结果',close:'结束征集',cancel:'取消求助','extend-enrollment':'延长征集','withdraw-application':'撤回申请','revoke-invitation':'撤回邀请'};
+const recoveryError=(reason:unknown)=>['task_operation_business_rejected','publication_business_rejected'].includes(errorField(reason,'code'))?'服务未接受上次内容，已停止自动发送。原内容仍保留。':['task_operation_authorization_review_required','publication_authorization_review_required'].includes(errorField(reason,'code'))?'上次提交需要重新确认。请核对保留的内容与可见范围，再继续。':['task_operation_authorization_expired','publication_authorization_expired'].includes(errorField(reason,'code'))?'上次提交的许可已到期。内容仍保留，可以重新确认后继续。':'上次提交暂未完成，原内容已保留。';
+type Props={runtime:OperationRuntime;connected:boolean;taskId?:string|null;managedFeedback?:boolean;onComplete?:(receipt:OperationReceipt)=>void|Promise<void>;onStopped?:(receipt:OperationReceipt)=>void|Promise<void>};
+
+function SubmittedContent({value}:{value:OperationAuthorizationPreview}){
+ const body=submittedContent(value.payload);
+ return <div className="submitted-content"><h3>{actions[body.kind]??'继续上次提交'}</h3>{body.texts.map((text,index)=><p className="reading-prose" key={index}>{text}</p>)}<dl><dt>可见范围</dt><dd>{value.visibility==='Public'?'公开':value.viewers.length?value.viewers.map(id=>memberName(id)).join('、'):'仅自己'}</dd><dt>本次授权至</dt><dd>{readableTime(value.expiresAt)}</dd>{body.enrollmentExpiresAt!==null&&<><dt>征集截止</dt><dd>{readableTime(body.enrollmentExpiresAt)}</dd></>}{body.expiresAt!==null&&<><dt>原内容有效至</dt><dd>{readableTime(body.expiresAt)}</dd></>}</dl><details className="technical-details"><summary>原提交的准确内容与引用</summary><pre className="code-block">{JSON.stringify(value.payload,null,2)}</pre></details></div>;
+}
+export function TaskOperationRecovery(props:Props){
+ const {runtime,connected,taskId=null,managedFeedback=false}=props;
+ const sessionKey=useCallback(()=>operationSessionKey(runtime,undefined,connected,taskId,managedFeedback?'managed-feedback':'all-operations'),[runtime,connected,taskId,managedFeedback]);
+ const [,setObserved]=useState(sessionKey);
+ useEffect(()=>{const read=()=>setObserved(sessionKey()),timer=window.setInterval(read,1000);document.addEventListener('visibilitychange',read);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',read);};},[sessionKey]);
+ return <RecoverySession key={sessionKey()} {...props} taskId={taskId}/>;
+}
+function RecoverySession({runtime,connected,taskId=null,onComplete,onStopped,managedFeedback=false}:Props){
+ const [pending,setPending]=useState<ReturnType<typeof readPendingOperation>>(null),[preview,setPreview]=useState<OperationAuthorizationPreview|null>(null),[stopPreview,setStopPreview]=useState<StopPreview|null>(null),[stopped,setStopped]=useState<StoppedOperation[]>([]),[archiveOpen,setArchiveOpen]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const session=useRef({active:false,generation:0,working:false,notified:new Set<string>()}),dialog=useRef<HTMLDialogElement>(null);
+ const callbacks=useRef({onComplete,onStopped});
+ useEffect(()=>{callbacks.current={onComplete,onStopped};},[onComplete,onStopped]);
+ const lease=useMemo(()=>connected?runtime.receiptStatus.captureLease():null,[runtime,connected]);
+ const current=()=>{if(!session.current.active||!lease)return false;try{lease.assertCurrent();return true;}catch{return false;}};
+ async function complete(receipt:OperationReceipt){
+  if(!current())return;const key=receipt.eventId??receipt.taskId;if(key&&session.current.notified.has(key))return;if(key)session.current.notified.add(key);
+  setPending(null);setPreview(null);await callbacks.current.onComplete?.(receipt);
+ }
+ async function read(resume=true){
+  const token=session.current.generation;if(!current()||session.current.working||document.hidden)return;session.current.working=true;
+  try{
+   const record=readPendingOperation(await runtime.getLocal(taskId?`task-event:${taskId}`:'task-publication'));if(!current()||token!==session.current.generation)return;
+   const handledFeedback=managedFeedback&&record!==null&&submittedContent(JSON.parse(record.payloadJson)).kind==='requester-feedback';
+   setPending(handledFeedback?null:record);if(handledFeedback)setError('');
+   if(record&&resume&&!handledFeedback){
+    try{const receipt=readOperationReceipt(taskId?await runtime.resumeTaskEvent(taskId):await runtime.resumePublication());if(!current()||token!==session.current.generation)return;
+     if(receipt.state==='acknowledged'||!receipt.state&&receipt.taskId){await complete(receipt);if(current())setError('');}
+    }catch(reason){if(current()&&token===session.current.generation)setError(recoveryError(reason));}
+   }
+   const records=readStoppedOperations(await runtime.stoppedTaskOperations(taskId));if(current()&&token===session.current.generation)setStopped(records);
+  }catch{if(current()&&token===session.current.generation)setError('暂时无法读取上次提交的状态。');}
+  finally{if(token===session.current.generation)session.current.working=false;}
+ }
+ const readCurrent=useEffectEvent(()=>read());
+ useEffect(()=>{
+  session.current.active=true;session.current.generation++;const visible=()=>{if(!document.hidden)void readCurrent();};visible();
+  const timer=window.setInterval(visible,8000);document.addEventListener('visibilitychange',visible);
+  const state=session.current;return()=>{state.active=false;state.generation++;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
+ },[session,runtime,connected,taskId,managedFeedback]);
+ useEffect(()=>{if(preview||stopPreview||archiveOpen)dialog.current?.showModal();else dialog.current?.close();},[preview,stopPreview,archiveOpen]);
+ async function run(action:(valid:()=>boolean)=>Promise<void>){
+  if(session.current.working||!current())return;session.current.working=true;setBusy(true);setError('');const token=session.current.generation,valid=()=>current()&&token===session.current.generation;
+  try{await action(valid);}catch(reason){if(valid())setError(errorField(reason,'message')||'暂时无法完成，请重试。');}
+  finally{if(valid()){session.current.working=false;setBusy(false);await read(false);}}
+ }
+ async function continueOriginal(valid:()=>boolean){
+  const value:unknown=await runtime.reviewTaskAuthorization(taskId);if(!valid())return;const result=readOperationReceipt(value);
+  if(result.state==='reauthorization-required')setPreview(readAuthorizationPreview(value));
+  else if(result.state==='acknowledged')await complete(result);
+  else{const receipt=readOperationReceipt(taskId?await runtime.resumeTaskEvent(taskId,{explicitRetry:true}):await runtime.resumePublication({explicitRetry:true}));if(valid()&&receipt.state==='acknowledged')await complete(receipt);}
+ }
+ async function reviewStop(valid:()=>boolean){
+  const value:unknown=await runtime.reviewTaskStop(taskId);if(!valid())return;const result=readOperationReceipt(value);
+  if(result.state==='acknowledged')await complete(result);else if(result.state==='stop-local-preview')setStopPreview(readStopPreview(value));
+ }
+ async function reauthorize(valid:()=>boolean){
+  if(!preview)return;const receipt=readOperationReceipt(await runtime.reauthorizeTaskOperation(preview,{taskId,confirmed:true}));
+  if(valid()){setPreview(null);if(receipt.state!=='none')await complete(receipt);}
+ }
+ async function stop(valid:()=>boolean){
+  if(!stopPreview)return;const receipt=readOperationReceipt(await runtime.stopTaskOperation(stopPreview,{taskId,confirmed:true}));if(!valid())return;setStopPreview(null);
+  if(receipt.state==='acknowledged')await complete(receipt);else if(receipt.state==='stopped-local'){setPending(null);setMessage('已停止本机重试。');await callbacks.current.onStopped?.(receipt);}
+ }
+ async function query(record:StoppedOperation,valid:()=>boolean){
+  const value:unknown=await runtime.queryStoppedTaskOperation(record.eventId,{taskId});if(!valid())return;
+  const results=readStoppedOperations([value]),result=results[0];
+  if(result.receipt.state==='acknowledged')await complete({...result,...result.receipt});else setMessage('已更新这次提交的状态。');
+ }
+ if(!pending&&!stopped.length&&!message&&!error)return null;
+ return <section className="task-pending-status" aria-label="上次提交状态">
+  {pending&&<div><p><output>{error||'正在继续上次提交，内容已保留。'}</output></p><div className="button-row">{error&&<Button variant="ghost" disabled={busy||!connected} onClick={()=>void run(continueOriginal)}>继续上次内容</Button>}<Button variant="ghost" disabled={busy||!connected} onClick={()=>void run(reviewStop)}>停止重试</Button></div></div>}
+  {!pending&&error&&<p role="alert">{error}</p>}{message&&<p><output>{message}</output></p>}{!pending&&stopped.length>0&&<button className="text-action" onClick={()=>setArchiveOpen(true)}>查看已停止的提交</button>}
+  <dialog ref={dialog} className="conversation-panel task-recovery-dialog" aria-label="处理上次提交" onClose={()=>{setPreview(null);setStopPreview(null);setArchiveOpen(false);}}><header><h2>{preview?'继续这次提交':stopPreview?'停止重试？':'已停止的提交'}</h2><button className="icon-button" aria-label="关闭提交状态" onClick={()=>{setPreview(null);setStopPreview(null);setArchiveOpen(false);}}><X size={20}/></button></header><div className="task-recovery-body">
+   {preview&&<><SubmittedContent value={preview}/><div className="button-row"><Button variant="ghost" onClick={()=>setPreview(null)}>暂不继续</Button><Button disabled={busy||!connected} onClick={()=>void run(reauthorize)}>确认内容并继续</Button></div></>}
+   {stopPreview&&<><p>停止本机继续发送。服务已经收到的内容仍可能完成。</p><div className="button-row"><Button variant="ghost" onClick={()=>setStopPreview(null)}>继续保留</Button><Button disabled={busy||!connected} onClick={()=>void run(stop)}>停止重试</Button></div></>}
+   {archiveOpen&&stopped.map(record=><article key={record.eventId}><h3>{actions[record.kind]??'上次提交'}</h3><p>{record.receipt.state==='acknowledged'?'服务已收到这次提交。':record.receipt.state==='absent'?'上次查询尚未收到。':'结果暂未确认。'}</p><Button variant="outline" disabled={busy||!connected} onClick={()=>void run(valid=>query(record,valid))}>更新状态</Button></article>)}
+  </div></dialog>
+ </section>;
 }

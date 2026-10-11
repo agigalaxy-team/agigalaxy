@@ -15,6 +15,6 @@ test('native account menu requires returning from browser and confirming locally
     async executeIdentity(_preview,text){assert.equal(text,'EXACT CONFIRM');executed++;return {state:'linked'};}}});
   menu.open();page.routes[1]();await wait(()=>page.kind==='select'&&page.title.includes('选择登录服务'));
   page.routes[1]();await wait(()=>page.kind==='select'&&page.title.includes('浏览器'));assert.equal(executed,0);
-  page.routes[1]();await wait(()=>page.kind==='prompt');assert.equal(executed,0);page.onBack();assert.equal(canceled,1);
-  page.routes[1]();await wait(()=>page.kind==='prompt');page.onSubmit('EXACT CONFIRM');await wait(()=>page.kind==='info'&&page.message==='linked');assert.equal(executed,1);
+  page.routes[1]();await wait(()=>page.kind==='select'&&page.options.some(o=>o.title==='允许本次内容与范围'));assert.equal(executed,0);page.onBack();assert.equal(canceled,1);
+  page.routes[1]();await wait(()=>page.kind==='select'&&page.options.some(o=>o.title==='允许本次内容与范围'));page.routes[1]();await wait(()=>page.kind==='info'&&page.message.includes('账户关联已更新'));assert.equal(executed,1);
 });

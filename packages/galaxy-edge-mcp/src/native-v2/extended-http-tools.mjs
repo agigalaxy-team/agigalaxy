@@ -8,6 +8,7 @@ import {hubToolDefinitions} from '../../../galaxy-official/src/personal-mcp-hubs
 import {workerPackUseToolDefinitions} from '../../../galaxy-official/src/personal-mcp-worker-pack-uses-v2.mjs';
 import {informationToolDefinitions} from '../../../galaxy-official/src/personal-mcp-information-v2.mjs';
 import {targetGovernanceToolDefinitions} from '../../../galaxy-official/src/personal-mcp-target-governance-v2.mjs';
+import {moderationToolDefinitions} from '../../../galaxy-official/src/personal-mcp-moderation-v2.mjs';
 
 // Canonical input, authority/scope and write semantics are reused unchanged.
 // Existing signed Consent bytes go directly to the API; this transport neither
@@ -22,6 +23,10 @@ export function extendedNativeHttpDefinitions(api){
    v2:group('/v2/builders/',{get:'support/read',publish:'support/events',exportPack:'pack/export',manifest:'pack/manifest'})},
   packUses:group('/v2/builders/pack-uses/',{candidates:'candidates',submit:'events',get:'read',query:'query',receipt:'receipt'}),
   information:{query:post('/v2/information/query')},
+  moderation:{...group('/v1/moderation/',{config:'config',query:'reports/query',report:'reports'}),
+   get:(_actor,reportId)=>api.call('/v1/moderation/reports/'+reportId+'/read',{}),
+   event:(_actor,reportId,input)=>api.call('/v1/moderation/reports/'+reportId+'/events',input),
+   receipt:(_actor,{reportId,...input})=>api.call('/v1/moderation/reports/'+reportId+'/receipt',input)},
   informationWatches:group('/v2/information/watches/',{command:'command',list:'list',receipt:'receipt',check:'check',events:'events'}),
   targetGovernance:{...group('/v2/target-governance/',{targetInfo:'target',report:'reports',event:'events',query:'query',receipt:'receipt'}),
    config:()=>api.call('/v2/target-governance/config',null,{method:'GET'}),
@@ -38,5 +43,5 @@ export function extendedNativeHttpDefinitions(api){
   ciV2:group('/v2/ci/',{receipt:'receipts',submit:'requests',get:'requests/read',revokeRequest:'requests/revoke',preview:'proofs/preview',publish:'proofs/publish',getProof:'proofs/read',revokeProof:'proofs/revoke'}),
   attachments:{specification:()=>api.call('/v2/chat/attachments/config',{}),...group('/v2/chat/attachments/',{get:'read',queryOwn:'query',revoke:'revoke'})},
  };
- return Object.assign({},...[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions].map(factory=>factory(services,null)));
+ return Object.assign({},...[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions].map(factory=>factory(services,null)));
 }

@@ -45,7 +45,7 @@ test('browser protocol client persists exact signed operations and requires rene
    assert.equal((await client.pending())[0].operationId,first.operationId);
    browser.disconnect();await connect();client=helper();
    assert.equal((await client.reconcile(first.operationId)).state,'absent');assert.equal(consentPosts.length,1);
-   const recovered=await client.retry(first.operationId,{confirmed:true});assert.equal(recovered.grantId,first.grantId);
+   const recovered=await client.resumePending(first.operationId);assert.equal(recovered.grantId,first.grantId);
    assert.equal(consentPosts.length,1,'accepted original Consent is reused across new binding');
    assert.equal((await client.pending()).length,0);
    const receiver=createBrowserClient({endpoint:p.bindings.endpoint,trustedKeys:f.bindings.trustedKeys,
@@ -58,17 +58,38 @@ test('browser protocol client persists exact signed operations and requires rene
    }finally{receiver.close();}
    const second=await client.prepareGrant(payload());dropGrant=true;
    await assert.rejects(client.execute(second,{confirmed:true}),/unknown grant ACK/);
-   client=helper();assert.equal((await client.reconcile(second.operationId)).state,'acknowledged');assert.equal((await client.pending()).length,0);
+   client=helper();const sentBeforeRecovery=consentPosts.length;
+   assert.equal((await client.resumePending(second.operationId)).state,'acknowledged');assert.equal(consentPosts.length,sentBeforeRecovery);assert.equal((await client.pending()).length,0);
    const third=await client.prepareGrant(payload());dropBeforeConsent=true;
    await assert.rejects(client.execute(third,{confirmed:true}),/offline before Consent/);
    const previous=[...records.values()].find(row=>row?.operationId===third.operationId).preparedConsent;
    browser.disconnect();await connect();client=helper();
+   const beforeStale=consentPosts.length;
+   assert.equal((await client.resumePending(third.operationId)).reason,'original-binding-changed');
+   assert.equal(consentPosts.length,beforeStale);
+   assert.equal([...records.values()].find(row=>row?.operationId===third.operationId).preparedConsent.signedIntent,previous.signedIntent);
    await assert.rejects(client.retry(third.operationId,{confirmed:true}),error=>error.code==='consent_reauthorization_required');
    const review=await client.reviewAuthorization(third.operationId);assert.equal(review.state,'reauthorization-required');
    assert.equal(review.consentId,previous.intent.id);assert.equal(review.operationId,third.operationId);
    await assert.rejects(async()=>client.reauthorize(third.operationId,review),/context_confirmation_required/);
    const renewed=await client.reauthorize(third.operationId,review,{confirmed:true});assert.equal(renewed.eventId,third.operationId);
    assert.equal((await client.pending()).length,0);
+   let failFirstSignature=true;
+   const unsignedClient=createContextClientV2({api:{...browser,prepareAuthorization:async(...args)=>{
+    if(failFirstSignature){failFirstSignature=false;throw Error('synthetic interrupted original signature');}
+    return browser.prepareAuthorization(...args);
+   }},getLocal,putLocal,now:()=>clock.now});
+   const unsigned=await unsignedClient.prepareGrant(payload());
+   await assert.rejects(unsignedClient.execute(unsigned,{confirmed:true}),/interrupted original signature/);
+   const beforeUnsigned=consentPosts.length;
+   assert.equal((await unsignedClient.resumePending(unsigned.operationId)).reason,'authorization-review-required');
+   assert.equal(consentPosts.length,beforeUnsigned);
+   assert.equal([...records.values()].find(row=>row?.operationId===unsigned.operationId).preparedConsent,undefined);
+   const unsignedReview=await unsignedClient.reviewAuthorization(unsigned.operationId);
+   assert.equal(unsignedReview.state,'reauthorization-required');assert.equal(unsignedReview.consentId,null);
+   assert.equal(unsignedReview.expiresAt,unsigned.expiresAt);
+   await assert.rejects(async()=>unsignedClient.reauthorize(unsigned.operationId,unsignedReview),/context_confirmation_required/);
+   assert.equal((await unsignedClient.reauthorize(unsigned.operationId,unsignedReview,{confirmed:true})).eventId,unsigned.operationId);
    const changed=await client.prepareGrant(payload());changed.payload.materials[0].content='User-facing preview altered';
    assert.throws(()=>client.execute(changed,{confirmed:true}),/context_preview_changed/);
    const stale=await client.prepareGrant(payload());browser.disconnect();await connect();
@@ -78,9 +99,20 @@ test('browser protocol client persists exact signed operations and requires rene
    const held=[...records.values()].find(row=>row?.operationId===late.operationId).preparedConsent;
    const stopped=await client.abandon(late.operationId,{confirmed:true});assert.equal(stopped.state,'stopped-local');assert.equal(stopped.serverCancellationConfirmed,false);
    const minimum=[...records.values()].find(row=>row?.operationId===late.operationId);assert.equal(minimum.payloadJson,undefined);assert.equal(minimum.preparedConsent,undefined);
+   const beforeStopped=consentPosts.length;
+   assert.equal((await client.resumePending(late.operationId)).reason,'stopped-local');assert.equal(consentPosts.length,beforeStopped);
    await assert.rejects(client.retry(late.operationId,{confirmed:true}),/context_local_retry_stopped/);
    const laterSubmission=await browser.submitAuthorization(held,{confirmed:true});await browser.call('/v2/context/grants',laterSubmission);
    assert.equal((await client.reconcile(late.operationId)).state,'acknowledged','late accepted original remains discoverable after local stop');
+   const expired=await client.prepareGrant(payload());dropBeforeConsent=true;
+   await assert.rejects(client.execute(expired,{confirmed:true}),/offline before Consent/);
+   const frozen=[...records.values()].find(row=>row?.operationId===expired.operationId),beforeExpired=consentPosts.length;
+   // The shared workflow's binding issuer keeps its fixed clock. Move only
+   // this recovery client's deadline clock; no request may reach a write path.
+   const expiredClient=createContextClientV2({api:browser,getLocal,putLocal,now:()=>clock.now+1801});
+   assert.equal((await expiredClient.resumePending(expired.operationId)).reason,'authorization-expired');assert.equal(consentPosts.length,beforeExpired);
+   assert.equal([...records.values()].find(row=>row?.operationId===expired.operationId).preparedConsent.signedIntent,frozen.preparedConsent.signedIntent);
+   await assert.rejects(expiredClient.reviewAuthorization(expired.operationId),/context_original_material_deadline_expired/);
    assert.ok(original.signedIntent);assert.equal(task.caseId,null);
   }finally{browser.close();}
  }});

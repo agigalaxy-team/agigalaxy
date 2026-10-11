@@ -9,7 +9,7 @@ test('native audit menu reads bounded pages, exports explicitly and confirms the
   const menu = createAuditMenu({ language: 'zh-CN', isCurrent: () => true, onBack() {}, availableScopes: ['audit', 'audit-review'],
     select: value => { page = { kind: 'select', ...value }; }, prompt: value => { page = { kind: 'prompt', ...value }; },
     info: (title, message, onBack) => { page = { kind: 'info', title, message, onBack }; }, controller: {
-      cancel() {}, async prepareAudit(input) { prepared = input; return preview; },
+      cancel() {}, async prepareAudit(input) { prepared = input; preview.payloadJson=JSON.stringify(input); return preview; },
       async executeAudit(value, confirmation) { assert.equal(value, preview); assert.equal(confirmation, preview.confirmation); approvals++; return { id: 'fixture' }; },
       async readAudit(method, input) {
         if (method === 'config') return { subjectId, canReview: true };
@@ -24,7 +24,8 @@ test('native audit menu reads bounded pages, exports explicitly and confirms the
   await wait(() => page.kind === 'info' && page.message.includes('audit.json')); assert.equal(exports, 1);
   menu.open(); await wait(() => page.kind === 'select'); choose('审批他人访问');
   for (const value of [readerId, subjectId, 'query,export', 'incident-001', '600']) page.onConfirm(value);
-  await wait(() => page.kind === 'prompt' && page.title.includes('CONFIRM fixture'));
+  await wait(() => page.kind === 'select' && page.options.some(o=>o.title==='允许本次内容与范围'));
   assert.deepEqual(prepared.subjectIds, [subjectId]); assert.deepEqual(prepared.actions, ['query', 'export']); assert.equal(approvals, 0);
-  page.onConfirm(preview.confirmation); await wait(() => approvals === 1); assert.equal(prepared.lifetimeSeconds, 600);
+  assert.ok(page.title.includes(readerId));assert.ok(page.title.includes(subjectId));assert.equal(page.title.includes(preview.confirmation),false);
+  page.routes[1](); await wait(() => approvals === 1); assert.equal(prepared.lifetimeSeconds, 600);
 });

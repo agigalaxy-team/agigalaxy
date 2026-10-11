@@ -1,4 +1,5 @@
-import { recruitmentEnvelopeV2Schema,recruitmentEventV2Schema,recruitmentQueryV2Schema } from './shared/recruitment-schema-v2.mjs';
+import { recruitmentEnvelopeV2Schema,recruitmentEventV2Schema,recruitmentQueryV2Schema,
+ recruitmentOperationReceiptQuerySchema,recruitmentOperationReceiptResultSchema } from './shared/recruitment-schema-v2.mjs';
 import { matchProjects } from './domain/discovery-match.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
 import { digest } from './shared/digest.mjs';
@@ -50,6 +51,23 @@ export class RecruitmentV2Service {
    interpretation:'user-side-model-or-user',activeEntries:['discover','publish-task','participate-task','ordinary-chat']};
  }
  get(actor,id){return this.discovery.run(actor,db=>this.readWithin(db,actor,id));}
+ operationReceipt(actor,input){
+  const parsed=recruitmentOperationReceiptQuerySchema.safeParse(input);if(!parsed.success)fail('invalid_recruitment_receipt_query',400);
+  const query=parsed.data;
+  return this.access.runAuthorized(actor,'history',async db=>{
+   // The original author and exact intent are independent of a later owner's
+   // current statement or representative permission. Never load either body.
+   const row=(await db.query(`SELECT operation_id,recruitment_id,payload_hash,revision,created_at
+    FROM recruitment_events WHERE operation_id=$1 AND subject_id=$2`,[query.operationId,actor.subjectId])).rows[0];
+   const common={schemaVersion:2,query,authority:'accepted-operation-only',audience:'owner-only',
+    currentAccessGranted:false,contentReturned:false,sourceAccessChecked:false};
+   if(!row)return recruitmentOperationReceiptResultSchema.parse({...common,state:'absent',absenceMeaning:'no-retained-owner-operation'});
+   if(row.recruitment_id!==query.recruitmentId||row.payload_hash!==query.payloadHash)
+    return recruitmentOperationReceiptResultSchema.parse({...common,state:'conflict',reason:'original-operation-mismatch'});
+   return recruitmentOperationReceiptResultSchema.parse({...common,state:'acknowledged',receipt:{
+    ...query,revision:row.revision,acceptedAt:new Date(row.created_at).toISOString()}});
+  });
+ }
  async opportunityWithin(db,actor,row,context){
   if(row.contact_subject_id===actor?.subjectId||!context.wish.purposes.includes('recruitment'))return null;
   let view;try{view=await this.readWithin(db,actor,row.id,{requireOpen:true});}catch(error){if(unavailable(error))return null;throw error;}

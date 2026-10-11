@@ -56,6 +56,12 @@
   },
   "overrides": [
     {
+      "files": ["packages/galaxy-web/**/*"],
+      "rules": {
+        "nextjs/no-html-link-for-pages": "off"
+      }
+    },
+    {
       "files": ["**/*.test.mjs"],
       "rules": {
         "typescript/no-floating-promises": ["error", {

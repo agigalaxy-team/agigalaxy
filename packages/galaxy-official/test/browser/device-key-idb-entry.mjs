@@ -38,4 +38,5 @@ async function test(){let store;const prior=JSON.parse(sessionStorage.getItem(ma
    staleDraftRejected:true,concurrentDraftWinnerCount:1,visitorOriginalRetained:true,cloudRequests:0,syntheticDatabaseDeleted:true,userAgent:navigator.userAgent},null,2);
  }catch(error){store?.close();output.textContent=JSON.stringify({passed:false,error:String(error)});}
 }
-document.querySelector('button').addEventListener('click',()=>test());if(sessionStorage.getItem(marker))test();
+const run=()=>test().catch(error=>{output.textContent=JSON.stringify({passed:false,error:String(error)});});
+document.querySelector('button').addEventListener('click',run);if(sessionStorage.getItem(marker))await run();

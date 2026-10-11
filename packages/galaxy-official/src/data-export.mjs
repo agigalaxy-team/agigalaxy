@@ -89,7 +89,7 @@ export class DataExportService {
       const items = []; let bytes = 0, cursor = selection.after;
       for (const row of rows.slice(0, selection.limit)) {
         const { export_cursor, ...original } = row;
-        let item = source?.transform ? source.transform(original, this.access.now()) : original;
+        let item = source?.transform ? await source.transform(original, this.access.now(), {db,actor,viewServices:this.viewServices}) : original;
         // Outcome material metadata is exportable as the owner's own record.
         // Attachment bytes must be read through the same current authorization
         // path as ordinary material reads; storage keys and encryption IDs are

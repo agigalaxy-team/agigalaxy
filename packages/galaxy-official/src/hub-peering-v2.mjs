@@ -36,7 +36,7 @@ export class HubPeeringServiceV2{
     const maintenance=this.hubs.builders.maintenance(b.rows);need(!maintenance.delisted&&!maintenance.securityIssue);
     return{row,event:e,grant:g,agreement,local,remote,head};
   }
-  async sourceWithin(db,actor,source,{authorId,forGrant=false}={}){
+  async sourceWithin(db,actor,source,{authorId,forGrant:_forGrant=false}={}){
     parse(peeringSourceSchema,source);
     if(source.kind==='ci-proof-v2'){
       const row=await one(db,'SELECT * FROM ci_proofs_v2 WHERE id=$1',[source.id]);
@@ -154,7 +154,7 @@ export class HubPeeringServiceV2{
       const e=await one(db,'SELECT * FROM hub_peering_events_v2 WHERE id=$1',[q.kind==='agreements'?row.event_id:row.id]);
       let record=null;try{await this.eventGrant(db,e);record=payload(e);}catch(x){if(!unavailable(x))throw x;}
       items.push({id:row.id,version:row.version??row.agreement_version,state:row.state??(row.revoked_at?'revoked':'granted'),expiresAt:Number(row.expires_at),record,
-        recordHash:e?.payload_hash??null,currentSourceStatus:'requires-current-query'});
+        recordHash:e?.payload_hash??null,currentSourceStatus:'requires-current-query',availableActions:q.kind==='agreements'?(row.state!=='exited'?['peer-exit']:[]):(!row.revoked_at?['source-revoke']:[])});
     }return{items,nextCursor:rows.length>q.limit?rows[q.limit-1].id:null,...flags};});}
   preview(actor,input){const q=parse(peeringPreviewSchema,input);return this.access.runAuthorized(actor,'builders',async db=>{
     await this.hubs.requireMemberWithin(db,actor,q.hubId,'approved-proof-query');
@@ -169,8 +169,14 @@ export class HubPeeringServiceV2{
     try{await this.eventGrant(db,e);record=payload(e)?.agreement;}catch(x){if(!unavailable(x))throw x;}
     return{agreementId:a.id,hubId:a.hub_id,version:a.version,agreementHash:a.agreement_hash,state:a.state,agreement:record,
       remoteApproval:'not-established-by-local-record',...flags};});}
-  async saveReceipt(db,q,side,hash){const prior=await one(db,'SELECT * FROM hub_peering_receipts_v2 WHERE query_id=$1 AND side=$2 FOR UPDATE',[q.queryId,side]);
+  async saveReceipt(db,q,side,hash){
+    // Lock absent operations as well as existing ones, then the shared quota.
+    // These separate transaction locks never upgrade agreementWithin's SHARE
+    // row lock. The same order applies to every incoming/outgoing caller.
+    await db.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))',[`galaxy-peering-query/${side}`,q.queryId]);
+    const prior=await one(db,'SELECT * FROM hub_peering_receipts_v2 WHERE query_id=$1 AND side=$2 FOR UPDATE',[q.queryId,side]);
     if(prior){need(prior.request_hash===hash&&prior.subject_id===q.requesterId&&prior.agreement_id===q.agreementId,'peering_query_conflict',409);return;}
+    await db.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))',[`galaxy-peering-quota/${side}`,q.agreementId]);
     const row=await one(db,'SELECT count(*)::int AS n FROM hub_peering_receipts_v2 WHERE agreement_id=$1 AND side=$2 AND created_at>$3',[q.agreementId,side,this.now()-60]);
     const ag=await one(db,'SELECT event_id FROM hub_peering_agreements_v2 WHERE id=$1',[q.agreementId]),e=await one(db,'SELECT payload_text FROM hub_peering_events_v2 WHERE id=$1',[ag.event_id]);
     need(row.n<payload(e).agreement.ratePerMinute,'peering_rate_limited',429);
@@ -180,7 +186,9 @@ export class HubPeeringServiceV2{
       await this.publicationMembershipWithin(db,row.subject_id,ag);
       need(p&&ag.agreement.sourceKinds.includes(p.source.kind));
       const view=await this.sourceWithin(db,{subjectId:requesterId,authenticationSource:'explicitly-pinned-peer-scope'},p.source,{authorId:row.subject_id});
-      await this.change(db,row,'permitted');return{grantId:row.id,state:'current',expiresAt:Math.min(Number(row.expires_at),view.expiresAt??Number(row.expires_at)),...view};
+      // Preserve the original proof bytes while applying the separate, shorter
+      // source permission to this projection. Its expiry is not proof validity.
+      await this.change(db,row,'permitted');return{...view,grantId:row.id,state:'current',expiresAt:Math.min(Number(row.expires_at),view.expiresAt??Number(row.expires_at))};
     }catch(error){if(!unavailable(error))throw error;await this.change(db,row,'unavailable');return{grantId:row.id,state:'unavailable'};}}
   async exchange(input){need(input&&Object.keys(input).join(',')==='signed'&&typeof input.signed==='string'&&Buffer.byteLength(input.signed)<=65536,'invalid_peering_envelope',400);
     let q;try{q=parse(peerExchangeRequestSchema,decodeJwt(input.signed).data);}catch{throw new ServiceError('peering_unavailable',404);}
@@ -202,10 +210,13 @@ export class HubPeeringServiceV2{
       for(const id of q.recheck)if(!selected.some(row=>row.id===id)){
         const r=await one(db,'SELECT * FROM hub_peering_grants_v2 WHERE id=$1 AND agreement_id=$2 AND requester_ids @> $3::jsonb',[id,q.agreementId,JSON.stringify([q.requesterId])]);
         if(!append(r?await this.grantProjection(db,r,q.requesterId,ag):{grantId:id,state:'unavailable'}))deferredRecheck.push(id);}
+      const checkedAt=this.now(),expiresAt=Math.min(checkedAt+ag.agreement.responseMaxAgeSeconds,Number(ag.row.expires_at),
+        ...items.filter(item=>item.state==='current').map(item=>item.expiresAt));
+      need(expiresAt>checkedAt,'peering_response_expired',409);
       const data={profile:'galaxy-direct-proof/1',kind:'response',queryId:q.queryId,requestHash:digest(JSON.stringify(q)),agreementId:q.agreementId,agreementHash:q.agreementHash,
         origin:this.endpoint,destination:q.origin,fromHubId:q.toHubId,toHubId:q.fromHubId,requesterId:q.requesterId,purpose:q.purpose,items,
-        nextCursor:selected.length?Number(selected.at(-1).sequence):q.after,hasMore:changes.length>selected.length,deferredRecheck,checkedAt:this.now(),
-        expiresAt:Math.min(this.now()+ag.agreement.responseMaxAgeSeconds,Number(ag.row.expires_at)),coverage:'explicit-source-grants-for-exact-peer-and-reader',...flags};
+        nextCursor:selected.length?Number(selected.at(-1).sequence):q.after,hasMore:changes.length>selected.length,deferredRecheck,checkedAt,
+        expiresAt,coverage:'explicit-source-grants-for-exact-peer-and-reader',...flags};
       need(this.sign,'peering_signer_unavailable',503);const signed=await this.sign('hub-peering',data,q.queryId,data.expiresAt-this.now());
       await db.query("UPDATE hub_peering_receipts_v2 SET state='delivered',response_hash=$3,checked_at=$4 WHERE query_id=$1 AND side=$2",[q.queryId,'incoming',digest(signed),this.now()]);return{signed};
     });
@@ -225,9 +236,10 @@ export class HubPeeringServiceV2{
         &&v.requesterId===actor.subjectId&&v.purpose===q.purpose&&v.expiresAt>this.now()&&v.rawContextIncluded===false&&v.route==='direct'&&v.intermediaries?.length===0,'peering_response_mismatch',409);
       // Parse a finite allowlist before returning or storing anything. Foreign
       // excess properties, including private text in an unavailable item, fail.
-      const clean=await this.validateResponse(v,ag);
-      return this.access.runAuthorized(actor,'builders',async db=>{await this.hubs.requireMemberWithin(db,actor,p.hubId,'approved-proof-query');
+      const validated=await this.validateResponse(v,ag),clean={...validated,expiresAt:Math.min(validated.expiresAt,checked.expiresAt)};
+      return await this.access.runAuthorized(actor,'builders',async db=>{await this.hubs.requireMemberWithin(db,actor,p.hubId,'approved-proof-query');
         const current=await this.agreementWithin(db,p.agreementId,p.hubId);need(current.row.agreement_hash===q.agreementHash,'peering_scope_changed',409);
+        need(clean.expiresAt>this.now(),'peering_response_expired',409);
         await db.query("UPDATE hub_peering_receipts_v2 SET state='delivered',response_hash=$3,checked_at=$4 WHERE query_id=$1 AND side=$2",[q.queryId,'outgoing',digest(response.signed),this.now()]);
         return{...clean,remoteApproval:'verified-for-this-current-query',peerAuthentication:'selected-peer-operator-attestation-within-explicit-read-scope',...flags};});
     }catch(e){await this.access.db.query("UPDATE hub_peering_receipts_v2 SET state='unknown',response_hash=NULL,checked_at=$3 WHERE query_id=$1 AND side=$2",[q.queryId,'outgoing',this.now()]);

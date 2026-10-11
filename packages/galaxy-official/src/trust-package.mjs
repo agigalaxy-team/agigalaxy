@@ -39,7 +39,11 @@ export function renderTrustSummary(objects) {
   out.push('', '## 选定来源（不是全部履历）');
   if (!objects.sources.length) out.push('未选择经历或证据；没有历史不影响使用原创自述包。');
   for (const s of objects.sources) {
-    out.push('', `### ${s.ref.kind} ${s.ref.id} / ${s.ref.version}`, `来源：${s.ref.endpoint}`, `作者：${s.authorId}`,
+    const identityLines=s.profile==='galaxy-ci-proof-v2-reference/1'
+      ?[`CI 签发服务：${s.issuer}`,`关联主体（不是签发者或原 Proof 复制许可方）：${s.associatedSubjectId}`,
+        `原签名字节 SHA256（不含签名）：${s.sourceSignatureHash}`,`原 Proof 最迟到期：${new Date(s.sourceExpiresAt*1000).toISOString()}`]
+      :[`作者：${s.authorId}`];
+    out.push('', `### ${s.ref.kind} ${s.ref.id} / ${s.ref.version}`, `来源：${s.ref.endpoint}`, ...identityLines,
       `内容 SHA256：${s.sourceHash}`, `材料性质：${s.authority}；观察状态：${s.sourceState}；观察时间：${new Date(s.checkedAt * 1000).toISOString()}`,
       `披露：${s.mode === 'copy' ? '精确作者记录（第三方来源正文不在内）' : '仅引用，不包含正文'}`,
       `原签名材料：${s.signatureEvidence}；复制许可：${s.permission ? '单独签署，需检查范围与状态' : '未包含'}`);
@@ -148,6 +152,11 @@ export async function verifyTrustPackage(input, { now = Math.floor(Date.now() / 
       catch { permission = { status: 'invalid-or-expired', currentRevocationChecked: false }; }
     }
     sources.push({ ref: source.ref, authority: source.authority, declaredSourceState: source.sourceState, checkedAt: source.checkedAt,
+      ...(source.profile==='galaxy-ci-proof-v2-reference/1'?{profile:source.profile,issuer:source.issuer,
+        associatedSubjectId:source.associatedSubjectId,sourceHash:source.sourceHash,sourceSignatureHash:source.sourceSignatureHash,
+        sourceExpiresAt:source.sourceExpiresAt,sourceTemporalState:source.sourceExpiresAt<=now?'expired':'within-observed-signed-interval',
+        issuerSignatureVerified:false,currentSourceState:'not-checked',sourceOwnershipVerified:false,
+        independentExecutionVerified:false}:{}),
       reproductionPermission: permission, originalSignature: await originalSignatureStatus(source, trustedIssuers), capabilityVerified: false });
   }
   return { packageId, subjectId: manifest.subjectId, integrity: 'valid', signature: 'valid-for-included-control-history',

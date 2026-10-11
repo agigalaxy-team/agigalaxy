@@ -23,7 +23,7 @@ export const helpBasisSchema = z.strictObject({
 export const helpOfferDraftSchema = z.strictObject({
   id: z.uuid(), path: z.enum(helpPaths), helpDescription: short, userFacingReason: short,
   participants: z.array(z.strictObject({ id: z.string().min(1).max(160),
-    kind: z.enum(['person', 'agent', 'tool', 'team', 'unknown']), basisKey: z.string().regex(/^[a-f0-9]{64}$/),
+    kind: z.enum(['person', 'agent', 'tool', 'team', 'organization', 'service', 'unknown']), basisKey: z.string().regex(/^[a-f0-9]{64}$/),
   })).max(16),
   interventionKinds: z.array(z.enum(['diagnosis', 'advice', 'context', 'tool', 'patch', 'review', 'takeover', 'verification'])).max(8),
   basisKeys: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(32),
@@ -48,10 +48,24 @@ export const helpSessionSchema = z.strictObject({
   queries: z.array(z.strictObject({ requestId: z.uuid(), kind: z.enum(['search', 'discovery', 'search-v2', 'discovery-v2']),
     state: z.enum(['ready', 'empty', 'failed', 'unavailable']), checkedAt: z.number().int().nonnegative(),
     basisKeys: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(40),
+    request: helpQuerySchema.shape.requests.element.optional(),
   })).max(32),
   linkedOperations: z.array(z.strictObject({ operationId: z.uuid(), taskId: z.uuid(), payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
     state: z.enum(['submitting', 'unknown', 'acknowledged', 'absent', 'conflict']),
     version: z.number().int().positive().optional(), checkedAt: z.number().int().nonnegative(),
   })).max(32),
+  actionOperations: z.array(z.strictObject({ operationId: z.uuid(), kind: z.enum(['publish-task', 'task-event', 'participation-propose', 'participation-event', 'context-grant', 'context-event']),
+    taskId: z.uuid(), payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
+    state: z.enum(['prepared', 'submitting', 'unknown', 'acknowledged', 'absent', 'conflict']),
+    checkedAt: z.number().int().nonnegative(), participationId: z.uuid().optional(), grantId: z.uuid().optional(),
+  })).max(128).default([]),
   selectionEffect: z.literal('local-choice-only'), cloudSync: z.literal('off'),
 });
+
+export const helpActionPrepareSchema = z.strictObject({
+  kind: z.enum(['publish-task', 'task-event', 'participation-propose', 'participation-event', 'context-grant', 'context-event']),
+  payloadJson: z.string().min(2).max(40000), taskId: z.uuid().optional(), participationId: z.uuid().optional(), offerId: z.uuid().optional(),
+  recipientIds: z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(16).optional(),
+  authorizationRequestId: z.uuid().optional(),
+});
+export const helpActionExecuteSchema = z.strictObject({ operationId: z.uuid(), payloadHash: z.string().regex(/^[a-f0-9]{64}$/), authorizationRequestId: z.uuid().optional() });

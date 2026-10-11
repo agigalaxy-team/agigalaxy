@@ -11,6 +11,7 @@ import { contactEnvelopeV2Schema } from './shared/contacts-schema-v2.mjs';
 import {
   recruitmentEnvelopeV2Schema,
   recruitmentQueryV2Schema,
+  recruitmentOperationReceiptQuerySchema,
 } from './shared/recruitment-schema-v2.mjs';
 export function discoveryToolDefinitions(services, actor) {
   const tool = (inputSchema, description, run, write = false) => ({
@@ -92,9 +93,14 @@ export function discoveryToolDefinitions(services, actor) {
       'Read current role statement, expiry, authority and permitted actual Task links. Expiry or pause does not finish or cancel linked Tasks.',
       (x) => services.recruitment.get(actor, x.recruitmentId),
     ),
+    galaxy_recruitment_v2_receipt: tool(
+      recruitmentOperationReceiptQuerySchema,
+      'Reconcile your original Recruitment operationId, recruitmentId and exact payloadJson SHA256 without replaying a publication. Returns only retained author acceptance metadata, including after representative withdrawal or a newer owner statement; no old material, current role or source access. Absence means no retained owner operation, not proof it never occurred.',
+      (x) => services.recruitment.operationReceipt(actor, x),
+    ),
     galaxy_recruitment_v2_event: tool(
       recruitmentEnvelopeV2Schema,
-      'Submit exact locally signed recruitment.write create/revise/renew/pause/close/link-task. Publication and renewal share real Account task quotas. Link only an existing exact-version requester Task; it additionally needs assistance scope. Never fabricate a Task for ordinary conversation.',
+      'Submit exact locally signed recruitment.write create/revise/renew/pause/close/link-task. After an unknown result first query galaxy_recruitment_v2_receipt with the original operationId and exact byte hash; do not infer acceptance from the current statement or issue a new operation. Publication and renewal share real Account task quotas. Link only an existing exact-version requester Task; it additionally needs assistance scope. Never fabricate a Task for ordinary conversation.',
       (x) => services.recruitment.submit(actor, x),
       true,
     ),

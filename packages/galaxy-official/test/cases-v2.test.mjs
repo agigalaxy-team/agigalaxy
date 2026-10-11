@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {CaseService,caseEventSchema,caseEventV2Schema} from '../src/cases.mjs';
 import {caseFactsV2MigrationSql} from '../src/infrastructure/case-facts-v2-migration.mjs';
+import {digest} from '../src/shared/digest.mjs';
 
 async function fixture(scopes){
   const f=await serviceFixture(scopes);
@@ -21,6 +22,34 @@ const grant=(f,e,overrides={})=>f.authorize(e,'case.teaser.publish',{objectId:e.
 const write=async(f,e)=>f.cases.submitV2(f.actor,await grant(f,e));
 function intervention(f,r,version,more={}){return fact(f,r,'intervention',version,{types:['diagnosis','tool-introduction'],
   affectsAttemptIds:[],description:'已核对工具版本，建议排查请求重复',sourceRefs:[],observedEffect:'版本差异已排除，根因未定位',...more});}
+
+test('canonical CaseService preserves self-declaration and historical decision after correcting its exact Result',async()=>{
+  const f=await fixture();try{
+    const r=root(f);await write(f,r);
+    const d=intervention(f,r,1);await write(f,d);
+    const self=fact(f,r,'intervention-response',2,{interventionRef:{id:d.eventId,version:1},state:'accepted',summary:'本人对自己工作的意见'});
+    await write(f,self);
+    let view=await f.cases.getV2(f.actor,r.caseId);
+    assert.equal(view.interventions[0].responses[0].relationship,'self');
+    assert.equal(view.interventions[0].confirmation,'unconfirmed');
+    const result=fact(f,r,'result-recorded',3,{origin:{kind:'intervention',id:d.eventId,version:1},scopeVersion:1,
+      deliverableRefs:[],reportedOutcome:'succeeded',summary:'原范围结果声明',limitations:'只是合成测试',supersedes:null});
+    await write(f,result);
+    const resolution=fact(f,r,'resolution-recorded',4,{taskScopeVersion:1,status:'resolved',summary:'原请求者解决结论',
+      satisfiedGoals:['合成目标'],remainingGoals:[],resultRefs:[{id:result.eventId,version:1}],verificationRefs:[],supersedesResolutionId:null});
+    const original=await grant(f,resolution);await f.cases.submitV2(f.actor,original);
+    await write(f,{...result,eventId:randomUUID(),expectedVersion:5,reportedOutcome:'inconclusive',summary:'纠正旧结果的支持边界',
+      supersedes:{id:result.eventId,version:1}});
+    view=await f.cases.getV2(f.actor,r.caseId);
+    assert.equal(view.resolution.status,'unrecorded');assert.equal(view.resolution.priorResolutionId,resolution.eventId);
+    assert.equal(view.resolution.currentDecisionAvailable,false);assert.equal(view.resolution.reconfirmationRequired,true);
+    assert.equal(view.resolutions[0].status,'resolved');assert.deepEqual(view.resolutions[0].resultRefs,[{id:result.eventId,version:1}]);
+    const row=(await f.db.query('SELECT payload_text,payload_hash FROM case_events WHERE id=$1',[resolution.eventId])).rows[0];
+    assert.equal(row.payload_text,original.payloadJson);assert.equal(row.payload_hash,digest(original.payloadJson));
+    assert.equal(view.results.length,2);assert.equal(view.results[0].verification,'not-provided');
+    assert.equal(view.results[1].acceptance,'not-provided');
+  }finally{await f.db.close();}
+});
 
 test('v2 diagnosis produces real intervention Result without a fictitious Attempt; decisions stay separate',async()=>{
   const f=await fixture();try{

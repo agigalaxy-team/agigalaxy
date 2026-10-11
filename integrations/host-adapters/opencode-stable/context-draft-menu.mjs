@@ -4,6 +4,8 @@ export function createContextDraftMenu({controller,select,prompt,info,language,i
   const label=(a,b)=>language==='en-US'?b:a;
   const plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,1200);
   let generation=0;const current=n=>isCurrent()&&generation===n;
+  const kindName=kind=>kind==='grant'?label('分享选定材料','Share selected materials'):kind==='revoke'?label('结束材料授权','End material access'):plain(kind);
+  const stateName=state=>({prepared:label('尚未确认完成','Completion not confirmed'),acknowledged:label('已完成','Completed'),unknown:label('暂未确认结果','Outcome unconfirmed'),absent:label('原材料尚未收到','Original materials not received')}[state]??plain(state));
   function menu(title,entries,back=onBack,offset=0){
     if(!isCurrent())return;const version=++generation,routes={};
     const once=fn=>()=>{if(current(version)){generation++;fn();}};
@@ -91,8 +93,9 @@ export function createContextDraftMenu({controller,select,prompt,info,language,i
       let source;try{source=contextDraftSource(record);}catch(error){return message(plain(error.message),back);}
       if(sameContextSource(row.content.source,source))return done(row);
       const previous=row.content.source;
-      menu(`${label('材料接收方或范围已变化；原材料仍保存在本机。','Recipient or scope changed; original materials remain local.')}\n${label('原接收方与范围','Saved recipient and scope')}:\n${plain(previous.participantId)}\n${plain(previous.scope)}\n${plain(previous.scopeEventId)}\n${label('当前接收方与范围','Current recipient and scope')}:\n${plain(source.participantId)}\n${plain(source.scope)}\n${plain(source.scopeEventId)}`,[
+      menu(`${label('材料接收方或范围选择已变化；原材料仍保存在本机。','Recipient or scope selection changed; original materials remain local.')}\n${label('原接收方与范围','Saved recipient and scope')}:\n${plain(previous.participantId)}\n${plain(previous.scope)}\n${label('当前接收方与范围','Current recipient and scope')}:\n${plain(source.participantId)}\n${plain(source.scope)}`,[
         [label('确认当前接收方和范围，重新审阅','Use current recipient and scope, then review'),()=>void run(()=>controller.rebaseContextDraft({id:row.id,expectedRevision:row.revision,record}),render,back)],
+        [label('查看原选择与当前来源','Inspect original choice and current source'),()=>message(JSON.stringify({previous,current:source},null,2),()=>checkSource(row,done))],
         [label('返回保留原草稿','Keep original draft'),back],
       ],back);
     },back);
@@ -105,25 +108,28 @@ export function createContextDraftMenu({controller,select,prompt,info,language,i
       [label('删除本地材料草稿','Remove local material draft'),()=>void run(()=>controller.forgetContextDraft(id),open)],
     ],open);
   },open);}
-  function operation(eventId){void run(()=>controller.listContextOperations(),page=>{
-    const row=page.items.find(item=>item.eventId===eventId);if(!row)return message(label('本地记录不存在。','Local record unavailable.'),open);
+  function operation(eventId){void run(async()=>{const page=await controller.listContextOperations(),row=page.items.find(item=>item.eventId===eventId);
+    let result,readError;if(row&&canSubmit&&controller.reconcileContext){try{result=await controller.reconcileContext(eventId);}catch(error){readError=plain(error.message);}}
+    return{row,result,readError};},({row,result,readError})=>{
+    if(!row)return message(label('本地记录不存在。','Local record unavailable.'),open);
     const back=()=>operation(eventId);
-    menu(`${plain(row.kind)} · ${plain(row.status)}\n${plain(row.grantId)}\n${label('历史接收回执不表示材料仍可访问。','Historical acceptance does not grant current material access.')}`,[
+    menu(`${kindName(row.kind)} · ${stateName(result?.state??row.status)}${readError?'\n'+label('暂未取得当前结果；原材料已保留。','Current outcome unavailable; original materials retained.'):''}`,[
       ...(controller.getLocalContextOperation?[[label('查看本地已确认内容','View locally prepared content'),()=>void run(()=>controller.getLocalContextOperation(eventId),
-        saved=>message(saved?.payloadJson??label('本地记录不存在。','Local record unavailable.'),back),back)]]:[]),
-      ...(canSubmit?[[label('核对服务端接收结果','Check server acknowledgement'),()=>void run(()=>controller.reconcileContext(eventId),result=>{
-        menu(`${label('接收结果','Acknowledgement')}: ${plain(result.state)}`,[
-          ...(result.state==='absent'?[[label('预览原材料操作并重试','Preview original material operation and retry'),()=>{generation++;onConfirm(eventId,back,true);}]]:[]),
-          [label('读取当前材料授权','Read current material grant'),()=>{generation++;onOpenGrant(row.grantId,row.kind==='grant');}],
-        ],back);
-      },back)]]:[]),
+        saved=>{let payload;try{payload=JSON.parse(saved?.payloadJson??'null');}catch{/* Exact bytes remain available in source details. */}
+          message(payload?.materials?.map(item=>plain(item.label)+'\n'+String(item.content??'')).join('\n\n')||label('这条本地记录没有材料正文。','This local record has no material text.'),back);},back)],
+        [label('查看原材料与签署来源','Inspect original materials and signed source'),()=>void run(()=>controller.getLocalContextOperation(eventId),saved=>message(saved?.payloadJson??label('本地记录不存在。','Local record unavailable.'),back),back)]]:[]),
+      ...(canSubmit?[
+        ...(readError?[[label('重试读取','Retry reading'),back]]:[]),
+        ...(result?.state==='absent'?[[label('预览原材料操作并重试','Preview original material operation and retry'),()=>{generation++;onConfirm(eventId,back,true);}]]:[]),
+        [label('读取当前材料授权','Read current material grant'),()=>{generation++;onOpenGrant(row.grantId,row.kind==='grant');}]
+      ]:[]),
       ...(['prepared','acknowledged'].includes(row.status)?[[label('删除本地提交记录','Remove local submission record'),()=>void run(()=>controller.forgetContextOperation(eventId),open,back)]]:[]),
     ],open);
   },open);}
   function open(){void run(async()=>({drafts:await controller.listContextDrafts(),operations:await controller.listContextOperations()}),({drafts,operations})=>menu(
-    label('本地材料草稿与提交恢复','Local material drafts and submission recovery'),[
+    label('本地材料草稿与已分享内容','Local material drafts and shared content'),[
       ...drafts.items.filter(row=>row.status==='editing').map(row=>[plain(row.title),()=>openDraft(row.id),plain(row.updatedAt)]),
-      ...operations.items.map(row=>[`${plain(row.kind)} · ${plain(row.status)}`,()=>operation(row.eventId),plain(row.grantId)]),
+      ...operations.items.map(row=>[`${kindName(row.kind)} · ${stateName(row.status)}`,()=>operation(row.eventId),plain(row.updatedAt)]),
     ]));}
   function create(record){void run(()=>controller.createContextDraft(record),row=>controller.previewContextFile?menu(label('选择材料来源','Choose material source'),[
     [label('粘贴文本片段','Paste a text excerpt'),()=>render(row)],

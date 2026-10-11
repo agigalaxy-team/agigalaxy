@@ -64,6 +64,10 @@ export class OutcomeMaterialServiceV2 {
       await this.attachments.readableWithin(db, actor, row);
       const bytes = await this.attachments.store.get({ key: row.storage_key, keyId: row.encryption_key_id, size: Number(row.byte_size) });
       if (!bytes || hash(bytes) !== row.sha256) fail('outcome_source_integrity_failed', 502);
+      // Storage may finish after the original room/source permission or TTL.
+      // A prior readable row is not permission to return its late bytes.
+      const { row: current } = await this.attachments.roomRow(db, actor, selection.id);
+      await this.attachments.readableWithin(db, actor, current);
       return { source: { kind: 'attachment', id: row.id, version: 1, sha256: row.sha256, roomId: row.room_id },
         authorId: row.subject_id, size: bytes.length, bytes, name: row.name, mediaType: row.media_type };
     }
@@ -80,7 +84,7 @@ export class OutcomeMaterialServiceV2 {
   async source(actor, input) {
     const selection = parse(outcomeMaterialSelectionSchema, input);
     return this.access.runAuthorized(actor, 'evidence', async db => {
-      const { text: _text, ...selected } = await this.selectedWithin(db, actor, selection);
+      const { text: _text, bytes: _bytes, ...selected } = await this.selectedWithin(db, actor, selection);
       return { ...selected, currentRoomReadOnly: true, independentRetentionGranted: false };
     });
   }
@@ -221,6 +225,11 @@ export class OutcomeMaterialServiceV2 {
         if (!bytes || hash(bytes) !== row.sha256) fail('outcome_material_integrity_failed', 500);
         bytesBase64 = bytes.toString('base64');
       } else if (hash(content) !== row.sha256) fail('outcome_material_integrity_failed', 500);
+      // This is the independently approved copy's current permission, not the
+      // original temporary chat attachment's lifetime. Keep original locators
+      // even when a late read is withheld.
+      await this.liveWithin(db, row);
+      if (this.state(row) !== 'available' || row.purge_pending) fail('outcome_material_unavailable', 404);
       return { ...this.view(row), ...(row.source_kind === 'attachment' ? { bytesBase64 } : { content }), contentAvailable: true, authorization: 'current' };
     } catch (error) {
       if (!(error instanceof ServiceError)) throw error;
@@ -241,7 +250,47 @@ export class OutcomeMaterialServiceV2 {
       // Permit the owner to reconcile even after a consent expires; other
       // authors only see the proposal while its exact request is authorised.
       if (actor.subjectId !== row.subject_id) await this.requireConsent(db, request);
-      return { ...this.view(row), requestHash: request.payload_hash, request: JSON.parse(request.payload_text) };
+      let sourceContent=null,sourceContentReason=null,sourceName=null,sourceMediaType=null,sourceReadExpiresAt=null;
+      if(row.source.kind==='message'){
+        try{
+          const selected=await this.exactSource(db,actor,row.source);
+          // Fetching the exact archive body may yield to the transport. Recheck
+          // current room membership and source lifetime after that await.
+          await this.chat.requireRoom(db,actor,row.source.roomId);
+          const current=(await db.query('SELECT room_id,subject_id,state,revision,expires_at FROM chat_message_refs WHERE message_id=$1 FOR SHARE',[row.source.id])).rows[0];
+          if(!current||current.room_id!==row.source.roomId||current.subject_id!==selected.authorId
+            ||current.state!=='accepted'||current.revision!==row.source.version
+            ||Date.parse(current.expires_at)<=this.now()*1000)fail('chat_message_version_unavailable');
+          sourceContent={source:selected.source,authorId:selected.authorId,size:selected.size,content:selected.text,
+            readExpiresAt:Math.floor(Date.parse(current.expires_at)/1000),currentRoomReadOnly:true,independentRetentionGranted:false};
+        }catch(error){if(!(error instanceof ServiceError))throw error;sourceContentReason=error.code;}
+      }else if(row.source.kind==='attachment'){
+        try{
+          if(!this.attachments)fail('outcome_attachment_copy_unavailable',503);
+          const {row:attachment}=await this.attachments.roomRow(db,actor,row.source.id);
+          if(row.source.version!==1||attachment.room_id!==row.source.roomId||attachment.sha256!==row.source.sha256)fail('outcome_source_changed');
+          await this.attachments.readableWithin(db,actor,attachment);
+          // Metadata follows current original-file permission. Inspect never
+          // reads storage bytes or assumes approval grants original access.
+          sourceName=attachment.name??null;sourceMediaType=attachment.media_type??null;
+          const expiresAt=Date.parse(attachment.expires_at??attachment.prepare_expires_at);
+          if(Number.isFinite(expiresAt))sourceReadExpiresAt=Math.floor(expiresAt/1000);
+          if(attachment.message_id){
+            const message=(await db.query('SELECT expires_at FROM chat_message_refs WHERE message_id=$1 FOR SHARE',[attachment.message_id])).rows[0],
+              messageExpiry=Date.parse(message?.expires_at);
+            if(Number.isFinite(messageExpiry))sourceReadExpiresAt=sourceReadExpiresAt===null?Math.floor(messageExpiry/1000):Math.min(sourceReadExpiresAt,Math.floor(messageExpiry/1000));
+          }
+        }catch(error){if(!(error instanceof ServiceError))throw error;sourceContentReason=error.code;}
+      }
+      if(actor.subjectId!==row.subject_id)await this.requireConsent(db,request);
+      if(sourceContent&&sourceContent.readExpiresAt<=this.now()){
+        sourceContent=null;sourceContentReason='chat_message_version_unavailable';
+      }
+      if(sourceReadExpiresAt!==null&&sourceReadExpiresAt<=this.now()){
+        sourceName=null;sourceMediaType=null;sourceReadExpiresAt=null;sourceContentReason='attachment_content_unavailable';
+      }
+      return { ...this.view(row), requestHash: request.payload_hash, request: JSON.parse(request.payload_text),
+        sourceContent,sourceContentReason,sourceName,sourceMediaType,sourceReadExpiresAt };
     });
   }
   query(actor, input) {

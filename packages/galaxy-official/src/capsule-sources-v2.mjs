@@ -1,5 +1,5 @@
 import { caseRepository } from './infrastructure/case-repository.mjs';
-import { projectCaseFacts, latestFact } from './domain/intervention.mjs';
+import { projectCaseFacts } from './domain/intervention.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { capsulePermissionV2Schema } from './shared/capsule-v2-schema.mjs';
 import { digest } from './shared/digest.mjs';
@@ -20,6 +20,20 @@ export class CapsuleSourcesV2 {
     Object.assign(this, { legacy, cases, verificationRecords, configurations, readSelectedWithin, outcomeMaterials });
     this.access = legacy.access; this.consents = legacy.consents;
   }
+  async factCurrentnessWithin(db, actor, rows, facts, kind, ref) {
+    // Exact historical access and current support are separate. Use the owning
+    // Case service's metadata guard instead of inferring latest from surviving
+    // bodies, which would resurrect an earlier fact after a retained change.
+    try {
+      await this.cases.requireFactWithin(db, actor, rows, facts, kind, ref, { latest: true });
+      return 'current';
+    } catch (error) {
+      if (!(error instanceof ServiceError)) throw error;
+      if (error.code === 'fact_version_conflict') return 'superseded';
+      if (error.code === 'fact_currentness_unavailable') return 'unavailable';
+      throw error;
+    }
+  }
   async sourceWithin(db, actor, ref, { latest = false, visited = new Set() } = {}) {
     const key = sourceKey(ref); capsuleRule(!visited.has(key), 'capsule_source_cycle'); visited.add(key);
     try {
@@ -35,6 +49,8 @@ export class CapsuleSourcesV2 {
         const message = await this.readSelectedWithin(db, actor, { messageId: ref.id, revision: ref.version });
         return { ref, authorId: message.authorId, contentHash: message.contentHash,
           dependencies: [{ key, authorId: message.authorId }], sourceState: 'current',
+          reading: { text: message.text, roomId: message.roomId, expiresAt: message.expiresAt,
+            permission: 'current-room-read-only', publicationPermission: false },
           rightsScope: 'exact-message-content; room-read-is-not-publication-permission' };
       }
       if (ref.kind === 'outcome-material') {
@@ -72,7 +88,7 @@ export class CapsuleSourcesV2 {
           }
         }
         return { ref, authorId: fact.actorId === 'unknown' ? fact.reportedBy : fact.actorId, fact,
-          currentVersion: latestFact(facts, ref.kind, ref.id)?.version, synthetic: sourceSynthetic,
+          currentness: latest ? 'current' : await this.factCurrentnessWithin(db, actor, rows, facts, ref.kind, ref), synthetic: sourceSynthetic,
           dependencies: unique(dependencies), sourceState: 'current', provenance: fact.provenance };
       }
       const record = await this.verificationRecords.requireReferenceWithin(db, actor, { kind: ref.kind, id: ref.id, version: ref.version }, { caseId: ref.caseId });
@@ -128,7 +144,7 @@ export class CapsuleSourcesV2 {
         authorId: actor.subjectId, coauthorApproval: false, legalOwnershipIndependentlyVerified: false };
     });
   }
-  async publicationSourcesWithin(db, actor, payload, disclosure, { requireCurrentResult = true } = {}) {
+  async publicationSourcesWithin(db, actor, payload, disclosure, { requireCurrentResult = true, includeCoverage = false } = {}) {
     const resolution = payload.sourceResolution, mainRef = { kind: 'result', id: resolution.resultId, version: resolution.resultVersion, caseId: resolution.caseId };
     const primary = await this.sourceWithin(db, actor, mainRef, { latest: requireCurrentResult });
     capsuleRule(primary.fact.reportedOutcome === 'succeeded', 'capsule_resolution_required');
@@ -136,9 +152,9 @@ export class CapsuleSourcesV2 {
     const refs = [mainRef, ...payload.sourceRefs, ...payload.attributionRefs.map(a => a.source),
       ...resolution.verificationRefs.map(ref => ({ kind: 'verification', ...ref, caseId: resolution.caseId }))];
     const resolved = [];
-    for (const ref of [...new Map(refs.map(r => [sourceKey(r), r])).values()]) resolved.push(await this.sourceWithin(db, actor, ref));
+    for (const ref of new Map(refs.map(r => [sourceKey(r), r])).values()) resolved.push(await this.sourceWithin(db, actor, ref));
     capsuleRule(payload.synthetic || !resolved.some(source=>source.synthetic===true),'synthetic_mismatch');
-    const dependencies = unique(resolved.flatMap(source => source.dependencies)), coverage = new Map(), permissions = [];
+    const dependencies = unique(resolved.flatMap(source => source.dependencies)), coverage = new Map(), permissions = [], coveringPermissions = new Map();
     // The publisher's exact publication Consent covers their own selected
     // registered content. It cannot stand in for another author's permission.
     for (const dependency of dependencies) if (dependency.authorId === actor.subjectId) coverage.set(dependency.key, actor.subjectId);
@@ -153,14 +169,19 @@ export class CapsuleSourcesV2 {
       for (const ref of license.sources) {
         const source = await this.sourceWithin(db, grantor, ref);
         capsuleRule(source.authorId === grantor.subjectId, 'capsule_source_author_required', 403);
-        for (const dependency of source.dependencies) if (dependency.authorId === grantor.subjectId) coverage.set(dependency.key, grantor.subjectId);
+        for (const dependency of source.dependencies) if (dependency.authorId === grantor.subjectId) {
+          coverage.set(dependency.key, grantor.subjectId);
+          coveringPermissions.set(dependency.key, [...new Set([...(coveringPermissions.get(dependency.key) ?? []), permissionId])]);
+        }
       }
       permissions.push({ permissionId, authorId: grantor.subjectId, license: license.license, scope: license.scope,
         basis: license.basis, attribution: license.attribution, licenseReference: license.licenseReference ?? null,
         status: 'current-source-permission', coauthorApproval: false, legalOwnershipIndependentlyVerified: false });
     }
     const uncovered = dependencies.filter(dep => coverage.get(dep.key) !== dep.authorId);
-    capsuleRule(!uncovered.length, 'capsule_source_permission_required', 403);
+    // A private, read-only preview can describe the current coverage gap. The
+    // publication path still rejects it and never treats reading as a license.
+    capsuleRule(includeCoverage || !uncovered.length, 'capsule_source_permission_required', 403);
     const attributions = payload.attributionRefs.map(attribution => {
       const source = resolved.find(s => sourceKey(s.ref) === sourceKey(attribution.source));
       capsuleRule(source?.authorId === attribution.subjectId, 'capsule_attribution_mismatch');
@@ -168,7 +189,76 @@ export class CapsuleSourcesV2 {
         contributionResponses: 'read-original-intervention-under-its-own-permission', coauthorApproval: false };
     });
     for (const contributor of payload.contributors) capsuleRule(payload.attributionRefs.some(a => a.subjectId === contributor), 'capsule_contributor_source_required');
+    const sourceCoverage = includeCoverage ? {
+      sources: resolved.map(source => ({ ref: source.ref, authorId: source.authorId, sourceState: source.sourceState,
+        currentness: source.currentness ?? null,
+        ...(source.reading ? { reading: source.reading } : source.fact ? { reading: {
+          text: source.fact.summary ?? source.fact.description ?? source.fact.strategy ?? '',
+          permission: 'current-source-read-only', publicationPermission: false } } : {}),
+      })),
+      dependencies: dependencies.map(dependency => ({ ...dependency,
+        covered: coverage.get(dependency.key) === dependency.authorId,
+        permissionIds: coveringPermissions.get(dependency.key) ?? [],
+        sourceRefs: resolved.filter(source => source.dependencies.some(item => item.key === dependency.key && item.authorId === dependency.authorId)).map(source => source.ref),
+      })),
+    } : null;
+    if (includeCoverage) for (const source of resolved) if (source.reading?.expiresAt)
+      capsuleRule(Date.parse(source.reading.expiresAt) > this.access.now() * 1000, 'chat_message_version_unavailable', 409);
     return { primary, permissions, attributions, sourceRefs: refs, synthetic: payload.synthetic || primary.synthetic === true,
-      sourceCurrent: primary.currentVersion === mainRef.version, capabilityVerified: false };
+      ...(includeCoverage ? { sourceCoverage, uncovered } : {}),
+      sourceCurrent: primary.currentness === 'current', sourceCurrentness: primary.currentness, capabilityVerified: false };
+  }
+  async attributionResponsesWithin(db, actor, attribution, cache) {
+    const base = { meaning: 'responses-to-exact-original-intervention; not-capsule-coauthorship',
+      coverage: 'currently-authorized-latest-response-per-actor; hidden-responses-not-inferred', coauthorApproval: false };
+    if (attribution.source.kind !== 'intervention') return { ...base, status: 'not-an-intervention', confirmation: null, responses: [] };
+    const ref = attribution.source, viewer = actor ?? { subjectId: null };
+    try {
+      let source = cache.get(ref.caseId);
+      if (!source) {
+        const repo = caseRepository(db), parent = await repo.lockAnyForRead(ref.caseId);
+        capsuleRule(parent && parent.state !== 'withdrawn', 'capsule_source_unavailable', 403);
+        const rows = await repo.events(ref.caseId);
+        source = { parent, rows, facts: projectCaseFacts(rows.filter(row => row.payload_text), parent) };
+        cache.set(ref.caseId, source);
+      }
+      const { rows, facts } = source;
+      const root = rows.find(row => ['case', 'case-created'].includes(row.kind));
+      await this.cases.requireEventVisibleWithin(db, viewer, root);
+      const fact = await this.cases.requireFactWithin(db, viewer, rows, facts, 'intervention', ref);
+      const responses = [];
+      // Select the latest original response before checking its visibility. A
+      // withdrawn/private newer response must not resurrect an older acceptance.
+      for (const response of fact.responses) {
+        const row = rows.find(item => item.id === response.id);
+        // Retained rows whose body has been erased cannot establish which
+        // Intervention they addressed. Do not reuse an earlier author's answer.
+        if (rows.some(item => item.kind === 'intervention-response' && item.subject_id === response.actorId
+          && item.version > row.version && !item.payload_text)) continue;
+        try {
+          await this.cases.requireEventVisibleWithin(db, viewer, row);
+          responses.push({ eventId: response.id, actorId: response.actorId, relationship: response.relationship,
+            state: response.state, interventionRef: response.interventionRef });
+        } catch (error) {
+          if (!(error instanceof ServiceError) || !['consent_required', 'origin_not_authorized', 'case_event_unavailable'].includes(error.code)) throw error;
+        }
+      }
+      const others = responses.filter(response => response.relationship !== 'self');
+      const confirmation = others.some(r => r.state === 'disputed') ? 'disputed' : others.some(r => r.state === 'partial')
+        ? 'partially-confirmed' : others.some(r => r.state === 'accepted') ? 'confirmed' : 'unconfirmed';
+      const currentness = await this.factCurrentnessWithin(db, viewer, rows, facts, 'intervention', ref);
+      return { ...base, status: currentness === 'current' ? 'current'
+        : currentness === 'unavailable' ? 'source-currentness-unavailable' : 'source-version-superseded',
+        source: { ...ref }, taskId: fact.taskId, confirmation, responses };
+    } catch (error) {
+      if (!(error instanceof ServiceError) || ![403, 404, 409, 422, 503].includes(error.status)) throw error;
+      return { ...base, status: 'source-not-readable', confirmation: null, responses: [] };
+    }
+  }
+  async attributionsWithin(db, actor, attributions) {
+    const cache = new Map(), items = [];
+    for (const attribution of attributions) items.push({ ...attribution,
+      contributionResponses: await this.attributionResponsesWithin(db, actor, attribution, cache) });
+    return items;
   }
 }

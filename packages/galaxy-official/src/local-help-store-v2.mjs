@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, readdir } from 'node:fs/promises';
 import * as z from 'zod/v4';
 import { withLocalRead, withLocalWrite } from '../../galaxy-core/src/storage/write-lock.mjs';
 import { readJson, writeJson, localPaths } from '../../galaxy-core/src/storage/files.mjs';
@@ -15,6 +15,7 @@ export function createLocalHelpStoreV2({ dataDirectory, endpoint, subjectId, now
   const scope = createHash('sha256').update(JSON.stringify([endpoint, subjectId])).digest('hex');
   const folder = directory => join(directory, 'help-v2', scope);
   const path = (directory, id) => join(folder(directory), z.uuid().parse(id) + '.json');
+  const operationPath = (directory, sessionId, operationId) => join(folder(directory), `${z.uuid().parse(sessionId)}-action-${z.uuid().parse(operationId)}.json`);
   async function guard(directory) {
     const paths = localPaths(directory), identity = readIdentityWithin ? await readIdentityWithin(directory) : await readJson(paths.identity, null);
     if (!identity || identity.id !== subjectId || !verifyGalaxyGenesis(identity.id, identity.genesisProof)
@@ -55,9 +56,38 @@ export function createLocalHelpStoreV2({ dataDirectory, endpoint, subjectId, now
   }
   async function forget(id) {
     return withLocalWrite(dataDirectory, async directory => {
-      await load(directory, id); await rm(path(directory, id));
+      await load(directory, id);
+      const exactPrefix = `${z.uuid().parse(id)}-action-`;
+      // Include a pending body saved just before its session reference, so a
+      // process crash cannot orphan private material outside this deletion.
+      const files = await readdir(folder(directory));
+      for (const file of files) {
+        if (!file.startsWith(exactPrefix) || !file.endsWith('.json') || !z.uuid().safeParse(file.slice(exactPrefix.length, -5)).success) continue;
+        await rm(join(folder(directory), file));
+      }
+      await rm(path(directory, id));
       return { id, deleted: true, localOnly: true, remoteOperationsCanceled: false };
     });
   }
-  return { create, get, update, forget, endpoint, subjectId };
+  // Exact, explicitly selected pending material lives separately from the
+  // public HelpSession view. Successful ACKs erase its local payload body.
+  async function readOperation(sessionId, operationId) {
+    return withLocalRead(dataDirectory, async directory => {
+      await load(directory, sessionId);
+      const row = await readJson(operationPath(directory, sessionId, operationId), null);
+      if (row && (row.sessionId !== sessionId || row.operationId !== operationId || row.subjectId !== subjectId || row.endpoint !== endpoint)) throw new Error('help_scope_mismatch');
+      return row;
+    });
+  }
+  async function writeOperation(sessionId, operationId, change) {
+    return withLocalWrite(dataDirectory, async directory => {
+      await load(directory, sessionId);
+      const target = operationPath(directory, sessionId, operationId), prior = await readJson(target, null);
+      const row = change(prior);
+      if (row?.then || !row || row.sessionId !== sessionId || row.operationId !== operationId || row.subjectId !== subjectId || row.endpoint !== endpoint
+        || Buffer.byteLength(JSON.stringify(row)) > 100000) throw new Error('help_operation_invalid');
+      await writeJson(target, row); return row;
+    });
+  }
+  return { create, get, update, forget, readOperation, writeOperation, endpoint, subjectId };
 }

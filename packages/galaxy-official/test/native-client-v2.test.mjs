@@ -14,6 +14,31 @@ import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch.mjs';
 import {createNativeStore} from '../../galaxy-edge-mcp/src/native-v2/store.mjs';
 import {verifyContextV2} from './context-v2-workflow.mjs';
 import {createNativeNavigation,navigationSchema} from '../../galaxy-edge-mcp/src/native-v2/navigation.mjs';
+import {InMemoryTransport,CLIENT_CAPABILITIES_META_KEY,CLIENT_INFO_META_KEY,PROTOCOL_VERSION_META_KEY} from '@modelcontextprotocol/server';
+
+async function verifyRequestCapabilities(server){
+ /** @type {Array<import('@modelcontextprotocol/server').ServerContext['mcpReq']['envelope']>} */
+ const seen=[];
+ server.registerTool('synthetic_capability_probe',{inputSchema:{},annotations:{readOnlyHint:true}},(_args,/** @type {import('@modelcontextprotocol/server').ServerContext} */ctx)=>{
+  seen.push(ctx.mcpReq.envelope);return{content:[]};
+ });
+ assert.equal(server.server.transport,undefined,'the fresh server has no host connection');
+ const[a,b]=InMemoryTransport.createLinkedPair();
+ try{
+  await server.connect(a);await b.start();
+  const first={ [PROTOCOL_VERSION_META_KEY]:'2026-07-28',[CLIENT_INFO_META_KEY]:{name:'synthetic-capability-client',version:'1'},
+   [CLIENT_CAPABILITIES_META_KEY]:{experimental:{'synthetic-only':{}}} };
+  const empty={ [PROTOCOL_VERSION_META_KEY]:'2026-07-28',[CLIENT_CAPABILITIES_META_KEY]:{} };
+  for(const request of [{id:1,meta:undefined},{id:2,meta:first},{id:3,meta:empty},{id:4,meta:undefined}]){
+   /** @type {Promise<import('@modelcontextprotocol/server').JSONRPCMessage>} */
+   const response=new Promise(resolve=>{b.onmessage=resolve;});
+   await b.send({jsonrpc:'2.0',id:request.id,method:'tools/call',params:{name:'synthetic_capability_probe',arguments:{},...(request.meta?{_meta:request.meta}:{})}});
+   const received=await response;assert.ok('result' in received,JSON.stringify(received));
+   assert.equal(seen.length,request.id,'each request reaches the actual SDK handler exactly once');
+   assert.deepEqual(seen.at(-1),request.meta,'only this request supplies client capabilities; omitted envelopes do not inherit earlier capabilities');
+  }
+ }finally{await server.close();await b.close();}
+}
 
 test('native canonical Context routes grant one recipient, accept exact metadata and revoke through real HTTP',async()=>{
  await verifyContextV2({extraScopes:browserScopes.filter(x=>!['binding','consent','assistance','context'].includes(x)),afterWorkflow:async({f,p,clock,fresh,localEndpoint})=>{
@@ -70,7 +95,8 @@ test('native current device survives restart; real HTTP Task and Consent retry p
   runtime=await createNativeRuntime(config);assert.equal((await runtime.status()).connected,false);assert.equal(requests,0);
   await runtime.initialize({profile:'coding-case'},{confirmed:true});assert.equal(requests,0,'local initialization stays local');
   await runtime.connect({confirmed:true});const first=await runtime.status();assert.equal(first.connected,true);
-  const server=createNativeToolServer(runtime);assert.equal(server.server.getClientCapabilities(),undefined);await server.close();
+  const server=createNativeToolServer(runtime),beforeCapabilities=requests;await verifyRequestCapabilities(server);
+  assert.equal(requests,beforeCapabilities,'checking MCP capability context does not contact Official or a model');
   const task={operationId:randomUUID(),taskId:randomUUID(),caseId:null,intent:'proactive-review',workContext:{goal:'Synthetic native workflow',currentSituation:'No failure history',attemptRefs:[]},title:'Native Task',summary:'Synthetic private request',visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:f.now+3600};
   const input={requestId:randomUUID(),payloadJson:JSON.stringify(task,null,2),action:'assistance.publish',objectId:task.operationId,visibility:'Private',viewers:[],expiresAt:f.now+3600};
   const authorized=await runtime.authorize(input,{confirmed:true});assert.equal(authorized.payloadJson,input.payloadJson,'signed bytes preserved');
@@ -104,7 +130,7 @@ test('native current device survives restart; real HTTP Task and Consent retry p
 
 test('host-driven watch is leased, rechecks source, skips self echo and never calls a model',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-native-watch-'));try{
-  const subjectId='GUID'+'1'.repeat(28),roomId=randomUUID(),bindingId=randomUUID();let grantId=randomUUID(),revoked=false,now=2000000000,calls=0,bodyAvailable=true,pendingResolve,currentBinding=bindingId;
+  const subjectId='GUID'+'1'.repeat(28),roomId=randomUUID(),bindingId=randomUUID();let grantId=randomUUID(),revoked=false,now=2000000000,calls=0,bodyAvailable=true,pendingResolve=null,currentBinding=bindingId;
   const other='GUID'+'2'.repeat(28);const api={endpoint:'https://official.example.org',snapshot:()=>({bindingId:currentBinding}),call:async(path,input)=>{
    calls++;if(path.endsWith('/agent-grants'))return{items:[{grantId,state:revoked?'revoked':'active',bindingId,expiresAt:2000100000}]};
    if(path.endsWith('/agent-revoke')){assert.equal(input.grantId,grantId);revoked=true;return{revoked:true,hostRuntimeStopped:false};}

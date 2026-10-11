@@ -9,10 +9,10 @@ const uuid=value=>z.uuid().parse(value);
 // record is saved before either Consent or the material operation can be sent.
 export function createContextClientV2({api,getLocal,putLocal,now=()=>Math.floor(Date.now()/1000),locks=globalThis.navigator?.locks}) {
   if(!api?.endpoint||!api.prepareAuthorization||!getLocal||!putLocal)throw new Error('Context client requires the existing identity and local storage.');
-  const previews=new WeakMap(),index='context-v2:pending';
+  const previews=new WeakMap(),index='context-v2:pending',endpoint=api.endpoint,resuming=new Map();
   const key=id=>`context-v2:operation:${uuid(id)}`;
   function actor(){const current=api.snapshot();if(!current?.scopes.includes('context'))throw issue('context_connection_required');return current;}
-  function same(lease){const current=actor();if(current.subjectId!==lease.subjectId||current.bindingId!==lease.bindingId)throw issue('context_identity_changed');}
+  function same(lease){const current=actor();if(api.endpoint!==endpoint||['subjectId','bindingId','generation','endpoint'].some(key=>current[key]!==lease[key]))throw issue('context_identity_changed');}
   function serial(lease,work){
     const name=`galaxy-context:${api.endpoint}:${lease.subjectId}`;
     if(locks?.request)return locks.request(name,{mode:'exclusive'},async()=>{same(lease);return work();});
@@ -103,12 +103,45 @@ export function createContextClientV2({api,getLocal,putLocal,now=()=>Math.floor(
       return send(lease,record);
     });
   }
+  // Visible-page recovery only reuses the durable original signature. An
+  // unsigned journal, changed binding or expired signature needs a new review;
+  // the saved material period is never extended here.
+  function resumePending(operationId){
+    const lease=actor(),lane=JSON.stringify([lease.subjectId,lease.bindingId,lease.generation,uuid(operationId)]);
+    if(resuming.has(lane))return resuming.get(lane);
+    const next=serial(lease,async()=>{
+      const record=await load(lease,operationId),receipt=await operationReceipt(lease,record);
+      if(receipt.state==='acknowledged')return complete(lease,record,receipt);
+      if(receipt.state!=='absent')return receipt;
+      if(record.state==='stopped-local')return{...receipt,reason:'stopped-local',serverCancellationConfirmed:false};
+      if(!Number.isSafeInteger(record.expiresAt)||record.expiresAt<=now())return{...receipt,reason:'authorization-expired'};
+      const prepared=record.preparedConsent,intent=prepared?.intent;
+      if(!prepared)return{...receipt,reason:'authorization-review-required'};
+      if(prepared.endpoint!==endpoint||prepared.payloadJson!==record.payloadJson||typeof prepared.signedIntent!=='string'
+        ||intent?.subjectId!==lease.subjectId||intent.endpoint!==endpoint||intent.action!=='context.grant'
+        ||intent.objectId!==record.operationId||intent.payloadHash!==record.payloadHash||intent.visibility!=='Private'
+        ||JSON.stringify(intent.viewers)!==JSON.stringify([record.recipientId])||intent.expiresAt!==record.expiresAt)
+        throw issue('context_saved_authorization_changed');
+      const authorization=await api.reconcileAuthorization(prepared);same(lease);
+      if(authorization.state==='absent'){
+        if(intent.bindingId!==lease.bindingId)return{...receipt,reason:'original-binding-changed'};
+        if(intent.issuedAt<now()-300)return{...receipt,reason:'original-signature-expired'};
+      }
+      return send(lease,record);
+    });resuming.set(lane,next);
+    return next.finally(()=>{if(resuming.get(lane)===next)resuming.delete(lane);});
+  }
   async function reviewWithin(lease,record){
     const receipt=await operationReceipt(lease,record);
     if(receipt.state==='acknowledged')return complete(lease,record,receipt);
     if(receipt.state!=='absent')throw issue('context_operation_conflict');
     if(record.state==='stopped-local')return {state:'stopped-local',operationId:record.operationId,serverCancellationConfirmed:false};
-    if(!record.preparedConsent)return {state:'retry-original',operationId:record.operationId};
+    if(!record.preparedConsent){
+      if(record.kind==='grant'&&record.expiresAt<=now())throw issue('context_original_material_deadline_expired');
+      return {state:'reauthorization-required',operationId:record.operationId,grantId:record.grantId,consentId:null,
+        payloadHash:record.payloadHash,payload:JSON.parse(record.payloadJson),recipientId:record.recipientId,
+        expiresAt:record.kind==='grant'?record.expiresAt:Math.max(now()+300,record.expiresAt)};
+    }
     const authorization=await api.reconcileAuthorization(record.preparedConsent);same(lease);
     if(authorization.state!=='absent')return {state:'retry-original',operationId:record.operationId};
     const intent=record.preparedConsent.intent;
@@ -128,7 +161,7 @@ export function createContextClientV2({api,getLocal,putLocal,now=()=>Math.floor(
         ||current.recipientId!==preview.recipientId||current.expiresAt!==preview.expiresAt)throw issue('context_authorization_preview_changed');
       const replacement=await api.prepareAuthorization(record.payloadJson,{action:'context.grant',objectId:record.operationId,
         visibility:'Private',viewers:[record.recipientId],expiresAt:current.expiresAt,confirmed:true});same(lease);
-      record.previousAuthorizations=[...(record.previousAuthorizations??[]),record.preparedConsent];
+      record.previousAuthorizations=[...(record.previousAuthorizations??[]),...(record.preparedConsent?[record.preparedConsent]:[])];
       record.preparedConsent=replacement;record.expiresAt=current.expiresAt;record.state='consent-result-unknown';await save(lease,record);
       return send(lease,record);
     });
@@ -138,7 +171,7 @@ export function createContextClientV2({api,getLocal,putLocal,now=()=>Math.floor(
       const record=await load(lease,operationId),receipt=await operationReceipt(lease,record);
       if(receipt.state==='acknowledged')return complete(lease,record,receipt);
       if(receipt.state!=='absent')throw issue('context_operation_conflict');
-      const {preparedConsent,previousAuthorizations,payloadJson,...minimal}=record;
+      const {preparedConsent:_preparedConsent,previousAuthorizations:_previousAuthorizations,payloadJson:_payloadJson,...minimal}=record;
       await save(lease,{...minimal,state:'stopped-local'});
       return {state:'stopped-local',operationId,grantId:record.grantId,payloadHash:record.payloadHash,serverCancellationConfirmed:false};
     });
@@ -165,5 +198,5 @@ export function createContextClientV2({api,getLocal,putLocal,now=()=>Math.floor(
       await validateView(item,item.metadata.grantId,true);}
     same(lease);return result;
   }
-  return Object.freeze({prepareGrant,prepareEvent,execute,pending,reconcile,retry,reviewAuthorization,reauthorize,abandon,get,query});
+  return Object.freeze({prepareGrant,prepareEvent,execute,pending,reconcile,retry,resumePending,reviewAuthorization,reauthorize,abandon,get,query});
 }

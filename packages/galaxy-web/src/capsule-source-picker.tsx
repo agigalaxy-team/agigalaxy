@@ -1,158 +1,77 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { capsuleRefKey } from './capsule-workspace-client.mjs';
+import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {capsuleRefKey} from './capsule-workspace-client.mjs';
+import {MemberAvatar,memberName,useMemberNames,readableTime} from './conversation-ui';
+import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
+import type {CapsuleAuthorRuntime,CapsuleSourceItem,CapsuleSourceRef} from './capsule-authoring-types';
+import './capsule-source-reading.css';
 
-// Exact selected message references only. No room-wide publication toggle and
-// no automatic transcript-to-Capsule conversion or cloud draft storage.
-export function CapsuleMessagePicker({
-  runtime,
-  subjectId,
-  busy,
-  run,
-  selected,
-  onChange,
-  onlyOwn = false,
-}: any) {
-  const [rooms, setRooms] = useState<any[]>([]),
-    [roomNext, setRoomNext] = useState<string | null>(null),
-    [roomId, setRoomId] = useState(''),
-    [messages, setMessages] = useState<any[]>([]),
-    [next, setNext] = useState<string | null>(null),
-    [loaded, setLoaded] = useState(false);
-  const epoch = useRef(0);
-  useEffect(() => {
-    epoch.current++;
-    return () => {
-      epoch.current++;
-    };
-  }, [runtime, subjectId]);
-  async function call(path: string, input: any) {
-    const token = epoch.current,
-      r = await runtime.api.call(path, input);
-    if (token !== epoch.current) throw new Error('消息来源身份已变化。');
-    return r;
-  }
-  async function readRooms(after?: string) {
-    const r = await call('/v2/chat/rooms/query', {
-      limit: 30,
-      ...(after ? { after } : {}),
-    });
-    setRooms((old) => (after ? [...old, ...r.rooms] : r.rooms));
-    setRoomNext(r.next);
-  }
-  async function readMessages(id = roomId, after = '0') {
-    const r = await call(`/v2/chat/rooms/${id}/history`, { after, limit: 30 });
-    setMessages((old) =>
-      after === '0' ? r.messages : [...old, ...r.messages],
-    );
-    setNext(r.next);
-    setLoaded(true);
-  }
-  return (
-    <details>
-      <summary>明确选择聊天消息作为来源（可选）</summary>
-      <p>
-        房间阅读权不等于发布许可。只选择确实需要的消息；第三方消息仍需原作者许可。共享摘要有单独派生来源，不能冒充普通原创消息。
-      </p>
-      <Button
-        type="button"
-        disabled={busy}
-        onClick={() => run(() => readRooms())}
-      >
-        读取我当前加入的房间
-      </Button>
-      {roomNext && (
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => run(() => readRooms(roomNext))}
-        >
-          更多房间
-        </Button>
-      )}
-      <label>
-        消息所在房间
-        <select
-          value={roomId}
-          disabled={busy}
-          onChange={(e) => {
-            setRoomId(e.target.value);
-            setMessages([]);
-            setNext(null);
-            setLoaded(false);
-          }}
-        >
-          <option value="">选择房间</option>
-          {rooms.map((r) => (
-            <option key={r.roomId} value={r.roomId}>
-              {r.title}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button
-        type="button"
-        disabled={busy || !roomId}
-        onClick={() => run(() => readMessages())}
-      >
-        读取当前消息页
-      </Button>
-      {messages
-        .filter(
-          (m) =>
-            m.text &&
-            !m.sharedSummaryId &&
-            (!onlyOwn || m.subjectId === subjectId),
-        )
-        .map((m) => {
-          const ref = {
-              kind: 'selected-message',
-              id: m.messageId,
-              version: m.revision,
-            },
-            k = capsuleRefKey(ref);
-          return (
-            <label className="task-card" key={k}>
-              <input
-                type="checkbox"
-                disabled={busy}
-                checked={selected.some((s: any) => capsuleRefKey(s.ref) === k)}
-                onChange={(e) =>
-                  onChange(
-                    e.target.checked
-                      ? [
-                          ...selected,
-                          { ref, authorId: m.subjectId, label: '选定聊天消息' },
-                        ]
-                      : selected.filter((s: any) => capsuleRefKey(s.ref) !== k),
-                  )
-                }
-              />
-              {m.text}
-              <p>
-                {m.subjectId} · 精确版本 {m.revision}
-              </p>
-            </label>
-          );
-        })}
-      {loaded &&
-        !messages.some(
-          (m) =>
-            m.text &&
-            !m.sharedSummaryId &&
-            (!onlyOwn || m.subjectId === subjectId),
-        ) && (
-          <p>这一页没有可选消息。失效、隐藏、其他作者或共享摘要可能被排除。</p>
-        )}
-      {next && (
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => run(() => readMessages(roomId, next))}
-        >
-          更多消息
-        </Button>
-      )}
-    </details>
-  );
+type Props={runtime:CapsuleAuthorRuntime;subjectId:string;busy:boolean;selected:CapsuleSourceItem[];onChange:(items:CapsuleSourceItem[])=>void;onlyOwn?:boolean};
+type Room={roomId:string;title:string};
+type Message={messageId:string;revision:number;subjectId:string;text:string|null;sharedSummaryId:string|null;sentAt?:string;createdAt?:string};
+type MessagePage={messages:Message[];next:string|null};
+type LeasedProps=Props&{lease:ChoiceViewLease};
+
+// Selection retains exact references, never a room-wide publication permission.
+export function CapsuleMessagePicker(props:Props){
+ const view=useChoiceViewLease(props.runtime,props.subjectId);
+ return view.lease?<CapsuleMessageChoices key={view.key} {...props} lease={view.lease}/>:null;
+}
+function CapsuleMessageChoices({runtime,subjectId,busy,selected,onChange,onlyOwn=false,lease}:LeasedProps){
+ const [open,setOpen]=useState(false),[rooms,setRooms]=useState<Room[]>([]),[roomNext,setRoomNext]=useState<string|null>(null),[roomId,setRoomId]=useState(''),[roomsLoaded,setRoomsLoaded]=useState(false),[readingRooms,setReadingRooms]=useState(false),[roomError,setRoomError]=useState('');
+ const roomRead=useRef(0),roomSelectId=useId();
+ const current=useCallback((token:number)=>{if(token!==roomRead.current)return false;try{lease.assertCurrent();return true;}catch{return false;}},[lease]);
+ const readRooms=useCallback(async(after?:string)=>{
+  const token=++roomRead.current;if(!current(token))return;setReadingRooms(true);setRoomError('');
+  try{const value:{rooms:Room[];next:string|null}=await runtime.api.call('/v2/chat/rooms/query',{limit:30,...(after?{after}:{})});if(!current(token))return;setRooms(old=>after?[...new Map([...old,...value.rooms].map(room=>[room.roomId,room])).values()]:value.rooms);setRoomNext(value.next);setRoomsLoaded(true);}
+  catch{if(current(token)){setRooms([]);setRoomNext(null);setRoomsLoaded(false);setRoomError('对话暂时无法读取，已选片段仍保留。');}}
+  finally{if(current(token))setReadingRooms(false);}
+ },[runtime,current]);
+ useEffect(()=>{const request=roomRead;return()=>{request.current++;};},[]);
+ useEffect(()=>{if(!open||roomsLoaded||readingRooms||roomError)return;const timer=window.setTimeout(()=>void readRooms(),0);return()=>window.clearTimeout(timer);},[open,roomsLoaded,readingRooms,roomError,readRooms]);
+ const chosen=selected.filter(item=>item.ref.kind==='selected-message');
+ return <details className="capsule-message-picker" onToggle={event=>setOpen(event.currentTarget.open)}>
+  <summary>{onlyOwn?'选择我的交流内容':'加入对话片段'}{chosen.length>0?' · 已选 '+chosen.length+' 条':''}</summary>
+  <p className="source-reading-note">{onlyOwn?'选择你写下的原话，保留准确消息版本。':'选择要引用的原话。他人的文字仍需原作者许可。'}</p>
+  {roomError&&<p className="message error" role="alert">{roomError}<Button type="button" variant="ghost" disabled={busy||readingRooms} onClick={()=>void readRooms()}>重新读取对话</Button></p>}
+  {readingRooms&&!roomsLoaded&&<p><output>正在读取你的对话…</output></p>}
+  {roomsLoaded&&!rooms.length&&!roomError&&<p className="source-reading-note">当前没有可选对话。</p>}
+  {rooms.length>0&&<label className="message-room-choice" htmlFor={roomSelectId}>选择对话<select id={roomSelectId} value={roomId} disabled={busy} onChange={event=>setRoomId(event.target.value)}><option value="">选择一段对话</option>{rooms.map(room=><option key={room.roomId} value={room.roomId}>{room.title}</option>)}</select></label>}
+  {roomNext&&<Button type="button" variant="ghost" disabled={busy||readingRooms} onClick={()=>void readRooms(roomNext)}>更多对话</Button>}
+  {open&&roomId&&<CapsuleRoomMessages key={roomId} {...{runtime,subjectId,busy,selected,onChange,onlyOwn,lease,roomId}} roomTitle={rooms.find(room=>room.roomId===roomId)?.title??'所选对话'}/>}
+  {chosen.length>0&&<details className="source-reference-details"><summary>查看已选片段</summary><p>已选内容会在保存前按当前权限核对。无法读取的文字不在这里保留副本。</p>{chosen.map(item=><div className="selected-source-reference" key={capsuleRefKey(item.ref)}><span>{item.label}<small>第 {item.ref.version} 版 · {item.ref.id}</small></span><Button type="button" variant="ghost" disabled={busy} onClick={()=>onChange(selected.filter(other=>capsuleRefKey(other.ref)!==capsuleRefKey(item.ref)))}>移除</Button></div>)}</details>}
+ </details>;
+}
+function CapsuleRoomMessages({runtime,subjectId,busy,selected,onChange,onlyOwn,lease,roomId,roomTitle}:LeasedProps&{roomId:string;roomTitle:string}){
+ const [messages,setMessages]=useState<Message[]>([]),[next,setNext]=useState<string|null>(null),[loaded,setLoaded]=useState(false),[readingMessages,setReadingMessages]=useState(false),[messageError,setMessageError]=useState('');
+ const messageRead=useRef(0),messagePages=useRef(1),reading=useRef(0),nextPage=useRef(next),checkboxPrefix=useId();
+ useLayoutEffect(()=>{nextPage.current=next;},[next]);
+ const people=useMemberNames(runtime,subjectId,true,messages.map(message=>message.subjectId));
+ const current=useCallback((token:number)=>{if(token!==messageRead.current)return false;try{lease.assertCurrent();return true;}catch{return false;}},[lease]);
+ const readMessages=useCallback(async(more=false)=>{
+  if(reading.current)return;
+  const token=++messageRead.current;if(!current(token))return;reading.current=token;setReadingMessages(true);setMessageError('');
+  try{
+   if(more){const after=nextPage.current;if(!after)return;const page:MessagePage=await runtime.api.call('/v2/chat/rooms/'+roomId+'/history',{after,limit:30});if(!current(token))return;setMessages(old=>[...new Map([...old,...page.messages].map(message=>[message.messageId,message])).values()]);setNext(page.next);messagePages.current++;}
+   else{let cursor='0',following:string|null=null;const items:Message[]=[];for(let page=0;page<messagePages.current;page++){const value:MessagePage=await runtime.api.call('/v2/chat/rooms/'+roomId+'/history',{after:cursor,limit:30});if(!current(token))return;items.push(...value.messages);following=value.next;if(!following)break;cursor=following;}setMessages([...new Map(items.map(message=>[message.messageId,message])).values()]);setNext(following);}
+   setLoaded(true);
+  }catch{if(current(token)){setMessages([]);setNext(null);setLoaded(false);setMessageError('这些消息当前不可读取。已选引用仍保留，保存前会重新核对。');}}
+  finally{if(reading.current===token)reading.current=0;if(current(token))setReadingMessages(false);}
+ },[runtime,roomId,current]);
+ useEffect(()=>{
+  const request=messageRead,inFlight=reading,initial=window.setTimeout(()=>void readMessages(),0),read=()=>{if(!document.hidden)void readMessages();};
+  const timer=window.setInterval(read,15000);document.addEventListener('visibilitychange',read);
+  return()=>{request.current++;inFlight.current=0;window.clearTimeout(initial);window.clearInterval(timer);document.removeEventListener('visibilitychange',read);};
+ },[readMessages]);
+ const visible=messages.filter(message=>message.text&&!message.sharedSummaryId&&(!onlyOwn||message.subjectId===subjectId));
+ return <>
+  {messageError&&<p className="message error" role="alert">{messageError}<Button type="button" variant="ghost" disabled={busy||readingMessages} onClick={()=>void readMessages()}>重新读取消息</Button></p>}
+  {readingMessages&&!loaded&&<p><output>正在打开对话内容…</output></p>}
+  <div className="source-message-list">{visible.map(message=>{
+   const ref:CapsuleSourceRef={kind:'selected-message',id:message.messageId,version:message.revision},key=capsuleRefKey(ref),isSelected=selected.some(item=>capsuleRefKey(item.ref)===key),inputId=checkboxPrefix+'-'+key;
+   return <label className={'source-message'+(isSelected?' is-selected':'')} key={key} htmlFor={inputId} aria-labelledby={inputId+'-author '+inputId+'-body'}><input id={inputId} type="checkbox" disabled={busy} checked={isSelected} onChange={event=>onChange(event.target.checked?[...selected,{ref,authorId:message.subjectId,label:'“'+roomTitle+'”中的消息'}]:selected.filter(item=>capsuleRefKey(item.ref)!==key))}/><div><span className="source-message-author"><MemberAvatar subjectId={message.subjectId}/><strong id={inputId+'-author'}>{memberName(message.subjectId,subjectId,people[message.subjectId]??undefined)}</strong>{(message.sentAt??message.createdAt)&&<time>{readableTime(message.sentAt??message.createdAt)}</time>}</span><span className="source-message-body" id={inputId+'-body'}>{message.text}</span><small>消息第 {message.revision} 版</small></div></label>;
+  })}</div>
+  {loaded&&!visible.length&&<p className="source-reading-note">{onlyOwn?'这一页没有你写下的可选原话。':'这一页没有可选原话。'}{next?'可以继续查看其他消息。':''}</p>}
+  {next&&<Button type="button" variant="ghost" disabled={busy||readingMessages} onClick={()=>void readMessages(true)}>更多消息</Button>}
+ </>;
 }

@@ -13,9 +13,17 @@ const valuesSchema = z.object(Object.fromEntries(['caseId','title','problem','at
   .map(key => [key, z.string().max(1200).optional()]))).strict();
 const draftContent = z.object({
   values: valuesSchema, step: z.enum(['details','visibility','viewers','budget','budget-fields','qualification','review']), index: z.number().int().min(0).max(6),
+  attemptedApproaches:z.array(z.string()).optional(),
   visibility: z.enum(['Private','Public']).nullable(), mode: z.enum(['open','fixed','range','quote']).nullable(),
   qualification: z.object({policyId:z.string().min(1).max(80),policyVersion:z.string().min(1).max(32)}).strict().nullable(),
 }).strict();
+// Old local draft text keeps its original semicolon meaning. The optional
+// array preserves current source entries and new edits without serialization
+// characters in the user's input. Frozen operations are never re-parsed here.
+export function assistanceDraftApproaches(content){
+  return Array.isArray(content.attemptedApproaches)?[...content.attemptedApproaches]
+    :String(content.values.attempts??'').split(/[;；]/).map(value=>value.trim()).filter(Boolean);
+}
 const contentSchema = value => value?.eventKind ? assistanceEventDraftSchema : draftContent;
 const parsePayload = text => {
   if (typeof text !== 'string' || Buffer.byteLength(text) > 16000) throw new Error('Invalid local Assistance payload.');
@@ -65,13 +73,31 @@ export function createLocalAssistanceStore({dataDirectory, endpoint, assertOpen 
   async function createDraft() { return withLocalWrite(dataDirectory, async directory => {
     const {paths, state, identity} = await load(directory), id = randomUUID(), at = new Date().toISOString();
     const row = {version:1, id, endpoint, subjectId:identity.id, revision:1, status:'editing', createdAt:at, updatedAt:at,
-      content:{values:{hours:'24'},step:'details',index:0,visibility:null,mode:null,qualification:null}};
+      content:{values:{hours:'24'},step:'details',index:0,visibility:null,mode:'open',qualification:null}};
     state.assistanceDrafts[key(identity.id,id)] = row; await write(paths,state); return row;
   }); }
   async function getDraft(id) { z.uuid().parse(id); return withLocalRead(dataDirectory, async directory => {
     const {state,identity} = await load(directory), row = state.assistanceDrafts[key(identity.id,id)];
     if (!row) throw new Error('Local Assistance draft unavailable.'); return draft(row,identity.id);
   }); }
+  async function previewRequestDraft({subjectId,id,expectedRevision,now}) {
+    z.uuid().parse(id);
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || !Number.isSafeInteger(now)) throw new Error('Invalid Assistance draft preview.');
+    return withLocalRead(dataDirectory, async directory => {
+      const {state,identity} = await load(directory,subjectId), row = draft(state.assistanceDrafts[key(identity.id,id)],identity.id);
+      if (row.status !== 'editing' || row.revision !== expectedRevision || row.content.eventKind) throw new Error('Assistance draft changed; reopen it.');
+      const {values,visibility,qualification} = row.content, mode = row.content.mode ?? 'open', hours = Number(values.hours);
+      if (!Number.isFinite(hours) || hours <= 0 || hours > 720) throw new Error('Invalid Assistance enrollment hours.');
+      const request = assistanceRequestSchema.parse({id:row.id,caseId:values.caseId,title:values.title,problem:values.problem,
+        attemptedApproaches:assistanceDraftApproaches(row.content),scope:values.scope,visibility,
+        collaboration:mode==='open'?'open-assistance':'basic-bounty',
+        ...(values.capabilityId?{capabilityId:values.capabilityId}:{}),
+        ...(mode==='open'?{}:{budget:{mode,unit:values.unit,...(mode==='fixed'?{amount:values.amount}:mode==='range'?{minimum:values.minimum,maximum:values.maximum}:{})}}),
+        ...(qualification?{qualification}:{}),enrollmentExpiresAt:Math.floor(now+hours*3600)});
+      const viewers = visibility==='Private'?(values.viewers??'').split(/[,，]/).map(value=>value.trim()).filter(Boolean):[];
+      return {draftId:row.id,draftRevision:row.revision,request,viewers};
+    });
+  }
   async function createEventDraft({record,eventKind,target={}}) {
     const content=assistanceEventDraftSchema.parse({eventKind,source:assistanceDraftSource(record),target,values:{},
       step:eventDraftFields[eventKind]?.length?'fields':'review',index:0,mode:null});
@@ -167,5 +193,5 @@ export function createLocalAssistanceStore({dataDirectory, endpoint, assertOpen 
     if (row.draftId) delete state.assistanceDrafts[key(identity.id,row.draftId)];
     await write(paths,state); return {eventId,remoteDeleted:false};
   }); }
-  return Object.freeze({createDraft,createEventDraft,rebaseDraft,getDraft,saveDraft,listDrafts,forgetDraft,save,get,list,mark,forget});
+  return Object.freeze({createDraft,createEventDraft,rebaseDraft,getDraft,previewRequestDraft,saveDraft,listDrafts,forgetDraft,save,get,list,mark,forget});
 }

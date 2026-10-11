@@ -33,12 +33,21 @@ export class HubServiceV2{
     requireValue(head.state==='active'&&!maintenance.delisted&&!maintenance.securityIssue&&current.row.id===c.payload.declarationId
       &&current.row.payload_hash===c.payload.declarationHash,'hub_current_scope_unavailable',409);
     return{head,...c};}
+  async reportsWithin(db,actor,hubId){
+    if(!this.builders.v2)return[];
+    let view;try{view=await this.builders.v2.readWithin(db,actor,{builderId:hubId});}catch(e){if(e instanceof ServiceError)return[];throw e;}
+    const rows=(await db.query("SELECT * FROM builder_events WHERE builder_id=$1 AND kind='scope-report'",[hubId])).rows,byId=new Map(rows.map(row=>[row.id,row]));
+    const reports=[];for(const report of view.reports){const row=byId.get(report.id);if(!row)continue;
+      const publiclyReadable=await this.builders.v2.permitted(db,null,row);
+      reports.push({...report,payloadHash:row.payload_hash,publiclyReadable,canReferenceInCharter:view.disclosure?.visibility!=='Public'||publiclyReadable});}
+    return reports;
+  }
   async readWithin(db,actor,input){const q=parsed(hubReadSchema,input),head=await this.head(db,q.hubId),c=await this.charterWithin(db,actor,head,q.version);
-    let currentState=head.state,reports=[];
+    let currentState=head.state,reports=[],currentDeclarationReadable=false;
     try{const b=await this.builders.load(db,head.id),d=await this.builders.current(db,actor,b),m=this.builders.maintenance(b.rows);
-      if(d.row.id!==c.payload.declarationId||d.row.payload_hash!==c.payload.declarationHash)currentState='declaration-changed';
+      currentDeclarationReadable=true;if(d.row.id!==c.payload.declarationId||d.row.payload_hash!==c.payload.declarationHash)currentState='declaration-changed';
       if(m.delisted||m.securityIssue)currentState='builder-unavailable';
-      if(this.builders.v2)reports=(await this.builders.v2.readWithin(db,actor,{builderId:head.id})).reports;
+      reports=await this.reportsWithin(db,actor,head.id);
     }catch(e){if(!(e instanceof ServiceError))throw e;currentState='declaration-unavailable';}
     const claims={};for(const [key,value]of Object.entries(c.payload.charter))if(value&&typeof value==='object'&&'status'in value){
       const report=value.reportRef&&reports.find(r=>r.id===value.reportRef.eventId);
@@ -47,7 +56,16 @@ export class HubServiceV2{
       claims[key]={...value,currentState:value.status!=='reported-tested'?value.status:report?.validity==='current'&&reportRow?.payload_hash===value.reportRef.payloadHash&&check?'reported-'+check.status:'report-unavailable',
         ...(report?{reportAuthority:report.authority,independentExecutionVerified:false}:{}),capabilityVerified:false};
     }
-    return{hubId:head.id,ownerId:head.owner_id,version:c.row.charter_version,latestVersion:head.version,
+    const owner=actor?.subjectId===head.owner_id,currentCharter=c.row.charter_version===head.version,availableActions=[];
+    if(owner){if(currentDeclarationReadable&&head.version<1000)availableActions.push('charter');
+      if(head.state==='active')availableActions.push('suspend');else if(currentCharter&&currentDeclarationReadable)availableActions.push('resume');
+      if(currentCharter&&currentState==='active')availableActions.push('invite','peer-approve');}
+    else if(actor&&currentCharter)availableActions.push('intake-open');
+    if(actor&&currentCharter&&currentState==='active'){
+      let permitted=owner;if(!permitted){const m=await one(db,"SELECT id FROM hub_memberships_v2 WHERE hub_id=$1 AND subject_id=$2 AND state='active'",[head.id,actor.subjectId]);
+        if(m){const member=await this.membershipWithin(db,actor,head,m.id);permitted=member.authorization==='active'&&member.scopes.includes('approved-proof-query');}}
+      if(permitted)availableActions.push('peering-query','peering-share');}
+    return{hubId:head.id,ownerId:head.owner_id,version:c.row.charter_version,latestVersion:head.version,operationalState:head.state,availableActions,reports,
       state:c.row.charter_version===head.version?currentState:'historical-version',charter:c.payload.charter,claims,
       charterEventId:c.row.id,charterHash:c.row.payload_hash,declarationId:c.payload.declarationId,declarationHash:c.payload.declarationHash,
       checkedAt:this.now(),...flags};
@@ -56,7 +74,9 @@ export class HubServiceV2{
   manage(actor,input){const q=parsed(hubReadSchema,input);return this.access.runAuthorized(actor,'builders',async db=>{
     const declaration=await this.builders.managementWithin(db,actor,q.hubId),head=await one(db,'SELECT * FROM hub_heads_v2 WHERE id=$1',[q.hubId]);
     let current=null;if(head)try{current=await this.readWithin(db,actor,{hubId:q.hubId});}catch(e){if(!(e instanceof ServiceError))throw e;}
-    return{hubId:q.hubId,ownerId:actor.subjectId,latestVersion:head?.version??0,state:head?.state??'charter-not-created',current,declaration,...flags};});}
+    const availableActions=current?.availableActions??[...(declaration.type==='hub'&&declaration.declarationState==='readable'&&(!head||head.version<1000)?['charter']:[]),...(head?.state==='active'?['suspend']:[])];
+    return{hubId:q.hubId,ownerId:actor.subjectId,latestVersion:head?.version??0,state:head?.state??'charter-not-created',current,declaration,availableActions,
+      reports:current?.reports??await this.reportsWithin(db,actor,q.hubId),...flags};});}
   async query(actor,input={}){const q=parsed(hubQuerySchema,input);requireValue(q.view==='public'||actor,'identity_required',401);
     return this.read(actor,async db=>{const rows=(await db.query(`SELECT h.id FROM hub_heads_v2 h WHERE ($1::uuid IS NULL OR h.id>$1)
       AND ($2='public' OR $2='owned' AND h.owner_id=$3 OR $2='joined' AND EXISTS(SELECT 1 FROM hub_memberships_v2 m WHERE m.hub_id=h.id AND m.subject_id=$3))
@@ -69,11 +89,14 @@ export class HubServiceV2{
     const invite=await one(db,'SELECT * FROM hub_events_v2 WHERE id=$1',[m.invite_id]),decision=m.decision_id&&await one(db,'SELECT * FROM hub_events_v2 WHERE id=$1',[m.decision_id]);
     const inviteValid=await this.readable(db,actor,invite),decisionValid=decision&&await this.readable(db,actor,decision);
     const base={membershipId:m.id,hubId:m.hub_id,memberId:m.subject_id,version:m.version,charterVersion:m.charter_version,state:m.state,
-      expiresAt:Number(m.expires_at),scopes:inviteValid?m.scopes:[],...flags};
+      expiresAt:Number(m.expires_at),scopes:inviteValid?m.scopes:[],availableActions:[],...flags};
     if(['declined','exited','removed'].includes(m.state))return{...base,authorization:'inactive'};
     let charterCurrent=false;try{await this.currentWithin(db,actor,head.id);charterCurrent=head.version===m.charter_version;}catch(e){if(!(e instanceof ServiceError))throw e;}
-    return{...base,authorization:!inviteValid||m.state==='active'&&!decisionValid?'permission-unavailable':m.expires_at<=this.now()?'expired'
-      :!charterCurrent?'charter-reconfirmation-required':m.state==='active'?'active':'awaiting-member-confirmation'};
+    const authorization=!inviteValid||m.state==='active'&&!decisionValid?'permission-unavailable':m.expires_at<=this.now()?'expired'
+      :!charterCurrent?'charter-reconfirmation-required':m.state==='active'?'active':'awaiting-member-confirmation';
+    const availableActions=[];if(actor.subjectId===m.subject_id){if(m.state==='invited'){if(authorization==='awaiting-member-confirmation')availableActions.push('accept');availableActions.push('decline');}
+      else if(m.state==='active')availableActions.push('exit');}else if(actor.subjectId===head.owner_id&&['invited','active'].includes(m.state))availableActions.push('remove');
+    return{...base,authorization,availableActions};
   }
   async members(actor,input){const q=parsed(hubMembershipQuerySchema,input);return this.access.runAuthorized(actor,'builders',async db=>{
     const h=await this.head(db,q.hubId),rows=(await db.query(`SELECT id FROM hub_memberships_v2 WHERE hub_id=$1 AND ($2::uuid IS NULL OR id>$2)
@@ -109,7 +132,7 @@ export class HubServiceV2{
         requireValue(owner,'hub_operator_required',403);requireValue(head.version===e.expectedVersion&&head.version<1000,'hub_version_conflict',409);
         const b=await this.builders.load(db,e.hubId),d=await this.builders.current(db,actor,b);
         requireValue(d.row.id===e.declarationId&&d.row.payload_hash===e.declarationHash,'hub_declaration_changed',409);
-        requireValue(grant.visibility===d.grant.visibility&&JSON.stringify([...grant.viewers].sort())===JSON.stringify([...d.grant.viewers].sort()),'hub_visibility_mismatch',403);
+        requireValue(grant.visibility===d.grant.visibility&&JSON.stringify([...grant.viewers].sort((left,right)=>left<right?-1:left>right?1:0))===JSON.stringify([...d.grant.viewers].sort((left,right)=>left<right?-1:left>right?1:0)),'hub_visibility_mismatch',403);
         for(const clause of Object.values(e.charter))if(clause&&typeof clause==='object'&&'status'in clause){requireValue(clause.asOf<=this.now(),'hub_future_claim',400);
           if(clause.reportRef){const r=await one(db,"SELECT * FROM builder_events WHERE id=$1 AND builder_id=$2 AND kind='scope-report'",[clause.reportRef.eventId,e.hubId]);
             requireValue(r?.payload_hash===clause.reportRef.payloadHash&&await this.builders.v2?.permitted(db,actor,r),'hub_report_unavailable',409);
@@ -174,7 +197,8 @@ export class HubServiceV2{
     for(const t of rows.slice(0,q.limit)){const events=(await db.query('SELECT * FROM hub_events_v2 WHERE hub_id=$1 AND object_id=$2 ORDER BY object_version',[h.id,t.id])).rows,texts=[];
       for(const r of events){const readable=t.expires_at>this.now()&&await this.readable(db,actor,r),e=readable?event(r):null;
         texts.push({id:r.id,authorId:r.subject_id,kind:r.kind,version:r.object_version,contentAvailable:!!e,...(e?{title:e.title,text:e.text}:{}),receivedAt:Number(r.received_at)});}
-      items.push({threadId:t.id,hubId:h.id,version:t.version,state:t.state,expiresAt:Number(t.expires_at),messages:texts});}
+      const availableActions=t.state==='open'&&t.expires_at>this.now()?['intake-reply','intake-close']:[];
+      items.push({threadId:t.id,hubId:h.id,version:t.version,state:t.state,expiresAt:Number(t.expires_at),availableActions,messages:texts});}
     return{items,nextCursor:rows.length>q.limit?rows[q.limit-1].id:null,externalServiceResponseGuarantee:false};});}
   async purgeExpired(limit=100){const rows=(await this.access.db.query('SELECT id FROM hub_intake_v2 WHERE expires_at<=$1 ORDER BY id LIMIT $2',[this.now(),limit])).rows;
     for(const r of rows)await this.access.db.query("UPDATE hub_events_v2 SET payload_text='' WHERE object_id=$1 AND kind IN ('intake-open','intake-reply','intake-close')",[r.id]);

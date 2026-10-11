@@ -9,7 +9,7 @@ import { createNativeA2aHostV2 } from '../src/host-flow-v2.mjs';
 import { hash } from '../src/journal.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 
-test('actual Participation/Intervention origin imports own Result; partial projection is not absence; revoked source stops future work', async t => {
+test('actual Participation/Intervention uses exact Result receipts; revoked source stops future work without erasing acceptance', async t => {
   const scopes = ['binding', 'consent', 'case-teaser', 'assistance'];
   const f = await serviceFixture(scopes), p = await serviceFixture(scopes, f.db, { migrateDatabase: false });
   t.after(() => f.db.close()); const peer = await sdkPeer(); t.after(() => peer.close());
@@ -44,24 +44,27 @@ test('actual Participation/Intervention origin imports own Result; partial proje
       if (path === `/v2/tasks/${taskId}`) return f.assistance.getTask(p.actor, taskId);
       if (path === `/v2/cases/${caseId}/read`) return f.cases.getV2(p.actor, caseId, input);
       if (path === '/v2/cases/events') return f.cases.submitV2(p.actor, input);
+      if (path === '/v2/cases/events/receipt') return f.cases.receipt(p.actor, input);
       throw new Error('unexpected fixture route');
     } }, status: async () => ({ identity: p.actor.subjectId }), authorize: input => p.authorize(JSON.parse(input.payloadJson), input.action,
       { id: input.requestId, objectId: input.objectId, visibility: input.visibility, viewers: input.viewers }) };
   const options = { runtime, directory, peers: [{ id: 'fixture', endpoint: peer.endpoint, tenant: 'fixture', agentCard: peer.card,
     cardHash: hash(JSON.stringify(peer.card)), trustExpiresAt: Date.now() + 60000, peerPrincipal: 'external-fixture-user' }],
-    readPeerAuthorization: async () => ({ subjectId: p.actor.subjectId, peerPrincipal: 'external-fixture-user', credential: 'synthetic-external-token' }), post: peer.post };
+    readPeerAuthorization: async () => ({ subjectId: p.actor.subjectId, peerPrincipal: 'external-fixture-user', credential: 'synthetic-external-token' }), post: (...args) => peer.post(...args) };
   const host = createNativeA2aHostV2(options);
   const selected = { taskId, caseId, attemptId, attemptVersion: 1, interventionRef: { id: interventionId, version: 1 }, text: 'complete' };
   const sent = await host.execute(await host.prepare('fixture', 'send', selected), { confirmed: true });
   assert.equal(sent.factContext.participationId, participationId);
   const prepared = await host.prepare('fixture', 'result', { associationId: sent.id, summary: 'Selected peer tool completed; diagnosis remains a claim', reportedOutcome: 'partial' });
   assert.deepEqual(prepared.draft.event.origin, { kind: 'intervention', id: interventionId, version: 1 });
-  assert.equal((await host.read('fixture', 'reconcile-result', sent.id)).state, 'unavailable', 'private owner events mean projection incomplete');
+  assert.equal((await host.read('fixture', 'reconcile-result', sent.id)).state, 'absent', 'exact own operation receipt is independent of partial Case projection');
   const receipt = await host.execute(prepared, { confirmed: true }); assert.equal(receipt.verification, 'not-provided');
   const view = await f.cases.getV2(p.actor, caseId, { taskId });
   assert.equal(view.results[0].participationId, participationId); assert.equal(view.resolution.status, 'unrecorded');
   await f.consents.revoke(p.actor, ig.consentId);
-  assert.equal((await host.read('fixture', 'reconcile-result', sent.id)).state, 'unavailable');
+  const accepted = await host.read('fixture', 'reconcile-result', sent.id);
+  assert.equal(accepted.state, 'acknowledged'); assert.equal(accepted.currentAccessGranted, false);
+  assert.equal(Object.hasOwn(accepted, 'externalSource'), false);
   const before = peer.requests.length; await assert.rejects(host.read('fixture', 'poll', sent.id), /Intervention/);
   assert.equal(peer.requests.length, before);
 });

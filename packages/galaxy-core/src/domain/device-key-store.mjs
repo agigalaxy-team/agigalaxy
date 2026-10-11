@@ -15,8 +15,29 @@ export async function openDeviceKeyStore({indexedDB=globalThis.indexedDB,name='g
     tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(tx.error??new Error('Local material update failed.'));tx.onerror=()=>reject(tx.error);
   });
   const get=key=>run('readonly',store=>store.get(key)),put=(key,value)=>run('readwrite',store=>store.put(value,key));
+  const update=(key,updater)=>{
+    if(typeof updater!=='function')throw new Error('local_update_callback_required');
+    // IndexedDB serializes readwrite transactions across connections and tabs.
+    // Keep the comparison and write in this transaction; awaiting a callback
+    // could close it and turn a conditional write into an unsafe later put.
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('materials','readwrite'),materials=tx.objectStore('materials');let result,failure;
+      const original=materials.get(key);
+      original.onsuccess=()=>{try{
+        const next=updater(original.result);
+        if(next&&typeof next.then==='function'){
+          if(next instanceof Promise)void next.catch(()=>{});
+          throw new Error('local_update_async_callback');
+        }
+        result=structuredClone(next);const saved=materials.put(result,key);saved.onerror=()=>{failure=saved.error;};
+      }catch(error){failure=error;tx.abort();}};
+      original.onerror=()=>{failure=original.error;};
+      tx.oncomplete=()=>resolve(result);
+      tx.onabort=tx.onerror=()=>reject(failure??tx.error??new Error('Local atomic update failed.'));
+    });
+  };
   return Object.freeze({
-    get,put,close:()=>db.close(),
+    get,put,update,close:()=>db.close(),
     async copyConfirmedDraft({sourceKey,targetKey,expectedSource,expectedTarget,confirmed=false}){
       if(!confirmed||typeof sourceKey!=='string'||typeof targetKey!=='string'||sourceKey===targetKey||!sourceKey.endsWith(':task-draft')||!targetKey.endsWith(':task-draft'))throw new Error('Confirm the exact local task draft copy.');
       // Read both versions and write the chosen copy in one IDB transaction.

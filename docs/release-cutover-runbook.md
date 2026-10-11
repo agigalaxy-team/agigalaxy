@@ -1,46 +1,7 @@
-<!-- GALAXY-CURRENT-ENTRY v1 -->
-> **现有实现说明，运行与决策状态以当前入口为准。** 本页于2026-09-12迁移。当前完整规范入口为[银河产品方案](../../../../02-architecture/redesign-v1/README.md)，其中候选和已确认方向分别标记。[迁移前原样快照](../../../../01-intake/traceability/snapshots/cc/cc1e9dd5b44b77c1de3d0e4ef069abab88206ae0fe3855882b29e6426ae12c69.md)保留旧文字与定位。
-> 本轮业务开发、部署与备份暂停。历史验证不代表当前完整动态业务上线；保留政策已确认但尚未实施。建议与用户决定以新方案逐项来源为准。
-<!-- END GALAXY-CURRENT-ENTRY -->
+# Official发布切换与恢复流程：资料入口
 
-# Official发布切换与恢复流程
+此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../02-architecture/archive-ui-20261009/implementation/repo--release-cutover-runbook.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
 
-C01-08，状态：本地代理演练已验证，目标staging与试点未发布。复用Caddy validate/reload和既有运行入口，不引入自制发布控制器。
+本主题现行要求：[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md)。相关界面与操作遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)；实现细节与产品目标按各自范围核对。
 
-2026-09-11目标更新：Caddy已升级2.11.4并完成宿主重启，仍为admin off；公开Official尚未切换，下文热重载命令不适用于当前目标。后续使用已准备galaxy-pilot-runtime.conf和准确服务重启/恢复步骤，见[维护结果](../../../GALAXY_HOST_MAINTENANCE_COMPLETED_2026-09-11.md)。
-
-## 放行前置
-
-- C01-01实时确认目标主机、域名、既有官网、监听、TLS和防火墙。C01-02/04角色、目录、数据库、签名根及配置隔离实际验证完成。
-- 指定发行文件清单/摘要、两套锁文件、运行时、源码版本或哈希。旧检查点不是最新源码；从独立目录冻结安装与验证后才可选定发行。
-- 将本次适用的原任务与验收结果记录在发布批次；未完成业务不得列入Manifest能力。运营者、联络、数据规则及发布责任需真实明确。
-- 数据库迁移先在隔离环境演练；兼容前一运行版本才可计划直接代码回退。备份必须实际恢复验证，并定义RPO/RTO、权限及保留，不能只确认备份文件存在。
-
-## staging验证
-
-1. 使用integration环境独立数据库和信任根，以不可变发行目录启动API/Worker，迁移单独执行；进程配置不共享API签名字段。
-2. 通过loopback检查health/readiness，再验证签名Manifest的预期endpoint、版本、pin和能力；旧版本或错误根即拒绝。
-3. 完成真实Case/Consent/撤销与本批适用验收。合成测试只能证明技术流程，不能冒充真实用户闭环。
-4. 合并Official路由片段到候选Caddy配置，检查只影响精确目标主机，保留官网及其他虚拟主机。caddy validate --config <candidate.json>成功后，才能进入切换。实际命令的路径/管理地址必须由已核验配置填写。
-
-## 试点切换
-
-1. 保存当前运行发行、有效Caddy配置及其摘要，候选使用新目录和明确端口；不要覆盖正在运行的文件。生产配置通过授权渠道注入，不包含在源码包里。
-2. 按兼容迁移决定执行迁移。Worker发布时先停止旧Worker、等待结束或记录超时结果，再启新Worker；若短暂并存，必须依现有租约/幂等验收，不能假定恰好一次执行。
-3. 候选API在内部端口通过readiness及签名检查后，用caddy reload --config <candidate.json> --address <verified-private-admin>切换目标路由。管理接口只能是受保护本地/私有地址，不向公网新增管理路由。
-4. 校验真实TLS、精确Host、公开路径、拒绝路径、客户端确认和撤销；记录发行标识、时间及结果。观察期和监测指标由目标运维决定，不虚构已经达成的SLO。
-5. 确认切换后再排空旧API连接并停止旧版本；保留恢复所需发行。Caddy reload成功只证明配置接受，不证明应用及业务正确。
-
-## 失败与回退
-
-配置校验失败不重载。重载失败核验当前有效路由而不是推测已经切换；候选业务检查失败且旧版本兼容当前数据库时，显式重载先前有效配置、确认旧端点结果，再停止候选。不要自动降级数据库或用旧备份覆盖新事实。若schema不兼容，停止扩大影响，按已验证的前向修复或隔离恢复方案处理，并重放撤销/删除状态；恢复旧库不等于可恢复公开授权。
-
-发布批次记录必须包含：发行摘要、实际目标、执行者/责任人、原任务验收列表、配置差异、迁移与备份恢复证据、切换前后探测、未运行项、回退结果。不得记录DATABASE_URL、令牌或私钥。
-
-## 本次自动证据
-
-真实本地Caddy测试三个场景全部通过：原代理配额、精确主机路由隔离，以及validate/拒绝无效reload/有效候选切换/显式回退。测试使用两个合成HTTP后端与临时loopback管理接口；TLS仅在该本地fixture关闭。它没有执行真实Official业务升级、数据库切换、云端发布或目标Linux服务管理。
-
-AI-agent复验：设置GALAXY_TEST_CADDY_BIN为已核验可执行文件，运行node --test packages/galaxy-official/test/proxy/caddy.test.mjs和node scripts/check.mjs lint。测试只创建自己的临时进程/配置，并在finally停止和删除临时目录；不能对系统现有Caddy执行测试重载。
-
-2026-09-10 C18-03补充：新增冻结Official源码和配置版本关联、准确数据库迁移预检，并扩展为真实Official API的切换/回滚演练。新入口和范围见[服务发行与应用回滚](service-release-rollback-v1.md)。上述三个合成代理场景保留为其原范围证据。
+接口和数据是否仍适用须结合实际代码与版本核对；原始事实、权限及历史检查不被这份导航改写。当前只改文档，业务开发与发布停止。

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { ServiceError } from '../src/shared/service-error.mjs';
-import { informationDigest } from '../src/information-v2.mjs';
+
 import { informationToolDefinitions } from '../src/personal-mcp-information-v2.mjs';
 import { cleanupInformationWatchesWithin } from '../src/operations/information-watch-retention-v2.mjs';
 import { createInformationClientV2 } from '../../galaxy-web/src/information-client-v2.mjs';
@@ -481,6 +481,10 @@ async function browserRecovery(f, origin, initial, clock, trustedKeys) {
       api,
       getLocal: async (k) => structuredClone(memory.get(k) ?? null),
       putLocal: async (k, v) => memory.set(k, structuredClone(v)),
+      updateLocal: async (k, change) => {
+        const value = change(structuredClone(memory.get(k) ?? null));
+        memory.set(k, structuredClone(value)); return structuredClone(value);
+      },
     };
   try {
     await connect();

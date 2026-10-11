@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { helpSessionCreateSchema, helpQuerySchema, helpOfferDraftSchema } from '../../galaxy-official/src/shared/help-schema-v2.mjs';
+import { helpSessionCreateSchema, helpQuerySchema, helpOfferDraftSchema,helpActionPrepareSchema,helpActionExecuteSchema } from '../../galaxy-official/src/shared/help-schema-v2.mjs';
 
 const recoveryByCode = Object.freeze({
   help_session_changed: 'reread-session-and-use-current-revision',
@@ -19,6 +19,21 @@ const recoveryByCode = Object.freeze({
   help_receipt_unavailable: 'restore-task-client-and-reconcile-original-operation',
   help_task_client_unavailable: 'restore-task-client-before-publication',
   help_local_storage_full: 'retain-pending-receipts-and-review-local-storage',
+  help_action_preview_changed: 'reread-exact-action-preview-before-authorization',
+  help_authorization_preview_changed: 'reread-original-preview-and-use-its-current-authorization-request-id',
+  help_authorization_refresh_required: 'prepare-same-business-operation-and-unchanged-bytes-for-a-fresh-exact-authorization',
+  help_authorization_renewal_requires_absence: 'reconcile-original-receipt-before-renewing-authorization',
+  help_context_expired: 'prepare-new-context-scope-after-current-source-and-participation-review',
+  help_exact_authorization_unavailable: 'use-a-connected-current-device-with-a-user-choice-surface',
+  help_action_unavailable: 'locate-original-session-and-operation-do-not-create-another-id',
+  help_action_scope_changed: 'refresh-task-recipient-and-material-scope-before-new-preview',
+  help_task_version_changed: 'refresh-current-task-before-preparing-new-bytes',
+  help_participation_version_changed: 'refresh-current-participation-before-preparing-new-bytes',
+  help_context_scope_changed: 'refresh-current-participation-and-material-permission',
+  help_context_material_changed: 'reread-original-grant-material-hash',
+  help_selected_participant_mismatch: 'use-the-participant-in-the-actual-selected-source',
+  help_participation_unavailable: 'refresh-original-task-and-current-participation',
+  help_action_target_mismatch: 'use-the-original-task-and-participation-reference',
 });
 
 function failure(error) {
@@ -32,10 +47,10 @@ function failure(error) {
 
 // The host injects a local HelpFlow with authorized clients. This module never
 // creates a login or stores help choices on a server. No background model loop.
-export function registerHelpTools(server, { flow }) {
+export function registerHelpTools(server, { flow,review }) {
   if (!flow?.start) throw new Error('Local HelpFlow required.');
   const id = { sessionId: z.uuid() }, revision = { expectedRevision: z.number().int().positive() };
-  const networkTools = new Set(['galaxy_help_query', 'galaxy_help_publish', 'galaxy_help_reconcile', 'galaxy_help_refresh', 'galaxy_help_return']);
+  const networkTools = new Set(['galaxy_help_query', 'galaxy_help_publish', 'galaxy_help_reconcile', 'galaxy_help_refresh', 'galaxy_help_return','galaxy_help_review','galaxy_help_prepare_action','galaxy_help_reconcile_action']);
   const add = (name, inputSchema, description, run, write = false) => server.registerTool(name,
     { inputSchema, description, annotations: { readOnlyHint: !write, destructiveHint: name === 'galaxy_help_forget', openWorldHint: networkTools.has(name) } },
     async input => {
@@ -65,4 +80,29 @@ export function registerHelpTools(server, { flow }) {
     'Return stable IDs, actual authorized Task data and existing commitments to the original conversation. Does not mark success or cancel collaboration.',
     ({ sessionId, ...input }) => flow.returnToTask(sessionId, input), true);
   add('galaxy_help_forget', z.strictObject(id), 'Delete the local help selection record only. Existing remote operations remain and are not canceled.', input => flow.forget(input.sessionId), true);
+  if(typeof flow.review==='function')add('galaxy_help_review',z.strictObject(id),
+    'Reread selected help sources and current Task responses separately. Withholds unavailable source bodies; recommendations are not applications or commitments.',input=>flow.review(input.sessionId));
+  if(typeof flow.prepareAction==='function')add('galaxy_help_prepare_action',z.strictObject({...id,...helpActionPrepareSchema.shape}),
+    'Prepare one exact original Task/Participation/Context action. Returns actual bytes, recipients, scope, materials, hash and authorizationRequestId for review, including without MCP Apps. Renew only an expired prepared or confirmed absent operation using the same business ID and bytes; never renew unknown/ACK. Does not authorize or submit.',
+    ({sessionId,...input})=>flow.prepareAction(sessionId,input),true);
+  if(typeof flow.actionPreview==='function')add('galaxy_help_action_preview',z.strictObject({...id,operationId:z.uuid()}),
+    'Read the stored exact action preview before user authorization. An acknowledged action keeps receipt references and no longer retains draft bodies.',
+    ({sessionId,operationId})=>flow.actionPreview(sessionId,operationId));
+  if(typeof flow.executeAction==='function')server.registerTool('galaxy_help_execute_action',{
+    inputSchema:z.strictObject({...id,...helpActionExecuteSchema.shape}),annotations:{readOnlyHint:false,openWorldHint:true},
+    description:'Execute the unchanged prepared action after actual user review of its exact content, recipients, scope and current authorizationRequestId. Use the nonce in the original preview; expired scope requires same-business-ID prepare and a fresh exact review. ACK returns its original receipt; unknown requires original reconciliation, never blind resubmission.',
+  },async({sessionId,...input},ctx)=>{
+    try{
+      const preview=await flow.actionPreview(sessionId,input.operationId);
+      if(preview.payloadHash!==input.payloadHash)throw Error('help_action_preview_changed');
+      const operation=()=>flow.executeAction(sessionId,input);
+      if(!['prepared','absent'].includes(preview.state))return{content:[{type:'text',text:JSON.stringify(await operation())}]};
+      if(preview.authorizationRequestId&&(input.authorizationRequestId??input.operationId)!==preview.authorizationRequestId)throw Error('help_authorization_preview_changed');
+      if(typeof review!=='function')throw Error('help_exact_authorization_unavailable');
+      return await review('galaxy_help_execute_action',{sessionId,...input,preview},ctx,operation);
+    }catch(error){const result=failure(error);return{isError:true,structuredContent:result,content:[{type:'text',text:JSON.stringify(result)}]};}
+  });
+  if(typeof flow.reconcileAction==='function')add('galaxy_help_reconcile_action',z.strictObject({...id,operationId:z.uuid()}),
+    'Read the receipt for this original prepared action and hash. Does not create a new Consent, retry the business write or claim current permission.',
+    ({sessionId,...input})=>flow.reconcileAction(sessionId,input),true);
 }

@@ -8,28 +8,40 @@ import { request as httpRequest } from 'node:http';
 
 test('real MCP HTTP client reads only public resources, templates, tools and explicit prompts', async () => {
   const bindings = { endpoint: 'http://127.0.0.1' };
-  const api = createApi({ bindings, docsMcp: handleDocsMcp });
+  // The catalog check deliberately reads every historical document over both MCP surfaces.
+  const api = createApi({ bindings, docsMcp: handleDocsMcp, rateLimit: 200 });
   await new Promise(resolve => api.listen(0, '127.0.0.1', resolve));
   bindings.endpoint = `http://127.0.0.1:${api.address().port}`;
   const client = new Client({ name: 'galaxy-docs-test', version: '0.1.0' });
   try {
     await client.connect(new StreamableHTTPClientTransport(new URL(bindings.endpoint + '/mcp/docs')));
-    assert.equal((await client.listResources()).resources.length, 8);
+    assert.equal((await client.listResources()).resources.length, (Object.keys(bundle.versions).length + 1) * 4);
     assert.equal((await client.listResourceTemplates()).resourceTemplates.length, 1);
     const read = await client.readResource({ uri: 'galaxy-docs://v0.1/overview' });
     assert.equal(read.contents[0].text, bundle.versions['v0.1'].overview);
-    const current = await client.readResource({ uri: 'galaxy-docs://v0.2/overview' });
+    const current = await client.readResource({ uri: `galaxy-docs://${bundle.version}/overview` });
     assert.equal(current.contents[0].text, bundle.documents.overview);
+    const alias = await client.readResource({ uri: 'galaxy-docs://current/overview' });
+    assert.equal(alias.contents[0].text, bundle.documents.overview);
     assert.notEqual(current.contents[0].text, read.contents[0].text);
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(tool => tool.name).sort(), ['docs_get', 'docs_search']);
     const found = await client.callTool({ name: 'docs_search', arguments: { version: 'v0.1', query: 'Galaxy' } });
     assert.ok(JSON.parse(found.content[0].text).results.length > 0);
-    const latest = await client.callTool({ name: 'docs_search', arguments: { version: 'v0.2', query: 'OAuth' } });
+    for (const [v, documents] of Object.entries(bundle.versions)) for (const [name, text] of Object.entries(documents)) {
+      const resource = await client.readResource({ uri: `galaxy-docs://${v}/${name}` });
+      assert.equal(resource.contents[0].text, text);
+      const tool = await client.callTool({ name: 'docs_get', arguments: { version: v, topic: name } });
+      assert.equal(tool.content[0].text, text);
+    }
+    const query = bundle.documents.overview.split(/\s+/).find(word => word && word !== '#').slice(0, 128);
+    const latest = await client.callTool({ name: 'docs_search', arguments: { query } });
     const matches = JSON.parse(latest.content[0].text).results;
     assert.ok(matches.length > 0);
-    assert.ok(matches.every(item => item.uri.startsWith('galaxy-docs://v0.2/')));
-    assert.equal((await client.callTool({ name: 'docs_get', arguments: { version: 'v0.2', topic: 'compatibility' } })).content[0].text, bundle.documents.compatibility);
+    assert.equal(JSON.parse(latest.content[0].text).version, bundle.version);
+    assert.ok(matches.every(item => item.uri.startsWith(`galaxy-docs://${bundle.version}/`)));
+    assert.equal((await client.callTool({ name: 'docs_get', arguments: { topic: 'compatibility' } })).content[0].text, bundle.documents.compatibility);
+    assert.equal((await client.callTool({ name: 'docs_get', arguments: { topic: 'privacy', internalPath: '../private' } })).isError, true);
     assert.equal((await client.callTool({ name: 'docs_get', arguments: { version: 'v9', topic: 'overview' } })).isError, true);
     assert.equal((await client.callTool({ name: 'docs_get', arguments: { version: 'v0.1', topic: '../private-key' } })).isError, true);
     await assert.rejects(client.readResource({ uri: 'galaxy-docs://v9/private' }));

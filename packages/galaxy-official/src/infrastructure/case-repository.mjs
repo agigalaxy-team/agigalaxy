@@ -11,6 +11,7 @@ export function caseRepository(db) {
     lockAnyForRead: id => one('SELECT * FROM cases WHERE id=$1 FOR SHARE', [id]),
     hasV2: id => one("SELECT id FROM case_events WHERE case_id=$1 AND kind NOT IN ('case','attempt','result','revision','withdrawal') LIMIT 1", [id]).then(Boolean),
     event: id => one('SELECT * FROM case_events WHERE id=$1', [id]),
+    eventReceipt: (id,subjectId) => one('SELECT id,case_id,payload_hash,version FROM case_events WHERE id=$1 AND subject_id=$2', [id,subjectId]),
     attemptCount: id => one("SELECT count(*) FROM case_events WHERE case_id=$1 AND kind='attempt'", [id]).then(row => Number(row.count)),
     reference: (id, caseId) => one('SELECT * FROM case_events WHERE id=$1 AND case_id=$2', [id, caseId]),
     insertEvent: ({ event, caseId, subjectId, version, consentId, payloadJson, hash }) => db.query(`INSERT INTO
@@ -34,6 +35,7 @@ export function caseRepository(db) {
     events: id => db.query('SELECT * FROM case_events WHERE case_id=$1 ORDER BY version LIMIT 1001', [id]).then(result => result.rows),
     taskLink: taskId => one('SELECT * FROM case_task_links WHERE task_id=$1', [taskId]),
     operationLink: id => one('SELECT * FROM case_task_links WHERE operation_id=$1', [id]),
+    operationReceipt: (id,subjectId) => one('SELECT task_id,case_id,payload_hash,receipt FROM case_task_links WHERE operation_id=$1 AND subject_id=$2', [id,subjectId]),
     insertTaskLink: ({taskId,caseId,operationId,subjectId,hash,receipt}) => db.query(`INSERT INTO case_task_links
       (task_id,case_id,operation_id,subject_id,payload_hash,receipt) VALUES ($1,$2,$3,$4,$5,$6::jsonb)`,
       [taskId,caseId,operationId,subjectId,hash,JSON.stringify(receipt)]),

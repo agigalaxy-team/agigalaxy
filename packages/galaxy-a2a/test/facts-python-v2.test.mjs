@@ -20,23 +20,31 @@ test('official Python 1.1.2 HelloWorld → actual HTTP v2 Attempt/Result; origin
   await new Promise(r => api.listen(0, '127.0.0.1', r));
   t.after(() => new Promise(r => { api.close(r); api.closeAllConnections(); }));
   const local = 'http://127.0.0.1:' + api.address().port;
-  const loseResult = true, resultWrites = 0, current = f.actor.subjectId;
+  let loseResult = true, resultWrites = 0, current = f.actor.subjectId;
+  let forbidCaseRead = false, receiptUnavailable = false, switchReceiptOwner = false;
+  let generation = 1, switchReceiptGeneration = false, switchPeerGeneration = false, authorizationMutation;
   const call = async (path, input, options = {}) => {
+    if (forbidCaseRead && /^\/v2\/cases\/[^/]+\/read$/.test(path)) throw new Error('Original material reread forbidden');
+    if (receiptUnavailable && path === '/v2/cases/events/receipt') throw new Error('Synthetic receipt unavailable');
     const response = await fetch(local + path, { method: options.method ?? 'POST', headers: { 'Content-Type': 'application/json',
       authorization: 'Bearer ' + f.credential }, ...(options.method === 'GET' ? {} : { body: JSON.stringify(input) }) });
     const value = await response.json(); if (!response.ok) throw Object.assign(new Error(value.error ?? JSON.stringify(value)), { status: response.status });
     if (path === '/v2/cases/events' && JSON.parse(input.payloadJson).kind === 'result-recorded') {
       resultWrites++; if (loseResult) { loseResult = false; throw new Error('Lost actual committed Result ACK'); }
     }
+    if (switchReceiptOwner && path === '/v2/cases/events/receipt') current = 'GUID' + 'B'.repeat(28);
+    if (switchReceiptGeneration && path === '/v2/cases/events/receipt') generation++;
     return value;
   };
   const authorizations = new Map(); let consentWrites = 0;
-  const runtime = { api: { endpoint: f.access.endpoint, call, snapshot: () => ({ subjectId: current, bindingId: f.actor.bindingId }) },
+  const runtime = { api: { endpoint: f.access.endpoint, call, snapshot: () => ({ subjectId: current, bindingId: f.actor.bindingId, generation }) },
     status: async () => ({ identity: current }),
     authorize: async input => {
       if (!authorizations.has(input.requestId)) { consentWrites++;
         authorizations.set(input.requestId, await f.authorize(JSON.parse(input.payloadJson), input.action,
           { id: input.requestId, objectId: input.objectId, visibility: input.visibility, viewers: input.viewers })); }
+      if (authorizationMutation === 'subject') current = 'GUID' + 'B'.repeat(28);
+      if (authorizationMutation === 'generation') generation++;
       return authorizations.get(input.requestId);
     } };
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-a2a-python-'));
@@ -45,7 +53,10 @@ test('official Python 1.1.2 HelloWorld → actual HTTP v2 Attempt/Result; origin
     expectedCardHash: hash(JSON.stringify(peer.card)), trustExpiresAt: Date.now() + 60000, fetchJson: peer.get });
   const options = { runtime, directory, peers: [{ id: 'python', name: 'Synthetic official Python', endpoint: peer.endpoint,
     agentCard: trust.card, cardHash: trust.cardHash, trustExpiresAt: trust.trustExpiresAt, peerPrincipal: 'synthetic-local' }],
-    readPeerAuthorization: async () => ({ subjectId: current, peerPrincipal: 'synthetic-local' }), post: peer.post };
+    readPeerAuthorization: async () => {
+      if (switchPeerGeneration) generation++;
+      return { subjectId: current, peerPrincipal: 'synthetic-local' };
+    }, post: (...args) => peer.post(...args) };
   let host = createNativeA2aHostV2(options);
   async function attempt() {
     const caseId = randomUUID(), eventId = randomUUID();
@@ -68,6 +79,8 @@ test('official Python 1.1.2 HelloWorld → actual HTTP v2 Attempt/Result; origin
   for (const privateValue of [ids.caseId, ids.attemptId, f.actor.subjectId, 'PRIVATE whole original']) assert.ok(!JSON.stringify(peer.requests).includes(privateValue));
   const result = await host.prepare('python', 'result', { associationId: link.id, summary: 'HelloWorld answered the selected message; original issue untested', reportedOutcome: 'inconclusive' });
   assert.equal(result.draft.event.kind, 'result-recorded'); assert.deepEqual(result.draft.event.deliverableRefs, []);
+  assert.equal((await host.read('python', 'reconcile-result', link.id)).state, 'absent');
+  assert.equal(resultWrites, 0, 'an absent receipt read never submits a Result');
   await assert.rejects(host.execute(result, { confirmed: true }), /Lost actual committed/);
   host = createNativeA2aHostV2(options);
   const receipt = await host.read('python', 'reconcile-result', link.id);
@@ -77,6 +90,38 @@ test('official Python 1.1.2 HelloWorld → actual HTTP v2 Attempt/Result; origin
   assert.equal(facts.results[0].acceptance, 'not-provided'); assert.equal(facts.resolution.status, 'unrecorded');
   assert.equal(facts.attempts.at(-1).status, 'running', 'peer completed never auto-ends the user Attempt');
   await assert.rejects(host.prepare('python', 'send', { ...ids, text: 'duplicate' }), /already dispatched/);
+  await f.consents.revoke(f.actor, authorizations.get(result.authorization.requestId).consentId);
+  await f.db.query("UPDATE case_events SET payload='{}'::jsonb,payload_text='' WHERE id=$1", [result.draft.event.eventId]);
+  forbidCaseRead = true;
+  const withdrawn = await host.read('python', 'reconcile-result', link.id);
+  assert.equal(withdrawn.state, 'acknowledged'); assert.equal(withdrawn.authority, 'accepted-operation-only');
+  assert.equal(withdrawn.currentAccessGranted, false); assert.equal(resultWrites, 1);
+  assert.equal(JSON.stringify(withdrawn).includes(result.draft.event.summary), false);
+  assert.equal(Object.hasOwn(withdrawn, 'externalSource'), false);
+  receiptUnavailable = true;
+  await assert.rejects(host.read('python', 'reconcile-result', link.id), /receipt unavailable/);
+  assert.equal(resultWrites, 1, 'an unavailable receipt cannot create or resend work');
+  receiptUnavailable = false; switchReceiptOwner = true;
+  await assert.rejects(host.read('python', 'reconcile-result', link.id), /connection changed/);
+  current = f.actor.subjectId; switchReceiptOwner = false; forbidCaseRead = false;
+  switchReceiptGeneration = true;
+  await assert.rejects(host.read('python', 'reconcile-result', link.id), /connection changed/);
+  switchReceiptGeneration = false; switchPeerGeneration = true;
+  const beforePeerLease = peer.requests.length;
+  await assert.rejects(host.read('python', 'get', link.id), /connection changed/);
+  assert.equal(peer.requests.length, beforePeerLease); switchPeerGeneration = false;
+  assert.equal((await host.read('python', 'reconcile-result', link.id)).state, 'acknowledged', 'fresh binding rebuilds validator and keeps original journal');
+  const authorizing = await attempt();
+  let authorizationLink = await host.execute(await host.prepare('python', 'send', { ...authorizing, text: 'Selected lease counterexample' }), { confirmed: true });
+  for (let i = 0; i < 10 && authorizationLink.peer.state !== 'completed'; i++) authorizationLink = await host.read('python', 'poll', authorizationLink.id);
+  const authorizationInput = { associationId: authorizationLink.id, summary: 'Old scope must not dispatch after authorization waits', reportedOutcome: 'inconclusive' };
+  authorizationMutation = 'subject'; const beforeAuthorization = resultWrites;
+  await assert.rejects(host.execute(await host.prepare('python', 'result', authorizationInput), { confirmed: true }), /connection changed/);
+  assert.equal(resultWrites, beforeAuthorization, 'changed subject after authorize makes zero business writes');
+  current = f.actor.subjectId; authorizationMutation = 'generation';
+  await assert.rejects(host.execute(await host.prepare('python', 'result', authorizationInput), { confirmed: true }), /connection changed/);
+  assert.equal(resultWrites, beforeAuthorization, 'same subject/binding with a new generation makes zero business writes');
+  authorizationMutation = undefined;
   const unknown = await attempt(), lost = createNativeA2aHostV2({ ...options, post: async (...args) => { await peer.post(...args); throw new Error('lost peer ACK'); } });
   const sending = await lost.prepare('python', 'send', { ...unknown, text: 'unknown synthetic' }), before = peer.requests.length;
   await assert.rejects(lost.execute(sending, { confirmed: true }), e => e.code === 'A2A_OUTCOME_UNKNOWN');

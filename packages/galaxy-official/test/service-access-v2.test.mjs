@@ -10,8 +10,10 @@ import {createGalaxyGenesis} from '../../galaxy-core/src/galaxy-guid.mjs';
 import {createRetirementController} from '../src/retirement.mjs';
 import {createIncidentController} from '../src/operations/incident.mjs';
 import {retirementFixturePolicy} from './retirement-workflow.mjs';
+import {retainTaskContactAgent} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 
-const store=()=>{const values=new Map();return{get:async key=>structuredClone(values.get(key)),put:async(key,value)=>{values.set(key,structuredClone(value));}};};
+const store=()=>{const values=new Map();return{get:async key=>structuredClone(values.get(key)),put:async(key,value)=>{values.set(key,structuredClone(value));},
+ update:async(key,change)=>{const next=change(structuredClone(values.get(key)));if(next?.then)throw Error('local_update_async_callback');const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);}};};
 
 test('existing browser control reconnects for bounded takeout and incident withdrawal, without reopening publication or enrollment',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)});
@@ -35,18 +37,19 @@ test('existing browser control reconnects for bounded takeout and incident withd
       if(dropDeletion&&path==='/v1/deletion-requests/submit'){dropDeletion=false;assert.equal(response.status,200);throw new Error('lost deletion acknowledgement');}
       return response;
     };
-    const disk=store();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at});
+    const disk=store();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
     await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    await retainTaskContactAgent(runtime,disk,at);
     const subjectId=(await runtime.status()).identity.subjectId;
     await assert.rejects(runtime.publishTask({title:'退役取回夹具',summary:'本人私有任务',intent:'collaboration',
       workContext:{goal:'验证退出',currentSituation:'没有失败尝试',attemptRefs:[]},visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:base+86400},{confirmed:true}),/lost committed/);
     const saved=await runtime.getLocal('task-publication'),taskId=saved.payload.taskId,consentId=saved.preparedConsent.intent.id;
-    other=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>at});await other.createIdentity({confirmed:true});await other.connect({confirmed:true});
+    other=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>at,website:origin});await other.createIdentity({confirmed:true});await other.connect({confirmed:true});
     const strangerKeys=generateKeyPairSync('ed25519'),stranger=createGalaxyGenesis({publicKeyPem:strangerKeys.publicKey.export({type:'spki',format:'pem'}),originCode:'5'});
     const enrollment={subjectId:stranger.id,genesisProof:stranger.genesisProof,installationId:randomUUID(),scopes:['binding']};
 
     at=policy.stopWritesAt;
-    runtime.close();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at});
+    runtime.close();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
     await runtime.connect({confirmed:true});assert.equal((await runtime.status()).connection.subjectId,subjectId);
     const consent=await runtime.api.reconcileAuthorization(saved.preparedConsent);assert.equal(consent.state,'acknowledged');
     const restored=await runtime.reconcilePublication();assert.equal(restored.taskId,taskId);assert.equal(restored.state,'acknowledged');
@@ -60,7 +63,7 @@ test('existing browser control reconnects for bounded takeout and incident withd
       await assert.rejects(runtime.api.call(path,{consentId,payloadJson:'{"kind":"publish"}'}),/service_writes_stopped/,path);
 
     state=createIncidentController({version:1,id:'isolated',revision:1,endpoint:f.bindings.endpoint,state:'contained',updatedAt:at,publicMessage:'Synthetic incident',recovery:null},{endpoint:f.bindings.endpoint,now:()=>at});
-    runtime.disconnect();await runtime.connect({confirmed:true});
+    await runtime.disconnect();await runtime.connect({confirmed:true});
     await assert.rejects(runtime.api.call('/v1/binding-challenges',enrollment,{authenticated:false}),/service_enrollment_stopped/);
     const rejected=await fetch(local+`/v1/consents/${consentId}/revoke`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer invalid'},body:'{}'});
     assert.equal(rejected.status,401);
@@ -68,7 +71,7 @@ test('existing browser control reconnects for bounded takeout and incident withd
     await assert.rejects(runtime.api.call('/v1/data-exports/page',{id:ticket.id,dataset:'identity'}),{code:'service_incident_contained',status:503});
     const deletion=await runtime.privacy.prepareDeletion({action:'request',scope:'all-owned-service-data',reason:'privacy',takeout:'not-needed'});
     dropDeletion=true;await assert.rejects(runtime.privacy.submitDeletion(deletion,{confirmed:true}),/lost deletion/);
-    runtime.disconnect();await runtime.connect({confirmed:true});
+    await runtime.disconnect();await runtime.connect({confirmed:true});
     const requested=await runtime.privacy.reconcileDeletion();assert.equal(requested.state,'requested');assert.equal(requested.physicalDeletionPerformed,false);
     assert.equal((await runtime.privacy.queryDeletion()).items.length,1);
     const cancel=await runtime.privacy.prepareDeletion({action:'cancel',requestId:requested.id,expectedRevision:requested.revision});
@@ -90,6 +93,12 @@ test('the explicit stop/readonly policy never admits a mixed events route or a s
   const incident=createIncidentController({version:1,id:'contained',revision:1,endpoint:policy.endpoint,state:'contained',updatedAt:policy.stopWritesAt,publicMessage:'Synthetic',recovery:null},{endpoint:policy.endpoint,now:()=>policy.stopWritesAt});
   const participants='/v2/chat/rooms/'+randomUUID()+'/agent-participants';
   retirement.assertRoute('POST',participants);
+  for(const path of ['/v2/cases/events/receipt','/v2/tasks/'+randomUUID()+'/case-link/receipt','/v2/personal-summaries/receipt']){
+    retirement.assertRoute('POST',path);
+    assert.throws(()=>retirement.assertRoute('PUT',path),/service_writes_stopped/);
+    assert.throws(()=>retirement.assertRoute('POST',path+'/events'),/service_writes_stopped/);
+    assert.throws(()=>incident.assertRoute('POST',path),/service_incident_contained/);
+  }
   assert.throws(()=>incident.assertRoute('POST',participants),/service_incident_contained/);
   assert.throws(()=>retirement.assertRoute('PUT',participants),/service_writes_stopped/);
   assert.throws(()=>retirement.assertRoute('POST',participants+'/events'),/service_writes_stopped/);

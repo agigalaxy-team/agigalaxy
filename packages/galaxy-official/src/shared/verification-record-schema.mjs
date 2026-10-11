@@ -24,7 +24,7 @@ export const verificationRecordSchema = z.strictObject({
   ...common,kind:z.literal('verification'),target:verificationTargetSchema,scopeVersion:version,
   method:z.enum(['participant-feedback','requester-acceptance','local-test','unit-test','integration-test','build','ci-report',
     'benchmark','peer-review','human-review','agent-verifier','production-validation','enterprise-attestation','external-system']),
-  scope:text,conditions:z.record(z.string().min(1).max(80),z.union([z.string().max(2000),z.number().finite(),z.boolean()])).refine(x=>Object.keys(x).length<=30),
+  scope:text,conditions:z.record(z.string().min(1).max(80),z.union([z.string().max(2000),z.number(),z.boolean()])).refine(x=>Object.keys(x).length<=30),
   observation:z.enum(['passed','failed','inconclusive','accepted','partially-accepted','rejected','comment']),
   summary:text,evidenceRefs:z.array(evidenceVersionRef).max(50),
   relationship:z.enum(['same-controller','counterparty','independent','unknown']),observedAt:z.iso.datetime(),
@@ -35,3 +35,18 @@ export const verificationRevocationSchema = z.strictObject({...common,kind:z.lit
 export const verificationEventSchema=z.discriminatedUnion('kind',[evidenceReferenceRecordSchema,verificationRecordSchema,verificationRevocationSchema]);
 export const evidenceStatusQuerySchema=z.strictObject({refs:z.array(z.strictObject({type:z.enum(['evidence','verification','proof','ci-proof-v2']),
   id:z.uuid(),version:version.optional()})).max(100)});
+
+// Exact accepted operation metadata is independent of current material access.
+// An absent retained row does not establish that an operation never occurred.
+export const verificationOperationReceiptQuerySchema=z.strictObject({type:z.enum(['evidence','verification']),
+  id:z.uuid(),operationId:z.uuid(),payloadHash:z.string().regex(/^[0-9a-f]{64}$/)});
+const receiptCommon={...verificationOperationReceiptQuerySchema.shape,authority:z.literal('accepted-operation-only'),
+  audience:z.literal('owner-only'),currentAccessGranted:z.literal(false),contentReturned:z.literal(false),
+  sourceAccessChecked:z.literal(false)};
+export const verificationOperationReceiptResultSchema=z.discriminatedUnion('state',[
+  z.strictObject({...receiptCommon,state:z.literal('acknowledged'),receipt:z.strictObject({
+    ...verificationOperationReceiptQuerySchema.shape,version,acceptedAt:z.iso.datetime()})}),
+  z.strictObject({...receiptCommon,state:z.literal('absent'),absenceMeaning:z.literal('no-retained-owner-operation')}),
+  z.strictObject({...receiptCommon,state:z.literal('conflict'),reason:z.literal('original-operation-mismatch')})
+]).superRefine((value,ctx)=>{if(value.state==='acknowledged'&&['type','id','operationId','payloadHash'].some(key=>value[key]!==value.receipt[key]))
+  ctx.addIssue({code:'custom',message:'Original verification operation receipt mismatch'});});

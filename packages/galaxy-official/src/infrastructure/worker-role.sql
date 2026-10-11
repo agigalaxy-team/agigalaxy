@@ -106,3 +106,12 @@ GRANT SELECT,DELETE ON identity_groups_v2,identity_group_operations_v2,identity_
 GRANT UPDATE(current_operation_id,source_erased_at) ON identity_groups_v2 TO galaxy_evidence_worker;
 GRANT UPDATE(payload_text,erased_at) ON identity_group_operations_v2 TO galaxy_evidence_worker;
 GRANT SELECT,DELETE ON watch_controls_v2,watch_control_operations_v2 TO galaxy_evidence_worker;
+
+-- Bounded forum erasure only. Current control/proof payloads and signing keys
+-- remain outside this additional role; no new Consent or binding write grant.
+GRANT SELECT,DELETE ON forum_posts_v1,forum_versions_v1,forum_replies_v1,forum_events_v1,forum_reports_v1,forum_governance_events_v1,forum_daily_usage_v1,forum_write_receipts_v1 TO galaxy_evidence_worker;
+GRANT SELECT(id,subject_id,account_id,event_id,consent_id,origin_binding_id,source_device_id,source_key_id,accepted_epoch,accepted_control_hash,signature_hash,payload_hash,action,object_id,visibility,fields,viewers,issued_at,published_until,accepted_at,authorization_audit_until,revoked_at,erased_at,policy_hash),DELETE ON forum_permissions_v1 TO galaxy_evidence_worker;
+GRANT SELECT(id,subject_id,kind) ON subject_control_events TO galaxy_evidence_worker;
+GRANT UPDATE(payload_text,erased_at) ON forum_events_v1,forum_governance_events_v1 TO galaxy_evidence_worker;
+GRANT EXECUTE ON FUNCTION public.galaxy_worker_prune_forum_authorizations(timestamptz) TO galaxy_evidence_worker;
+GRANT EXECUTE ON FUNCTION public.galaxy_worker_lock_closed_forum_reports(timestamptz) TO galaxy_evidence_worker;

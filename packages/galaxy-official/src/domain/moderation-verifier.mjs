@@ -8,13 +8,22 @@ export const verifierTarget=report=>report.caseId?{caseId:report.caseId,caseVers
 // Original Case participant assertions and invitations alone grant no party role.
 export function projectModerationVerifiers(events){
   const members=new Map();
-  for(const row of events){const event=JSON.parse(row.payload_text);
+  for(const row of events){const event=row.payload??JSON.parse(row.payload_text);
     if(event.kind==='invite-verifier'){
       const prior=members.get(event.verifierId);
       members.set(event.verifierId,{subjectId:event.verifierId,invitationId:event.id,inviterId:row.subject_id,
         expiresAt:event.expiresAt,status:'invited',participated:prior?.participated??false});
     }else if(verifierEventKinds.has(event.kind)){
-      const member=members.get(row.subject_id);if(!member||member.invitationId!==event.invitationId)continue;
+      let member=members.get(row.subject_id);
+      if(!member&&['accept-verifier','withdraw-verifier','verification-response'].includes(event.kind)){
+        // These surviving subject-authored facts were accepted against an exact
+        // invitation at submission. Another author's erasure cannot erase that
+        // historical process role; unavailable scope and expiry stay unknown.
+        member={subjectId:row.subject_id,invitationId:event.invitationId,inviterId:null,
+          expiresAt:null,status:'accepted',participated:true,invitationAvailable:false};
+        members.set(row.subject_id,member);
+      }
+      if(!member||member.invitationId!==event.invitationId)continue;
       if(event.kind==='accept-verifier'){member.status='accepted';member.participated=true;}
       if(event.kind==='decline-verifier')member.status='declined';
       if(event.kind==='withdraw-verifier')member.status='withdrawn';
@@ -33,7 +42,9 @@ export function verifierTransition(row,actorId,event,now,independentModerator){
     if(prior&&(prior.status==='accepted'||prior.status==='invited'&&prior.expiresAt>now))throw new ServiceError('verifier_already_invited',409);
     if(!prior&&row.verifiers.length>=4)throw new ServiceError('verifier_invitation_limit',429);
     if(event.expiresAt<=now||event.expiresAt>now+604800)throw new ServiceError('verifier_invitation_expiry',409);
-    if(JSON.stringify(event.target)!==JSON.stringify(verifierTarget(JSON.parse(row.payload_text))))throw new ServiceError('verifier_target_mismatch',409);
+    const report=row.reportData===undefined?JSON.parse(row.payload_text):row.reportData;
+    if(!report)throw new ServiceError('moderation_source_unavailable',409);
+    if(JSON.stringify(event.target)!==JSON.stringify(verifierTarget(report)))throw new ServiceError('verifier_target_mismatch',409);
     return;
   }
   if(!own||own.invitationId!==event.invitationId)throw new ServiceError('verifier_invitation_required',403);

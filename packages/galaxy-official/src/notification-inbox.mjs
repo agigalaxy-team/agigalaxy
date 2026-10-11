@@ -13,7 +13,7 @@ const key=c=>c.kind+':'+c.event_id;
 
 // This is a projection over business sources, not a delivery queue or a model.
 export class NotificationInboxService {
- constructor({access,notifications,chat,tasks=null,comments=null,commentGovernance=null}){Object.assign(this,{access,notifications,chat,tasks,comments,commentGovernance});}
+ constructor({access,notifications,chat,tasks=null,comments=null,commentGovernance=null,moderationNotifications=null}){Object.assign(this,{access,notifications,chat,tasks,comments,commentGovernance,moderationNotifications});}
  run(actor,write,fn){return write?this.access.runResourceWrite(actor,'notifications',{},fn):this.access.runAuthorized(actor,'notifications',fn);}
  async optionsWithin(db,actor){const r=(await db.query('SELECT revision,settings FROM notification_options_v2 WHERE subject_id=$1',[actor.subjectId])).rows[0];
   return{revision:r?.revision??0,settings:parse(inboxOptionsSchema,r?.settings??{}),externalDelivery:'disabled'};}
@@ -70,6 +70,7 @@ export class NotificationInboxService {
   AND ($6::text IS NULL OR i.kind=$6 AND i.event_id=$7::uuid) AND (NOT $8::boolean OR r.event_id IS NULL)
   ORDER BY i.event_id,i.kind LIMIT 200`,[actor.subjectId,stamp(this.access.now()),stamp(this.access.now()-90*day),after?.[1]??null,after?.[0]??null,exact?.[0]??null,exact?.[1]??null,x.unreadOnly??false])).rows;}
  async visibleWithin(db,actor,c){
+  if(['moderation-report','moderation-event'].includes(c.kind))return this.moderationNotifications?.noticeWithin(db,actor,c.kind,c.event_id)??null;
   if(c.kind==='target-governance')return targetGovernanceNoticeWithin(db,actor,c.event_id,this.targetGovernance);
   if(c.kind==='information-change')return this.informationWatches?.notificationWithin(db,actor,c.event_id)??null;
   if(c.kind==='qualification-request'){
@@ -103,25 +104,26 @@ export class NotificationInboxService {
    if(e.kind==='invite'&&t.governance.scopes.includes('new-participation-paused'))return null;
    return{title:t.snapshot.request.title,eventKind:e.kind,actorId:e.subject_id,object:{type:'task',id:e.task_id,eventId:e.id},serviceReceipt:['dispute','confirm-resolution','propose-resolution'].includes(e.kind)};
   }
-  const v=await this.notifications.visible(db,actor,c);if(!v)return null;const {summary,...safe}=v;
+  const v=await this.notifications.visible(db,actor,c);if(!v)return null;const {summary:_summary,...safe}=v;
   return {...safe,object:c.kind==='capsule'&&v.object?v.object:c.assistance_id?{type:'assistance',id:c.assistance_id}:c.kind==='incident'?{type:'incident',id:v.incidentId}:{type:c.kind,id:c.event_id},serviceReceipt:c.kind==='incident'};
  }
  async collectWithin(db,actor,x,exact=null){
   const legacy=await this.notifications.preferencesWithin(db,actor),extra=await this.optionsWithin(db,actor);
   const settings={...legacy.settings,invitations:true,collaboration:true,materials:true,capsules:true,incidents:true,mutedAssistanceIds:[]};
   const a=await this.notifications.candidates(db,actor,x,settings,exact,legacy.archivedBefore),b=await this.newCandidates(db,actor,x,exact);
-  const candidates=[...a,...b].filter(c=>Date.parse(c.created_at)>this.access.now()*1000-90*day*1000&&(!legacy.archivedBefore||Date.parse(c.created_at)>=Date.parse(legacy.archivedBefore))).sort(compare).slice(0,200);
-  return{candidates,legacy,extra,possiblyMore:a.length===200||b.length===200||a.length+b.length>200};
+  const m=await this.moderationNotifications?.candidatesWithin(db,actor,x,exact)??[];
+  const candidates=[...a,...b,...m].filter(c=>Date.parse(c.created_at)>this.access.now()*1000-90*day*1000&&(!legacy.archivedBefore||Date.parse(c.created_at)>=Date.parse(legacy.archivedBefore))).sort(compare).slice(0,200);
+  return{candidates,legacy,extra,possiblyMore:[a,b,m].some(list=>list.length===200)||a.length+b.length+m.length>200};
  }
  async itemWithin(db,actor,c,legacy,extra){try{
   const v=await this.visibleWithin(db,actor,c);if(!v)return null;
   const s=extra.settings,roomId=c.room_id,blocked=s.blockedSubjectIds.includes(v.actorId)||s.roomBlocks.some(b=>b.roomId===roomId&&b.subjectId===v.actorId);
-  const categoryDisabled=legacy.settings[c.category]===false;
+  const category=v.category??c.category,categoryDisabled=legacy.settings[category]===false;
   const quiet=!legacy.settings.enabled||categoryDisabled||blocked||legacy.settings.mutedAssistanceIds.includes(c.assistance_id)
    ||roomId&&(s.mutedRoomIds.includes(roomId)||!s.rooms)||['task-v2','task-comment'].includes(c.kind)&&!s.tasks;
   if(!v.serviceReceipt&&(blocked||!legacy.settings.enabled||categoryDisabled))return null;
   const present=(await db.query('SELECT presented_at FROM notification_presentations WHERE subject_id=$1 AND kind=$2 AND event_id=$3',[actor.subjectId,c.kind,c.event_id])).rows[0];
-  return{id:key(c),category:c.category,at:new Date(c.created_at).toISOString(),read:!!c.read_at,...v,
+  return{id:key(c),category,at:new Date(c.created_at).toISOString(),read:!!c.read_at,...v,
    quiet:!!quiet,interruptiveEligible:!quiet&&!c.read_at&&!present?.presented_at,presented:!!present?.presented_at};
  }catch(e){if(e instanceof ServiceError&&[403,404].includes(e.status))return null;throw e;}}
  query(actor,input={}){const x=parse(inboxQuerySchema,input);return this.run(actor,false,async db=>{
@@ -143,11 +145,15 @@ export class NotificationInboxService {
   return{id:x.id,claimed:!!r,claimId:r?.claim_id??null,leaseUntil:r?new Date(r.lease_until).toISOString():null,deliveryConfirmed:false};
  });}
  presented(actor,input){const x=parse(inboxClaimSchema,input);return this.run(actor,false,async db=>{
-  const item=await this.oneWithin(db,actor,x.id);if(item.quiet||item.read)return{id:x.id,presented:false};
+  // This acknowledges a previously claimed display, not another source read.
+  // A mute, human read or withdrawal after display must not lose its original
+  // receipt and let another device prompt again. Exact ownership and the
+  // original live lease remain required; no old event body is retrieved.
   const [kind,id]=x.id.split(':');const r=await db.query(`UPDATE notification_presentations SET presented_at=COALESCE(presented_at,$6)
    WHERE subject_id=$1 AND kind=$2 AND event_id=$3 AND client_id=$4 AND claim_id=$5 AND (presented_at IS NOT NULL OR lease_until>$6) RETURNING event_id`,
    [actor.subjectId,kind,id,x.deliveryClientId,x.claimId,stamp(this.access.now())]);
-  return{id:x.id,presented:r.rows.length>0,acknowledgement:'client-reported-display',read:false};
+  const read=(await db.query('SELECT 1 FROM notification_reads WHERE subject_id=$1 AND kind=$2 AND event_id=$3',[actor.subjectId,kind,id])).rows.length>0;
+  return{id:x.id,presented:r.rows.length>0,acknowledgement:'client-reported-display',read,humanReadChanged:false};
  });}
  markRead(actor,input){const x=parse(z.strictObject({id:inboxIdSchema,reader:z.literal('human')}),input);return this.run(actor,true,async(db,authorization)=>{
   await this.oneWithin(db,actor,x.id);const [kind,id]=x.id.split(':');

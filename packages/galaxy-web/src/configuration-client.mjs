@@ -4,15 +4,23 @@ export function createConfigurationClient(options) {
       ...options,
       operationFamily: 'configuration',
     }),
-    { api, subjectId } = options;
+    { api, subjectId } = options,
+    endpoint = api.endpoint;
+  const capture = () => {
+    const value = api.snapshot();
+    return JSON.stringify([api.endpoint, value?.subjectId ?? null,
+      value?.bindingId ?? null, value?.generation ?? null,
+      value?.control?.deviceId ?? null, value?.control?.epoch ?? null]);
+  };
   const read = async (path, input) => {
-    const current = api.snapshot()?.subjectId,
+    const lease = capture(), current = api.snapshot()?.subjectId,
       authenticated = !!subjectId && current === subjectId;
+    if (api.endpoint !== endpoint) throw Error('配置读取服务已变化。');
     const result = await api.call('/v2/configurations/' + path, input, {
       authenticated,
     });
-    if (api.snapshot()?.subjectId !== current)
-      throw Error('配置读取身份已变化。');
+    if (capture() !== lease)
+      throw Error('配置读取身份或连接已变化。');
     return result;
   };
   return {

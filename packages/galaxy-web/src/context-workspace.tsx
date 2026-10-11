@@ -1,673 +1,227 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { createContextClientV2 } from '../../galaxy-official/src/context-v2-client.mjs';
+import { MemberAvatar, memberName, readableTime, useMemberNames } from './conversation-ui';
+import {checkedContextDraft,recordErrorField} from './record-workspace-types';
+import type {ContextClient,ContextComposeInput,ContextEvent,ContextGrantChoice,ContextMaterialInput,ContextPending,ContextPreview,ContextReceipt,ContextRenewal,ContextTask,ContextView,RecordRuntime} from './record-workspace-types';
+type Props={task:ContextTask;runtime:RecordRuntime;subjectId?:string;connected:boolean};
 
 const statusNames: Record<string, string> = {
-  pending: '等待指定参与者接受',
-  accepted: '指定参与者已接受',
-  declined: '已婉拒',
-  revoked: '授权已撤回',
-  expired: '材料已到期',
-  'source-erased': '原文已清除',
-  'scope-changed': '参与范围已改变，需要重新选择材料',
-  'participation-inactive': '本次参与已停止',
-  'participation-unavailable': '参与依据当前不可用',
-  'source-permission-unavailable': '材料原授权当前不可用',
-  'source-deletion-pending': '来源正在申请删除，暂不展示',
-  'acceptance-permission-unavailable': '接受记录授权当前不可用',
+  pending: '等待接收', accepted: '已接收', declined: '已婉拒', revoked: '已撤回', expired: '已到期',
+  'source-erased': '原文已清除', 'scope-changed': '参与范围已改变', 'participation-inactive': '本次参与已停止',
+  'participation-unavailable': '当前无法核对参与范围', 'source-permission-unavailable': '材料授权当前不可用',
+  'source-deletion-pending': '来源正在申请删除', 'acceptance-permission-unavailable': '接收授权当前不可用',
 };
-const material = () => ({
-  id: crypto.randomUUID(),
-  label: '',
-  mediaType: 'text/plain',
-  content: '',
-});
-export function ContextWorkspace({ task, runtime, subjectId, connected }: any) {
-  const generation = useRef(0);
-  const client = useMemo(
-    () =>
-      connected && runtime && subjectId
-        ? createContextClientV2({
-            api: runtime.api,
-            getLocal: runtime.getLocal,
-            putLocal: runtime.putLocal,
-          })
-        : null,
-    [runtime, subjectId, connected],
-  );
-  const [items, setItems] = useState<any[]>([]),
-    [pending, setPending] = useState<any[]>([]),
-    [nextAfter, setNextAfter] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [notice, setNotice] = useState('');
-  const [creating, setCreating] = useState(false),
-    [selected, setSelected] = useState<string[]>([]),
-    [materials, setMaterials] = useState<any[]>([]),
-    [minutes, setMinutes] = useState('60');
-  const [preview, setPreview] = useState<any>(null),
-    [opened, setOpened] = useState<any>(null),
-    [renewal, setRenewal] = useState<any>(null);
-  const owner = task.requesterId === subjectId,
-    eligible = (task.participations ?? []).filter(
-      (p: any) =>
-        p.subjectId !== subjectId &&
-        p.scopeAvailable !== false &&
-        p.agreedScope &&
-        p.scopeEventId &&
-        ['active', 'delivered', 'accepted'].includes(p.state),
-    );
+const errorText = (error: unknown) => ({
+  context_connection_required: '请先连接当前银河身份。', context_identity_changed: '连接已变化，请重新打开材料。',
+  context_original_material_deadline_expired: '这次材料已经到期。原操作仍可核对，如需重新提供，请重新选择资料与时间。',
+  consent_reauthorization_required: '原发送需要你重新确认，请审阅保留的材料与接收者。',
+  context_local_retry_stopped: '本机已停止发送，可以继续核对原结果。',
+  context_payload_too_large: '选定的文字过长，请减少一些片段后再预览。',
+} as Record<string,string>)[recordErrorField(error,'code')] ?? (recordErrorField(error,'name') === 'ZodError' ? '请补全材料名称、文字和本次接收范围。' : recordErrorField(error,'message') || '材料暂未处理完成，请稍后重试。');
+const material = () => ({ id: crypto.randomUUID(), label: '', mediaType: 'text/plain' as const, content: '' });
+const roleName = (role: string) => ({diagnosis:'分析问题',advice:'提供建议',context:'提供背景',tool:'提供工具',patch:'提供修改',review:'审阅',verification:'验证检查',takeover:'接续完成','main-responsible':'主要负责人'} as Record<string,string>)[role] ?? role;
+
+export function ContextWorkspace(props:Props) {
+  const connection = props.runtime?.api.snapshot();
+  return <ContextSession key={JSON.stringify([props.runtime?.api.endpoint, props.subjectId, connection?.bindingId, connection?.generation, props.task.taskId])} {...props}/>;
+}
+function ContextSession({ task, runtime, subjectId, connected }:Props) {
+  const client = useMemo<ContextClient|null>(() => connected && runtime && subjectId ? createContextClientV2({ api: runtime.api, getLocal: runtime.getLocal, putLocal: runtime.putLocal }) : null, [runtime, subjectId, connected]);
+  const [items, setItems] = useState<ContextView[]>([]), [pending, setPending] = useState<ContextPending[]>([]), [nextAfter, setNextAfter] = useState<string|null>(null), [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [creating, setCreating] = useState(false), [step, setStep] = useState(0), [selected, setSelected] = useState<string[]>([]), [materials, setMaterials] = useState<ContextMaterialInput[]>([]), [minutes, setMinutes] = useState('60');
+  const [preview, setPreview] = useState<ContextPreview|null>(null), [renewal, setRenewal] = useState<ContextRenewal|null>(null), [opened, setOpened] = useState<ContextView|null>(null), [openedId, setOpenedId] = useState<string|null>(null);
+  const [operationErrors, setOperationErrors] = useState<Record<string,string>>({});
+  const lifecycle = useRef({generation:0,reading:0,working:false}), openId = useRef<string|null>(null);
+  const confirmation = useRef<HTMLDialogElement>(null), reader = useRef<HTMLDialogElement>(null), editor = useRef<HTMLElement>(null);
+  const owner = task.requesterId === subjectId;
+  const eligible = (task.participations ?? []).filter((p):p is NonNullable<ContextTask['participations']>[number]&{agreedScope:string;scopeEventId:string} => p.subjectId !== subjectId && p.scopeAvailable !== false && !!p.agreedScope && !!p.scopeEventId && ['active','delivered','accepted'].includes(p.state));
+  const names = useMemberNames(runtime, subjectId, connected, [...eligible.map(p => p.subjectId), ...items.flatMap(item => [item.metadata.ownerId,item.metadata.participantId]), ...pending.map(op => op.recipientId)]);
+  const name = (id: string) => names[id] ?? memberName(id);
+  const waiting = pending.filter(op => op.taskId === task.taskId), activePending = waiting.filter(op => op.state !== 'stopped-local');
+  const draftKey='context-compose:v1:'+task.taskId,draftLease=useMemo(()=>client&&owner?runtime.receiptStatus.captureLease():null,[runtime,client,owner]);
+  const draftHead=useRef<string|null>(null),draftQueue=useRef<Promise<void>>(Promise.resolve()),draftActive=useRef({active:true}),draftFailed=useRef(false),draftStarted=useRef(false);
+  const draftInput=useRef<ContextComposeInput>({materials,selected,minutes,step}),materialFieldId=useId(),minutesId=useId();
+  const [loadedDraft,setDraftReady]=useState(false),[draftStatus,setDraftStatus]=useState('');
+  const draftReady=!draftLease||loadedDraft;
+  const checkDraft=()=>{if(!draftLease)throw Error('当前身份不能编写这项工作的材料。');draftLease.assertCurrent();};
+  const checkedDraft=checkedContextDraft;
+  function showDraft(input:ContextComposeInput){draftInput.current=structuredClone(input);setMaterials(input.materials);setSelected(input.selected);setMinutes(input.minutes);setStep(input.step);}
+  async function settleDraft(){if(!draftLease)return null;await draftQueue.current;checkDraft();const saved=checkedDraft(await runtime.getLocal(draftKey,subjectId));checkDraft();
+    if(!saved?.attempt?.length)return saved;
+    for(const locator of saved.attempt){const result:ContextReceipt=await runtime.api.call('/v2/context/receipt',locator);checkDraft();if(result.grantId!==locator.grantId||result.eventId!==locator.eventId||result.payloadHash!==locator.payloadHash)throw Error('材料发送回执与草稿引用不一致，请保留原记录。');if(result.state!=='acknowledged')return saved;}
+    let removed=false;const remaining=checkedDraft(await runtime.updateLocal(draftKey,(value:unknown)=>{checkDraft();const current=checkedDraft(value);if(current?.revision===saved.revision&&JSON.stringify(current.attempt)===JSON.stringify(saved.attempt)){removed=true;return null;}return current;},subjectId));checkDraft();
+    if(removed&&draftHead.current===saved.revision){draftHead.current=remaining?.revision??null;draftStarted.current=!!remaining;if(draftActive.current.active){setDraftStatus('');if(JSON.stringify(draftInput.current)===JSON.stringify(saved.value)){showDraft({materials:[],selected:[],minutes:'60',step:0});setCreating(false);}}}return remaining;
+  }
+  const restoreDraft=useEffectEvent(()=>settleDraft());
+  const applyDraft=useEffectEvent((saved:ReturnType<typeof checkedContextDraft>)=>{draftHead.current=saved?.revision??null;draftStarted.current=!!saved;if(saved){showDraft(saved.value);setCreating(true);setDraftStatus('已恢复本机草稿。');}setDraftReady(true);});
+  useEffect(()=>{const availability=draftActive.current;availability.active=true;let active=true;
+    if(draftLease)void restoreDraft().then(saved=>{if(active)applyDraft(saved??null);}).catch((reason:unknown)=>{draftFailed.current=true;if(active)setDraftStatus(recordErrorField(reason,'message')||'材料草稿暂未读取成功，请保留本页输入。');});
+    return()=>{active=false;availability.active=false;};
+  },[draftLease,draftKey]);
+  function changeDraft(patch:Partial<ContextComposeInput>,inputChange=true){
+    const value={...draftInput.current,...patch};showDraft(value);if(inputChange)draftStarted.current=true;if(!draftReady||draftFailed.current||!draftStarted.current)return;setDraftStatus('正在保存本机草稿…');
+    const next=draftQueue.current.then(async()=>{checkDraft();const expected=draftHead.current;const saved=checkedDraft(await runtime.updateLocal(draftKey,(input:unknown)=>{checkDraft();const current=checkedDraft(input);if((current?.revision??null)!==expected)throw Error('另一页已修改这份材料草稿，当前输入仍在本页，请重新打开后核对。');return{version:1,revision:crypto.randomUUID(),value};},subjectId));checkDraft();if(!saved)throw Error('材料草稿暂未保存，请保留本页输入。');draftHead.current=saved.revision;if(draftActive.current.active&&JSON.stringify(draftInput.current)===JSON.stringify(value))setDraftStatus('草稿已保存在本机。');});
+    draftQueue.current=next;void next.catch((reason:unknown)=>{draftFailed.current=true;if(draftActive.current.active)setDraftStatus(recordErrorField(reason,'message')||'草稿暂未保存，请保留本页输入。');});
+  }
+  async function markDraftAttempt(chosen:Extract<ContextPreview,{kind:'grants'}>){await draftQueue.current;checkDraft();const revision=chosen.draftRevision;if(!revision)return;
+    const attempt=chosen.drafts.map(draft=>({grantId:draft.prepared.grantId,eventId:draft.prepared.operationId,payloadHash:draft.prepared.payloadHash}));
+    await runtime.updateLocal(draftKey,(input:unknown)=>{checkDraft();const current=checkedDraft(input);return current?.revision===revision?{...current,attempt}:current;},subjectId);checkDraft();
+  }
+  useEffect(() => { if (preview || renewal) confirmation.current?.showModal(); else confirmation.current?.close(); }, [preview,renewal]);
+  useEffect(() => { if (openedId) reader.current?.showModal(); else reader.current?.close(); }, [openedId]);
+  useEffect(() => { if (!creating) return; const frame=requestAnimationFrame(() => { editor.current?.querySelector<HTMLElement>('h4')?.focus({preventScroll:true}); editor.current?.scrollIntoView({block:'start'}); }); return () => cancelAnimationFrame(frame); }, [creating,step]);
+  useEffect(() => { if (!opened?.metadata?.expiresAt||!opened.contextAccessGranted) return;let timer:number;const expire=()=>{const remaining=opened.metadata.expiresAt*1000-Date.now();if(remaining<=0)setOpened({...opened,contextAccessGranted:false,materials:[],state:'expired'});else timer=window.setTimeout(expire,Math.min(remaining,2147483647));};expire();return()=>window.clearTimeout(timer); }, [opened]);
+
   async function load(after?: string) {
     if (!client) return;
-    const epoch = generation.current,
-      previousOpen = opened?.metadata.taskId === task.taskId ? opened : null;
-    setOpened(null);
-    const page = await client.query({
-      taskId: task.taskId,
-      ...(after ? { after } : {}),
-      limit: 20,
-    });
-    if (epoch !== generation.current) return;
-    setItems((previous) =>
-      after
-        ? [
-            ...previous.filter(
-              (x) =>
-                !page.items.some(
-                  (y: any) => y.metadata.grantId === x.metadata.grantId,
-                ),
-            ),
-            ...page.items,
-          ]
-        : page.items,
-    );
-    setNextAfter(page.nextAfter ?? null);
-    const waiting = await client.pending();
-    if (epoch !== generation.current) return;
-    setPending(waiting);
-    if (previousOpen) {
-      const current = await client.get(previousOpen.metadata.grantId);
-      if (epoch === generation.current) setOpened(current);
+    const token=lifecycle.current.generation,ticket=++lifecycle.current.reading,currentOpen=openId.current;
+    if (currentOpen) setOpened(null);
+    const page=await client.query({taskId:task.taskId,...(after?{after}:{}),limit:20});
+    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading) return;
+    setItems(previous => after ? [...previous.filter(x=>!page.items.some(y=>y.metadata.grantId===x.metadata.grantId)),...page.items] : page.items);
+    setNextAfter(page.nextAfter??null); setLoaded(true);
+    const local=await client.pending();
+    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading) return;
+    setPending(local);
+    if (currentOpen && openId.current===currentOpen) {
+      const view=await client.get(currentOpen);
+      if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&openId.current===currentOpen)setOpened(view);
     }
   }
-  useEffect(() => {
-    const epoch = ++generation.current;
-    setItems([]);
-    setPreview(null);
-    setCreating(false);
-    setOpened(null);
-    setRenewal(null);
-    setSelected([]);
-    setError('');
-    setNotice('');
-    setNextAfter(null);
-    if (client)
-      load().catch((e: any) => {
-        if (epoch === generation.current) setError(typeof e?.message === 'string' && e.message.trim() ? e.message : '上下文读取暂未完成，请稍后重试。');
-      });
-    const reload = () => {
-      if (document.visibilityState === 'visible' && client && !busy) load().catch((e: any) => {
-        if (epoch === generation.current) setError(typeof e?.message === 'string' && e.message.trim() ? e.message : '上下文操作暂未完成，请稍后重试。');
-      });
-    };
-    const timer = window.setInterval(reload, 20000);
-    document.addEventListener('visibilitychange', reload);
-    return () => {
-      generation.current++;
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', reload);
-    };
-  }, [client, task.taskId, task.version]);
-  async function run(fn: () => Promise<any>) {
-    if (busy) return;
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      await fn();
-    } catch (e: any) {
-      setError(typeof e?.message === 'string' && e.message.trim() ? e.message : '上下文操作暂未完成，请稍后重试。');
-    } finally {
-      if (client)
-        try {
-          setPending(await client.pending());
-        } catch {}
-      setBusy(false);
-    }
-  }
-  async function prepare() {
-    if (!client) throw new Error('请先连接当前银河身份。');
-    const recipients = eligible.filter((p: any) =>
-      selected.includes(p.participationId),
-    );
-    if (!recipients.length)
-      throw new Error('请选择至少一项当前已确认的参与约定。');
-    const duration = Number(minutes);
-    if (!Number.isInteger(duration) || duration < 5 || duration > 43200)
-      throw new Error('请选择 5 分钟到 30 天之间的本次有效期。');
-    const expiresAt = Math.floor(Date.now() / 1000) + duration * 60;
-    const drafts = [];
-    for (const p of recipients) {
-      const payload = {
-        schemaVersion: 2,
-        id: crypto.randomUUID(),
-        taskId: task.taskId,
-        participationId: p.participationId,
-        participantId: p.subjectId,
-        scopeVersion: p.scopeVersion,
-        scopeEventId: p.scopeEventId,
-        expiresAt,
-        materials: structuredClone(materials),
-      };
-      drafts.push({
-        prepared: await client.prepareGrant(payload),
-        payload,
-        recipient: p,
-      });
-    }
-    setPreview({ kind: 'grants', drafts });
-  }
-  async function prepareEvent(item: any, kind: string) {
-    if (!client) throw new Error('请先连接当前银河身份。');
-    const current = await client.get(item.metadata.grantId, {
-      metadataOnly: true,
-    });
-    if (kind !== 'revoke' && current.state !== 'pending')
-      throw new Error('这份材料当前不再等待接受，请刷新查看。');
-    setPreview({
-      kind,
-      drafts: [
-        {
-          prepared: await client.prepareEvent(kind, current.metadata),
-          metadata: current.metadata,
-          materials: current.materials,
-        },
-      ],
-    });
-  }
-  async function commit() {
-    if (!client) throw new Error('请先连接当前银河身份。');
-    // Each chosen person has an independent exact operation and response. A
-    // failed later item never rolls an earlier recipient back or signs for them.
-    const remaining = [...preview.drafts],
-      failures = [];
-    let completed = 0;
-    for (const draft of preview.drafts) {
+  async function reconcilePending(valid:()=>boolean) {
+    if (!client) return;
+    const local=await client.pending(); if(!valid())return;
+    for(const op of local.filter(op=>op.taskId===task.taskId)) {
       try {
-        await client.execute(draft.prepared, { confirmed: true });
-        remaining.splice(remaining.indexOf(draft), 1);
-        completed++;
-      } catch (e: any) {
-        failures.push(e.message);
-      }
+        const result=await client.resumePending(op.operationId);
+        if(!valid())return;
+        if(result.state==='acknowledged')setOperationErrors(old=>{const next={...old};delete next[op.operationId];return next;});
+        else if(result.state==='absent'&&result.reason!=='stopped-local')setOperationErrors(old=>({...old,[op.operationId]:result.reason==='authorization-expired'&&op.kind==='grant'?'这次材料的阅读时间已到期。可以核对原结果，重新交接时请重新选择资料。':'请重新审阅这次材料操作，再决定是否继续。'}));
+      } catch(reason:unknown) { if(!valid())return;setOperationErrors(old=>({...old,[op.operationId]:errorText(reason)})); }
     }
-    // The helper consumes each preview once. Failed submitted operations are
-    // continued through their exact persisted IDs, never execute(preview) again.
-    setPreview(null);
-    if (!remaining.length) {
-      setCreating(false);
-      setMaterials([]);
-      setSelected([]);
-    }
-    await load();
-    setNotice(
-      `${completed} 项独立操作已记录。${remaining.length ? '其余项目保留原操作，请查询回执后继续。' : '其他参与者的授权与回应各自独立。'}`,
-    );
-    if (failures.length) setError([...new Set(failures)].join('；'));
+    if(draftLease&&draftHead.current)await settleDraft();
   }
-  if (!connected || !client) return null;
-  return (
-    <section className="workspace-panel" aria-label="逐人上下文材料授权">
-      <h3>逐人提供工作材料</h3>
-      <p>
-        只提交本次明确选定的文字片段。每位参与者先看到材料目录，亲自接受后才能打开正文；接受参与或加入房间均不等于接受材料。
-      </p>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      <div className="button-row">
-        <Button
-          variant="outline"
-          disabled={busy}
-          onClick={() => run(() => load())}
-        >
-          刷新材料状态
-        </Button>
-        {owner && task.state === 'open' && (
-          <Button
-            disabled={busy || !eligible.length}
-            onClick={() => {
-              setCreating(true);
-              setMaterials([material()]);
-              setPreview(null);
-              setSelected([]);
-            }}
-          >
-            选择材料并指定参与者
-          </Button>
-        )}
-      </div>
-      {owner && !eligible.length && (
-        <p className="muted">
-          先等对应参与者确认实际职责和范围，再向其交接材料。任务无需先创建
-          Case。
-        </p>
-      )}
-      {pending
-        .filter((op: any) => op.taskId === task.taskId)
-        .map((op: any) => (
-          <article className="message" key={op.operationId}>
-            <p>待查询原操作：{op.operationId}</p>
-            <div className="button-row">
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    const receipt = await client.reconcile(op.operationId);
-                    setNotice(
-                      receipt.state === 'acknowledged'
-                        ? '已查到原操作回执。'
-                        : '目前没有取得确定结果，原操作仍保留。',
-                    );
-                    await load();
-                  })
-                }
-              >
-                查询原回执
-              </Button>
-              {op.state !== 'stopped-local' && (
-                <>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
-                      run(async () => {
-                        await client.retry(op.operationId, { confirmed: true });
-                        await load();
-                      })
-                    }
-                  >
-                    按原内容重试
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
-                      run(async () => {
-                        const review = await client.reviewAuthorization(
-                          op.operationId,
-                        );
-                        if (review.state === 'reauthorization-required')
-                          setRenewal(review);
-                        else {
-                          setNotice(
-                            review.state === 'acknowledged'
-                              ? '已确认原操作已记录。'
-                              : '原授权仍可查询或重试，无需另行授权。',
-                          );
-                          await load();
-                        }
-                      })
-                    }
-                  >
-                    检查原授权能否继续
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      run(async () => {
-                        const result = await client.abandon(op.operationId, {
-                          confirmed: true,
-                        });
-                        setNotice(
-                          result.state === 'stopped-local'
-                            ? '已停止本机重试，服务端取消未确认。保留最小原操作定位以便继续查询。'
-                            : '已查到原操作回执；如需撤回已有材料，请对该授权单独撤回。',
-                        );
-                        await load();
-                      })
-                    }
-                  >
-                    停止本机重试
-                  </Button>
-                </>
-              )}
-            </div>
-            {op.state === 'stopped-local' && (
-              <p className="muted">
-                本机原文待发副本已清除；服务端取消未确认，只继续查询原操作。
-              </p>
-            )}
-          </article>
-        ))}
-      {renewal && (
-        <section className="message">
-          <h4>原操作需要重新授权</h4>
-          <p>收件人：{renewal.recipientId}</p>
-          <p>
-            业务操作与材料版本保持原值。仅在确认旧授权未写入且已失效后，重新签署当前连接的授权。
-          </p>
-          {(renewal.payload.materials ?? []).map((m: any) => (
-            <article key={m.id}>
-              <strong>{m.label}</strong>
-              <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                {m.content}
-              </pre>
-            </article>
-          ))}
-          <div className="button-row">
-            <Button
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await client.reauthorize(renewal.operationId, renewal, {
-                    confirmed: true,
-                  });
-                  setRenewal(null);
-                  await load();
-                })
-              }
-            >
-              确认按原内容重新授权
-            </Button>
-            <Button variant="outline" onClick={() => setRenewal(null)}>
-              取消此次确认
-            </Button>
-          </div>
-        </section>
-      )}
-      {creating && !preview && (
-        <form
-          className="workspace-form message"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(prepare);
-          }}
-        >
-          <h4>本次选定材料</h4>
-          <fieldset>
-            <legend>分别授权给哪些当前参与约定</legend>
-            {eligible.map((p: any) => (
-              <label key={p.participationId}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(p.participationId)}
-                  onChange={(e) =>
-                    setSelected(
-                      e.target.checked
-                        ? [...selected, p.participationId]
-                        : selected.filter((id) => id !== p.participationId),
-                    )
-                  }
-                />
-                {p.subjectId} · {p.role} · 范围版本 {p.scopeVersion}
-                <span className="muted">：{p.agreedScope}</span>
-              </label>
-            ))}
-          </fieldset>
-          <p className="muted">
-            多选时每个人得到当前预览的同一组材料，但形成独立授权。需要提供不同材料时分别提交。
-          </p>
-          {materials.map((m, index) => (
-            <fieldset key={m.id}>
-              <legend>片段 {index + 1}</legend>
-              <label>
-                材料名称
-                <Input
-                  required
-                  maxLength={160}
-                  value={m.label}
-                  onChange={(e) =>
-                    setMaterials(
-                      materials.map((x) =>
-                        x.id === m.id ? { ...x, label: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                本次明确选择的文字
-                <Textarea
-                  required
-                  maxLength={4000}
-                  value={m.content}
-                  onChange={(e) =>
-                    setMaterials(
-                      materials.map((x) =>
-                        x.id === m.id ? { ...x, content: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              {materials.length > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    setMaterials(materials.filter((x) => x.id !== m.id))
-                  }
-                >
-                  移除此片段
-                </Button>
-              )}
-            </fieldset>
-          ))}
-          {materials.length < 8 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setMaterials([...materials, material()])}
-            >
-              添加另一个明确片段
-            </Button>
-          )}
-          <label>
-            本次材料有效期（分钟）
-            <Input
-              type="number"
-              required
-              min={5}
-              max={43200}
-              value={minutes}
-              onChange={(e) => setMinutes(e.target.value)}
-            />
-          </label>
-          <p className="muted">
-            材料到期或参与范围改变后停止读取。已经由对方另行保存的外部副本不在此删除范围内。
-          </p>
-          <div className="button-row">
-            <Button type="submit" disabled={busy}>
-              预览本次逐人授权
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setCreating(false);
-                setMaterials([]);
-              }}
-            >
-              取消本地草稿
-            </Button>
-          </div>
-        </form>
-      )}
-      {preview && (
-        <section className="message">
-          <h4>
-            {preview.kind === 'grants'
-              ? '确认本次逐人材料授权'
-              : preview.kind === 'accept'
-                ? '确认接受此精确版本材料'
-                : preview.kind === 'decline'
-                  ? '确认婉拒此材料'
-                  : '确认撤回这份材料授权'}
-          </h4>
-          {preview.drafts.map((draft: any, index: number) => (
-            <article key={index}>
-              {draft.payload ? (
-                <>
-                  <p>指定参与者：{draft.payload.participantId}</p>
-                  <p>
-                    已确认范围：{draft.recipient.agreedScope} / 版本{' '}
-                    {draft.payload.scopeVersion}
-                  </p>
-                  <p>
-                    有效至{' '}
-                    {new Date(draft.payload.expiresAt * 1000).toLocaleString()}
-                  </p>
-                  {draft.payload.materials.map((m: any) => (
-                    <div key={m.id}>
-                      <strong>{m.label}</strong>
-                      <pre
-                        style={{
-                          whiteSpace: 'pre-wrap',
-                          overflowWrap: 'anywhere',
-                        }}
-                      >
-                        {m.content}
-                      </pre>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <p>
-                    材料作者：{draft.metadata.ownerId}；指定参与者：
-                    {draft.metadata.participantId}
-                  </p>
-                  <p>
-                    范围版本 {draft.metadata.scopeVersion}；有效至{' '}
-                    {new Date(draft.metadata.expiresAt * 1000).toLocaleString()}
-                  </p>
-                  {(draft.materials ?? []).map((m: any) => (
-                    <p key={m.id}>{m.label}</p>
-                  ))}
-                  <p className="muted">
-                    本次确认绑定服务返回的真实材料摘要。
-                    {preview.kind === 'accept'
-                      ? '仅你接受后才能打开正文。'
-                      : '其他人的独立授权保持原状态。'}
-                  </p>
-                </>
-              )}
-            </article>
-          ))}
-          <div className="button-row">
-            <Button disabled={busy} onClick={() => run(commit)}>
-              确认本次操作
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setPreview(null)}
-            >
-              返回；不提交新操作
-            </Button>
-          </div>
-        </section>
-      )}
-      {!items.length && <p>当前没有你可见的材料授权。</p>}
-      {items.map((item: any) => {
-        const m = item.metadata;
-        return (
-          <article className="task-card" key={m.grantId}>
-            <h4>{statusNames[item.state] ?? '当前不可使用'}</h4>
-            <p>
-              作者：{m.ownerId} → 指定参与者：{m.participantId}
-            </p>
-            <p>
-              范围版本 {m.scopeVersion}；有效至{' '}
-              {new Date(m.expiresAt * 1000).toLocaleString()}
-            </p>
-            {(item.materials ?? []).map((material: any) => (
-              <p key={material.id}>{material.label}</p>
-            ))}
-            <div className="button-row">
-              {m.participantId === subjectId && item.state === 'pending' && (
-                <>
-                  <Button
-                    disabled={busy}
-                    onClick={() => run(() => prepareEvent(item, 'accept'))}
-                  >
-                    查看目录并确认接受
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => run(() => prepareEvent(item, 'decline'))}
-                  >
-                    婉拒这些材料
-                  </Button>
-                </>
-              )}
-              {(m.ownerId === subjectId || item.state === 'accepted') &&
-                ['pending', 'accepted'].includes(item.state) && (
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
-                      run(async () => setOpened(await client.get(m.grantId)))
-                    }
-                  >
-                    打开当前获准材料
-                  </Button>
-                )}
-              {m.ownerId === subjectId &&
-                !['revoked', 'source-erased'].includes(item.state) && (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => run(() => prepareEvent(item, 'revoke'))}
-                  >
-                    撤回这份授权
-                  </Button>
-                )}
-            </div>
-          </article>
-        );
-      })}
-      {nextAfter && (
-        <Button
-          variant="outline"
-          disabled={busy}
-          onClick={() => run(() => load(nextAfter))}
-        >
-          继续查看材料授权
-        </Button>
-      )}
-      {opened && (
-        <section className="message">
-          <h4>当前授权材料</h4>
-          <p>{statusNames[opened.state] ?? '当前不可使用'}</p>
-          {opened.contextAccessGranted ? (
-            (opened.materials ?? []).map((m: any) => (
-              <article key={m.id}>
-                <strong>{m.label}</strong>
-                <pre
-                  style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-                >
-                  {m.content}
-                </pre>
-              </article>
-            ))
-          ) : (
-            <p>当前未获得读取正文的授权。</p>
-          )}
-          <Button variant="outline" onClick={() => setOpened(null)}>
-            关闭正文
-          </Button>
-        </section>
-      )}
-    </section>
-  );
+  async function run(fn:(valid:()=>boolean)=>Promise<void>) {
+    if(!client||lifecycle.current.working)return;
+    const token=lifecycle.current.generation,valid=()=>token===lifecycle.current.generation;
+    lifecycle.current.working=true;setBusy(true);setError('');setNotice('');
+    try { await fn(valid); } catch(reason) { if(valid())setError(errorText(reason)); }
+    finally { if(valid()){try{const local=await client.pending();if(valid())setPending(local);}catch{}setBusy(false);}lifecycle.current.working=false; }
+  }
+  const refreshOnTick=useEffectEvent(()=>{if(!client||document.hidden||lifecycle.current.working)return;void run(async valid=>{await reconcilePending(valid);if(valid())await load();});});
+  useEffect(() => {
+    const control=lifecycle.current;control.generation++;
+    const refresh=()=>refreshOnTick();
+    refresh();const timer=setInterval(refresh,20000);document.addEventListener('visibilitychange',refresh);
+    return()=>{control.generation++;control.reading++;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
+  },[client,task.taskId]);
+  const readVersion=useEffectEvent(()=>{if(client&&!lifecycle.current.working)void run(()=>load());});
+  useEffect(()=>{readVersion();},[task.version]);
+  function closeReader(){openId.current=null;setOpenedId(null);setOpened(null);}
+  async function openMaterial(id:string,valid:()=>boolean){openId.current=id;setOpenedId(id);setOpened(null);const view=await client!.get(id);if(valid()&&openId.current===id)setOpened(view);}
+  function begin(){setCreating(true);setPreview(null);if(!materials.length)showDraft({materials:[material()],selected:[],minutes:'60',step:0});}
+  async function prepare(valid:()=>boolean,clock:()=>number) {
+    await draftQueue.current;checkDraft();if(!valid())return;const draftRevision=draftHead.current;
+    const recipients=eligible.filter(p=>selected.includes(p.participationId));
+    if(!recipients.length)throw Error('请选择至少一位已经确认工作范围的参与者。');
+    if(!materials.length||materials.some(m=>!m.label.trim()||!m.content.trim())){setStep(0);throw Error('请填写材料名称与要交接的文字。');}
+    const duration=Number(minutes);if(!Number.isInteger(duration)||duration<5||duration>43200)throw Error('可阅读时间须在 5 分钟到 30 天之间。');
+    const expiresAt=Math.floor(clock()/1000)+duration*60,drafts:ContextGrantChoice[]=[];
+    for(const p of recipients){
+      const payload:ContextGrantChoice['payload']={schemaVersion:2,id:crypto.randomUUID(),taskId:task.taskId,participationId:p.participationId,participantId:p.subjectId,scopeVersion:p.scopeVersion,scopeEventId:p.scopeEventId,expiresAt,materials:structuredClone(materials)};
+      const prepared=await client!.prepareGrant(payload);if(!valid())return;drafts.push({prepared,payload,recipient:p});
+    }
+    if(valid())setPreview({kind:'grants',drafts,draftRevision});
+  }
+  async function prepareEvent(item:ContextView,kind:ContextEvent['kind'],valid:()=>boolean) {
+    const current=await client!.get(item.metadata.grantId,{metadataOnly:true});if(!valid())return;
+    if(kind!=='revoke'&&current.state!=='pending')throw Error('这份材料的状态已改变，请查看当前结果。');
+    const prepared=await client!.prepareEvent(kind,current.metadata);
+    if(valid())setPreview({kind,drafts:[{prepared,metadata:current.metadata,materials:current.materials}]});
+  }
+  async function commit(valid:()=>boolean) {
+    const chosen=preview;if(!chosen)return;let completed=0;const failures:string[]=[];
+    if(chosen.kind==='grants'){await markDraftAttempt(chosen);if(!valid())return;}
+    for(const draft of chosen.drafts){
+      try{await client!.execute(draft.prepared,{confirmed:true});completed++;}
+      catch(reason){failures.push(errorText(reason));}
+      if(!valid())return;
+    }
+    setPreview(null);
+    if(chosen.kind==='grants')await settleDraft();
+    await load();if(!valid())return;
+    setNotice(chosen.kind==='grants'?completed?'已向 '+completed+' 位参与者发送资料，等待各自接收。':'发送暂未完成，正在保留本次资料。':chosen.kind==='accept'?'已接收，可以打开材料正文。':chosen.kind==='decline'?'已婉拒这份材料。':'已撤回这份材料。');
+    if(failures.length)setError([...new Set(failures)].join('；'));
+  }
+  async function reviewOperation(op:ContextPending,valid:()=>boolean){
+    const review=await client!.reviewAuthorization(op.operationId);if(!valid())return;
+    if(review.state==='reauthorization-required')setRenewal(review);
+    else{
+      if(review.state!=='acknowledged'&&review.state!=='stopped-local'){await client!.retry(op.operationId,{confirmed:true});if(!valid())return;}
+      await load();
+    }
+  }
+  if(!client||!connected)return null;
+  return <section className="material-workspace" aria-label="工作材料">
+    {error&&<p className="message error" role="alert">{error}{!loaded&&<button className="text-link" onClick={()=>run(()=>load())}>重新读取</button>}</p>}
+    {notice&&<p className="message"><output>{notice}</output></p>}
+    {!creating&&<>
+      <div className="section-heading"><p>{owner?'对方先确认接收，再打开本次交接的文字。':'先核对材料目录，接收后即可打开正文。'}</p>{owner&&task.state==='open'&&eligible.length>0&&<Button disabled={busy||activePending.length>0||!draftReady} onClick={begin}>{materials.length?'继续整理资料':'交接资料'}</Button>}</div>
+      {draftStatus&&<p className="record-meta"><output>{draftStatus}</output></p>}
+      {owner&&!eligible.length&&<p className="empty-state">有参与者确认工作范围后，可以在这里向其提供资料。</p>}
+      {!items.length&&!(!eligible.length&&owner)&&<p className="empty-state">{loaded?'这里还没有共享材料。':'正在读取共享材料…'}</p>}
+      <div className="material-list">{items.map(item=>{
+        const m=item.metadata,title=(item.materials??[]).map(x=>x.label).join('、')||'工作材料';
+        return <article key={m.grantId} className="material-row">
+          <div className="member-line"><MemberAvatar subjectId={owner?m.participantId:m.ownerId}/><div><h4>{title}</h4><p>{owner?'给 '+name(m.participantId):'来自 '+name(m.ownerId)} · {statusNames[item.state]??'当前不可用'}</p></div></div>
+          <p className="record-meta">{['pending','accepted'].includes(item.state)?'可阅读至':'原定有效至'} {readableTime(m.expiresAt)}</p>
+          <div className="button-row">{m.participantId===subjectId&&item.state==='pending'&&<><Button disabled={busy||activePending.length>0} onClick={()=>run(valid=>prepareEvent(item,'accept',valid))}>查看并接收</Button><button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'decline',valid))}>婉拒</button></>}
+          {(m.ownerId===subjectId||item.state==='accepted')&&['pending','accepted'].includes(item.state)&&<Button variant="outline" disabled={busy} onClick={()=>run(valid=>openMaterial(m.grantId,valid))}>打开材料</Button>}
+          {m.ownerId===subjectId&&!['revoked','source-erased'].includes(item.state)&&<button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'revoke',valid))}>撤回</button>}</div>
+          <details className="technical-details"><summary>交接范围与准确引用</summary><p>参与范围第 {m.scopeVersion} 版；提供者 {m.ownerId}；接收者 {m.participantId}。</p><p>材料 {m.grantId}；摘要 {m.materialsHash}</p></details>
+        </article>;
+      })}</div>
+      {nextAfter&&<Button variant="outline" disabled={busy} onClick={()=>run(()=>load(nextAfter))}>更多材料</Button>}
+    </>}
+    {creating&&<section className="material-editor" ref={editor} style={{scrollMarginTop:'6rem'}}>
+      <button className="back-link" onClick={()=>setCreating(false)}>← 回到材料列表</button>
+      {draftStatus&&<p className="record-meta"><output>{draftStatus}</output></p>}
+      <nav className="flow-steps" aria-label="交接资料步骤"><button aria-current={step===0?'step':undefined} onClick={()=>changeDraft({step:0},false)}>1. 选择资料</button><button aria-current={step===1?'step':undefined} onClick={()=>changeDraft({step:1},false)}>2. 接收者与时间</button></nav>
+      <form className="workspace-form" onSubmit={event=>{event.preventDefault();if(step===0){changeDraft({step:1},false);return;}void run(valid=>prepare(valid,()=>Date.now()));}}>
+        <h4 tabIndex={-1}>{step===0?'要交接哪些文字？':'给谁阅读，保留多久？'}</h4>
+        {step===0?<>{materials.map((m,index)=><fieldset key={m.id}><legend>材料 {index+1}</legend><label htmlFor={materialFieldId+'-'+m.id+'-name'}>材料名称<Input id={materialFieldId+'-'+m.id+'-name'} required maxLength={160} value={m.label} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,label:event.target.value}:x)})}/></label><label htmlFor={materialFieldId+'-'+m.id+'-text'}>要交接的文字<Textarea id={materialFieldId+'-'+m.id+'-text'} required maxLength={4000} value={m.content} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,content:event.target.value}:x)})}/></label>{materials.length>1&&<button type="button" className="text-link" onClick={()=>changeDraft({materials:materials.filter(x=>x.id!==m.id)})}>移除这份材料</button>}</fieldset>)}{materials.length<8&&<Button type="button" variant="outline" onClick={()=>changeDraft({materials:[...materials,material()]})}>添加另一份材料</Button>}</>:<>
+          <fieldset><legend>接收者</legend>{eligible.map(p=><label className="material-recipient check-label" key={p.participationId}><input type="checkbox" checked={selected.includes(p.participationId)} onChange={event=>changeDraft({selected:event.target.checked?[...selected,p.participationId]:selected.filter(id=>id!==p.participationId)})}/><MemberAvatar subjectId={p.subjectId}/><span><strong>{name(p.subjectId)}</strong><small>{roleName(p.role)} · {p.agreedScope}</small></span></label>)}</fieldset>
+          <p className="record-meta">所选的人分别收到同一组材料，各自确认接收。</p>
+          <label>可阅读多久<select value={['60','1440','10080'].includes(minutes)?minutes:'custom'} onChange={event=>changeDraft({minutes:event.target.value==='custom'?'120':event.target.value})}><option value="60">1 小时</option><option value="1440">1 天</option><option value="10080">7 天</option><option value="custom">自定时间</option></select></label>
+          {!['60','1440','10080'].includes(minutes)&&<label htmlFor={minutesId}>分钟数<Input id={minutesId} type="number" required min={5} max={43200} value={minutes} onChange={event=>changeDraft({minutes:event.target.value})}/></label>}
+          <p className="record-meta">到期或参与范围改变后，这里的正文停止读取；对方已另行保存的副本不在此删除。</p>
+        </>}
+        <div className="button-row">{step>0&&<Button type="button" variant="outline" onClick={()=>changeDraft({step:0},false)}>上一步</Button>}<Button type="submit" disabled={busy||activePending.length>0||!draftReady}>{step===0?'继续':'预览交接内容'}</Button></div>
+      </form>
+    </section>}
+    {waiting.length>0&&<section className="operation-status" aria-label="材料发送状态">{waiting.map(op=><article key={op.operationId}>
+      <p>{op.state==='stopped-local'?'这次发送已在本机停止。':operationErrors[op.operationId]??'上次材料操作已保留，可以继续核对。'}</p>
+      {op.state!=='stopped-local'&&<Button variant="outline" disabled={busy} onClick={()=>run(valid=>reviewOperation(op,valid))}>继续这次材料操作</Button>}
+      <details><summary>查看本次发送记录</summary><p>操作 {op.operationId} · 接收者 {name(op.recipientId)}</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.reconcile(op.operationId);if(valid())await load();})}>核对结果</button>{op.state!=='stopped-local'&&<><p>停止本机发送不会撤回可能已经送达的材料。</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.abandon(op.operationId,{confirmed:true});if(valid())await load();})}>停止本机发送</button></>}</details>
+    </article>)}</section>}
+    <dialog ref={confirmation} className="workspace-dialog material-dialog" onCancel={event=>{if(busy)event.preventDefault();else{setPreview(null);setRenewal(null);}}}>
+      {(preview||renewal)&&<><header className="dialog-heading"><span>{renewal?'重新确认材料范围':preview?.kind==='grants'?'预览资料交接':preview?.kind==='accept'?'接收这份材料':preview?.kind==='decline'?'婉拒这份材料':'撤回这份材料'}</span><button className="icon-button" disabled={busy} aria-label="关闭材料预览" onClick={()=>{setPreview(null);setRenewal(null);}}>×</button></header>
+        {renewal?<><h3>{{grant:'发送原材料',accept:'接收原材料',decline:'婉拒原材料',revoke:'撤回原材料'}[('kind' in renewal.payload?renewal.payload.kind:'grant')]}</h3><p>本次操作的另一方：{name(renewal.recipientId)}</p><p>{'materials' in renewal.payload?'原材料可阅读至':'本次操作授权至'} {readableTime(renewal.expiresAt)}。</p>{('materials' in renewal.payload?renewal.payload.materials:[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>)}<details className="technical-details"><summary>原操作的准确引用</summary><p>操作 {renewal.operationId} · 材料 {renewal.grantId} · 参与范围第 {renewal.payload.scopeVersion} 版</p><p>摘要 {renewal.payloadHash}</p></details></>:preview?.drafts.map((draft,index)=><article key={index}>
+          {draft.payload?<><h3>给 {name(draft.payload.participantId)}</h3><p className="record-meta">{draft.recipient.agreedScope} · 可阅读至 {readableTime(draft.payload.expiresAt)}</p>{draft.payload.materials.map(m=><section key={m.id}><h4>{m.label}</h4><p className="reading-prose">{m.content}</p></section>)}</>:<><p>提供者：{name(draft.metadata.ownerId)} · 接收者：{name(draft.metadata.participantId)}</p><p>可阅读至 {readableTime(draft.metadata.expiresAt)}</p><ul>{(draft.materials??[]).map(m=><li key={m.id}>{m.label}</li>)}</ul></>}
+        </article>)}
+        <p className="permission-line">{preview?.kind==='revoke'?'撤回后，这份材料不再通过本次授权读取。':preview?.kind==='decline'?'婉拒只影响这次材料接收。':'仅提供者与所选接收者可见，接收者确认后才能打开正文。'}</p>
+        {error&&<p className="message error" role="alert">{error}</p>}
+        <div className="button-row"><Button disabled={busy} onClick={()=>run(async valid=>{if(renewal){await client.reauthorize(renewal.operationId,renewal,{confirmed:true});if(valid()){setRenewal(null);await load();}}else await commit(valid);})}>{renewal?'确认继续':preview?.kind==='grants'?'发送资料':preview?.kind==='accept'?'确认接收':preview?.kind==='decline'?'确认婉拒':'确认撤回'}</Button><Button variant="outline" disabled={busy} onClick={()=>{setPreview(null);setRenewal(null);}}>返回</Button></div>
+      </>}
+    </dialog>
+    <dialog ref={reader} className="workspace-dialog material-dialog" onCancel={closeReader}>{openedId&&<>
+      <header className="dialog-heading"><span>工作材料</span><button className="icon-button" aria-label="关闭工作材料" onClick={closeReader}>×</button></header>
+      {opened?<><p className="record-meta">{statusNames[opened.state]??'当前不可用'}</p>{opened.contextAccessGranted?(opened.materials??[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>):<p>当前没有读取正文的授权。</p>}</>:<p>正在核对当前材料与可读范围…</p>}
+      {error&&<p className="message error" role="alert">{error}</p>}
+    </>}</dialog>
+  </section>;
 }

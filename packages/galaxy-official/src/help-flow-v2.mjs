@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod/v4';
 import { helpQuerySchema, helpOfferDraftSchema, helpBasisSchema, helpPaths } from './shared/help-schema-v2.mjs';
 import { taskRequestV2Schema } from './shared/task-schema-v2.mjs';
+import { createHelpActionFlowV2 } from './help-action-flow-v2.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const unique = values => [...new Set(values)];
@@ -56,7 +57,7 @@ function sourceRefs(kind, page, endpoint, now) {
 // Runs in the user's process. sources.*.query and actions are already-authorized
 // clients; they must not be constructed from model-supplied raw source records.
 // Query permission never implies permission for createTask or other mutations.
-export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () => Math.floor(Date.now() / 1000) }) {
+export function createHelpFlowV2({ store, sources = {}, actions = {}, authorize, now = () => Math.floor(Date.now() / 1000) }) {
   if (!store?.update || !store?.get) throw new Error('help_store_required');
   function view(row) {
     const keys = currentKeys(row);
@@ -92,7 +93,8 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () =
       const queries = new Map(draft.queries.map(q => [q.requestId, q]));
       const refs = new Map(draft.basis.map(ref => [ref.key, ref]));
       for (const result of results) {
-        queries.set(result.requestId, { requestId: result.requestId, kind: result.kind, state: result.state, checkedAt: result.checkedAt, basisKeys: result.basis.map(b => b.key) });
+        queries.set(result.requestId, { requestId: result.requestId, kind: result.kind, state: result.state, checkedAt: result.checkedAt,
+          basisKeys: result.basis.map(b => b.key), request: parsed.requests.find(request => request.requestId === result.requestId) });
         for (const ref of result.basis) refs.set(ref.key, ref);
       }
       draft.queries = [...queries.values()].slice(-32);
@@ -141,12 +143,46 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () =
     row.pauseState = z.enum(['active', 'paused']).parse(state);
   }, expectedRevision));
 
+  async function review(id, { signal } = {}) {
+    const row = await store.get(id), needed = new Set(row.offers.flatMap(offer => offer.basisKeys)), statuses = new Map();
+    const queries = row.queries.filter(query => query.basisKeys.some(key => needed.has(key)));
+    await Promise.all(queries.map(async query => {
+      let references = null;
+      if (query.request && sources[query.kind]?.query) {
+        try {
+          signal?.throwIfAborted();
+          references = sourceRefs(query.kind, await sources[query.kind].query(query.request.input, { signal }), store.endpoint, now());
+        } catch { signal?.throwIfAborted(); }
+      }
+      for (const key of query.basisKeys.filter(key => needed.has(key))) {
+        const old = row.basis.find(ref => ref.key === key), current = references?.find(ref => ref.id === old?.id && ref.kind === old.kind);
+        const state = !current ? 'unavailable' : current.key === key ? 'current' : 'changed';
+        const prior = statuses.get(key);
+        // A failure of any independently requested source cannot be erased by
+        // a successful duplicate page in the same review.
+        if (!prior || prior.state === 'current') statuses.set(key, { key, state, checkedAt: now() });
+      }
+    }));
+    const latest = await store.get(id);
+    if (latest.revision !== row.revision) throw new Error('help_session_changed');
+    const offers = row.offers.map(offer => {
+      const basisStatuses = offer.basisKeys.map(key => statuses.get(key) ?? { key, state: 'unavailable', checkedAt: now() });
+      const state = basisStatuses.some(ref => ref.state === 'unavailable') ? 'unavailable' : basisStatuses.some(ref => ref.state === 'changed') ? 'changed' : 'current';
+      return { id: offer.id, state, basisStatuses, ...(state === 'current' ? { offer: { ...offer, sourceStatus: 'current-readable', checkedAt: now() } } : {}) };
+    });
+    // session metadata deliberately excludes old explanatory bodies. The
+    // model's old reason is useful only after its exact sources reread current.
+    const { offers: _offers, basis: _basis, queries: _queries, ...session } = view(row);
+    return { session, offers, checkedAt: now(), sourceBodiesPersisted: false, dataServiceProvidesModel: false };
+  }
+
   async function publish(id, submission) {
     z.strictObject({ consentId: z.uuid(), payloadJson: z.string().min(1).max(24000) }).parse(submission);
     const request = taskRequestV2Schema.parse(JSON.parse(submission.payloadJson));
     if (!actions.createTask) throw new Error('help_task_client_unavailable');
     const payloadHash = digest(submission.payloadJson);
     await store.update(id, row => {
+      if (row.actionOperations.some(op => ['submitting', 'unknown', 'conflict'].includes(op.state))) throw new Error('help_reconcile_original_operation');
       if (row.caseId && row.caseId !== request.caseId || row.taskId && row.taskId !== request.taskId) throw new Error('help_original_task_mismatch');
       const prior = row.linkedOperations.find(op => op.operationId === request.operationId);
       if (prior && (prior.payloadHash !== payloadHash || prior.taskId !== request.taskId)) throw new Error('help_operation_conflict');
@@ -164,7 +200,7 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () =
         draft.taskId = request.taskId; draft.caseId = request.caseId;
       });
       return { session: view(row), publication: { state: 'acknowledged', receipt }, invitationsSent: false, candidateQueryIndependent: true };
-    } catch (_error) {
+    } catch {
       const row = await store.update(id, draft => {
         const op = draft.linkedOperations.find(o => o.operationId === request.operationId);
         if (op.state !== 'acknowledged') Object.assign(op, { state: 'unknown', checkedAt: now() });
@@ -182,23 +218,57 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () =
       || receipt.state === 'acknowledged' && (!Number.isInteger(receipt.version) || receipt.version < 1)) throw new Error('help_receipt_mismatch');
     const next = await store.update(id, draft => {
       const operation = draft.linkedOperations.find(o => o.operationId === operationId);
+      // A receipt read may finish after the original publication ACK. A late
+      // absence/conflict observation must not erase that historical write.
+      if (operation.state === 'acknowledged' && receipt.state !== 'acknowledged') return;
       Object.assign(operation, { state: receipt.state, checkedAt: now(), ...(receipt.version ? { version: receipt.version } : {}) });
       if (receipt.state === 'acknowledged') draft.taskId = receipt.taskId;
     });
     return { session: view(next), receipt, currentPermissionEstablished: false, invitationsSent: false };
   }
+  async function recoverForRefresh(id) {
+    const initial = await store.get(id), operations = [];
+    const pending = state => ['submitting', 'unknown', 'conflict'].includes(state);
+    const references = [...initial.linkedOperations.filter(op => pending(op.state)).map(op => ({ ...op, kind: 'publish-task', legacy: true })),
+      ...initial.actionOperations.filter(op => pending(op.state)).map(op => ({ ...op, legacy: false }))];
+    for (const reference of references) {
+      let receiptState, error;
+      try {
+        // Only the already recorded event and exact payload digest are read.
+        // No submission, automatic retry or new business ID is created here.
+        const result = reference.legacy ? await reconcile(id, reference.operationId)
+          : await actionFlow.reconcileAction(id, { operationId: reference.operationId });
+        receiptState = result.receipt.state;
+      } catch (failure) { receiptState = 'unavailable'; error = errorCode(failure); }
+      // Local identity/endpoint guards still apply, even when the remote read
+      // fails. A failed receipt must not discard another operation's result.
+      const latest = await store.get(id), current = (reference.legacy ? latest.linkedOperations : latest.actionOperations)
+        .find(op => op.operationId === reference.operationId);
+      if (!current) throw new Error('help_session_changed');
+      operations.push({ operationId: current.operationId, kind: reference.kind, taskId: current.taskId, state: current.state, receiptState,
+        ...(current.participationId ? { participationId: current.participationId } : {}), ...(current.grantId ? { grantId: current.grantId } : {}),
+        ...(error ? { error, next: 'reconcile-original-operation' } : {}) });
+    }
+    return { row: await store.get(id), reconciliation: { operations, automaticallyRetried: false, currentPermissionEstablished: false } };
+  }
   async function refresh(id) {
-    const row = await store.get(id);
-    if (!row.taskId) return { session: view(row), remote: null, state: 'no-acknowledged-task' };
-    if (!actions.getTask) return { session: view(row), remote: null, state: 'task-client-unavailable' };
+    const { row, reconciliation } = await recoverForRefresh(id);
+    if (!row.taskId) return { session: view(row), remote: null, state: 'no-acknowledged-task', reconciliation };
+    if (!actions.getTask) return { session: view(row), remote: null, state: 'task-client-unavailable', reconciliation };
     try {
       const remote = await actions.getTask(row.taskId);
       if (remote?.taskId !== row.taskId || !Number.isInteger(remote.version) || remote.version < 1) throw new Error('help_task_mismatch');
       if (row.caseId && remote.caseId && row.caseId !== remote.caseId) throw new Error('help_case_mismatch');
-      const next = remote.caseId && !row.caseId ? await store.update(id, draft => { draft.caseId = remote.caseId; }) : row;
-      return { session: view(next), remote, state: 'refreshed', remoteDataStoredLocally: false,
+      // A late page cannot overwrite a newer local choice/pause or attach its
+      // Case to a session that changed while the current Task was being read.
+      if ((await store.get(id)).revision !== row.revision) throw new Error('help_session_changed');
+      const next = remote.caseId && !row.caseId ? await store.update(id, draft => { draft.caseId = remote.caseId; }, row.revision) : row;
+      return { session: view(next), remote, state: 'refreshed', reconciliation, remoteDataStoredLocally: false,
         suggestionsAreResponses: false, roomAccess: 'requires-separate-room-grant' };
-    } catch (error) { return { session: view(row), remote: null, state: 'unavailable', error: errorCode(error), previousReceiptsDoNotProveCurrentAccess: true }; }
+    } catch (error) {
+      if (error.message === 'help_session_changed' || error.message === 'help_identity_changed') throw error;
+      return { session: view(row), remote: null, state: 'unavailable', reconciliation, error: errorCode(error), previousReceiptsDoNotProveCurrentAccess: true };
+    }
   }
   async function returnToTask(id, { expectedRevision }) {
     const initial = await store.get(id);
@@ -207,8 +277,10 @@ export function createHelpFlowV2({ store, sources = {}, actions = {}, now = () =
     const row = await store.update(id, draft => { draft.pauseState = 'returned'; }, result.session.revision);
     return { ...result, session: view(row), handoff: { localTaskRef: row.localTaskRef, caseId: row.caseId, taskId: row.taskId,
       operationRefs: row.linkedOperations.map(({ operationId, taskId, state }) => ({ operationId, taskId, state })),
+      actionOperationRefs: row.actionOperations,
       method: 'original-conversation-and-mcp-refresh', hostCallbackVerified: false },
       remoteOperationsCanceled: false, successFactsCreated: false, userMustDecideExistingCommitments: true };
   }
-  return { start, get, query, compose, select, pause, publish, reconcile, refresh, returnToTask, forget: store.forget };
+  const actionFlow = createHelpActionFlowV2({ store, actions, authorize, review, now });
+  return { start, get, query, compose, select, pause, publish, reconcile, refresh, review, returnToTask, forget: store.forget, ...actionFlow };
 }

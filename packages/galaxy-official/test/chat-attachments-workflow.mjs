@@ -17,13 +17,13 @@ export function attachmentContractFixture(){
 }
 export async function verifyAttachments({database=null,runtimeDb=null,workerDb=null,store,scanner,transport,migrateDatabase=true}={}){
  const messages=new Map(),contract=attachmentContractFixture();
- transport??={available:true,project:async()=>{},send:async x=>{messages.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});return {archiveId:x.messageId};},read:async x=>x.ids.map(id=>messages.get(id)).filter(Boolean),erase:async x=>{messages.delete(x.archiveId??x.messageId);}};
+ transport??={available:true,project:async()=>{},send:async x=>{messages.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});return {archiveId:x.messageId};},read:async x=>x.ids.map(id=>messages.get(id)).filter(Boolean),erase:async x=>{messages.delete(x.archiveId??x.messageId);return{archiveDeleted:true};}};
  const f=await chatFixture({database,runtimeDb,transport,migrateDatabase}),[a,b,c]=f.people,files=new ChatAttachmentsService({chat:f.chat,store:store??contract.store,scanner:scanner??contract.scanner});
  f.chat.attachments=files;
  const jobs=workerDb?new ChatAttachmentsService({chat:{db:workerDb,now:f.now},store:files.store,scanner:files.scanner}):files;
  const server=createApi({bindings:{endpoint:f.chat.access.endpoint},access:f.chat.access,chat:f.chat,attachments:files,rateLimit:1000,browserOrigins:['https://galaxy.example.org']});
  server.listen(0,'127.0.0.1');await once(server,'listening');const url='http://127.0.0.1:'+server.address().port;
- async function post(actor,path,input,method='POST'){const res=await fetch(url+path,{method,headers:{Authorization:'Bearer '+f.credentials.get(actor.subjectId),'Content-Type':method==='PUT'?'application/octet-stream':'application/json'},body:method==='PUT'?input:JSON.stringify(input)});return res;}
+ async function post(actor,path,input,method='POST'){const res=await fetch(url+path,{method,headers:{Authorization:'Bearer '+f.credentials.get(actor.subjectId),'Content-Type':method==='PUT'?'application/octet-stream':'application/json'},...(method==='GET'?{}:{body:method==='PUT'?input:JSON.stringify(input)})});return res;}
  const roomId=randomUUID(),bytes=Buffer.from('Synthetic ordinary room attachment, not a Task.\n');
  const input=(data=bytes)=>({attachmentId:randomUUID(),roomId,name:'example.txt',mediaType:'text/plain',size:data.length,sha256:digest(data),purpose:'temporary-room-attachment',confirmed:true});
  const root='/v2/chat/attachments/';

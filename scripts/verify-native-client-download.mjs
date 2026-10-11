@@ -1,17 +1,12 @@
 // Uses the existing Galaxy publisher pin and standard release verifier.
 // Run only after checking this script's published SHA-256 and HTTPS source.
-import { readFile, stat } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { resolve } from 'node:path';
+import { downloadedLocal as local,nativeArtifactFilename } from './native-download-inputs.mjs';
 import { calculateJwkThumbprint, importJWK } from 'jose';
 import { verifyRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
 
 const publisher = 'https://agigalaxy.org', kid = 'galaxy-release-20260911';
 const thumbprint = 'mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4';
-async function local(directory, name, limit) {
-  const path = join(directory, name), info = await stat(path);
-  if (!info.isFile() || info.size > limit) throw new Error('Unexpected downloaded file');
-  return readFile(path);
-}
 try {
   if (process.argv.length !== 3) throw new Error('Expected downloaded release directory');
   const directory = resolve(process.argv[2]);
@@ -31,14 +26,17 @@ try {
   if (keys.length !== 1 || periods.length !== 1 || keys[0].alg !== 'EdDSA'
     || await calculateJwkThumbprint(keys[0], 'sha256') !== thumbprint) throw new Error('Publisher pin changed');
   const key = await importJWK(keys[0], 'EdDSA');
+  const packageMetadata=JSON.parse((await local(directory,'package-metadata.json',65536)).toString('utf8'));
+  const artifactFilename=nativeArtifactFilename(packageMetadata);
   const result = await verifyRelease((await local(directory, 'release.jws', 65536)).toString('utf8').trim(), {
     publisher, expectedPackage: '@galaxy/native-client',
-    artifact: await local(directory, 'galaxy-native-client-0.2.0.tgz', 64 * 1024 * 1024),
+    artifact: await local(directory, artifactFilename, 64 * 1024 * 1024),
     report: await local(directory, 'protocol-report.json', 256 * 1024),
     trustedKeys: new Map([[kid, { publicKey: key, notBefore: periods[0].notBefore,
       notAfter: periods[0].notAfter, revoked: periods[0].revoked !== false }]]),
   });
-  if (result.manifest.purpose !== 'release-candidate' || result.manifest.kind !== 'galaxy-native-client-release')
+  if (result.manifest.purpose !== 'release-candidate' || result.manifest.kind !== 'galaxy-native-client-release'
+    ||result.manifest.package.version!==packageMetadata.version||result.manifest.package.filename!==artifactFilename)
     throw new Error('Unexpected release channel');
   console.log(JSON.stringify({ verified: true, publisher, package: result.manifest.package.name,
     version: result.manifest.package.version, sha256: result.manifest.package.sha256,

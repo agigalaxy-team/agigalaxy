@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod/v4';
-import { AgentCard, SendMessageRequest, GetTaskRequest, CancelTaskRequest } from '@a2a-js/sdk';
+import { AgentCard, Message, Role, SendMessageRequest, GetTaskRequest, CancelTaskRequest } from '@a2a-js/sdk';
 import { ClientFactory, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import { A2AError } from '@a2a-js/sdk/errors';
 import { postA2aJson, validatePublicUrl } from '../../galaxy-official/src/public-fetch.mjs';
@@ -24,13 +24,14 @@ const label = value => z.string().min(1).max(160).refine(text => !/\p{Cc}/u.test
  * post is a trusted transport injection for hosts/tests, never peer input.
  */
 export function createA2aBridge({ endpoint, tenant = '', agentCard, subjectId, peerPrincipal,
-  officialEndpoint, directory, authorize, cases, factsV2, post = postA2aJson, now = () => Date.now() }) {
+  officialEndpoint, directory, authorize, cases, factsV2, assertCurrent = () => {}, post = postA2aJson, now = () => Date.now() }) {
   endpoint = validatePublicUrl(endpoint).href;
   if (validatePublicUrl(officialEndpoint).origin !== officialEndpoint) throw new Error('Invalid Official origin.');
   z.string().regex(/^GUID[0-9A-Z]{28}$/).parse(subjectId);
   label(peerPrincipal);
   z.string().max(256).parse(tenant);
   if (typeof authorize !== 'function' || (typeof cases?.get !== 'function' && typeof factsV2?.resolve !== 'function')) throw new Error('Host authorization and Case reader required.');
+  if (typeof assertCurrent !== 'function') throw new Error('Trusted current authority check required.');
   const card = AgentCard.fromJSON(agentCard);
   const selected = card.supportedInterfaces.find(item => item.url === endpoint && item.tenant === tenant
     && item.protocolBinding === A2A_PROFILE.transport && item.protocolVersion === A2A_PROFILE.protocol);
@@ -121,7 +122,10 @@ export function createA2aBridge({ endpoint, tenant = '', agentCard, subjectId, p
       const operations = previous?.operations ?? [];
       if (operations.length >= 128) throw new Error('A2A association operation limit reached.');
       return { ...link, status: 'dispatching', operations: [...operations,
-        { id: operationId, kind, requestHash, at: now(), outcome: 'dispatching' }] };
+        { id: operationId, kind, requestHash, at: now(), outcome: 'dispatching',
+          ...(params.message ? { originalMessage: { messageId: params.message.messageId,
+            contentHash: messageContentHash(params.message), taskId: params.message.taskId || null,
+            contextId: params.message.contextId || null } } : {}) }] };
     });
     try {
       signal?.throwIfAborted();
@@ -170,6 +174,57 @@ export function createA2aBridge({ endpoint, tenant = '', agentCard, subjectId, p
     if (!link.peer?.taskId) throw new Error('No observed peer task ID; automatic recovery/resend is unavailable.');
     const params = GetTaskRequest.fromJSON({ tenant, id: link.peer.taskId, historyLength: 0 });
     return perform('poll', link, auth, signal, params, randomUUID(), hash(JSON.stringify(params)));
+  }
+  async function reconcileTask(id, { signal, ...input } = {}) {
+    const query = z.strictObject({ operationId: z.uuid(), requestHash: z.string().regex(/^[0-9a-f]{64}$/),
+      candidateTaskId: z.string().min(1).max(512).refine(value => !/\p{Cc}/u.test(value)) }).parse(input);
+    const check = () => { signal?.throwIfAborted(); assertCurrent(); };
+    check();
+    const link = await journal.get(uuid(id)); check();
+    const op = link.operations?.find(item => item.id === query.operationId);
+    if (!op || op.requestHash !== query.requestHash || op.kind !== 'send' || link.operations.length !== 1
+      || link.peer?.taskId || !['unknown', 'dispatching'].includes(link.status)
+      || !['unknown', 'dispatching'].includes(op.outcome)) throw new Error('Exact unknown original operation required.');
+    const unknown = reason => ({ state: 'unknown', reason, associationId: link.id, operationId: op.id,
+      requestHash: op.requestHash, originalOperationRetained: true, remoteResent: false });
+    const { auth } = await access(link.caseId, link.attemptId, signal, link.factContext); check();
+    // Older journals cannot acquire an inferred message locator. The digest is
+    // durable before dispatch and contains no selected request text.
+    const saved = op.originalMessage;
+    if (!saved || !z.uuid().safeParse(saved.messageId).success || !/^[0-9a-f]{64}$/.test(saved.contentHash)
+      || saved.taskId !== null || saved.contextId !== null) return unknown('original-message-unavailable');
+    const sdk = await client(auth, signal); check();
+    let result;
+    try { result = await sdk.getTask(GetTaskRequest.fromJSON({ tenant, id: query.candidateTaskId, historyLength: 128 }), { signal }); }
+    catch { check(); return unknown('peer-observation-unavailable'); }
+    check();
+    // Re-read current source and external authorization after the peer await.
+    // A historical send or peer ACK grants no current access to Galaxy facts.
+    await access(link.caseId, link.attemptId, signal, link.factContext); check();
+    const currentAuth = await authorize(Object.freeze({ ...scope })); check();
+    if (currentAuth?.subjectId !== subjectId || currentAuth?.peerPrincipal !== peerPrincipal)
+      throw new Error('A2A host authorization changed during original Task observation.');
+    if (result.id !== query.candidateTaskId || !Array.isArray(result.history) || result.history.length > 128)
+      return unknown('original-message-unproven');
+    const matches = result.history.filter(message => message.messageId === saved.messageId);
+    if (matches.length !== 1) return unknown('original-message-unproven');
+    const message = matches[0];
+    // Python supplies assigned route IDs; JS may retain the original empty
+    // route. Only these two fields are excluded from the content digest, and
+    // any supplied value must bind to this exact returned Task/context.
+    if (message.role !== Role.ROLE_USER || (message.taskId && message.taskId !== result.id) || (message.contextId && message.contextId !== result.contextId)
+      || messageContentHash(message) !== saved.contentHash) return unknown('original-message-unproven');
+    let peer;
+    try { peer = snapshot(result); } catch { return unknown('original-message-unproven'); }
+    check();
+    const association = await journal.change(link.id, link.revision, previous => {
+      check();
+      return { ...previous, peer, status: 'observed', operations: finish(previous.operations,
+        { outcome: 'observed', state: peer.state, responseHash: peer.responseHash,
+          correlation: 'original-message-history', reconciledAt: now() }) };
+    });
+    check();
+    return { state: 'observed', association, originalOperationRetained: true, remoteResent: false };
   }
   async function prepareResult(id) {
     const link = await journal.get(uuid(id));
@@ -241,11 +296,15 @@ export function createA2aBridge({ endpoint, tenant = '', agentCard, subjectId, p
       resultImportV2: { ...prior.resultImportV2, state: 'acknowledged', receipt: structuredClone(receipt) } }));
     return receipt;
   }
-  return Object.freeze({ prepareStart, prepareReply, prepareCancel, execute, abort, poll, prepareResult,
+  return Object.freeze({ prepareStart, prepareReply, prepareCancel, execute, abort, poll, reconcileTask, prepareResult,
     prepareResultV2, saveResultAuthorizationV2, recordResultV2,
     // Local reads contain selected peer text, never external credentials.
     get: async id => journal.get(uuid(id)), list: journal.list, saveResultConsent, recordResult, profile: A2A_PROFILE });
 }
 function finish(operations, result) {
   return [...operations.slice(0, -1), { ...operations.at(-1), ...result }];
+}
+function messageContentHash(message) {
+  const { taskId: _taskId, contextId: _contextId, ...content } = Message.toJSON(message);
+  return hash(JSON.stringify(content));
 }

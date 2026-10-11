@@ -1,13 +1,15 @@
 import { searchSourceTypes } from '../../../packages/galaxy-official/src/shared/search-schema.mjs';
+import {searchSourceName} from './source-reading.mjs';
 const plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,6000);
 function surface({select,info,language,isCurrent,onBack}){
   const label=(cn,en)=>language==='en-US'?en:cn;let generation=0;
   const current=()=>isCurrent();
   const begin=()=>{const version=++generation;return ()=>current()&&version===generation;};
-  function menu(title,entries,back=onBack){
-    if(!current())return;const valid=begin(),routes={},options=entries.map(([title,action,description=''],i)=>{
-      routes[i+1]=()=>{if(valid())action();};return {number:String(i+1),title,description};});
-    select({title,options,routes,onBack:()=>{if(valid()){generation++;back();}}});
+  function menu(title,entries,back=onBack,offset=0){
+    if(!current())return;const valid=begin(),routes={},activate=fn=>()=>{if(valid()){generation++;fn();}},options=entries.slice(offset,offset+8).map(([title,action,description=''],i)=>{
+      routes[i+1]=activate(action);return {number:String(i+1),title,description};});
+    if(offset+8<entries.length){options.push({number:'9',title:label('继续查看','More content'),description:''});routes[9]=activate(()=>menu(title,entries,back,offset+8));}
+    select({title,options,routes,onBack:activate(offset?()=>menu(title,entries,back,offset-8):back)});
   }
   function message(text,back=onBack){if(current()){const valid=begin();info('Galaxy',text,()=>{if(valid()){generation++;back();}});}}
   return {label,begin,menu,message};
@@ -45,8 +47,8 @@ export function createSearchFeedbackMenu(options){
     const valid=begin();
     try{
       const page=await controller.querySearchFeedback({limit:1});if(!valid())return;
-      menu(`${label('本机反馈汇总','Local feedback summary')}\n${plain(page.endpoint)}\n${summaryText(page.summary)}`,
-        [[label('全部反馈','All feedback'),()=>browse()],...searchSourceTypes.map(type=>[type,()=>browse({sourceType:type}),String(page.summary.bySource[type]?.responses??0)])],onBack);
+      menu(`${label('本机反馈汇总','Local feedback summary')}\n${summaryText(page.summary)}`,
+        [[label('全部反馈','All feedback'),()=>browse()],...searchSourceTypes.map(type=>[searchSourceName(type,label),()=>browse({sourceType:type}),String(page.summary.bySource[type]?.responses??0)])],onBack);
     }catch(error){if(valid())message(plain(error.message),onBack);}
   }
   async function browse(selection={}){
@@ -54,17 +56,21 @@ export function createSearchFeedbackMenu(options){
     try{
       const page=await controller.querySearchFeedback({...selection,limit:8});if(!valid())return;
       const back=()=>browse(selection),entries=page.items.map(row=>[
-        `${row.sourceType} · ${plain(row.criteria.query)||label('无关键词','No keywords')}`,
-        ()=>message([`${row.sourceType}: ${row.sourceId}`,`${label('来源版本','Source version')}: ${row.sourceVersion}`,
-          `${label('来源摘要','Source hash')}: ${row.snapshotHash}`,`${label('更新时间','Updated')}: ${row.updatedAt}`,
-          JSON.stringify(row.criteria,null,2),`${row.relevance} · ${String(row.helpedSelection)}`,
-          label('这是个人反馈记录；来源当前有效性未重新核查。','Personal feedback record; current source validity has not been rechecked.')].join('\n'),()=>{
+        `${searchSourceName(row.sourceType,label)} · ${plain(row.criteria.query)||label('无关键词','No keywords')}`,
+        ()=>menu(label('保存的个人反馈','Saved personal feedback')+'\n'+[
+          label('关键词','Keywords')+'：'+(plain(row.criteria.query)||label('无','None')),
+          ({relevant:label('相关','Relevant'),'not-relevant':label('不相关','Not relevant'),unsure:label('不确定','Unsure')})[row.relevance]??plain(row.relevance),
+          row.helpedSelection===null?label('未回答是否有帮助','Helpfulness unanswered'):row.helpedSelection?label('帮助了选择','Helped selection'):label('没有帮助选择','Did not help selection'),
+          label('更新时间','Updated')+'：'+plain(row.updatedAt),
+          label('这是个人反馈记录；来源当前有效性未重新核查。','Personal feedback record; current source validity has not been rechecked.')
+        ].join('\n'),[[label('修改个人反馈','Edit personal feedback'),()=>{
             const current=begin();createSearchFeedbackForm({...options,isCurrent:current,onBack:back,
               initial:{relevance:row.relevance,helpedSelection:row.helpedSelection},
               submit:verdict=>controller.editSearchFeedback({id:row.id,revision:row.revision,verdict})}).open();
-          }),`${row.relevance} · ${plain(row.sourceId)}`]);
+          }],[label('查看保存时的条件与来源','Inspect saved criteria and source'),()=>message(JSON.stringify(row,null,2),back)]],back),
+          ({relevant:label('相关','Relevant'),'not-relevant':label('不相关','Not relevant'),unsure:label('不确定','Unsure')})[row.relevance]??plain(row.relevance)]);
       if(page.nextCursor)entries.push([label('下一页','Next page'),()=>browse({...selection,after:page.nextCursor})]);
-      menu(`${label('本机反馈','Local feedback')} · ${selection.sourceType??label('全部','All')}\n${summaryText(page.summary)}\n${page.items.length? '':label('本页没有反馈。','No feedback on this page.')}`,entries,home);
+      menu(`${label('本机反馈','Local feedback')} · ${selection.sourceType?searchSourceName(selection.sourceType,label):label('全部','All')}\n${summaryText(page.summary)}\n${page.items.length? '':label('本页没有反馈。','No feedback on this page.')}`,entries,home);
     }catch(error){if(valid())message(plain(error.message),home);}
   }
   return Object.freeze({open:home});

@@ -17,6 +17,8 @@ export async function verifyNativeCandidate(candidate,pythonExecutable){
  for(const[name,version]of Object.entries(pkg.dependencies))assert.equal(JSON.parse(await readFile(join(candidate,'node_modules',name,'package.json'),'utf8')).version,version);
  const {generateHostConfigs}=await import(pathToFileURL(join(candidate,'host-configs.mjs')));
  const temporary=await mkdtemp(join(tmpdir(),'galaxy-native-config-check-'));
+ const actual=resolve(temporary),prefix=resolve(tmpdir())+sep;
+ if(!actual.startsWith(prefix)||!actual.split(sep).at(-1).startsWith('galaxy-native-config-check-'))throw new Error('Temporary cleanup target changed');
  try{
   const key=generateKeyPairSync('ed25519'),now=Math.floor(Date.now()/1000),configPath=join(temporary,'synthetic-public-config.json');
   await writeFile(configPath,JSON.stringify({version:2,endpoint:'https://not-connected.example.org',website:'https://www.example.org',dataDirectory:join(temporary,'data'),
@@ -43,8 +45,6 @@ export async function verifyNativeCandidate(candidate,pythonExecutable){
    generatedFiles:files.length,sharedSkillCopies:files.filter(x=>x.endsWith('/SKILL.md')).length,existingOutputOverwriteRejected:true,
    actualSettingsModified:false,actualHostAcceptance:false,syntheticConfigurationOnly:true,temporaryDirectoryRemoved:true,syntaxCheck};
  }finally{
-  const actual=resolve(temporary),prefix=resolve(tmpdir())+sep;
-  if(!actual.startsWith(prefix)||!actual.split(sep).at(-1).startsWith('galaxy-native-config-check-'))throw new Error('Temporary cleanup target changed');
   await rm(actual,{recursive:true,force:true});
  }
 }

@@ -1,7 +1,9 @@
 import { discoveryPreferencesSchema, functionTagsSchema } from '../../../packages/galaxy-official/src/shared/discovery-schema.mjs';
 import { createProfileMenu } from './profile-menu.mjs';
+import {createNativeProjectDiscoveryMenu} from './project-contact-menu.mjs';
 
-export function createProjectDiscoveryMenu({ controller, select, prompt, info, language, isCurrent, onBack, now = () => Math.floor(Date.now() / 1000) }) {
+export function createProjectDiscoveryMenu({ controller=null, nativeCall=null, select, prompt, info, language, isCurrent, onBack, onReturnWork=onBack, onOpenRoom=null, openLink=null, readWorkContext=null, now = () => Math.floor(Date.now() / 1000) }) {
+  if(nativeCall)return createNativeProjectDiscoveryMenu({call:nativeCall,select,prompt,info,language,isCurrent,onBack,onReturnWork,onOpenRoom,openLink,readWorkContext,now});
   const label = (cn, en) => language === 'en-US' ? en : cn;
   // oxlint-disable-next-line no-control-regex -- Prevent terminal controls in displayed user text.
   const plain = value => String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').slice(0, 2400);
@@ -44,7 +46,6 @@ export function createProjectDiscoveryMenu({ controller, select, prompt, info, l
           const current = ++generation;
           createProfileMenu({ controller, select, prompt, info, language, isCurrent: () => isCurrent() && current === generation, onBack: home }).open();
         }],
-        [label('重新读取', 'Reload'), home],
       ], leave);
     }, leave);
   }
@@ -54,34 +55,37 @@ export function createProjectDiscoveryMenu({ controller, select, prompt, info, l
     if (offset + 6 < projects.length) entries.push([label('下一页', 'Next page'), () => chooseProject(offset + 6)]);
     menu(projects.length ? label('选择自己的项目／模块', 'Choose your project / module') : label('请先在“我的资料”中填写并发布项目介绍。', 'First publish a project description in My Profile.'), entries);
   }
-  function query(project) {
-    void run(() => controller.queryProjectDiscovery({ projectId: project.id, limit: 20 }), page => cards(project, page), () => chooseProject());
+  function query(project,offset=0) {
+    void run(() => controller.queryProjectDiscovery({ projectId: project.id, limit: 20 }), page => cards(project, page,Math.min(offset,Math.max(0,Math.floor((page.items.length-1)/6)*6))), () => chooseProject());
   }
   function cards(project, page, offset = 0) {
     const entries = page.items.slice(offset, offset + 6).map(card => [brief(card.project.title, 32), () => cardView(project, page, card, offset), join(card.match.sharedFunctions)]);
     if (offset) entries.push([label('上一页', 'Previous page'), () => cards(project, page, offset - 6)]);
     if (offset + 6 < page.items.length) entries.push([label('下一页', 'Next page'), () => cards(project, page, offset + 6)]);
-    entries.push([label('刷新机会', 'Refresh opportunities'), () => query(project)]);
     menu(label('相关机会', 'Related opportunities') + ' · ' + plain(project.title) + '\n'
       + (!page.enabled ? label('发现已关闭或暂时暂停；在接触意愿中调整。', 'Discovery is disabled or temporarily paused; change contact wishes.')
         : !page.items.length ? label('本次没有符合可见性、功能及意愿的机会。', 'No opportunity met visibility, function and contact wishes in this query.') : label('功能相关，自述未经认证；尚未发送任何接触消息。', 'Shared functions; self-declared, not certified. No contact message has been sent.'))
       + (page.windowLimited || page.resultLimited ? '\n' + label('结果有截断，不代表全部项目；可调整关注方向。', 'Results are bounded; this is not the complete directory. Adjust your focus if useful.') : ''), entries, () => chooseProject());
   }
-  function cardView(project, page, card, offset) {
-    const d = card.match.differences, back = () => cards(project, page, offset);
-    menu(brief(card.project.title, 32) + '\n' + brief(card.project.summary, 32) + '\n\n'
-      + label('相关功能：', 'Shared functions: ') + brief(join(card.match.sharedFunctions)) + '\n'
-      + label('共同目的：', 'Common purposes: ') + brief(join(card.match.purposes.map(value => purposes[value]))) + '\n'
-      + label('我方独有功能：', 'Your distinct functions: ') + brief(join(d.sourceOnlyFunctions)) + '\n'
-      + label('对方独有功能：', 'Their distinct functions: ') + brief(join(d.candidateOnlyFunctions)) + '\n'
-      + label('我方不同技术：', 'Your distinct technologies: ') + brief(join(d.sourceOnlyTechnologies)) + '\n'
-      + label('对方不同技术：', 'Their distinct technologies: ') + brief(join(d.candidateOnlyTechnologies)) + '\n'
-      + label('自述，未经能力认证；技术相同不是推荐理由。', 'Self-declared, not capability certification; a shared technology is not a matching reason.'), [
+  function cardView(project,page,card,offset){void run(()=>controller.queryProjectDiscovery({projectId:project.id,limit:20}),current=>{
+    const fresh=current.items.find(item=>item.subjectId===card.subjectId&&item.project.id===card.project.id);
+    if(!fresh)return notice(label('这项机会当前已不可见，或接触意愿已变化。','This opportunity is unavailable or the contact wish changed.'),()=>query(project,offset));
+    renderCard(project,current,fresh,offset);
+  },()=>query(project,offset));}
+  function renderCard(project, page, card, offset) {
+    const d = card.match.differences, back = () => query(project,offset);
+    menu(plain(card.project.title) + '\n' + plain(card.project.summary) + '\n\n'
+      + label('相关功能：', 'Shared functions: ') + join(card.match.sharedFunctions) + '\n'
+      + label('共同目的：', 'Common purposes: ') + join(card.match.purposes.map(value => purposes[value])) + '\n'
+      + label('我方独有功能：', 'Your distinct functions: ') + join(d.sourceOnlyFunctions) + '\n'
+      + label('对方独有功能：', 'Their distinct functions: ') + join(d.candidateOnlyFunctions) + '\n'
+      + label('我方不同技术：', 'Your distinct technologies: ') + join(d.sourceOnlyTechnologies) + '\n'
+      + label('对方不同技术：', 'Their distinct technologies: ') + join(d.candidateOnlyTechnologies), [
         [label('查看当前来源资料', 'Read current source Profile'), () => void run(() => controller.queryHistory({ subjectId: card.subjectId, limit: 1 }), profile => {
           const current = profile.selfDeclared?.projects?.find(value => value.id === card.project.id);
-          if (!current || !profile.selfDeclaredSource) { notice(label('这份来源已不可见，请刷新机会。', 'The source is no longer visible. Refresh opportunities.'), back); return; }
-          notice((profile.selfDeclaredSource.id !== card.sources[1].statementId ? label('资料已更新；以下为当前来源。\n', 'Profile updated; current source follows.\n') : '')
-            + `${card.subjectId}\n${profile.selfDeclaredSource.id}\n${plain(current.title)}\n${plain(current.summary)}\n${join(current.functions)}\n${plain(current.sourceUrl)}`, back);
+          if (!current || !profile.selfDeclaredSource) { notice(label('这份来源当前已不可见。','This source is no longer visible.'), back); return; }
+          notice((profile.selfDeclaredSource.id !== card.sources[1]?.statementId ? label('资料已更新；以下为当前来源。\n', 'Profile updated; current source follows.\n') : '')
+            + `${plain(profile.selfDeclared.displayName)||card.subjectId}\n\n${plain(current.title)}\n${plain(current.summary)}\n${join(current.functions)}\n${plain(current.sourceUrl)}`, back);
         }, back)],
         [label('查看双方来源引用', 'View both source references'), () => notice(card.sources.map(source => `${source.subjectId}\n${source.projectId}\n${source.statementId}\n${plain(source.sourceUrl)}`).join('\n\n'), back)],
         [label('查看完整介绍与差异', 'Read full description and differences'), () => menu(label('完整资料（自述）', 'Full self-declared details'), [
@@ -123,7 +127,6 @@ export function createProjectDiscoveryMenu({ controller, select, prompt, info, l
         [label('长期关注方向', 'Long-term function focus'), () => editFunctions(p.functions, values => save(current, { ...p, functions: values }), () => renderPreferences(current)), join(p.functions)],
         [label('临时调整', 'Temporary override'), () => temporary(current), p.temporary ? `${p.temporary.contact} · ${time(p.temporary.until)}` : ''],
         [label('清除临时调整，恢复长期设置', 'Clear override and restore long-term settings'), () => save(current, { ...p, temporary: null })],
-        [label('重新读取', 'Reload'), preferences],
       ]);
   }
   function temporary(current) {

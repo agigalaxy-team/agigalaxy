@@ -3,7 +3,7 @@ import {digest} from './shared/digest.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
 import {PersonalSummaryService,createSummarySourceReader} from './personal-summaries.mjs';
-import {sharedSummaryPublishSchema,sharedSummaryGetSchema,sharedSummaryPageSchema} from './shared/chat-shared-summary-schema.mjs';
+import {sharedSummaryPublishSchema,sharedSummaryGetSchema,sharedSummaryPageSchema,sharedSummaryReceiptSchema} from './shared/chat-shared-summary-schema.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),hash=x=>digest(canonicalize(x));
 const fail=(c,s=409)=>{throw new ServiceError(c,s);};
 function parse(schema,x){const p=schema.safeParse(x);if(!p.success)fail('invalid_shared_summary_request',400);return p.data;}
@@ -89,19 +89,51 @@ export class ChatSharedSummaryService {
   return this.get(actor,{roomId:x.roomId,shareId:x.shareId});
  }
  get(actor,input){const x=parse(sharedSummaryGetSchema,input);return this.run(actor,false,async db=>{await this.chat.requireRoom(db,actor,x.roomId);return this.viewWithin(db,actor,await this.rowWithin(db,x.roomId,x.shareId));});}
+ receipt(actor,input){const x=parse(sharedSummaryReceiptSchema,input);return this.run(actor,false,async db=>{
+  const base={...x,checkedAt:stamp(this.now()),currentAccessGranted:false,contentReturned:false,acceptedByRoom:false,othersReadStatus:'not-asserted'};
+  // A historical operation receipt is independent of present room readership.
+  // Never select its old content, source facts, members or archive body here.
+  const row=(await db.query(`SELECT s.share_id,s.room_id,s.request_hash,s.notice_hash,s.state,s.message_id,s.expires_at,s.retracted_at,
+   m.message_id AS notice_message_id,m.payload_hash AS notice_payload_hash,m.state AS notice_state,m.archive_id,m.expires_at AS notice_expires_at,m.purge_pending
+   FROM room_shared_summaries s LEFT JOIN chat_message_refs m ON m.room_id=s.room_id AND m.subject_id=s.subject_id AND m.client_message_id=s.share_id
+   WHERE s.share_id=$1 AND s.subject_id=$2`,[x.shareId,actor.subjectId])).rows[0];
+  if(!row)return{...base,state:'absent'};
+  if(row.room_id!==x.roomId||row.request_hash!==x.requestHash)return{...base,state:'conflict'};
+  const message=row.notice_message_id?{message_id:row.notice_message_id,payload_hash:row.notice_payload_hash,state:row.notice_state,archive_id:row.archive_id,expires_at:row.notice_expires_at,purge_pending:row.purge_pending}:null;
+  if(message&&message.payload_hash!==row.notice_hash)return{...base,state:'conflict'};
+  const expired=Date.parse(row.expires_at)<=this.now()*1000||message&&Date.parse(message.expires_at)<=this.now()*1000;
+  const state=expired||row.state==='expired'?'expired':row.state==='retracted'||message?.state==='retracted'?'retracted':message?.state==='accepted'?'published':'pending';
+  const messageState=!message?'not-found':Date.parse(message.expires_at)<=this.now()*1000?'expired':message.state;
+  return{...base,state,messageId:message?.message_id??row.message_id??null,messageState,acceptedByRoom:state==='published',
+   historicalAcceptanceRecorded:!!message?.archive_id,summaryContentHidden:['retracted','expired'].includes(state),noticeRetractionRecorded:message?.state==='retracted',
+   noticeCleanupState:!message?'not-recorded':message.purge_pending?'pending':['retracted','expired'].includes(message.state)?'recorded-complete':'not-requested',archiveScope:'shared-summary-notice-only'};
+ });}
  list(actor,input){const x=parse(sharedSummaryPageSchema,input);return this.run(actor,false,async db=>{await this.chat.requireRoom(db,actor,x.roomId);
   const rows=(await db.query('SELECT * FROM room_shared_summaries WHERE room_id=$1 AND ($2::uuid IS NULL OR share_id>$2) ORDER BY share_id LIMIT $3 FOR UPDATE',[x.roomId,x.after??null,x.limit+1])).rows;
   const items=[];for(const r of rows.slice(0,x.limit)){try{items.push(await this.viewWithin(db,actor,r));}catch(e){if(!(e instanceof ServiceError)||![403,404].includes(e.status))throw e;}}
   return{items,nextAfter:rows.length>x.limit?rows[x.limit-1].share_id:null,historyRemainsAvailable:true};});}
- async retract(actor,input){const x=parse(sharedSummaryGetSchema,input);const r=await this.run(actor,false,async db=>{await this.chat.requireRoom(db,actor,x.roomId,{write:true});const row=await this.rowWithin(db,x.roomId,x.shareId);
-  if(row.subject_id!==actor.subjectId)fail('shared_summary_author_required',403);
+ async retract(actor,input){const x=parse(sharedSummaryGetSchema,input);const r=await this.run(actor,false,async db=>{
+  const prior=(await db.query('SELECT state FROM room_shared_summaries WHERE room_id=$1 AND share_id=$2 AND subject_id=$3',[x.roomId,x.shareId,actor.subjectId])).rows[0];
+  if(!prior)fail('shared_summary_author_required',403);
+  // A first withdrawal needs current room permission. Once its exact owned
+  // stop is recorded, leaving cannot prevent completion of that original stop.
+  if(prior.state!=='retracted')await this.chat.requireRoom(db,actor,x.roomId,{write:true});
+  const row=await this.rowWithin(db,x.roomId,x.shareId);if(row.subject_id!==actor.subjectId)fail('shared_summary_author_required',403);
   await db.query("UPDATE room_shared_summaries SET state='retracted',content='{}'::jsonb,source_facts='[]'::jsonb,retracted_at=COALESCE(retracted_at,$2) WHERE share_id=$1",[x.shareId,stamp(this.now())]);
   return row;});
-  // The ordinary message carries no copied body; its own retraction uses the
-  // existing external receipt path. A failure leaves the summary already hidden.
-  const status=await this.chat.messageStatus(actor,x.roomId,{clientMessageId:x.shareId});
-  if(status.messageId&&['accepted','pending'].includes(status.state))await this.chat.retract(actor,x.roomId,status.messageId);
-  return{shareId:x.shareId,retracted:true,personalVersionDeleted:false,messageId:status.messageId??r.message_id??null};
+  const message=await this.run(actor,false,async db=>{
+   const owned=(await db.query('SELECT message_id,payload_hash,state,purge_pending FROM chat_message_refs WHERE room_id=$1 AND subject_id=$2 AND client_message_id=$3 FOR UPDATE',[x.roomId,actor.subjectId,x.shareId])).rows[0];
+   if(!owned)return null;if(owned.payload_hash!==r.notice_hash)fail('shared_summary_message_conflict');
+   if(['accepted','pending'].includes(owned.state)){await db.query("UPDATE chat_message_refs SET state='retracted',purge_pending=true,retracted_at=COALESCE(retracted_at,$2) WHERE message_id=$1",[owned.message_id,stamp(this.now())]);return{...owned,state:'retracted',purge_pending:true};}
+   return owned;
+  });
+  let noticeArchiveDeleted=false,noticeCleanupPending=!!message?.purge_pending;
+  if(message&&['retracted','expired'].includes(message.state)){
+   if(!message.purge_pending)noticeArchiveDeleted=true;
+   else try{await this.chat.purgeOne(message.message_id);noticeArchiveDeleted=true;noticeCleanupPending=false;}catch(error){if(!(error instanceof ServiceError))throw error;}
+  }
+  return{shareId:x.shareId,retracted:true,personalVersionDeleted:false,messageId:message?.message_id??r.message_id??null,
+   noticeRetractionRecorded:message?.state==='retracted',noticeArchiveDeleted,noticeCleanupPending,archiveScope:'shared-summary-notice-only'};
  }
  async eraseSubjectWithin(db,subjectId){const r=await db.query("UPDATE room_shared_summaries SET state='retracted',content='{}'::jsonb,source_facts='[]'::jsonb,retracted_at=COALESCE(retracted_at,$2) WHERE subject_id=$1 AND state IN ('pending','published') RETURNING share_id",[subjectId,stamp(this.now())]);
   return{erasedShares:r.rows.length,remainingMetadata:true,noticeDeletionDelegatedToChat:true};}

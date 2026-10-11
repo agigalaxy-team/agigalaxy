@@ -10,7 +10,7 @@ assert.match(release??'',/^official-2026\.09\.13-product-v2-r[1-9][0-9]*$/);
 assert.ok(reportPath&&isAbsolute(reportPath));
 const ready=await fetch('https://official.agigalaxy.org/readyz',{redirect:'error'});
 assert.equal(ready.status,200);assert.equal(ready.headers.get('x-galaxy-release'),release);
-const config=await loadWebConfiguration((path,options)=>fetch('https://agigalaxy.org'+path,options));
+const config=await loadWebConfiguration((path,options)=>{assert.equal(path,'/galaxy-web-config.json');return fetch('https://agigalaxy.org/galaxy-web-config.json',options);});
 assert.equal(config.endpoint,'https://official.agigalaxy.org');
 const values=new Map(),store={get:async key=>structuredClone(values.get(key)),put:async(key,value)=>{values.set(key,structuredClone(value));}};
 const runtime=await createWebRuntime(config,{store,fetch:(url,options)=>fetch(url,{...options,headers:{...options.headers,Origin:'https://agigalaxy.org'}})});
@@ -28,7 +28,7 @@ try{
  promptPolicyVersion:null,rulesVersion:null,operationScope:[],inputScopeSummary:null,limitations:'Synthetic deployment probe; no user files, prompts, model use or capability claim.'},
  observedAt:new Date().toISOString(),synthetic:true,selectedFieldsOnly:true};
  const preview=await client.prepare(payload,{visibility:'Private',viewers:[]});
- const receipt=await client.execute(preview,{confirmed:true});configurationVersion=1;
+ await client.execute(preview,{confirmed:true});configurationVersion=1;
  const read=await client.get({id:configurationId,version:1});assert.equal(read.record.synthetic,true);assert.equal(read.record.title,payload.title);
  record.checks.privateConfigurationExactVersion=true;record.configurationId=configurationId;
  const owned=await runtime.api.call('/v1/builders/owned/query',{});assert.ok(Array.isArray(owned.items));record.checks.builderOwnedQuery=true;

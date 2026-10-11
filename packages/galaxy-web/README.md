@@ -1,20 +1,18 @@
-# 银河实际网页工作区
+# 银河产品网页实现
 
-当前开发切片，使用正式 Core 浏览器身份材料、Official v2 Task 与签名验证。既有根目录 React 演示保持独立；此包单独生成静态资源，预期挂到已有 Oracle/Caddy 官网 `/app/`。本文件不证明已部署。
+实际产品入口为 src/main.tsx。根仓 app 中的旧演示不代表当前工作区。
 
-在仓库根运行：
+依据[当前本地开发目标](../../../../../01-intake/CURRENT_LOCAL_DEVELOPMENT_GOAL_2026-10-09.md)，本轮已开始修改实际网页、必要的业务接续和数据客户端。导航按发现、社区、消息、我的组织；发布、求助、个人资料、经历、笔记、资料包与数据操作正在按完整使用流程整合。各部分状态见[当前状态](../../../../../02-architecture/current/chapters/11-current-state.md)，不能将本段列出的入口全部视为验收完成。
+
+设计与实现依[全产品体验规则](../../../../../02-architecture/current/EXPERIENCE_RULES.md)和[用户流程](../../../../../02-architecture/current/chapters/03-user-flows.md)。内容、人、对话和结果是页面主体；系统处理更新、来源检查、去重和同一已授权操作的恢复。真实数据范围及新的对外动作仍由用户选择。暂停、撤销、到期或身份变化不会被后台接续绕过。
+
+从本仓库根目录执行现有网页构建和类型检查：
 
 ```powershell
-node node_modules/vite/bin/vite.js --config packages/galaxy-web/vite.config.mjs
 node node_modules/vite/bin/vite.js build --config packages/galaxy-web/vite.config.mjs
+node node_modules/typescript/bin/tsc --noEmit
 ```
 
-网站根需由部署提供 `galaxy-web-config.json`：版本1、真实 `endpoint`、`operator`、`signingKeys`。每个签名公钥包含 `kid/publicKeyPem/notBefore/notAfter/revoked`；不得把示例公钥或接收到的未受信任manifest当配置。文件只有公开资料，不放客户端私钥/会话凭据。缺配置时界面明确不可连接，不返回演示业务。
+本地可操作预览需要隔离的 API、当前身份接续及合成数据。空态、静态原型和构建成功各有不同范围；不能代替多人操作、真实 AI 宿主或用户体验验证。相关工程检查和浏览证据保留在项目 07-logs/development/ui-reconstruction-20261009 下。
 
-API 使用 `GALAXY_BROWSER_POLICY_FILE` 指向版本1 JSON，字段 `origins` 为明确 HTTPS 网站 origin 列表；默认空列表维持旧API拒绝浏览器Origin。只开放GET/POST及Content-Type/Authorization/Accept，不允许通配符、cookie授权或任意子域。Origin允许不等于身份授权，各动作继续走实际 Access/Consent/Account。
-
-当前网页已接本机ID创建/恢复/保存声明、真实账号验证流程、主动任务发布/申请/邀请/独立参与、普通房间/共同设置/消息恢复、项目发现与Capsule实时源权限读取。实际HTTP测试已贯穿新身份、无失败主动Task、申请回执恢复和参与确认。
-
-聊天采用开源 Prosody/XMPP 通信与存档底座，银河实现房间、成员、授权、期限、业务关联及客户端界面。私有 Prosody 的实际部署记录见[后端部署 r12](../../../../../07-logs/development/public-deployment-v2-r12.md)，真实 Prosody、Garage、ClamAV 组合的聊天附件集成证据见[部署与集成 r8](../../../../../07-logs/development/public-deployment-v2-r8.md)。这些记录证明各自时点和范围，不表示当前服务健康、全部公网用户流程或八端宿主已验收。最新网页实现、部署、浏览器与本人验收分别以[实施记录](../../../../../02-architecture/redesign-v1/data/implementation-progress.json)为准，不能将构建通过写成26模块完成。
-
-AI Agent 部署：先读项目 M18/M15/M01/M11 阅读包及CUR-35；使用已确认资源，保留官方公共资料白名单。部署API新迁移及角色后再发布工作区；给 `/app/*` 配SPA入口回退，API路径独立且不回退HTML；检查真实Browser Origin、签名pin期限、服务端点及一条实际授权旅程。身份与任务未验证时只记录构建/预览范围。禁用备份任务，不恢复旧实验，不复制本机身份材料进发行包。
+当前工作保留有效功能和数据语义，调整页面与流程；不沿旧路由逐页复刻，也不按历史模块数量计算完成率。本地开发已恢复，部署、公开发布、生产数据变更和旧自动任务继续暂停。

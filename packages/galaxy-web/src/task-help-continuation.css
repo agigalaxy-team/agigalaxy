@@ -1,0 +1,90 @@
+/* Scoped to the existing help publication flow and its original-work return. */
+.galaxy-site .request-work-origin{min-width:0;padding-top:20px;margin-top:3px;border-top:1px solid var(--g-line)}
+.galaxy-site .request-work-origin>header{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}
+.galaxy-site .request-work-origin>header h2{font-size:17px;line-height:1.5;margin:0}
+.galaxy-site .request-work-origin>header a{font-size:12px;color:var(--g-accent);white-space:nowrap;padding:6px 0}
+.galaxy-site .request-origin-reading{padding:16px 18px;background:#f7f5fa;border-radius:8px;margin-bottom:15px}
+.galaxy-site .request-origin-reading h3{font-size:16px;font-weight:550;line-height:1.65;margin:0;overflow-wrap:anywhere}
+.galaxy-site .request-origin-summary{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;color:#6e6278;line-height:1.85;margin:8px 0 0}
+.galaxy-site .request-compose-page .request-work-origin label.request-origin-choice{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:start;gap:10px;margin:0;padding:9px 0;cursor:pointer}
+.galaxy-site .request-origin-choice strong{font-weight:500;font-size:14px;line-height:1.5}
+.galaxy-site .request-origin-choice small{display:block;color:#97899f;font-size:12px;line-height:1.75;margin-top:5px}
+.galaxy-site .request-compose-page .request-work-origin input[type=checkbox],.galaxy-site .request-compose-page .request-help-person-choice input[type=checkbox]{width:17px;height:17px;padding:0;margin:3px 0 0;accent-color:var(--g-accent);border-radius:3px;flex-shrink:0}
+.galaxy-site .request-compose-page fieldset.request-origin-attempts{border:0;border-top:1px solid var(--g-line);padding:14px 0 0;margin:16px 0 0;display:grid;gap:0;min-width:0}
+.galaxy-site .request-compose-page fieldset.request-origin-attempts>legend{padding-right:10px;margin:0;font-size:14px;font-weight:500}
+.galaxy-site .request-origin-attempts>legend>span{font-size:11px;font-weight:400;color:#a394af;margin-left:10px}
+.galaxy-site .request-compose-page .request-work-origin label.request-attempt-choice{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:start;gap:10px;margin:0;padding:13px 0;cursor:pointer}
+.galaxy-site .request-attempt-choice+label{border-top:1px solid #eee8f2}
+.galaxy-site .request-attempt-choice>span{min-width:0}
+.galaxy-site .request-attempt-choice strong{display:block;font-size:14px;font-weight:500;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+.galaxy-site .request-attempt-summary{display:block;white-space:pre-wrap;font-size:13px;line-height:1.8;color:#80748a;margin-top:5px;overflow-wrap:anywhere}
+.galaxy-site .request-attempt-choice small{display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:11px;color:#95859f;line-height:1.7;margin-top:7px}
+.galaxy-site .request-attempt-choice .member-avatar{display:inline-flex;width:20px;height:20px;border-radius:50%}
+.galaxy-site .request-attempt-choice .member-avatar svg{width:13px;height:13px}
+.galaxy-site .request-help-note{font-size:12px;color:#97879f;line-height:1.85;margin:10px 0;overflow-wrap:anywhere}
+.galaxy-site .request-source-error{font-size:13px;line-height:1.8;color:#9d6663;margin:10px 0}
+.galaxy-site .request-source-error p{margin:0 0 7px}
+.galaxy-site .request-origin-missing{padding:10px 0;color:#91717b}
+.galaxy-site .request-origin-missing p{font-size:12px;line-height:1.75;margin:0}
+.galaxy-site .request-origin-missing details{font-size:11px;margin-top:7px}
+.galaxy-site .request-origin-missing code{overflow-wrap:anywhere}
+.galaxy-site .request-help-reference{margin:12px 0 0;font-size:12px;color:#94849e}
+.galaxy-site .request-help-reference>summary{cursor:pointer;padding:5px 0;min-height:28px}
+.galaxy-site .request-help-reference dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;margin:10px 0 0}
+.galaxy-site .request-help-reference dt{color:#9a8ba4}
+.galaxy-site .request-help-reference dd{margin:0;min-width:0;font-size:11px;line-height:1.8}
+.galaxy-site .request-help-reference dd p{margin:0 0 4px}
+.galaxy-site .request-help-reference code{font-size:11px;overflow-wrap:anywhere}
+.galaxy-site .request-origin-return{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#8c8b7d;line-height:1.7;padding:10px 0}
+.galaxy-site .request-origin-return a{color:var(--g-accent);min-height:32px;display:inline-flex;align-items:center}
+.galaxy-site .request-compose-page .request-related-help{margin:22px 0 0;padding:18px 0 0}
+.galaxy-site .request-related-help>button{font-size:13px;min-height:36px}
+.galaxy-site .request-help-search{display:flex;align-items:flex-end;gap:12px;margin:15px 0 10px}
+.galaxy-site .request-compose-page .request-help-search>label{flex:1;min-width:0;display:grid;gap:7px;margin:0;font-size:12px}
+.galaxy-site .request-help-search>button{height:43px;min-width:68px}
+.galaxy-site .request-help-directions{margin:12px 0 18px;font-size:12px;color:#97879f}
+.galaxy-site .request-help-directions>summary{padding:5px 0;cursor:pointer;min-height:28px}
+.galaxy-site .request-compose-page .request-help-directions>label{margin:12px 0 0;display:grid;gap:7px;font-size:12px}
+.galaxy-site .request-help-results{min-width:0;margin-top:16px}
+.galaxy-site .request-help-people{border-top:1px solid var(--g-line);margin-top:14px}
+.galaxy-site .request-help-person{padding:18px 0;border-bottom:1px solid var(--g-line);min-width:0}
+.galaxy-site .request-compose-page label.request-help-person-choice{display:grid;grid-template-columns:18px 34px minmax(0,1fr);gap:10px;align-items:center;margin:0;cursor:pointer;min-height:40px}
+.galaxy-site .request-help-person-choice .member-avatar{width:34px;height:34px}
+.galaxy-site .request-help-person-choice>span:last-child{min-width:0}
+.galaxy-site .request-help-person-choice strong{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}
+.galaxy-site .request-help-person-choice small{display:block;font-size:11px;margin-top:3px;color:#aa9aaf}
+.galaxy-site .request-help-source{margin:15px 0 0 62px;min-width:0}
+.galaxy-site .request-help-source-kind{font-size:11px;color:#a395ad;margin:0 0 5px}
+.galaxy-site .request-help-source h4{font-size:14px;font-weight:500;line-height:1.75;color:#65536f;margin:0 0 7px;overflow-wrap:anywhere}
+.galaxy-site .request-help-excerpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;white-space:pre-wrap;font-size:13px;line-height:1.85;color:#82708d;margin:0;overflow-wrap:anywhere}
+.galaxy-site .request-help-full{white-space:pre-wrap;font-size:13px;line-height:1.85;color:#76677f;margin:8px 0;overflow-wrap:anywhere}
+.galaxy-site .request-help-source .request-help-reference{margin-top:4px}
+.galaxy-site .request-help-source h5{font-size:12px;font-weight:500;margin:14px 0 4px}
+.galaxy-site .request-help-locator{font-size:11px;line-height:1.8;margin:10px 0 0;overflow-wrap:anywhere}
+.galaxy-site .request-help-other-sources{margin:12px 0 0 62px;font-size:12px;color:#9983a7}
+.galaxy-site .request-help-other-sources>summary{cursor:pointer;min-height:28px;padding:5px 0}
+.galaxy-site .request-help-other-sources .request-help-source{margin-left:0;padding-top:10px;border-top:1px solid #eee8f2}
+.galaxy-site .request-help-person>.request-help-note{margin:12px 0 0 62px}
+.galaxy-site .request-help-unavailable{padding:15px 0;font-size:12px;line-height:1.8;color:#958194}
+.galaxy-site .request-help-unavailable>p{margin:0 0 9px}
+.galaxy-site .request-help-unavailable>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0}
+.galaxy-site .request-help-unavailable>div>span{overflow-wrap:anywhere}
+@media(max-width:600px){
+ .galaxy-site .request-work-origin{padding-top:16px}
+ .galaxy-site .request-work-origin>header{gap:10px;margin-bottom:12px}
+ .galaxy-site .request-work-origin>header h2{font-size:15px}
+ .galaxy-site .request-origin-reading{padding:13px 14px}
+ .galaxy-site .request-origin-reading h3{font-size:14px}
+ .galaxy-site .request-compose-page .request-work-origin label.request-origin-choice,.galaxy-site .request-compose-page .request-work-origin label.request-attempt-choice{padding:12px 0;gap:9px}
+ .galaxy-site .request-attempt-choice strong{font-size:13px}
+ .galaxy-site .request-help-reference dl{grid-template-columns:1fr;gap:3px}
+ .galaxy-site .request-help-reference dt{margin-top:7px}
+ .galaxy-site .request-help-search{gap:9px}
+ .galaxy-site .request-help-search>button{min-width:62px}
+ .galaxy-site .request-help-source,.galaxy-site .request-help-other-sources,.galaxy-site .request-help-person>.request-help-note{margin-left:28px}
+ .galaxy-site .request-help-source h4{font-size:13px}
+ .galaxy-site .request-help-reference>summary,.galaxy-site .request-help-other-sources>summary,.galaxy-site .request-help-directions>summary{min-height:34px;padding:7px 0}
+ .galaxy-site .request-source-error button,.galaxy-site .request-help-unavailable button{min-height:40px}
+ .galaxy-site .request-origin-return{display:block}
+ .galaxy-site .request-origin-return>span{display:block;font-size:11px;margin-top:3px}
+}

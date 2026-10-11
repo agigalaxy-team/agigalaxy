@@ -238,11 +238,11 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return result;
     } finally { if (checking === operation) checking = null; }
   }
-  async function prepareCollaboration(input, retry = false) {
+  async function prepareCollaboration(input, retry = false, draftPreview = false) {
     if (!assistanceFlow || busy()) throw new Error('Collaboration preparation unavailable.');
     preparing = true; const version = generation;
     try {
-      const preview = await assistanceFlow[retry ? 'prepareRetry' : 'prepare'](input);
+      const preview = await assistanceFlow[retry ? 'prepareRetry' : draftPreview ? 'prepareDraft' : 'prepare'](input);
       if (version !== generation) { assistanceFlow.cancel(preview); throw new Error('Collaboration preparation canceled.'); }
       activeCollaboration = preview; return preview;
     } finally { preparing = false; }
@@ -633,6 +633,7 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       ...(assistanceClient.requesterHistoryFacts ? { queryRequesterHistoryFacts: input => queryRequesterHistory(input, 'requesterHistoryFacts') } : {}),
       qualificationPolicies: () => queryRequesterHistory({}, 'qualificationPolicies'), evaluateQualification: input => queryRequesterHistory(input, 'evaluateQualification') } : {}),
     ...(assistanceFlow ? { prepareCollaboration, executeCollaboration } : {}),
+    ...(assistanceFlow?.prepareDraft ? { prepareCollaborationDraft: input => prepareCollaboration(input, false, true) } : {}),
     ...(assistanceFlow?.prepareRetry ? {
       listCollaborationOperations: () => readCollaborationOperation('list'),
       reconcileCollaboration: id => readCollaborationOperation('reconcile', id),

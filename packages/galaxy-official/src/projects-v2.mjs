@@ -1,7 +1,8 @@
 import canonicalize from 'canonicalize';
-import { projectEventV2Schema, projectEnvelopeV2Schema, projectDocumentV2Schema, projectPreferenceV2Schema } from './shared/projects-schema-v2.mjs';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { projectEventV2Schema, projectEnvelopeV2Schema, projectDocumentV2Schema, projectPreferenceV2Schema, projectDirectoryQueryV2Schema } from './shared/projects-schema-v2.mjs';
 import { discoveryPreferencesSchema, defaultDiscoveryPreferences } from './shared/discovery-schema.mjs';
-import { effectiveDiscovery } from './domain/discovery-match.mjs';
+import { effectiveDiscovery, normalizeFunction } from './domain/discovery-match.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
@@ -12,9 +13,11 @@ const fail = (code,status=409) => {throw new ServiceError(code,status);};
 const stamp = now => new Date(now*1000).toISOString();
 const parse = (schema,input) => {const result=schema.safeParse(input);if(!result.success)fail('invalid_project_request',400);return result.data;};
 const unavailable = error => error instanceof ServiceError && [403,404].includes(error.status);
+const directoryWindowSize = 200, directoryCursorSeconds = 900;
+const directoryFields = ['kind','title','summary','functions','technologies','participantKind','sourceUrl'];
 
 export class ProjectV2Service {
-  constructor(access,{consents,profiles,notifications,requireAccountWithin=null}={}) {Object.assign(this,{access,consents,profiles,notifications,requireAccountWithin});}
+  constructor(access,{consents,profiles,notifications,requireAccountWithin=null}={}) {Object.assign(this,{access,consents,profiles,notifications,requireAccountWithin});this.directoryCursorKey=randomBytes(32);}
   run(actor,fn,{write=false}={}) {return actor ? write ? this.access.runResourceWrite(actor,'history',{},fn) : this.access.runAuthorized(actor,'history',fn) : transaction(this.access.db,fn);}
   async grantWithin(db,event) {
     if(!event?.payload_text)fail('project_source_unavailable',404);
@@ -135,7 +138,7 @@ export class ProjectV2Service {
         if(event.sourceStatementId) {
           const profile=await this.profiles.readWithin(db,actor,actor.subjectId),old=profile.selfDeclared.projects?.find(p=>p.id===event.projectId);
           if(!old||profile.selfDeclaredSource?.id!==event.sourceStatementId)fail('project_import_source_unavailable',404);
-          const {id,...original}=old;
+          const {id:_id,...original}=old;
           if(canonicalize(projectDocumentV2Schema.parse(original))!==canonicalize(document))fail('project_import_must_preserve_source',400);
         }
       } else {
@@ -217,5 +220,64 @@ export class ProjectV2Service {
     const long=effectiveDiscovery(base,this.access.now()),specific=local?effectiveDiscovery(local,this.access.now()):null;
     return {enabled:long.enabled&&(!specific||specific.enabled),purposes:purposes??specific?.purposes??long.purposes,
       functions:specific?.functions??long.functions,temporaryUntil:specific?.temporaryUntil??long.temporaryUntil};
+  }
+  sealDirectoryCursor(value) {
+    const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.directoryCursorKey,iv);
+    cipher.setAAD(Buffer.from('galaxy-project-directory-v2'));
+    const body=Buffer.concat([cipher.update(JSON.stringify({...value,expiresAt:this.access.now()+directoryCursorSeconds})),cipher.final()]);
+    return Buffer.concat([iv,cipher.getAuthTag(),body]).toString('base64url');
+  }
+  openDirectoryCursor(value,queryHash,viewerId) {
+    try {
+      const bytes=Buffer.from(value,'base64url');
+      if(bytes.toString('base64url')!==value||bytes.length<29)throw new Error();
+      const cipher=createDecipheriv('aes-256-gcm',this.directoryCursorKey,bytes.subarray(0,12));
+      cipher.setAAD(Buffer.from('galaxy-project-directory-v2'));cipher.setAuthTag(bytes.subarray(12,28));
+      const cursor=JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)),cipher.final()]).toString('utf8'));
+      if(cursor.v!==2||cursor.queryHash!==queryHash||cursor.viewerId!==viewerId||cursor.expiresAt<=this.access.now())throw new Error();
+      return cursor;
+    } catch {fail('project_directory_cursor_unavailable_restart');}
+  }
+  async directoryItemWithin(db,projectId,options) {
+    // A directory is public for every caller. Owner/editor rights and private
+    // field sources must never enlarge its objects or summary, even when logged in.
+    const view=await this.readWithin(db,null,projectId),row=await this.rowWithin(db,projectId);
+    const latest=(await db.query('SELECT * FROM project_events_v2 WHERE operation_id=$1',[row.document_event_id])).rows[0];
+    const grant=await this.grantWithin(db,latest);
+    if(!canReadProjection(grant,{viewerId:null,projection:'history',now:this.access.now()})||!view.document.discoverable)return null;
+    const wish=await this.effectiveWishWithin(db,view.ownerId,projectId);
+    if(!wish.enabled||options.purpose&&!wish.purposes.includes(options.purpose)||options.kind&&view.document.kind!==options.kind)return null;
+    const publicFunctions=[...new Set(view.document.functions.map(normalizeFunction))].sort((left,right)=>left<right?-1:left>right?1:0);
+    const allowedFunctions=wish.functions.length?publicFunctions.filter(value=>wish.functions.includes(value)):publicFunctions;
+    if(!allowedFunctions.length)return null;
+    if(options.query&&!normalizeFunction([view.document.title,view.document.summary,...view.document.functions].join('\n')).includes(options.query))return null;
+    const document=Object.fromEntries(directoryFields.filter(field=>Object.hasOwn(view.document,field)).map(field=>[field,view.document[field]]));
+    return {projectId,ownerId:view.ownerId,document,classification:'self-declared',capabilityVerified:false,legalOwnershipVerified:false,
+      discovery:{purposes:wish.purposes,functions:allowedFunctions,functionsRestricted:wish.functions.length>0,
+        temporaryUntil:wish.temporaryUntil,contactRequiresCurrentCheck:true},
+      source:{kind:'project',projectId,fieldSources:view.source.fieldSources.filter(source=>directoryFields.includes(source.field))}};
+  }
+  publicDirectory(actor,input) {
+    const parsed=projectDirectoryQueryV2Schema.safeParse(input);
+    if(!parsed.success)fail('invalid_project_directory_query',400);
+    const options={...parsed.data,query:normalizeFunction(parsed.data.query)},viewerId=actor?.subjectId??null;
+    const queryHash=digest(canonicalize({query:options.query,kind:options.kind??null,purpose:options.purpose??null,limit:options.limit}));
+    const cursor=options.after?this.openDirectoryCursor(options.after,queryHash,viewerId):null,startAfter=cursor?.startAfter??'';
+    return this.run(actor,async db=>{
+      // The raw scan is finite. Its position can include private objects, so only
+      // the authenticated encrypted cursor carries it; no counts or ranks leak.
+      const rows=(await db.query("SELECT id FROM projects_v2 WHERE state='active' AND ($1='' OR id::text>$1) ORDER BY id LIMIT $2",[startAfter,directoryWindowSize+1])).rows;
+      const scanned=rows.slice(0,directoryWindowSize),visible=[];
+      for(const row of scanned){try{const item=await this.directoryItemWithin(db,row.id,options);if(item)visible.push(item);}catch(error){if(!unavailable(error))throw error;}}
+      const sourceHash=digest(canonicalize(visible));
+      if(cursor?.lastKey&&(cursor.sourceHash!==sourceHash||!visible.some(item=>item.projectId===cursor.lastKey)))fail('project_directory_sources_changed_retry');
+      const remaining=cursor?.lastKey?visible.filter(item=>item.projectId>cursor.lastKey):visible,items=remaining.slice(0,options.limit);
+      let nextAfter=null;
+      if(remaining.length>options.limit)nextAfter=this.sealDirectoryCursor({v:2,queryHash,viewerId,startAfter,lastKey:items.at(-1).projectId,sourceHash});
+      else if(rows.length>directoryWindowSize)nextAfter=this.sealDirectoryCursor({v:2,queryHash,viewerId,startAfter:scanned.at(-1).id,lastKey:null,sourceHash:null});
+      return {schemaVersion:2,items,nextAfter,computedAt:this.access.now(),readOnly:true,readingGrantsContact:false,readingGrantsMembership:false,
+        coverage:{windowLimited:rows.length>directoryWindowSize,scanWindowLimit:directoryWindowSize,ordering:'project-id-within-window',
+          currentPublicSources:true,globalCountProvided:false,globalRanking:false}};
+    });
   }
 }

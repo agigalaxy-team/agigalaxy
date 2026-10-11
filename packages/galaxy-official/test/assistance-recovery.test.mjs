@@ -21,7 +21,7 @@ async function fixture(t) {
   const origin=`http://127.0.0.1:${api.address().port}`,sessions=createSessionMemory({now:()=>f.now,isCurrent:async()=>true});
   sessions.adopt({endpoint,subjectId:f.actor.subjectId,bindingId:f.actor.bindingId,scopes,expiresAt:f.now+600,bindingExpiresAt:f.now+900,takeCredential:()=>f.credential});
   t.after(async()=>{sessions.close();api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await f.db.close();await rm(directory,{recursive:true,force:true});});
-  let fail=null,writes=0;
+  let fail=null,writes=0;const signed=[];
   const transport=async(url,input,method='POST')=>{
     const path=new URL(url).pathname,eventWrite=method==='POST'&&(path==='/v1/assistance'||/^\/v1\/assistance\/[^/]+\/events$/.test(path));
     if(eventWrite&&fail==='before'){fail=null;throw new Error('Dropped before event');}
@@ -33,14 +33,61 @@ async function fixture(t) {
   };
   const journal=()=>createLocalAssistanceStore({dataDirectory:directory,endpoint});
   const flow=()=>createAssistanceFlow({endpoint,sessions,now:()=>f.now,journal:journal(),consentSend:transport,assistanceSend:transport,
-    assistanceRead:(url,input)=>transport(url,input,'GET'),signIntent:f.signForTest});
+    assistanceRead:(url,input)=>transport(url,input,'GET'),signIntent:async(payload,type)=>{signed.push(JSON.parse(payload));return f.signForTest(payload,type);}});
   const root={kind:'case',id:randomUUID(),localRef:randomUUID(),title:'Recovery case',summary:'Selected teaser',
     source:{kind:'local',reference:randomUUID()},participants:[{subjectId:f.actor.subjectId,role:'requester'}]};
   await f.cases.submit(f.actor,await f.authorize(root));
   const request=()=>({caseId:root.id,title:'Recovery request',problem:'Compiler fails',attemptedApproaches:['Checked options'],scope:'Suggest a patch',
     visibility:'Public',collaboration:'open-assistance',enrollmentExpiresAt:f.now+300});
-  return {f,directory,endpoint,sessions,transport,journal,flow,request,fail:value=>{fail=value;},writes:()=>writes};
+  return {f,directory,endpoint,sessions,transport,journal,flow,request,signed,fail:value=>{fail=value;},writes:()=>writes};
 }
+
+async function requestDraft(h,values={}) {
+  const store=h.journal(),row=await store.createDraft(),request=h.request();
+  return store.saveDraft({id:row.id,expectedRevision:row.revision,content:{...row.content,step:'review',visibility:'Private',
+    values:{caseId:request.caseId,title:request.title,problem:request.problem,attempts:request.attemptedApproaches.join(';'),scope:request.scope,hours:'1',...values}}});
+}
+
+test('editable request preview returns to the same draft and one explicit publication freezes and recovers its exact updated scope',async t=>{
+  const h=await fixture(t),flow=h.flow();let row=await requestDraft(h);
+  const first=await flow.prepareDraft({draftId:row.id,draftRevision:row.revision});
+  assert.equal((await h.journal().getDraft(row.id)).status,'editing');assert.equal((await flow.list()).items.length,0);
+  assert.equal(h.signed.length,0);assert.equal(h.writes(),0);flow.cancel(first);
+  const approaches=['Checked options; this stays one approach','Read logs\nand retained their context'];
+  row=await h.journal().saveDraft({id:row.id,expectedRevision:row.revision,content:{...row.content,attemptedApproaches:approaches,values:{...row.content.values,scope:'Only inspect the selected export'}}});
+  const final=await flow.prepareDraft({draftId:row.id,draftRevision:row.revision});
+  assert.equal(first.assistanceId,final.assistanceId);assert.notEqual(first.payloadJson,final.payloadJson);
+  assert.equal(JSON.parse(final.payloadJson).scope,'Only inspect the selected export');assert.equal(JSON.parse(final.intentJson).visibility,'Private');assert.deepEqual(JSON.parse(final.intentJson).viewers,[]);
+  assert.equal(JSON.parse(final.payloadJson).collaboration,'open-assistance');assert.equal('budget' in JSON.parse(final.payloadJson),false);assert.equal('qualification' in JSON.parse(final.payloadJson),false);
+  await assert.rejects(flow.execute(first,first.confirmation),/confirmation/);assert.equal(h.signed.length,0);
+  h.fail('after');await assert.rejects(flow.execute(final,final.confirmation),/Lost acknowledgement/);
+  assert.equal(h.signed.length,1);assert.equal(h.writes(),1);assert.equal((await h.journal().getDraft(row.id)).status,'prepared');
+  const original=await h.journal().get(final.eventId);assert.equal(original.payloadJson,final.payloadJson);assert.equal(original.status,'unknown');
+  const resumed=h.flow();assert.equal((await resumed.reconcile(final.eventId)).state,'acknowledged');
+  const actual=(await h.f.assistance.get(h.f.actor,final.assistanceId)).request;assert.equal(h.writes(),1);assert.equal(h.signed.length,1);assert.equal(actual.scope,'Only inspect the selected export');assert.deepEqual(actual.attemptedApproaches,approaches);
+  await assert.rejects(resumed.prepareRetry(final.eventId),/acknowledged/);
+});
+
+test('editable preview rejects concurrent revision, owner and lease changes before signing or freezing another operation',async t=>{
+  const h=await fixture(t),flow=h.flow();let row=await requestDraft(h);
+  const stale=await flow.prepareDraft({draftId:row.id,draftRevision:row.revision});
+  row=await h.journal().saveDraft({id:row.id,expectedRevision:row.revision,content:{...row.content,values:{...row.content.values,scope:'A concurrent edit'}}});
+  await assert.rejects(flow.execute(stale,stale.confirmation),/draft changed/);
+  assert.equal(h.signed.length,0);assert.equal(h.writes(),0);assert.equal((await flow.list()).items.length,0);assert.equal((await h.journal().getDraft(row.id)).status,'editing');
+  await assert.rejects(h.journal().previewRequestDraft({subjectId:'GUID'+'A'.repeat(28),id:row.id,expectedRevision:row.revision,now:h.f.now}),/identity unavailable/);
+  const preview=await flow.prepareDraft({draftId:row.id,draftRevision:row.revision});h.sessions.close();
+  await assert.rejects(flow.execute(preview,preview.confirmation),/authorization changed/);
+  assert.equal(h.signed.length,0);assert.equal(h.writes(),0);assert.equal((await flow.list()).items.length,0);assert.equal((await h.journal().getDraft(row.id)).status,'editing');
+});
+
+test('a frozen historical compensation request retains its original bytes and same receipt after an unknown delivery',async t=>{
+  const h=await fixture(t),flow=h.flow(),request={...h.request(),collaboration:'basic-bounty',budget:{mode:'fixed',amount:'12.50',unit:'external-unit'}};
+  const preview=await flow.prepare({request});h.fail('after');await assert.rejects(flow.execute(preview,preview.confirmation),/Lost acknowledgement/);
+  const resumed=h.flow();assert.equal((await resumed.reconcile(preview.eventId)).state,'acknowledged');
+  const record=await h.journal().get(preview.eventId);assert.equal(record.payloadJson,preview.payloadJson);assert.deepEqual(JSON.parse(record.payloadJson).budget,request.budget);
+  assert.deepEqual((await h.f.assistance.get(h.f.actor,preview.assistanceId)).request.budget,request.budget);assert.equal(h.writes(),1);
+  await assert.rejects(resumed.prepareDraft({draftId:preview.eventId,draftRevision:1}));assert.equal(h.writes(),1);
+});
 
 test('Assistance request and event retries survive restart, preserve bytes, and recover a lost acknowledgement',async t=>{
   const h=await fixture(t);let flow=h.flow();const preview=await flow.prepare({request:h.request()});

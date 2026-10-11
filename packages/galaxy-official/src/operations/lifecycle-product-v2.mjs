@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { digest } from '../shared/digest.mjs';
 import { lifecyclePolicyVersion } from '../infrastructure/lifecycle-registry-v2.mjs';
+import {prepareForumDeletionWithin,minimizeForumDeletionWithin} from './community-forum-retention-v1.mjs';
 
 const iso = seconds => new Date(seconds * 1000).toISOString();
 export async function recordContentErasure(db, { table, key, subjectId, originalHash = null, requestId = null,
@@ -55,7 +56,7 @@ export async function redactTaskEventCopies(db, events, { subjectId = null, requ
   const removedIds = new Set(events.map(event => event.id)), taskIds = [...new Set(events.map(event => event.task_id))];
   if (subjectId) for (const row of (await db.query('SELECT id FROM task_requests WHERE requester_id=$1', [subjectId])).rows) if (!taskIds.includes(row.id)) taskIds.push(row.id);
   let snapshots = 0;
-  for (const taskId of taskIds.sort()) {
+  for (const taskId of taskIds.sort((left,right)=>left<right?-1:left>right?1:0)) {
     const tasks = (await db.query('SELECT id,requester_id,snapshot FROM task_requests WHERE id=$1 FOR UPDATE', [taskId])).rows;
     for (const row of tasks) {
       const snapshot = redactTaskSnapshot(row.snapshot, removedIds, subjectId);
@@ -87,6 +88,7 @@ export async function prepareProductV2Deletion(db, { subjectId, requestId, at, r
   // external Garage/S3 object.
   await db.query("UPDATE outcome_materials_v2 SET state=CASE WHEN state='erased' THEN state ELSE 'revoked' END,purge_pending=true WHERE purged_at IS NULL AND (subject_id=$1 OR author_id=$1)",[subjectId]);
   const info = { subjectId, requestId, at, retainedUntil };
+  await prepareForumDeletionWithin(db,info);
   await db.query("UPDATE hub_heads_v2 SET state='suspended' WHERE owner_id=$1",[subjectId]);
   await db.query("UPDATE hub_intake_v2 SET state='closed' WHERE subject_id=$1",[subjectId]);
   await db.query("UPDATE hub_memberships_v2 SET state='exited' WHERE subject_id=$1 AND state IN ('active','invited')",[subjectId]);
@@ -139,6 +141,7 @@ export async function prepareProductV2Deletion(db, { subjectId, requestId, at, r
 // is not permission to retain the source body. Keep its ID/hash, erase all copies.
 export async function minimizeRetainedProductContent(db, info) {
   const minimized = {};
+  Object.assign(minimized,await minimizeForumDeletionWithin(db,info));
   // A co-signed display relationship cannot survive physical erasure of a
   // member's proof. This marker is not a forged member-signed revocation.
   await db.query('UPDATE identity_groups_v2 SET source_erased_at=COALESCE(source_erased_at,$2) WHERE member_ids ? $1',[info.subjectId,iso(info.at)]);

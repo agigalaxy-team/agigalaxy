@@ -9,15 +9,17 @@ import {cleanupTargetGovernanceWithin} from './target-governance-retention-v2.mj
 import {cleanupIdentityGroupsWithin} from './identity-group-retention-v2.mjs';
 import {cleanupWatchControlsWithin} from './watch-control-retention-v2.mjs';
 import {cleanupOutcomeMaterialsWithin} from './outcome-material-retention-v2.mjs';
+import {cleanupForumWithin} from './community-forum-retention-v1.mjs';
 
 const day = 86400;
 // Bounded worker maintenance, never a backup or an inference loop. Original
 // event hashes remain; erased bytes can no longer be cryptographically replayed.
-export async function cleanupProductV2Retention(database, { now = () => Math.floor(Date.now() / 1000), outcomeStore = null } = {}) {
+export async function cleanupProductV2Retention(database, { now = () => Math.floor(Date.now() / 1000), outcomeStore = null,forumPolicy,endpoint } = {}) {
   const at = now(); if (!Number.isSafeInteger(at) || at < 0) throw new Error('Invalid lifecycle clock');
   const iso = seconds => new Date(seconds * 1000).toISOString();
   return transaction(database, async db => {
     const removed = {};
+    Object.assign(removed,await cleanupForumWithin(db,at,{policy:forumPolicy,endpoint}));
     Object.assign(removed,await cleanupWatchControlsWithin(db,at));
     Object.assign(removed,await cleanupIdentityGroupsWithin(db,at));
     Object.assign(removed,await cleanupTargetGovernanceWithin(db,at));

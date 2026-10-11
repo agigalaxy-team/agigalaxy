@@ -4,6 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createPersonalSummaryClient,createNotificationInboxClient} from '../src/personal-summary-client.mjs';
+import {summaryToolDefinitions} from '../src/personal-mcp-summaries-v2.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
 import {invite} from './chat-workflow.mjs';
 test('current authenticated HTTP entry reaches private summaries and the independent inbox',async()=>{
  const f=await serviceFixture(['binding','notifications']),peer=await serviceFixture(['binding','notifications'],f.db,{migrateDatabase:false});
@@ -23,7 +25,12 @@ test('current authenticated HTTP entry reaches private summaries and the indepen
   const x={versionId:randomUUID(),summaryId:randomUUID(),roomId,preferenceRevision:pref.revision,baseRevision:0,content:{generator:{kind:'manual'},
    coverage:{fromSequence:'0',throughSequence:'1',complete:false},fragments:[{id:randomUUID(),kind:'derived',text:'A selected personal summary',sourceRefs:[{messageId:sent.messageId,revision:1}]}],keyMessageRefs:[]}};
   const stored=await client.put(x);assert.equal(stored.audience,'owner-only');assert.equal(stored.sharedToRoom,false);
+  const original=await client.receipt({summaryId:x.summaryId,versionId:x.versionId});assert.equal(original.state,'committed');assert.equal(original.operation.versionId,x.versionId);assert.equal(Object.hasOwn(original.operation,'content'),false);
+  const receiptTool=summaryToolDefinitions(f,peer.actor).galaxy_personal_summary_receipt;assert.equal(receiptTool.write,false);assert.equal((await receiptTool.run({summaryId:x.summaryId,versionId:x.versionId})).state,'committed');
+  assert.equal((await nativeHttpDefinitions({call}).galaxy_personal_summary_receipt.run({summaryId:x.summaryId,versionId:x.versionId})).state,'committed');
+  assert.equal((await client.receipt({summaryId:x.summaryId,versionId:randomUUID()})).state,'absent');
   const other=createPersonalSummaryClient({call:callFor(f.credential)});assert.equal((await other.get({summaryId:x.summaryId})).current,null);
+  assert.equal((await other.receipt({summaryId:x.summaryId,versionId:x.versionId})).state,'absent');
   await assert.rejects(client.put({...x,subjectId:f.actor.subjectId}),/invalid_personal_summary/);
   assert.equal((await client.sources({roomId,refs:[{messageId:sent.messageId,revision:1}]})).items[0].available,true);
   const item=(await notifications.query()).items.find(i=>i.id==='room-message:'+sent.messageId);assert(item);assert.equal(item.read,false);

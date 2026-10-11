@@ -7,7 +7,7 @@ import * as z from 'zod/v4';
 const rule=(ok,code,status=403)=>{if(!ok)throw new ServiceError(code,status);};
 const key=ref=>`${ref.kind}:${ref.id}:${ref.payloadHash}`;
 const action=kind=>kind==='compute'?'qualification.compute':'qualification.source-permission';
-const omitGrant=e=>{const{calculationGrantId,...rest}=e;return rest;};
+const omitGrant=e=>{const{calculationGrantId:_calculationGrantId,...rest}=e;return rest;};
 export class QualificationCalculationService{
   constructor(access,consents,assistance){Object.assign(this,{access,consents,assistance});}
   receipt(actor,input){const q=z.strictObject({operationId:z.uuid(),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)}).safeParse(input);rule(q.success,'invalid_qualification_receipt',400);
@@ -22,13 +22,18 @@ export class QualificationCalculationService{
           sourceReadGranted:false,qualificationGranted:false});}
       return{items,nextAfter:rows.length>p.limit?items.at(-1).id:null};});}
   async sourceWithin(db,ref){
-    const table=ref.kind==='case-event'?'case_events':'task_events';
-    const row=(await db.query(`SELECT * FROM ${table} WHERE id=$1`,[ref.id])).rows[0];
+    let row;
+    if(ref.kind==='experience-event')row=(await db.query(`SELECT e.*,e.operation_id AS id,o.subject_id
+      FROM experience_events e JOIN experience_objects o ON o.id=e.object_id WHERE e.operation_id=$1`,[ref.id])).rows[0];
+    else{
+      const table=ref.kind==='case-event'?'case_events':'task_events';
+      row=(await db.query(`SELECT * FROM ${table} WHERE id=$1`,[ref.id])).rows[0];
+    }
     rule(row?.payload_text&&row.payload_hash===ref.payloadHash,'qualification_source_unavailable');return row;
   }
   async sourceGrantWithin(db,ref,row){
     const g=await this.consents.require(db,{id:row.consent_id,subjectId:row.subject_id,objectId:row.id,
-      action:ref.kind==='case-event'?'case.teaser.publish':'assistance.publish',recipient:this.access.endpoint,payloadJson:row.payload_text});
+      action:ref.kind==='experience-event'?'experience.submit':ref.kind==='case-event'?'case.teaser.publish':'assistance.publish',recipient:this.access.endpoint,payloadJson:row.payload_text});
     rule(!g.currentVisibility?.deletionPending,'qualification_source_unavailable');return g;
   }
   async readGrantWithin(db,actor,id){
@@ -81,7 +86,8 @@ export class QualificationCalculationService{
           &&grant.viewers.every(id=>[data.candidateId,data.recipientId].includes(id)),'qualification_calculation_visibility_required');
         if(data.kind==='compute'){
           rule(data.candidateId===actor.subjectId,'qualification_candidate_required');
-          rule(['externalReviewRefs','capsuleUseIds','proofIds','assistanceIds'].every(k=>data.evidence[k].length===0),'qualification_calculation_source_kind_unsupported',422);
+          rule(['capsuleUseIds','proofIds','assistanceIds'].every(k=>data.evidence[k].length===0)
+            &&(!data.evidence.externalReviewRefs.length||data.sourceRefs.some(r=>r.kind==='experience-event')),'qualification_calculation_source_kind_unsupported',422);
           await this.assistance.requireTaskWithin(db,actor,data.taskId);
         }
         const covered=data.kind==='compute'?await this.permissionsWithin(db,actor,data):null;
@@ -93,7 +99,7 @@ export class QualificationCalculationService{
         if(prior)rule(prior.subject_id===actor.subjectId&&prior.payload_hash===digest(input.payloadJson)&&prior.consent_id===input.consentId,'qualification_calculation_conflict',409);
         else await db.query('INSERT INTO qualification_calculation_grants(id,subject_id,task_id,consent_id,payload_text,payload_hash) VALUES($1,$2,$3,$4,$5,$6)',[data.id,actor.subjectId,data.taskId,input.consentId,input.payloadJson,digest(input.payloadJson)]);
       }
-      const audit=await db.query(`INSERT INTO audit_events(actor,action,object_id,request_id,outcome,context_version,client_id,audience,scope,consent_id,binding_id,http_request_id,idempotency_key,binding_scopes,credential_scopes,caller_binding_id,caller_client_id,caller_audience,caller_binding_scopes)
+      await db.query(`INSERT INTO audit_events(actor,action,object_id,request_id,outcome,context_version,client_id,audience,scope,consent_id,binding_id,http_request_id,idempotency_key,binding_scopes,credential_scopes,caller_binding_id,caller_client_id,caller_audience,caller_binding_scopes)
         SELECT $1,$2,$3,$3,'accepted',1,ch.payload->>'installationId',b.audience,'assistance',c.id,b.id,$4,$3,b.scopes,$5::jsonb,cb.id,cch.payload->>'installationId',cb.audience,cb.scopes
         FROM consents c JOIN bindings b ON b.id=c.binding_id JOIN binding_challenges ch ON ch.id=b.challenge_id JOIN bindings cb ON cb.id=$6::uuid AND cb.subject_id=$1 JOIN binding_challenges cch ON cch.id=cb.challenge_id
         WHERE c.id=$7 AND c.subject_id=$1 AND NOT EXISTS(SELECT 1 FROM audit_events WHERE actor=$1 AND action=$2 AND request_id=$3) RETURNING sequence`,

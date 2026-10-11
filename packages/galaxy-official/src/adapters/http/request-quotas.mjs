@@ -21,6 +21,12 @@ const uuid='[0-9a-f-]{36}';
 const revocation=new RegExp(`^/v1/(?:bindings|consents|proofs|context-grants)/${uuid}/revoke$`);
 const publicMetadata=new Set(['/mcp/docs','/.well-known/galaxy-network.json','/.well-known/galaxy-signing-keys.json','/v1/policy','/v1/signing-keys/status','/v1/service-status','/v1/honor/rules','/v1/honor/ranking','/v1/honor/rule-history','/v1/builders/specification']);
 export function requestQuotaCategory(method,path,hasCredential=false){
+  if(path.startsWith('/v2/community/')){
+    if(method==='GET'&&/^\/v2\/community\/(?:posts\/[0-9a-f-]{36}(?:\/versions\/[0-9a-f-]{36})?|replies\/[0-9a-f-]{36})$/.test(path)
+      ||method==='POST'&&(path==='/v2/community/posts/query'||path==='/v2/community/replies/query'||/^\/v2\/community\/posts\/[0-9a-f-]{36}\/versions$/.test(path)))return 'anonymous';
+    if(method==='POST'&&(path.endsWith('/withdraw')||path.endsWith('/appeal')))return 'revocation';
+    if(method==='GET'||path.endsWith('/query')||path.endsWith('/config')||path.endsWith('/owned')||path.endsWith('/receipt'))return hasCredential?'query':'anonymous';
+  }
   if(method==='POST'&&path==='/v2/target-governance/events')return 'revocation';
   if(method==='POST'&&['/v2/target-governance/receipt','/v2/target-governance/target'].includes(path))return hasCredential?'query':'anonymous';
   if(path==='/.well-known/oauth-protected-resource/mcp/personal')return 'anonymous';

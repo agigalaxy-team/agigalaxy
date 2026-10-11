@@ -1,13 +1,7 @@
-# OpenCode 2 富交互（可选增强）
+# OpenCode 2 富交互（可选增强）：资料入口
 
-OpenCode 2 的 Beta TUI Plugin API 可注册 Slash Command、Dialog 和选择器，因此可作为 `rich-dialog` Renderer 的候选实现。
+此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../../../02-architecture/archive-ui-20261009/implementation/host-opencode2--README.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
 
-它不是 Galaxy 的默认安装目标：
+本主题现行要求：[AI宿主、客户端与命令界面](../../../../../../02-architecture/current/CLIENT_EXPERIENCE.md)；全产品交互遵循[体验规则](../../../../../../02-architecture/current/EXPERIENCE_RULES.md)。按当前问题返回可读结果；完整背景按权限调用，界面按用途精炼。
 
-- 先读取 Core 的 `GalaxyInitializationContract`；
-- 仅在 `richDialog`、`nativeSingleSelect`、`nativeConfirm` 都可用时使用富交互；
-- 任何 API、加载或版本检测失败时，立即改用同一 Contract 的 `numbered-list`；
-- 不把 Beta 版本、特定渲染库或自定义字符布局写入 Core；
-- 仍通过 MCP/Core 的预览与最终确认执行状态变更。
-
-等通用 Contract 的阶段转换、已有 ID 绑定和多级隐私均有可执行语义后，再实现并测试此可选 Renderer。
+接口和数据是否仍适用须结合实际代码与版本核对；原始事实、权限及历史检查不被这份导航改写。当前只改文档，业务开发与发布停止。

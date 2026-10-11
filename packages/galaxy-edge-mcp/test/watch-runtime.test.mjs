@@ -79,3 +79,38 @@ test('watch runtime retries scheduling after a transient status failure', async 
   assert.equal(timers[0].delay, 60000);
   await runtime.stop('watch-2');
 });
+
+test('dispose shares its drain for a check detached by pause and an in-flight ACK', async () => {
+  let releaseCheck, releaseAck;
+  const timers = [], delivered = [];
+  const watch = {
+    check: () => new Promise(resolve => { releaseCheck = resolve; }),
+    ack: () => new Promise(resolve => { releaseAck = resolve; }),
+    status: async () => ({ items: [{ id: 'a', state: 'active', nextCheckAt: 1000 }, { id: 'b', state: 'active', nextCheckAt: 1000 }] }),
+    pause: async () => ({ state: 'paused' }),
+  };
+  const runtime = createNativeWatchRuntime({ watch, now: () => 100,
+    schedule: (fn, delay) => { const timer = { fn, delay }; timers.push(timer); return timer; },
+    cancelSchedule: timer => { timer.canceled = true; }, onWork: item => delivered.push(item) });
+  await runtime.activate('a', { checkNow: false }); await runtime.activate('b', { checkNow: false });
+  const checking = runtime.check('a'), acknowledging = runtime.ack('b', 'work');
+  await new Promise(resolve => setImmediate(resolve)); await runtime.pause('a');
+  const first = runtime.dispose(); assert.equal(first, runtime.dispose());
+  let ended = false; first.then(() => { ended = true; });
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(ended, false);
+  releaseCheck({ state: 'work-ready', work: {} }); await checking;
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(ended, false);
+  releaseAck({ state: 'processed', humanRead: false }); await acknowledging; await first;
+  assert.equal(delivered.length, 0); assert.equal(timers.filter(timer => !timer.canceled).length, 0);
+});
+
+for (const action of ['pause', 'stop']) test('dispose waits for a detached '+action+' revocation receipt', async () => {
+  let release;
+  const watch = { check: async () => ({}), status: async () => ({ items: [{ id: 'a', state: 'active', nextCheckAt: 1000 }] }),
+    [action]: () => new Promise(resolve => { release = resolve; }) };
+  const runtime = createNativeWatchRuntime({ watch, now: () => 100, schedule: () => 1, cancelSchedule: () => {} });
+  await runtime.activate('a', { checkNow: false }); const halted = runtime[action]('a');
+  const closing = runtime.dispose(); let ended = false; closing.then(() => { ended = true; });
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(ended, false);
+  release({ state: action === 'pause' ? 'paused' : 'stopped', remoteGrantRevoked: true }); await halted; await closing;
+});

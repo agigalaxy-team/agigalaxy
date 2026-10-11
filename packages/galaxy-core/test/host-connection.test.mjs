@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { tsImport } from 'tsx/esm/api';
 import { initializeGalaxyIntegration } from '../src/local-store.mjs';
 
-test('injected native connection page requires literal confirmation and ignores completion after Escape', async t => {
+test('injected connection uses actual native selection over the exact preview and ignores late completion after Escape', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'galaxy-host-connect-'));
   const prior = process.env.GALAXY_DATA_DIR; process.env.GALAXY_DATA_DIR = dir;
   t.after(async () => {
@@ -41,14 +41,13 @@ test('injected native connection page requires literal confirmation and ignores 
   }
   const choose = number => transition(() => page.options.find(item => item.value === number).onSelect());
   await transition(() => commands.get('galaxy.open')());
-  await choose('6');
+  await choose('4');await choose('6');
   assert.match(page.title, /no-session/);
   await choose('1');
-  assert.equal(page.type, 'prompt'); assert.ok(page.title.includes(preview.requestJson));
-  await transition(() => page.onConfirm('CONFIRM'));
-  assert.equal(executes, 0);
-  await transition(() => page.onConfirm());
-  await transition(() => page.onConfirm(preview.confirmation));
+  assert.equal(page.type, 'select'); assert.equal(page.title.includes(preview.requestJson),false);assert.equal(executes,0);
+  await choose('2');assert.equal(page.type,'alert');assert.ok(page.message.includes(preview.requestJson));
+  await transition(()=>page.onConfirm());assert.equal(executes,0);
+  await choose('1');
   assert.equal(executes, 1);
   commands.get('galaxy.exit')();
   assert.equal(page, null); assert.ok(cancels > 0);
@@ -56,7 +55,7 @@ test('injected native connection page requires literal confirmation and ignores 
   await delay(30);
   assert.equal(page, null);
   await transition(() => commands.get('galaxy.open')());
-  await choose('6'); assert.equal(checks, 0);
+  await choose('4');await choose('6'); assert.equal(checks, 0);
   await choose('3'); assert.equal(checks, 1);
   commands.get('galaxy.exit')(); assert.equal(page, null);
   finishCheck({ endpoint: preview.endpoint, state: 'binding-verified' });

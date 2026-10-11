@@ -23,6 +23,7 @@ import { runtimeServiceRelease } from './operations/service-release.mjs';
 import { assertRuntimeEnvironment, assertRuntimePaths } from './runtime-environment.mjs';
 import { apiReads } from './infrastructure/api-reads.mjs';
 import { createServices } from './services.mjs';
+import {loadForumPolicy,forumPolicyHash} from './community-forum-policy-v1.mjs';
 import { loadNetworkProfile } from './network-profile.mjs';
 import canonicalize from 'canonicalize';
 import { assertSupportedSchema } from './infrastructure/migrations.mjs';
@@ -108,6 +109,7 @@ try {
   const incident = await loadIncidentController(process.env.GALAXY_INCIDENT_FILE, { endpoint });
   const requestQuotaPolicy=await loadRequestQuotaPolicy(process.env.GALAXY_REQUEST_QUOTA_FILE);
   const communityPolicy=await loadCommunityPolicy(process.env.GALAXY_COMMUNITY_QUOTA_FILE);
+  const forumPolicy=await loadForumPolicy(process.env.GALAXY_FORUM_POLICY_FILE);
   const browserPolicy=await loadBrowserPolicy(process.env.GALAXY_BROWSER_POLICY_FILE);
   const chatConfiguration=await loadChatTransport(process.env.GALAXY_CHAT_CONFIG_FILE);
   chatTransport=chatConfiguration.transport;
@@ -126,13 +128,13 @@ try {
   const identityConfiguration = await loadIdentityProviders(process.env.GALAXY_IDENTITY_CONFIG_FILE, { endpoint });
   startupPhase = 'attachment-config';
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
-  const services = createServices({ ...governance, communityPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
+  const services = createServices({ ...governance, communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
     operator: process.env.GALAXY_OPERATOR, region: process.env.GALAXY_REGION });
   startupPhase = 'personal-mcp';
   const personalMcp=await loadPersonalMcp(process.env.GALAXY_PERSONAL_MCP_CONFIG_FILE,{services,identityProviders:identityConfiguration.providers});
   startupPhase = 'configuration-audit';
   await recordRuntimeConfig(db,{endpoint,component:'api',operatorRef:process.env.GALAXY_OPERATOR_REF,honorRules:governance.honorRules,qualificationPolicies:governance.qualificationPolicies,experienceReviewers:governance.experienceReviewers??[],
-    snapshot:runtimeConfigSnapshot({personalMcpConfigurationHash:personalMcp?.configurationHash??null,identityConfigurationHash:identityConfiguration.configurationHash,governance,governanceReview,incident:incident.policy(),retirement:retirement.snapshot().policy,release,signingKeyId:kid,trustSequence:trusted.nextState.sequence,requestQuotaHash:digest(JSON.stringify(requestQuotaPolicy)),communityQuotaHash:digest(JSON.stringify(communityPolicy)),browserPolicyHash:digest(JSON.stringify(browserPolicy)),chatConfigurationHash:chatConfiguration.configurationHash,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),network:{type:services.manifest.data.networkType,manifestSha256:digest(canonicalize(services.manifest.data))}})});
+    snapshot:runtimeConfigSnapshot({forumPolicyHash:forumPolicyHash(forumPolicy),personalMcpConfigurationHash:personalMcp?.configurationHash??null,identityConfigurationHash:identityConfiguration.configurationHash,governance,governanceReview,incident:incident.policy(),retirement:retirement.snapshot().policy,release,signingKeyId:kid,trustSequence:trusted.nextState.sequence,requestQuotaHash:digest(JSON.stringify(requestQuotaPolicy)),communityQuotaHash:digest(JSON.stringify(communityPolicy)),browserPolicyHash:digest(JSON.stringify(browserPolicy)),chatConfigurationHash:chatConfiguration.configurationHash,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),network:{type:services.manifest.data.networkType,manifestSha256:digest(canonicalize(services.manifest.data))}})});
   await services.honor.useRegistry();
   await services.qualification.useRegistry();
   await services.experienceReviews.useRegistry();

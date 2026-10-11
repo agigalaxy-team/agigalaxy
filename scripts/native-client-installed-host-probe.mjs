@@ -4,9 +4,19 @@ import {join,resolve,sep,isAbsolute} from 'node:path';
 import {tmpdir} from 'node:os';
 import {generateKeyPairSync} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-const root=fileURLToPath(new URL('../',import.meta.url));
 const json=x=>JSON.stringify(x,null,2)+'\n';
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
+export function galaxySkillDiscovery(response,cwd){
+ const data=!response?.error&&Array.isArray(response?.result?.data)?response.result.data:null;
+ const expectedPath=typeof cwd==='string'&&isAbsolute(cwd)?resolve(cwd,'.agents/skills/galaxy/SKILL.md'):null;
+ const samePath=(value,expected)=>typeof value==='string'&&isAbsolute(value)&&resolve(value)===expected;
+ // A response cwd can itself contain "galaxy". Only the requested workspace's
+ // exact named Skill at the copied absolute path proves candidate discovery.
+ const evidence=expectedPath&&data?data.flatMap(row=>samePath(row?.cwd,resolve(cwd))&&Array.isArray(row?.skills)
+  ?row.skills.filter(skill=>skill?.name==='galaxy'&&samePath(skill.path,expectedPath))
+   .map(skill=>({name:skill.name,path:skill.path,expectedPath})) :[]):[];
+ return{skillsListed:data!==null,galaxySkillFound:evidence.length>0,galaxySkillEvidence:evidence};
+}
 function environment(directory){
  const env={};for(const name of ['PATH','Path','SystemRoot','SYSTEMROOT','ComSpec','COMSPEC','PATHEXT','WINDIR'])if(process.env[name])env[name]=process.env[name];
  // These are child-process configuration selectors, never exports or changes to
@@ -29,6 +39,8 @@ function rpc(child){
 export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable,reportFile}){
  for(const p of[candidate,codexEntry,claudeExecutable,reportFile])if(!isAbsolute(p))throw new Error('Explicit absolute candidate, installed CLI and new report paths required');
  const directory=await mkdtemp(join(tmpdir(),'galaxy-installed-host-probe-'));let codex;
+ const target=resolve(directory);
+ if(!target.startsWith(resolve(tmpdir())+sep)||!target.split(sep).at(-1).startsWith('galaxy-installed-host-probe-'))throw new Error('Host probe cleanup target changed');
  const codexRun=codexEntry.endsWith('.exe')?{file:codexEntry,args:[]}:{file:process.execPath,args:[codexEntry]};
  const report={version:1,candidate,startedAt:new Date().toISOString(),syntheticConfiguration:true,userLoginRead:false,userModelCalls:0,globalConfigurationChanged:false,desktopUiVerified:false,hosts:[]};
  try{
@@ -53,7 +65,7 @@ export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable
   const skills=await channel.request('skills/list',{cwds:[cwd],forceReload:true});
   const server=status.result?.data?.find(x=>x.name==='galaxy'),events=await trace(codexTrace);
   report.hosts.push({host:'Codex CLI app-server',version,rpcError:status.error?.code??null,serverPresent:!!server,
-   toolCount:server?.tools?Object.keys(server.tools).length:0,events,skillsListed:!skills.error,galaxySkillFound:JSON.stringify(skills.result??{}).includes('galaxy'),modelTurnStarted:false});
+   toolCount:server?.tools?Object.keys(server.tools).length:0,events,...galaxySkillDiscovery(skills,cwd),modelTurnStarted:false});
   await stop(codex);codex=null;
   const claudeTrace=join(directory,'claude-trace.jsonl'),mcpArgs=[proxy,join(candidate,'galaxy.js'),claudeTrace],claudeVersion=execFileSync(claudeExecutable,['--version'],{env,cwd,windowsHide:true,encoding:'utf8',timeout:15000}).trim();
   // Explicit installed CLI writes only this empty temporary profile.
@@ -67,7 +79,7 @@ export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable
   report.completedAt=new Date().toISOString();
  }catch(e){report.probeError={message:String(e.message).split('\n')[0],code:e.code??null,stderr:String(e.stderr??'').slice(0,1500)};
  }finally{
-  await stop(codex);const target=resolve(directory);if(!target.startsWith(resolve(tmpdir())+sep)||!target.split(sep).at(-1).startsWith('galaxy-installed-host-probe-'))throw new Error('Host probe cleanup target changed');
+  await stop(codex);
   try{await rm(target,{recursive:true,force:true,maxRetries:20,retryDelay:300});report.temporaryProfileRemoved=true;}
   catch(e){report.temporaryProfileRemoved=false;report.cleanupPending={directory:target,code:e.code};}
  }

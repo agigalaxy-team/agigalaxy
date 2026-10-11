@@ -7,7 +7,7 @@ import { createHelpSourcesV2 } from './help-sources-v2.mjs';
 
 // Trusted desktop/CLI host supplies its existing process-only session memory.
 // A configured endpoint is not a connection and does not cause any I/O here.
-export function createHelpRuntimeV2({ dataDirectory, endpoint, subjectId, sessions, send, read, now, readIdentityWithin }) {
+export function createHelpRuntimeV2({ dataDirectory, endpoint, subjectId, sessions, send, read, now, readIdentityWithin, authorize }) {
   const store = createLocalHelpStoreV2({ dataDirectory, endpoint, subjectId, now, readIdentityWithin });
   if (!sessions) return createHelpFlowV2({ store, now });
   const scoped = {
@@ -22,5 +22,5 @@ export function createHelpRuntimeV2({ dataDirectory, endpoint, subjectId, sessio
     invalidateAuthorization: (authorization, reason) => sessions.invalidateAuthorization(authorization, reason),
   };
   const config = { endpoint, sessions: scoped, ...(send ? { send } : {}), ...(read ? { read } : {}) };
-  return createHelpFlowV2({ store, now, sources: { search: createSearchClient(config), discovery: createProjectDiscoveryClient(config), ...createHelpSourcesV2(config) }, actions: createTaskClientV2(config) });
+  return createHelpFlowV2({ store, now, authorize, sources: { search: createSearchClient(config), discovery: createProjectDiscoveryClient(config), ...createHelpSourcesV2(config) }, actions: createTaskClientV2(config) });
 }

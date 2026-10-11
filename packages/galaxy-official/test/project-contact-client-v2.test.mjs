@@ -10,7 +10,8 @@ test('browser coordinator and MCP use actual HTTP/Consent for transfer, recruitm
     afterWorkflow: async ({ f, p, alias, request }) => {
       const locals = new Map(),
         runtimes = new Map();
-      let lostRecruitment = true;
+      let lostRecruitment = true,
+        recruitmentDispatches = 0;
       function runtime(who) {
         if (runtimes.has(who)) return runtimes.get(who);
         const local = new Map();
@@ -27,6 +28,7 @@ test('browser coordinator and MCP use actual HTTP/Consent for transfer, recruitm
                 visibility === 'Public' ? 'public-profile' : 'operational',
             }),
           call: async (path, input, options = {}) => {
+            if (path === '/v2/recruitment' && options.method !== 'GET') recruitmentDispatches++;
             const r = await request(
               who,
               path,
@@ -51,7 +53,14 @@ test('browser coordinator and MCP use actual HTTP/Consent for transfer, recruitm
         pc = getProjectContactClient(runtime(p), p.actor.subjectId),
         ft = discoveryToolDefinitions(f, f.actor),
         pt = discoveryToolDefinitions(p, p.actor);
-      assert.equal(Object.keys(ft).length, 13);
+      assert.deepEqual(Object.keys(ft).sort(), [
+        'galaxy_discovery_v2_query', 'galaxy_discovery_v2_detail',
+        'galaxy_project_v2_query', 'galaxy_project_v2_get', 'galaxy_project_v2_event',
+        'galaxy_project_v2_preferences', 'galaxy_project_v2_preferences_save',
+        'galaxy_contacts_v2_query', 'galaxy_contact_v2_get', 'galaxy_contact_v2_event',
+        'galaxy_recruitment_v2_query', 'galaxy_recruitment_v2_get',
+        'galaxy_recruitment_v2_receipt', 'galaxy_recruitment_v2_event',
+      ].sort());
       assert.equal(ft.galaxy_contact_v2_event.write, true);
       const projectId = randomUUID(),
         document = {
@@ -195,15 +204,20 @@ test('browser coordinator and MCP use actual HTTP/Consent for transfer, recruitm
         assert.equal(e.resultUnknown, true);
       }
       assert.equal((await fc.pending()).length, 1);
-      assert.equal(
-        (await fc.reconcile(unknown.operationId)).current.recruitmentId,
-        recruitmentId,
-      );
+      assert.equal(recruitmentDispatches, 1);
+      const reconciled = await fc.reconcile(unknown.operationId);
+      assert.equal(reconciled.state, 'acknowledged');
+      assert.equal(reconciled.receipt.recruitmentId, recruitmentId);
+      assert.equal(reconciled.receipt.revision, 1);
+      assert.equal(reconciled.currentAccessGranted, false);
+      assert.equal(reconciled.current, undefined);
       const retried = await fc.reconcile(unknown.operationId, {
         retry: true,
         confirmed: true,
       });
-      assert.equal(retried.replayed, true);
+      assert.equal(retried.state, 'acknowledged');
+      assert.equal(retried.receipt.operationId, unknown.operationId);
+      assert.equal(recruitmentDispatches, 1, 'original ACK reconciliation never dispatches another Recruitment write');
       assert.equal((await fc.pending()).length, 0);
       assert.equal(
         (
@@ -343,7 +357,7 @@ test('unknown retry is never rebound to another identity and a later rejection d
   const pending = (await client.pending())[0];
   active = 'GUID' + 'B'.repeat(28);
   await assert.rejects(
-    client.reconcile(pending.operationId, { retry: true, confirmed: true }),
+    async () => client.reconcile(pending.operationId, { retry: true, confirmed: true }),
     /身份/,
   );
   assert.equal(calls, 1);

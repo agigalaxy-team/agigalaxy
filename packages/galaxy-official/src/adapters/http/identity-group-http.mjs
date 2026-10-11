@@ -8,5 +8,5 @@ export async function dispatchIdentityGroups({identityGroups,access,request,requ
  const auth=await authenticate(request,access,'binding',publicRead),actor=auth?{...auth,httpRequestId:requestId}:null;
  if(request.method==='GET'){send(200,await(id?identityGroups.read(actor,id[1]):proposal?identityGroups.proposal(actor,proposal[1]):identityGroups.current(actor)));return true;}
  const method=methods[url.pathname],input=await body(request,method==='submit'?['payloadJson','proofJson','signature']:null);
- if(method==='query')consumeSearchPage(actor,input.after);send(200,await identityGroups[method](actor,input));return true;
+ if(method==='query')consumeSearchPage(actor,input.after===undefined?input.proposalAfter:input.after);send(200,await identityGroups[method](actor,input));return true;
 }

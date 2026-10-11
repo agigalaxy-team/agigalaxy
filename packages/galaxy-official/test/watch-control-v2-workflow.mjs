@@ -25,7 +25,7 @@ export async function verifyWatchControlV2({database=null,adminDatabase=database
  // this is not another Prosody or public Account acceptance test.
  f.chat.requireAccountWithin=async()=>{};f.chat.consumeInviteWithin=async()=>{};f.chat.markInviteRespondedWithin=async()=>{};
  f.chat.transport={available:true,project:async()=>{},send:async x=>{bodies.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});return{archiveId:x.messageId};},
-  read:async x=>x.ids.map(id=>bodies.get(id)).filter(Boolean),erase:async x=>bodies.delete(x.messageId)};
+  read:async x=>x.ids.map(id=>bodies.get(id)).filter(Boolean),erase:async x=>{bodies.delete(x.messageId);return{archiveDeleted:true};}};
  const server=createApi({...f,browserOrigins:['https://galaxy.example.org'],rateLimit:10000});let outsider,loseTakeover=false;
  try{
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
@@ -74,8 +74,8 @@ export async function verifyWatchControlV2({database=null,adminDatabase=database
   assert.equal(moved.receipt.previousInstallationState,'revoked-for-this-watch');assert.equal(moved.watch.externalProcessStopped,'unconfirmed');
   const wb=createNativeWatch({store:localB,api:b,subjectId:f.genesis.id,now:()=>f.now});
   assert.equal((await wb.status(watchId)).items[0].after,acknowledged);assert.equal((await wb.check(watchId)).work.items[0].text,'Synthetic work not acknowledged');
-  for(const [method,input]of [['history',{after:'0',agentGrantId:oldGrant}],['cursor',{kind:'agent',agentGrantId:oldGrant,sequence:acknowledged}],
-   ['send',{clientMessageId:randomUUID(),text:'stale responder must fail',agentGrantId:oldGrant}]]){
+  for(const {method,input}of [{method:'history',input:{after:'0',agentGrantId:oldGrant}},{method:'cursor',input:{kind:'agent',agentGrantId:oldGrant,sequence:acknowledged}},
+   {method:'send',input:{clientMessageId:randomUUID(),text:'stale responder must fail',agentGrantId:oldGrant}}]){
    await assert.rejects(a.call(`/v2/chat/rooms/${room.roomId}/${method}`,input),/chat_agent_not_authorized/);}
   await assert.rejects(pendingReader.ack(watchId,pending.work.workId),/chat_agent_not_authorized/);
   await assert.rejects(c.call('/v2/watch-controls/takeover',{...takeover,operationId:randomUUID(),targetBindingId:c.snapshot().bindingId,newGrantId:randomUUID()}),/watch_control_revision_conflict/);

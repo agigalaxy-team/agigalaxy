@@ -2,9 +2,9 @@ import canonicalize from 'canonicalize';
 import {digest} from './shared/digest.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
-import {choicePreferenceSchema,choicePutSchema,choiceGetSchema,choicePageSchema,choiceDeleteSchema} from './shared/choice-snapshot-schema-v2.mjs';
+import {choicePreferenceSchema,choicePutSchema,choicePutIntent,choiceGetSchema,choicePageSchema,choiceDeleteSchema,choiceReceiptQuerySchema,choiceReceiptResultSchema} from './shared/choice-snapshot-schema-v2.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),day=86400,key=r=>`${r.type}:${r.id}:${r.version}`;
-const contentDigest=content=>{const {localVersion,...effective}=content;return digest(canonicalize(effective));};
+const contentDigest=content=>{const {localVersion:_localVersion,...effective}=content;return digest(canonicalize(effective));};
 const fail=(code,status=409)=>{throw new ServiceError(code,status);};
 function parse(schema,x){const p=schema.safeParse(x);if(!p.success)fail('invalid_choice_snapshot_request',400);return p.data;}
 export class ChoiceSnapshotServiceV2 {
@@ -22,7 +22,7 @@ export class ChoiceSnapshotServiceV2 {
   return this.preferenceWithin(db,actor);
  });}
  async viewWithin(db,actor,row){
-  if(!row)return null;const state=row.state,content=row.content,statuses=[];
+  if(!row)return null;let state=row.state,content=row.content;const statuses=[];
   if(['current','conflict','invalidated'].includes(state)&&Date.parse(row.expires_at)<=this.now()*1000){state='expired';content={};
    await db.query("UPDATE choice_snapshot_versions SET state='expired',content='{}',dependencies='[]' WHERE subject_id=$1 AND version_id=$2",[actor.subjectId,row.version_id]);}
   if(['current','conflict'].includes(state)){
@@ -41,10 +41,24 @@ export class ChoiceSnapshotServiceV2 {
   return{snapshotId:id,revision:h.revision,current,conflicts,audience:'owner-only',shared:false,deleted:!!h.deleted_at};
  }
  get(actor,input){const x=parse(choiceGetSchema,input);return this.run(actor,false,db=>this.getWithin(db,actor,x.snapshotId));}
+ receipt(actor,input){const x=parse(choiceReceiptQuerySchema,input);return this.run(actor,false,db=>this.receiptWithin(db,actor.subjectId,x));}
+ async receiptWithin(db,subjectId,input){const x=parse(choiceReceiptQuerySchema,input);
+  // Historical acceptance is independent from current synchronization and
+  // source permission. SELECT only retained metadata; no head/body projection,
+  // source lookup, expiry write or new receipt ledger after owner deletion.
+  const row=(await db.query(`SELECT snapshot_id,version_id,request_hash,base_revision,revision,state,created_at,expires_at
+   FROM choice_snapshot_versions WHERE subject_id=$1 AND version_id=$2`,[subjectId,x.versionId])).rows[0];
+  const common={...x,authority:'accepted-operation-only',audience:'owner-only',currentAccessGranted:false,contentReturned:false,sourceAccessChecked:false};
+  if(!row)return choiceReceiptResultSchema.parse({...common,state:'absent',absenceMeaning:'no-retained-owner-operation'});
+  if(row.snapshot_id!==x.snapshotId||row.request_hash!==x.requestHash)return choiceReceiptResultSchema.parse({...common,state:'conflict',reason:'original-operation-mismatch'});
+  return choiceReceiptResultSchema.parse({...common,state:'acknowledged',receipt:{snapshotId:row.snapshot_id,versionId:row.version_id,requestHash:row.request_hash,
+   baseRevision:row.base_revision,revision:row.revision,storedState:row.state,acceptedAt:new Date(row.created_at).toISOString(),contentExpiresAt:new Date(row.expires_at).toISOString(),
+   contentRetentionDue:Date.parse(row.expires_at)<=this.now()*1000}});
+ }
  async exportOwnedWithin(db,actor,input={}){const x=parse(choicePageSchema,input),rows=(await db.query('SELECT snapshot_id FROM choice_snapshot_heads WHERE subject_id=$1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR snapshot_id>$2) ORDER BY snapshot_id LIMIT $3',[actor.subjectId,x.after??null,x.limit+1])).rows;
   const items=[];for(const r of rows.slice(0,x.limit))items.push(await this.getWithin(db,actor,r.snapshot_id));return{items,nextAfter:rows.length>x.limit?rows[x.limit-1].snapshot_id:null,audience:'owner-only'};}
  list(actor,input={}){return this.run(actor,false,db=>this.exportOwnedWithin(db,actor,input));}
- put(actor,input){const x=parse(choicePutSchema,input),{preferenceRevision,witnesses,...intent}=x,hash=digest(canonicalize(intent));return this.run(actor,true,async db=>{
+ put(actor,input){const x=parse(choicePutSchema,input),witnesses=x.witnesses,hash=digest(canonicalize(choicePutIntent(x)));return this.run(actor,true,async db=>{
   const p=(await db.query('SELECT * FROM choice_snapshot_preferences WHERE subject_id=$1 FOR SHARE',[actor.subjectId])).rows[0];
   if(!p?.enabled||p.endpoint!==this.endpoint||p.revision!==x.preferenceRevision||!p.snapshot_ids.includes(x.snapshotId))fail('choice_sync_not_authorized',403);
   await db.query('INSERT INTO choice_snapshot_heads(subject_id,snapshot_id,created_at,updated_at) VALUES($1,$2,$3,$3) ON CONFLICT DO NOTHING',[actor.subjectId,x.snapshotId,stamp(this.now())]);

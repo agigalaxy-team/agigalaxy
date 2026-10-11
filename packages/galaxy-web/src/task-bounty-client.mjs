@@ -1,5 +1,6 @@
 import {taskRequestV2Schema,taskEnvelopeV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 import {qualificationEvidenceV2Schema} from '../../galaxy-official/src/shared/qualification-v2-schema.mjs';
+import {helpOriginPayload} from './help-origin-client.mjs';
 
 export const budgetText=b=>!b?'未单独报价':b.mode==='quote'?`待报价 · ${b.unit}`:b.mode==='range'?`${b.minimum}—${b.maximum} ${b.unit}`:`${b.amount} ${b.unit}`;
 export const policyKey=p=>`${p.id}@${p.version}`;
@@ -17,13 +18,19 @@ export function publicationFromDraft(d,policies,now=Math.floor(Date.now()/1000))
  if(!Number.isSafeInteger(expires)||expires<=now)throw Error('请设置将来的征集截止时间；这不是交付截止时间。');
  const paid=d.collaboration==='basic-bounty',policy=policies.find(p=>policyKey(p)===d.policyKey&&p.collaboration==='basic-bounty'&&p.notBefore<=now&&p.notAfter>now);
  if(paid&&!policy)throw Error('请选择服务当前启用的赏金资格规则；目录为空时可以先保留本地草稿。');
+ const origin=helpOriginPayload(d.helpOrigin);
  const input={title:d.title.trim(),summary:d.summary.trim(),intent:d.intent,visibility:d.visibility,collaboration:d.collaboration,
-  caseId:null,workContext:{goal:d.goal.trim(),currentSituation:d.situation.trim(),attemptRefs:[]},enrollmentExpiresAt:expires,
+  caseId:origin.caseId,...(origin.parentTaskId?{parentTaskId:origin.parentTaskId}:{}),workContext:{goal:d.goal.trim(),currentSituation:d.situation.trim(),attemptRefs:origin.attemptRefs},enrollmentExpiresAt:expires,
   ...(d.expectedOutcome.trim()?{expectedOutcome:d.expectedOutcome.trim()}:{}),
   ...(paid?{budget:formBudget(d),capabilityId:policy.capabilityId,qualification:{policyId:policy.id,policyVersion:policy.version,profile:'facts-v2'}}:
    d.capabilityId.trim()?{capabilityId:d.capabilityId.trim()}:{})};
- const {operationId,taskId,...validated}=taskRequestV2Schema.parse({...input,operationId:'00000000-0000-4000-8000-000000000001',taskId:'00000000-0000-4000-8000-000000000002'});
+ const {operationId:_operationId,taskId:_taskId,...validated}=taskRequestV2Schema.parse({...input,operationId:'00000000-0000-4000-8000-000000000001',taskId:'00000000-0000-4000-8000-000000000002'});
  return validated;
+}
+// New requests use ordinary assistance even when an older local draft retains
+// historical bounty fields. Keep that draft intact; create no fee or paid rule.
+export function ordinaryPublicationFromDraft(d,now=Math.floor(Date.now()/1000)){
+ return publicationFromDraft({...d,collaboration:'open-assistance'},[],now);
 }
 export function evidenceFromSelection(items){
  const computation=items.filter(i=>i.kind==='calculation');
@@ -39,7 +46,7 @@ export function applicationFromDraft(d,task){
   ...(task.request.qualification?{qualificationEvidence:task.request.qualification.profile==='facts-v2'?evidenceFromSelection(d.selected??[]):legacyEvidenceFromSelection(d.selected??[])}:{})};
  // Shape validation only: runtime creates and persists the real ID exactly once.
  const parsed=taskEnvelopeV2Schema.parse({taskId:task.taskId,event:{...event,eventId:'00000000-0000-4000-8000-000000000001'}});
- const {eventId,...data}=parsed.event;return data;
+ const {eventId:_eventId,...data}=parsed.event;return data;
 }
 export function legacyEvidenceFromSelection(items){if(items.some(i=>!['legacy-assistance','proof'].includes(i.kind)))throw Error('旧规则只接受旧协助与 Proof；请移除其他来源，不能自动转换。');
  const e=evidenceFromSelection(items);return{proofIds:e.proofIds,assistanceIds:e.assistanceIds};}
@@ -48,4 +55,4 @@ export function qualificationEvaluationInput(task,subjectId,items){return task.r
  {path:'/v1/qualification/evaluate',input:{subjectId,policyId:task.request.qualification.policyId,policyVersion:task.request.qualification.policyVersion,capabilityId:task.request.capabilityId,evidence:legacyEvidenceFromSelection(items)}};}
 export const qualificationEvaluationView=r=>r.state?r:{...r,state:r.eligible?'satisfied':'insufficient-evidence',missing:r.reasons??[]};
 export const qualificationState=q=>!q?'尚未核对':q.state==='satisfied'?'当前满足本任务条件':q.state==='not-satisfied'?'当前不满足限定条件':'当前材料不足';
-export const taskWriteError=e=>e?.issues?.length?'请检查内容是否完整，金额须为非负十进制文本，区间下限不能大于上限，单位和当前规则不能为空。':({qualification_required:'当前材料不足以开始这项赏金参与。查看本任务资格结果；开放协助仍可开始。',qualification_policy_unavailable:'该资格规则当前未启用或已到期，请刷新目录。',enrollment_closed:'征集已结束；只有请求者明确延长后才能继续征集。',task_version_conflict:'任务已被其他操作更新。先核对原操作状态；不要重签一个不同的申请。',pending_task_event:'同一任务有待确认原操作，请先恢复它。',pending_task_publication:'还有一项原发布结果待核对，请先恢复它。',connection_required:'请先连接当前银河身份。',account_verification_required:'公开发布需要先完成账号验证。',verified_account_required:'公开发布需要先完成账号验证。'}[e?.code??e?.message]??e?.message??'操作未完成。');
+export const taskWriteError=e=>e?.issues?.length?'请检查目标、当前情况、内容、范围和截止时间是否完整。':({consent_required:'这次内容的授权未通过当前核对，暂未完成操作。',assistance_case_unavailable:'所选原工作当前不可用，请核对原工作及其分享范围后继续。',agent_identity_required:'请先通过本机 Agent 的审阅页接续已有银河身份，再发布或参与任务。草稿仍保存在此浏览器。',agent_identity_evidence_invalid:'本机保存的 Agent 接续依据未通过核对。请查询原设备申请或回本机 Agent 重新核对；草稿和原操作保留。',agent_identity_device_not_current:'此浏览器设备的当前授权已变化。请回已有设备核对当前控制，再继续原操作。',qualification_required:'当前材料不足以开始这项赏金参与。查看本任务资格结果；开放协助仍可开始。',qualification_policy_unavailable:'该资格规则当前未启用或已到期，请刷新目录。',enrollment_closed:'征集已结束；只有请求者明确延长后才能继续征集。',task_version_conflict:'任务已被其他操作更新。先核对原操作状态；不要重签一个不同的申请。',pending_task_event:'同一任务有待确认原操作，请先恢复它。',pending_task_publication:'还有一项原发布结果待核对，请先恢复它。',connection_required:'请先连接当前银河身份。',account_verification_required:'公开发布需要先完成账号验证。',verified_account_required:'公开发布需要先完成账号验证。'}[e?.code??e?.message]??e?.message??'操作未完成。');

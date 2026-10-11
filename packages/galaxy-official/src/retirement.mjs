@@ -23,7 +23,7 @@ const takeoutPosts = new Set([
   '/v1/identity/query', '/v1/identity/cancel', '/v1/identity/revoke',
   '/v1/deletion-requests/config', '/v1/deletion-requests/submit', '/v1/deletion-requests/read', '/v1/deletion-requests/query',
   '/v1/binding-challenges', '/v1/bindings', '/v1/bindings/query', '/v1/session-challenges', '/v1/sessions', '/mcp/docs',
-  '/v1/data-exports/specification', '/v1/data-exports/create', '/v1/data-exports/page', '/v1/data-exports/revoke',
+  '/v1/data-exports/specification', '/v1/data-exports/create', '/v1/data-exports/page', '/v1/data-exports/binary', '/v1/data-exports/revoke',
   '/v1/history/query', '/v1/assistance/query', '/v1/assistance/events/receipt', '/v1/context-grants/query', '/v1/context-grants/receipt', '/v1/requester-history/query',
   '/v1/notifications/query', '/v1/notifications/preferences/read', '/v1/qualification/policies', '/v1/qualification/evaluate',
   '/v1/builders/specification', '/v1/builders/read', '/v1/builders/query', '/v1/builders/reports/export',
@@ -57,6 +57,10 @@ export function createRetirementController(input = null, { endpoint, now = () =>
     const state = phase();
     if (['normal', 'announced'].includes(state) || metadata.has(`${method} ${path}`)) return;
     if (state === 'status-only' && method === 'GET' && proofStatus.test(path)) return;
+    // Exact retained acceptance metadata only. This endpoint authenticates the
+    // current owner and cannot return content, renew TTL or restart a write.
+    if (state === 'status-only' && method === 'POST' && path === '/v2/choice-snapshots/receipt') return;
+    if (state === 'status-only' && method === 'POST' && ['/v2/receipt-status/challenges','/v2/receipt-status/query'].includes(path)) return;
     if (state === 'takeout' && serviceAccessV2(method,path)!==null) return;
     if (state === 'takeout' && (method === 'GET' && (['/.well-known/galaxy-network.json', '/v1/consents'].includes(path) || takeoutRead.test(path))
       || method === 'POST' && (takeoutPosts.has(path) || revocation.test(path) || moderationRead.test(path) || ownAttachmentExport.test(path)))) return;

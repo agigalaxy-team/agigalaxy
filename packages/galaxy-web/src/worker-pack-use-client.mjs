@@ -4,6 +4,7 @@ export function createWorkerPackUseClient({
   subjectId,
   now,
 }) {
+  const endpoint = runtime.api.endpoint;
   const journal = createCapsuleWebClient({
     api: runtime.api,
     getLocal: runtime.getLocal,
@@ -13,12 +14,16 @@ export function createWorkerPackUseClient({
     ...(now ? { now } : {}),
   });
   const read = async (path, input = {}, privateRead = false) => {
-    const current = runtime.api.snapshot()?.subjectId,
+    const snapshot = () => { const s = runtime.api.snapshot(); return JSON.stringify([
+      runtime.api.endpoint, s?.subjectId ?? null, s?.bindingId ?? null, s?.generation ?? null,
+      s?.control?.deviceId ?? null, s?.control?.epoch ?? null]); },
+      lease = snapshot(), current = runtime.api.snapshot()?.subjectId,
       authenticated = !!subjectId && current === subjectId;
+    if (runtime.api.endpoint !== endpoint) throw Error('读取服务连接已变化。');
     if (privateRead && !authenticated) throw Error('请连接当前身份。');
     const value = await runtime.api.call(path, input, { authenticated });
-    if (runtime.api.snapshot()?.subjectId !== current)
-      throw Error('读取身份已变化。');
+    if (snapshot() !== lease)
+      throw Error('读取身份或连接已变化，请重新读取当前来源。');
     return value;
   };
   return {
@@ -37,6 +42,18 @@ export function createWorkerPackUseClient({
       read('/v2/cases/' + caseId + '/read', taskId ? { taskId } : {}, true),
   };
 }
+/**
+ * @param {{
+ *   pack: import('./tool-workspace-state').ToolManifest,
+ *   caseView: import('./tool-workspace-state').ToolCaseCandidate,
+ *   attempt: import('./tool-workspace-state').ToolCandidateAttempt,
+ *   result?: import('./tool-workspace-state').ToolResult|null,
+ *   evidence?: import('./tool-workspace-state').ToolEvidence[],
+ *   verifications?: import('./tool-workspace-state').ToolVerification[],
+ *   prior?: import('./tool-workspace-state').PackUseRecord['follows'],
+ *   existing?: import('./tool-workspace-state').PackUseView|null
+ * }} input
+ */
 export function preparePackUse({
   pack,
   caseView,

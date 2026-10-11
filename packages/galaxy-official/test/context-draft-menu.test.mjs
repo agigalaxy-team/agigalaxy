@@ -48,6 +48,7 @@ async function fixture(t){
 
 test('native material drafts preserve multiple excerpts across offline restart and freeze exact IDs only at preview',async t=>{
   const f=await fixture(t);let h=f.host({root:true});h.menu.openRequest(f.record().request.id);
+  await wait(()=>h.page()?.kind==='info'&&h.page().title===f.record().request.title);assert.ok(h.page().text.includes(f.record().request.scope));assert.equal(f.previews.length,0);h.page().onBack();
   await wait(()=>h.page()?.options?.some(item=>item.title==='授权选定文本材料'));h.choose('授权选定文本材料');
   await wait(()=>h.page()?.options?.some(item=>item.title==='粘贴文本片段'));h.choose('粘贴文本片段');
   await wait(()=>h.page()?.kind==='prompt');await h.enter('Compiler log');
@@ -74,7 +75,9 @@ test('native material recovery requires explicit review even when reconfirmed sc
   f.setRecord({...f.record(),events:[...f.record().events,{event:{kind:'confirm-scope',id:newEvent}}]});
   const h=f.host();h.menu.openDraft(row.id);await wait(()=>h.page()?.options?.some(item=>item.title==='继续编辑材料'));h.choose('继续编辑材料');
   await wait(()=>h.page()?.options?.some(item=>item.title==='确认当前接收方和范围，重新审阅'));
-  assert.ok(h.page().title.includes(previous)&&h.page().title.includes(newEvent));assert.equal(f.inputs.length,0);
+  assert.ok(!h.page().title.includes(previous)&&!h.page().title.includes(newEvent));assert.equal(f.inputs.length,0);
+  h.choose('查看原选择与当前来源');assert.ok(h.page().text.includes(previous)&&h.page().text.includes(newEvent));h.page().onBack();
+  await wait(()=>h.page()?.options?.some(item=>item.title==='确认当前接收方和范围，重新审阅'));
   assert.equal((await f.store.getDraft(row.id)).content.source.scopeEventId,previous);
   h.choose('确认当前接收方和范围，重新审阅');await wait(()=>h.page()?.options?.some(item=>item.title==='预览接收方、范围和材料'));
   const updated=await f.store.getDraft(row.id);assert.equal(updated.content.source.scopeEventId,newEvent);

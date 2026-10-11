@@ -159,7 +159,13 @@ test('local help uses actual authorized HTTP sources and Task receipts; four pat
     registerHelpTools({ registerTool(name, meta, run) { registrations.set(name, { meta, run }); } }, { flow });
     const response = await registrations.get('galaxy_help_get').run({ sessionId: session.id });
     assert.equal(JSON.parse(response.content[0].text).id, session.id);
-    assert.equal(registrations.size, 11); assert.ok(httpRequests >= 9);
+    assert.deepEqual([...registrations.keys()].sort((a, b) => a.localeCompare(b)), [
+      'galaxy_help_start', 'galaxy_help_get', 'galaxy_help_query', 'galaxy_help_compose', 'galaxy_help_select',
+      'galaxy_help_pause', 'galaxy_help_publish', 'galaxy_help_reconcile', 'galaxy_help_refresh', 'galaxy_help_return',
+      'galaxy_help_forget', 'galaxy_help_review', 'galaxy_help_prepare_action', 'galaxy_help_action_preview',
+      'galaxy_help_execute_action', 'galaxy_help_reconcile_action',
+    ].sort((a, b) => a.localeCompare(b)));
+    assert.ok(httpRequests >= 9);
     const legacy = { id: id(), caseId: root.id, title: 'Existing legacy assistance', problem: 'Existing issue', attemptedApproaches: [],
       scope: 'Legacy scope', visibility: 'Private', collaboration: 'open-assistance', enrollmentExpiresAt: f.now + 3600 };
     await f.assistance.create(f.actor, await f.authorize(legacy, 'assistance.publish'));

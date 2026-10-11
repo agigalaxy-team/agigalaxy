@@ -4,6 +4,9 @@ export const lifecyclePolicyVersion = 'galaxy-retention/v1-product-v2';
 const exclusiveAccount = account => `${account} IN (SELECT l.account_id FROM community_account_links l WHERE l.subject_id=$1)
   AND NOT EXISTS(SELECT 1 FROM community_account_links other WHERE other.account_id=${account} AND other.subject_id<>$1)`;
 export const productV2DeletionTargets = {
+  forum_posts_v1:'t.subject_id=$1',forum_versions_v1:'t.subject_id=$1',forum_replies_v1:'t.subject_id=$1',forum_events_v1:'t.subject_id=$1',
+  forum_permissions_v1:'t.subject_id=$1',forum_reports_v1:'t.subject_id=$1',forum_governance_events_v1:'t.subject_id=$1',forum_write_receipts_v1:'t.subject_id=$1',
+  forum_daily_usage_v1:exclusiveAccount('t.account_id'),
   watch_controls_v2:'t.subject_id=$1',watch_control_operations_v2:'t.subject_id=$1',
   identity_groups_v2:'t.subject_id=$1',identity_group_operations_v2:'t.subject_id=$1',identity_group_approvals_v2:'t.subject_id=$1',
   target_reports_v2:'t.subject_id=$1',target_governance_events_v2:'t.subject_id=$1',
@@ -49,6 +52,11 @@ export const lifecycleManagedTables = ['lifecycle_erasure_records'];
 // body deletion receipt. Their adapter adds actual controlled-copy results.
 export const chatDelegatedTables = ['chat_rooms','chat_memberships','chat_decisions','chat_message_refs','chat_message_operations','chat_cursors','chat_message_preferences','chat_agent_grants','chat_attachments','outcome_materials_v2','outcome_material_events_v2'];
 export const productV2Retention = Object.freeze({
+  communityForum:{tables:['forum_posts_v1','forum_versions_v1','forum_replies_v1','forum_events_v1','forum_permissions_v1','forum_reports_v1','forum_governance_events_v1','forum_daily_usage_v1','forum_write_receipts_v1'],
+    permission:'exact accepted signed deadline <=30days; natural binding expiry does not shorten it; explicit source revocation/deletion stops reads',
+    independentReply:'parent exit retains locator only; own reply permission governs existing reply',bodyCleanup:'bounded cleanupForumWithin; actual erasure ledger records',
+    policy:'strict loaded forum-quota/1; daily30days and receipt/closed-governance180days defaults; no read renewal',
+    deletion:'own statements only; independent replies retain exact parent locator without deleted source identity/body'},
   watchControls:{tables:['watch_controls_v2','watch_control_operations_v2'],category:'explicit-private-user-host-control',
     daysAfterStopOrExpiry:90,technicalChoice:'CUR-35 bounded metadata recovery window; no room bodies or model credentials',
     cleanup:'cleanupWatchControlsWithin',readingRenewsExpiry:false},

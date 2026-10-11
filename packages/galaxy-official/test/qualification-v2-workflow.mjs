@@ -68,14 +68,14 @@ export async function verifyScopedCalculationWorkflow(database=null,{testHttp=fa
     assert.equal((await f.qualification.v2.evaluate(n.actor,input)).simulation.state,'insufficient-evidence');
     await assert.rejects(f.assistance.getTask(n.actor,work.open.taskId),/not_found/);
     const sourceRefs=[];
-    for(const[kind,table,ids]of[['task-event','task_events',[work.open.operationId,work.proposal.eventId,work.confirm.eventId,work.delivery.eventId,work.acceptance.eventId]],
-      ['case-event','case_events',[work.r.eventId,work.intervention.eventId,work.result.eventId]]]){
+    for(const{kind,table,ids}of[{kind:'task-event',table:'task_events',ids:[work.open.operationId,work.proposal.eventId,work.confirm.eventId,work.delivery.eventId,work.acceptance.eventId]},
+      {kind:'case-event',table:'case_events',ids:[work.r.eventId,work.intervention.eventId,work.result.eventId]}]){
       for(const id of ids){const row=(await f.db.query(`SELECT subject_id,payload_hash FROM ${table} WHERE id=$1`,[id])).rows[0];assert.ok(row);
         sourceRefs.push({kind,id,eventVersion:1,payloadHash:row.payload_hash,owner:row.subject_id});}}
     const common={id:randomUUID(),taskId:t.taskId,candidateId:p.actor.subjectId,recipientId:n.actor.subjectId,
       purpose:'this-task-eligibility-computation-only',expiresAt:new Date((f.now+300)*1000).toISOString(),
       disclosure:'public-conditions-and-bounded-satisfaction-only; no-source-text-or-other-party-identity'};
-    const plain=refs=>refs.map(({owner,...ref})=>ref),ownForeign=sourceRefs.filter(s=>s.owner===f.actor.subjectId);
+    const plain=refs=>refs.map(({owner:_owner,...ref})=>ref),ownForeign=sourceRefs.filter(s=>s.owner===f.actor.subjectId);
     const compute={...common,kind:'compute',sourceRefs:plain(sourceRefs),permissionIds:[],evidence};
     await assert.rejects(f.qualificationCalculations.submit(p.actor,await grantFor(p,compute)),/qualification_source_permission_required/);
     const permission={...common,id:randomUUID(),kind:'source-permission',sourceRefs:plain(ownForeign)};

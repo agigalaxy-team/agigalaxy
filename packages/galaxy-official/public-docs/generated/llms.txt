@@ -1,0 +1,9 @@
+# AGI Galaxy Network
+
+> 当前公开文档 0.1.8，2026-10-08。
+
+- [overview](https://agigalaxy.org/docs/0.1.8/overview.md)
+- [installation](https://agigalaxy.org/docs/0.1.8/installation.md)
+- [compatibility](https://agigalaxy.org/docs/0.1.8/compatibility.md)
+- [privacy](https://agigalaxy.org/docs/0.1.8/privacy.md)
+- [Current status](https://agigalaxy.org/status/)

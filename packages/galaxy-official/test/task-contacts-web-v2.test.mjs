@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { retainTaskContactAgent, taskContactWebsite } from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 import assert from 'node:assert/strict';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
@@ -75,16 +76,24 @@ test(
         return {
           get: async (key) => structuredClone(values.get(key)),
           put: async (key, value) => values.set(key, structuredClone(value)),
+          update: async (key, updater) => {
+            const next = updater(structuredClone(values.get(key)));
+            if (next && typeof next.then === 'function') throw Error('synchronous_update_required');
+            const stored = structuredClone(next); values.set(key, stored); return structuredClone(stored);
+          },
         };
       };
       const ownerStore = storage(),
         config = { endpoint, trustedKeys: f.bindings.trustedKeys };
-      const make = async (store) => {
+      const stores = new WeakMap();
+    const make = async (store) => {
         const rt = await createWebRuntime(config, {
           store,
           fetch: wire,
           now: () => now,
+          website: taskContactWebsite,
         });
+        stores.set(rt, store);
         runtimes.push(rt);
         return rt;
       };
@@ -94,6 +103,7 @@ test(
       for (const [index, rt] of [a, b, c].entries()) {
         await rt.createIdentity({ confirmed: true });
         await rt.connect({ confirmed: true });
+        await retainTaskContactAgent(rt, stores.get(rt), now);
         issuer.setAccount(`synthetic-task-contact-${index}`);
         const login = await rt.api.call('/v1/identity/begin', {
           providerId: 'fixture',
@@ -234,7 +244,7 @@ test(
       ]);
       assert.equal(invites.length, 0);
       loseInvite = true;
-      let pending = await client.sendInvites({ confirmed: true });
+      let pending = await client.sendInvites({ confirmed: true, batchId: batch.batchId });
       assert.equal(pending.items[0].state, 'result-unknown');
       assert.equal(pending.items[1].state, 'queued');
       assert.equal(
@@ -248,7 +258,7 @@ test(
       a = await make(ownerStore);
       await a.connect({ confirmed: true });
       client = createTaskContactClient(a, taskId);
-      pending = await client.sendInvites({ confirmed: true });
+      pending = await client.sendInvites({ confirmed: true, batchId: batch.batchId });
       assert.deepEqual(
         pending.items.map((item) => item.state),
         ['acknowledged', 'acknowledged'],
@@ -293,10 +303,10 @@ test(
       assert.equal(task.participations.length, 0);
       const roomPlan = await client.prepareRooms('together', [bid, cid]);
       loseRoom = true;
-      let roomBatch = await client.sendRooms({ confirmed: true });
+      let roomBatch = await client.sendRooms({ confirmed: true, batchId: roomPlan.batchId });
       assert.equal(roomBatch.rooms[0].state, 'result-unknown');
       client = createTaskContactClient(a, taskId);
-      roomBatch = await client.sendRooms({ confirmed: true });
+      roomBatch = await client.sendRooms({ confirmed: true, batchId: roomBatch.batchId });
       assert.equal(roomWrites.length, 2);
       assert.deepEqual(
         roomWrites[0],
@@ -335,7 +345,7 @@ test(
         roomPlan.rooms[0].invitations[1].decisionId,
         'unsent recipient retains original stable batch ID',
       );
-      roomBatch = await client.sendRooms({ confirmed: true });
+      roomBatch = await client.sendRooms({ confirmed: true, batchId: refreshed.batchId });
       const second = roomBatch.rooms[0].invitations[1],
         decisions = await a.api.call(path + '/decisions', {});
       assert.equal(

@@ -26,3 +26,13 @@ export const moderationEventSchema=z.discriminatedUnion('kind',[
     references:z.array(moderationReferenceSchema).max(8).default([])})
 ]);
 export const moderatorIdsSchema=z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(8).refine(ids=>new Set(ids).size===ids.length);
+
+// This is the SHA256 of the original signed payloadJson bytes, independent of
+// the client confirmation hash that also includes the Consent envelope.
+export const moderationReceiptSchema=z.strictObject({reportId:z.uuid(),eventId:z.uuid(),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)});
+const receiptBase={...moderationReceiptSchema.shape,authority:z.literal('accepted-operation-only'),currentAccessGranted:z.literal(false),
+  contentReturned:z.literal(false),independenceVerified:z.literal(false),capabilityVerified:z.literal(false)};
+export const moderationReceiptResultSchema=z.discriminatedUnion('state',[
+  z.strictObject({...receiptBase,state:z.literal('acknowledged'),receipt:z.strictObject({reportId:z.uuid(),eventId:z.uuid(),version:z.number().int().positive().max(100)})}),
+  z.strictObject({...receiptBase,state:z.literal('absent')}),z.strictObject({...receiptBase,state:z.literal('conflict')})
+]).refine(result=>result.state!=='acknowledged'||result.receipt.reportId===result.reportId&&result.receipt.eventId===result.eventId);

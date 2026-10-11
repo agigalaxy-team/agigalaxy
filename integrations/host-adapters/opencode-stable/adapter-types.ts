@@ -1,10 +1,10 @@
 // The narrow stable Dialog/keymap surface used by Galaxy, not an alternate UI.
 export type Action = () => unknown;
 export type Routes = Record<string, Action>;
-export type MenuOption = { number: string; title: string; description?: string; disabled?: boolean };
+export type MenuOption = { number: string; title: string; description?: string; disabled?: boolean; reading?: boolean };
 export type ModuleEntry = { id: string; title?: string };
 export type Menu = { title: string; options: MenuOption[]; routes: Routes; onBack: Action; onEscape?: Action };
-export type Prompt = { title: string; placeholder: string; onConfirm: (value: string) => unknown; onCancel?: Action };
+export type Prompt = { title: string; placeholder: string; value?: string; onConfirm: (value: string) => unknown; onCancel?: Action };
 type Command = { name: string; title: string; run: Action; desc?: string; category?: string; namespace?: string; slashName?: string; slashAliases?: string[] };
 export interface StableHostApi {
   lifecycle?: { readonly signal: AbortSignal; onDispose(handler: Action): Action };
@@ -12,7 +12,7 @@ export interface StableHostApi {
   ui: {
     dialog: { setSize(size: 'medium' | 'xlarge'): void; clear(): void; replace(factory: Action, dispose?: Action): void };
     DialogAlert(input: { title: string; message: string; onConfirm: Action }): unknown;
-    DialogPrompt(input: { title: string; placeholder: string; onConfirm: (value: string) => unknown; onCancel: Action }): unknown;
+    DialogPrompt(input: { title: string; placeholder: string; value?: string; onConfirm: (value: string) => unknown; onCancel: Action }): unknown;
     DialogSelect(input: { title: string; skipFilter: boolean; options: { title: string; description?: string; value: string; disabled: boolean; onSelect: Action }[] }): unknown;
   };
 }

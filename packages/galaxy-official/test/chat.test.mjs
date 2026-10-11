@@ -24,10 +24,10 @@ test('message intents survive unknown delivery, expiry does not change and curso
  // Explicit transport contract double: verifies PostgreSQL orchestration only.
  // Real Prosody storage/delivery has a separate required integration test.
  const transport={available:true,project:async()=>{},send:async x=>{calls.push(x);if(lose){lose=false;throw new ServiceError('chat_delivery_unknown',504);}return{archiveId:x.messageId};},
-  read:async x=>x.ids.map(id=>({archiveId:id,text:'body provided by transport fixture'})),edit:async()=>{},erase:async()=>{}};
+  read:async x=>x.ids.map(id=>({archiveId:id,text:'body provided by transport fixture'})),edit:async()=>{},erase:async()=>({archiveDeleted:true})};
  const f=await chatFixture({transport});try{const{chat,people:[a,b]}=f,roomId=randomUUID();await chat.create(a,{roomId,operationId:randomUUID(),title:'No task'});await invite(chat,a,roomId,b);
   const input={clientMessageId:randomUUID(),text:'a normal message'};await assert.rejects(chat.send(a,roomId,input),/delivery_unknown/);
-  const pending=await chat.messageStatus(a,roomId,input);assert.equal(pending.state,'pending');
+  const pending=await chat.messageStatus(a,roomId,{clientMessageId:input.clientMessageId});assert.equal(pending.state,'pending');
   const sent=await chat.send(a,roomId,input);assert.equal(sent.acceptedByRoom,true);assert.equal(sent.readByOthers,false);assert.equal(calls[0].messageId,calls[1].messageId);
   assert.equal(Number((await f.db.query('SELECT content_bytes FROM chat_message_refs WHERE message_id=$1',[sent.messageId])).rows[0].content_bytes),Buffer.byteLength(input.text));
   const usage=await subjectResourceUsage(f.db,a.subjectId,f.now());chat.access.resourceBudgetPolicy={...defaultResourceBudgetPolicy,maxPayloadBytesPerSubject:Number(usage.payloadBytes)};
@@ -35,7 +35,7 @@ test('message intents survive unknown delivery, expiry does not change and curso
   chat.access.resourceBudgetPolicy=null;
   await assert.rejects(chat.send(a,roomId,{...input,text:'changed'}),/message_conflict/);
   const decisionId=randomUUID(),r=await chat.get(a,roomId);await chat.proposeDecision(a,roomId,{decisionId,expectedRevision:r.revision,action:'retention',retentionDays:7});await chat.voteDecision(b,roomId,{decisionId,choice:'approve'});
-  assert.equal(new Date((await chat.messageStatus(a,roomId,input)).expiresAt).getTime(),new Date(sent.expiresAt).getTime());
+  assert.equal(new Date((await chat.messageStatus(a,roomId,{clientMessageId:input.clientMessageId})).expiresAt).getTime(),new Date(sent.expiresAt).getTime());
   const next=await chat.send(a,roomId,{clientMessageId:randomUUID(),text:'new policy'});assert.equal(Date.parse(next.expiresAt)-Date.parse(next.sentAt),7*86400000);
   const history=await chat.history(b,roomId,{limit:1});assert.equal(history.messages.length,1);assert.ok(history.next);
   const deletionId=randomUUID();await f.db.query(`INSERT INTO deletion_requests(id,subject_id,binding_id,requester_public_key,payload_text,payload_hash,signature,state,revision)
@@ -60,7 +60,7 @@ test('message intents survive unknown delivery, expiry does not change and curso
   transport.erase=async()=>{throw new ServiceError('chat_transport_unavailable',503);};assert.equal((await chat.retract(a,roomId,sent.messageId)).purgePending,true);
   const after=await chat.history(b,roomId);assert.equal(after.messages[0].text,null);assert.equal(after.messages[0].state,'retracted');
   assert.ok(Number((await f.db.query('SELECT content_bytes FROM chat_message_refs WHERE message_id=$1',[sent.messageId])).rows[0].content_bytes)>0,'Failed physical erase retains quota reservation');
-  transport.erase=async()=>{};await chat.purgeOne(sent.messageId);assert.equal(Number((await f.db.query('SELECT content_bytes FROM chat_message_refs WHERE message_id=$1',[sent.messageId])).rows[0].content_bytes),0);
+  transport.erase=async()=>({archiveDeleted:true});await chat.purgeOne(sent.messageId);assert.equal(Number((await f.db.query('SELECT content_bytes FROM chat_message_refs WHERE message_id=$1',[sent.messageId])).rows[0].content_bytes),0);
   await chat.hide(b,roomId,next.messageId);const empty=await chat.history(b,roomId,{after:history.next,limit:1});assert.equal(empty.messages.length,0);
   await f.db.query('UPDATE chat_message_refs SET sent_at=$2 WHERE message_id=$1',[next.messageId,new Date((f.now()-86401)*1000).toISOString()]);
   await assert.rejects(chat.edit(a,roomId,next.messageId,{operationId:randomUUID(),expectedRevision:1,text:'late'}),/edit_window_closed_use_correction/);

@@ -117,7 +117,7 @@ export async function verifyDiscoveryV2(database = null, options = {}) {
     const small = new DiscoveryV2Service(f.access, { profiles: f.profiles, notifications: f.notifications, history: f.history.v2, scanWindowLimit: 1 });
     const earliest = [f, ...others].sort((a, b) => a.actor.subjectId.localeCompare(b.actor.subjectId))[0];
     await save(earliest, { enabled: false });
-    const page = await small.query(null, input), found = [];
+    let page = await small.query(null, input); const found = [];
     assert.equal(page.items.length, 0); assert.ok(page.nextAfter, 'empty window does not mean no other matches');
     while (page.nextAfter) { page = await small.query(null, { ...input, after: page.nextAfter }); found.push(...page.items); }
     assert.ok(found.length > 0); assert.equal(new Set(found.map(item => item.id)).size, found.length);

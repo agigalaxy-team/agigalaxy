@@ -1,5 +1,5 @@
 import { capsuleEventV2Schema, capsuleUseV2Schema, capsulePreviewV2Schema, capsuleReadSchema,
-  capsuleQuerySchema, capsuleUsesQuerySchema } from './shared/capsule-v2-schema.mjs';
+  capsuleQuerySchema, capsuleUsesQuerySchema, capsuleUseOriginRef, capsuleVersionV2Schema } from './shared/capsule-v2-schema.mjs';
 import { CapsuleSourcesV2, capsuleRule as rule, parseCapsuleV2 as parse } from './capsule-sources-v2.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
@@ -8,6 +8,7 @@ import { recordObjectAudit } from './infrastructure/object-audit.mjs';
 import {capsuleReceiptV2Schema,capsuleVersionsV2Schema,capsulePermissionsQueryV2Schema} from './shared/capsule-v2-schema.mjs';
 const absent = e => e instanceof ServiceError && [400, 403, 404, 409, 422, 503].includes(e.status);
 const json = value => JSON.stringify(value);
+const compareSubject = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const ownControl=(actor,row,type)=>actor?.subjectId===row.subject_id?{ownerControl:{type,operationId:row.id,consentId:row.consent_id,payloadHash:row.payload_hash}}:{};
 const audit = (db, actor, authorization, id, action) => recordObjectAudit(db, { subjectId: actor.subjectId,
   objectId: id, action, httpRequestId: actor.httpRequestId ?? null, ...authorization });
@@ -81,15 +82,23 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
   async preview(actor, input) {
     const parsed = capsulePreviewV2Schema.safeParse(input); rule(parsed.success, 'invalid_capsule_v2_payload', 400);
     return this.access.runAuthorized(actor, 'capsules', async db => {
-      const payload = parsed.data.payload;
+      const {payload, visibility} = parsed.data;
       // Preview does not store draft text or issue a Consent. The final exact
       // publication and its chosen recipient scope are checked again on write.
       try {
-        const sources = await this.publicationSourcesWithin(db, actor, payload, { visibility: 'Public' });
-        return { readyForPublicPublication: true, published: false, draftStorage: 'user-side-only', payload,
-          permissions: sources.permissions, attributions: sources.attributions, capabilityVerified: false,
+        const sources = await this.publicationSourcesWithin(db, actor, payload, { visibility }, {includeCoverage:true});
+        const ready = sources.uncovered.length === 0;
+        const attributions = await this.attributionsWithin(db, actor, sources.attributions);
+        // Do not return a selected message body after its actual lifetime ends
+        // while the other read-only checks are awaiting transport or storage.
+        for (const source of sources.sourceCoverage.sources) if (source.reading?.expiresAt)
+          rule(Date.parse(source.reading.expiresAt) > this.access.now() * 1000, 'chat_message_version_unavailable', 409);
+        return { readyForPublication: ready, visibility, readyForPublicPublication: ready && visibility === 'Public',
+          ...(ready ? {} : {reason:'capsule_source_permission_required'}), sourceCoverage:sources.sourceCoverage,
+          published: false, draftStorage: 'user-side-only', payload,
+          permissions: sources.permissions, attributions, capabilityVerified: false,
           requiredFinalStep: 'exact publication Consent with chosen visibility', coauthorApproval: false };
-      } catch (error) { if (!absent(error)) throw error; return { readyForPublicPublication: false, published: false,
+      } catch (error) { if (!absent(error)) throw error; return { readyForPublication:false, visibility, readyForPublicPublication: false, published: false,
         draftStorage: 'user-side-only', reason: error.code, capabilityVerified: false, automaticPublication: false }; }
     });
   }
@@ -114,7 +123,8 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
     const row = rows[0]; rule(row?.payload_text, 'capsule_unavailable', 404);
     const grant = await this.legacy.grant(db, row, 'capsule.publish');
     rule(this.legacy.visible(grant, actor), 'capsule_unavailable', 404);
-    const payload = JSON.parse(row.payload_text), maintenance = await this.maintenanceWithin(db, actor, capsuleId, row.id);
+    const raw = JSON.parse(row.payload_text), payload = raw.schemaVersion === 2 ? parse(row.payload_text, capsuleVersionV2Schema) : raw;
+    const maintenance = await this.maintenanceWithin(db, actor, capsuleId, row.id);
     if (payload.schemaVersion !== 2) {
       const legacy = await this.legacy.readWithin(db, actor, { capsuleId, versionId: row.id });
       return { row, grant, payload, ...maintenance, source: { legacy, sourceCurrent: !legacy.sourceNeedsReview,
@@ -126,7 +136,8 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
       // Current source checks use the publisher's licensed access, not a public
       // reader's raw-room identity. Only selected published content is returned.
       source = await this.publicationSourcesWithin(db, { subjectId: row.subject_id }, payload, grant, { requireCurrentResult: false });
-      if (!source.sourceCurrent) sourceStatus = 'source-result-superseded';
+      if (!source.sourceCurrent) sourceStatus = source.sourceCurrentness === 'unavailable'
+        ? 'source-currentness-unavailable' : 'source-result-superseded';
     } catch (error) { if (!absent(error) || !tolerateUnavailableSource) throw error; sourceStatus = 'source-unavailable'; source = { reason: error.code }; }
     return { row, grant, payload, ...maintenance, source, sourceStatus, compatibility: 'native-v2' };
   }
@@ -153,7 +164,7 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
       } else {
         // Maintenance remains possible after a source is unavailable.
         const current = await this.versionWithin(db, actor, parent.id, versionId);
-        rule(grant.visibility === current.grant.visibility && json([...grant.viewers].sort()) === json([...current.grant.viewers].sort()), 'capsule_notice_visibility_mismatch', 403);
+        rule(grant.visibility === current.grant.visibility && json([...grant.viewers].sort(compareSubject)) === json([...current.grant.viewers].sort(compareSubject)), 'capsule_notice_visibility_mismatch', 403);
         rule(!(payload.kind === 'deprecate' && current.deprecated || payload.kind === 'security-issue' && current.securityIssue || payload.kind === 'resolve-security' && !current.securityIssue), 'capsule_transition_denied');
         if (payload.replacementVersionId) { rule(payload.replacementVersionId !== versionId, 'capsule_replacement_mismatch'); await this.versionWithin(db, actor, parent.id, payload.replacementVersionId); }
       }
@@ -176,7 +187,7 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
     return { capsuleId: input.capsuleId, versionId: current.row.id, authorId: current.row.subject_id, version: current.payload,
       ...ownControl(actor,current.row,'publication'),
       ...(ownState ? { revision: ownState.revision } : {}),
-      sourceStatus: current.sourceStatus, permissions: current.source.permissions, attributions: current.source.attributions,
+      sourceStatus: current.sourceStatus, permissions: current.source.permissions, attributions: await this.attributionsWithin(db, actor, current.source.attributions),
       deprecated: current.deprecated, securityIssue: current.securityIssue, notices: current.notices,
       newApplicationAllowed: !current.deprecated && !current.securityIssue && current.source.sourceCurrent,
       synthetic: current.source.synthetic, compatibility: current.compatibility,
@@ -204,16 +215,32 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
   get(actor, input) { rule(capsuleReadSchema.safeParse(input).success, 'invalid_capsule_query', 400);
     return actor ? this.access.runAuthorized(actor, 'capsules', db => this.readWithin(db, actor, input)) : transaction(this.access.db, db => this.readWithin(db, null, input)); }
   async applicationWithin(db, actor, payload, { latest = false } = {}) {
-    const attempt = await this.sourceWithin(db, actor, { kind: 'attempt', ...payload.attemptRef, caseId: payload.caseId });
+    const originRef = capsuleUseOriginRef(payload);
+    const origin = await this.sourceWithin(db, actor, { ...originRef, caseId: payload.caseId });
     const result = await this.sourceWithin(db, actor, { kind: 'result', ...payload.resultRef, caseId: payload.caseId }, { latest });
-    rule(attempt.authorId === actor.subjectId && result.authorId === actor.subjectId, 'capsule_application_author_required', 403);
-    const origin = result.fact.origin;
-    rule(origin.kind === 'attempt' && origin.id === payload.attemptRef.id && origin.version === payload.attemptRef.version, 'capsule_result_mismatch');
+    rule(origin.authorId === actor.subjectId && result.authorId === actor.subjectId, 'capsule_application_author_required', 403);
+    const recorded = result.fact.origin;
+    rule(recorded.kind === originRef.kind && recorded.id === originRef.id && recorded.version === originRef.version, 'capsule_result_mismatch');
     rule(result.fact.reportedOutcome === payload.outcome, 'capsule_result_mismatch');
-    const environment = typeof attempt.fact.environment === 'object' ? attempt.fact.environment : { name: 'unknown', version: 'unknown' };
+    let environment = originRef.kind === 'attempt' && typeof origin.fact.environment === 'object' ? origin.fact.environment : { name: 'unknown', version: 'unknown' };
+    let environmentSource = originRef.kind === 'attempt' ? 'recorded-attempt; subject-reported' : 'unknown-origin-conditions';
+    if (payload.configurationRef) {
+      rule(this.configurations, 'capsule_configuration_source_unavailable', 503);
+      rule(origin.fact.sourceRefs.some(ref => ref.kind === 'configuration' && ref.id === payload.configurationRef.id
+        && ref.version === payload.configurationRef.version), 'capsule_configuration_not_in_origin');
+      const selected = await this.configurations.requireReferenceWithin(db, actor, payload.configurationRef);
+      environment = { name: selected.record.conditions.environment.name ?? 'unknown', version: selected.record.conditions.environment.version ?? 'unknown' };
+      environmentSource = 'selected-origin-configuration; subject-reported';
+    }
     rule(environment.name === payload.environment.name && environment.version === payload.environment.version, 'capsule_environment_mismatch');
     rule((result.fact.taskId ?? null) === (payload.taskId ?? null) && (result.fact.participationId ?? null) === (payload.participationId ?? null), 'capsule_application_context_mismatch');
-    return { attempt, result, synthetic: result.synthetic, currentResult: result.currentVersion === payload.resultRef.version };
+    if (latest && payload.participationId) {
+      rule(this.cases.tasks, 'capsule_participation_source_unavailable', 503);
+      const p = await this.cases.tasks.requireParticipationWithin(db, actor, { taskId: payload.taskId, participationId: payload.participationId });
+      rule(p.subjectId === actor.subjectId && p.scopeVersion === result.fact.participationScopeVersion, 'capsule_application_scope_changed', 403);
+    }
+    return { origin, result, environmentSource, synthetic: result.synthetic,
+      currentResult: result.currentness === 'current', resultCurrentness: result.currentness };
   }
   async recordUse(actor, request) {
     const payload = parse(request.payloadJson, capsuleUseV2Schema);
@@ -224,7 +251,9 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
       const grant = await this.legacy.grant(db, { id: payload.id, subject_id: actor.subjectId, consent_id: request.consentId, payload_text: request.payloadJson }, 'capsule.use');
       rule(['Private', 'Public'].includes(grant.visibility), 'capsule_visibility_required', 403);
       const previous = (await db.query('SELECT * FROM capsule_uses_v2 WHERE id=$1', [payload.id])).rows[0];
-      if (previous) { rule(previous.subject_id === actor.subjectId && previous.payload_hash === digest(request.payloadJson) && previous.consent_id === request.consentId, 'capsule_use_conflict'); return { eventId: payload.id, kind: payload.kind }; }
+      if (previous) { rule(previous.subject_id === actor.subjectId && previous.payload_hash === digest(request.payloadJson) && previous.consent_id === request.consentId, 'capsule_use_conflict');
+        return { eventId: payload.id, capsuleId: payload.capsuleId, versionId: payload.versionId, kind: payload.kind,
+          reportedOutcome: payload.outcome ?? null, verifiedReuse: false, capabilityVerified: false }; }
       rule(payload.attribution === parent.subject_id, 'capsule_attribution_mismatch');
       const current = await this.versionWithin(db, actor, payload.capsuleId, payload.versionId, { tolerateUnavailableSource: false });
       if (payload.kind === 'reference') {
@@ -236,7 +265,12 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
         if (payload.kind === 'reverify') {
           const prior = (await db.query("SELECT * FROM capsule_uses_v2 WHERE id=$1 AND subject_id=$2 AND version_id=$3 AND case_id=$4 AND kind='apply'", [payload.priorUseId, actor.subjectId, payload.versionId, payload.caseId])).rows[0];
           rule(prior?.payload_text, 'capsule_application_required'); await this.legacy.grant(db, prior, 'capsule.use');
-          rule(prior.result_id === payload.resultRef.id && prior.attempt_id === payload.attemptRef.id, 'capsule_application_mismatch');
+          const original = parse(prior.payload_text, capsuleUseV2Schema), originalOrigin = capsuleUseOriginRef(original), selectedOrigin = capsuleUseOriginRef(payload);
+          rule(original.resultRef.id === payload.resultRef.id && original.resultRef.version === payload.resultRef.version
+            && originalOrigin.kind === selectedOrigin.kind && originalOrigin.id === selectedOrigin.id && originalOrigin.version === selectedOrigin.version,
+          'capsule_application_mismatch');
+          rule((original.configurationRef?.id ?? null) === (payload.configurationRef?.id ?? null)
+            && (original.configurationRef?.version ?? null) === (payload.configurationRef?.version ?? null), 'capsule_application_mismatch');
           for (const ref of payload.verificationRefs) {
             const verification = await this.verificationRecords.requireReferenceWithin(db, actor, { kind: 'verification', ...ref }, { caseId: payload.caseId });
             rule(verification.record.target.type === 'result' && verification.record.target.id === payload.resultRef.id && verification.record.target.version === payload.resultRef.version, 'capsule_verification_mismatch');
@@ -244,12 +278,13 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
         }
       }
       const fingerprint = payload.kind === 'reverify' ? digest(json(payload.verificationRefs.map(ref => `${ref.id}:${ref.version}`).sort())) : '';
+      const originRef = payload.kind === 'reference' ? null : capsuleUseOriginRef(payload);
       try {
         await db.query(`INSERT INTO capsule_uses_v2(id,capsule_id,version_id,subject_id,case_id,attempt_id,attempt_version,result_id,result_version,prior_use_id,
-          kind,observed_revision,verification_fingerprint,consent_id,payload_text,payload_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [payload.id, payload.capsuleId, payload.versionId, actor.subjectId, payload.caseId, payload.attemptRef?.id ?? null, payload.attemptRef?.version ?? null,
+          kind,observed_revision,verification_fingerprint,consent_id,payload_text,payload_hash,origin_kind,origin_id,origin_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+        [payload.id, payload.capsuleId, payload.versionId, actor.subjectId, payload.caseId, originRef?.kind === 'attempt' ? originRef.id : null, originRef?.kind === 'attempt' ? originRef.version : null,
           payload.resultRef?.id ?? null, payload.resultRef?.version ?? null, payload.priorUseId ?? null, payload.kind, parent.revision, fingerprint,
-          request.consentId, request.payloadJson, digest(request.payloadJson)]);
+          request.consentId, request.payloadJson, digest(request.payloadJson), originRef?.kind ?? null, originRef?.id ?? null, originRef?.version ?? null]);
       } catch (error) { if (error.code === '23505') throw new ServiceError('capsule_use_already_recorded', 409); throw error; }
       await audit(db, actor, authorization, payload.id, 'capsule.use');
       return { eventId: payload.id, capsuleId: payload.capsuleId, versionId: payload.versionId, kind: payload.kind,
@@ -283,7 +318,9 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
       try { rule(prior?.payload_text, 'capsule_application_required'); const pg = await this.legacy.grant(db, prior, 'capsule.use'); rule(this.legacy.visible(pg, actor), 'capsule_application_required'); }
       catch (error) { if (!absent(error)) throw error; return { ...base, sourceStatus: 'prior-application-unavailable', record: null }; }
     }
-    return { ...base, record: payload, sourceStatus: applied && !applied.currentResult ? 'application-result-superseded' : 'current',
+      return { ...base, record: payload, sourceStatus: applied && !applied.currentResult
+        ? applied.resultCurrentness === 'unavailable' ? 'application-currentness-unavailable' : 'application-result-superseded' : 'current',
+      ...(applied ? { originRef: capsuleUseOriginRef(payload), environmentSource: applied.environmentSource } : {}),
       capsuleSourceStatus: current.sourceStatus, capsuleDeprecated: current.deprecated, capsuleSecurityIssue: current.securityIssue,
       synthetic: applied?.synthetic===true || current.source.synthetic===true ? true : applied?.synthetic===false && current.source.synthetic===false ? false : null, verifications,
       verificationMeaning: 'current-scoped-reports; not-independent-causality-or-expertise',

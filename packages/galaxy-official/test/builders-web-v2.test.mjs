@@ -16,7 +16,8 @@ test('Builder webpage actual device signatures reconcile a lost response without
     const fetcher=async(url,options)=>{const path=new URL(url).pathname;
       if(path==='/v2/builders/support/events')sent.push(JSON.parse(options.body));
       const result=await fetch(address+path,options);if(drop&&path==='/v2/builders/support/events'){drop=false;throw new Error('synthetic lost response');}return result;};
-    const data=new Map(),store={get:async key=>structuredClone(data.get(key)),put:async(key,value)=>data.set(key,structuredClone(value))};
+    const data=new Map(),store={get:async key=>structuredClone(data.get(key)),put:async(key,value)=>data.set(key,structuredClone(value)),
+      update:async(key,change)=>{const next=change(structuredClone(data.get(key)));if(next?.then)throw Error('local_update_async_callback');data.set(key,structuredClone(next));return structuredClone(next);}};
     runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,fetch:fetcher,now:()=>f.now});
     await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId,client=createBuildersWebClient(runtime,{subjectId}),builderId=randomUUID();

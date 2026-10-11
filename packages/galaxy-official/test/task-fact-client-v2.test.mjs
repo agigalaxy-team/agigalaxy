@@ -7,7 +7,6 @@ import { digest } from '../src/shared/digest.mjs';
 import {
   getFactClient,
   latestFacts,
-  exactFactRef,
 } from '../../galaxy-web/src/fact-client.mjs';
 
 // Actual HTTP, signatures, Consent and persistent services. Synthetic identities
@@ -59,7 +58,7 @@ test('client links actual work without failed attempts, keeps multiple authors a
     runtimes.set(who, {
       api: {
         endpoint: who.access.endpoint,
-        snapshot: () => ({ subjectId: who.actor.subjectId }),
+        snapshot: () => ({ subjectId: who.actor.subjectId, bindingId: who.actor.bindingId, endpoint: who.access.endpoint }),
         prepareAuthorization: async (payloadJson, options) => {
           const intent = {
             version: 1,
@@ -250,7 +249,7 @@ test('client links actual work without failed attempts, keeps multiple authors a
       work(q, qp, qWork),
       (error) => error.resultUnknown === true,
     );
-    assert.equal((await client(q).reconcile(taskId)).state, 'result-unknown');
+    assert.equal((await client(q).reconcile(taskId)).state, 'absent');
     const qd = await client(q).reconcile(taskId, {
       retry: true,
       confirmed: true,

@@ -25,8 +25,14 @@ test('Two real web runtimes retain draft base, reconcile lost sync response and 
   await ha.saveChoice(make(ra,'Device A reasoning visible to user'));await hb.saveChoice(make(rb,'Device B alternative visible to user'));
   assert.equal((await ca.preferences()).enabled,false);await assert.rejects(ca.sync(choiceId),/not_selected/);
   await ca.savePreference({endpoint:f.access.endpoint,expectedRevision:0,enabled:true,snapshotIds:[choiceId]});
-  drop=true;await assert.rejects(ca.sync(choiceId),/lost response/);assert.ok((await ca.localState()).pending[choiceId]);
-  const accepted=await ca.sync(choiceId);assert.equal(accepted.replayed,true);assert.equal(writes[0].versionId,writes[1].versionId);
+  const preview=await ca.localPreview(choiceId);
+  await assert.rejects(ca.sync(choiceId,{expectedLocalHash:'f'.repeat(64)}),/choice_sync_preview_changed/);
+  assert.equal(writes.length,0,'a stale preview cannot upload a different local version');
+  drop=true;await assert.rejects(ca.sync(choiceId,{expectedLocalHash:preview.hash}),/lost response/);const original=(await ca.localState()).pending[choiceId];assert.ok(original);
+  await assert.rejects(ca.sync(choiceId,{expectedPendingVersionId:randomUUID()}),/choice_sync_preview_changed/);
+  assert.deepEqual((await ca.localState()).pending[choiceId],original,'a different pending operation cannot replace the previewed original');
+  const accepted=await ca.sync(choiceId,{expectedPendingVersionId:original.versionId});assert.equal(accepted.replayed,true);
+  assert.equal(writes.length,1,'an accepted original is recovered through its receipt without another upload');assert.equal(writes[0].versionId,original.versionId);assert.equal(accepted.operationVersionId,original.versionId);
   await cb.list();const alternative=await cb.sync(choiceId);assert.equal(alternative.syncState,'conflict','reading latest head did not rebase old local draft');
   assert.equal(alternative.current.content.visibleRationale,'Device A reasoning visible to user');assert.equal(alternative.conflicts[0].content.visibleRationale,'Device B alternative visible to user');
   const restored=await cb.restore(choiceId,alternative.current.versionId);assert.equal(restored.content.visibleRationale,'Device A reasoning visible to user');assert.equal((await hb.local()).choices[0].versions[0].visibleRationale,'Device B alternative visible to user');

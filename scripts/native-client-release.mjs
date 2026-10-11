@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {isDeepStrictEqual} from 'node:util';
 import {signRelease} from '../packages/galaxy-official/src/release-artifact.mjs';
 import {verifyNativeLicenseNotices} from './native-license-notices.mjs';
+import {parseComponentRelease} from './release-identifiers.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),sha=x=>createHash('sha256').update(x).digest('hex'),json=x=>JSON.stringify(x,null,2)+'\n';
 const suites=['packages/galaxy-official/test/native-client-v2.test.mjs','packages/galaxy-edge-mcp/test/native-v2-stdio.test.mjs'];
 const fail=message=>{throw new Error(message);};
@@ -15,17 +16,19 @@ async function object(path){return JSON.parse((await bytes(path)).toString('utf8
 function run(exe,args,options={}){try{return execFileSync(exe,args,{windowsHide:true,timeout:120000,maxBuffer:64*1024*1024,stdio:['ignore','pipe','pipe'],...options});}
  catch(error){throw new Error('Native release command failed ('+(error.status??'no-exit')+'); inspect the named local validation directly.');}}
 
-export async function inspectNativeClientCandidate({source}){
- if(!isAbsolute(source))fail('Absolute native candidate required');
+export async function inspectNativeClientCandidate({source,sourceDirectory=root}){
+ if(!isAbsolute(source)||!isAbsolute(sourceDirectory))fail('Absolute native candidate and captured source required');
  const packageJson=await object(join(source,'package.json')),manifest=await object(join(source,'native-v2.json')),sourceBytes=await bytes(join(source,'source-hashes.json')),
   lockBytes=await bytes(join(source,'package-lock.json')),hashes=JSON.parse(sourceBytes),lock=JSON.parse(lockBytes);
- if(packageJson.name!=='@galaxy/native-client'||packageJson.version!=='0.2.0'||packageJson.private!==true||
+ if(packageJson.name!=='@galaxy/native-client'||!parseComponentRelease(packageJson.version)||packageJson.private!==true||
   JSON.stringify(packageJson.exports)!==JSON.stringify({'./runtime':'./runtime.js','./server':'./server.js'})||
   !isDeepStrictEqual(packageJson.dependencies,lock.packages?.['']?.dependencies)||
   manifest.kind!=='galaxy-native-v2-local-candidate'||manifest.containsPrivateKeys!==false||manifest.containsConfiguredAuthority!==false||
-  manifest.sourceFiles!==Object.keys(hashes).length)fail('Native client metadata differs');
- for(const[name,digest]of Object.entries(hashes))if(sha(await bytes(inside(root,name)))!==digest)fail('Native client source is stale');
- for(const[name,digest]of Object.entries(manifest.artifacts))if(!/^[a-zA-Z0-9_-]+\.js$/.test(name)||sha(await bytes(inside(source,name)))!==digest)fail('Native bundle differs');
+  manifest.sourceFiles!==Object.keys(hashes).length||manifest.releaseId&&manifest.releaseId!==packageJson.version)fail('Native client metadata differs');
+ for(const[name,digest]of Object.entries(hashes))if(sha(await bytes(inside(sourceDirectory,name)))!==digest)fail('Native client source is stale');
+ for(const[name,digest]of Object.entries(manifest.artifacts))if((!/^[a-zA-Z0-9_-]+\.js$/.test(name)&&name!=='windows-notify-icon.ps1')||sha(await bytes(inside(source,name)))!==digest)fail('Native bundle differs');
+ const helperSource='packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1';
+ if(manifest.artifacts['windows-notify-icon.ps1']!==undefined&&manifest.artifacts['windows-notify-icon.ps1']!==hashes[helperSource])fail('Native notification helper source differs');
  for(const[name,version]of Object.entries(packageJson.dependencies)){
   if(!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(name)||!/^\d+\.\d+\.\d+$/.test(version)||
    lock.packages?.['node_modules/'+name]?.version!==version|| (await object(join(source,'node_modules',name,'package.json'))).version!==version)fail('Native dependency lock differs');
@@ -51,9 +54,9 @@ function protocolReport(report){
 
 // No credentials. Build exact archive bytes, then run only the two relevant
 // native suites. They exercise real stdio and local HTTP fixtures, not host UIs.
-export async function prepareNativeClientRelease({source,destination,nodeExecutable=process.execPath,tarExecutable}){
+export async function prepareNativeClientRelease({source,destination,nodeExecutable=process.execPath,tarExecutable,sourceDirectory=root}){
  if(![source,destination,nodeExecutable,tarExecutable].every(p=>typeof p==='string'&&isAbsolute(p)))fail('Absolute preparation paths required');
- const candidate=await inspectNativeClientCandidate({source}),files=await members(source,candidate.manifest);
+ const candidate=await inspectNativeClientCandidate({source,sourceDirectory}),files=await members(source,candidate.manifest);
  await mkdir(destination);const staging=join(destination,'.pack'),packageRoot=join(staging,'package');
  await mkdir(packageRoot,{recursive:true});
  const filename='galaxy-native-client-'+candidate.packageJson.version+'.tgz',tarball=join(destination,filename);
@@ -78,7 +81,7 @@ export async function prepareNativeClientRelease({source,destination,nodeExecuta
   if(count('fail')!==0||count('pass')<1||count('skipped')!==0||sha(await bytes(join(root,suite)))!==suiteSha256)fail('Native validation incomplete or changed');
   runs.push({suite,suiteSha256,outputSha256:sha(output),exitCode:0,passed:count('pass'),failures:count('fail'),skipped:count('skipped')});
  }
- await inspectNativeClientCandidate({source});
+ await inspectNativeClientCandidate({source,sourceDirectory});
  for(const[name,digest]of Object.entries(files))if(sha(await bytes(inside(source,name)))!==digest)fail('Candidate changed during validation');
  const artifact=await bytes(tarball),artifactsSha256=sha(JSON.stringify(files)),sourceSha256=sha(candidate.sourceBytes);
  const report=protocolReport({version:1,profile:'galaxy-native-client/1',scope:'local-stdio-http-fixtures',status:'passed',checkedAt:new Date().toISOString(),
@@ -112,4 +115,4 @@ export async function createNativeClientRelease({preparedDirectory,publisher,pur
   protocolAcceptance:{profile:report.profile,scope:report.scope,reportSha256:sha(reportBytes),sourceSha256:report.sourceSha256,artifactsSha256:report.artifactsSha256,actualHostAcceptance:false}};
  return{manifest,signed:await signRelease(manifest,{privateKey,kid}),reportBytes,artifact};
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))console.log(JSON.stringify(await prepareNativeClientRelease({source:process.argv[2],destination:process.argv[3],tarExecutable:process.argv[4]})));
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))console.log(JSON.stringify(await prepareNativeClientRelease({source:process.argv[2],destination:process.argv[3],tarExecutable:process.argv[4],sourceDirectory:process.argv[5]??root})));

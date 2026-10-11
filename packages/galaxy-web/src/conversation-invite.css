@@ -1,0 +1,16 @@
+.galaxy-site .conversation-invite{margin-top:20px}.galaxy-site .conversation-invite>details>summary{display:flex;align-items:center;gap:8px;width:fit-content;color:var(--g-accent);font-size:13px;cursor:pointer;list-style:none}.galaxy-site .conversation-invite>details>summary::-webkit-details-marker{display:none}.galaxy-site .conversation-settings .conversation-invite-form{display:block;margin-top:16px}.galaxy-site .conversation-invite-form>label{display:grid;gap:8px}.galaxy-site .invite-person-list{display:grid;max-height:260px;overflow:auto;margin:12px 0}.galaxy-site .invite-person-list .invite-person{display:flex;align-items:center;gap:11px;padding:11px 10px;border-radius:9px;cursor:pointer;min-width:0}.galaxy-site .invite-person.selected{background:var(--g-lilac,#f4eff9)}.galaxy-site .invite-person>input{accent-color:var(--g-accent);flex:none}.galaxy-site .invite-person>span:last-child{display:grid;gap:3px;min-width:0}.galaxy-site .invite-person strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}.galaxy-site .invite-person small{font-size:11px;color:var(--g-muted)}.galaxy-site .invite-more{display:flex;gap:14px;flex-wrap:wrap}.galaxy-site .invite-known-person{font-size:12px;margin:12px 0;color:var(--g-muted)}.galaxy-site .invite-known-person label{margin-top:10px}.galaxy-site .invite-selection{font-size:13px;margin:16px 0 8px}.galaxy-site .invite-impact{color:var(--g-muted);line-height:1.7}.galaxy-site .invite-feedback{color:var(--g-accent)}.galaxy-site .conversation-invite-form .button-row{margin-top:15px;flex-wrap:wrap}
+.galaxy-site .conversation-settings .member-list>li{margin:0;min-height:48px}
+.galaxy-site .conversation-settings .member-list>li>div{min-width:0}
+.galaxy-site .conversation-settings .member-list .technical-details{margin:3px 0 0;padding:0;border:0}
+.galaxy-site .conversation-settings .member-list .technical-details>summary{padding:2px 0;font-size:11px}
+.galaxy-site .conversation-invite>details{margin:0;padding:0;border:0}
+.galaxy-site .conversation-invite>details>summary{padding:5px 0}
+.galaxy-site .conversation-invite .invite-known-person{padding:0;border:0}
+.galaxy-site .conversation-invite .invite-known-person>summary{padding:5px 0}
+.galaxy-site .conversation-settings .member-change-history{margin:0;padding:0;border:0}
+.galaxy-site .conversation-settings .member-change-history>summary{padding:5px 0;font-size:12px;color:var(--g-muted);cursor:pointer}
+.galaxy-site .member-decision{overflow-wrap:anywhere}
+.galaxy-site .member-decision .member-request-meta{color:var(--g-muted)}
+.galaxy-site .member-decision .button-row{flex-wrap:wrap;margin-top:10px}
+.galaxy-site .member-decision .button-row:empty{display:none}
+.galaxy-site .conversation-invite output{display:block;margin:12px 0}

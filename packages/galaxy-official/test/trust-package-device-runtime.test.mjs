@@ -44,7 +44,7 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   const records=new Map(),store={get:async key=>records.get(key),put:async(key,value)=>records.set(key,value)};
   web=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});
   await web.createIdentity({confirmed:true});await web.connect({confirmed:true});const browserId=(await web.status()).identity.subjectId;
-  web.disconnect();await exportOffline(web,browserId,1);
+  await web.disconnect();await exportOffline(web,browserId,1);
   const before=requests;await web.trustPackages.refreshIdentity();assert.ok(requests>before,'refresh is an explicit network operation');
   await exportOffline(web,browserId,1);
   const adapter=createTrustPackageDeviceAdapter({endpoint:config.endpoint,getMaterial:()=>null,readIdentity:()=>null,writeIdentity:()=>{},fetchIdentity:()=>{throw Error('unexpected network');}});

@@ -17,6 +17,24 @@
 
 Claude 桌面的 Chat 与 Code 需分别标注。当前官方文档说明，本地 Code 会话也加载 claude_desktop_config.json，遇到同名配置有优先级；独立 CLI 不直接读取该文件。生成的 claude-desktop-chat 只是可合并片段，不能把 Chat、Code 和远程会话都标为同一种验收。[桌面说明](https://code.claude.com/docs/en/desktop)
 
+Claude Code 的前台 Skill + MCP 接入与后台 reader 分别核验。2026-10-02 本机 CLI 为 2.1.266；本轮只执行 `--version`、`--help` 和配置来源的本机元数据检查，没有发送真实模型 prompt。正式本机配置已接受 `claude-code`，可在原服务配置中增加以下 `watchHost` 片段。两条路径须替换为本人实际的 Claude 原生可执行文件和已授权工作目录的绝对路径；它不代替宿主连接 Galaxy MCP 的 `.mcp.json`。
+
+```json
+{
+  "watchHost": {
+    "kind": "claude-code",
+    "command": "C:\\Tools\\ClaudeCode\\claude.exe",
+    "cwd": "C:\\Work\\my-project"
+  }
+}
+```
+
+`galaxy_watch_host_capabilities` 通过这个正式入口查询版本和帮助，不创建模型会话、不启用 Watch。当前会分别说明固定 reader 参数是否有文档依据，以及有效配置是否已确认：`readerProfileDocumented` 可以为 `true`，但 `readerConfigurationConfirmed`、`effectiveManagedPolicyConfirmed` 和 `backgroundReaderSupported` 仍为 `false`。配置不接受额外启动参数、认证环境变量或“已经验证”的布尔声明。
+
+缺少完整有效配置证据时，明确选择 `galaxy_watch_host_activate` 也会返回 `foreground-fallback`，通常原因是 `host_reader_configuration_unconfirmed`；后台模型未启用，模型调用为零。用户仍可在现有 Claude 前台会话使用 Galaxy MCP，读取 `galaxy_watch_check` 返回的授权工作，实际处理完成后再明确 `galaxy_watch_ack`，只更新 Agent 游标。原未知执行通过 `galaxy_watch_host_reconcile` 查询时保持 `unknown`，不会另建会话或重放工作；这也不是原模型已停止的证明。
+
+这个限制来自当前有效配置的证据边界：官方说明 `--restricted` 保留 managed settings，`--safe-mode` 仍可保留 managed hooks、status line 和 file-suggestion commands，managed settings 的优先级高于 `--settings`。本机 managed 文件或注册表键缺席也不能证明远端或动态 policy 缺席。因此，旗标存在、零 turn 握手、工具发现和协议替身测试都不作为后台 reader 已完成的依据；当前正式入口提供诊断和前台回退，Claude 后台持续协作仍待可验证的官方配置能力及真实宿主验收。[CLI 参数](https://code.claude.com/docs/en/cli-reference)、[配置优先级](https://code.claude.com/docs/en/settings)、[managed 来源](https://code.claude.com/docs/en/managed-settings)
+
 TRAE 的 command 字段官方明确要求不含空格。生成器为其单独使用 node 命令，必须在实际宿主 PATH 中解析到合适 Node；也可传已核对且不含空格的完整路径。不要将带空格的 Windows 安装路径强塞进去。此次该页面对普通 User-Agent 返回 400，按网站要求以真实模型名称 User-Agent 读取到 200 的正文，确认其属于 TraeWork 桌面文档。[添加 MCP](https://docs.trae.cn/work_remote-mcp-server)
 
 Cursor 文档列有 elicitation、MCP Apps 等能力；本包未实现、未验证银河侧栏或 MCP Apps 页面。DSH 的浮动窗口和宿主后台运行也是独立后续适配项，不能从“插件能连接 MCP”推导为完成。能力登记使用 host-capabilities.json；目前只直接确认上述两种 CLI 的本机版本，其余端仍待真实宿主验收。

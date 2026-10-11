@@ -5,7 +5,7 @@ const fields={bootstrap:['genesisProof','newDevice'],'authorize-device':['newDev
   'set-recovery':['recoveryGeneration','nextRecoveryPublicKey','saveDeclaration'],
   recover:['recoveryGeneration','newDevice','nextRecoveryPublicKey'],'declare-recovery-saved':['recoveryGeneration','saveDeclaration']};
 const stable=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
-const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
+const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort((left,right)=>left<right?-1:left>right?1:0).join(',');
 function publicRequest(input){
   const request={...input,version:input.version??2};
   if(!fields[request.kind]||!exact(request,[...common,...fields[request.kind]])||request.version!==2)throw new Error('Unsupported public identity request.');

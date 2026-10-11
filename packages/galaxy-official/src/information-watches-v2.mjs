@@ -8,7 +8,6 @@ import {
 } from './shared/information-v2-schema.mjs';
 import {
   informationDigest,
-  informationBase,
   informationWithCursor,
   informationScope,
 } from './information-v2.mjs';
@@ -259,9 +258,9 @@ export class InformationWatchServiceV2 {
   }
   async scanSource(actor, selection, previous = {}, baseline = null) {
     let after = previous.after ?? null,
-      refs = previous.after ? [...(previous.refs ?? [])] : [],
-      seen = new Set(),
-      last;
+      refs = previous.after ? [...(previous.refs ?? [])] : [];
+    const seen = new Set();
+    let last;
     for (let pageNumber = 0; pageNumber < 5; pageNumber++) {
       last = await this.information.source(actor, {
         key: selection.key,

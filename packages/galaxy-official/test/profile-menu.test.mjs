@@ -16,15 +16,15 @@ test('native Profile menu separates self claims and facts, defaults private and 
   assert.match(page.title,/自述（未经认证）/);assert.match(page.title,/事实派生履历/);assert.match(page.title,/Actual Case/);
   page.routes[1]();page.routes[2]();const stale=page.onConfirm;page.onConfirm('New about');
   stale('Late overwritten text');assert.equal(page.options.find(o=>o.number==='2').description,'New about');
-  page.routes[6]();await waitFor(()=>page.kind==='prompt');
+  page.routes[6]();await waitFor(()=>page.kind==='select'&&page.options.some(o=>o.title==='允许本次内容与范围'));
   assert.equal(prepared.visibility,'Private');assert.deepEqual(prepared.viewers,[]);assert.equal(prepared.expectedRevision,0);
   assert.ok(page.title.includes('New about'));assert.equal(executed,0);
-  page.onConfirm('wrong');assert.equal(executed,0);page.onConfirm();
-  page.onConfirm('CONFIRM PROFILE fixture');await waitFor(()=>page.kind==='info'&&executed===1);
+  page.routes[2]();assert.equal(executed,0);page.onConfirm();
+  page.routes[1]();await waitFor(()=>page.kind==='info'&&executed===1);
   page.onConfirm();await waitFor(()=>page.kind==='select');
   page.routes[1]();page.routes[7]();assert.equal(executed,1);
-  page.routes[6]();await waitFor(()=>page.kind==='prompt');assert.deepEqual(prepared.selfDeclared,{});
-  const lateConfirmation=page.onConfirm;page.onCancel();lateConfirmation('CONFIRM PROFILE fixture');
+  page.routes[6]();await waitFor(()=>page.kind==='select'&&page.options.some(o=>o.title==='允许本次内容与范围'));assert.deepEqual(prepared.selfDeclared,{});
+  const lateConfirmation=page.routes[1];page.onBack();lateConfirmation();
   assert.equal(executed,1);assert.ok(canceled>0);
 });
 test('native Profile menu offers read-only empty profiles and discards a late result after leaving',async()=>{

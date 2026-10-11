@@ -36,6 +36,9 @@ export async function validatePeerResponse(input,{agreement,peer,now}){
       if(data.id!==item.sourceObject.id||digest(JSON.stringify(checked.data))!==item.sourceObject.payloadHash||data.subject!==item.subjectId
         ||data.synthetic!==item.synthetic||provenance.sourceKey!==item.sourceKey||data.observedAt!==item.observedAt||item.expiresAt>data.expiresAt)
         throw new ServiceError('peering_proof_mismatch',409);
+      // This parsed projection is local. Keep the original signed bytes/data
+      // intact, and never display them beyond their actual signature lifespan.
+      item.expiresAt=Math.min(item.expiresAt,checked.expiresAt);
       const group=groups.get(item.sourceKey)??{sourceKey:item.sourceKey,records:0,commits:new Set(),conclusions:new Set()};
       group.records++;group.commits.add(data.source.commit);group.conclusions.add(data.conclusion);groups.set(item.sourceKey,group);
     }else{
@@ -44,7 +47,11 @@ export async function validatePeerResponse(input,{agreement,peer,now}){
         throw new ServiceError('peering_summary_mismatch',409);
     }
   }
-  return{...value,sourceGroups:[...groups.values()].map(g=>({sourceKey:g.sourceKey,proofRecords:g.records,
+  // The peer's signed observation remains intact. Only the local display window
+  // narrows to the earliest known current source or agreement deadline.
+  const expiresAt=Math.min(value.expiresAt,agreement.expiresAt,...value.items.filter(item=>item.state==='current').map(item=>item.expiresAt));
+  if(expiresAt<=now)throw new ServiceError('peering_response_expired',409);
+  return{...value,expiresAt,sourceGroups:[...groups.values()].map(g=>({sourceKey:g.sourceKey,proofRecords:g.records,
     conflicts:[...(g.commits.size>1?['commit']:[]),...(g.conclusions.size>1?['conclusion']:[])],independentEvidenceAdded:0})),
     scopeMeaning:'Peer-authorized finite observations; no automatic result acceptance, resolution or capability certification'};
 }

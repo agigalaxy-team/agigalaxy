@@ -6,7 +6,7 @@ export function createPersonalSummaryClient({call}){
  if(typeof call!=='function')throw new Error('Current authenticated API transport required');
  const invoke=(method,input={},options)=>call('/v2/personal-summaries/'+method,input,options);
  return Object.freeze({preferences:(input={},o)=>invoke('preferences/read',input,o),savePreference:(x,o)=>invoke('preferences/save',x,o),
-  put:(x,o)=>invoke('put',x,o),get:(x,o)=>invoke('get',x,o),list:(x={},o)=>invoke('list',x,o),delete:(x,o)=>invoke('delete',x,o),
+  put:(x,o)=>invoke('put',x,o),get:(x,o)=>invoke('get',x,o),receipt:(x,o)=>invoke('receipt',x,o),list:(x={},o)=>invoke('list',x,o),delete:(x,o)=>invoke('delete',x,o),
   sources:(x,o)=>invoke('sources',x,o)});
 }
 export function createNotificationInboxClient({call}){

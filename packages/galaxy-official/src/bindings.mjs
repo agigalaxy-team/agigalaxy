@@ -177,8 +177,8 @@ export class BindingService {
         row = (await records.lockOwned([bindingId, subjectId])).rows[0];
       }
       if (!row || row.audience !== this.endpoint) throw new ServiceError('not_found', 404);
-      if (!row.revoked_at) {
-        await bindingRepository(db).revoke([bindingId, iso(this.now())]);
+      if (!row.revoked_at || row.revocation_kind === 'recovery') {
+        await bindingRepository(db).revoke([bindingId, iso(this.now()), requestId]);
         await bindingRepository(db).revokeCredentials([bindingId, iso(this.now())]);
         await bindingRepository(db).auditRevoke([subjectId, bindingId, requestId, httpRequestId, credentialScopes, actor?.bindingId ?? null]);
       }

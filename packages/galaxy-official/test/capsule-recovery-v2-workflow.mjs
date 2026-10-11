@@ -24,7 +24,7 @@ export async function verifyCapsuleRecoveryV2(db,options={}){
   await call(p,'/v2/capsules/uses',await p.authorize(use,'capsule.use'));
   const maintenance={schemaVersion:2,kind:'deprecate',id:randomUUID(),capsuleId:v.capsuleId,versionId:v.id,expectedRevision:1,summary:'仅此旧版停止推荐'};
   await call(f,'/v2/capsules/events',await f.authorize(maintenance,'capsule.publish',pub));
-  let inbox=await f.inbox.query(p.actor,{}),notice=inbox.items.find(x=>x.id==='capsule:'+maintenance.id);assert.ok(notice);assert.deepEqual(notice.object,{type:'capsule',id:v.capsuleId,versionId:v.id});assert.equal(notice.deprecated,true);
+  const inbox=await f.inbox.query(p.actor,{});let notice=inbox.items.find(x=>x.id==='capsule:'+maintenance.id);assert.ok(notice);assert.deepEqual(notice.object,{type:'capsule',id:v.capsuleId,versionId:v.id});assert.equal(notice.deprecated,true);
   assert.equal((await f.capsules.getV2(p.actor,{capsuleId:v.capsuleId})).ownerControl,undefined);
   await f.consents.revoke(f.actor,source.grants[2].consentId);
   notice=(await f.inbox.query(p.actor,{})).items.find(x=>x.id==='capsule:'+maintenance.id);assert.equal(notice.sourceStatus,'source-unavailable');assert.equal(notice.title,'Capsule 来源或版本状态已变化');assert.ok(!JSON.stringify(notice).includes(v.solutionStrategy));

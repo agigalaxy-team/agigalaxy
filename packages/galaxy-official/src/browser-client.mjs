@@ -1,9 +1,10 @@
-import { verifyBindingChallenge, verifyBindingReceipt, verifySessionChallenge, verifySessionActivation } from './verification/connection.mjs';
+import { verifyBindingChallenge, verifyBindingReceipt, verifyExistingBindingReceipt, verifySessionChallenge, verifySessionActivation } from './verification/connection.mjs';
 import { sha256Hex, base64url, equalJson } from './shared/web-primitives.mjs';
 import { consentSchema } from './shared/consents-schema.mjs';
 import { assertConsentPolicy } from './domain/consent-policy.mjs';
 
 export const browserScopes = Object.freeze(['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'history', 'assistance', 'context', 'notifications', 'moderation', 'capsules', 'builders', 'audit', 'data-export', 'data-delete']);
+const recruitmentReceiptPath = /^\/v2\/recruitment\/[0-9a-f-]{36}\/receipt\?operationId=[0-9a-f-]{36}&payloadHash=[a-f0-9]{64}$/;
 
 // The deploy-time public configuration supplies the authority and pins. Neither
 // a URL parameter nor a model response can select a credential destination.
@@ -19,10 +20,11 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
   const origin = new URL(endpoint);
   if (origin.protocol !== 'https:' || origin.origin !== endpoint || origin.username || origin.password
     || !(trustedKeys instanceof Map) || !trustedKeys.size || typeof sign !== 'function') throw new Error('Invalid browser authority configuration.');
-  let session = null, generation = 0, closed = false, connectionController;
+  let session = null, generation = 0, closed = false, connectionController, establishedBinding = null;
   async function send(url, { bodyJson, method = 'POST', signal, credential } = {}) {
     const target = new URL(url);
-    if (closed || target.origin !== endpoint || target.username || target.password || target.hash || target.search)
+    if (closed || target.origin !== endpoint || target.username || target.password || target.hash
+      || target.search && !(method === 'GET' && recruitmentReceiptPath.test(target.pathname + target.search)))
       throw new Error('Invalid browser API target.');
     const deadline = AbortSignal.timeout(30000), operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     let response;
@@ -42,16 +44,32 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
       const code = typeof result?.error === 'string' && /^[a-z0-9_:-]{1,100}$/.test(result.error) ? result.error : 'request_failed';
       if (credential && [401, 403].includes(response.status) && session?.credential === credential
         && ['unauthorized', 'binding_revoked', 'invalid_session', 'session_expired', 'access_denied'].includes(code)) session = null;
-      throw Object.assign(new Error(code), { code, status: response.status, outcome: 'rejected' });
+      const rejection = { code, status: response.status, outcome: 'rejected' };
+      // These are already public HTTP response metadata. Retain the server's
+      // waiting condition without copying arbitrary response fields or bodies.
+      const retryHeader = response.headers.get('retry-after');
+      if ([429, 503].includes(response.status) || code === 'community_restricted') {
+        const seconds = /^\d{1,9}$/.test(retryHeader ?? '') ? Number(retryHeader) : 0;
+        if (Number.isSafeInteger(seconds) && seconds > 0 && seconds <= 31536000)
+          Object.assign(rejection, {retryAfterSeconds: seconds, retryAt: new Date((now() + seconds) * 1000).toISOString()});
+        const quota = result?.quota;
+        if (quota && ['task', 'comment', 'invitation'].includes(quota.category)
+          && ['used', 'limit', 'remaining'].every(field => Number.isSafeInteger(quota[field]) && quota[field] >= 0)
+          && typeof quota.resetAt === 'string' && Number.isFinite(Date.parse(quota.resetAt))
+          && ['new', 'normal'].includes(quota.tier) && typeof quota.policyVersion === 'string' && quota.policyVersion.length <= 80)
+          Object.assign(rejection, {quota: {category: quota.category, used: quota.used, limit: quota.limit, remaining: quota.remaining,
+            resetAt: new Date(quota.resetAt).toISOString(), tier: quota.tier, policyVersion: quota.policyVersion}});
+      }
+      throw Object.assign(new Error(code), rejection);
     }
     return result;
   }
   function snapshot() {
     if (!session || session.expiresAt <= now()) { session = null; return null; }
-    const { credential, ...publicState } = session; return { ...publicState, scopes: [...publicState.scopes] };
+    const { credential: _credential, ...publicState } = session; return { ...publicState, generation, scopes: [...publicState.scopes] };
   }
   async function call(path, input, { method = 'POST', authenticated = true, signal } = {}) {
-    if (!/^\/(v[12]\/|\.well-known\/)/.test(path) || path.includes('?') || path.includes('#')) throw new Error('Invalid API path.');
+    if (!/^\/(v[12]\/|\.well-known\/)/.test(path) || path.includes('?') && !(method === 'GET' && recruitmentReceiptPath.test(path)) || path.includes('#')) throw new Error('Invalid API path.');
     const current = session, lease = generation;
     if (authenticated && !snapshot()) throw Object.assign(new Error('connection_required'), { code: 'connection_required' });
     const result = await send(endpoint + path, { bodyJson: method === 'GET' ? undefined : JSON.stringify(input), method, signal,
@@ -59,7 +77,8 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
     if (lease !== generation || authenticated && (session !== current || !snapshot())) throw new Error('Authorization changed during request.');
     return result;
   }
-  async function connect(input, { confirmed = false } = {}) {
+  /** @param {any} input @param {{confirmed?:boolean,binding?:{bindingId:string,receipt:string}|null}} [options] */
+  async function connect(input, { confirmed = false, binding: originalBinding = null } = {}) {
     if (!confirmed || closed || connectionController) throw new Error('Confirm one connection at a time.');
     // Immutable public request: private keys and recovery material never enter it.
     const request = structuredClone(input);
@@ -88,12 +107,18 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
       }
     }
     try {
-      const response = await post('/v2/binding-challenges', request);
-      const challenge = await verifyCurrent(verifyBindingChallenge,response,{request});
-      const signature = await sign(challenge.challenge, 'galaxy-binding-response+jws'); check();
-      await verifyCurrent(verifyBindingChallenge,response,{request});
-      const bound = await post('/v1/bindings', { challenge: challenge.challenge, clientSession: challenge.clientSession, signature });
-      const binding = await verifyCurrent(verifyBindingReceipt,bound,{challenge});
+      let bound, binding, challenge;
+      if (originalBinding) {
+        bound = JSON.parse(JSON.stringify(originalBinding));
+        binding = await verifyCurrent(verifyExistingBindingReceipt,bound,{request});
+      } else {
+        const response = await post('/v2/binding-challenges', request);
+        challenge = await verifyCurrent(verifyBindingChallenge,response,{request});
+        const signature = await sign(challenge.challenge, 'galaxy-binding-response+jws'); check();
+        await verifyCurrent(verifyBindingChallenge,response,{request});
+        bound = await post('/v1/bindings', { challenge: challenge.challenge, clientSession: challenge.clientSession, signature });
+        binding = await verifyCurrent(verifyBindingReceipt,bound,{challenge});
+      }
       const credential = base64url(crypto.getRandomValues(new Uint8Array(32))), credentialHash = await sha256Hex(credential, crypto);
       const sessionResponse = await post('/v1/session-challenges', { bindingId: bound.bindingId, credentialHash });
       const sessionChallenge = await verifyCurrent(verifySessionChallenge,sessionResponse,{binding,credentialHash});
@@ -101,8 +126,14 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
       await verifyCurrent(verifySessionChallenge,sessionResponse,{binding,credentialHash});
       const activation = await post('/v1/sessions', { challenge: sessionChallenge.challenge, signature: sessionSignature });
       const active = verifySessionActivation(activation, { challenge: sessionChallenge, now: now() });
-      await verifyCurrent(verifyBindingReceipt,bound,{challenge}); check();
+      if (originalBinding) await verifyCurrent(verifyExistingBindingReceipt,bound,{request});
+      else await verifyCurrent(verifyBindingReceipt,bound,{challenge});
+      check();
       session = { ...active, subjectId: request.subjectId, endpoint, control: request.control, credential };
+      establishedBinding = bound;
+      // A completed connection installs a new lease even if its public owner
+      // and binding happen to match. Failed connects never install a lease.
+      generation++;
       return snapshot();
     } finally { if (connectionController === controller) connectionController = null; }
   }
@@ -187,6 +218,6 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
     return submitAuthorization(await prepareAuthorization(payload, options), { confirmed: options.confirmed === true });
   }
   function disconnect() { generation++; connectionController?.abort(); connectionController = null; session = null; }
-  return Object.freeze({ endpoint, send, call, attachmentTransfer, connect, snapshot, authorizePayload, prepareAuthorization, submitAuthorization, reconcileAuthorization, disconnect,
+  return Object.freeze({ endpoint, send, call, attachmentTransfer, connect, snapshot, bindingRecord:()=>establishedBinding?JSON.parse(JSON.stringify(establishedBinding)):null, authorizePayload, prepareAuthorization, submitAuthorization, reconcileAuthorization, disconnect,
     close() { disconnect(); closed = true; } });
 }

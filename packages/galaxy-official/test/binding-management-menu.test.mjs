@@ -6,7 +6,7 @@ const wait=async predicate=>{for(let i=0;i<200;i++){if(predicate())return;await 
 function fixture(){
   const id=randomUUID(),installationId=randomUUID(),queries=[];let page,prepared=0,writes=0,canceled=0,current=true;
   const item={bindingId:id,installationId,scopes:['binding'],state:'active',createdAt:'2030-01-01T00:00:00.000Z',expiresAt:'2030-01-02T00:00:00.000Z',revokedAt:null};
-  const preview={bindingId:id,previewJson:JSON.stringify({target:item,currentSession:false}),confirmation:'REVOKE '+id};
+  const preview={bindingId:id,previewJson:JSON.stringify({action:'revoke-binding',target:item,currentSession:false}),confirmation:'REVOKE '+id};
   const controller={cancel(){canceled++;},queryBindings:async input=>{queries.push(input);return {subjectId:'GUID'+'A'.repeat(28),currentBindingId:randomUUID(),items:[item],nextAfter:queries.length===1?id:null};},
     prepareBindingRevoke:async target=>{assert.equal(target,id);prepared++;return preview;},
     executeBindingRevoke:async(p,confirmation)=>{assert.equal(p,preview);assert.equal(confirmation,preview.confirmation);writes++;return {state:'revoked',currentSessionEnded:false};}};
@@ -20,12 +20,12 @@ test('native installation list carries pagination and filtering, then requires e
   f.choose('下一页');await wait(()=>f.queries.length===2&&f.page()?.kind==='select');assert.equal(f.queries[1].after,f.id);
   f.choose('其他绑定');assert.ok(f.page().title.includes('不支持保留原ID换钥'));f.choose('查看此安装实例的全部绑定');
   await wait(()=>f.queries.length===3&&f.page()?.kind==='select');assert.equal(f.queries[2].installationId,f.installationId);
-  f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='prompt');
+  f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='select'&&f.page().options.some(o=>o.title==='允许本次内容与范围'));
   assert.ok(f.page().title.includes(f.id)&&f.page().title.includes(f.installationId));assert.equal(f.writes(),0);
-  f.page().onConfirm('wrong');assert.equal(f.writes(),0);assert.equal(f.canceled(),1);
-  f.page().onBack();await wait(()=>f.page()?.kind==='select');f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='prompt');
-  const confirmed=f.page();confirmed.onConfirm(f.preview.confirmation);await wait(()=>f.writes()===1&&f.page()?.kind==='info'&&f.page().text.includes('已撤销'));
-  confirmed.onConfirm(f.preview.confirmation);assert.equal(f.writes(),1);
+  const oldAllow=f.page().routes[1];f.page().onBack();assert.equal(f.writes(),0);assert.equal(f.canceled(),1);oldAllow();assert.equal(f.writes(),0);
+  await wait(()=>f.page()?.kind==='select');f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='select'&&f.page().options.some(o=>o.title==='允许本次内容与范围'));
+  const confirmed=f.page();confirmed.routes[1]();await wait(()=>f.writes()===1&&f.page()?.kind==='info'&&f.page().text.includes('已撤销'));
+  confirmed.routes[1]();assert.equal(f.writes(),1);
 });
 test('canceling a pending native revocation preview prevents a delayed prompt and any submission',async()=>{
   const f=fixture();let release;

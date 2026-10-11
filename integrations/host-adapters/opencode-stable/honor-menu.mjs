@@ -1,18 +1,22 @@
+import {sourceReadingText} from './source-reading.mjs';
 export function createHonorMenu({controller,select,prompt,info,language,isCurrent,onBack}) {
   const zh=language!=='en-US',label=(a,b)=>zh?a:b;
   const plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,1200);
+  const stateName=state=>({'insufficient-evidence':label('当前来源不足','Insufficient current sources'),'inactive-rule':label('本规则当前未启用','Rule currently inactive'),'incomplete-source-scan':label('当前来源尚未全部读取','Current source read incomplete'),accepted:label('已验收','Accepted'),canceled:label('已取消','Canceled'),active:label('进行中','Active'),delivered:label('已交付，待验收','Delivered; awaiting acceptance')}[state]??plain(state));
+  const cardState=state=>state==='active'?label('当前符合本规则','Currently meets this rule'):stateName(state);
+  const date=value=>Number.isFinite(value)?new Date(value*1000).toLocaleString(zh?'zh-CN':'en-US'):'';
   const correctionState=state=>({ 'not-required':label('无需纠正后复核','No correction review required'),
     'new-delivery-required':label('需要按当前纠正记录重新交付','A new delivery must acknowledge current corrections'),
     'awaiting-requester-acceptance':label('等待请求者重新验收','Waiting for requester reacceptance'),
     'participant-reaccepted':label('已重新交付并验收','Delivered again and reaccepted') })[state]??plain(state);
-  let generation=0;
+  let generation=0,viewGeneration=0;
   const leave=()=>{generation++;controller.cancel();onBack();};
   const message=(text,back=home)=>{if(isCurrent())info('Galaxy',text,back);};
   const menu=(title,entries,back=home,offset=0)=>{
-    if(!isCurrent())return;const routes={};const options=entries.slice(offset,offset+8).map(([title,action,description=''],i)=>{
-      routes[i+1]=()=>{if(isCurrent())action();};return {number:String(i+1),title,description};});
-    if(offset+8<entries.length){options.push({number:'9',title:label('下一页','Next page'),description:''});routes[9]=()=>menu(title,entries,back,offset+8);}
-    select({title,options,routes,onBack:offset?()=>menu(title,entries,back,offset-8):back});
+    if(!isCurrent())return;const routes={},version=++viewGeneration,activate=fn=>()=>{if(isCurrent()&&version===viewGeneration){viewGeneration++;fn();}};const options=entries.slice(offset,offset+8).map(([title,action,description=''],i)=>{
+      routes[i+1]=activate(action);return {number:String(i+1),title,description};});
+    if(offset+8<entries.length){options.push({number:'9',title:label('下一页','Next page'),description:''});routes[9]=activate(()=>menu(title,entries,back,offset+8));}
+    select({title,options,routes,onBack:activate(offset?()=>menu(title,entries,back,offset-8):back)});
   };
   async function run(work,done,back=home){const version=++generation;
     message(label('正在读取来源事实','Reading source facts'),()=>{generation++;controller.cancel();back();});
@@ -34,25 +38,26 @@ export function createHonorMenu({controller,select,prompt,info,language,isCurren
         },refresh);
       }
       function sources(){
-        const entries=view.contributions.map(item=>{
-          const detail=()=>message([
-            `${plain(item.state)} · ${plain(item.independence)}`,`${label('暂停/纠正/争议','Paused/corrected/disputed')}: ${item.paused}/${item.corrected}/${item.disputed}`,
-            `Case: ${plain(item.caseId)}`,...item.sourceEvents.map(e=>`${plain(e.kind)} · ${plain(e.eventId)}`),...item.proofs.map(p=>`CI Proof: ${plain(p.proofId)}`),
+        const entries=view.contributions.map((item,index)=>{
+          const title=plain(item.title)||label('工作来源 ','Work source ')+((view.pagination?.contributions?.offset??0)+index+1);
+          const detail=()=>menu(title+'\n'+[
+            stateName(item.state),item.independence==='issuer-declared-related-party'?label('已声明关联方','Declared related party'):item.independence==='independence-not-established'?label('未确认独立关系','Independence not established'):'',
+            ...(item.paused?[label('当前已暂停','Currently paused')]:[]),...(item.corrected?[label('原工作已纠正','Original work corrected')]:[]),...(item.disputed?[label('当前有异议','Current dispute')]:[]),
             ...(item.correctionReview?[`${label('纠正后复核','Correction review')}: ${correctionState(item.correctionReview.state)} · ${label('复核版本','Review version')} ${plain(item.correctionReview.deliveredCaseReviewVersion)}`,
-              `${label('本次交付与验收','Current delivery and acceptance')}: ${plain(item.correctionReview.deliveryEventId)} / ${plain(item.correctionReview.acceptanceEventId)}`,
               label('双方重新验收不等于独立能力认证。','Participant reacceptance is not independent capability certification.')]:[]),
             ...(item.referencesComplete===false?[label('以下为部分引用；完整引用可逐页查看','Partial references; open all references to continue')]:[])
-          ].join('\n'),refresh);
-          return [plain(item.assistanceId),()=>item.referencesComplete===false?menu(label('贡献来源详情','Contribution source details'),[
+          ].filter(Boolean).join('\n'),[[label('查看准确来源记录','Inspect exact source records'),()=>message(JSON.stringify(item,null,2),sources)]],sources);
+          return [title,()=>item.referencesComplete===false?menu(label('贡献来源详情','Contribution source details'),[
             [label('查看摘要','View summary'),detail],[label('查看全部引用','All references'),()=>references('source',item.assistanceId,0,sources)]
-          ],sources):detail(),plain(item.capabilityId)];
+          ],sources):detail(),stateName(item.state)];
         });
         const page=view.pagination?.contributions;
         if(page?.nextAfter)entries.push([label('下一批贡献','Next contributions'),()=>next({after:page.nextAfter},'sources')]);
         menu(`${label('可见来源','Visible sources')}${page?` · ${page.total}`:''}`,entries,refresh);
       }
       function proofs(){
-        const entries=(current.proofs??[]).map(item=>[plain(item.proofId),()=>message(plain(JSON.stringify(item)),proofs),plain(item.sourceKey)]);
+        const entries=(current.proofs??[]).map((item,index)=>{const source=item.provenance?.source??item.source??{},title=[source.owner&&source.repository?source.owner+'/'+source.repository:'',source.runId?label('运行 ','Run ')+source.runId:'',item.provenance?.conclusion??item.conclusion].filter(Boolean).map(plain).join(' · ')||label('CI 来源 ','CI source ')+(index+1);
+          return[title,()=>menu(title+'\n\n'+sourceReadingText({type:'proof',record:{assertion:item.provenance??item},summary:item.conclusion??item.scope},label,plain),[[label('查看准确来源记录','Inspect exact source records'),()=>message(JSON.stringify(item,null,2),proofs)]],proofs),plain(item.scope??'')];});
         if(view.pagination?.proofs.nextAfter)entries.push([label('下一批CI依据','Next CI evidence'),()=>next({proofAfter:view.pagination.proofs.nextAfter},'proofs')]);
         menu(`${label('CI依据','CI evidence')} · ${current.proofCount??current.proofs?.length??0}`,entries,refresh);
       }
@@ -61,13 +66,19 @@ export function createHonorMenu({controller,select,prompt,info,language,isCurren
           `${label('不同Case验收数','Distinct accepted Cases')}: ${view.facets.contribution.acceptedCases}`,
           `${label('关联方Case数','Related-party Cases')}: ${view.facets.contribution.relatedPartyCases}`,
           `${label('有限CI证据数','Limited CI evidence count')}: ${view.facets.capabilityEvidence.proofCount}`,
-          `${label('协作可靠性事实','Collaboration reliability facts')}: ${plain(JSON.stringify(view.facets.collaborationReliability))}`,
+          ...Object.entries({accepted:label('已验收协作','Accepted collaborations'),canceled:label('已取消协作','Canceled collaborations'),disputed:label('有异议协作','Disputed collaborations'),paused:label('已暂停协作','Paused collaborations')}).filter(([key])=>Number.isFinite(view.facets.collaborationReliability[key])).map(([key,name])=>name+': '+view.facets.collaborationReliability[key]),
           label('请求者履历单列；没有全局总分或自动接单资格','Requester history is separate; no global score or automatic qualification')
         ].join('\n'),refresh)],
         [label('查看来源贡献','Source contributions'),sources],
-        [label('规则与时间窗','Rule and time window'),()=>message(`${plain(JSON.stringify(current.rule))}\n${plain(current.ruleHash)}\n${plain(JSON.stringify(current.projectionRule??{id:'honor-contribution',version:1}))}`,refresh)],
+        [label('规则与时间窗','Rule and time window'),()=>message([
+          plain(current.rule.title),label('版本 ','Version ')+plain(current.rule.version),
+          ...(Number.isFinite(current.rule.windowFrom)&&Number.isFinite(current.rule.windowUntil)?[label('来源时间范围','Source time window')+': '+date(current.rule.windowFrom)+' — '+date(current.rule.windowUntil)]:[]),
+          ...(Number.isFinite(current.rule.notBefore)&&Number.isFinite(current.rule.notAfter)?[label('规则有效时间','Rule validity')+': '+date(current.rule.notBefore)+' — '+date(current.rule.notAfter)]:[]),
+          ...(Number.isFinite(current.rule.minAcceptedCases)?[label('所需验收工作数','Required accepted work count')+': '+current.rule.minAcceptedCases]:[]),
+          ...(Number.isFinite(current.rule.minProofs)?[label('所需 CI 来源数','Required CI source count')+': '+current.rule.minProofs]:[])
+        ].join('\n\n'),refresh)],
         [label('当前状态链接','Current status link'),()=>message(`${plain(current.statusUrl)}\n${label('接收方仍须有来源权限；截图不是当前证明','Recipients still need source access; screenshots are not current proof')}`,refresh)],
-        [label('刷新状态','Refresh status'),refresh]
+        [label('查看卡片与规则来源','Inspect card and rule sources'),()=>message(JSON.stringify(current,null,2),refresh)]
       ];
       function risks(){
         const risk=view.riskAssessment,codes={
@@ -102,7 +113,7 @@ export function createHonorMenu({controller,select,prompt,info,language,isCurren
       if(!publicView&&controller.getPublicHonor)entries.push([label('检查公开可见结果','Check public projection'),()=>card(rule,current.subjectId,true)]);
       if(current.proofs)entries.push([label('查看CI依据','View CI evidence'),proofs]);
       if(section==='sources')return sources();if(section==='proofs')return proofs();if(section==='risks')return risks();
-      menu(`${plain(rule.title)}\n${plain(current.subjectId)}\n${plain(current.issuer)}\n${plain(current.status)}\n${label('核对时间','Checked at')}: ${new Date(current.checkedAt*1000).toISOString()}\n${label('荣誉由来源派生，不是个人能力认证','Source-derived honor, not individual capability certification')}`,entries);
+      menu(`${plain(rule.title)}\n${cardState(current.status)}\n${label('读取时间','Read at')}: ${date(current.checkedAt)}`,entries);
     });
   }
   function ranking(rule){void run(()=>controller.honorRanking({ruleId:rule.id,ruleVersion:rule.version}),result=>{

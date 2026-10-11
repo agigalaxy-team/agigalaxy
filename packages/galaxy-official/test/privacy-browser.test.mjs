@@ -57,7 +57,7 @@ test('browser privacy flow verifies selected export pages, partial/cancel outcom
     const cancellation=await runtime.privacy.prepareDeletion({action:'cancel',requestId:receipt.id,expectedRevision:receipt.revision});
     dropDeletion=true;await assert.rejects(runtime.privacy.submitDeletion(cancellation,{confirmed:true}),/acknowledgement lost/);
     assert.equal((await runtime.privacy.reconcileDeletion()).state,'cancelled');
-    runtime.disconnect();assert.equal((await runtime.privacy.holderStatus(receipt.id)).state,'cancelled');
+    await runtime.disconnect();assert.equal((await runtime.privacy.holderStatus(receipt.id)).state,'cancelled');
     await runtime.connect({confirmed:true});
     const before=await runtime.privacy.prepareDeletion({action:'request',scope:'all-owned-service-data',reason:'privacy',takeout:'not-needed'});
     dropBefore=true;await assert.rejects(runtime.privacy.submitDeletion(before,{confirmed:true}),/lost before/);

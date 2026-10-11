@@ -9,7 +9,7 @@ import {packManifestReadSchema} from './shared/worker-pack-uses-v2-schema.mjs';
 const extensionKinds=new Set(['support-profile','pack-manifest','scope-report']);
 const parse=row=>row?.payload_text ? JSON.parse(row.payload_text) : null;
 const latest=(rows,kind)=>rows.findLast(row=>row.kind===kind);
-const equalViewers=(a,b)=>JSON.stringify([...a].sort())===JSON.stringify([...b].sort());
+const equalViewers=(a,b)=>JSON.stringify([...a].sort((left,right)=>left<right?-1:left>right?1:0))===JSON.stringify([...b].sort((left,right)=>left<right?-1:left>right?1:0));
 export class BuilderSupportV2Service {
   constructor(builders){this.builders=builders;this.access=builders.access;}
   specification(){return {profile:'galaxy-builder-support/2',eventKinds:[...extensionKinds],
@@ -89,6 +89,7 @@ export class BuilderSupportV2Service {
         authorId:loaded.parent.owner_id,identityMeaning:'typed pack reference within this worker registration',
         installation:'not-performed-by-registry',runtime:'not-started-by-registry',actualUseCount:null},
       reports,...state,checkedAt:this.access.now(),capabilityVerified:false,
+      canSubmitReport:!!actor&&actor.subjectId!==loaded.parent.owner_id&&this.builders.assessorIds.has(actor.subjectId),
       disclosure:actor?.subjectId===loaded.parent.owner_id?{visibility:current.grant.visibility,viewers:current.grant.viewers}:null,
       reportDisclosure:actor&&actor.subjectId!==loaded.parent.owner_id&&this.builders.assessorIds.has(actor.subjectId)?
         {visibility:current.grant.visibility,viewers:current.grant.visibility==='Public'?[]:[...new Set([loaded.parent.owner_id,...current.grant.viewers.filter(id=>id!==actor.subjectId)])]}:null};

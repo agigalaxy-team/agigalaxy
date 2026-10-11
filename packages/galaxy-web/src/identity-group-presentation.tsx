@@ -1,0 +1,60 @@
+import React,{useCallback,useEffect,useId,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
+import {HistoryFields} from './history-facts';
+import {identityGroupIntentSchema} from '../../galaxy-official/src/shared/identity-group-v2-schema.mjs';
+import type {IdentityGroupCandidateRef,IdentityGroupClient,IdentityGroupIntent as GroupIntent,IdentityGroupLease,IdentityGroupProposal,IdentityGroupRecord,IdentityGroupRuntime,IdentityGroupSourceView} from './identity-group-types';
+
+export const identityGroupStates:Record<string,string>={pending:'等待其他身份同意',committed:'这次变更已生效',active:'共同展示中',revoked:'分组已撤销',declined:'这次邀请已拒绝',cancelled:'这次邀请已取消',expired:'这次邀请已到期',conflict:'原分组已经变化',absent:'暂未查到这次变更','source-deletion-pending':'相关身份正在申请删除，展示已暂停','source-deleted':'相关来源已删除','control-evidence-unavailable':'身份控制证明当前不可用'};
+export function identityGroupError(error:unknown){const value=typeof error==='object'&&error!==null?error:null,message=value&&'message' in value&&typeof value.message==='string'?value.message:'',code=value&&'code' in value&&typeof value.code==='string'?value.code:message;return({
+ identity_group_unavailable:'这份身份分组或邀请现在无法读取。',identity_group_action_unavailable:'这项操作当前已不可用，已重新读取现有状态。',
+ identity_group_source_scope_required:'当前连接没有读取这份原记录的范围。',identity_group_source_unavailable:'这份原记录现在无法读取或选择，已有输入仍保留。',identity_group_source_changed:'原记录已经变化，请重新选择准确记录。',identity_group_source_author_required:'只能新增由当前身份写下的原记录。',identity_group_legacy_author_unknown:'这条早期记录没有可核对的原作者，暂时不能选择。',identity_group_source_deletion_pending:'原作者正在申请删除，这份记录暂时不能加入分组。',
+ identity_group_control_changed:'当前设备控制已变化，请查看原内容后继续。',identity_control_stale:'原同意对应的设备控制已失效，需要由当前设备重新同意。',identity_group_explicit_new_approval_required:'连接或设备控制已变化，请查看原内容后继续。',identity_group_identity_changed:'身份或连接已变化，请重新打开身份分组。',receipt_status_authority_changed:'身份或连接已变化，请重新打开身份分组。',
+ identity_group_version_changed:'分组已经有新的变化，原输入仍保留。请查看当前分组后继续。',identity_group_proposal_expired:'原邀请已经到期，无法继续发送。原输入仍保留。',identity_group_operation_pending:'这次内容已有尚未完成的发送，请先查看原操作的结果。',identity_group_operation_closed:'原邀请已经结束，请查看它的处理结果。',identity_group_local_retry_stopped:'本机已停止这次发送，仍可查看原邀请的处理结果。',identity_group_original_changed:'本机原记录校验不一致，暂时无法继续。',identity_group_operation_changed:'另一页已经处理了原操作，请重新查看结果。',identity_group_receipt_mismatch:'返回结果与原操作不一致，尚不能确认完成。',identity_group_locator_mismatch:'本机原操作信息不一致，尚不能确认完成。',
+ } as Record<string,string>)[code]??(/[\u3400-\u9fff]/.test(message)?message:'暂时无法完成，已输入的内容仍保留。');}
+export const groupTime=(value:string|number|null|undefined)=>value?new Date(typeof value==='number'&&value<1e12?value*1000:value).toLocaleString('zh-CN'):'';
+export const groupRefKey=(ref:IdentityGroupCandidateRef)=>JSON.stringify([ref.kind,ref.id,ref.version,ref.caseId??null]);
+export {identityGroupDraftKey} from './identity-group-draft.mjs';
+export function identityGroupPayload(value:Pick<IdentityGroupProposal,'payloadJson'>|null):GroupIntent|null{try{if(!value?.payloadJson)return null;const parsed=identityGroupIntentSchema.safeParse(JSON.parse(value.payloadJson));return parsed.success?parsed.data:null;}catch{return null;}}
+const eventNames:Record<string,string>={'case-created':'工作说明','case':'工作说明','attempt-start':'开始尝试','attempt-end':'尝试结果','attempt-correct':'更正尝试结果',intervention:'协作帮助','intervention-response':'回应协作','result-recorded':'工作成果','resolution-recorded':'问题解决情况','case-scope-revised':'调整工作范围','case-withdrawn':'撤回工作',record:'配置记录',revoke:'撤回配置'};
+const outcomes:Record<string,string>={succeeded:'成功',partial:'部分完成',failed:'失败',inconclusive:'尚无结论',conflicting:'存在分歧',completed:'完成',abandoned:'放弃',canceled:'取消',resolved:'已解决','partially-resolved':'部分解决',unresolved:'未解决',regressed:'再次出现'};
+export const groupRecordTitle=(record:IdentityGroupRecord)=>record.title??eventNames[record.kind??'']??'原记录';
+export function IdentityGroupPeople({ids,canonical,subjectId,names}:{ids:string[];canonical?:string|null;subjectId:string;names:Record<string,string|null>}){return <ul className="ig-people">{[...new Set(ids)].map(id=><li key={id}><MemberAvatar subjectId={id} own={id===subjectId}/><span>{memberName(id,subjectId,names[id]??undefined)}{id===canonical&&<small>主要展示身份</small>}</span></li>)}</ul>;}
+export function IdentityGroupSource({source,display,compact=false}:{source:IdentityGroupSourceView;display:(id:string)=>string;compact?:boolean}){
+ const ref=source.ref,record=source.record,conditions=record?.conditions;
+ return <div className="ig-source-content"><h4>{record?groupRecordTitle(record):'原记录当前不可读'}</h4><p className="muted">{ref.kind==='configuration'?'配置记录':'工作记录'} · 版本 {ref.version}{ref.originalSubjectId?' · 原作者 '+display(ref.originalSubjectId):''}</p>
+  {record?<><div className="reading-prose">{record.summary&&<p>{record.summary}</p>}{record.strategy&&<p>{record.strategy}</p>}{record.description&&<p>{record.description}</p>}{record.observedEffect&&<p>已观察到的影响：{record.observedEffect}</p>}{record.reason&&<p>说明：{record.reason}</p>}{record.failureReason&&<p>未完成的原因：{record.failureReason}</p>}</div>
+   {record.reportedOutcome&&<p>作者报告的结果：{outcomes[record.reportedOutcome]??'尚无结论'}</p>}{record.status&&outcomes[record.status]&&<p>记录状态：{outcomes[record.status]}</p>}
+   {!compact&&conditions&&<dl className="ig-conditions">{([['model','模型'],['runtime','运行工具'],['environment','运行环境']] as const).map(([key,label])=><React.Fragment key={key}><dt>{label}</dt><dd>{conditions[key]?.name??'未说明'}{conditions[key]?.version?' · '+conditions[key].version:''}</dd></React.Fragment>)}{conditions.inputScopeSummary&&<><dt>输入范围</dt><dd>{conditions.inputScopeSummary}</dd></>}{conditions.limitations&&<><dt>适用限制</dt><dd>{conditions.limitations}</dd></>}</dl>}
+   {!compact&&record.limitations&&<p>适用限制：{Array.isArray(record.limitations)?record.limitations.join('；'):record.limitations}</p>}
+  </>:<p>保留原选择，当前不展示来源正文。身份分组不会扩大这份记录的访问权。</p>}
+  {source.displaySubjectId&&source.displaySubjectId!==ref.originalSubjectId&&<p>共同展示在 {display(source.displaySubjectId)} 下；原作者与签名保留。</p>}
+  <details className="ig-technical"><summary>准确记录</summary><HistoryFields value={{...ref,...(record?{record}:{}),accessGranted:false}}/></details>
+ </div>;
+}
+export function IdentityGroupIntent({payload,sources=[],subjectId,names}:{payload:GroupIntent;sources?:IdentityGroupSourceView[];subjectId:string;names:Record<string,string|null>}){
+ const display=(id:string)=>memberName(id,subjectId,names[id]??undefined);
+ return <div className="ig-intent">{payload.kind==='revoke'?<><p>撤销整个身份分组，停止共同展示。原身份、原记录与各自权限保留。</p><p className="reading-prose">{payload.reason}</p></>:<>
+  <IdentityGroupPeople ids={payload.memberIds??[]} canonical={payload.canonicalDisplayId} subjectId={subjectId} names={names}/>
+  <p><strong>谁能看到分组：</strong>{payload.visibility==='Public'?'所有人':'分组中的身份'+(payload.viewers?.length?'和 '+payload.viewers.map(display).join('、'):'')}。</p>
+  {!!payload.sourceRefs?.length&&<section className="ig-chosen-sources"><h3>这次选择的原记录</h3>{payload.sourceRefs.map(ref=>{const source=sources.find(item=>groupRefKey(item.ref)===groupRefKey(ref)),correction=payload.attributionCorrections?.find(item=>groupRefKey(item.source)===groupRefKey(ref));return <article key={groupRefKey(ref)}><IdentityGroupSource source={source??{ref,record:null}} display={display}/>{correction&&<p className="reading-prose">展示在 {display(correction.displaySubjectId)} 下，原因：{correction.reason}。原作者仍是 {display(ref.originalSubjectId)}。</p>}</article>;})}</section>}
+  <p className="permission-line">只有这些身份全部同意，才共同展示。能力、额度、资料访问权和原作者均不合并。</p>
+ </>}<p className="muted">{payload.kind==='revoke'?'撤销记录签署于 '+groupTime(payload.issuedAt):'本次邀请有效至 '+groupTime(payload.expiresAt)}</p><details className="ig-technical"><summary>分组与原操作详情</summary><HistoryFields value={payload}/></details></div>;
+}
+type PeoplePickerProps={runtime:IdentityGroupRuntime;client:IdentityGroupClient;lease:IdentityGroupLease;subjectId:string;value:string[];onChange:(value:string[])=>void;label:string;query:string;onQuery:(value:string)=>void;manual:string;onManual:(value:string)=>void;disabled?:boolean;max?:number;includeSelf?:boolean;lockSelf?:boolean};
+export function IdentityGroupPeoplePicker({runtime,client,lease,subjectId,value,onChange,label,query,onQuery,manual,onManual,disabled=false,max=8,includeSelf=false,lockSelf=false}:PeoplePickerProps){
+ const field=useId(),active=useRef(true),reading=useRef(false),pagesRef=useRef(1);
+ const [people,setPeople]=useState<string[]>([]),[more,setMore]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[manualError,setManualError]=useState('');
+ const ids=[...new Set<string>([...(includeSelf?[subjectId]:[]),...value,...people])],names=useMemberNames(runtime,subjectId,true,ids);
+ const load=useCallback(async()=>{if(reading.current)return;reading.current=true;try{const found:string[]=[],seen=new Set<string>();let after:string|undefined;for(let page=0;page<pagesRef.current;page++){lease.assertCurrent();const result=await client.contacts(after?{after}:{});lease.assertCurrent();if(!active.current)return;found.push(...result.items.filter(item=>item.state==='accepted').map(item=>item.initiatorId===subjectId?item.recipientId:item.initiatorId));after=result.nextAfter??undefined;if(!after)break;if(seen.has(after))throw Error('联系人列表暂时不能继续读取。');seen.add(after);}setPeople([...new Set(found)]);setMore(!!after);setError('');}catch{if(active.current){setPeople([]);setMore(false);setError('联系人暂时无法读取，已经选中的身份仍保留。');}}finally{reading.current=false;if(active.current)setReady(true);}},[client,lease,subjectId]);
+ useEffect(()=>{active.current=true;const start=window.setTimeout(()=>void load(),0),tick=()=>{if(!document.hidden)void load();};const timer=window.setInterval(tick,20000);document.addEventListener('visibilitychange',tick);return()=>{active.current=false;window.clearTimeout(start);window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);};},[load]);
+ const shown=ids.filter(id=>value.includes(id)||memberName(id,subjectId,names[id]??undefined).toLowerCase().includes(query.trim().toLowerCase()));
+ function choose(id:string,checked:boolean){onChange(checked?[...new Set([...value,id])]:value.filter((item:string)=>item!==id));setManualError('');}
+ function addManual(){const id=manual.trim();if(!/^GUID[0-9A-Z]{28}$/.test(id)){setManualError('请粘贴完整的银河身份编号。');return;}if(!value.includes(id)&&value.length>=max){setManualError('最多选择 '+max+' 个身份。');return;}choose(id,true);onManual('');}
+ return <fieldset className="ig-people-picker"><legend>{label}</legend><label htmlFor={field}>按姓名查找</label><Input id={field} type="search" value={query} disabled={disabled} onChange={e=>onQuery(e.target.value)} placeholder="联系人姓名"/>
+  <div className="ig-person-options">{shown.map(id=><label key={id}><input type="checkbox" checked={value.includes(id)} disabled={disabled||(lockSelf&&id===subjectId)||(!value.includes(id)&&value.length>=max)} onChange={e=>choose(id,e.target.checked)}/><MemberAvatar subjectId={id} own={id===subjectId}/><span>{memberName(id,subjectId,names[id]??undefined)}{value.includes(id)&&!people.includes(id)&&id!==subjectId&&<small>已选择的身份</small>}</span></label>)}</div>
+  {!ready&&<output>正在读取联系人…</output>}{ready&&!shown.length&&!error&&<p className="muted">{query?'当前已读联系人中没有这个姓名。':'还没有可选择的联系人。可以使用自己另一个身份的准确编号。'}</p>}{error&&<output>{error}<button type="button" className="text-link" onClick={()=>void load()}>重新读取</button></output>}{more&&<Button type="button" variant="ghost" disabled={disabled} onClick={()=>{pagesRef.current++;void load();}}>更多联系人</Button>}
+  <details><summary>使用已知的银河身份编号</summary><label htmlFor={field+'-manual'}>完整身份编号</label><Input id={field+'-manual'} value={manual} disabled={disabled} onChange={e=>{onManual(e.target.value);setManualError('');}}/><Button type="button" variant="outline" disabled={disabled||!manual.trim()} onClick={addManual}>加入选择</Button>{manualError&&<p role="alert">{manualError}</p>}</details>
+ </fieldset>;
+}

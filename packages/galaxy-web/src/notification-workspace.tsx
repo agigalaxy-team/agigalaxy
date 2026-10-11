@@ -1,19 +1,28 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {createNotificationInboxClient} from '../../galaxy-official/src/personal-summary-client.mjs';
-import {mergeNotificationItems} from './notification-merge.mjs';
+import {mergeNotificationItems,notificationRows,markNotificationRowRead} from './notification-merge.mjs';
 import {createNotificationLoader} from './notification-loader.mjs';
-type Props={runtime:any;subjectId?:string;connected:boolean;navigate:(path:string)=>void;room?:any};
-const kinds:Record<string,string>={'qualification-permission-request':'资格材料许可请求','qualification-permission-decline':'原作者已拒绝许可请求','qualification-permission-cancel':'申请者已取消许可请求','qualification-permission-record-permission':'原作者已关联限定许可','room-message':'房间消息','room-invitation':'房间邀请','information-change':'关注的信息发生变化',dispute:'任务争议','confirm-resolution':'结果回应','propose-resolution':'交付建议'};
-export function notificationTarget(item:any){const o=item?.object;if(!o)return null;if(o.type==='capsule')return `/app/capsules/${o.id}${o.versionId?`/versions/${o.versionId}`:''}`;if(o.type==='qualification-request')return `/app/qualification-permissions/${o.id}`;if(o.type==='room')return `/app/rooms/${o.id}`;if(o.type==='room-invitation')return '/app/rooms';if(o.type==='task')return `/app/tasks/${o.id}`;if(o.type==='information-watch')return '/app/information';if(o.type==='project')return `/app/projects?projectId=${encodeURIComponent(o.id)}`;if(o.type==='builder'||o.type==='worker-pack')return '/app/builders';if(o.type==='hub')return '/app/hubs';if(o.type==='governance'||o.type==='case')return '/app/governance';return null;}
+import {PageLoading} from './site-shell';
+import {notificationTarget} from './notification-target.mjs';
+import {Bell,BellOff,Check,FileText,MessageCircle,Settings2,X} from 'lucide-react';
+import {MessageNavigation,readableTime} from './conversation-ui';
+import {NotificationSettings} from './notification-settings';
+import {applyNotificationChanges,saveNotificationSelection} from './notification-settings-model.mjs';
+type Runtime=Awaited<ReturnType<typeof import('./runtime.mjs').createWebRuntime>>;
+type Item={id:string;at:string;read:boolean;quiet:boolean;interruptiveEligible:boolean;presented:boolean;eventKind:string;title:string;object:{type:string;id:string}};
+type Options={revision:number;settings:import('zod/v4').infer<typeof import('../../galaxy-official/src/shared/notification-inbox-schema.mjs').inboxOptionsSchema>;externalDelivery:'disabled'};
+type Page={items:Item[];nextAfter:string|null;lastCheckedAt:string};
+type Prompt={item:Item;claimId:string;deliveryClientId:string;lease:number;leaseUntil:string};
+type Props={runtime:Runtime|null;subjectId?:string;connected:boolean;navigate:(path:string)=>void};
+const readableError=(reason:unknown,fallback:string)=>reason instanceof Error&&reason.message.trim()?reason.message:fallback;
+const kinds:Record<string,string>={'qualification-permission-request':'材料使用请求','qualification-permission-decline':'原作者已拒绝许可请求','qualification-permission-cancel':'申请者已取消许可请求','qualification-permission-record-permission':'原作者已关联限定许可','room-message':'对话消息','room-invitation':'对话邀请','information-change':'关注的信息发生变化',dispute:'任务争议','confirm-resolution':'结果回应','propose-resolution':'交付建议'};
 export function NotificationWorkspace(props:Props){
- return <NotificationSession key={`${props.runtime?.api.endpoint}:${props.subjectId}:${props.connected}`} {...props}/>;
+ const connection=props.runtime?.api.snapshot();
+ return <NotificationSession key={JSON.stringify([props.runtime?.api.endpoint,props.subjectId,props.connected,connection?.bindingId,connection?.generation])} {...props}/>;
 }
 function NotificationSession({runtime,subjectId,connected,navigate}:Props){
- const boundSubject=useRef<string|undefined>(subjectId),boundEndpoint=useRef<string|undefined>(runtime?.api.endpoint);
- const call=useMemo(()=>runtime?((path:string,input:any,options:any)=>{const current=runtime.api.snapshot()?.subjectId;if(!boundSubject.current&&current)boundSubject.current=current;if(!boundSubject.current||current!==boundSubject.current||runtime.api.endpoint!==boundEndpoint.current)throw new Error('身份或连接已改变，请重新打开通知。');return runtime.api.call(path,input,options);}):null,[runtime]);
- const client=useMemo(()=>call?createNotificationInboxClient({call}):null,[call]);
+ const connection=runtime?.api.snapshot(),permitted=!!(connected&&connection?.subjectId===subjectId&&(connection.scopes.includes('notifications')||connection.scopes.includes('*')));
+ const client=useMemo(()=>runtime&&permitted?runtime.notifications:null,[runtime,permitted]);
  const loader=useMemo(()=>client?createNotificationLoader(client):null,[client]);
  const deliveryClientId=useMemo(()=>{
    const key=`galaxy.notification.delivery-client-id:${runtime?.api.endpoint??'offline'}:${subjectId??'unknown'}`;
@@ -23,30 +32,36 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
    const created=crypto.randomUUID(); window.localStorage.setItem(key,created); return created;
   } catch { return crypto.randomUUID(); }
  },[runtime?.api.endpoint,subjectId]);
- const [items,setItems]=useState<any[]>([]),[next,setNext]=useState<string|null>(null),[options,setOptions]=useState<any>(null),[settings,setSettings]=useState<any>(null);
- const [prompt,setPrompt]=useState<any>(null);
- const [unread,setUnread]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[checked,setChecked]=useState<string|null>(null),[block,setBlock]=useState('');
- const active=useRef(0),working=useRef(false),dirty=useRef(false),presentedIds=useRef(new Set<string>()),titleBase=useRef(document.title.replace(/^\(\d+\)\s*/,''));
- async function load(after?:string){if(!loader||!connected)return;const lease=active.current;
-  return loader.load({unreadOnly:unread,...(after?{after}:{})},{apply:(page:any,prefs:any)=>{if(lease!==active.current)return;
-   setItems(old=>after?mergeNotificationItems(old,page.items):page.items);setNext(page.nextAfter);setChecked(page.lastCheckedAt);setError('');if(!dirty.current){setOptions(prefs);setSettings(prefs.settings);}
-  },failed:()=>{if(lease===active.current){setItems([]);setNext(null);}}});}
- async function run(fn:()=>Promise<any>){if(working.current)return;working.current=true;setBusy(true);setError('');setNotice('');const lease=active.current;let committed=false;
-  try{await fn();committed=true;if(lease===active.current)await load();}catch(e:any){if(lease===active.current)setError(committed?'通知操作已收到服务回执，但列表暂未刷新；请稍后刷新，不要重复提交。':e?.message??'当前未取得通知，请稍后重试。');}finally{if(lease===active.current){working.current=false;setBusy(false);}}}
- useEffect(()=>{active.current++;setItems([]);setPrompt(null);setOptions(null);setSettings(null);setError('');dirty.current=false;working.current=false;presentedIds.current.clear();setBusy(false);return()=>{active.current++;};},[runtime,subjectId,connected]);
- useEffect(()=>{let alive=true;setItems([]);setNext(null);setPrompt(null);const update=()=>{if(alive&&connected&&!working.current&&!document.hidden)void load().catch(e=>{if(alive)setError(e?.message??'暂时未取得通知。');});};const onVisibility=()=>{if(!document.hidden)update();};update();const timer=setInterval(update,15000);document.addEventListener('visibilitychange',onVisibility);return()=>{alive=false;loader?.invalidate();clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);};},[loader,connected,subjectId,unread]);
+ const [items,setItems]=useState<Item[]>([]),[next,setNext]=useState<string|null>(null),[options,setOptions]=useState<Options|null>(null);
+ const [savedPrompt,setPrompt]=useState<Prompt|null>(null);
+ const prompt=savedPrompt&&items.some(item=>item.id===savedPrompt.item.id&&!item.read&&!item.quiet)?savedPrompt:null;
+ const [settingsOpen,setSettingsOpen]=useState(false),loadedPages=useRef(1);
+ const [unread,setUnread]=useState(true),[busy,setBusy]=useState(false),[loading,setLoading]=useState(permitted),[error,setError]=useState(''),[notice,setNotice]=useState(''),[checked,setChecked]=useState<string|null>(null);
+ const active=useRef({epoch:0,open:true}),working=useRef(false),presentedIds=useRef(new Set<string>()),titleBase=useRef(document.title.replace(/^\(\d+\)\s*/,''));
+ const load=useCallback(async(after?:string)=>{if(!loader||!permitted)return;const lease=active.current.epoch;
+  return loader.load({unreadOnly:unread,...(after?{after}:{})},{pages:after?1:loadedPages.current,apply:(page:Page,prefs:Options)=>{if(lease!==active.current.epoch)return;if(after)loadedPages.current++;
+   setItems(old=>after?mergeNotificationItems(old,page.items):page.items);setNext(page.nextAfter);setChecked(page.lastCheckedAt);setLoading(false);setError('');setOptions(prefs);
+  },failed:()=>{if(lease===active.current.epoch){setItems([]);setNext(null);setLoading(false);}}});},[loader,permitted,unread]);
+ async function run(fn:()=>Promise<unknown>){if(working.current)return;working.current=true;setBusy(true);setError('');setNotice('');const lease=active.current.epoch;let committed=false;
+  try{await fn();committed=true;if(lease===active.current.epoch)await load();}catch(reason){if(lease===active.current.epoch)setError(committed?'通知操作已完成，列表稍后会自动更新。':readableError(reason,'当前未取得通知，请稍后重试。'));}finally{if(active.current.open){working.current=false;setBusy(false);}}}
+ useEffect(()=>{const session=active.current;session.epoch++;session.open=true;return()=>{session.open=false;session.epoch++;};},[]);
+ function changeFilter(value:boolean){if(value===unread)return;loader?.invalidate();active.current.epoch++;loadedPages.current=1;setUnread(value);setLoading(permitted);setItems([]);setNext(null);setPrompt(null);setError('');setChecked(null);}
+ useEffect(()=>{let alive=true;const update=()=>{if(alive&&permitted&&!busy&&!working.current&&!document.hidden)void load().catch((reason:unknown)=>{if(alive){setLoading(false);setError(readableError(reason,'暂时未取得通知。'));}});};const onVisibility=()=>{if(!document.hidden)update();};update();const timer=setInterval(update,15000);document.addEventListener('visibilitychange',onVisibility);return()=>{alive=false;loader?.invalidate();clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);};},[loader,permitted,load,busy]);
  useEffect(()=>{const base=titleBase.current;const count=items.filter(item=>!item.read&&!item.quiet).length;document.title=count?`(${count}) ${base}`:base;return()=>{document.title=base;};},[items]);
  useEffect(()=>{
   if(!client||!connected||!items.length||prompt||document.hidden)return;
-  let cancelled=false;
-  (async()=>{
+  let cancelled=false;const epoch=active.current.epoch;
+  void (async()=>{
    for(const item of items){
-    if(cancelled||!item.interruptiveEligible||item.presented||presentedIds.current.has(item.id))continue;
+    if(cancelled||epoch!==active.current.epoch||!item.interruptiveEligible||item.presented||presentedIds.current.has(item.id))continue;
     const claimId=crypto.randomUUID(); presentedIds.current.add(item.id);
     try {
-     const claim=await client.claim({id:item.id,deliveryClientId,claimId});
-     if(!claim.claimed||cancelled||document.hidden){presentedIds.current.delete(item.id);continue;}
-     setPrompt({item,claimId,deliveryClientId,lease:active.current});
+     const claim=await client.claim({id:item.id,deliveryClientId,claimId},undefined);
+     if(!claim.claimed||cancelled||epoch!==active.current.epoch||document.hidden){presentedIds.current.delete(item.id);continue;}
+     const current=await client.query({limit:20,unreadOnly:true},undefined);
+     const fresh=current.items.find((value:Item)=>value.id===item.id&&!value.read&&!value.quiet);
+     if(!fresh||cancelled||epoch!==active.current.epoch||document.hidden||Date.parse(claim.leaseUntil)<=Date.now()){presentedIds.current.delete(item.id);continue;}
+     setPrompt({item:fresh,claimId,deliveryClientId,lease:epoch,leaseUntil:claim.leaseUntil});
      break;
     } catch { presentedIds.current.delete(item.id); }
    }
@@ -55,40 +70,35 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
  },[client,connected,deliveryClientId,items,prompt]);
  useEffect(()=>{
   if(!prompt||!client)return;
-  if(document.hidden||prompt.lease!==active.current){presentedIds.current.delete(prompt.item.id);setPrompt(null);return;}
-  let cancelled=false;
+  if(prompt.lease!==active.current.epoch)return;
+  let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
   // This effect runs after the separate prompt has been committed to the page.
-  client.presented({id:prompt.item.id,deliveryClientId:prompt.deliveryClientId,claimId:prompt.claimId}).then((receipt: { presented?: boolean })=>{
-   if(!cancelled&&prompt.lease===active.current){
+  const acknowledge=()=>client.presented({id:prompt.item.id,deliveryClientId:prompt.deliveryClientId,claimId:prompt.claimId},undefined).then((receipt: { presented?: boolean })=>{
+   if(!cancelled&&prompt.lease===active.current.epoch){
     if(receipt.presented)setItems(old=>old.map(value=>value.id===prompt.item.id?{...value,presented:true,interruptiveEligible:false}:value));
     else setPrompt(null);
    }
-  }).catch(()=>{if(!cancelled)setPrompt(null);});
-  return()=>{cancelled=true;};
+  }).catch(()=>{if(!cancelled&&prompt.lease===active.current.epoch){setNotice('这条提醒已在本端显示，正在核对原显示回执；尚未标记为已读。');if(Date.parse(prompt.leaseUntil)>Date.now()+2000)timer=setTimeout(acknowledge,2000);}});
+  const onVisibility=()=>{if(document.hidden){presentedIds.current.delete(prompt.item.id);setPrompt(null);}else void acknowledge();};
+  document.addEventListener('visibilitychange',onVisibility);
+  if(!document.hidden)void acknowledge();
+  return()=>{cancelled=true;if(timer)clearTimeout(timer);document.removeEventListener('visibilitychange',onVisibility);};
  },[client,prompt]);
- useEffect(()=>{if(prompt&&!items.some(item=>item.id===prompt.item.id&&!item.read&&!item.quiet))setPrompt(null);},[items,prompt]);
- function editSettings(next:any){dirty.current=true;setSettings(next);}
- function target(item:any){return notificationTarget(item);}
- if(!connected)return <section><h1 className="small">通知</h1><p>连接身份后查看自己的待处理事项，关闭页面不会处理或取消任何业务。</p><Button onClick={()=>navigate('/app/settings')}>连接身份</Button></section>;
- return <section aria-busy={busy}><h1 className="small">通知</h1><p className="lead">查看消息、邀请及任务变化，再按需要进入原内容。</p>
+ function target(item:Item){return notificationTarget(item);}
+ async function markItemRead(item:Item){await markNotificationRowRead(client,item);}
+ function openItem(item:Item){const destination=target(item);if(!destination)return;void markItemRead(item).catch(()=>{});navigate(destination);}
+ async function toggleRoom(roomId:string){const lease=active.current.epoch,current=await client!.options({},undefined);if(lease!==active.current.epoch)return;const muted=current.settings.mutedRoomIds.includes(roomId),settings=applyNotificationChanges(current.settings,{mutedRooms:{[roomId]:!muted}});
+  const saved=await saveNotificationSelection(client,{expectedRevision:current.revision,settings});if(lease!==active.current.epoch)return;setOptions(saved);setNotice(muted?'已恢复这段对话的通知。':'已静音这段对话的通知。');}
+ if(!connected)return <section><p className="eyebrow">继续已有的协作</p><h1 className="small">有什么新进展？</h1><p className="lead">连接自己的身份，查看邀请、消息和待回应事项。</p><div className="empty-state"><h2>当前尚未连接</h2><p>未连接时无法取得通知。此前未保存的通知选择留在本浏览器，重新连接原身份后可继续。</p><Button onClick={()=>navigate('/app/settings/identity')}>连接我的身份</Button></div></section>;
+ if(!permitted)return <section><p className="eyebrow">继续已有的协作</p><h1 className="small">有什么新进展？</h1><div className="browse-note"><p>当前设备还不能查看和处理通知。可以在原设备的授权设置中添加通知权限，然后回到这里。</p><Button variant="outline" onClick={()=>navigate('/app/settings/identity')}>查看当前身份与设备</Button></div></section>;
+ return <section className="messages-page notifications-page" aria-busy={busy}><div className="page-heading"><h1 className="small">消息</h1><button className="icon-button" aria-label="通知设置" onClick={()=>setSettingsOpen(true)}><Settings2 size={20}/></button></div><MessageNavigation active="notifications" navigate={navigate}/>
   {error&&<div className="message error" role="alert">{error}</div>}{notice&&<output className="message">{notice}</output>}
-  {prompt&&<div className="message" role="status" aria-live="polite"><strong>待处理提醒：{prompt.item.title}</strong><div className="button-row">{target(prompt.item)&&<Button variant="outline" onClick={()=>navigate(target(prompt.item)!)}>进入对应内容</Button>}<Button variant="ghost" onClick={()=>setPrompt(null)}>收起这条提醒</Button></div><p className="muted">收起不标记已读，也不处理任务；原事项继续留在通知列表。</p></div>}
-  <div className="button-row"><label><input type="checkbox" disabled={busy} checked={unread} onChange={e=>setUnread(e.target.checked)}/>只看未读</label><Button variant="outline" disabled={busy} onClick={()=>run(async()=>{})}>刷新通知</Button></div>
-  <p className="muted">{checked?`最近查询：${new Date(checked).toLocaleString()}。`:'尚未取得查询结果。'}当前页运行时刷新；不会自动标记已读，也不承诺关闭网页后的系统推送。</p>
-   <div className="result-list">{items.map(item=><article className="task-card" key={item.id}><h2>{item.title}</h2><p>{kinds[item.eventKind]??'业务事项'} · {item.read?'已标记已读':'未读'} · {new Date(item.at).toLocaleString()}{item.presented?' · 已提示':item.quiet?' · 安静收件':''}</p>
-   <div className="button-row">{target(item)&&<Button onClick={()=>navigate(target(item)!)}>进入对应内容</Button>}<Button variant="outline" disabled={busy||item.read} onClick={()=>run(async()=>{await client!.markRead({id:item.id,reader:'human'});setNotice('已按你的选择标记此通知已读，不改变任务或房间阅读位置。');})}>我已读这条通知</Button>
-    {item.object.type==='room'&&settings&&<Button variant="ghost" disabled={busy} onClick={()=>{const roomId=item.object.id,muted=settings.mutedRoomIds.includes(roomId);editSettings({...settings,mutedRoomIds:muted?settings.mutedRoomIds.filter((id:string)=>id!==roomId):[...settings.mutedRoomIds,roomId]});setNotice('房间静音选择尚未保存，请在下方保存通知设置。');}}>{settings.mutedRoomIds.includes(item.object.id)?'取消房间静音':'静音这个房间'}</Button>}</div>
-   {!target(item)&&<p className="muted">原对象类型：{item.object.type}。完整旧对象页面尚未接入，可用银河 MCP 按该对象查询；不把它转成另一项任务。</p>}
-  </article>)}</div>
-  {!items.length&&!error&&<div className="empty-state">当前条件下没有仍可见的通知。关闭类别、静音、已读或来源到期会影响结果。</div>}
-  {next&&<Button variant="outline" disabled={busy} onClick={async()=>{if(working.current)return;working.current=true;setBusy(true);try{await load(next);}catch(e:any){setError(typeof e?.message==='string'&&e.message.trim()?e.message:'通知下一页暂未读取成功，请稍后重试。');}finally{working.current=false;setBusy(false);}}}>继续读取通知</Button>}
-  {settings&&options&&<details className="room-settings"><summary>通知与屏蔽设置</summary><form className="workspace-form" onSubmit={e=>{e.preventDefault();void run(async()=>{const receipt=await client!.saveOptions({expectedRevision:options.revision,settings});setOptions((old:any)=>({...old,revision:receipt.revision??old.revision,settings:receipt.settings??settings}));setSettings(receipt.settings??settings);dirty.current=false;setNotice('通知设置已保存。必要的业务回执仍会安静留在收件区。');});}}>
-   <fieldset disabled={busy}><legend>选择通知范围</legend><label><input type="checkbox" checked={settings.rooms} onChange={e=>editSettings({...settings,rooms:e.target.checked})}/>显示房间类通知</label><label><input type="checkbox" checked={settings.tasks} onChange={e=>editSettings({...settings,tasks:e.target.checked})}/>显示任务类通知</label>
-   {settings.mutedRoomIds.map((id:string)=><p key={id}>静音房间 <code>{id}</code><Button type="button" variant="ghost" onClick={()=>editSettings({...settings,mutedRoomIds:settings.mutedRoomIds.filter((r:string)=>r!==id)})}>解除静音</Button></p>)}
-   <label htmlFor="galaxy-block-subject">要屏蔽的银河 ID<Input id="galaxy-block-subject" value={block} onChange={e=>setBlock(e.target.value.trim())} placeholder="填写对方的银河 ID"/></label><Button type="button" variant="outline" disabled={!/^GUID[A-Z0-9]{28}$/.test(block)||block===subjectId||settings.blockedSubjectIds.includes(block)} onClick={()=>{editSettings({...settings,blockedSubjectIds:[...settings.blockedSubjectIds,block]});setBlock('');}}>加入待保存的屏蔽清单</Button>
-   {settings.blockedSubjectIds.map((id:string)=><p key={id}><code>{id}</code><Button type="button" variant="ghost" onClick={()=>editSettings({...settings,blockedSubjectIds:settings.blockedSubjectIds.filter((s:string)=>s!==id)})}>解除屏蔽</Button></p>)}
-   <p className="muted">屏蔽影响后续联系和通知，不等于撤销已经公开的资料。外部邮件、系统推送当前未在此开启。</p><div className="button-row"><Button type="submit" disabled={busy}>保存所选通知设置</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>run(async()=>{dirty.current=false;})}>放弃未保存修改并重新读取</Button></div>
-  </fieldset></form></details>}
+  {prompt&&<output className="notification-prompt" aria-live="polite"><Bell size={18}/><button onClick={()=>openItem(prompt.item)}>{prompt.item.title}</button><button className="icon-button" aria-label="收起提醒" onClick={()=>setPrompt(null)}><X size={16}/></button></output>}
+  <div className="notification-filter" aria-label="通知筛选"><button aria-pressed={unread} onClick={()=>changeFilter(true)}>未读</button><button aria-pressed={!unread} onClick={()=>changeFilter(false)}>全部</button></div>
+  {loading&&!checked&&<PageLoading label="正在读取当前允许的通知…"/>}
+   <div className="notification-list">{notificationRows(items).map(item=><article className={!item.read?'unread':''} key={item.rowKey}><span className="notification-type" aria-hidden="true">{item.object.type==='room'?<MessageCircle size={21}/>:<FileText size={21}/>}</span><div className="notification-content"><h2>{target(item)?<a href={target(item)!} onClick={event=>{event.preventDefault();openItem(item);}}>{item.title}</a>:item.title}</h2><p><span>{kinds[item.eventKind]??'更新'}</span><time dateTime={item.at}>{readableTime(item.at)}</time></p>{!target(item)&&<p>这项内容暂时无法从网页打开。</p>}</div><div className="notification-row-actions">{!item.read&&<button className="icon-button notification-read" aria-label={'标为已读：'+item.title} disabled={busy} onClick={()=>run(()=>markItemRead(item))}><Check size={18}/></button>}{item.object.type==='room'&&<button className="icon-button notification-read" aria-label={(options?.settings.mutedRoomIds.includes(item.object.id)?'恢复通知：':'静音通知：')+item.title} disabled={busy} onClick={()=>run(()=>toggleRoom(item.object.id))}><BellOff size={16}/></button>}</div></article>)}</div>
+  {!loading&&!items.length&&!error&&<div className="empty-state"><h2>{unread?'当前没有可见的未读事项':'当前没有可见的通知'}</h2><p>{unread?'可以查看已读事项，或直接继续自己的对话与工作。':'通知按当前权限和来源期限显示。没有通知时，也可以继续已有交流。'}</p><div className="button-row">{unread&&<Button variant="outline" onClick={()=>changeFilter(false)}>查看全部通知</Button>}<Button variant="outline" onClick={()=>navigate('/app/rooms')}>继续聊天</Button></div></div>}
+  {next&&<Button variant="outline" disabled={busy} onClick={async()=>{if(working.current)return;const lease=active.current.epoch;working.current=true;setBusy(true);try{await load(next);}catch(reason){if(lease===active.current.epoch)setError(readableError(reason,'通知下一页暂未读取成功，请稍后重试。'));}finally{if(active.current.open){working.current=false;setBusy(false);}}}}>更多通知</Button>}
+  {runtime&&client&&subjectId&&<NotificationSettings runtime={runtime} subjectId={subjectId} client={client} open={settingsOpen} onResume={()=>setSettingsOpen(true)} onClose={()=>setSettingsOpen(false)} onSaved={(value,message)=>{setOptions(value);setNotice(message);void load().catch(()=>{});}}/>}
  </section>;
 }
-

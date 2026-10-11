@@ -1,5 +1,6 @@
 import type { Action, Routes, Menu, MenuOption, Prompt, ModuleEntry, StableHostApi, ConnectionController, CaseSubmission, HistoryFilters, AdapterCore, PublicationDraft, HistoryItem, DiscoverySource, BindingReceiptView } from './adapter-types.ts';
 import { createDeletionMenu } from './deletion-menu.mjs';
+import { createLocalDeletionRecords } from '../local-deletion-records.mjs';
 import { createDataExportMenu } from './data-export-menu.mjs';
 import { createProfileMenu } from './profile-menu.mjs';
 import { createCaseReviewMenu } from './case-review-menu.mjs';
@@ -14,6 +15,10 @@ import { createContextDraftMenu } from './context-draft-menu.mjs';
 import { createBindingManagementMenu } from './binding-management-menu.mjs';
 import { createIdentityMenu } from './identity-menu.mjs';
 import { describeConnectionState } from './connection-state.mjs';
+import { createPurposeMenu } from './purpose-menu.mjs';
+import { showExactChoice } from './exact-choice.mjs';
+import {readableDialogSelect} from './dialog-reading.mjs';
+import {sourceReadingText} from './source-reading.mjs';
 
 const MODULE_LABELS: Record<string, string> = {
   'galaxy-id': '银河 ID 与本地身份卡',
@@ -57,7 +62,7 @@ function compactModules(modules: (string | ModuleEntry)[], language: string) {
   return lines.join('\n');
 }
 
-export function createGalaxyAdapter(connectionController: ConnectionController | null = null, { readCaseSubmission = null, discovery = null, dataDirectory: configuredDirectory }: { readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null; discovery?: DiscoverySource | null; dataDirectory?: string } = {}) {
+export function createGalaxyAdapter(connectionController: ConnectionController | null = null, { readCaseSubmission = null, discovery = null, dataDirectory: configuredDirectory, nativeTools = null, readWorkContext = null }: { readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null; discovery?: DiscoverySource | null; dataDirectory?: string; nativeTools?: {call(name:string,args:Record<string,unknown>):Promise<unknown>;openLink?:(url:string)=>Promise<unknown>} | null; readWorkContext?: (()=>Promise<{origin?:{host:string;workRef:string};caseId?:string;taskId?:string;a2a?:{peerId:string;attemptId:string;attemptVersion:number;text:string}} | null>) | null } = {}) {
 let closed = false, attached = false;
 let disposeHost: Action | null = null;
 let disposeLifecycle: Action | null = null;
@@ -109,6 +114,7 @@ return {
     let pageGeneration = 0;
     let visiblePage: number | null = null;
     let pendingConnection: Awaited<ReturnType<ConnectionController['prepare']>> | null = null;
+    let purposeMenu: ReturnType<typeof createPurposeMenu> | null = null;
 
     function clearMenuKeys() {
       if (disposeMenuKeys) disposeMenuKeys();
@@ -121,6 +127,7 @@ return {
       discoveryAbort?.abort();
       connectionController?.cancel();
       pendingConnection = null;
+      purposeMenu?.close(); purposeMenu = null;
       clearMenuKeys();
       if (visiblePage !== null) {
         visiblePage = null;
@@ -192,19 +199,19 @@ return {
       );
     }
 
-    function showPrompt({ title, placeholder, onConfirm, onCancel = closeGalaxy }: Prompt) {
+    function showPrompt({ title, placeholder, value, onConfirm, onCancel = closeGalaxy }: Prompt) {
       if (closed) return;
       const page = ++pageGeneration;
       let transitioning = false;
-      // A prompt is used only where the product contract requires literal text,
-      // rather than treating a destructive or identity-creating action as a
-      // conveniently clickable menu item.
+      // A prompt collects actual content or a value required by the operation.
+      // Authorization comes from the corresponding exact native choice.
       const cleanup = pageCleanup(page, installMenuKeys({}, closeGalaxy, null, { includeZero: false }), () => transitioning);
       api.ui.dialog.setSize('xlarge');
       api.ui.dialog.replace(
         () => api.ui.DialogPrompt({
           title,
           placeholder,
+          ...(value===undefined?{}:{value}),
           onConfirm: (value) => {
             transitioning = true;
             setTimeout(() => { transitioning = false; if (!closed && page === pageGeneration) onConfirm(value); }, 0);
@@ -223,7 +230,10 @@ return {
       );
     }
 
-    function showSelect({ title, options, routes, onBack, onEscape = closeGalaxy }: Menu) {
+    function showSelect(input: Menu) {
+      const prepared: Menu=readableDialogSelect(input);
+      const {title,options,routes:inputRoutes,onBack,onEscape=closeGalaxy}=prepared;
+      let routes: Routes=inputRoutes;
       if (closed) return;
       const page = ++pageGeneration;
       let transitioning = false;
@@ -233,10 +243,10 @@ return {
       api.ui.dialog.setSize('xlarge');
       api.ui.dialog.replace(
         () => api.ui.DialogSelect({
-          title: `${title}\n${divider()}\n[0] 返回/退出  [?] 规则  Esc 退出\n数字选择 / Enter 确认`,
+          title: `${title}\n\n[0] 返回 · Esc 回到原工作`,
           skipFilter: true,
           options: options.map((option) => ({
-            title: `[${option.number}] ${option.title}`,
+            title: option.number ? `[${option.number}] ${option.title}` : option.title,
             description: option.description,
             value: option.number,
             disabled: option.disabled === true,
@@ -244,7 +254,9 @@ return {
             // its cleanup cannot dismiss the next Galaxy page.
             onSelect: () => {
               transitioning = true;
-              setTimeout(() => { transitioning = false; if (!closed && page === pageGeneration) routes[option.number]?.(); }, 0);
+              setTimeout(() => { transitioning = false; if (!closed && page === pageGeneration) {
+                if(option.reading)showInfo(title,option.description??'',reopen);else routes[option.number]?.();
+              } }, 0);
             },
           })),
         }),
@@ -452,7 +464,7 @@ return {
             createContextDraftMenu({controller:source,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
               canSubmit:false,isCurrent:()=>current===connectionGeneration,onBack:()=>showDiscovery(onBack),onConfirm:undefined,onOpenGrant:undefined}).open();
           }, 4: () => { if(version!==connectionGeneration)return;const current=++connectionGeneration;
-            createAssistanceDraftMenu({controller:source,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
+            createAssistanceDraftMenu({controller:source,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,readWorkContext,
               canSubmit:false,isCurrent:()=>current===connectionGeneration,onBack:()=>showDiscovery(onBack),onConfirm:undefined,onOpenRequest:undefined}).open();
           }, 3: () => { if(version===connectionGeneration)showLocalSearchFeedback(() => showDiscovery(onBack)); },
           2: () => void showBindingReceipts(() => showDiscovery(onBack)), 1: async () => {
@@ -488,13 +500,16 @@ return {
       try {
         const status = await controllerMethod('status')();
         if (version !== connectionGeneration) return;
+        const managesData=!!(connectionController.queryBindings||connectionController.querySearchFeedback||connectionController.listBindingReceipts
+          ||(connectionController.queryHistory&&status.scopes?.includes('history'))||(connectionController.readAudit&&status.scopes?.includes('audit'))
+          ||(connectionController.saveDataExport&&status.scopes?.includes('data-export'))||((connectionController.readDeletion&&status.scopes?.includes('data-delete'))||connectionController.prepareDeletionStatus));
         showSelect({
-          title: `${chinese ? 'Galaxy / 接入银河' : 'Galaxy / Connect to Galaxy'}\n${status.endpoint}\n${status.state}\n${describeConnectionState(status.state, activeLanguage)}\n${discovery ? describeConnectionState(discovery.status().state, activeLanguage, 'discovery') : ''}\n${'receiptSaveState' in status && status.receiptSaveState === 'save-failed' ? (chinese ? '本机回执保存失败；请检查本机存储，不要重复绑定' : 'Local receipt save failed; check local storage, do not repeat binding') : ''}`,
+          title: `${chinese ? 'Galaxy / 连接与专业入口' : 'Galaxy / Connection and professional tools'}\n${describeConnectionState(status.state, activeLanguage)}\n${chinese?'服务：':'Service: '}${status.endpoint}\n${discovery ? describeConnectionState(discovery.status().state, activeLanguage, 'discovery') : ''}\n${'receiptSaveState' in status && status.receiptSaveState === 'save-failed' ? (chinese ? '本机回执保存失败；请检查本机存储，不要重复绑定' : 'Local receipt save failed; check local storage, do not repeat binding') : ''}`,
           options: [
             { number: '1', title: chinese ? '预览连接' : 'Preview connection', description: chinese ? '先显示准确请求；确认前不联网或签名' : 'Review exact request before signing or network activity' },
             { number: '2', title: chinese ? '断开本机会话' : 'Disconnect local session', description: chinese ? '丢弃本机凭据；不声称已撤销远端绑定' : 'Discard local credential; does not revoke remote binding' },
-            ...(connectionController.checkRemote ? [{ number: '3', title: connectionController.queryBindings || (connectionController.queryHistory && status.scopes?.includes('history')) || (connectionController.readAudit && status.scopes?.includes('audit')) || (connectionController.saveDataExport && status.scopes?.includes('data-export')) || ((connectionController.readDeletion && status.scopes?.includes('data-delete')) || connectionController.prepareDeletionStatus)
-              ? (chinese ? '绑定、审计与数据管理' : 'Binding, audit and data') : (chinese ? '核查远端绑定' : 'Check remote binding'), description: chinese ? '读取绑定状态或当前获准查看的操作记录' : 'Read binding status or currently authorized operation records' }] : []),
+            ...(connectionController.checkRemote||managesData ? [{ number: '3', title: managesData
+              ? (chinese ? '设备与本人资料' : 'Devices and my data') : (chinese ? '核查远端绑定' : 'Check remote binding'), description: chinese ? '读取当前获准的原记录或处理本人资料。' : 'Read currently authorized records or manage my data.' }] : []),
             ...((connectionController.querySearch&&['history','proof','capsules','builders'].some(scope=>status.scopes?.includes(scope))||connectionController.queryHistory&&status.scopes?.includes('history')) && status.state === 'session-local'
               ? [{ number: '4', title: connectionController.querySearch?(chinese?'分类型搜索':'Search by source'):(chinese ? '查询履历' : 'Search history'), description: chinese ? '向上方端点发送关键词，保留当前可见记录的来源类型' : 'Send search terms and retain authorized source types' }] : []),
             ...(connectionController.prepareCase && readCaseSubmission && status.scopes?.includes('case-teaser') && status.state === 'session-local'
@@ -511,16 +526,16 @@ return {
           routes: { 9: () => { if (version === connectionGeneration && connectionController.readA2a) {
               const current = ++connectionGeneration;
               createA2aMenu({controller: connectionController, select: showSelect, prompt: showPrompt, info: showInfo, language: activeLanguage,
-                availableScopes: status.scopes, onBack: reopen, isCurrent: () => current === connectionGeneration}).open();
+                availableScopes: status.scopes, readWorkContext, onReturnWork:closeGalaxy, onBack: reopen, isCurrent: () => current === connectionGeneration}).open();
             } }, 8: () => { if (version === connectionGeneration && connectionController.queryBuilders) {
               const current = ++connectionGeneration;
               createBuilderMenu({controller: connectionController, select: showSelect, prompt: showPrompt, info: showInfo, language: activeLanguage,
-                availableScopes: status.scopes, onBack: reopen, isCurrent: () => current === connectionGeneration}).open();
+                availableScopes: status.scopes, onReturnWork:closeGalaxy,onBack: reopen, isCurrent: () => current === connectionGeneration}).open();
             } }, 1: () => void previewConnection(onBack), 2: () => { controllerMethod('disconnect')(); if (discovery) { clearConnectionController(); showDiscovery(onBack); } else reopen(); },
-            3: () => { if (version !== connectionGeneration || !connectionController.checkRemote) return;
-              if (!connectionController.queryBindings && !connectionController.querySearchFeedback && !connectionController.listBindingReceipts && !(connectionController.queryHistory && status.scopes?.includes('history')) && !(connectionController.readAudit && status.scopes?.includes('audit')) && !(connectionController.saveDataExport && status.scopes?.includes('data-export')) && !((connectionController.readDeletion && status.scopes?.includes('data-delete')) || connectionController.prepareDeletionStatus)) { void checkRemoteBinding(onBack); return; }
-              showSelect({ title: chinese ? '绑定、审计与数据管理' : 'Binding, audit and data',
-                options: [{ number: '1', title: chinese ? '核查远端绑定' : 'Check remote binding', description: '' },
+            3: () => { if (version !== connectionGeneration) return;
+              if (!managesData) { if (connectionController.checkRemote) void checkRemoteBinding(onBack); return; }
+              showSelect({ title: chinese ? '设备与本人资料' : 'Devices and my data',
+                options: [...(connectionController.checkRemote?[{ number: '1', title: chinese ? '核查远端绑定' : 'Check remote binding', description: '' }]:[]),
                   ...(connectionController.readIdentity&&status.state==='session-local'?[{number:'9',title:chinese?'外部账户关联':'External accounts',description:chinese?'关联或撤销OIDC账户':'Link or unlink an OIDC account'}]:[]),
                   ...(connectionController.queryBindings&&status.state==='session-local'? [{number:'8',title:chinese?'本人设备与绑定':'My installations and bindings',description:chinese?'查看安装实例、当前绑定及撤销入口':'View installations, current bindings and revocation'}]:[]),
                   ...(connectionController.readAudit && status.scopes?.includes('audit') ? [{ number: '2', title: chinese ? '审计记录与授权' : 'Audit records and approval', description: '' }] : []),
@@ -544,18 +559,19 @@ return {
                       language: activeLanguage, onBack: reopen, isCurrent: () => current === connectionGeneration }).open(); },
                   4: () => { const current = ++connectionGeneration;
                     createDeletionMenu({ controller: connectionController, select: showSelect, prompt: showPrompt, canSubmit: status.state === 'session-local' && status.scopes?.includes('data-delete'), info: showInfo, language: activeLanguage,
-                      onBack: reopen, isCurrent: () => current === connectionGeneration }).open(); } }, onBack: reopen });
+                      records: createLocalDeletionRecords({dataDirectory,endpoint:status.endpoint,isCurrent:()=>current===connectionGeneration}),
+                      onReturnWork:closeGalaxy,onBack: reopen, isCurrent: () => current === connectionGeneration }).open(); } }, onBack: reopen });
             },
             4: () => {if(version!==connectionGeneration)return;
               if(connectionController.querySearch){const current=++connectionGeneration;createSearchMenu({controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
-                isCurrent:()=>current===connectionGeneration,onBack:reopen,onHistoryFilters:()=>promptHistory(onBack),availableScopes:status.scopes}).open();}
+                isCurrent:()=>current===connectionGeneration,onReturnWork:closeGalaxy,readWorkContext,onBack:reopen,onHistoryFilters:()=>promptHistory(onBack),availableScopes:status.scopes}).open();}
               else if(connectionController.queryHistory)promptHistory(onBack);},
             5: () => { if (version === connectionGeneration && connectionController.prepareCase && readCaseSubmission) void previewCaseSubmission(onBack); },
             6: () => { if (version === connectionGeneration && connectionController.listPublicationDrafts) void showPublicationDrafts(onBack); },
             7: () => { if (version === connectionGeneration && connectionController.queryAssistance) {
               const current = ++connectionGeneration;
               createAssistanceMenu({ controller: connectionController, select: showSelect, prompt: showPrompt, info: showInfo,
-                language: activeLanguage, availableScopes: status.scopes, onBack: reopen, isCurrent: () => current === connectionGeneration }).open();
+                language: activeLanguage, availableScopes: status.scopes, readWorkContext, onBack: reopen, isCurrent: () => current === connectionGeneration }).open();
             } } },
           onBack: back,
         });
@@ -629,27 +645,21 @@ return {
           : await controllerMethod('prepareCase')(request);
         if (version !== connectionGeneration) { controllerMethod('cancel')(); return; }
         let started = false;
-        const prompt = () => {
-          if (version !== connectionGeneration) return;
-          showPrompt({ title: `${chinese ? '确认提交草稿' : 'Confirm draft submission'}\n${preview.endpoint}\nConsent: ${preview.intentJson ?? preview.consentId}\n${preview.payloadJson}\n${chinese ? '逐字输入' : 'Type exactly'}: ${preview.confirmation}`,
-            placeholder: preview.confirmation, onCancel: cancel,
-            onConfirm: async value => {
+        showExactChoice({preview,title:chinese?'发送这份工作内容与范围':'Send this work content and scope',select:showSelect,info:showInfo,language:activeLanguage,
+            isCurrent:()=>version===connectionGeneration&&!started,onCancel:cancel,
+            onConfirm: async (value: string) => {
               if (version !== connectionGeneration || started) return;
-              if (value !== preview.confirmation)
-                return showInfo('Galaxy', chinese ? '确认文本不匹配；尚未提交。' : 'Confirmation mismatch; nothing submitted.', prompt);
               started = true;
               showInfo('Galaxy', chinese ? '正在提交；Esc取消本地等待。' : 'Submitting; Esc cancels locally.', cancel);
               try {
                 const result = localDraftId ? await controllerMethod('executePublication')(preview, value)
                   : await controllerMethod('executeCase')(preview, value);
                 if (version !== connectionGeneration) return;
-                showInfo('Galaxy', `${chinese ? '已记录事件' : 'Event recorded'}: ${result.eventId}\nCase: ${result.caseId}\n${chinese ? '版本' : 'Version'}: ${result.version}`, reopen);
+                showInfo('Galaxy', chinese?'这份工作内容已保存，可以回到原工作继续。':'This work content was saved. Continue the original work.', reopen);
               } catch {
-                if (version === connectionGeneration) showInfo('Galaxy', chinese ? '提交未确认。请先核对事件是否已记录，再决定是否用原事件 ID 重试。' : 'Submission unconfirmed. Check the event before retrying with the original event ID.', reopen);
+                if (version === connectionGeneration) showInfo('Galaxy', chinese ? '发送结果尚未确认。已有提交可在原草稿中继续查询；请先查询同一次操作。' : 'Sending is not confirmed. Continue checking this same operation from the original draft.', reopen);
               }
             } });
-        };
-        prompt();
       } catch {
         if (version === connectionGeneration) { controllerMethod('cancel')(); showInfo('Galaxy', chinese ? '无法准备草稿；没有提交。' : 'Draft preparation failed; nothing submitted.', reopen); }
       }
@@ -791,12 +801,11 @@ return {
             const ownerReview=item.fieldPolicy?.view==='owner'&&item.rebuild&&connectionController.getCase&&connectionController.prepareCaseReview&&connectionController.executeCaseReview;
             const caseModeration=item.rebuild&&connectionController.queryModeration;
             const linked=item.collaborationContext?.items??[];
-            if(!ownerReview&&!caseModeration&&!(linked.length&&connectionController.getAssistance)){if(connectionController.recordSearchFeedback)feedback();else render();return;}
             void (async()=>{
               try{
                 const status=await controllerMethod('status')();if(version!==connectionGeneration)return;
-                const entries:MenuOption[]=[{number:'1',title:chinese?'返回结果列表':'Back to results'}];
-                const choices:Routes={1:render};
+                const entries:MenuOption[]=[{number:'1',title:chinese?'返回结果列表':'Back to results'},{number:'6',title:chinese?'查看来源与完整记录':'Inspect source and complete record'}];
+                const choices:Routes={1:render,6:()=>showInfo(plain(item.title),sourceText,actions)};
                 if(connectionController.recordSearchFeedback){entries.push({number:'2',title:chinese?'查询反馈':'Search feedback'});choices[2]=feedback;}
                 if(ownerReview&&['case-teaser','consent'].every(scope=>status.scopes?.includes(scope))){
                   entries.push({number:'3',title:chinese?'纠正与争议记录（本人Case）':'Correction and dispute records (my Case)'});
@@ -811,7 +820,7 @@ return {
                     linked.slice(offset,offset+8).forEach((link,i)=>{
                       options.push({number:String(i+1),title:plain(link.assistanceId),description:plain(link.requestedScope)});
                       linkRoutes[i+1]=()=>{const current=++connectionGeneration;
-                        createAssistanceMenu({controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,availableScopes:status.scopes,
+                        createAssistanceMenu({controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,availableScopes:status.scopes,readWorkContext,
                           isCurrent:()=>current===connectionGeneration,onBack:()=>void showHistoryPage(onBack,query)}).openRequest(link.assistanceId);};
                     });
                     if(offset+8<linked.length){options.push({number:'9',title:chinese?'下一页':'Next page'});linkRoutes[9]=()=>chooseLinks(offset+8);}
@@ -822,7 +831,7 @@ return {
                 if(caseModeration&&status.scopes?.includes('moderation')){
                   entries.push({number:'5',title:chinese?'Case独立争议处理':'Case independent moderation'});
                   choices[5]=()=>{const current=++connectionGeneration;
-                    createAssistanceMenu({controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,availableScopes:status.scopes,
+                    createAssistanceMenu({controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,availableScopes:status.scopes,readWorkContext,
                       isCurrent:()=>current===connectionGeneration,onBack:()=>void showHistoryPage(onBack,query)})
                       .openCaseModeration({caseId:item.caseId,sourceVersion:item.rebuild!.sourceVersion,events:item.rebuild!.sources.events});};
                 }
@@ -830,8 +839,7 @@ return {
               }catch{if(version===connectionGeneration)showInfo('Galaxy',chinese?'请重新查询后操作。':'Query history again before acting.',render);}
             })();
           };
-          routes[index + 1] = () => showInfo(plain(item.title),
-            [plain(item.summary), `Case: ${plain(item.caseId)}`,
+          const sourceText=[plain(item.summary), `Case: ${plain(item.caseId)}`,
               ...(item.fieldPolicy?[`${chinese?'字段视图':'Field view'}: ${plain(item.fieldPolicy.view)} / ${plain(item.fieldPolicy.id)}@${item.fieldPolicy.version}`]:[]),
               ...(item.participants??[]).map(person=>`${chinese?'Case中声明的参与者':'Case-declared participant'}: ${plain(person.subjectId)} · ${plain(person.role)}`),
               ...(item.attempts??[]).filter(attempt=>attempt.configuration).map(attempt=>`${chinese?'尝试配置':'Attempt configuration'}: ${plain(attempt.id)} · ${plain(attempt.configuration?.environment)} / ${plain(attempt.configuration?.version)}`),
@@ -868,7 +876,12 @@ return {
                 ...item.moderationContext.items.flatMap(record=>[`${plain(record.reportId)} · ${plain(record.state)}${record.paused?' · paused':''}`,
                   ...record.events.map(event=>`${plain(event.kind)} · ${plain(event.verdict)} · ${plain(event.summary)}`),
                   ...(record.revalidation?[`${chinese?'Evidence验证轮次':'Evidence verification round'}: ${record.revalidation.generation} · ${plain(record.revalidation.state)}`]:[])])]:[]),
-              ...item.matchReasons.map(plain)].join('\n'), actions);
+              ...item.matchReasons.map(plain)].join('\n');
+          routes[index + 1] = () => showInfo(plain(item.title),[
+            sourceReadingText({type:'history',record:item,summary:item.summary},(cn:string,en:string)=>chinese?cn:en,plain),
+            ...(item.corrections?.length?[chinese?'原工作有纠正，具体内容可从来源记录继续阅读。':'The original work has corrections. Read their source records for details.']:[]),
+            ...(item.moderationContext?.items.some(record=>record.paused)?[chinese?'当前可见处理记录标明暂停，请查看处理详情后继续。':'A visible handling record reports a pause. Inspect its details before continuing.']:[]),
+          ].join('\n\n'),actions);
         });
         if (page.nextCursor) {
           const number = String(items.length + 1);
@@ -937,20 +950,21 @@ return {
         let started = false;
         const prompt = () => {
           if (version !== connectionGeneration || pendingConnection !== preview) return;
-          showPrompt({
-          title: `${chinese ? '确认远程连接' : 'Confirm remote connection'}\n${preview.endpoint}\n${preview.requestJson}\n${chinese ? '最长绑定/会话秒数' : 'Maximum binding/session seconds'}: ${preview.maximumBindingSeconds}/${preview.maximumSessionSeconds}\n${chinese ? '逐字输入' : 'Type exactly'}: ${preview.confirmation}`,
-          placeholder: preview.confirmation,
-          onCancel: cancel,
-          onConfirm: async value => {
+          let request: {scopes?:string[]}={};try{request=JSON.parse(preview.requestJson);}catch{/* The exact original still stays in its preview. */}
+          const scopes: Record<string,string>={binding:'设备连接',consent:'所选内容授权',history:'可见履历',assistance:'求助与参与',context:'所选材料',notifications:'消息通知',capsules:'知识胶囊',builders:'开放节点信息','case-teaser':'当前工作记录',proof:'来源证据',evidence:'提交的材料',moderation:'已获准的处理记录',audit:'本人操作记录','audit-review':'本人授权记录','data-export':'本人资料导出','data-delete':'本人资料删除'};
+          showSelect({
+          title: `${chinese ? '连接到银河' : 'Connect to Galaxy'}\n${preview.endpoint}\n${chinese?'本次选择的权限':'Selected permissions'}：${request.scopes?.map(scope=>chinese?scopes[scope]??scope:scope).join('、')??(chinese?'宿主已选择的设备连接':'The device connection selected by the host')}\n${chinese?'私人笔记与原工作全文不会由这次连接上传。':'This connection does not upload private notes or the original work in full.'}`,
+          options:[{number:'1',title:chinese?'允许这次连接':'Allow this connection'},
+            {number:'2',title:chinese?'查看连接来源':'Inspect connection source',description:chinese?'需要诊断时查看准确请求。':'Inspect the exact request when diagnosing.'}],
+          onBack: cancel,
+          routes:{2:()=>showInfo(chinese?'连接来源与诊断':'Connection source and diagnostics',preview.requestJson,prompt),1:async () => {
             if (version !== connectionGeneration || pendingConnection !== preview || started) return;
-            if (value !== preview.confirmation) {
-              showInfo('Galaxy', chinese ? '确认文本不匹配；没有发送。' : 'Confirmation mismatch; nothing sent.', prompt);
-              return;
-            }
             started = true;
             showInfo('Galaxy', chinese ? '正在连接；Esc可取消，已送达请求不保证撤回。' : 'Connecting; Esc cancels locally but cannot undo delivered requests.', cancel);
             try {
-              await controllerMethod('execute')(preview, value);
+              // This action comes from the actual native selection. The exact
+              // host preview remains the same object and checks its own expiry.
+              await controllerMethod('execute')(preview, preview.confirmation);
               if (version !== connectionGeneration) return;
               pendingConnection = null;
               void showManagedConnection(onBack);
@@ -959,7 +973,7 @@ return {
               pendingConnection = null;
               showInfo('Galaxy', chinese ? '连接未完成；远端结果可能需复核，不会自动重试。' : 'Connection incomplete; remote outcome may need review. No automatic retry.', () => void showManagedConnection(onBack));
             }
-          },
+          }},
           });
         };
         prompt();
@@ -1025,7 +1039,7 @@ return {
           1: async () => {
             try {
               await store.resetGalaxyIntegration(dataDirectory);
-              showLanguage();
+              void showQuickInitialize(onReturn);
             } catch (error) {
               showInfo(chinese ? '重新初始化未完成' : 'Reinitialization did not complete', String(error instanceof Error ? error.message : error), onReturn);
             }
@@ -1036,19 +1050,37 @@ return {
       });
     }
 
-    function showSettings(onReturn: Action) {
+    function showSettings(onReturn: Action): void {
       const chinese = activeLanguage === 'zh-CN';
+      if(nativeTools){
+        const nativeEntry=(kind:'identity'|'methods'|'external'|'projects')=>()=>{
+          const version=++connectionGeneration;purposeMenu?.close();
+          purposeMenu=createPurposeMenu({nativeTools,controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
+            isCurrent:()=>!closed&&version===connectionGeneration,onBack:()=>showSettings(onReturn),onReturnWork:closeGalaxy,readWorkContext});purposeMenu[kind]();
+        };
+        return showSelect({title:chinese?'Galaxy / 我的与设置':'Galaxy / My settings',options:[
+          {number:'1',title:chinese?'身份与设备':'Identity and devices',description:chinese?'沿用当前 Native 的稳定身份。':'Use the current stable Native identity.'},
+          {number:'2',title:chinese?'方法':'Methods',description:chinese?'沿用实际工作整理、应用与验证方法。':'Prepare, apply and reverify methods from actual work.'},
+          {number:'4',title:chinese?'交给已有服务处理':'Use an existing service',description:chinese?'选择现有工作与必要内容，接续已配置 A2A 服务。':'Select current work and necessary content for a configured A2A service.'},
+          {number:'5',title:chinese?'同行与联系':'People and contacts',description:chinese?'从当前方向读项目、发起联系，接续对话。':'Read projects, contact people, and continue the conversation.'},
+          {number:'3',title:chinese?'显示语言':'Display language',description:chinese?'更改这个 OpenCode 入口的显示语言。':'Change the language of this OpenCode entry.'}],
+          routes:{1:nativeEntry('identity'),2:nativeEntry('methods'),4:nativeEntry('external'),5:nativeEntry('projects'),3:()=>showSettingsLanguage(()=>showSettings(onReturn))},onBack:onReturn});
+      }
       showSelect({
         title: chinese
-          ? `Galaxy / 设置\n这里管理当前宿主中的本机查看项与显示偏好；首次初始化不是设置功能。\n\n${localBoundary(activeLanguage)}`
-          : `Galaxy / Settings\nManage local inspection and display preferences for this host. First-time initialization is not a settings feature.\n\n${localBoundary(activeLanguage)}`,
+          ? 'Galaxy / 我的与设置'
+          : 'Galaxy / My settings',
         options: [
+          { number: '6', title: chinese ? '连接与设备' : 'Connection and devices', description: chinese ? '按需要接入已有身份，查看当前连接。' : 'Connect an existing identity when needed and inspect this connection.' },
+          { number: '5', title: chinese ? '创建本机身份' : 'Create local identity', description: chinese ? '仅在这台设备尚未准备身份时使用。' : 'Use only when this device has no local identity yet.' },
           { number: '1', title: chinese ? '本机身份与运行边界' : 'Local identity and boundary', description: chinese ? '查看本机身份卡及服务边界。' : 'Review the local identity card and service boundary.' },
           { number: '2', title: chinese ? '模块与集成' : 'Modules and integrations', description: chinese ? '查看已启用的本机模块，不安装或变更。' : 'Review enabled local modules; no installation or change.' },
           { number: '3', title: chinese ? '显示语言' : 'Display language', description: chinese ? '仅更改当前 OpenCode 对话语言。' : 'Change language only for this OpenCode conversation.' },
           { number: '4', title: chinese ? '重新初始化 Galaxy' : 'Reinitialize Galaxy', description: chinese ? '清除 Galaxy 托管数据与当前 ID，然后从首次初始化开始。' : 'Clear Galaxy-managed data and the current ID, then restart first-time setup.' },
         ],
         routes: {
+          6: () => showConnection(onReturn),
+          5: () => showQuickInitialize(onReturn),
           1: () => showStatus(onReturn),
           2: () => showSettingsModules(onReturn),
           3: () => showSettingsLanguage(onReturn),
@@ -1059,33 +1091,46 @@ return {
       });
     }
 
+    async function showQuickInitialize(onReturn: Action) {
+      const status = await store.getGalaxyIntegrationStatus(dataDirectory);
+      if (status.initialized) return showConsole(status);
+      const chinese=activeLanguage==='zh-CN';
+      showSelect({title:chinese?'Galaxy / 在本机准备身份\n保存稳定身份和设备密钥，便于接续工作。连接和外发范围按需另行选择。':'Galaxy / Prepare this device\nSave a stable identity and device-held key. Connection and external sharing are selected when needed.',
+        options:[{number:'1',title:chinese?'创建本机身份':'Create local identity',description:chinese?'使用当前默认配置；保留已有文件。':'Use current defaults and retain existing files.'}],
+        routes:{1:async()=>{try{const initialized=await store.initializeGalaxyIntegration(dataDirectory,{initializationPath:'personal-galaxy',source:'opencode-native-tui'});showConsole(initialized);}catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}}},onBack:onReturn});
+    }
+
+    function purpose(kind: 'search' | 'messages' | 'publish', onBack: Action) {
+      const version=++connectionGeneration;
+      purposeMenu?.close();
+      if(!nativeTools&&kind==='search'&&!connectionController?.querySearch){
+        return showSelect({title:activeLanguage==='zh-CN'?'找帮助\n当前宿主尚未接入可查询的银河服务。':'Find help\nThis host has no connected Galaxy search service.',
+          options:[{number:'1',title:activeLanguage==='zh-CN'?'接入银河':'Connect to Galaxy'},{number:'2',title:activeLanguage==='zh-CN'?'回到原工作':'Return to original work'}],routes:{1:()=>showConnection(onBack),2:closeGalaxy},onBack});
+      }
+      purposeMenu=createPurposeMenu({nativeTools,controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
+        isCurrent:()=>!closed&&version===connectionGeneration,onBack,onReturnWork:closeGalaxy,readWorkContext});
+      purposeMenu[kind]();
+    }
+
     async function showConsole(initialized?: Awaited<ReturnType<typeof store.getGalaxyIntegrationStatus>>) {
-      const status = initialized?.integration ? initialized : await store.getGalaxyIntegrationStatus(dataDirectory);
-      const consoleContract = store.getGalaxyConsoleContract(status, { language: activeLanguage });
+      const status = nativeTools ? undefined : initialized?.integration ? initialized : await store.getGalaxyIntegrationStatus(dataDirectory);
       const chinese = activeLanguage === 'zh-CN';
-      const boundary = localBoundary(activeLanguage);
       const reopen = () => showConsole(status);
-      const showConsoleInfo = (title: string, copy: string, boundary: string) => showInfo(
-        title,
-        `${copy}\n\n${boundary}\n\n${divider()}\n${chinese ? '按 Enter 返回 Galaxy 控制台。' : 'Press Enter to return to the Galaxy console.'}`,
-        reopen,
-      );
       showSelect({
-        title: `${consoleContract.header.title}\n${consoleContract.welcome.title}\n${consoleContract.welcome.summary}\n\n${boundary}\n\n${divider()}\n${chinese ? '选择一个入口' : 'Choose an entry'}`,
+        title: chinese ? '✧ 银河' : '✧ Galaxy',
         options: [
-          { number: '1', title: chinese ? '工作中的 Case' : 'Working Case', description: chinese ? '记录或继续一个本地难题' : 'Capture or continue a local hard problem' },
-          { number: '2', title: chinese ? '隐私与披露' : 'Privacy and disclosure', description: chinese ? '查看本地授权与披露边界' : 'Inspect local consent and disclosure boundaries' },
-          { number: '3', title: chinese ? 'Galaxy 设置' : 'Galaxy settings', description: chinese ? '检查本机配置' : 'Inspect local configuration' },
-          { number: '4', title: chinese ? '本机状态' : 'Local status', description: chinese ? '查看 Galaxy ID 与当前能力' : 'View Galaxy ID and capabilities' },
-          { number: '5', title: chinese ? '未来网络' : 'Future network', description: chinese ? 'Worker / Hub 仍在规划中。' : 'Worker / Hub are still planned.', disabled: true },
-          { number: '6', title: chinese ? '接入银河' : 'Connect to Galaxy', description: chinese ? '查看端点、Scope 与未连接状态' : 'Review endpoints, Scopes and disconnected status' },
+          { number: '1', title: chinese ? '找帮助' : 'Find help', description: chinese ? '说明目标，直接查看当前可用的帮助。' : 'Describe a goal and read currently available help.' },
+          { number: '2', title: chinese ? '发起求助' : 'Ask for help', description: chinese ? '沿用当前工作准备需要的协助。' : 'Prepare a request from the current work.' },
+          { number: '3', title: chinese ? '消息' : 'Messages', description: chinese ? '查看对话，做必要回复。' : 'Read conversations and reply when needed.' },
+          { number: '4', title: chinese ? '我的与设置' : 'My settings', description: chinese ? '身份、连接、资料和显示偏好。' : 'Identity, connection, data and display preferences.' },
+          { number: '5', title: chinese ? '回到原工作' : 'Return to original work', description: '' },
         ],
         routes: {
-          1: () => showConsoleInfo(chinese ? '工作中的 Case' : 'Working Case', chinese ? 'Case 的创建、记录与本地历史继续由当前 Agent 通过 Galaxy MCP 处理。该控制台入口不会绕过授权或自动披露。' : 'Case creation, capture, and local history continue through Galaxy MCP in the current Agent. This console never bypasses consent or discloses content automatically.', chinese ? '当前 Founding Beta 只保存本机 Case Draft。' : 'Founding Beta stores only local Case Drafts.'),
-          2: () => showConsoleInfo(chinese ? '隐私与披露' : 'Privacy and disclosure', chinese ? '当前只有本机隐私控制。任何未来披露都必须先预览、限期授权，并保留撤销记录。' : 'Only local privacy controls exist today. Any future disclosure must be previewed, time-limited, and revocable.', boundary),
-          3: () => showSettings(reopen),
-          4: () => showStatus(reopen),
-          6: () => showConnection(reopen),
+          1: () => purpose('search',reopen),
+          2: () => purpose('publish',reopen),
+          3: () => purpose('messages',reopen),
+          4: () => showSettings(reopen),
+          5: closeGalaxy,
           0: closeGalaxy,
         },
         onBack: closeGalaxy,
@@ -1096,6 +1141,7 @@ return {
       if (closed) return;
       const page = ++pageGeneration;
       try {
+        if(nativeTools){await showConsole();return;}
         const status = await store.getGalaxyIntegrationStatus(dataDirectory);
         if (closed || page !== pageGeneration) return;
         if (status.recoveryRequired) {
@@ -1106,7 +1152,7 @@ return {
           showConsole(status);
           return;
         }
-        showLanguage();
+        showConsole(status);
       } catch (error) {
         if (closed || page !== pageGeneration) return;
         showInfo('Galaxy', `无法打开本机 Galaxy：${String(error instanceof Error ? error.message : error)}`, closeGalaxy);

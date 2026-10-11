@@ -37,7 +37,7 @@ export async function verifyHonorV2Workflow(database=null,{testHttp=false,...opt
     assert.equal(read.items.length,1);assert.equal(read.card.capabilityVerified,false);assert.equal(read.card.acceptedCases,0);
     assert.equal((await f.honor.v2.query(q.actor,{...query,subjectId:q.actor.subjectId})).simulation.distinctCases,1);
     assert.equal((await f.honor.v2.query(null,query)).items.length,0);
-    const{includeSimulation,...oldQuery}=query;await assert.rejects(f.honor.query(p.actor,oldQuery),/unsupported_semantics/);
+    const{includeSimulation:_includeSimulation,...oldQuery}=query;await assert.rejects(f.honor.query(p.actor,oldQuery),/unsupported_semantics/);
     const published=[];
     const caseRows=(await f.db.query('SELECT * FROM case_events WHERE case_id=$1',[work.cid])).rows;
     const taskRows=(await f.db.query('SELECT * FROM task_events WHERE task_id=$1',[taskId])).rows;
@@ -60,7 +60,7 @@ export async function verifyHonorV2Workflow(database=null,{testHttp=false,...opt
     assert.ok(verifier.items[0].projections.some(p=>p.projection.reportedOutcome==='failed'));
     assert.ok(verifier.items[0].projections.some(p=>p.projection.interventionTypes?.includes('verification')));
     await assert.rejects(f.assistance.getPublicTask(taskId),/not_found/);
-    const plainSource=published[1].data.sourceRefs[0];const{fields,...source}=plainSource;
+    const plainSource=published[1].data.sourceRefs[0];const{fields:_fields,...source}=plainSource;
     const view=await f.contributionSharing.readProjection(null,{source,purpose:'honor'});assert.equal(view.payload,undefined);assert.equal(view.originalTextAccessGranted,false);
     assert.deepEqual((await f.contributionSharing.readProjection(null,{...view.ref,purpose:'honor'})).projection,view.projection);
     await assert.rejects(f.contributionSharing.preview(q.actor,{sourceRefs:[plainSource],purposes:['honor']}),/contribution_source_author_required/);

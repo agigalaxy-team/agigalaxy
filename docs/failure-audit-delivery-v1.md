@@ -1,42 +1,7 @@
-<!-- GALAXY-CURRENT-ENTRY v1 -->
-> **现有实现说明，运行与决策状态以当前入口为准。** 本页于2026-09-12迁移。当前完整规范入口为[银河产品方案](../../../../02-architecture/redesign-v1/README.md)，其中候选和已确认方向分别标记。[迁移前原样快照](../../../../01-intake/traceability/snapshots/f0/f0f85cd04f5c22cadd7541f18ea6cb5d0397d5a818acbd73f53d6e8053bd1758.md)保留旧文字与定位。
-> 本轮业务开发、部署与备份暂停。历史验证不代表当前完整动态业务上线；保留政策已确认但尚未实施。建议与用户决定以新方案逐项来源为准。
-<!-- END GALAXY-CURRENT-ENTRY -->
+# HTTP失败审计持久交付：资料入口
 
-# HTTP失败审计持久交付
+此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../02-architecture/archive-ui-20261009/implementation/repo--failure-audit-delivery-v1.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
 
-当前服务使用数据库Schema37、SQLite失败队列格式2（数据库去重索引在Schema19引入）。HTTP失败先写入API本机SQLite队列，收到`queued`表示本地事务已提交；后台确认PostgreSQL写入后才删除队列项。复用Node内置SQLite，无新增npm依赖。动态服务尚未部署。
+本主题现行要求：[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)。相关界面与操作遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)；实现细节与产品目标按各自范围核对。
 
-## 运行流程
-
-`server.mjs`在已验证的`GALAXY_TRUST_DIRECTORY`中打开`http-failure-audit.sqlite`，校验队列所属endpoint，并安装持久失败审计。启动时自动回放积压项，之后每秒最多补写32项。一次只执行一个补写循环，数据库断开或确认丢失时保留原项，后续仍用同一请求ID重试。
-
-Schema19只新增`audit_http_failure_request`部分唯一索引，覆盖`http.rejected`和`http.failed`的请求ID/action组合。补写采用ON CONFLICT DO NOTHING；数据库已提交但进程尚未删除本地项时，即使重启或两个交付实例同时重试，仍只有一行。审计行created_at保留本地捕获时间，sequence反映数据库插入顺序；两者不必同序。
-
-本机队列最多10000项，SQLite FULL同步、WAL日志、100ms忙等待、8192页上限，默认页大小下数据库约32MiB；WAL和文件系统额外空间需由部署配额覆盖。队列满返回`capacity`，写盘失败返回`failed`，不淘汰旧项或将其标成已交付。readiness同时检查队列可写状态与余量，异常时503；healthz仍表示进程存活。服务日志记录队列交付状态和待补写数量，不记录队列载荷。
-
-队列使用600文件权限（Windows继承已配置环境目录ACL），保存requestId、状态码、固定路由、认证通过后的主体/绑定ID和捕获时间。认证通过时另捕获安装客户端ID、audience、实际scope、绑定范围和凭据范围；后续范围修改、撤销或安装ID变化不改写该快照。即使内部对象带额外字段，也不会复制body、Token、凭据哈希、原始URL或异常详情。
-
-失败记录保持context_version=0，Consent和业务binding_id为空，不声称业务授权已经通过。未经认证的事件及旧格式记录没有这些快照时，scope和credential_scopes仍为NULL；旧项保留原补写绑定元数据语义，不反向补造发生时的权限。新旧语义见[统一审计覆盖](audit-coverage-v1.md)。
-
-## 覆盖范围
-
-| 情况 | 捕获记录 |
-|---|---|
-| HTTP处理器catch中的4xx/5xx | http.rejected/http.failed；固定路由标签 |
-| readiness返回false或超时 | 503，GET /readyz |
-| Node解析器拒绝、头部溢出、请求超时 | 400/431/408，http.parser；不保存rawPacket |
-| 请求中断或响应完成前断开 | 499；同一请求已有失败记录时不重复记第二次 |
-| 未知路由 | http.request；不复制请求路径 |
-
-499描述观察到连接中断，不证明业务事务未提交；业务成功事实仍由原事务审计说明。解析器错误没有已认证身份。日志、队列和数据库均不能证明到达进程以前的网络拒绝，或尚未捕获前的进程/主机故障。正常成功响应、直接内部调用和管理查询另按业务审计覆盖，不据本队列宣称全部事件已覆盖。
-
-## 恢复、升级与AI-agent操作
-
-1. 使用管理连接升级到当前Schema37，API/Worker角色权限不变。队列格式2可读取并升级格式1旧项，保留旧项缺失字段。旧服务不能接管新数据库或格式2队列；按前向修复或验证过的隔离恢复处理，不删除历史或队列来降级。
-2. 保留原trust目录并确认API能持久写入；容器必须为该目录提供持久卷。SQLite队列中有主体标识，应按私有运营数据保留，不能发布到源码包或公共日志。
-3. 正常停机先停止HTTP接收，等待当前交付，再关闭队列与数据库。15秒整体截止仍生效；超时终止可能留下已提交但未确认项，重启依靠相同请求ID补写去重。
-4. 数据库恢复后观察`failure_audit_delivery`中的pending是否下降。磁盘满或队列满应恢复容量，不能靠删除旧项假装恢复。读取或迁移队列须停服务或使用SQLite一致性备份，不能单独复制正在运行的主文件而漏掉WAL。
-5. 不同endpoint禁止共用队列。损坏/未知版本项不会跳过丢弃；保留现场并修复或从已验证备份恢复。本批未实现异地副本、全盘故障恢复或管理员处置界面。
-
-可执行验证包括：数据库中断后补写、提交回执丢失后重启、两个交付实例并发去重、容量限制、字段筛选、实际子进程强制终止后恢复，以及原HTTP错误/超时路径。真实PostgreSQL受限角色工作流和API入口另纳入隔离集群演练。没有读取真实凭据或连接生产数据库。
+接口和数据是否仍适用须结合实际代码与版本核对；原始事实、权限及历史检查不被这份导航改写。当前只改文档，业务开发与发布停止。

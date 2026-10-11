@@ -4,6 +4,13 @@ import { nativeResult } from '../../packages/galaxy-edge-mcp/src/native-v2/choic
 import { consentSchema } from '../../packages/galaxy-official/src/shared/consents-schema.mjs';
 
 const peerId = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/), id = z.uuid();
+const a2aReadSchema = z.discriminatedUnion('action', [
+  z.strictObject({ peerId, action: z.literal('list') }),
+  ...['get', 'poll', 'reconcile-result'].map(action => z.strictObject({ peerId, action: z.literal(action), associationId: id })),
+  z.strictObject({ peerId, action: z.literal('reconcile-task'), associationId: id, operationId: id,
+    requestHash: z.string().regex(/^[0-9a-f]{64}$/),
+    candidateTaskId: z.string().min(1).max(512).refine(value => !/\p{Cc}/u.test(value)) }),
+]);
 export const a2aPrepareSchema = z.discriminatedUnion('action', [
   z.strictObject({ peerId, action: z.literal('send'), caseId: id, attemptId: id, attemptVersion: z.number().int().positive(),
     taskId: id.optional(), interventionRef: z.strictObject({ id, version: z.number().int().positive() }).optional(), text: z.string().min(1).max(12000) }),
@@ -25,9 +32,10 @@ export function registerNativeA2aTools(server, { host, runtime, review, now = ()
       ...(error.associationId ? { associationId: error.associationId } : {}), originalOperationRetained: true }) }; } };
   const prune = () => { for (const [id, op] of operations) if (op.expires <= now()) operations.delete(id); };
   server.registerTool('galaxy_a2a_peers', { inputSchema: z.strictObject({}), description: 'List only explicitly configured A2A 1.0 peers; no discovery enrollment or model calls.', annotations: { readOnlyHint: true } }, () => output(() => host.peers()));
-  server.registerTool('galaxy_a2a_read', { inputSchema: z.strictObject({ peerId, action: z.enum(['list', 'get', 'poll', 'reconcile-result']), associationId: id.optional() }),
-    description: 'Read scoped journal, poll a known peer Task, or reconcile original Result. Unknown initial ACK cannot be resent. Poll never means cancel.', annotations: { readOnlyHint: true } },
-    input => output(() => { if (input.action !== 'list' && !input.associationId) throw new Error('Association ID required.'); return host.read(input.peerId, input.action, input.associationId); }));
+  server.registerTool('galaxy_a2a_read', { inputSchema: a2aReadSchema,
+    description: 'Read scoped journal, poll known Task, reconcile original Result, or explicitly check an externally known Task against the original unknown operation and message evidence. Missing history stays unknown; no resend or cancellation.', annotations: { readOnlyHint: true } },
+    input => output(() => { const { peerId, action, associationId, ...original } = input;
+      return action === 'reconcile-task' ? host.read(peerId, action, associationId, original) : host.read(peerId, action, associationId); }));
   server.registerTool('galaxy_a2a_prepare', { inputSchema: a2aPrepareSchema,
     description: 'Prepare a locally persisted association or exact v2 Result draft from an existing current Attempt. Only selected text goes to peer; no cloud write occurs yet.', annotations: { readOnlyHint: false } },
     input => output(async () => {

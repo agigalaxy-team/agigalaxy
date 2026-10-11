@@ -4,10 +4,10 @@ export const ownerExportDatasets = ['identity', 'external-identity-links', 'bind
   'assistance-requests', 'assistance-events', 'context-grants', 'context-acceptances', 'notification-preferences', 'notification-reads',
   'moderation-reports', 'moderation-events', 'capsules', 'capsule-events', 'capsule-uses', 'builders', 'builder-events', 'audit',
   'audit-access-grants', 'audit-reads', 'export-reads', 'deletion-requests', 'deletion-events', 'deletion-executions', 'incident-notices', 'profile-statements', 'builder-probes', ...productV2ExportDatasets];
-export const exportViewScopes = { 'builder-support':'builders', 'choice-snapshot':'binding', recruitment:'history', project: 'history', contact: 'history', 'personal-summary': 'binding', assistance: 'assistance', task: 'assistance', case: 'case-teaser', evidence: 'evidence', verification: 'evidence', context: 'context', proof: 'proof', capsule: 'capsules', builder: 'builders', moderation: 'moderation' };
+export const exportViewScopes = { 'forum-post-version':'assistance','forum-reply':'assistance', 'builder-support':'builders', 'choice-snapshot':'binding', recruitment:'history', project: 'history', contact: 'history', 'personal-summary': 'binding', assistance: 'assistance', task: 'assistance', case: 'case-teaser', evidence: 'evidence', verification: 'evidence', context: 'context', proof: 'proof', capsule: 'capsules', builder: 'builders', moderation: 'moderation' };
 export const exportViewSchema = z.object({ kind: z.enum(Object.keys(exportViewScopes)),
   id: z.uuid(), versionId: z.uuid().optional(), version: z.number().int().positive().optional(), taskId: z.uuid().optional() }).strict()
-  .refine(value => (!value.versionId || value.kind === 'capsule') && (!value.version || ['evidence','verification'].includes(value.kind)) && (!value.taskId || value.kind === 'case'));
+  .refine(value => (!value.versionId || ['capsule','forum-post-version'].includes(value.kind)) && (value.kind!=='forum-post-version'||!!value.versionId) && (!value.version || ['evidence','verification'].includes(value.kind)) && (!value.taskId || value.kind === 'case'));
 export const exportDatasets = [...ownerExportDatasets, 'authorized-views'];
 export const sameExportViews = (left, right) => Array.isArray(left) && Array.isArray(right) && left.length === right.length
   && left.every((value, index) => value?.kind === right[index]?.kind && value?.id === right[index]?.id && value?.versionId === right[index]?.versionId

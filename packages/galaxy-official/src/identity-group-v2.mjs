@@ -15,7 +15,8 @@ export class IdentityGroupServiceV2{
  now(){return this.access.now();}
  run(actor,write,control,fn){return write?this.access.runResourceWrite(actor,'binding',{control},fn):actor?this.access.runAuthorized(actor,'binding',fn):transaction(this.access.db,fn);}
  async control(db,actor){return currentControlKey(db,actor.subjectId,{keyId:actor.keyId??undefined,epoch:actor.controlEpoch??undefined,deviceId:actor.deviceId??undefined,scope:'manage-identity'});}
- current(actor){return this.run(actor,false,false,async db=>{const c=await this.control(db,actor);return{subjectId:actor.subjectId,keyId:c.keyId,epoch:c.epoch,endpoint:this.access.endpoint,checkedAt:this.now(),signingType:identityGroupSignatureType};});}
+ current(actor){return this.run(actor,false,false,async db=>{const c=await this.control(db,actor);return{subjectId:actor.subjectId,keyId:c.keyId,epoch:c.epoch,endpoint:this.access.endpoint,checkedAt:this.now(),signingType:identityGroupSignatureType,
+  availableActions:await this.deletionPending(db,[actor.subjectId])?[]:['create']};});}
  source(actor,input){const x=parse(identityGroupSourceSelectionSchema,input);return this.run(actor,false,false,async db=>{
   const row=x.kind==='configuration'?await one(db,'SELECT subject_id,payload_hash FROM configuration_events WHERE configuration_id=$1 AND version=$2',[x.id,x.version]):await one(db,'SELECT subject_id,payload_hash FROM case_events WHERE id=$1 AND version=$2 AND case_id=$3',[x.id,x.version,x.caseId??null]);
   rule(row&&row.subject_id===actor.subjectId,'identity_group_source_unavailable',404);
@@ -32,22 +33,23 @@ export class IdentityGroupServiceV2{
   rule(g.state==='active'&&(p.kind==='revoke'||!g.source_erased_at),'identity_group_inactive');
   return p.kind==='revoke'?g.member_ids:[...new Set([...g.member_ids,...p.memberIds])];
  }
- async state(db,op){
+ async state(db,op,actor=null){
   const approvals=(await db.query('SELECT * FROM identity_group_approvals_v2 WHERE operation_id=$1 ORDER BY sequence',[op.id])).rows;
   const latest=new Map();for(const a of approvals)latest.set(a.subject_id,a);
   const current=op.state==='pending'&&Date.parse(op.expires_at)<=this.now()*1000?'expired':op.state;
   return{operationId:op.id,groupId:op.group_id,payloadHash:op.payload_hash,state:current,resultVersion:op.result_version,
    requiredSubjectIds:op.required_ids,approvals:[...latest.values()].map(a=>({id:a.id,subjectId:a.subject_id,decision:a.decision,keyId:a.key_id,epoch:a.epoch,at:a.created_at,expiresAt:JSON.parse(a.proof_text).expiresAt})),
+   acknowledgedProofIds:actor?approvals.filter(a=>a.subject_id===actor.subjectId).map(a=>a.id):[],
    expiresAt:op.expires_at,acceptedOperationOnly:true,currentAccessGranted:false};
  }
  async receiptWithin(db,actor,input){const x=parse(identityGroupReceiptSchema,input),op=await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[x.operationId]);
   if(!op)return{operationId:x.operationId,state:'absent'};
   rule(op.subject_id===actor.subjectId||op.required_ids.includes(actor.subjectId),'identity_group_unavailable',404);
-  if(op.payload_hash!==x.payloadHash)return{operationId:x.operationId,state:'conflict'};return this.state(db,op);
+  if(op.payload_hash!==x.payloadHash)return{operationId:x.operationId,state:'conflict',payloadHashMismatch:true};return this.state(db,op,actor);
  }
  receipt(actor,input){return this.run(actor,false,false,db=>this.receiptWithin(db,actor,input));}
  async submit(actor,input){const x=parse(identityGroupSubmitSchema,input);let p,proof;
-  try{p=parse(identityGroupIntentSchema,JSON.parse(x.payloadJson));proof=parse(identityGroupProofSchema,JSON.parse(x.proofJson));}catch(e){throw new ServiceError('invalid_identity_group',400);}
+  try{p=parse(identityGroupIntentSchema,JSON.parse(x.payloadJson));proof=parse(identityGroupProofSchema,JSON.parse(x.proofJson));}catch{throw new ServiceError('invalid_identity_group',400);}
   rule(p.endpoint===this.access.endpoint&&proof.endpoint===p.endpoint&&proof.operationId===p.operationId&&proof.groupId===p.groupId&&proof.payloadHash===digest(x.payloadJson)&&proof.subjectId===actor.subjectId,'identity_group_signature_scope',403);
   rule(p.kind==='create'?p.expectedVersion===0&&p.previousOperationId===null:p.expectedVersion>0&&p.previousOperationId!==null,'invalid_identity_group',400);
   return this.run(actor,true,p.kind==='revoke'||proof.decision!=='approve',async(db,auth)=>{
@@ -56,7 +58,7 @@ export class IdentityGroupServiceV2{
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['identity-group:'+p.groupId]);
    let op=await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1 FOR UPDATE',[p.operationId]);
    const prior=await one(db,'SELECT * FROM identity_group_approvals_v2 WHERE id=$1',[proof.id]);
-   if(prior){rule(prior.operation_id===p.operationId&&prior.subject_id===actor.subjectId&&prior.proof_text===x.proofJson&&prior.signature===x.signature&&op?.payload_text===x.payloadJson,'identity_group_operation_conflict');return this.state(db,op);}
+   if(prior){rule(prior.operation_id===p.operationId&&prior.subject_id===actor.subjectId&&prior.proof_text===x.proofJson&&prior.signature===x.signature&&op?.payload_text===x.payloadJson,'identity_group_operation_conflict');return this.state(db,op,actor);}
    rule(p.issuedAt<=this.now()+2&&p.expiresAt>this.now()&&proof.issuedAt<=this.now()+2&&proof.expiresAt>this.now()&&proof.expiresAt<=p.expiresAt&&proof.expiresAt>proof.issuedAt,'identity_group_proposal_expired');
    let g=await one(db,'SELECT * FROM identity_groups_v2 WHERE id=$1 FOR UPDATE',[p.groupId]);
    if(!g){rule(p.kind==='create'&&p.memberIds.includes(actor.subjectId)&&proof.decision==='approve','identity_group_unavailable',404);
@@ -88,7 +90,7 @@ export class IdentityGroupServiceV2{
      else{
       const ids=p.kind==='revoke'?[actor.subjectId]:op.required_ids;
       rule(p.kind==='revoke'||!await this.deletionPending(db,ids),'identity_group_deletion_pending');
-      for(const id of [...ids].sort()){const a=latest.find(a=>a.subjectId===id);rule(a.expiresAt>this.now(),'identity_group_approval_expired');await currentControlKey(db,id,{keyId:a.keyId,epoch:a.epoch,scope:'manage-identity'});}
+      for(const id of [...ids].sort((left,right)=>left<right?-1:left>right?1:0)){const a=latest.find(a=>a.subjectId===id);rule(a.expiresAt>this.now(),'identity_group_approval_expired');await currentControlKey(db,id,{keyId:a.keyId,epoch:a.epoch,scope:'manage-identity'});}
       await this.approvedSources(db,p);
       await db.query('UPDATE identity_groups_v2 SET version=version+1,state=$2,current_operation_id=$3,member_ids=$4,updated_at=$5 WHERE id=$1',
        [p.groupId,p.kind==='revoke'?'revoked':'active',p.operationId,JSON.stringify(p.kind==='revoke'?g.member_ids:p.memberIds),iso(this.now())]);
@@ -101,13 +103,24 @@ export class IdentityGroupServiceV2{
     SELECT $1,$2,$3,$4,'accepted',1,ch.payload->>'installationId',b.audience,'binding',b.id,$5,$4,b.scopes,$6::jsonb,b.id,ch.payload->>'installationId',b.audience,b.scopes
     FROM bindings b JOIN binding_challenges ch ON ch.id=b.challenge_id WHERE b.id=$7 AND b.subject_id=$1`,
     [actor.subjectId,'identity.group.approval',p.groupId,proof.id,actor.httpRequestId??null,JSON.stringify(auth.credentialScopes),auth.callerBindingId]);
-   return this.state(db,await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[p.operationId]));
+   return this.state(db,await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[p.operationId]),actor);
   });
  }
- async proposal(actor,id){parse(z.uuid(),id);return this.run(actor,false,false,async db=>{const op=await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[id]);
-  rule(op&&(op.subject_id===actor.subjectId||op.required_ids.includes(actor.subjectId)),'identity_group_unavailable',404);
-  const status=await this.state(db,op);return{...status,payloadJson:op.payload_text||null,proposerId:op.subject_id,originalIdsPreserved:true,capabilityMerged:false};});}
- async manifest(db,actor,g,{historical=false}={}){
+ async optionalControl(db,actor){if(!actor)return null;try{return await this.control(db,actor);}catch(error){if(unavailable(error))return null;throw error;}}
+ async sourcesWithin(db,actor,refs){const sources=[];for(const ref of refs)try{sources.push({...await this.readSourceWithin(db,actor,ref),state:'readable'});}catch(error){if(!unavailable(error))throw error;sources.push({ref,state:'unavailable',record:null});}return sources;}
+ async proposalWithin(db,actor,op){
+  rule(op&&actor&&(op.subject_id===actor.subjectId||op.required_ids.includes(actor.subjectId)),'identity_group_unavailable',404);
+  const status=await this.state(db,op,actor),availableActions=[],c=await this.optionalControl(db,actor);
+  if(status.state==='pending'&&op.payload_text&&c&&op.required_ids.includes(actor.subjectId)){
+   const own=status.approvals.find(a=>a.subjectId===actor.subjectId),alreadyApproved=own?.decision==='approve'&&own.keyId===c.keyId&&own.epoch===c.epoch&&own.expiresAt>this.now();
+   if(!alreadyApproved&&!await this.deletionPending(db,[actor.subjectId]))availableActions.push('approve');
+   availableActions.push('decline');if(op.subject_id===actor.subjectId)availableActions.push('cancel');
+  }
+  const payload=op.payload_text?JSON.parse(op.payload_text):null,sources=payload&&payload.kind!=='revoke'?await this.sourcesWithin(db,actor,payload.sourceRefs):[];
+  return{...status,payloadJson:op.payload_text||null,proposerId:op.subject_id,kind:op.kind,sources,availableActions,originalIdsPreserved:true,capabilityMerged:false};
+ }
+ async proposal(actor,id){parse(z.uuid(),id);return this.run(actor,false,false,async db=>this.proposalWithin(db,actor,await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[id])));}
+ async manifest(db,actor,g,{historical:_historical=false}={}){
   const op=await one(db,'SELECT * FROM identity_group_operations_v2 WHERE id=$1',[g.current_operation_id]);
   if(!op?.payload_text)return null;
   let p=JSON.parse(op.payload_text);if(p.kind==='revoke'){
@@ -128,10 +141,12 @@ export class IdentityGroupServiceV2{
    const source=await this.readSourceWithin(db,actor,ref),correction=p.attributionCorrections.find(c=>factsKey(c.source)===factsKey(ref));
    sources.push({...source,displaySubjectId:correction?.displaySubjectId??ref.originalSubjectId,attributionCorrection:correction??null,originalActorUnchanged:true});
   }catch(e){if(!unavailable(e))throw e;sources.push({ref,state:'unavailable',record:null});}
+  const c=own?await this.optionalControl(db,actor):null,availableActions=[];
+  if(g.state==='active'&&own&&c){if(!m.erased&&!m.pending)availableActions.push('revise');availableActions.push('revoke');}
   return{groupId:g.id,version:g.version,operationId:g.current_operation_id,state:m.erased?'source-deleted':m.pending?'source-deletion-pending':g.state==='active'&&!m.complete?'control-evidence-unavailable':g.state,
    memberIds:active||own?p.memberIds:[],canonicalDisplayId:active?p.canonicalDisplayId:null,
-   visibility:p.visibility,sources,sourceCount:p.sourceRefs.length,originalIdsPreserved:true,capabilityMerged:false,accessGranted:false,
-   permissionMeaning:'each-original-source-is-read-as-current-viewer; group-is-display-only',canRevoke:g.state==='active'&&own,
+   visibility:p.visibility,viewers:p.viewers,sources,sourceCount:p.sourceRefs.length,originalIdsPreserved:true,capabilityMerged:false,accessGranted:false,
+   permissionMeaning:'each-original-source-is-read-as-current-viewer; group-is-display-only',canRevoke:availableActions.includes('revoke'),availableActions,
    history:active?[...new Map(sources.filter(s=>s.record).map(s=>[factsKey(s.ref),s])).values()]:[],
    caseGroups:active?[...new Set(sources.filter(s=>s.record&&s.ref.caseId).map(s=>s.ref.caseId))].map(caseId=>({caseId,events:sources.filter(s=>s.record&&s.ref.caseId===caseId),capabilityMerged:false})):[],
    historyDedup:'original-event-or-configuration-id-and-version; no-capability-statistics',checkedAt:this.now()};
@@ -140,7 +155,13 @@ export class IdentityGroupServiceV2{
  query(actor,input={}){const x=parse(identityGroupQuerySchema,input);return this.run(actor,false,false,async db=>{
   const rows=(await db.query(`SELECT * FROM identity_groups_v2 WHERE ($1::text IS NULL OR member_ids ? $1) AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT 200`,[x.subjectId??actor?.subjectId??null,x.after??null])).rows,items=[];
   let last=null;for(const g of rows){last=g.id;try{items.push(await this.viewWithin(db,actor,g));}catch(e){if(!unavailable(e))throw e;}if(items.length===x.limit)break;}
-  return{items,next:rows.length&&last!==rows.at(-1).id||rows.length===200?last:null,coverage:'authorized-canonical-display-groups',capabilityMerged:false};
+  const proposals=[];let proposalNext=null;
+  if(x.includeProposals&&actor){
+   const operations=(await db.query("SELECT * FROM identity_group_operations_v2 WHERE required_ids ? $1 AND state='pending' AND expires_at>$2 AND ($3::uuid IS NULL OR id>$3) AND ($4='all' OR ($4='incoming' AND subject_id<>$1) OR ($4='outgoing' AND subject_id=$1)) ORDER BY id LIMIT $5",[actor.subjectId,iso(this.now()),x.proposalAfter??null,x.proposalDirection,x.proposalLimit+1])).rows;
+   for(const op of operations.slice(0,x.proposalLimit))proposals.push(await this.proposalWithin(db,actor,op));
+   if(operations.length>x.proposalLimit)proposalNext=operations[x.proposalLimit-1].id;
+  }
+  return{items,next:rows.length&&last!==rows.at(-1).id||rows.length===200?last:null,proposals,proposalNext,coverage:'authorized-canonical-display-groups',capabilityMerged:false};
  });}
  async resolve(actor,input){const x=parse(z.strictObject({subjectId:identityGroupQuerySchema.shape.subjectId.unwrap()}),input),result=await this.query(actor,{subjectId:x.subjectId});
   const ids=[...new Set(result.items.filter(g=>g.state==='active').map(g=>g.canonicalDisplayId))];return{...result,canonicalDisplayIds:ids,ambiguous:ids.length>1,automaticIdentitySelection:false};}

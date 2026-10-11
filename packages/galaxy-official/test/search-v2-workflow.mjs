@@ -26,7 +26,7 @@ export async function verifySearchV2(database=null,options={}) {
     const grant=await publish(fixture,end,visibility);return{root,start,end,grant};
   }
   try {
-    const one=await actual(f,'search-visible first'),two=await actual(other,'search-visible second');
+    const one=await actual(f,'search-visible first'),_two=await actual(other,'search-visible second');
     const query={type:'history',query:{query:'search-visible',limit:1}};
     const first=await post('/v2/search/query',query);assert.equal(first.items.length,1);assert.ok(first.nextCursor);
     assert.equal(first.items[0].record.attempts.at(-1).reportedOutcome,'failed');assert.equal(first.items[0].capabilityVerified,false);

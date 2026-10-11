@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 export const consentSchema = z.strictObject({
   version: z.literal(1), id: z.uuid(), subjectId: z.string().regex(/^GUID[0-9A-Z]{28}$/),
   bindingId: z.uuid(), endpoint: z.url(), objectId: z.string().min(1).max(128),
-  action: z.enum(['hub.publish','qualification.request','configuration.publish', 'ci.observe', 'proof.publish', 'case.teaser.publish', 'history.query', 'profile.publish', 'project.write', 'contact.write', 'recruitment.write', 'contribution.publish', 'experience.submit', 'qualification.compute', 'qualification.source-permission', 'context.grant', 'evidence.submit', 'outcome.material', 'assistance.publish', 'comment.publish', 'moderation.publish', 'capsule.publish', 'capsule.use', 'capsule.permission', 'builder.publish']),
+  action: z.enum(['hub.publish','qualification.request','configuration.publish', 'ci.observe', 'proof.publish', 'case.teaser.publish', 'history.query', 'profile.publish', 'project.write', 'contact.write', 'recruitment.write', 'contribution.publish', 'experience.submit', 'qualification.compute', 'qualification.source-permission', 'context.grant', 'evidence.submit', 'outcome.material', 'assistance.publish', 'task.owner-read', 'comment.publish', 'moderation.publish', 'capsule.publish', 'capsule.use', 'capsule.permission', 'builder.publish', 'forum.post.publish', 'forum.reply.publish', 'forum.withdraw', 'forum.report.publish', 'forum.report.event', 'forum.governance.resolve']),
   purpose: z.enum(['operational', 'public-profile', 'federated-proof']),
   recipient: z.string().min(1).max(240), fields: z.array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,63}$/)).min(1).max(32),
   visibility: z.enum(['Local', 'Private', 'Hub-scoped', 'Proof-only', 'Public']),

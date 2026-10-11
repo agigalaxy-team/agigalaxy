@@ -14,10 +14,10 @@ export const nativeA2aSchema = z.strictObject({peers:z.array(z.strictObject({
 // Only the explicitly named child-process variable is read, only when this peer
 // is actually used. No Official token, environment discovery or credential file
 // enters the public configuration, peer listing, preview or persistent journal.
-export function createConfiguredNativeA2a({runtime,directory,configuration,environment=process.env}) {
+export function createConfiguredNativeA2a({runtime,directory,configuration,environment=process.env,post}) {
  const config=nativeA2aSchema.parse(configuration);
- const peers=config.peers.map(({authentication,...peer})=>peer);
- return createNativeA2aHostV2({runtime,directory,peers,readPeerAuthorization:async scope=>{
+ const peers=config.peers.map(({authentication:_authentication,...peer})=>peer);
+ return createNativeA2aHostV2({runtime,directory,peers,post,readPeerAuthorization:async scope=>{
   const selected=config.peers.find(peer=>peer.id===scope.peerId);
   if(!selected||selected.endpoint!==scope.endpoint||selected.peerPrincipal!==scope.peerPrincipal||selected.cardHash!==scope.cardHash
    ||(selected.tenant??'')!==scope.tenant)throw new Error('Selected external authorization scope changed.');

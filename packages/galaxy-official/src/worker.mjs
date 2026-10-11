@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeServiceRelease } from './operations/service-release.mjs';
 import { cleanupExpiredExports } from './infrastructure/export-retention.mjs';
 import { cleanupProductV2Retention } from './operations/lifecycle-retention-v2.mjs';
+import {loadForumPolicy,forumPolicyHash} from './community-forum-policy-v1.mjs';
 import { assertRecoveryReady } from './infrastructure/recovery-state.mjs';
 import { assertRuntimeEnvironment } from './runtime-environment.mjs';
 import { workerReads } from './infrastructure/worker-reads.mjs';
@@ -47,7 +48,11 @@ try {
     to_regprocedure('public.galaxy_worker_lock_consent(uuid,text,timestamptz)') IS NOT NULL AND
     to_regprocedure('public.galaxy_worker_lock_builder(uuid)') IS NOT NULL AND
     to_regprocedure('public.galaxy_worker_lock_ci_case(uuid,uuid)') IS NOT NULL AND
-    to_regprocedure('public.galaxy_worker_lock_ci_record(uuid,uuid)') IS NOT NULL AS ready`)).rows[0];
+    to_regprocedure('public.galaxy_worker_lock_ci_record(uuid,uuid)') IS NOT NULL AND
+    to_regprocedure('public.galaxy_worker_prune_forum_authorizations(timestamptz)') IS NOT NULL AND
+    to_regprocedure('public.galaxy_worker_lock_closed_forum_reports(timestamptz)') IS NOT NULL AND
+    has_function_privilege(current_user,'public.galaxy_worker_prune_forum_authorizations(timestamptz)','EXECUTE') AND
+    has_function_privilege(current_user,'public.galaxy_worker_lock_closed_forum_reports(timestamptz)','EXECUTE') AS ready`)).rows[0];
   if (!functions.ready) throw new Error('Worker role provisioning required');
   const now = () => Math.floor(Date.now() / 1000);
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
@@ -55,12 +60,13 @@ try {
   const retirement = await loadRetirementController(process.env.GALAXY_RETIREMENT_FILE, { endpoint, now });
   const incident = await loadIncidentController(process.env.GALAXY_INCIDENT_FILE, { endpoint, now });
   const resourceBudgetPolicy=await loadResourceBudgetPolicy(process.env.GALAXY_RESOURCE_BUDGET_FILE);
+  const forumPolicy=await loadForumPolicy(process.env.GALAXY_FORUM_POLICY_FILE);
   const metricsConfig=await loadMetricsConfiguration(process.env);
   const metrics=createOperationalMetrics({component:'worker',...metricsConfig,backupStatusDirectory:null,logStatus:runtimeLog.status});
   if(process.env.GALAXY_SEARCH_INDEX_ENABLED!==undefined&&!['true','false'].includes(process.env.GALAXY_SEARCH_INDEX_ENABLED))throw new Error('Invalid search index state');
   const searchIndexMode=process.env.GALAXY_SEARCH_INDEX_ENABLED==='true'?'enabled':process.env.GALAXY_SEARCH_INDEX_ENABLED==='false'?'disabled':'unconfigured';
   await recordRuntimeConfig(db,{endpoint,component:'worker',operatorRef:process.env.GALAXY_OPERATOR_REF,
-    snapshot:runtimeConfigSnapshot({incident:incident.policy(),retirement:retirement.snapshot().policy,release,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),searchIndexMode})});
+    snapshot:runtimeConfigSnapshot({forumPolicyHash:forumPolicyHash(forumPolicy),incident:incident.policy(),retirement:retirement.snapshot().policy,release,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),searchIndexMode})});
   const evidence = new EvidenceService(null, new ConsentReader({ now, readGrant: workerReads.readGrant }), { db, endpoint, now, readCase: workerReads.readCase,resourceBudgetPolicy });
   const ciV2 = createCiWorkerV2({ db, endpoint, now, resourceBudgetPolicy });
   const probes=new BuilderProbeWorker({db,endpoint,now,consents:new ConsentReader({now,readGrant:workerReads.readGrant}),readBuilder:workerReads.readBuilder,resourceBudgetPolicy});
@@ -79,7 +85,7 @@ try {
         nextExportCleanup = Date.now() + 60000;
         const cleanup = await cleanupExpiredExports(db);
         if (cleanup.removed) runtimeLog.write({ event: 'expired_exports_removed', count: cleanup.removed });
-        const productCleanup = await cleanupProductV2Retention(db,{outcomeStore:attachments?.store ?? null});
+        const productCleanup = await cleanupProductV2Retention(db,{outcomeStore:attachments?.store ?? null,forumPolicy,endpoint});
         if (Object.values(productCleanup.removed).some(Boolean)) runtimeLog.write({ event: 'product_lifecycle_cleanup', counts: productCleanup.removed });
       }
       if (stopping) break;

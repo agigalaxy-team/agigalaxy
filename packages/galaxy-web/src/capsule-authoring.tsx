@@ -1,1165 +1,208 @@
-import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  capsuleCaseSources,
-  capsuleRefKey,
-  currentCapsuleFacts,
-} from './capsule-workspace-client.mjs';
-import { CapsuleMessagePicker } from './capsule-source-picker';
+import React,{useEffect,useId,useMemo,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Textarea} from '@/components/ui/textarea';
+import {memberName} from './conversation-ui';
+import {capsuleRefKey,currentCapsuleFacts} from './capsule-workspace-client.mjs';
+import {CapsuleMessagePicker} from './capsule-source-picker';
 import {ConfigurationPicker} from './configuration-picker';
+import {useGovernanceDraft} from './governance-presentation';
+import {CapsuleInputGate,capsuleAuthoringDraftKey,capsuleInputDraftKey} from './capsule-authoring-state';
+import {PeopleSelection,SourceReading,WorkSelection,methodInputError,readableCaseSources,sourceLocator,uniqueSources,useCapsulePeople,useCapsuleWorkHistory,useRegisteredCapsuleDraft,workPeople} from './capsule-authoring-shared';
+import type {CapsuleAuthorForm,CapsuleAuthorInput,CapsuleAuthoringProps,CapsuleAuthorMode,CapsuleDetail,CapsuleDisclosure,CapsuleLocator,CapsuleManagement,CapsulePreviewContext,CapsulePreviewDisplay,CapsulePublication,CapsulePublicationCheck,CapsuleSourceItem,CapsuleSourceRef,CapsuleVersion} from './capsule-authoring-types';
+import './capsule-authoring.css';
+export {capsuleAuthoringDraftKey} from './capsule-authoring-state';
+export {CapsulePermissionWorkspace} from './capsule-permission-workspace';
 
-const lines = (s: string) =>
-    s
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean),
-  factKey = (x: any) => `${x.id}:${x.version}`;
-const blank = {
-  title: '',
-  problemPattern: '',
-  environmentName: '',
-  environmentVersion: '',
-  solutionStrategy: '',
-  tools: '',
-  skills: '',
-  mcpRefs: '',
-  verificationMethod: '',
-  limitations: '',
-  capabilityId: '',
-  applicableScope: '',
-  license: '',
-  visibility: 'Private',
-  redaction: false,
-  caseId: '',
-  resultKey: '',
-  sourceKeys: [] as string[],
-  permissionIds: [] as string[],
-  attributionKeys: [] as string[],
-  externalReferences: [] as any[],
-  extraSources: [] as any[],
-};
-function initial(detail: any, mode: string) {
-  if (mode !== 'revision' || !detail?.version) return { ...blank };
-  const v = detail.version;
-  return {
-    ...blank,
-    ...v,
-    environmentName: v.environment.name,
-    environmentVersion: v.environment.version,
-    tools: v.tools.join('\n'),
-    skills: v.skills.join('\n'),
-    mcpRefs: v.mcpRefs.join('\n'),
-    limitations: v.limitations.join('\n'),
-    caseId: v.sourceResolution.caseId,
-    resultKey: `${v.sourceResolution.resultId}:${v.sourceResolution.resultVersion ?? 1}`,
-    sourceKeys: (v.sourceRefs ?? []).map(capsuleRefKey),
-    permissionIds: v.permissionRefs ?? [],
-    attributionKeys: (v.attributionRefs ?? []).map((a: any) =>
-      capsuleRefKey(a.source),
-    ),
-    extraSources: [],
-    externalReferences: v.externalReferences ?? [],
-    redaction: false,
-  };
+const textLines=(value:string)=>value.split('\n').map(line=>line.trim()).filter(Boolean);
+const factKey=(value:{id:string;version:number})=>value.id+':'+value.version;
+const blank=():CapsuleAuthorForm=>({title:'',problemPattern:'',environmentName:'',environmentVersion:'',solutionStrategy:'',tools:'',skills:'',mcpRefs:'',verificationMethod:'',limitations:'',capabilityId:'',applicableScope:'',license:'',visibility:'Private',caseId:'',resultKey:'',sources:[],permissionIds:[],contributorIds:[],externalReferences:[]});
+function referenceFromKey(key:string,caseId:string):CapsuleSourceRef{
+ const [kind,id,version]=key.split(':'),number=Number(version);
+ if(id&&Number.isInteger(number)&&number>0){
+  if(kind==='configuration'||kind==='selected-message')return{kind,id,version:number};
+  if(caseId&&(kind==='case-root'||kind==='attempt'||kind==='intervention'||kind==='result'||kind==='evidence'||kind==='verification'||kind==='outcome-material'))return{kind,id,version:number,caseId};
+ }
+ throw Error('旧草稿有一条来源格式暂不能核对，原内容仍保留。');
 }
-function WorkPicker({
-  history,
-  historyLoaded,
-  historyNext,
-  loadHistory,
-  value,
-  onChange,
-  busy,
-  run,
-}: any) {
-  return (
-    <>
-      <div className="button-row">
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => run(() => loadHistory())}
-        >
-          读取我的真实工作与参与记录
-        </Button>
-        {historyNext && (
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => run(() => loadHistory(historyNext))}
-          >
-            更多工作记录
-          </Button>
-        )}
-      </div>
-      <label>
-        来源工作
-        <select
-          value={value}
-          disabled={busy}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">选择已发生的工作</option>
-          {history.map((c: any) => (
-            <option key={c.caseId} value={c.caseId}>
-              {c.title ?? '已授权工作'}
-              {c.synthetic ? '（合成演示）' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-      {historyLoaded && !history.length && (
-        <p>
-          当前页没有可见 Case。可继续读取更多记录；也可先在原任务记录实际工作。
-        </p>
-      )}
-    </>
-  );
+export function capsuleAuthorInput(detail:CapsuleDetail|null,mode:CapsuleAuthorMode,management:CapsuleManagement|null=null,disclosure:CapsuleDisclosure|null=null):CapsuleAuthorInput{
+ const version=mode==='revision'?detail?.version:null,form=blank();
+ if(version){
+  for(const key of ['title','problemPattern','solutionStrategy','verificationMethod','capabilityId','applicableScope','license'] as const)form[key]=version[key]??'';
+  for(const key of ['tools','skills','mcpRefs','limitations'] as const)form[key]=(version[key]??[]).join('\n');
+  form.environmentName=version.environment.name;form.environmentVersion=version.environment.version;form.caseId=version.sourceResolution.caseId;form.resultKey=version.sourceResolution.resultId+':'+('resultVersion' in version.sourceResolution?version.sourceResolution.resultVersion:1);
+  const attributions=version.attributionRefs??[],sources=version.sourceRefs??[];
+  const authors=new Map(attributions.map(item=>[capsuleRefKey(item.source),item.subjectId]));
+  form.sources=uniqueSources([...sources,...attributions.map(item=>item.source)].map(ref=>{const authorId=authors.get(capsuleRefKey(ref));return sourceLocator({ref,...(authorId?{authorId}:{})});}));
+  form.permissionIds=version.permissionRefs??[];form.contributorIds=version.contributors;form.externalReferences=version.externalReferences??[];
+ }
+ form.visibility=disclosure?.visibility??'Private';
+ return{form,viewers:disclosure?.viewers??[],step:0,externalInput:{url:'',description:'',license:''},expectedRevision:management?.revision??0,maintenance:detail?.securityIssue?'resolve-security':detail?.deprecated?'security-issue':'deprecate',summary:'',replacement:''};
 }
-export function CapsuleAuthoring({
-  runtime,
-  client,
-  subjectId,
-  history,
-  historyLoaded,
-  historyNext,
-  loadHistory,
-  permissions,
-  permissionNext,
-  loadPermissions,
-  busy,
-  run,
-  propose,
-  navigate,
-  mode,
-  detail,
-  management,
-  disclosure,
-  versionOptions = [],
-}: any) {
-  const [form, setForm] = useState<any>(() => initial(detail, mode)),
-    [viewers, setViewers] = useState<string[]>([]),
-    [previewCheck, setPreviewCheck] = useState<any>(null),
-    [message, setMessage] = useState(''),
-    [maintenance, setMaintenance] = useState(
-      detail?.securityIssue
-        ? 'resolve-security'
-        : detail?.deprecated
-          ? 'security-issue'
-          : 'deprecate',
-    ),
-    [summary, setSummary] = useState(''),
-    [replacement, setReplacement] = useState('');
-  const [external, setExternal] = useState({
-    url: '',
-    description: '',
-    license: '',
-  });
-  const source = history.find((h: any) => h.caseId === form.caseId),
-    caseSources = source ? capsuleCaseSources(source) : [],
-    allSources = [...caseSources, ...form.extraSources],
-    results = currentCapsuleFacts(source?.results ?? []).filter(
-      (r: any) => r.reportedOutcome === 'succeeded',
-    ),
-    result = results.find((r: any) => factKey(r) === form.resultKey),
-    people = [
-      ...new Set(
-        [
-          source?.requesterId,
-          ...caseSources.map((s: any) => s.authorId),
-          ...(source?.collaborations ?? []).flatMap((t: any) => [
-            t.requesterId,
-            ...t.participation.map((p: any) => p.subjectId),
-          ]),
-        ].filter(
-          (id) => id && id !== subjectId && /^GUID[0-9A-Z]{28}$/.test(id),
-        ),
-      ),
-    ] as string[];
-  function change(key: string, value: any) {
-    setForm((old: any) => ({ ...old, [key]: value }));
-    setPreviewCheck(null);
-    setMessage('');
+export function migrateCapsuleAuthorInput(saved:unknown,mode:CapsuleAuthorMode,id:string|undefined,initial:CapsuleAuthorInput):CapsuleAuthorInput|null{
+ const record=(value:unknown):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value);
+ if(!record(saved)||!record(saved.form)||saved.kind&&saved.kind!=='capsule-authoring-draft'||saved.mode&&saved.mode!==mode||mode==='revision'&&saved.capsuleId!==id)return null;
+ const invalid=()=>Error('旧草稿格式暂不能核对，原内容仍保留。');
+ const list=(value:unknown):unknown[]=>{if(value===undefined||value===null)return[];if(!Array.isArray(value))throw invalid();return value;};
+ const text=(value:unknown):string=>{if(typeof value!=='string')throw invalid();return value;};
+ const strings=(value:unknown)=>list(value).map(text),old=saved.form,form={...initial.form};
+ for(const key of ['title','problemPattern','environmentName','environmentVersion','solutionStrategy','tools','skills','mcpRefs','verificationMethod','limitations','capabilityId','applicableScope','license','caseId','resultKey'] as const)
+  if(old[key]!==undefined)form[key]=text(old[key]);
+ if(old.visibility!==undefined){if(old.visibility!=='Private'&&old.visibility!=='Public')throw invalid();form.visibility=old.visibility;}
+ const reference=(value:unknown):CapsuleSourceRef=>{
+  if(!record(value)||typeof value.kind!=='string'||typeof value.id!=='string'||typeof value.version!=='number')throw invalid();
+  return referenceFromKey(value.kind+':'+value.id+':'+value.version,typeof value.caseId==='string'?value.caseId:form.caseId);
+ };
+ const source=(value:unknown):CapsuleSourceItem=>{
+  if(!record(value))throw invalid();const ref=reference(value.ref);
+  return sourceLocator({ref,...(value.authorId!==undefined&&value.authorId!==null?{authorId:text(value.authorId)}:{})});
+ };
+ const attributions=list(old.attributionRefs).map(value=>{if(!record(value))throw invalid();return{subjectId:text(value.subjectId),source:reference(value.source)};});
+ const known=list(old.extraSources).map(source),selected=list(old.sources).map(source);
+ const exact=[...list(old.sourceRefs).map(reference),...attributions.map(item=>item.source),...selected.map(item=>item.ref),...known.map(item=>item.ref)];
+ const refs=[...exact,...[...new Set([...strings(old.sourceKeys),...strings(old.attributionKeys)])].map(key=>exact.find(ref=>capsuleRefKey(ref)===key)??referenceFromKey(key,form.caseId))];
+ form.sources=uniqueSources([...selected,...refs.map(ref=>({ref,authorId:known.find(item=>capsuleRefKey(item.ref)===capsuleRefKey(ref))?.authorId??attributions.find(item=>capsuleRefKey(item.source)===capsuleRefKey(ref))?.subjectId})),...known].map(sourceLocator));
+ form.permissionIds=strings(old.permissionIds??old.permissionRefs);form.contributorIds=old.contributorIds!==undefined||old.contributors!==undefined?strings(old.contributorIds??old.contributors):initial.form.contributorIds;
+ if(old.externalReferences!==undefined)form.externalReferences=list(old.externalReferences).map(value=>{
+  if(!record(value)||value.inclusion!=='reference-only; no-imported-body'||value.license!==null&&typeof value.license!=='string')throw invalid();
+  return{url:text(value.url),description:text(value.description),license:value.license,inclusion:value.inclusion};
+ });
+ const step=saved.step??0;if(typeof step!=='number'||!Number.isFinite(step))throw invalid();
+ return{...initial,form,viewers:saved.viewers!==undefined?strings(saved.viewers):initial.viewers,step:Math.min(1,Math.max(0,step))};
+}
+export function CapsuleAuthoring(props:CapsuleAuthoringProps){
+ const {runtime,subjectId,mode,detail,management,disclosure}=props,identity=mode==='maintenance'?detail?.versionId??undefined:mode==='revision'?detail?.capsuleId:undefined;
+ const draftKey=capsuleInputDraftKey(runtime.api.endpoint,subjectId,mode,identity),initial=capsuleAuthorInput(detail,mode,management??null,disclosure??null);
+ return <CapsuleInputGate {...{runtime,subjectId,draftKey}} legacyKeys={mode==='maintenance'?[]:[capsuleAuthoringDraftKey(runtime.api.endpoint,subjectId,mode,detail?.capsuleId),'capsule-draft:'+runtime.api.endpoint+':'+subjectId]} normalize={saved=>migrateCapsuleAuthorInput(saved,mode,detail?.capsuleId,initial)}>
+  <CapsuleAuthorEditor {...props} {...{draftKey,initial}}/>
+ </CapsuleInputGate>;
+}
+type FormTextKey=Exclude<{[K in keyof CapsuleAuthorForm]:CapsuleAuthorForm[K] extends string?K:never}[keyof CapsuleAuthorForm],'visibility'>;
+function CapsuleAuthorEditor({runtime,client,subjectId,busy,run,propose,navigate,mode,detail,management,disclosure,versionOptions=[],draftKey,initial,registerDraft}:CapsuleAuthoringProps&{draftKey:string;initial:CapsuleAuthorInput}){
+ const [initialValue]=useState(()=>initial),draft=useGovernanceDraft<CapsuleAuthorInput,CapsuleLocator>(runtime,subjectId,true,draftKey,initialValue),draftRef=useRegisteredCapsuleDraft(draft,draftKey,client,registerDraft);
+ const lease=useMemo(()=>{const owner=runtime.receiptStatus.captureLease();if(owner.subjectId!==subjectId)throw Error('身份或连接已改变，请重新打开原稿。');return owner;},[runtime,subjectId]),epoch=useRef(0);
+ useEffect(()=>{const view=epoch;view.current++;return()=>{view.current++;};},[]);
+ function assertCurrent(token:number){lease.assertCurrent();if(token!==epoch.current)throw Error('页面或身份已改变，原输入仍保留。');}
+ const input={...initialValue,...draft.value},form={...initialValue.form,...input.form},history=useCapsuleWorkHistory(client,form.caseId,busy),source=history.items.find(item=>item.caseId===form.caseId);
+ const [check,setCheck]=useState<CapsulePublicationCheck|null>(null),[message,setMessage]=useState(''),[checking,setChecking]=useState(false),[currentManagement,setCurrentManagement]=useState<CapsuleManagement|null>(null),fieldId=useId(),top=useRef<HTMLElement>(null);
+ const caseSources=readableCaseSources(source,form.sources),mainResults=currentCapsuleFacts(source?.results??[]).filter(item=>item.reportedOutcome==='succeeded'),result=mainResults.find(item=>factKey(item)===form.resultKey),main=result?caseSources.find(item=>item.ref.kind==='result'&&item.ref.id===result.id&&item.ref.version===result.version):null;
+ const related=[...workPeople(source),...form.sources.map(item=>item.authorId),...form.contributorIds,...input.viewers,...(check?.sourceCoverage?.dependencies??[]).map(item=>item.authorId)],people=useCapsulePeople(runtime,subjectId,related);
+ const currentSelected=form.sources.map(item=>caseSources.find(current=>capsuleRefKey(current.ref)===capsuleRefKey(item.ref))??(check?.sourceCoverage?.sources??[]).find(current=>capsuleRefKey(current.ref)===capsuleRefKey(item.ref))??item);
+ const selectedKeys=new Set(form.sources.map(item=>capsuleRefKey(item.ref))),extraSources=form.sources.filter(item=>['configuration','selected-message'].includes(item.ref.kind));
+ function change(patch:Partial<CapsuleAuthorInput>){draft.change(patch);setMessage('');setCheck(null);setCurrentManagement(null);}
+ function fieldChange<K extends keyof CapsuleAuthorForm>(key:K,value:CapsuleAuthorForm[K]){change({form:{...form,[key]:value}});}
+ function chooseExtra(items:CapsuleSourceItem[]){const other=form.sources.filter(item=>!['configuration','selected-message'].includes(item.ref.kind));fieldChange('sources',uniqueSources([...other,...items.map(sourceLocator)]));}
+ function chooseSource(item:CapsuleSourceItem,chosen:boolean){const rest=form.sources.filter(current=>capsuleRefKey(current.ref)!==capsuleRefKey(item.ref));fieldChange('sources',chosen?[...rest,sourceLocator(item)]:rest);}
+ async function snapshot(){const token=epoch.current;assertCurrent(token);let saved=await draft.snapshot();assertCurrent(token);if(!saved.revision){draft.change(saved.value);saved=await draft.snapshot();assertCurrent(token);}return saved;}
+ async function publicationPayload(chosen:CapsuleAuthorInput,token:number):Promise<CapsuleVersion>{
+  assertCurrent(token);const chosenForm=chosen.form;
+  if(textLines(chosenForm.limitations).length>8)throw Error('限制最多填写八项，请合并相同含义的说明。');
+  if(textLines(chosenForm.limitations).some(line=>line.length>1200))throw Error('每项限制最多一千二百字，请简要说明适用边界。');
+  if((['tools','skills','mcpRefs'] as const).some(key=>textLines(chosenForm[key]).length>16||textLines(chosenForm[key]).some(line=>line.length>160)))throw Error('每类工具最多十六项，每项最多一百六十字。');
+  const rows=await history.load();assertCurrent(token);const fresh=(rows??history.items).find(item=>item.caseId===chosenForm.caseId);
+  if(!fresh)throw Error('所选工作当前不可读取。原输入和引用仍保留，请重新核对。');
+  const actualResult=currentCapsuleFacts(fresh.results??[]).find(item=>factKey(item)===chosenForm.resultKey&&item.reportedOutcome==='succeeded');
+  if(!actualResult)throw Error('所选结果当前不能支持新方法。请核对原结果或选择明确报告达到目标的当前版本。');
+  let revision=0,version=1;
+  if(mode==='revision'){
+   if(!detail)throw Error('当前未取得本人版本管理状态，原稿仍保留。');
+   const current=await client.versions({capsuleId:detail.capsuleId,limit:1});assertCurrent(token);
+   if(!current.management)throw Error('当前未取得本人版本管理状态，原稿仍保留。');
+   if(current.management.revision!==chosen.expectedRevision){setCurrentManagement(current.management);throw Error('这份方法已有更新。请核对当前管理状态，再决定用原输入整理新版本。');}
+   revision=current.management.revision;version=current.management.publishedVersionCount+1;
   }
-  async function build() {
-    if (!source || !result)
-      throw new Error(
-        '从当前真实工作中选择已报告达到目标的结果。不会为生成 Capsule 补造成功。',
-      );
-    if (!form.redaction)
-      throw new Error('请逐项核对自己编写的内容和来源范围。');
-    if (mode === 'revision' && !management)
-      throw new Error('未取得本人版本管理状态，请刷新。');
-    const selected = allSources.filter((s: any) =>
-        form.sourceKeys.includes(capsuleRefKey(s.ref)),
-      ),
-      attributed = allSources.filter((s: any) =>
-        form.attributionKeys.includes(capsuleRefKey(s.ref)),
-      );
-    if (
-      [...form.sourceKeys, ...form.attributionKeys].some(
-        (k: string) => !allSources.some((s: any) => capsuleRefKey(s.ref) === k),
-      )
-    )
-      throw new Error(
-        '草稿中部分来源或署名依据尚未重新读取。请重新选择消息或工作，不能悄悄删掉来源。',
-      );
-    return {
-      schemaVersion: 2,
-      id: crypto.randomUUID(),
-      capsuleId: mode === 'revision' ? detail.capsuleId : crypto.randomUUID(),
-      kind: 'version',
-      expectedRevision: mode === 'revision' ? management.revision : 0,
-      version: mode === 'revision' ? management.publishedVersionCount + 1 : 1,
-      title: form.title,
-      problemPattern: form.problemPattern,
-      environment: {
-        name: form.environmentName,
-        version: form.environmentVersion,
-      },
-      solutionStrategy: form.solutionStrategy,
-      tools: lines(form.tools),
-      skills: lines(form.skills),
-      mcpRefs: lines(form.mcpRefs),
-      verificationMethod: form.verificationMethod,
-      limitations: lines(form.limitations),
-      capabilityId: form.capabilityId,
-      applicableScope: form.applicableScope,
-      license: form.license,
-      contributors: [...new Set(attributed.map((s: any) => s.authorId))],
-      publicationClass: 'formal-source-success',
-      synthetic: source.synthetic === true,
-      sourceResolution: {
-        caseId: source.caseId,
-        resultId: result.id,
-        resultVersion: result.version,
-        proofIds: [],
-        verificationRefs: selected
-          .filter((s: any) => s.ref.kind === 'verification')
-          .map((s: any) => ({ id: s.ref.id, version: s.ref.version })),
-      },
-      sourceRefs: selected.map((s: any) => s.ref),
-      permissionRefs: form.permissionIds,
-      attributionRefs: attributed.map((s: any) => ({
-        subjectId: s.authorId,
-        source: s.ref,
-      })),
-      externalReferences: form.externalReferences,
-      redactionConfirmed: true,
-    };
-  }
-  async function prepare() {
-    const payload = await build();
-    await propose('publication', payload, {
-      visibility: form.visibility,
-      viewers: form.visibility === 'Private' ? viewers : [],
-    });
-  }
-  if (mode === 'maintenance')
-    return (
-      <section className="task-card">
-        <h2>维护选定版本</h2>
-        <fieldset disabled={busy}>
-          <form
-            className="workspace-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              run(async () => {
-                if (!disclosure || !management)
-                  throw new Error('先读取本人精确版本和原披露范围。');
-                await propose(
-                  'publication',
-                  {
-                    schemaVersion: 2,
-                    id: crypto.randomUUID(),
-                    kind: maintenance,
-                    capsuleId: detail.capsuleId,
-                    versionId: detail.versionId,
-                    expectedRevision: management.revision,
-                    summary,
-                    ...(maintenance === 'deprecate' && replacement
-                      ? { replacementVersionId: replacement }
-                      : {}),
-                  },
-                  disclosure,
-                );
-              });
-            }}
-          >
-            <label>
-              状态
-              <select
-                value={maintenance}
-                onChange={(e) => setMaintenance(e.target.value)}
-              >
-                <option value="deprecate" disabled={detail.deprecated}>
-                  停用这一版本
-                </option>
-                <option value="security-issue" disabled={detail.securityIssue}>
-                  标记具体安全事项
-                </option>
-                <option
-                  value="resolve-security"
-                  disabled={!detail.securityIssue}
-                >
-                  记录安全事项处理
-                </option>
-              </select>
-            </label>
-            <label>
-              说明
-              <Textarea
-                required
-                maxLength={1600}
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-              />
-            </label>
-            {maintenance === 'deprecate' && (
-              <label>
-                替代版本（可选，不自动切换读者选择）
-                <select
-                  value={replacement}
-                  onChange={(e) => setReplacement(e.target.value)}
-                >
-                  <option value="">不指定替代版本</option>
-                  {versionOptions
-                    .filter((v: any) => v.versionId !== detail.versionId)
-                    .map((v: any) => (
-                      <option key={v.versionId} value={v.versionId}>
-                        v{v.version} · {v.title ?? '来源当前不可用'}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            )}
-            <p>
-              维护说明沿用本版本原披露范围。停止推荐不抹去历史应用；撤销说明正文也不会偷偷恢复已停用状态。
-            </p>
-            <Button type="submit">预览维护操作</Button>
-          </form>
-        </fieldset>
-      </section>
-    );
-  return (
-    <section className="task-card">
-      <h2>
-        {mode === 'revision' ? '整理一个独立新版本' : '从实际工作整理本机草稿'}
-      </h2>
-      <p>
-        先编写真实方法、验证范围和限制。已有许可可以继续使用；不自动发布聊天、不要求同一来源重复签署。
-      </p>
-      <fieldset disabled={busy}>
-        <div className="button-row">
-          <Button
-            type="button"
-            onClick={() =>
-              run(async () => {
-                await client.saveDraft({
-                  kind: 'capsule-authoring-draft',
-                  form,
-                  mode,
-                  capsuleId: mode === 'revision' ? detail.capsuleId : null,
-                });
-                setMessage('草稿已保存在当前设备，未同步或发布到云端。');
-              })
-            }
-          >
-            保存本机草稿
-          </Button>
-          <Button
-            type="button"
-            onClick={() =>
-              run(async () => {
-                const d = await client.loadDraft();
-                if (!d || d.kind !== 'capsule-authoring-draft')
-                  throw new Error('本机没有 Capsule 草稿。');
-                if (
-                  d.mode !== mode ||
-                  (mode === 'revision' && d.capsuleId !== detail.capsuleId)
-                )
-                  throw new Error(
-                    '草稿属于另一发布操作。请先回到其对应入口，不改变原胶囊。',
-                  );
-                setForm(d.form);
-                setPreviewCheck(null);
-                setMessage('已载入本机草稿，请重新读取来源并核对当前版本。');
-              })
-            }
-          >
-            恢复本机草稿
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() =>
-              run(async () => {
-                await client.saveDraft(null);
-                setMessage('本机保存的草稿已删除，表单仍可继续编辑。');
-              })
-            }
-          >
-            删除保存的草稿
-          </Button>
-        </div>
-        {message && <p className="message">{message}</p>}
-        <WorkPicker
-          {...{ history, historyLoaded, historyNext, loadHistory, busy, run }}
-          value={form.caseId}
-          onChange={(value: string) => {
-            change('caseId', value);
-            setForm((old: any) => ({
-              ...old,
-              caseId: value,
-              resultKey: '',
-              sourceKeys: [],
-              attributionKeys: [],
-            }));
-          }}
-        />
-        <form
-          className="workspace-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(prepare);
-          }}
-        >
-          <label>
-            已经报告达到目标的来源结果
-            <select
-              required
-              value={form.resultKey}
-              onChange={(e) => change('resultKey', e.target.value)}
-            >
-              <option value="">选择当前精确结果版本</option>
-              {results.map((r: any) => (
-                <option key={factKey(r)} value={factKey(r)}>
-                  {r.summary} · v{r.version} · {r.actorId}
-                </option>
-              ))}
-            </select>
-          </label>
-          {source && (
-            <p>
-              来源
-              {source.synthetic
-                ? '是合成演示，将保留演示标识。'
-                : '未标记为合成；仍不代表结果已经独立核实。'}{' '}
-              结果声明、有限验证和问题解决分别成立。
-            </p>
-          )}
-          <label>
-            方法标题
-            <Input
-              required
-              maxLength={160}
-              value={form.title}
-              onChange={(e) => change('title', e.target.value)}
-            />
-          </label>
-          <label>
-            问题模式
-            <Textarea
-              required
-              maxLength={1200}
-              value={form.problemPattern}
-              onChange={(e) => change('problemPattern', e.target.value)}
-            />
-          </label>
-          <div className="form-pair">
-            <label>
-              适用环境名称
-              <Input
-                required
-                maxLength={160}
-                value={form.environmentName}
-                onChange={(e) => change('environmentName', e.target.value)}
-              />
-            </label>
-            <label>
-              环境版本
-              <Input
-                required
-                maxLength={80}
-                value={form.environmentVersion}
-                onChange={(e) => change('environmentVersion', e.target.value)}
-              />
-            </label>
-          </div>
-          <label>
-            策略与可执行做法
-            <Textarea
-              required
-              maxLength={4000}
-              value={form.solutionStrategy}
-              onChange={(e) => change('solutionStrategy', e.target.value)}
-              placeholder="具体步骤、判断依据和为何这样处理；不要粘贴未获准的聊天、代码或文件"
-            />
-          </label>
-          {(
-            [
-              ['tools', '工具'],
-              ['skills', 'Skill'],
-              ['mcpRefs', 'MCP'],
-            ] as string[][]
-          ).map(([field, label]) => (
-            <label key={field}>
-              {label}（可选，每行一项）
-              <Textarea
-                value={form[field]}
-                onChange={(e) => change(field, e.target.value)}
-              />
-            </label>
-          ))}
-          <label>
-            验证方法及已验证范围
-            <Textarea
-              required
-              maxLength={1200}
-              value={form.verificationMethod}
-              onChange={(e) => change('verificationMethod', e.target.value)}
-            />
-          </label>
-          <label>
-            限制和不适用条件（每行一项）
-            <Textarea
-              required
-              value={form.limitations}
-              onChange={(e) => change('limitations', e.target.value)}
-            />
-          </label>
-          <label>
-            能力领域标识
-            <Input
-              required
-              maxLength={128}
-              pattern="[a-zA-Z0-9][a-zA-Z0-9:._/\-]*"
-              value={form.capabilityId}
-              onChange={(e) => change('capabilityId', e.target.value)}
-              placeholder="例如 software-debugging（分类标签，不是资格认证）"
-            />
-          </label>
-          <label>
-            具体适用范围
-            <Textarea
-              required
-              maxLength={1200}
-              value={form.applicableScope}
-              onChange={(e) => change('applicableScope', e.target.value)}
-            />
-          </label>
-          <label>
-            采用的内容许可
-            <Input
-              required
-              maxLength={80}
-              value={form.license}
-              onChange={(e) => change('license', e.target.value)}
-              placeholder="与来源许可一致，不由系统代替你授予权利"
-            />
-          </label>
-          <fieldset>
-            <legend>附加来源与分项署名（主结果及其上游仍会核对）</legend>
-            {allSources.map((s: any) => {
-              const k = capsuleRefKey(s.ref);
-              return (
-                <article className="task-card" key={k}>
-                  <p>
-                    {s.label} · {s.ref.kind} v{s.ref.version} · {s.authorId}
-                  </p>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={form.sourceKeys.includes(k)}
-                      onChange={(e) =>
-                        change(
-                          'sourceKeys',
-                          e.target.checked
-                            ? [...form.sourceKeys, k]
-                            : form.sourceKeys.filter((v: string) => v !== k),
-                        )
-                      }
-                    />
-                    引用这条精确来源
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={form.attributionKeys.includes(k)}
-                      onChange={(e) =>
-                        change(
-                          'attributionKeys',
-                          e.target.checked
-                            ? [...form.attributionKeys, k]
-                            : form.attributionKeys.filter(
-                                (v: string) => v !== k,
-                              ),
-                        )
-                      }
-                    />
-                    将来源作者列为此项贡献者（不冒充共同署名同意）
-                  </label>
-                </article>
-              );
-            })}
-          </fieldset>
-          <CapsuleMessagePicker
-            {...{ runtime, subjectId, busy, run }}
-            selected={form.extraSources}
-            onChange={(items: any[]) => {
-              const removed = form.extraSources
-                .filter(
-                  (x: any) =>
-                    !items.some(
-                      (i) => capsuleRefKey(i.ref) === capsuleRefKey(x.ref),
-                    ),
-                )
-                .map((x: any) => capsuleRefKey(x.ref));
-              setForm((old: any) => ({
-                ...old,
-                extraSources: items,
-                sourceKeys: [
-                  ...old.sourceKeys.filter((k: string) => !removed.includes(k)),
-                  ...items
-                    .map((x) => capsuleRefKey(x.ref))
-                    .filter((k) => !old.sourceKeys.includes(k)),
-                ],
-                attributionKeys: old.attributionKeys.filter(
-                  (k: string) => !removed.includes(k),
-                ),
-              }));
-              setPreviewCheck(null);
-            }}
-          />
-          <ConfigurationPicker {...{runtime,subjectId,busy,run}} selected={form.extraSources} onChange={(items:any[])=>{
-            const removed=form.extraSources.filter((x:any)=>!items.some(i=>capsuleRefKey(i.ref)===capsuleRefKey(x.ref))).map((x:any)=>capsuleRefKey(x.ref));
-            setForm((old:any)=>({...old,extraSources:items,sourceKeys:[...new Set([...old.sourceKeys.filter((k:string)=>!removed.includes(k)),...items.map(x=>capsuleRefKey(x.ref))])],attributionKeys:old.attributionKeys.filter((k:string)=>!removed.includes(k))}));setPreviewCheck(null);
-          }}/>
-          <fieldset>
-            <legend>来源许可清单</legend>
-            <Button
-              type="button"
-              onClick={() => run(() => loadPermissions('granted'))}
-            >
-              读取明确授予我的许可
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => run(() => loadPermissions('owned'))}
-            >
-              读取我已有的许可
-            </Button>
-            {[...permissions.granted, ...permissions.owned].map((p: any) => (
-              <label className="task-card" key={p.permissionId}>
-                <input
-                  type="checkbox"
-                  checked={form.permissionIds.includes(p.permissionId)}
-                  disabled={
-                    p.revoked ||
-                    p.expired ||
-                    p.sourceStatus !== 'current' ||
-                    !p.payload.grantees.includes(subjectId)
-                  }
-                  onChange={(e) =>
-                    change(
-                      'permissionIds',
-                      e.target.checked
-                        ? [...form.permissionIds, p.permissionId]
-                        : form.permissionIds.filter(
-                            (id: string) => id !== p.permissionId,
-                          ),
-                    )
-                  }
-                />
-                {p.authorId}：{p.payload.scope} · {p.payload.license} ·{' '}
-                {p.revoked ? '已撤销' : p.expired ? '已到期' : p.sourceStatus} ·{' '}
-                {p.payload.allowPublic ? '可按许可公开' : '不允许公开'}
-              </label>
-            ))}
-            {['owned', 'granted'].map(
-              (v) =>
-                permissionNext[v] && (
-                  <Button
-                    type="button"
-                    key={v}
-                    onClick={() =>
-                      run(() => loadPermissions(v, permissionNext[v]))
-                    }
-                  >
-                    更多{v === 'owned' ? '本人' : '授予我的'}许可
-                  </Button>
-                ),
-            )}
-            <p>没有覆盖的第三方内容先保留本机，不因勾选检查框而变成可公开。</p>
-          </fieldset>
-          <details>
-            <summary>外部资料仅保留链接（可选）</summary>
-            <p>链接不会被服务器导入；不能以此声称拥有外部正文权利。</p>
-            {form.externalReferences.map((r: any, i: number) => (
-              <p key={i}>
-                {r.description} · {r.url}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    change(
-                      'externalReferences',
-                      form.externalReferences.filter(
-                        (_: any, j: number) => j !== i,
-                      ),
-                    )
-                  }
-                >
-                  移除
-                </Button>
-              </p>
-            ))}
-            <label>
-              链接
-              <Input
-                type="url"
-                value={external.url}
-                onChange={(e) =>
-                  setExternal({ ...external, url: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              说明
-              <Input
-                value={external.description}
-                onChange={(e) =>
-                  setExternal({ ...external, description: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              已知许可（未知留空）
-              <Input
-                value={external.license}
-                onChange={(e) =>
-                  setExternal({ ...external, license: e.target.value })
-                }
-              />
-            </label>
-            <Button
-              type="button"
-              onClick={() => {
-                change('externalReferences', [
-                  ...form.externalReferences,
-                  {
-                    ...external,
-                    license: external.license || null,
-                    inclusion: 'reference-only; no-imported-body',
-                  },
-                ]);
-                setExternal({ url: '', description: '', license: '' });
-              }}
-            >
-              加入链接
-            </Button>
-          </details>
-          <label>
-            本次版本可见范围
-            <select
-              value={form.visibility}
-              onChange={(e) => change('visibility', e.target.value)}
-            >
-              <option value="Private">本人和选定协作者</option>
-              <option value="Public">面向公众</option>
-            </select>
-          </label>
-          {form.visibility === 'Private' && (
-            <fieldset>
-              <legend>额外阅读者</legend>
-              {people.map((id) => (
-                <label key={id}>
-                  <input
-                    type="checkbox"
-                    checked={viewers.includes(id)}
-                    onChange={(e) =>
-                      setViewers(
-                        e.target.checked
-                          ? [...viewers, id]
-                          : viewers.filter((x) => x !== id),
-                      )
-                    }
-                  />
-                  {id}
-                </label>
-              ))}
-            </fieldset>
-          )}
-          <label>
-            <input
-              type="checkbox"
-              required
-              checked={form.redaction}
-              onChange={(e) => change('redaction', e.target.checked)}
-            />
-            我已核对即将发布的原文、选定来源与许可，未把未获准的代码、文件或聊天内容当作本人创作。
-          </label>
-          <div className="button-row">
-            <Button
-              type="button"
-              onClick={() =>
-                run(async () => {
-                  const p = await build();
-                  setPreviewCheck(await client.preview(p));
-                })
-              }
-            >
-              核对公开来源条件（不发布）
-            </Button>
-            <Button type="submit">预览选定范围的发布</Button>
-          </div>
-          {previewCheck && (
-            <p className="message">
-              {previewCheck.readyForPublicPublication
-                ? '当前公开来源条件可以满足，仍需确认精确发布内容。'
-                : `公开条件尚未满足：${previewCheck.reason}。私有发布仍按本次具体许可重新判断。`}
-            </p>
-          )}
-        </form>
-        {(source?.taskIds ?? []).map((id: string) => (
-          <Button
-            type="button"
-            key={id}
-            variant="link"
-            onClick={() => navigate(`/app/tasks/${id}`)}
-          >
-            返回来源任务
-          </Button>
-        ))}
-      </fieldset>
+  const sources=readableCaseSources(fresh,chosenForm.sources),mainSource=sources.find(item=>item.ref.kind==='result'&&item.ref.id===actualResult.id&&item.ref.version===actualResult.version);
+  const selected=uniqueSources([...chosenForm.sources.map(item=>sources.find(current=>capsuleRefKey(current.ref)===capsuleRefKey(item.ref))??item),...(mainSource?[mainSource]:[])]);
+  const attributed=selected.filter((item):item is CapsuleSourceItem&{authorId:string}=>typeof item.authorId==='string'&&!!item.authorId);
+  return{schemaVersion:2,id:crypto.randomUUID(),capsuleId:mode==='revision'&&detail?detail.capsuleId:crypto.randomUUID(),kind:'version',expectedRevision:revision,version,title:chosenForm.title,problemPattern:chosenForm.problemPattern,environment:{name:chosenForm.environmentName,version:chosenForm.environmentVersion},solutionStrategy:chosenForm.solutionStrategy,tools:textLines(chosenForm.tools),skills:textLines(chosenForm.skills),mcpRefs:textLines(chosenForm.mcpRefs),verificationMethod:chosenForm.verificationMethod,limitations:textLines(chosenForm.limitations),capabilityId:chosenForm.capabilityId,applicableScope:chosenForm.applicableScope,license:chosenForm.license,contributors:[...new Set(attributed.map(item=>item.authorId))],publicationClass:'formal-source-success',synthetic:fresh.synthetic===true,sourceResolution:{caseId:fresh.caseId,resultId:actualResult.id,resultVersion:actualResult.version,proofIds:[],verificationRefs:selected.filter(item=>item.ref.kind==='verification').map(item=>({id:item.ref.id,version:item.ref.version}))},sourceRefs:selected.map(item=>item.ref),permissionRefs:chosenForm.permissionIds,attributionRefs:attributed.map(item=>({subjectId:item.authorId,source:item.ref})),externalReferences:chosenForm.externalReferences,redactionConfirmed:true};
+ }
+ async function prepare(){
+  const token=epoch.current;assertCurrent(token);setMessage('');setChecking(true);
+  try{
+   const saved=await snapshot();assertCurrent(token);const chosen={...initialValue,...saved.value,form:{...initialValue.form,...saved.value.form}};
+   if(mode==='maintenance'){
+    if(!disclosure||!management||!detail?.versionId)throw Error('当前版本与原展示范围尚未读到。');
+    const current=await client.versions({capsuleId:detail.capsuleId,limit:1});assertCurrent(token);
+    if(current.management?.revision!==chosen.expectedRevision){setCurrentManagement(current.management??null);throw Error('方法状态已变化，请核对当前状态后再维护。');}
+    const payload:CapsulePublication={schemaVersion:2,id:crypto.randomUUID(),kind:chosen.maintenance,capsuleId:detail.capsuleId,versionId:detail.versionId,expectedRevision:chosen.expectedRevision,summary:chosen.summary,...(chosen.maintenance==='deprecate'&&chosen.replacement?{replacementVersionId:chosen.replacement}:{})};
+    await propose('publication',payload,disclosure,context(saved,{title:detail.version?.title??'选定方法'}));return;
+   }
+   const payload=await publicationPayload(chosen,token);assertCurrent(token);
+   let resolved=await client.resolvePublication(payload,{visibility:chosen.form.visibility});assertCurrent(token);setCheck(resolved.preview);
+   if(!resolved.preview.readyForPublication)throw Error(methodInputError({code:resolved.preview.reason}));
+   // Recover authors of restored body-free references from the exact source read.
+   const reading=resolved.preview.sourceCoverage?.sources??[],attributionRefs=resolved.payload.sourceRefs.map(ref=>{
+    const observed=reading.find(item=>capsuleRefKey(item.ref)===capsuleRefKey(ref));
+    return observed?.authorId?{subjectId:observed.authorId,source:ref}:resolved.payload.attributionRefs.find(item=>capsuleRefKey(item.source)===capsuleRefKey(ref));
+   }).filter((item):item is CapsuleVersion['attributionRefs'][number]=>item!==undefined);
+   const attributedPayload={...resolved.payload,attributionRefs,contributors:[...new Set(attributionRefs.map(item=>item.subjectId))]};
+   if(JSON.stringify(attributedPayload.attributionRefs)!==JSON.stringify(resolved.payload.attributionRefs)){
+    const nextPreview=await client.preview(attributedPayload,{visibility:chosen.form.visibility});assertCurrent(token);setCheck(nextPreview);
+    if(!nextPreview.readyForPublication)throw Error(methodInputError({code:nextPreview.reason}));
+    resolved={...resolved,payload:attributedPayload,preview:nextPreview};
+   }
+   const currentSources=readableCaseSources(history.items.find(item=>item.caseId===chosen.form.caseId),chosen.form.sources);
+   const sourceRows=await Promise.all((resolved.preview.sourceCoverage?.sources??[]).filter(item=>resolved.payload.sourceRefs.some(ref=>capsuleRefKey(ref)===capsuleRefKey(item.ref))).map(async item=>{
+    assertCurrent(token);const value=item.ref.kind==='configuration'?{...item,view:await client.configuration({id:item.ref.id,version:item.ref.version})}:{...currentSources.find(source=>capsuleRefKey(source.ref)===capsuleRefKey(item.ref)),...item};
+    assertCurrent(token);return value;
+   }));assertCurrent(token);
+   const permissions=await Promise.all(resolved.permissionRefs.map(id=>client.permission(id)));assertCurrent(token);
+   await propose('publication',resolved.payload,{visibility:chosen.form.visibility,viewers:chosen.form.visibility==='Private'?chosen.viewers:[]},context(saved,{title:chosen.form.title,sourceTitle:source?.title??'所选实际工作',sources:sourceRows,coverage:resolved.preview.sourceCoverage,permissions,unavailablePermissionIds:resolved.unavailablePermissionIds}));
+  }catch(error){
+   try{assertCurrent(token);}catch{throw error;}
+   const readable=methodInputError(error);setMessage(readable);throw Error(readable);
+  }finally{try{assertCurrent(token);setChecking(false);}catch{/* The former editor cannot update the current view. */}}
+ }
+ function context(saved:{revision:string|null},display:CapsulePreviewDisplay):CapsulePreviewContext{
+  return{draftKey,display,onJournal:async locator=>draftRef.current.attach(locator,saved.revision),onAcknowledged:async receipt=>draftRef.current.settle(async locator=>locator.operationId===receipt.operationId?client.receiptFor(locator):null)};
+ }
+ const textField=(key:FormTextKey,label:string,maxLength=1600,required=true)=><label htmlFor={fieldId+'-'+key}>{label}<Textarea id={fieldId+'-'+key} required={required} maxLength={maxLength} value={form[key]} onChange={event=>fieldChange(key,event.target.value)}/></label>;
+ const inputField=(key:FormTextKey,label:string,maxLength=160,required=true)=><label htmlFor={fieldId+'-'+key}>{label}<Input id={fieldId+'-'+key} required={required} maxLength={maxLength} value={form[key]} onChange={event=>fieldChange(key,event.target.value)}/></label>;
+ if(!draft.ready)return <p><output>{draft.status||'正在读取本机草稿…'}</output></p>;
+ return <section ref={top} className="method-authoring method-author-workspace">
+  {mode!=='maintenance'&&<nav className="method-author-stages" aria-label="整理方法"><button type="button" aria-current={input.step===0?'step':undefined} disabled={busy} onClick={()=>change({step:0})}>1. 阅读实际来源</button><button type="button" aria-current={input.step===1?'step':undefined} disabled={busy} onClick={()=>change({step:1})}>2. 写下做法与条件</button></nav>}
+  {message&&<p role="alert" className="message error">{message}</p>}
+  {currentManagement&&<aside className="method-source-change"><p>当前已有 {currentManagement.publishedVersionCount} 个发布版本。你的原输入保持完整。</p><Button type="button" variant="outline" disabled={busy} onClick={()=>change({expectedRevision:currentManagement.revision})}>以当前状态继续这份输入</Button></aside>}
+  <form className="workspace-form" onSubmit={event=>{event.preventDefault();void run(prepare);}}>
+   <fieldset disabled={busy||checking} className="method-authoring-fields">
+   {mode==='maintenance'?<section className="method-form-section"><h2>维护这一版本</h2><p>{detail?.version?.title??'选定方法'} · 第 {detail?.version?.version??'所选'} 版</p>
+    <label>需要怎样维护？<select value={input.maintenance} onChange={event=>change({maintenance:event.target.value==='security-issue'?'security-issue':event.target.value==='resolve-security'?'resolve-security':'deprecate'})}><option value="deprecate" disabled={detail?.deprecated}>停用这一版本</option><option value="security-issue" disabled={detail?.securityIssue}>说明安全事项</option><option value="resolve-security" disabled={!detail?.securityIssue}>记录安全事项处理</option></select></label>
+    <label htmlFor={fieldId+'-maintenance'}>具体说明<Textarea id={fieldId+'-maintenance'} required maxLength={1600} value={input.summary} onChange={event=>change({summary:event.target.value})}/></label>
+    {input.maintenance==='deprecate'&&<label>推荐的替代版本（可选）<select value={input.replacement} onChange={event=>change({replacement:event.target.value})}><option value="">不指定替代版本</option>{versionOptions.filter(value=>value.versionId!==detail?.versionId).map(value=><option value={value.versionId} key={value.versionId}>第 {value.version} 版 · {value.title??'来源当前不可用'}</option>)}</select></label>}<p className="source-reading-note">说明沿用这一版本的原展示范围。停用会保留此前的实际应用。</p>
+   </section>:input.step===0?<>
+    <section className="method-form-section"><h2>从已经发生的工作出发</h2><WorkSelection history={history} value={form.caseId} busy={busy} onChange={(caseId:string)=>fieldChange('caseId',caseId)}/>
+     {source&&<><h3>{source.title}</h3>{source.synthetic&&<p className="permission-line">这件工作是合成演示，方法会保留此标记。</p>}<label>哪条实际结果支持这份方法？<select value={form.resultKey} onChange={event=>fieldChange('resultKey',event.target.value)}><option value="">选择实际结果</option>{mainResults.map(item=><option value={factKey(item)} key={factKey(item)}>{item.summary} · 第 {item.version} 版</option>)}{form.resultKey&&!result&&<option value={form.resultKey}>原选结果已变化或暂不可读取</option>}</select></label>{main&&<SourceReading item={main} subjectId={subjectId} names={people.names}/>}
+      {!mainResults.length&&<p>这件工作还没有可支持新方法的成功结果。可以继续原工作，或选择另一件已发生的工作。</p>}
+     </>}
     </section>
-  );
-}
-
-export function CapsulePermissionWorkspace({
-  runtime,
-  subjectId,
-  history,
-  historyLoaded,
-  historyNext,
-  loadHistory,
-  permissions,
-  permissionNext,
-  loadPermissions,
-  busy,
-  run,
-  propose,
-}: any) {
-  const [caseId, setCaseId] = useState(''),
-    [selected, setSelected] = useState<string[]>([]),
-    [messages, setMessages] = useState<any[]>([]),
-    [grantees, setGrantees] = useState<string[]>([]),
-    [extraPerson, setExtraPerson] = useState(''),
-    [scope, setScope] = useState(''),
-    [license, setLicense] = useState(''),
-    [basis, setBasis] = useState('authored-content'),
-    [licenseReference, setLicenseReference] = useState(''),
-    [attribution, setAttribution] = useState(''),
-    [allowPublic, setAllowPublic] = useState(false),
-    [expires, setExpires] = useState(''),
-    [revoke, setRevoke] = useState<any>(null),
-    [reason, setReason] = useState('');
-  const source = history.find((h: any) => h.caseId === caseId),
-    caseSources = source ? capsuleCaseSources(source) : [],
-    sources = [
-      ...caseSources.filter((s: any) => s.authorId === subjectId),
-      ...messages,
-    ],
-    people = [
-      ...new Set(
-        [
-          ...grantees,
-          ...caseSources.map((s: any) => s.authorId),
-          ...(source?.collaborations ?? []).flatMap((t: any) => [
-            t.requesterId,
-            ...t.participation.map((p: any) => p.subjectId),
-          ]),
-        ].filter(
-          (id) => id && id !== subjectId && /^GUID[0-9A-Z]{28}$/.test(id),
-        ),
-      ),
-    ] as string[];
-  return (
-    <section className="task-card">
-      <h2>选定来源许可</h2>
-      <p>
-        只处理本人创作的注册来源。已知覆盖许可可以说明文档依据；不代替其他作者作出同意。
-      </p>
-      <fieldset disabled={busy}>
-        <WorkPicker
-          {...{ history, historyLoaded, historyNext, loadHistory, busy, run }}
-          value={caseId}
-          onChange={(id: string) => {
-            setCaseId(id);
-            setSelected([]);
-          }}
-        />
-        <form
-          className="workspace-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(async () => {
-              const chosen = sources.filter(
-                (s: any) =>
-                  selected.includes(capsuleRefKey(s.ref)) ||
-                  s.ref.kind === 'selected-message',
-              );
-              await propose(
-                'permission',
-                {
-                  schemaVersion: 2,
-                  id: crypto.randomUUID(),
-                  kind: 'grant',
-                  sources: chosen.map((s: any) => s.ref),
-                  grantees,
-                  license,
-                  scope,
-                  basis,
-                  ...(basis === 'documented-covering-license'
-                    ? { licenseReference }
-                    : {}),
-                  attribution,
-                  allowPublic,
-                  ...(expires
-                    ? { expiresAt: new Date(expires).toISOString() }
-                    : {}),
-                },
-                { visibility: 'Private', viewers: grantees },
-              );
-            });
-          }}
-        >
-          <fieldset>
-            <legend>我的来源</legend>
-            {sources
-              .filter((s: any) => s.ref.kind !== 'selected-message')
-              .map((s: any) => {
-                const k = capsuleRefKey(s.ref);
-                return (
-                  <label className="task-card" key={k}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(k)}
-                      onChange={(e) =>
-                        setSelected(
-                          e.target.checked
-                            ? [...selected, k]
-                            : selected.filter((x) => x !== k),
-                        )
-                      }
-                    />
-                    {s.label} · {s.ref.kind} v{s.ref.version}
-                  </label>
-                );
-              })}
-          </fieldset>
-          <CapsuleMessagePicker
-            {...{ runtime, subjectId, busy, run }}
-            onlyOwn
-            selected={messages}
-            onChange={setMessages}
-          />
-          <ConfigurationPicker {...{runtime,subjectId,busy,run}} onlyOwn selected={messages} onChange={setMessages}/>
-          <fieldset>
-            <legend>明确获许可的人</legend>
-            {people.map((id) => (
-              <label key={id}>
-                <input
-                  type="checkbox"
-                  checked={grantees.includes(id)}
-                  onChange={(e) =>
-                    setGrantees(
-                      e.target.checked
-                        ? [...grantees, id]
-                        : grantees.filter((x) => x !== id),
-                    )
-                  }
-                />
-                {id}
-              </label>
-            ))}
-            <label>
-              补充已有联系人的银河 ID
-              <Input
-                value={extraPerson}
-                onChange={(e) => setExtraPerson(e.target.value)}
-                placeholder="仅用于已有联系人，不替代发现或邀请"
-              />
-            </label>
-            <Button
-              type="button"
-              onClick={() => {
-                if (!/^GUID[0-9A-Z]{28}$/.test(extraPerson)) return;
-                setGrantees([...new Set([...grantees, extraPerson])]);
-                setExtraPerson('');
-              }}
-            >
-              加入已知联系人
-            </Button>
-          </fieldset>
-          <label>
-            许可名称
-            <Input
-              required
-              maxLength={80}
-              value={license}
-              onChange={(e) => setLicense(e.target.value)}
-            />
-          </label>
-          <label>
-            允许使用的具体范围
-            <Textarea
-              required
-              maxLength={1600}
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-            />
-          </label>
-          <label>
-            授权依据
-            <select value={basis} onChange={(e) => setBasis(e.target.value)}>
-              <option value="authored-content">本人创作的选定内容</option>
-              <option value="documented-covering-license">
-                已有文件明确覆盖的许可
-              </option>
-            </select>
-          </label>
-          {basis === 'documented-covering-license' && (
-            <label>
-              覆盖许可的实际文件或链接
-              <Input
-                required
-                maxLength={1200}
-                value={licenseReference}
-                onChange={(e) => setLicenseReference(e.target.value)}
-              />
-            </label>
-          )}
-          <label>
-            署名说明
-            <Textarea
-              required
-              maxLength={1600}
-              value={attribution}
-              onChange={(e) => setAttribution(e.target.value)}
-            />
-          </label>
-          <label>
-            可选截止时间
-            <Input
-              type="datetime-local"
-              value={expires}
-              onChange={(e) => setExpires(e.target.value)}
-            />
-          </label>
-          <p>即使未指定额外截止时间，仍受真实签名授权有效期限制。</p>
-          <label>
-            <input
-              type="checkbox"
-              checked={allowPublic}
-              onChange={(e) => setAllowPublic(e.target.checked)}
-            />
-            允许获许可人按上述范围向公众发布选定内容
-          </label>
-          <Button type="submit">预览来源许可</Button>
-        </form>
-        <h3>现有许可与撤销</h3>
-        {['owned', 'granted'].map((view) => (
-          <section key={view}>
-            <h4>{view === 'owned' ? '我授予的' : '明确授予我的'}</h4>
-            <Button
-              type="button"
-              onClick={() => run(() => loadPermissions(view))}
-            >
-              刷新
-            </Button>
-            {permissions[view].map((p: any) => (
-              <article className="task-card" key={p.permissionId}>
-                <p>
-                  {p.authorId}：{p.payload.scope} · {p.payload.license}
-                </p>
-                <p>
-                  {p.revoked ? '已撤销' : p.expired ? '已到期' : p.sourceStatus}{' '}
-                  · {p.payload.attribution}
-                </p>
-                {view === 'owned' && !p.revoked && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setRevoke(p);
-                      setReason('');
-                    }}
-                  >
-                    撤销此项许可
-                  </Button>
-                )}
-              </article>
-            ))}
-            {permissionNext[view] && (
-              <Button
-                type="button"
-                onClick={() =>
-                  run(() => loadPermissions(view, permissionNext[view]))
-                }
-              >
-                更多许可
-              </Button>
-            )}
-          </section>
-        ))}
-        {revoke && (
-          <form
-            className="workspace-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              run(() =>
-                propose(
-                  'permission',
-                  {
-                    schemaVersion: 2,
-                    id: crypto.randomUUID(),
-                    kind: 'revoke',
-                    permissionId: revoke.permissionId,
-                    reason,
-                  },
-                  { visibility: 'Private', viewers: revoke.payload.grantees },
-                ),
-              );
-            }}
-          >
-            <h3>撤销：{revoke.payload.scope}</h3>
-            <label>
-              原因
-              <Textarea
-                required
-                value={reason}
-                maxLength={1600}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            <p>
-              当前依赖内容会重新判定是否可读；不会宣称所有外部副本都已收回。
-            </p>
-            <Button type="submit">预览撤销</Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setRevoke(null)}
-            >
-              取消
-            </Button>
-          </form>
-        )}
-      </fieldset>
+    <section className="method-form-section"><h2>保留做法的来处</h2><p>主结果及其必要上游会自动核对。再选择方法实际引用的背景、尝试、协助或检查，来源作者随这一条引用保留。</p>
+     <div className="method-source-choices">{caseSources.filter(item=>!main||capsuleRefKey(item.ref)!==capsuleRefKey(main.ref)).map(item=><SourceReading key={capsuleRefKey(item.ref)} item={item} subjectId={subjectId} names={people.names}><label className="method-source-toggle"><input type="checkbox" checked={selectedKeys.has(capsuleRefKey(item.ref))} onChange={event=>chooseSource(item,event.target.checked)}/>引用这条来源并保留作者</label></SourceReading>)}</div>
+     <CapsuleMessagePicker {...{runtime,subjectId,busy,run}} selected={extraSources} onChange={chooseExtra}/><ConfigurationPicker {...{runtime,subjectId,busy,run}} selected={extraSources} onChange={chooseExtra}/>
+     {currentSelected.filter(item=>!caseSources.some(current=>capsuleRefKey(current.ref)===capsuleRefKey(item.ref))&&!['configuration','selected-message'].includes(item.ref.kind)).map(item=><SourceReading key={capsuleRefKey(item.ref)} item={{...item,unavailable:!item.reading}} subjectId={subjectId} names={people.names}><Button type="button" variant="ghost" onClick={()=>chooseSource(item,false)}>移除这一条引用</Button></SourceReading>)}
+     <p className="source-reading-note">来源署名表示内容出自谁。共同署名仍由对方自己回应。</p>
     </section>
-  );
+    <div className="method-author-next"><Button type="button" disabled={!result||busy} onClick={()=>{change({step:1});top.current?.scrollIntoView({block:'start'});}}>继续整理做法</Button></div>
+   </>:<>
+    <section className="method-form-section"><h2>让下一位读者能够照着做</h2><p className="method-source-context">{source?.title??'原工作正在重新核对'}{result?' · '+result.summary:''}<button type="button" className="text-link" onClick={()=>change({step:0})}>查看来源</button></p>
+     {inputField('title','方法标题')}{textField('problemPattern','遇到了什么问题？',1200)}{textField('solutionStrategy','具体怎么做？',4000)}
+    </section>
+    <section className="method-form-section"><h2>必要条件与实际边界</h2><div className="method-form-pair">{inputField('environmentName','适用环境')}{inputField('environmentVersion','环境版本',80)}</div><p className="source-reading-note">只写实际知道的条件；未知处请明确写“未知”，不要用推测补齐。</p>
+     {textField('applicableScope','适用于哪些情况？',1200)}{textField('verificationMethod','怎样核对效果，实际核对到哪里？',1200)}{textField('limitations','限制与不适用的情况（每行一项）',4000)}
+     <label>方法分类<select required value={form.capabilityId} onChange={event=>fieldChange('capabilityId',event.target.value)}><option value="">选择分类</option>{[['software','软件与开发'],['writing','写作与整理'],['research','研究与分析'],['design','设计与体验'],['general','其他工作方法']].map(([value,label])=><option key={value} value={value}>{label}</option>)}{form.capabilityId&&!['software','writing','research','design','general'].includes(form.capabilityId)&&<option value={form.capabilityId}>{form.capabilityId}</option>}</select></label>
+     <details className="method-optional-tools"><summary>使用的工具、Skill 或 MCP（可选）</summary>{textField('tools','工具（每行一项）',4000,false)}{textField('skills','Skill（每行一项）',4000,false)}{textField('mcpRefs','MCP（每行一项）',4000,false)}</details>
+    </section>
+    <section className="method-form-section"><h2>怎样分享和使用</h2>{inputField('license','内容许可',80)}<p className="source-reading-note">填写你有权采用的许可。已有来源许可会自动按作者、所选内容、截止时间和公开范围核对。</p>
+     <label>谁可以阅读这份方法？<select value={form.visibility} onChange={event=>fieldChange('visibility',event.target.value==='Public'?'Public':'Private')}><option value="Private">本人和选定协作者</option><option value="Public">公开</option></select></label>
+     {form.visibility==='Private'&&<PeopleSelection {...{people,subjectId}} value={input.viewers} onChange={(viewers:string[])=>change({viewers})} title="额外阅读者（可不选）"/>}
+     {check&&<div className="method-coverage"><h3>来源许可核对</h3><p>{check.readyForPublication?'当前许可覆盖所选范围。':methodInputError({code:check.reason})}</p>{(check.sourceCoverage?.dependencies??[]).filter(item=>!item.covered).map(item=><p key={item.key}>{memberName(item.authorId,subjectId,people.names[item.authorId]??undefined)}的来源尚未覆盖本次范围。</p>)}{!check.readyForPublication&&<Button type="button" variant="outline" onClick={()=>navigate('/app/capsules?mode=permissions')}>查看来源许可</Button>}</div>}
+     <details className="method-links"><summary>外部参考链接（可选）</summary><p>保留链接与说明，外部正文不会被导入。</p>{form.externalReferences.map((item,index)=><div className="method-link-row" key={index}><a href={item.url} target="_blank" rel="noreferrer">{item.description}</a><Button type="button" variant="ghost" onClick={()=>fieldChange('externalReferences',form.externalReferences.filter((_,other)=>index!==other))}>移除</Button></div>)}
+      <label htmlFor={fieldId+'-external-url'}>链接<Input id={fieldId+'-external-url'} type="url" value={input.externalInput.url} onChange={event=>change({externalInput:{...input.externalInput,url:event.target.value}})}/></label><label htmlFor={fieldId+'-external-description'}>说明<Input id={fieldId+'-external-description'} value={input.externalInput.description} maxLength={1600} onChange={event=>change({externalInput:{...input.externalInput,description:event.target.value}})}/></label><label htmlFor={fieldId+'-external-license'}>已知许可（未知留空）<Input id={fieldId+'-external-license'} value={input.externalInput.license} maxLength={160} onChange={event=>change({externalInput:{...input.externalInput,license:event.target.value}})}/></label><Button type="button" variant="outline" disabled={!input.externalInput.url||!input.externalInput.description||form.externalReferences.length>=16} onClick={()=>{change({form:{...form,externalReferences:[...form.externalReferences,{...input.externalInput,license:input.externalInput.license||null,inclusion:'reference-only; no-imported-body'}]},externalInput:{url:'',description:'',license:''}});}}>加入链接</Button>
+     </details>
+     <p className="method-publication-intent">下一页会完整显示内容、实际来源和分享范围。确认保存时表示你已核对本人编写的文字，可按所选范围分享；他人来源仍由服务核对原作者许可。</p>
+    </section>
+   </>}
+   <footer className="method-author-footer"><output>{draft.status||'填写后自动保存在此浏览器。'}</output>{(mode==='maintenance'||input.step===1)&&<Button type="submit">{checking?'正在核对来源…':mode==='maintenance'?'预览维护说明':'预览完整方法'}</Button>}</footer>
+   </fieldset>
+  </form>
+ </section>;
 }

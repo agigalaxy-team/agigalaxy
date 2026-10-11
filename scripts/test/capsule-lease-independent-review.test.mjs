@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID,createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import {createCapsuleWebClient} from '../../packages/galaxy-web/src/capsule-workspace-client.mjs';
+const source=new URL('../../packages/galaxy-web/src/capsule-workspace-client.mjs',import.meta.url);
+const expected='7a571da28ee6a289021289361e2ceca68d37ed8611a7d99946b861543e80c88a';
+const hash=async()=>createHash('sha256').update(await readFile(source)).digest('hex');
+const subjectId='GUID'+'A'.repeat(28);
+function fixture(phase,change){
+ const current={subjectId,bindingId:randomUUID(),generation:1},store=new Map(),calls=[];
+ const replace=()=>{if(change==='binding')current.bindingId=randomUUID();else current.generation++;};
+ const api={endpoint:'https://official.example.org',snapshot:()=>({...current}),
+  prepareAuthorization:async(payloadJson,options)=>{if(phase==='prepareAuthorization')replace();return{payloadJson,intent:{id:randomUUID(),...options}};},
+  submitAuthorization:async p=>{if(phase==='submitAuthorization')replace();return{payloadJson:p.payloadJson,consentId:p.intent.id};},
+  call:async(path,input)=>{calls.push({path,input});if(path.endsWith('/receipt')){if(phase==='receipt')replace();return{state:'acknowledged',operationId:input.operationId};}return{};}};
+ const client=createCapsuleWebClient({api,subjectId,getLocal:async key=>structuredClone(store.get(key)),putLocal:async(key,value)=>{store.set(key,structuredClone(value));}});
+ return{client,store,calls,payload:{schemaVersion:2,kind:'revoke',id:randomUUID(),permissionId:randomUUID(),reason:'independent lease boundary'}};
+}
+for(const phase of ['prepareAuthorization','submitAuthorization','receipt'])for(const change of ['binding','generation'])
+ test(`frozen Capsule ${phase} ${change} replacement withholds original operation`,async()=>{
+  assert.equal(await hash(),expected,'Review must run the exact frozen source');
+  const f=fixture(phase,change),preview=await f.client.prepare('permission',f.payload);
+  await assert.rejects(f.client.execute(preview,{confirmed:true}),/身份|连接/);
+  const original=[...f.store.values()][0]?.active;
+  assert.equal(original.operationId,preview.operationId,'Keep original journal for exact recovery');
+  assert.equal(original.payloadHash,preview.payloadHash);
+  const business=f.calls.filter(x=>x.path==='/v2/capsules/permissions');
+  assert.equal(business.length,phase==='receipt'?1:0,'A late ACK may follow one accepted write; no retry/new business write');
+  assert.equal(await hash(),expected);
+ });

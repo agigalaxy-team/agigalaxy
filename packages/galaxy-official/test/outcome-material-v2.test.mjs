@@ -13,7 +13,7 @@ export async function verifyOutcomeMaterialV2() {
   const a = await serviceFixture(['binding','consent','case-teaser','evidence','capsules','data-export'],null,{now:fixtureNow});
   const b = await serviceFixture(['binding','consent','case-teaser','evidence','capsules','data-export'], a.db, { migrateDatabase:false,now:fixtureNow });
   const messages = new Map();
-  const transport = { available:true, async project(){}, async send(x){ messages.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1}); return {archiveId:x.messageId}; }, async read(x){ return x.ids.map(k=>messages.get(k)).filter(Boolean); }, async erase(x){ messages.delete(x.archiveId??x.messageId); } };
+  const transport = { available:true, async project(){}, async send(x){ messages.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1}); return {archiveId:x.messageId}; }, async read(x){ return x.ids.map(k=>messages.get(k)).filter(Boolean); }, async erase(x){ messages.delete(x.archiveId??x.messageId);return{archiveDeleted:true}; } };
   const chat = new ChatService({db:a.db,access:a.access,transport,now:()=>a.now,requireAccountWithin:async()=>{},consumeInviteWithin:async()=>{},markInviteRespondedWithin:async()=>{}});
   const materials = new OutcomeMaterialServiceV2(a.access,{consents:a.consents,chat,records:a.verificationRecords});
   const api = (await import('../src/http.mjs')).createApi({ ...a, outcomeMaterials:materials, chat, rateLimit:1000 });

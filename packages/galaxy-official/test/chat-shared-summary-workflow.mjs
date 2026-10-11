@@ -9,7 +9,7 @@ export async function verifySharedSummaryWorkflow(options={}){
  // Explicit external transport contract double, not a running Prosody server.
  const transport={available:true,project:async()=>{},send:async x=>{calls.push(x);if(!bodies.has(x.messageId))bodies.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});
   if(loseNext){loseNext=false;throw new ServiceError('chat_delivery_unknown',504);}return{archiveId:x.messageId};},
-  read:async x=>x.ids.flatMap(id=>bodies.has(id)?[structuredClone(bodies.get(id))]:[]),erase:async x=>{bodies.delete(x.messageId);return{deleted:true};},
+  read:async x=>x.ids.flatMap(id=>bodies.has(id)?[structuredClone(bodies.get(id))]:[]),erase:async x=>{bodies.delete(x.messageId);return{archiveDeleted:true};},
   edit:async x=>{const r=bodies.get(x.messageId);r.text=x.text;r.revision=x.expectedRevision+1;return{revision:r.revision};}};
  const f=await chatFixture({...options,transport});try{const{chat,people:[a,b,c]}=f;
   const shared=new ChatSharedSummaryService({db:options.runtimeDb??f.db,access:chat.access,chat,now:f.now});

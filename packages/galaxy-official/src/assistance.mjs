@@ -35,7 +35,9 @@ export class AssistanceService extends TaskServiceV2 {
     if (!parent || parent.state === 'withdrawn') throw new ServiceError('assistance_case_unavailable', 403);
     const rows = (await db.query('SELECT * FROM case_events WHERE case_id=$1 ORDER BY version LIMIT 1001', [caseId])).rows;
     if (rows.length > 1000) throw new ServiceError('case_event_limit', 413);
-    for (const row of rows) await this.consents.require(db, { id: row.consent_id, subjectId: owner, action: 'case.teaser.publish',
+    // The Case owner does not become the signer of another participant's fact.
+    // Selected v2 Attempt references still pass their separate current read check.
+    for (const row of rows) await this.consents.require(db, { id: row.consent_id, subjectId: row.subject_id, action: 'case.teaser.publish',
       objectId: row.id, recipient: this.access.endpoint, payloadJson: row.payload_text });
   }
   async grant(db, actorId, id, objectId, payloadJson) {

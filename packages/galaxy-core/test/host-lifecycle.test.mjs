@@ -37,14 +37,14 @@ test('host disposal clears modal state and delayed callbacks; cached plugin can 
   });
   const first = host();
   await plugin.tui(first.api); await first.open();
-  assert.match(first.page.title, /选择语言/);
+  assert.match(first.page.title, /当前工作/);
   first.page.options[0].onSelect(); // A real native selection defers its next page.
   first.dispose(); await delay(30);
   assert.equal(first.page, null); assert.equal(first.commands.size, 0); assert.equal(first.cleanups.size, 0);
   assert.equal(disconnects, 1);
   const second = host();
   await plugin.tui(second.api); await second.open();
-  assert.equal(instances, 2); assert.match(second.page.title, /选择语言/);
+  assert.equal(instances, 2); assert.match(second.page.title, /当前工作/);
   second.dispose(); second.dispose();
   assert.equal(disconnects, 2); assert.deepEqual(await readdir(directory), []);
 });
@@ -54,6 +54,8 @@ test('replacing a native dialog keeps new page keys and unloading preserves anot
   t.after(() => rm(directory, { recursive: true, force: true }));
   const current = host();
   await createGalaxyAdapter(null, { dataDirectory: directory }).tui(current.api); await current.open();
+  current.commands.get('galaxy.choose.4').run();
+  current.commands.get('galaxy.choose.3').run();
   current.commands.get('galaxy.choose.1').run();
   assert.equal(current.page.kind, 'alert'); assert.equal(current.commands.has('galaxy.exit'), true);
   current.page.onConfirm(); await delay(30);
@@ -88,16 +90,16 @@ test('native dismissal without onCancel releases a pending connection and confir
     cancel() { busy = false; }, disconnect() {}, execute() { sends++; } }, { dataDirectory: directory });
   t.after(() => adapter.close()); await adapter.tui(current.api);
   async function openPrompt() {
-    await current.open(); current.commands.get('galaxy.choose.6').run(); await delay(30);
-    current.commands.get('galaxy.choose.1').run(); await delay(30); assert.equal(current.page.kind, 'prompt');
+    await current.open(); current.commands.get('galaxy.choose.4').run(); current.commands.get('galaxy.choose.6').run(); await delay(30);
+    current.commands.get('galaxy.choose.1').run(); await delay(30); assert.equal(current.page.kind, 'select'); assert.match(current.page.title,/连接到银河/);
   }
   await openPrompt(); assert.equal(busy, true);
   current.api.ui.dialog.clear(); // OpenCode's native Esc invokes only the dialog cleanup.
   assert.equal(busy, false);
-  await openPrompt(); current.page.onConfirm('wrong'); await delay(30);
-  assert.match(current.page.message, /确认文本不匹配/); assert.equal(sends, 0);
+  await openPrompt(); current.commands.get('galaxy.choose.2').run();
+  assert.equal(current.page.kind,'alert'); assert.equal(sends,0);
   current.page.onConfirm(); current.api.ui.dialog.clear(); await delay(30);
-  assert.equal(current.page.kind, 'prompt'); assert.equal(busy, true);
+  assert.equal(current.page.kind, 'select'); assert.equal(busy, true);
   current.api.ui.dialog.clear(); assert.equal(busy, false); assert.equal(sends, 0);
 });
 

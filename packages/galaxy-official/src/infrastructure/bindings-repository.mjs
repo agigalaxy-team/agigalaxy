@@ -23,7 +23,7 @@ export function bindingRepository(db) {
     lockRevokeBindings: ids => db.query('SELECT * FROM bindings WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids]),
     lockRevokeCredential: (hash, bindingId, time) => db.query(`SELECT scopes FROM access_credentials
       WHERE token_hash=$1 AND binding_id=$2 AND revoked_at IS NULL AND expires_at>$3 FOR SHARE`, [hash, bindingId, time]),
-    revoke: values => db.query('UPDATE bindings SET revoked_at=$2 WHERE id=$1', values),
+    revoke: values => db.query("UPDATE bindings SET revoked_at=COALESCE(revoked_at,$2),revocation_kind='explicit-binding',revocation_control_event_id=NULL,revocation_request_id=$3 WHERE id=$1", values),
     revokeCredentials: values => db.query('UPDATE access_credentials SET revoked_at=$2 WHERE binding_id=$1 AND revoked_at IS NULL', values),
     auditRevoke: ([subjectId, bindingId, requestId, httpRequestId = null, credentialScopes = null, callerBindingId = null]) => recordAuthAudit(db, { subjectId, bindingId, requestId, action: 'binding.revoke', httpRequestId, credentialScopes, callerBindingId }),
   };

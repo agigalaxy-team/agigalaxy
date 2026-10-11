@@ -79,6 +79,9 @@ test('native help consumes current Capsule, facts, Task and project HTTP sources
     const offers = [offer('capsule-or-history', cap, f.actor.subjectId), offer('open-assistance', expert, newcomer.actor.subjectId)];
     session = await flow.compose(session.id, { expectedRevision: session.revision, offers });
     session = await flow.select(session.id, { expectedRevision: session.revision, offerIds: offers.map(o => o.id) });
+    const reviewed = await runtime().review(session.id);
+    assert.ok(reviewed.offers.every(row => row.state === 'current' && row.offer));
+    assert.equal(Object.hasOwn(reviewed.session, 'offers'), false);
     const returned = await runtime().returnToTask(session.id, { expectedRevision: session.revision });
     assert.equal(returned.handoff.localTaskRef, 'original-conversation:current-parser'); assert.equal(returned.successFactsCreated, false);
     assert.equal((await f.capsules.usesV2(f.actor, { capsuleId: capsule.capsuleId })).counts.applications, 0);
@@ -88,6 +91,9 @@ test('native help consumes current Capsule, facts, Task and project HTTP sources
     assert.equal(partial.session.offers.find(o => o.id === offers[1].id).sourceStatus, 'refresh-required');
     await f.consents.revoke(f.actor, signedCapsule.consentId);
     const withdrawn = await flow.query(session.id, { requests: [capsuleQuery] }); assert.equal(withdrawn.results[0].state, 'empty');
+    const withdrawnReview = await flow.review(session.id);
+    assert.equal(withdrawnReview.offers.find(row => row.id === offers[0].id).state, 'unavailable');
+    assert.equal(Object.hasOwn(withdrawnReview.offers.find(row => row.id === offers[0].id), 'offer'), false);
     await assert.rejects(flow.select(session.id, { expectedRevision: withdrawn.session.revision, offerIds: [offers[0].id] }), /refresh_required/);
     corruptSource = true; const malformed = await flow.query(session.id, { requests: [queries[2]] }); assert.equal(malformed.results[0].state, 'failed');
     const stored = JSON.stringify(await flow.get(session.id));

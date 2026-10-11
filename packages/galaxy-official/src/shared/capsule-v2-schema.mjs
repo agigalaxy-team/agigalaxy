@@ -36,14 +36,26 @@ export const capsuleEventV2Schema = z.discriminatedUnion('kind', [capsuleVersion
 
 const common = { schemaVersion: z.literal(2), id: z.uuid(), capsuleId: z.uuid(), versionId: z.uuid(), caseId: z.uuid(),
   attribution: subject, note: text, taskId: z.uuid().optional(), participationId: z.uuid().optional() };
-const applied = { ...common, attemptRef: factReferenceSchema, resultRef: factReferenceSchema,
+export const capsuleOriginV2Schema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('attempt'), ...factReferenceSchema.shape }),
+  z.strictObject({ kind: z.literal('intervention'), ...factReferenceSchema.shape }),
+]);
+const applied = { ...common, attemptRef: factReferenceSchema.optional(), originRef: capsuleOriginV2Schema.optional(), resultRef: factReferenceSchema,
+  configurationRef: factReferenceSchema.optional(),
   environment: z.strictObject({ name: z.string().min(1).max(160), version: z.string().min(1).max(80) }),
   environmentDifference: text, adoptedParts: z.array(text).min(1).max(16),
   outcome: z.enum(['succeeded', 'partial', 'failed', 'inconclusive', 'conflicting']) };
 export const capsuleUseV2Schema = z.discriminatedUnion('kind', [
   z.strictObject({ ...common, kind: z.literal('reference') }), z.strictObject({ ...applied, kind: z.literal('apply') }),
-  z.strictObject({ ...applied, kind: z.literal('reverify'), priorUseId: z.uuid(), verificationRefs: z.array(factReferenceSchema).min(1).max(16) })]);
-export const capsulePreviewV2Schema = z.strictObject({ payload: capsuleVersionV2Schema });
+  z.strictObject({ ...applied, kind: z.literal('reverify'), priorUseId: z.uuid(), verificationRefs: z.array(factReferenceSchema).min(1).max(16) })])
+  .refine(p => p.kind === 'reference' || (p.originRef ? p.originRef.kind === 'intervention' ? !p.attemptRef
+    : !p.attemptRef || p.attemptRef.id === p.originRef.id && p.attemptRef.version === p.originRef.version : !!p.attemptRef),
+  'One exact Attempt or Intervention origin is required; legacy Attempt references must match.')
+  .refine(p => p.kind === 'reference' || !p.configurationRef || p.originRef?.kind === 'intervention',
+  'Selected configuration is only used for an Intervention application.');
+export const capsuleUseOriginRef = payload => payload.originRef ?? { kind: 'attempt', ...payload.attemptRef };
+export const capsulePreviewV2Schema = z.strictObject({ payload: capsuleVersionV2Schema,
+  visibility: z.enum(['Private', 'Public']).default('Public') });
 export const capsuleReceiptV2Schema=z.strictObject({type:z.enum(['publication','use','permission']),operationId:z.uuid(),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)});
 export const capsuleVersionsV2Schema=z.strictObject({capsuleId:z.uuid(),after:z.uuid().optional(),limit:z.number().int().min(1).max(50).default(20)});
 export const capsulePermissionsQueryV2Schema=z.strictObject({view:z.enum(['owned','granted']).default('owned'),after:z.uuid().optional(),limit:z.number().int().min(1).max(50).default(20)});

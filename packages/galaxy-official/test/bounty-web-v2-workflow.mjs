@@ -10,6 +10,7 @@ import {QualificationV2Service} from '../src/qualification-v2.mjs';
 import {ExperienceReviewService} from '../src/experience-review.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
 import {taskDraft,publicationFromDraft,applicationFromDraft,evidenceFromSelection,policyKey,localDateTime} from '../../galaxy-web/src/task-bounty-client.mjs';
+import {retainTaskContactAgent,taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 
 // Entirely isolated test identities, local OIDC, example.org records and money
 // units. synthetic:false below deliberately exercises that branch of validation;
@@ -34,9 +35,11 @@ export async function verifyBountyWebV2(database=null,options={}){
    if(loseApplication&&/\/v2\/tasks\/.+\/events$/.test(path)){loseApplication=false;assert.equal(response.status,200);throw Error('lost application ACK');}
    return response;
   };
-  const store=()=>{const data=new Map();return{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))};};
-  const config={endpoint,trustedKeys:f.bindings.trustedKeys};a=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>now});b=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>now});
+  const store=()=>{const data=new Map();return{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),
+   update:async(k,change)=>{const next=change(structuredClone(data.get(k)));if(next?.then)throw Error('local_update_async_callback');const committed=structuredClone(next);data.set(k,committed);return structuredClone(committed);}};};
+  const aStore=store(),bStore=store(),config={endpoint,trustedKeys:f.bindings.trustedKeys};a=await createWebRuntime(config,{store:aStore,fetch:wire,now:()=>now,website:taskContactWebsite});b=await createWebRuntime(config,{store:bStore,fetch:wire,now:()=>now,website:taskContactWebsite});
   for(const rt of [a,b]){await rt.createIdentity({confirmed:true});await rt.connect({confirmed:true});}
+  await retainTaskContactAgent(a,aStore,now);await retainTaskContactAgent(b,bStore,now);
   const aid=(await a.status()).identity.subjectId,bid=(await b.status()).identity.subjectId;
   const call=(rt,path,input)=>rt.api.call(path,input,{authenticated:true});
   const read=(rt,id)=>rt.api.call('/v2/tasks/'+id,null,{method:'GET',authenticated:true});
@@ -52,7 +55,7 @@ export async function verifyBountyWebV2(database=null,options={}){
   assert.throws(()=>publicationFromDraft(paid,[],now),/请选择/);
   losePublication=true;await assert.rejects(a.publishTask(payload,{confirmed:true}),/lost publication/);const pending=await a.getLocal('task-publication');
   assert.equal(pending.payload.budget.minimum,'0.10000001');const postCount=publications.length,consentCount=authorizations.length;
-  a.disconnect();await a.connect({confirmed:true});const receipt=await a.reconcilePublication({retry:true});assert.equal(receipt.state,'acknowledged');assert.equal(publications.length,postCount);assert.equal(authorizations.length,consentCount);
+  await a.disconnect();await a.connect({confirmed:true});const receipt=await a.reconcilePublication({retry:true});assert.equal(receipt.state,'acknowledged');assert.equal(publications.length,postCount);assert.equal(authorizations.length,consentCount);
   assert.deepEqual(await a.getLocal('task-draft'),draft,'pending reconciliation never deletes or replaces an edited local draft');
   let task=await read(a,receipt.taskId);assert.equal(task.caseId,null);assert.deepEqual(task.request.budget,payload.budget);assert.equal(task.request.enrollmentExpiresAt,payload.enrollmentExpiresAt);
   await a.taskEvent(task.taskId,{kind:'invite',expectedTaskVersion:task.version,recipientId:bid,note:'先了解限定范围',expiresAt:Math.min(now+7*86400,task.request.enrollmentExpiresAt)},{viewers:[bid],confirmed:true});
@@ -76,7 +79,7 @@ export async function verifyBountyWebV2(database=null,options={}){
   const selected={...applicationDraft,selected:choices.items};await b.putLocal(`task-application-draft:${task.taskId}`,selected);
   const event=applicationFromDraft(selected,task);assert.equal((await call(b,'/v2/qualification/evaluate',{taskId:task.taskId,subjectId:bid,evidence:event.qualificationEvidence})).state,'satisfied');
   loseApplication=true;await assert.rejects(b.taskEvent(task.taskId,event,{viewers:[aid],confirmed:true}),/lost application/);const original=await b.getLocal(`task-event:${task.taskId}`),count=applications.length;
-  b.disconnect();await b.connect({confirmed:true});assert.equal((await b.reconcileTaskEvent(task.taskId,{retry:true})).state,'acknowledged');assert.equal(applications.length,count);assert.equal(JSON.parse(original.payloadJson).event.quote.amount,'125.00000001');
+  await b.disconnect();await b.connect({confirmed:true});assert.equal((await b.reconcileTaskEvent(task.taskId,{retry:true})).state,'acknowledged');assert.equal(applications.length,count);assert.equal(JSON.parse(original.payloadJson).event.quote.amount,'125.00000001');
   assert.deepEqual(await b.getLocal(`task-application-draft:${task.taskId}`),selected);
   task=await read(a,task.taskId);const application=task.contacts.responses.applications.find(x=>x.state==='pending');assert.equal(application.quote.amount,'125.00000001');
   const anonymous=await (await fetch(origin+'/v2/tasks/'+task.taskId)).json();assert.equal(JSON.stringify(anonymous).includes('125.00000001'),false);assert.equal(anonymous.contacts,undefined);

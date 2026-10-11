@@ -112,6 +112,7 @@ test(
             putLocal,
             subjectId: f.actor.subjectId,
             taskId: task.taskId,
+            now: () => clock.now,
           });
         const payload = (body) => ({
           schemaVersion: 2,

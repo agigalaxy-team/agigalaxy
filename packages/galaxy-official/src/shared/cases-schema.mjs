@@ -23,6 +23,7 @@ export const caseEventSchema = z.discriminatedUnion('kind', [
 // v1 stays strict and unchanged. v2 records actual work without manufacturing
 // an Attempt for advice-only interventions. References identify immutable versions.
 const subject = z.string().regex(/^GUID[0-9A-Z]{28}$/);
+export const taskCaseContainerSummary='任务协作记录，仅保存各参与者报告的实际工作。';
 export const factReferenceSchema = z.strictObject({ id: z.uuid(), version: z.number().int().positive() });
 const outcome = z.enum(['succeeded', 'partial', 'failed', 'inconclusive', 'conflicting']);
 const terminal = z.enum(['completed', 'abandoned', 'canceled', 'inconclusive']);
@@ -79,4 +80,8 @@ export const caseEventV2Schema = z.discriminatedUnion('kind', [
 export const caseTaskLinkSchema = z.strictObject({ operationId: z.uuid(), taskId: z.uuid(),
   expectedTaskVersion: z.number().int().positive(), case: z.strictObject({ consentId: z.uuid(), payloadJson: z.string() }),
   initialFact: z.strictObject({ consentId: z.uuid(), payloadJson: z.string() }) });
+
+const receiptHash = z.string().regex(/^[0-9a-f]{64}$/);
+export const caseEventReceiptSchema = z.strictObject({ caseId: z.uuid(), eventId: z.uuid(), payloadHash: receiptHash });
+export const caseTaskLinkReceiptSchema = z.strictObject({ taskId: z.uuid(), operationId: z.uuid(), payloadHash: receiptHash });
 

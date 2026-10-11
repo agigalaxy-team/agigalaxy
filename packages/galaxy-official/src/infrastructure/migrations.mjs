@@ -1,3 +1,4 @@
+import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
 import { searchIndexMigrationSql } from './search-index-schema-v1.mjs';
 import {identityGroupV2MigrationSql} from './identity-group-v2-schema.mjs';
 import {watchControlV2MigrationSql} from './watch-control-v2-schema.mjs';
@@ -500,6 +501,9 @@ import {workerPackUsesV2MigrationSql} from './worker-pack-uses-v2-schema.mjs';
 import {trustPackagePermissionsMigrationSql} from './trust-package-permissions-schema-v1.mjs';
 import {targetGovernanceV2MigrationSql} from './target-governance-v2-schema.mjs';
 import {outcomeMaterialV2MigrationSql} from './outcome-material-v2-schema.mjs';
+import {capsuleApplicationOriginV2MigrationSql} from './capsule-application-origin-v2-schema.mjs';
+import {moderationNotificationsV2MigrationSql} from './moderation-notifications-v2-schema.mjs';
+import {chatRoomGovernanceV2MigrationSql} from './chat-room-governance-v2-schema.mjs';
 migrations.push({ version: 42, sql: identityControlMigrationSql },
   { version: 43, sql: caseFactsV2MigrationSql }, { version: 44, sql: accountQuotaMigrationSql },
   { version: 45, sql: taskParticipationMigrationSql }, { version: 46, sql: evidenceVerificationV2MigrationSql },
@@ -520,7 +524,12 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
  (client_id IS NOT NULL AND audience IS NOT NULL AND scope IS NOT NULL AND binding_id IS NOT NULL AND idempotency_key IS NOT NULL AND
  ((action IN ('binding.create','binding.revoke','session.create','audit.grant','audit.grant.revoke','audit.query','audit.export','data.export.create','data.export.page','data.export.binary','data.export.revoke','data.deletion.request','data.deletion.cancel','context.query','notification.preferences','notification.read','notification.archive','identity.link','identity.unlink','oauth.access','trust.permission.grant','trust.permission.revoke','identity.group.approval') AND consent_id IS NULL) OR
  (action NOT IN ('binding.create','binding.revoke','session.create','audit.grant','audit.grant.revoke','audit.query','audit.export','data.export.create','data.export.page','data.export.binary','data.export.revoke','data.deletion.request','data.deletion.cancel','context.query','notification.preferences','notification.read','notification.archive','identity.link','identity.unlink','oauth.access','trust.permission.grant','trust.permission.revoke','identity.group.approval') AND consent_id IS NOT NULL))));
-`});
+`},{version:76,sql:capsuleApplicationOriginV2MigrationSql},
+  // Development-only registration: these next-batch inputs are not in the
+  // immutable published 0.1.1/schema76 release and await focused acceptance.
+  {version:77,sql:moderationNotificationsV2MigrationSql},
+  {version:78,sql:chatRoomGovernanceV2MigrationSql},
+  {version:79,sql:communityForumV1MigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

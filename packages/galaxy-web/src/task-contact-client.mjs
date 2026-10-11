@@ -46,7 +46,7 @@ export function contactCandidates(pages, self) {
           roles: [],
           help: '',
           basis: '',
-          conditions: '当前时间、意愿和报价需要本人回应确认。',
+          conditions: '实际可投入时间、意愿与工作范围需要本人回应确认。',
         };
         if (
           !entry.sources.some(
@@ -65,7 +65,36 @@ export function contactCandidates(pages, self) {
   return [...candidates.values()];
 }
 
-export function createTaskContactClient(runtime, taskId) {
+export function createTaskContactClient(sourceRuntime, taskId) {
+  const connection = () => {
+    const value = sourceRuntime.api.snapshot();
+    return value && { subjectId: value.subjectId, endpoint: sourceRuntime.api.endpoint ?? value.endpoint,
+      bindingId: value.bindingId, generation: value.generation };
+  };
+  const owner = connection(); let closed = false;
+  const check = () => {
+    const current = connection();
+    if (closed || !owner || !current || Object.keys(owner).some(key => owner[key] !== current[key]))
+      throw Error('身份或连接已改变，请重新打开当前任务并核对原批次。');
+  };
+  const guarded = async action => {
+    check(); let result;
+    try { result = await action(); } catch (error) { check(); throw error; }
+    check(); return result;
+  };
+  // Bind every local, network and nested operation to this exact reviewed
+  // connection. A remounted client may inspect a retained original batch, but
+  // an in-flight old client cannot keep sending under a new binding.
+  const runtime = {
+    api: { snapshot: () => { check(); return sourceRuntime.api.snapshot(); }, call: (...args) => guarded(() => sourceRuntime.api.call(...args)) },
+    chat: Object.fromEntries(['create', 'pending', 'propose', 'retry'].map(name => [name, (...args) => guarded(() => sourceRuntime.chat[name](...args))])),
+    ...Object.fromEntries(['getLocal', 'putLocal', 'status', 'taskEvent', 'reconcileTaskEvent', 'stoppedTaskOperations', 'queryStoppedTaskOperation']
+      .map(name => [name, (...args) => guarded(() => sourceRuntime[name](...args))])),
+    updateLocal: (name, updater, subjectId) => guarded(() => {
+      if (typeof sourceRuntime.updateLocal !== 'function') throw Error('local_atomic_update_unavailable');
+      return sourceRuntime.updateLocal(name, updater, subjectId);
+    }),
+  };
   const key = `task-contact-batch:${taskId}`,
     roomKey = `task-room-batch:${taskId}`;
   let working = false;
@@ -76,18 +105,52 @@ export function createTaskContactClient(runtime, taskId) {
       method: 'GET',
       authenticated: true,
     });
-  const save = (k, value) => {
-    if (
-      runtime.api.snapshot()?.subjectId !== (value.ownerId ?? value.requesterId)
-    )
-      throw Error('当前身份已变化，原批次保留在原身份本机空间。');
-    return runtime.putLocal(k, clone(value));
-  };
+  const inviteError = (code, message) => Object.assign(new Error(message), { code });
+  const finishedInvite = item => ['acknowledged', 'stopped-unsent', 'stopped-local'].includes(item.state);
+  const sameInvite = (left, right) => left.eventId === right.eventId && left.subjectId === right.subjectId
+    && left.note === right.note && left.expiresAt === right.expiresAt;
+  // One IDB transaction compares the original batch and merges exact event
+  // progress. A late old completion cannot replace another reviewed batch;
+  // another tab's ACK cannot be downgraded by our delayed transport failure.
+  async function persistInvites(batch) {
+    let matched = false;
+    const proposed = clone(batch);
+    const stored = await runtime.updateLocal(key, current => {
+      check();
+      if (!current || current.batchId !== proposed.batchId) return current;
+      if (current.taskId !== taskId || current.requesterId !== owner.subjectId
+        || proposed.requesterId !== current.requesterId || proposed.items.length !== current.items.length
+        || proposed.items.some((item, index) => !sameInvite(item, current.items[index])))
+        throw inviteError('task_contact_operation_changed', '原批次对象或逐人内容已改变，请核对原操作。');
+      matched = true;
+      const merged = clone(current);
+      merged.confirmed = current.confirmed || proposed.confirmed;
+      for (let index = 0; index < merged.items.length; index++) {
+        const previous = current.items[index], next = proposed.items[index];
+        if (previous.payloadHash && next.payloadHash && previous.payloadHash !== next.payloadHash
+          || previous.payloadJson && next.payloadJson && previous.payloadJson !== next.payloadJson)
+          throw inviteError('task_contact_operation_changed', '原邀请载荷已固定，不能替换原 ID 或 hash。');
+        if (previous.state === 'acknowledged' || finishedInvite(previous) && next.state !== 'acknowledged'
+          || next.state === 'queued' && previous.state !== 'queued') continue;
+        if (next.state === 'stopped-unsent' && (previous.state !== 'queued' || previous.payloadJson))
+          throw inviteError('task_contact_operation_changed', '原邀请已准备发送，不能取消成未发送状态。');
+        merged.items[index] = { ...previous, ...next,
+          ...(previous.payloadHash ? { payloadHash: previous.payloadHash, payloadJson: previous.payloadJson } : {}) };
+      }
+      return merged;
+    }, owner.subjectId);
+    if (matched) {
+      batch.confirmed = stored.confirmed;
+      for (let index = 0; index < batch.items.length; index++) Object.assign(batch.items[index], stored.items[index]);
+    }
+    return matched;
+  }
   const lock = async (operation) => {
+    check();
     if (working) throw Error('请等待当前批次操作完成。');
     working = true;
     try {
-      return await operation();
+      return await guarded(operation);
     } finally {
       working = false;
     }
@@ -150,6 +213,7 @@ export function createTaskContactClient(runtime, taskId) {
   }
   async function saveSuggestions(items, { confirmed = false } = {}) {
     if (!confirmed) throw Error('请确认本次建议和依据。');
+    check(); items = clone(items);
     for (const candidate of items)
       for (const source of candidate.sources ?? []) {
         const view = await call('/v2/search/reference', {
@@ -183,6 +247,7 @@ export function createTaskContactClient(runtime, taskId) {
     );
   }
   async function prepareInvites(items) {
+    check(); items = clone(items);
     if (
       !items.length ||
       items.length > 32 ||
@@ -200,6 +265,8 @@ export function createTaskContactClient(runtime, taskId) {
     )
       throw Error('请先处理原联系批次。');
     const current = await read();
+    if (current.requesterId !== owner.subjectId)
+      throw inviteError('task_contact_requester_required', '仅任务请求者可以准备本次邀请。');
     const itemsWithIds = items.map((item) => {
       if (
         !guid(item.subjectId) ||
@@ -232,16 +299,36 @@ export function createTaskContactClient(runtime, taskId) {
       confirmed: false,
       items: itemsWithIds,
     };
-    await save(key, value);
+    const stopped = await runtime.stoppedTaskOperations(taskId);
+    await runtime.updateLocal(key, current => {
+      check();
+      if ((current?.batchId ?? null) !== (prior?.batchId ?? null)) throw Error('请先处理原联系批次。');
+      if (current && (current.taskId !== taskId || current.requesterId !== owner.subjectId))
+        throw inviteError('task_contact_operation_changed', '原批次主体或任务已改变，请核对原操作。');
+      if (current?.items.some(item => {
+        if (finishedInvite(item)) return false;
+        const original = prior.items.find(previous => sameInvite(previous, item) && previous.payloadHash === item.payloadHash);
+        // pending() projects explicit local stops from a body-free archive.
+        // Release only that exact original event/hash, never another slot or an
+        // unknown operation that has not actually been stopped by the user.
+        return !original || !item.payloadHash || !stopped.some(record => record.eventId === item.eventId && record.payloadHash === item.payloadHash);
+      })) throw Error('请先处理原联系批次。');
+      return clone(value);
+    }, owner.subjectId);
     return value;
   }
-  async function sendInvites({ confirmed = false } = {}) {
+  /** @param {{confirmed?: boolean, batchId?: string}} [options] */
+  async function sendInvites({ confirmed = false, batchId } = {}) {
     if (!confirmed) throw Error('请确认所选对象、逐人内容和发送范围。');
+    if (typeof batchId !== 'string' || !batchId)
+      throw inviteError('task_contact_batch_id_required', '请从实际显示的原批次确认发送，不能猜测当前批次。');
     return lock(async () => {
       const batch = await runtime.getLocal(key);
-      if (!batch) throw Error('没有待发送批次。');
+      if (!batch || batch.batchId !== batchId)
+        throw inviteError('task_contact_batch_changed', '当前本机批次已变化，请查看并确认实际名单和逐人内容。');
       batch.confirmed = true;
-      await save(key, batch);
+      if (!await persistInvites(batch))
+        throw inviteError('task_contact_batch_changed', '当前本机批次已变化，请查看并确认实际名单和逐人内容。');
       for (const item of batch.items) {
         if (
           ['acknowledged', 'stopped-unsent', 'stopped-local'].includes(
@@ -266,7 +353,7 @@ export function createTaskContactClient(runtime, taskId) {
                 : 'stopped-local';
             item.receipt = checked.receipt;
             item.error = null;
-            await save(key, batch);
+            if (!await persistInvites(batch)) return batch;
             continue;
           }
           if (item.payloadHash) {
@@ -284,7 +371,7 @@ export function createTaskContactClient(runtime, taskId) {
               item.state = 'acknowledged';
               item.receipt = receipt;
               item.error = null;
-              await save(key, batch);
+              if (!await persistInvites(batch)) return batch;
               continue;
             }
           }
@@ -307,10 +394,11 @@ export function createTaskContactClient(runtime, taskId) {
             item.payloadJson = JSON.stringify(payload);
             item.payloadHash = await sha256Hex(item.payloadJson);
             item.state = 'sending';
-            await save(key, batch);
+            if (!await persistInvites(batch)) return batch;
+            if (finishedInvite(item)) continue;
           }
           const receipt = pending
-            ? await runtime.reconcileTaskEvent(taskId, { retry: true })
+            ? await runtime.reconcileTaskEvent(taskId, { retry: true, explicitRetry: true })
             : await runtime.taskEvent(
                 taskId,
                 JSON.parse(item.payloadJson).event,
@@ -328,11 +416,11 @@ export function createTaskContactClient(runtime, taskId) {
           item.receipt = receipt;
           item.state = 'acknowledged';
           item.error = null;
-          await save(key, batch);
+          if (!await persistInvites(batch)) return batch;
         } catch (error) {
           item.state = 'result-unknown';
           item.error = error.message;
-          await save(key, batch);
+          await persistInvites(batch);
           break;
         }
       }
@@ -346,9 +434,66 @@ export function createTaskContactClient(runtime, taskId) {
       if (!item || item.payloadJson || item.state !== 'queued')
         throw Error('仅能取消尚未准备发送的对象。已发送或未知操作需要先对账。');
       item.state = 'stopped-unsent';
-      await save(key, batch);
+      if (!await persistInvites(batch))
+        throw inviteError('task_contact_batch_changed', '原取消对象已不在当前批次，请重新核对。');
       return batch;
     });
+  }
+  const sameRoomValue = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  const roomBatchChanged = () => inviteError('task_room_batch_changed', '原房间批次已改变，请重新核对当前显示的计划。');
+  function displayedRoomBatch(batch, batchId) {
+    if (!batchId) throw inviteError('task_room_batch_id_required', '请传入本次实际显示的房间批次标识。');
+    if (!batch || batch.batchId !== batchId) throw roomBatchChanged();
+    if (batch.taskId !== taskId || batch.ownerId !== owner.subjectId)
+      throw inviteError('task_room_operation_changed', '原房间计划的任务或主体已改变。');
+    return batch;
+  }
+  function checkRoomPlan(current, proposed) {
+    displayedRoomBatch(current, proposed.batchId);
+    if (proposed.taskId !== current.taskId || proposed.ownerId !== current.ownerId || proposed.mode !== current.mode
+      || proposed.rooms.length !== current.rooms.length || proposed.rooms.some((room, index) => {
+        const previous = current.rooms[index];
+        return !sameRoomValue(room.input, previous.input) || !sameRoomValue(room.reviewedMembers, previous.reviewedMembers)
+          || room.invitations.length !== previous.invitations.length || room.invitations.some((item, at) => {
+            const prior = previous.invitations[at];
+            return item.subjectId !== prior.subjectId || item.decisionId !== prior.decisionId
+              || !sameRoomValue(item.history, prior.history)
+              || item.input && prior.input && !sameRoomValue(item.input, prior.input);
+          });
+      })) throw inviteError('task_room_operation_changed', '原房间、收件人或已固定提议载荷已改变，请核对原操作。');
+  }
+  // Merge only this exact reviewed plan. A different tab's accepted original
+  // operation is monotone; delayed completion cannot replace a newer plan.
+  async function persistRooms(batch) {
+    const proposed = clone(batch); let matched = false;
+    const stored = await runtime.updateLocal(roomKey, current => {
+      check();
+      if (!current || current.batchId !== proposed.batchId) return current;
+      checkRoomPlan(current, proposed); matched = true;
+      const merged = clone(current);
+      for (let index = 0; index < merged.rooms.length; index++) {
+        const previous = current.rooms[index], next = proposed.rooms[index];
+        const room = { ...previous, ...next, created: previous.created || next.created };
+        room.invitations = previous.invitations.map((prior, at) => {
+          const item = next.invitations[at];
+          if (prior.state === 'acknowledged' || item.state === 'queued' && prior.state !== 'queued') return clone(prior);
+          return { ...prior, ...item, ...(prior.input ? { input: prior.input } : {}) };
+        });
+        if (previous.state === 'acknowledged' || room.created && room.invitations.every(item => item.state === 'acknowledged')) {
+          room.state = 'acknowledged'; room.error = null;
+        } else if (previous.state === 'waiting-for-members' && next.state === 'creating') {
+          room.state = previous.state; room.error = previous.error;
+        }
+        merged.rooms[index] = room;
+      }
+      return merged;
+    }, owner.subjectId);
+    if (matched) for (let index = 0; index < batch.rooms.length; index++) {
+      const room = batch.rooms[index], invitations = room.invitations;
+      Object.assign(room, stored.rooms[index]); room.invitations = invitations;
+      for (let at = 0; at < invitations.length; at++) Object.assign(invitations[at], stored.rooms[index].invitations[at]);
+    }
+    return matched;
   }
   async function rooms(after = '') {
     await read();
@@ -360,6 +505,7 @@ export function createTaskContactClient(runtime, taskId) {
     };
   }
   async function prepareRooms(mode, recipients) {
+    check(); recipients = [...recipients];
     if (
       !['separate', 'together'].includes(mode) ||
       !recipients.length ||
@@ -418,14 +564,21 @@ export function createTaskContactClient(runtime, taskId) {
         })),
       })),
     };
-    await save(roomKey, batch);
-    return batch;
+    return runtime.updateLocal(roomKey, current => {
+      check();
+      if ((current?.batchId ?? null) !== (prior?.batchId ?? null)
+        || current?.rooms.some(room => room.state !== 'acknowledged')) throw Error('请先处理原房间批次。');
+      if (current) displayedRoomBatch(current, prior.batchId);
+      if (ownerId !== owner.subjectId) throw Error('当前身份已变化。');
+      return clone(batch);
+    }, owner.subjectId);
   }
-  async function sendRooms({ confirmed = false } = {}) {
+  /** @param {{confirmed?: boolean, batchId?: string}} [options] */
+  async function sendRooms({ confirmed = false, batchId } = {}) {
     if (!confirmed) throw Error('请确认本次沟通方式及逐人邀请。');
     return lock(async () => {
-      const batch = await runtime.getLocal(roomKey);
-      if (!batch) throw Error('没有房间批次。');
+      const batch = displayedRoomBatch(await runtime.getLocal(roomKey), batchId);
+      if (!await persistRooms(batch)) throw roomBatchChanged();
       for (const room of batch.rooms) {
         if (room.state === 'acknowledged') continue;
         try {
@@ -438,14 +591,14 @@ export function createTaskContactClient(runtime, taskId) {
             )
               throw Error('另有普通房间创建操作待确认，请先恢复它。');
             room.state = 'creating';
-            await save(roomKey, batch);
+            if (!await persistRooms(batch)) return batch;
             const created = pending
               ? await runtime.chat.retry(null, { confirmed: true })
               : await runtime.chat.create(room.input, { confirmed: true });
             if (created.roomId !== room.input.roomId)
               throw Error('房间回执标识不一致。');
             room.created = true;
-            await save(roomKey, batch);
+            if (!await persistRooms(batch)) return batch;
           }
           const path = `/v2/chat/rooms/${room.input.roomId}`;
           for (const invitation of room.invitations) {
@@ -477,7 +630,7 @@ export function createTaskContactClient(runtime, taskId) {
                 decisionId: prior.decisionId,
                 state: prior.state,
               };
-              await save(roomKey, batch);
+              if (!await persistRooms(batch)) return batch;
               continue;
             }
             const pending = await runtime.chat.pending(room.input.roomId);
@@ -504,14 +657,14 @@ export function createTaskContactClient(runtime, taskId) {
               if (waiting) {
                 room.state = 'waiting-for-members';
                 room.error = null;
-                await save(roomKey, batch);
+                if (!await persistRooms(batch)) return batch;
                 return batch;
               }
               if (
                 current.members
                   .map((m) => m.subjectId)
-                  .sort()
-                  .join(',') !== [...room.reviewedMembers].sort().join(',')
+                  .sort((left,right)=>left<right?-1:left>right?1:0)
+                  .join(',') !== [...room.reviewedMembers].sort((left,right)=>left<right?-1:left>right?1:0).join(',')
               )
                 throw Error(
                   '房间成员已变化。请先检查当前成员，再为未加入者预览新的共同决定。',
@@ -523,10 +676,10 @@ export function createTaskContactClient(runtime, taskId) {
                 targetSubjectId: invitation.subjectId,
               };
               invitation.state = 'sending';
-              await save(roomKey, batch);
+              if (!await persistRooms(batch)) return batch;
             }
             invitation.state = 'sending';
-            await save(roomKey, batch);
+            if (!await persistRooms(batch)) return batch;
             const receipt = pending
               ? await runtime.chat.retry(room.input.roomId, { confirmed: true })
               : await runtime.chat.propose(
@@ -536,24 +689,25 @@ export function createTaskContactClient(runtime, taskId) {
                 );
             invitation.state = 'acknowledged';
             invitation.receipt = receipt;
-            await save(roomKey, batch);
+            if (!await persistRooms(batch)) return batch;
           }
           room.state = 'acknowledged';
           room.error = null;
-          await save(roomKey, batch);
+          if (!await persistRooms(batch)) return batch;
         } catch (error) {
           room.state = 'result-unknown';
           room.error = error.message;
-          await save(roomKey, batch);
+          if (!await persistRooms(batch)) return batch;
           break;
         }
       }
       return batch;
     });
   }
-  async function cancelPreparedRooms() {
+  /** @param {{batchId?: string}} [options] */
+  async function cancelPreparedRooms({ batchId } = {}) {
     return lock(async () => {
-      const batch = await runtime.getLocal(roomKey);
+      const batch = displayedRoomBatch(await runtime.getLocal(roomKey), batchId);
       if (
         !batch ||
         batch.rooms.some(
@@ -570,7 +724,11 @@ export function createTaskContactClient(runtime, taskId) {
         );
       if (runtime.api.snapshot()?.subjectId !== batch.ownerId)
         throw Error('当前身份已变化。');
-      await runtime.putLocal(roomKey, null);
+      await runtime.updateLocal(roomKey, current => {
+        check(); displayedRoomBatch(current, batchId);
+        if (!sameRoomValue(current, batch)) throw roomBatchChanged();
+        return null;
+      }, owner.subjectId);
       return null;
     });
   }
@@ -622,6 +780,11 @@ export function createTaskContactClient(runtime, taskId) {
       const batch = await runtime.getLocal(roomKey),
         room = batch?.rooms.find((r) => r.input.roomId === roomId);
       if (!room?.created) throw Error('请先核对这个房间的创建回执。');
+      displayedRoomBatch(batch, batch.batchId);
+      const original = clone(batch);
+      if (batch.rooms.some(item => ['creating', 'result-unknown'].includes(item.state)
+        || item.invitations.some(invitation => invitation.state === 'sending')))
+        throw Error('房间还有原操作待核对，不能刷新替换未知操作。');
       const pending = await runtime.chat.pending(roomId);
       if (pending)
         throw Error('房间还有原操作待核对，请先在房间恢复，不能替换未知操作。');
@@ -677,8 +840,12 @@ export function createTaskContactClient(runtime, taskId) {
       room.reviewedMembers = current.members.map((m) => m.subjectId);
       room.state = 'queued';
       room.error = null;
-      await save(roomKey, batch);
-      return batch;
+      batch.batchId = crypto.randomUUID();
+      return runtime.updateLocal(roomKey, stored => {
+        check(); displayedRoomBatch(stored, original.batchId);
+        if (!sameRoomValue(stored, original)) throw roomBatchChanged();
+        return clone(batch);
+      }, owner.subjectId);
     });
   }
   async function pendingBatch() {
@@ -701,7 +868,7 @@ export function createTaskContactClient(runtime, taskId) {
     }
     return batch;
   }
-  return {
+  const methods = {
     search,
     saveSuggestions,
     prepareInvites,
@@ -716,4 +883,6 @@ export function createTaskContactClient(runtime, taskId) {
     pending: pendingBatch,
     pendingRooms: () => runtime.getLocal(roomKey),
   };
+  /** @typedef {{[K in keyof typeof methods]: (...args: Parameters<(typeof methods)[K]>) => Promise<Awaited<ReturnType<(typeof methods)[K]>>>}} GuardedMethods */
+  return Object.freeze({ close() { closed = true; }, .../** @type {GuardedMethods} */ (Object.fromEntries(Object.entries(methods).map(([name, fn]) => [name, (...args) => guarded(() => fn(...args))]))) });
 }

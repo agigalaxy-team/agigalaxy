@@ -12,7 +12,7 @@ import {invite} from './chat-workflow.mjs';
 test('shared HTTP client and actual MCP tool transport preserve explicit room publication',async()=>{
  const f=await serviceFixture(['binding','notifications']),peer=await serviceFixture(['binding','notifications'],f.db,{migrateDatabase:false}),bodies=new Map();
  f.chat.requireAccountWithin=async()=>{};f.chat.consumeInviteWithin=async()=>{};f.chat.markInviteRespondedWithin=async()=>{};
- f.chat.transport={available:true,project:async()=>{},send:async x=>{bodies.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});return{archiveId:x.messageId};},read:async x=>x.ids.map(id=>bodies.get(id)),erase:async x=>bodies.delete(x.messageId)};
+ f.chat.transport={available:true,project:async()=>{},send:async x=>{bodies.set(x.messageId,{archiveId:x.messageId,text:x.text,revision:1});return{archiveId:x.messageId};},read:async x=>x.ids.map(id=>bodies.get(id)),erase:async x=>{bodies.delete(x.messageId);return{archiveDeleted:true};}};
  const api=createApi(f);await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));
  // The actor was authenticated by the fixture's real binding/session workflow.
  // This isolated MCP transport is not an OAuth-provider integration claim.

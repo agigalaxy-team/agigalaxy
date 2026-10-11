@@ -224,7 +224,8 @@ export class TaskServiceV2 {
       if (row && row.subject_id !== actor.subjectId) throw new ServiceError('not_found', 404);
       const matches = row && row.task_id === input.taskId && row.payload_hash === input.payloadHash;
       return { ...parsed.data, state: !row ? 'absent' : matches ? 'acknowledged' : 'conflict', checkedAt: this.access.now(),
-        ...(matches ? { version: row.version, participationVersion: row.participation_version } : {}),
+        ...(matches ? { version: row.version, participationVersion: row.participation_version,
+          participationId: row.participation_id ?? null, kind: row.kind } : {}),
         authority: 'accepted-event-only; not-current-authorization' };
     });
   }

@@ -100,8 +100,19 @@ export async function verifyPersonalMcp(database=null,options={}) {
     clients.push(sdk);
     await sdk.connect(new StreamableHTTPClientTransport(new URL(resource),{fetch:fetchFn,requestInit:{headers:{authorization:'Bearer '+token}}}));
     const tools=await sdk.listTools();
-    for(const name of ['galaxy_case_submit','galaxy_tasks_v2_query','galaxy_task_v2_create','galaxy_participation_v2_event','galaxy_account_quotas'])
+    for(const name of ['galaxy_case_submit','galaxy_tasks_v2_query','galaxy_task_v2_create','galaxy_participation_v2_event','galaxy_account_quotas',
+      'galaxy_trust_sources','galaxy_trust_permission_preview','galaxy_trust_permission_revoke_preview',
+      'galaxy_trust_permission_submit','galaxy_trust_permission_receipt','galaxy_trust_permission_status','galaxy_trust_permission_query',
+      'galaxy_personal_summary_receipt'])
       assert.ok(tools.tools.some(tool=>tool.name===name),'required current or compatible tool: '+name);
+    const summaryReceiptInput={summaryId:randomUUID(),versionId:randomUUID()};
+    const summaryReceipt=await sdk.callTool({name:'galaxy_personal_summary_receipt',arguments:summaryReceiptInput});
+    assert.ok(!summaryReceipt.isError,JSON.stringify(summaryReceipt));
+    assert.deepEqual(JSON.parse(summaryReceipt.content[0].text),{state:'absent',operationVersionId:summaryReceiptInput.versionId,summaryId:summaryReceiptInput.summaryId,readOnly:true});
+    const emptyTrust=await sdk.callTool({name:'galaxy_trust_permission_query',arguments:{}});
+    assert.ok(!emptyTrust.isError,JSON.stringify(emptyTrust));
+    const forgedTrust=await sdk.callTool({name:'galaxy_trust_permission_submit',arguments:{signed:'unsigned-model-approval'}});
+    assert.equal(forgedTrust.isError,true,'transport OAuth cannot supply a current-device trust reproduction signature');
     const status=JSON.parse((await sdk.callTool({name:'galaxy_connection_status',arguments:{}})).content[0].text);
     assert.equal(status.subjectId,f.actor.subjectId);assert.equal(status.authorization,'oauth-resource');
     const proactive={operationId:randomUUID(),taskId:randomUUID(),caseId:null,intent:'proactive-review',
@@ -145,6 +156,9 @@ export async function verifyPersonalMcp(database=null,options={}) {
     const shallow=await authorize('galaxy:binding');
     const scopeFailure=await rpc(shallow,{jsonrpc:'2.0',id:randomUUID(),method:'tools/call',params:{name:'galaxy_case_get',arguments:{id:parent.id}}});
     assert.equal(scopeFailure.status,403);assert.ok(scopeFailure.headers.get('www-authenticate').includes('galaxy:case-teaser'));
+    const trustScopeFailure=await rpc(shallow,{jsonrpc:'2.0',id:randomUUID(),method:'tools/call',params:{name:'galaxy_trust_permission_query',arguments:{}}});
+    assert.equal(trustScopeFailure.status,403);
+    assert.ok(trustScopeFailure.headers.get('www-authenticate').includes('galaxy:consent'),'trust reproduction uses its separate current Consent scope');
     const {actor:shallowActor}=await authority.authenticate(shallow);
     await assert.rejects(f.cases.get(shallowActor,parent.id),error=>error.code==='access_denied');
     const {actor:fullActor,authInfo:fullInfo}=await authority.authenticate(token);

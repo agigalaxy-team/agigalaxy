@@ -1,0 +1,6 @@
+<!-- docs release 0.1.1; historical protocol profile v0.4 -->
+# 网页入口与已有客户端
+
+2026-09-13。打开 https://agigalaxy.org/app/ 。初次创建身份只上传公开材料，连接及数据操作分别确认。恢复码请存放在设备之外。
+
+当前下载与逐批签名见 /downloads/ 和 /docs/native-client-v0.2/installation.md。共享原生客户端包含Skill、MCP及宿主配置生成；新版本采用新目录并保留已有身份。实际工具发现、协议联调和桌面体验分别验收，不把旧候选覆盖到现有安装。

@@ -19,7 +19,7 @@ let runtime,client,sourceConsentId,permissionId,permissionRevoked=false,apiCalls
 try{
  const ready=await fetch('https://official.agigalaxy.org/readyz',{redirect:'error'});
  assert.equal(ready.status,200);assert.equal(ready.headers.get('x-galaxy-release'),release);
- const config=await loadWebConfiguration((path,options)=>fetch('https://agigalaxy.org'+path,options));
+ const config=await loadWebConfiguration((path,options)=>{assert.equal(path,'/galaxy-web-config.json');return fetch('https://agigalaxy.org/galaxy-web-config.json',options);});
  assert.equal(config.endpoint,'https://official.agigalaxy.org');record.checks.selectedOfficialPinConfiguration=true;
  runtime=await createWebRuntime(config,{store,fetch:(url,options)=>{apiCalls++;return fetch(url,{...options,headers:{...options.headers,Origin:'https://agigalaxy.org'}});}});
  step='synthetic-identity';await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});

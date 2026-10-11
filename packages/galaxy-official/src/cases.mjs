@@ -4,9 +4,10 @@ import { digest } from './shared/digest.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { assertCaseReview, projectCaseReviews } from './domain/case-review.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
-import { projectCaseFacts, factAt, latestFact, publicFactView } from './domain/intervention.mjs';
+import { projectCaseFacts, factAt, latestFact, publicFactView, currentResolutionView } from './domain/intervention.mjs';
 
-import { caseEventSchema, caseEventV2Schema, caseTaskLinkSchema, factReferenceSchema } from './shared/cases-schema.mjs';
+import { caseEventSchema, caseEventV2Schema, caseTaskLinkSchema, factReferenceSchema, caseEventReceiptSchema, caseTaskLinkReceiptSchema,taskCaseContainerSummary } from './shared/cases-schema.mjs';
+import { caseTaskLinkPayloadHash, legacyCaseTaskLinkPayloadHash } from './shared/case-operation-hash.mjs';
 export { caseEventSchema, caseEventV2Schema } from './shared/cases-schema.mjs';
 
 function parseFact(payloadJson) {
@@ -124,7 +125,15 @@ export class CaseService {
     const found=factAt(facts,kind,ref);
     rule(found,'invalid_result_origin',422);
     if(own)rule(found.actorId===actor.subjectId,'origin_not_authorized',403);
-    if(latest)rule(latestFact(facts,kind,ref.id)?.version===ref.version,'fact_version_conflict');
+    if(latest){
+      rule(latestFact(facts,kind,ref.id)?.version===ref.version,'fact_version_conflict');
+      // Retained changes without their body cannot identify an object/version.
+      // They make this author's earlier currentness unknown, never a license
+      // to reuse an erased version. Nonlatest historical reads stay separate.
+      const changes={attempt:['attempt-end','attempt-correct'],intervention:['intervention'],result:['result-recorded']}[kind]??[];
+      rule(!rows.some(row=>changes.includes(row.kind)&&!row.payload_text
+        &&row.subject_id===found.actorId&&row.version>found.caseVersion),'fact_currentness_unavailable');
+    }
     const key=`${kind}:${ref.id}:${ref.version}`;
     if(visited.has(key))return found;
     visited.add(key);
@@ -146,24 +155,24 @@ export class CaseService {
     return this.sources.requireReferenceWithin(db,actor,ref,{caseId:facts.caseId,visited});
   }
 
-  async submitV2Within(db,actor,{consentId,payloadJson},authorization,{allowTaskRoot=false}={}) {
+  async submitV2Within(db,actor,{consentId,payloadJson},authorization,{allowTaskRoot=false,taskRootContext=null}={}) {
     const event=parseFact(payloadJson),records=caseRepository(db),caseId=event.caseId;
     rule(event.actorId===actor.subjectId,'actor_mismatch',403);
     if(event.kind==='case-created'){
       rule(event.eventId===caseId,'case_root_id_mismatch',422);
-      rule(!event.participationId,'requester_required',403);
+      rule(!event.participationId||allowTaskRoot&&taskRootContext?.participation,'requester_required',403);
       rule(!event.taskId||allowTaskRoot,'task_case_link_required');
-      await records.ensureCase(caseId,actor.subjectId,event.localRef,event.source.reference);
+      await records.ensureCase(caseId,taskRootContext?.ownerId??actor.subjectId,event.localRef,event.source.reference);
     }
     const parent=await records.lockAnyForWrite(caseId);
     rule(parent,'case_conflict_or_not_found');
     const owner=parent.subject_id===actor.subjectId;
-    let participation=null;
+    let participation=event.kind==='case-created'&&allowTaskRoot?taskRootContext?.participation??null:null;
     if(!owner||event.participationId){
       rule(this.tasks&&event.taskId&&event.participationId,'participation_required',403);
-      const task=await this.tasks.requireTaskWithin(db,actor,event.taskId,{write:false});
-      rule(task.caseId===caseId,'task_case_link_required');
-      participation=await this.tasks.requireParticipationWithin(db,actor,{taskId:event.taskId,participationId:event.participationId});
+      if(!participation){const task=await this.tasks.requireTaskWithin(db,actor,event.taskId,{write:false});
+       rule(task.caseId===caseId,'task_case_link_required');
+       participation=await this.tasks.requireParticipationWithin(db,actor,{taskId:event.taskId,participationId:event.participationId});}
       rule(participation.subjectId===actor.subjectId,'participation_required',403);
     }
     const intent=await this.consents.require(db,{id:consentId,subjectId:actor.subjectId,action:'case.teaser.publish',
@@ -177,7 +186,7 @@ export class CaseService {
     rule(parent.state!=='withdrawn','case_withdrawn');
     const rows=await records.events(caseId),facts=projectCaseFacts(rows,parent);
     rule(rows.length<1000,'case_event_limit',413);
-    if(event.kind==='case-created')rule(owner&&rows.length===0,'case_conflict_or_not_found');
+    if(event.kind==='case-created')rule((owner||allowTaskRoot&&!!taskRootContext?.participation)&&rows.length===0,'case_conflict_or_not_found');
     else rule(parent.version===event.expectedVersion,'version_conflict');
     const scopeVersion=event.scopeVersion??event.taskScopeVersion??facts.scopeVersion;
     if(event.kind!=='case-created'&&event.kind!=='case-scope-revised')
@@ -251,6 +260,33 @@ export class CaseService {
       claimAuthority:'participant-reported',verification:'not-provided',acceptance:'not-provided',resolution:'separate'};
   }
 
+  // A receipt proves acceptance of the caller's exact operation only. It does
+  // not read the Case projection, revive Consent, or expose retained fact text.
+  receipt(actor,input){
+    const parsed=caseEventReceiptSchema.safeParse(input);
+    rule(parsed.success,'invalid_case_receipt',400);
+    const query=parsed.data;
+    return this.access.runAuthorized(actor,'case-teaser',async db=>{
+      const row=await caseRepository(db).eventReceipt(query.eventId,actor.subjectId);
+      const state=!row?'absent':row.case_id!==query.caseId||row.payload_hash!==query.payloadHash?'conflict':'acknowledged';
+      return {...query,state,checkedAt:new Date(this.access.now()*1000).toISOString(),authority:'accepted-operation-only',currentAccessGranted:false,
+        ...(state==='acknowledged'?{caseVersion:row.version,verification:'not-provided',acceptance:'not-provided',resolution:'separate'}:{})};
+    });
+  }
+
+  taskLinkReceipt(actor,input){
+    const parsed=caseTaskLinkReceiptSchema.safeParse(input);
+    rule(parsed.success,'invalid_case_receipt',400);
+    const query=parsed.data;
+    return this.access.runAuthorized(actor,'case-teaser',async db=>{
+      const row=await caseRepository(db).operationReceipt(query.operationId,actor.subjectId);
+      const state=!row?'absent':row.task_id!==query.taskId||row.payload_hash!==query.payloadHash?'conflict':'acknowledged';
+      const prior=state==='acknowledged'?row.receipt:null;
+      return {...query,state,checkedAt:new Date(this.access.now()*1000).toISOString(),authority:'accepted-operation-only',currentAccessGranted:false,
+        ...(prior?{caseId:row.case_id,caseVersion:prior.caseVersion,taskVersion:prior.taskVersion,taskCaseLinkVersion:prior.taskCaseLinkVersion}:{})};
+    });
+  }
+
   async respondBatch(actor,requests){
     rule(Array.isArray(requests)&&requests.length>0&&requests.length<=32,'invalid_response_batch',422);
     const results=[];
@@ -273,20 +309,34 @@ export class CaseService {
       &&initial.expectedVersion===1,'initial_work_fact_required',422);
     return this.access.runResourceWrite(actor,'case-teaser',{},async(db,authorization)=>{
       const task=await this.tasks.requireTaskWithin(db,actor,command.taskId,{write:true}),records=caseRepository(db);
-      rule(task.requesterId===actor.subjectId,'requester_required',403);
-      const hash=digest(JSON.stringify(command)),prior=await records.operationLink(command.operationId);
+      const hash=caseTaskLinkPayloadHash(command),prior=await records.operationLink(command.operationId);
       if(prior){
-        rule(prior.subject_id===actor.subjectId&&prior.task_id===command.taskId&&prior.payload_hash===hash,'event_conflict');
+        rule(prior.subject_id===actor.subjectId&&prior.task_id===command.taskId
+          &&[hash,legacyCaseTaskLinkPayloadHash(command)].includes(prior.payload_hash),'event_conflict');
         await this.requireEventVisibleWithin(db,actor,await records.event(root.eventId));
         await this.requireEventVisibleWithin(db,actor,await records.event(initial.eventId));
-        return prior.receipt;
+        return {...prior.receipt,operationId:command.operationId,payloadHash:prior.payload_hash};
       }
       rule(!task.caseId&&!(await records.taskLink(command.taskId)),'task_case_link_conflict');
       rule(task.row.version===command.expectedTaskVersion,'task_version_conflict');
-      await this.submitV2Within(db,actor,command.case,authorization,{allowTaskRoot:true});
-      const linkedTask=await this.tasks.attachCaseWithin(db,{taskId:command.taskId,caseId:root.caseId,requesterId:actor.subjectId});
+      let participation=null;
+      if(task.requesterId!==actor.subjectId){
+        rule(root.participationId&&root.participationId===initial.participationId&&root.actorId===initial.actorId,'participation_required',403);
+        participation=await this.tasks.requireParticipationWithin(db,actor,{taskId:command.taskId,participationId:root.participationId});
+        rule(participation.subjectId===actor.subjectId&&['active','delivered','accepted','disputed'].includes(participation.state),'participation_required',403);
+        rule(!participation.paused&&!['canceled','closed'].includes(participation.taskState),'participation_paused',403);
+        rule(root.participationScopeVersion===participation.scopeVersion&&initial.participationScopeVersion===participation.scopeVersion,'participation_scope_changed');
+        rule(root.taskScopeVersion===task.snapshot.scopeVersion&&initial.taskScopeVersion===task.snapshot.scopeVersion,'invalid_scope_version',422);
+        rule(root.title===task.snapshot.request.title&&root.summary===taskCaseContainerSummary,'invalid_task_case_root',422);
+        const rootGrant=await this.consents.require(db,{id:command.case.consentId,subjectId:actor.subjectId,action:'case.teaser.publish',objectId:root.eventId,recipient:this.endpoint,payloadJson:command.case.payloadJson}),
+          initialGrant=await this.consents.require(db,{id:command.initialFact.consentId,subjectId:actor.subjectId,action:'case.teaser.publish',objectId:initial.eventId,recipient:this.endpoint,payloadJson:command.initialFact.payloadJson});
+        rule(rootGrant.visibility==='Private'&&initialGrant.visibility==='Private'
+          &&JSON.stringify([...rootGrant.viewers].sort((left,right)=>left<right?-1:left>right?1:0))===JSON.stringify([...initialGrant.viewers].sort((left,right)=>left<right?-1:left>right?1:0)),'disclosure_mismatch',403);
+      }
+      await this.submitV2Within(db,actor,command.case,authorization,{allowTaskRoot:true,taskRootContext:{ownerId:task.requesterId,participation}});
+      const linkedTask=await this.tasks.attachCaseWithin(db,{taskId:command.taskId,caseId:root.caseId,requesterId:task.requesterId});
       const fact=await this.submitV2Within(db,actor,command.initialFact,authorization);
-      const receipt={caseId:root.caseId,taskId:command.taskId,caseVersion:fact.caseVersion,
+      const receipt={operationId:command.operationId,payloadHash:hash,caseId:root.caseId,taskId:command.taskId,caseVersion:fact.caseVersion,
         taskVersion:linkedTask.version,taskCaseLinkVersion:1,synthetic:root.synthetic,failedAttemptsCreated:0,initialFact:fact.objectRef};
       await records.insertTaskLink({taskId:command.taskId,caseId:root.caseId,operationId:command.operationId,
         subjectId:actor.subjectId,hash,receipt});
@@ -342,7 +392,56 @@ export class CaseService {
           safe.push(row);
         }catch(error){if(!(error instanceof ServiceError))throw error;unavailableReasons.add(error.code);}
       }
-      const facts=publicFactView(projectCaseFacts(safe,parent));
+      const projected=projectCaseFacts(safe,parent);
+      // Select current opinions from the whole original sequence before applying
+      // read permission. A newer private/revoked reply cannot revive an older one.
+      const latestResponses=new Map(),erasedResponseVersions=new Map(),safeIds=new Set(safe.map(row=>row.id));
+      const responseKey=(ref,subjectId)=>`${ref.id}:${ref.version}:${subjectId}`;
+      for(const row of rows.filter(row=>row.kind==='intervention-response').sort((a,b)=>a.version-b.version)){
+        if(!row.payload_text){
+          erasedResponseVersions.set(row.subject_id,row.version);
+          continue;
+        }
+        latestResponses.set(responseKey(row.payload.interventionRef,row.subject_id),row);
+      }
+      for(const intervention of projected.interventions){
+        const currentIds=new Set();let complete=true;
+        for(const row of latestResponses.values()){
+          const ref=row.payload.interventionRef;
+          if(ref.id!==intervention.id||ref.version!==intervention.version)continue;
+          // A retained reply without its body cannot identify its target. It
+          // makes only this author's earlier opinions uncertain, never a new
+          // inferred answer. A later explicit readable reply can restore them.
+          if(safeIds.has(row.id)&&row.version>(erasedResponseVersions.get(row.subject_id)??0))currentIds.add(row.id);
+          else complete=false;
+        }
+        for(const [subjectId,version] of erasedResponseVersions){
+          if(version<=intervention.caseVersion)continue;
+          const later=latestResponses.get(responseKey(intervention,subjectId));
+          if(!later||later.version<=version||!safeIds.has(later.id))complete=false;
+        }
+        intervention.responses=intervention.responses.filter(response=>currentIds.has(response.id));
+        const others=intervention.responses.filter(response=>response.relationship!=='self');
+        intervention.confirmation=others.some(response=>response.state==='disputed')?'disputed':others.some(response=>response.state==='partial')
+          ?'partially-confirmed':others.some(response=>response.state==='accepted')?'confirmed':'unconfirmed';
+        intervention.responseCoverage={mode:'currently-authorized-latest-per-actor',complete};
+        if(!complete)unavailableReasons.add('intervention_response_currentness_unavailable');
+      }
+      // A hidden or withdrawn correction cannot restore an older Result as
+      // current support. The view reveals no private correction ID or version.
+      projected.resolution=currentResolutionView(projected,all);
+      const decision=projected.resolution;
+      if(decision.status!=='unrecorded'&&decision.resultRefs.some(ref=>{
+        const result=factAt(all,'result',ref);
+        // An erased newer result body no longer identifies what it corrected.
+        // Its original author/kind/sequence can only make support uncertain;
+        // they cannot establish a replacement version or revive old support.
+        return result&&rows.some(row=>row.kind==='result-recorded'&&!row.payload_text
+          &&row.subject_id===result.actorId&&row.version>decision.caseVersion);
+      }))projected.resolution={status:'unrecorded',scopeVersion:projected.scopeVersion,priorResolutionId:decision.id,
+        currentSupport:'referenced-result-currentness-unavailable',currentDecisionAvailable:false,reconfirmationRequired:true,
+        summary:'结果当前版本资料不完整，当前解决程度需要重新确认。'};
+      const facts=publicFactView(projected);
       // Conditions are optional comparison metadata. Losing this permission
       // cannot erase otherwise independent Attempt/Result facts. Explicit
       // sourceRefs/deliverableRefs above remain real content dependencies.

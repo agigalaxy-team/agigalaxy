@@ -7,7 +7,7 @@ import {browserScopes} from '../src/browser-client.mjs';
 import {createAttachmentsClient} from '../../galaxy-web/src/chat-attachments-client.mjs';
 import {createChatClient} from '../../galaxy-web/src/chat-client.mjs';
 import {attachmentContractFixture} from './chat-attachments-workflow.mjs';
-const store=()=>{const m=new Map();return {get:async k=>structuredClone(m.get(k)),put:async(k,v)=>m.set(k,structuredClone(v))};};
+const store=()=>{const m=new Map();return {get:async k=>structuredClone(m.get(k)),put:async(k,v)=>m.set(k,structuredClone(v)),update:async(k,updater)=>{const next=updater(structuredClone(m.get(k)));if(next&&typeof next.then==='function')throw Error('synchronous_update_required');m.set(k,structuredClone(next));return structuredClone(next);}};};
 test('browser binary transfer recovers exact upload receipt and checks digest/current identity without exposing credentials',{timeout:60000},async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),contract=attachmentContractFixture();
  Object.assign(f.attachments,contract);f.chat.requireAccountWithin=async()=>{};

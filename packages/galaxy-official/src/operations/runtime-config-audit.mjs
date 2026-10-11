@@ -19,10 +19,11 @@ const roleFields=['auditReaderIds','auditReviewerIds','builderAssessorIds','mode
 
 // Build from the already loaded values used by this process, never from an
 // environment dump or a second read of a possibly changed configuration file.
-export function runtimeConfigSnapshot({governance,governanceReview=null,incident,retirement=null,release=null,signingKeyId=null,trustSequence=null,requestQuotaHash,communityQuotaHash,browserPolicyHash,chatConfigurationHash,resourceBudgetHash,searchIndexMode,network,identityConfigurationHash,personalMcpConfigurationHash}){
+export function runtimeConfigSnapshot({governance,governanceReview=null,incident,retirement=null,release=null,signingKeyId=null,trustSequence=null,requestQuotaHash,communityQuotaHash,forumPolicyHash,browserPolicyHash,chatConfigurationHash,resourceBudgetHash,searchIndexMode,network,identityConfigurationHash,personalMcpConfigurationHash}){
   const result={version:1,governance:null,retirement:null,release:null,signingKeyId,trustSequence};
   if(requestQuotaHash!==undefined)result.requestQuotaHash=requestQuotaHash;
   if(communityQuotaHash!==undefined)result.communityQuotaHash=communityQuotaHash;
+  if(forumPolicyHash!==undefined)result.forumPolicyHash=forumPolicyHash;
   if(browserPolicyHash!==undefined)result.browserPolicyHash=browserPolicyHash;
   if(chatConfigurationHash!==undefined)result.chatConfigurationHash=chatConfigurationHash;
   if(resourceBudgetHash!==undefined)result.resourceBudgetHash=resourceBudgetHash;
@@ -43,7 +44,7 @@ export function runtimeConfigSnapshot({governance,governanceReview=null,incident
 const sha=z.string().regex(/^[a-f0-9]{64}$/);
 const snapshotSchema=z.object({version:z.literal(1),incident:z.object({id:ref,revision:z.number().int().positive(),state:z.enum(['contained','recovery','resolved']),updatedAt:z.number().int().nonnegative(),sha256:sha}).strict().nullable().optional(),requestQuotaHash:sha.optional(),resourceBudgetHash:sha.optional(),identityConfigurationHash:sha.optional(),governance:z.object({configurationSha256:sha.optional(),review:governanceReviewRecordSchema.nullable().optional(),roles:z.object(Object.fromEntries(roleFields.map(key=>[key,z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(128)]))).strict(),policyHashes:z.object({honorRules:sha,qualificationPolicies:sha,conformanceSuitePins:sha}).strict()}).strict().nullable(),
   retirement:z.object({id:ref,sha256:sha,announcedAt:z.number().int().nonnegative(),stopWritesAt:z.number().int().nonnegative(),takeoutUntil:z.number().int().nonnegative(),statusUntil:z.number().int().nonnegative()}).strict().nullable(),
-  searchIndexMode:z.enum(['enabled','disabled','unconfigured']).optional(),communityQuotaHash:sha.optional(),browserPolicyHash:sha.optional(),chatConfigurationHash:sha.nullable().optional(),honorRegistry:honorRegistrySchema.optional(),qualificationRegistry:qualificationRegistrySchema.optional(),personalMcpConfigurationHash:sha.nullable().optional(),
+  searchIndexMode:z.enum(['enabled','disabled','unconfigured']).optional(),communityQuotaHash:sha.optional(),forumPolicyHash:sha.optional(),browserPolicyHash:sha.optional(),chatConfigurationHash:sha.nullable().optional(),honorRegistry:honorRegistrySchema.optional(),qualificationRegistry:qualificationRegistrySchema.optional(),personalMcpConfigurationHash:sha.nullable().optional(),
   experienceReviewerRegistry:z.object({version:z.literal(1),reviewers:z.array(z.object({subjectId:z.string().regex(/^GUID[0-9A-Z]{28}$/),definitionHash:sha}).strict()).max(128)}).strict().optional(),
   network:z.object({type:z.enum(['official','hub']),manifestSha256:sha}).strict().optional(),
   release:z.object({id:ref,configurationVersion:ref,manifestSha256:sha}).strict().nullable(),signingKeyId:z.string().min(1).max(200).nullable(),trustSequence:z.number().int().nonnegative().nullable()}).strict();

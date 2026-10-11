@@ -50,7 +50,7 @@ export async function verifyTargetGovernanceV2({database=null,adminDatabase=null
   const self={schemaVersion:2,id:randomUUID(),reportId:a.p.id,expectedVersion:1,kind:'pause',summary:'Invalid self judgement',targetVersion:1,scopes:['discovery-hidden'],until:now+1000,rule:'synthetic-v1'};
   await assert.rejects(g.event(owner.actor,await authorization(owner,self,[f.actor.subjectId])),e=>e.code==='target_independent_handler_required');
   await assert.rejects(g.read(other.actor,a.p.id),e=>e.status===404);
-  const paused=await event(handler,a,'pause',{targetVersion:1,scopes:['discovery-hidden','new-participation-paused'],until:now+1000,rule:'synthetic-v1'});
+  const _paused=await event(handler,a,'pause',{targetVersion:1,scopes:['discovery-hidden','new-participation-paused'],until:now+1000,rule:'synthetic-v1'});
   await assert.rejects(f.assistance.getPublicTask(task.taskId),e=>e.status===404);
   assert.equal((await f.assistance.queryPublicTasks({})).items.some(x=>x.taskId===task.taskId),false);
   assert.equal((await f.assistance.getTask(owner.actor,task.taskId)).governance.scopes.includes('discovery-hidden'),true);
@@ -117,7 +117,7 @@ export async function verifyTargetGovernanceV2({database=null,adminDatabase=null
   const local=new Map();await connect();const client=createTargetGovernanceClientV2({api:browser,subjectId:f.actor.subjectId,getLocal:async k=>structuredClone(local.get(k)),putLocal:async(k,v)=>local.set(k,structuredClone(v))});
   const browserPayload={schemaVersion:2,id:randomUUID(),target:(await client.target({type:'room',id:roomId})).target,category:'other',summary:'SYNTHETIC browser-client report exact lost reply'};
   const preview=await client.prepare('report',browserPayload,{viewers:[handler.actor.subjectId]});await assert.rejects(client.execute(preview,{confirmed:true}),/synthetic lost/);
-  await connect();assert.equal((await client.retry(browserPayload.id,{confirmed:true})).state,'acknowledged');assert.equal(writes,1);assert.deepEqual(await client.pending(),[]);await browser.disconnect();
+  await connect();assert.equal((await client.retry(browserPayload.id,{confirmed:true})).state,'acknowledged');assert.equal(writes,1);assert.deepEqual(await client.pending(),[]);browser.disconnect();
   // Current source revocation is not undone by resuming the governance case.
   await owner.consents.revoke(owner.actor,taskEnv.consentId);await event(handler,b,'resume',{},[owner.actor.subjectId]);
   await assert.rejects(f.assistance.getPublicTask(task.taskId),e=>[403,404].includes(e.status));

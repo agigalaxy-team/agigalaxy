@@ -20,14 +20,17 @@ export class ExperienceReviewService{
     if(this.registryEnabled){const current=await currentExperienceReviewerRegistry(db,this.access.endpoint);rule(current.reviewers.some(p=>p.subjectId===subjectId&&p.definitionHash===experienceReviewerHash(r)),'experience_reviewer_unavailable',403);}return r;}
   async rowWithin(db,id,write=false){return(await db.query(`SELECT * FROM experience_objects WHERE id=$1 ${write?'FOR UPDATE':'FOR SHARE'}`,[id])).rows[0];}
   async eventWithin(db,id,version){return(await db.query('SELECT * FROM experience_events WHERE object_id=$1 AND version=$2',[id,version])).rows[0];}
-  async visibleWithin(db,actor,row,event){rule(event?.payload_text,'experience_unavailable',404);
+  async visibleWithin(db,actor,row,event,readEventWithin=null){rule(event?.payload_text,'experience_unavailable',404);
+    // Only the internal task calculation reader can license this exact event.
+    // Public read() never supplies it and retains the original source ACL.
+    if(readEventWithin)return readEventWithin('experience-event',{...event,id:event.operation_id,subject_id:row.subject_id});
     const grant=await this.consents.require(db,{id:event.consent_id,subjectId:row.subject_id,objectId:event.operation_id,action:'experience.submit',recipient:this.access.endpoint,payloadJson:event.payload_text});
     rule(canReadProjection(grant,{viewerId:actor?.subjectId??null,now:this.access.now()}),'experience_unavailable',404);return grant;}
-  async readWithin(db,actor,{id,version},visited=new Set()){
+  async readWithin(db,actor,{id,version},visited=new Set(),readEventWithin=null){
     rule(!visited.has(id),'experience_source_cycle');visited.add(id);
     try{
       const row=await this.rowWithin(db,id);rule(row,'experience_unavailable',404);
-      const event=await this.eventWithin(db,id,version??row.version);await this.visibleWithin(db,actor,row,event);
+      const event=await this.eventWithin(db,id,version??row.version);await this.visibleWithin(db,actor,row,event,readEventWithin);
       const record=JSON.parse(event.payload_text),base={id,type:row.object_type,subjectId:row.subject_id,version:event.version,currentVersion:row.version,
         synthetic:record.synthetic,sourceGroup:row.source_key,capabilityVerified:false,taskOutcomeVerified:false,authority:'signed-author-or-registered-reviewer-report; not-automatic-external-verification'};
       if(row.state==='revoked')return{...base,record:null,referenceStatus:'revoked'};
@@ -35,7 +38,7 @@ export class ExperienceReviewService{
       if(record.expiresAt&&Date.parse(record.expiresAt)<=this.access.now()*1000)status='expired';
       if(row.object_type==='review'){
         try{
-          const source=await this.readWithin(db,actor,record.experienceRef,visited);
+          const source=await this.readWithin(db,actor,record.experienceRef,visited,readEventWithin);
           rule(source.referenceStatus==='current'&&source.record,'experience_source_unavailable');
           const reviewer=await this.reviewerWithin(db,row.subject_id,record.capabilityId,source.record.kind);
           rule(source.record.subjectId!==row.subject_id,'experience_nonparty_reviewer_required',403);

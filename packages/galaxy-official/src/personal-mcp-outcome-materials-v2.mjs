@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { outcomeMaterialEventSchema, outcomeMaterialQuerySchema, outcomeMaterialReadSchema,
+import { outcomeMaterialQuerySchema, outcomeMaterialReadSchema,
   outcomeMaterialSelectionSchema, outcomeMaterialReceiptSchema } from './shared/outcome-material-v2-schema.mjs';
 
 const envelope = z.strictObject({ consentId: z.uuid(), payloadJson: z.string().min(1).max(24000) });
@@ -23,8 +23,14 @@ export function outcomeMaterialToolDefinitions(services, actor) {
       'Decline, cancel or revoke one outcome material using an exact signed control event. Revocation schedules only the Galaxy-held copy for cleanup.',
       input => services.outcomeMaterials.control(actor, input), true),
     galaxy_outcome_material_read: tool(outcomeMaterialReadSchema,
-      'Read one current outcome material only when its owner, source-author and Case permissions remain valid. Permission loss returns metadata without the body to a party.',
-      input => services.outcomeMaterials.read(actor, input)),
+      'Read one current outcome material only when its owner, source-author and Case permissions remain valid. Text content may be returned; attachments return metadata and instructions for explicit authorized web or HTTP retrieval, never binary base64. Permission loss returns metadata without the body or retrieval instructions to a party.',
+      async input => {
+        const { bytesBase64, ...view } = await services.outcomeMaterials.read(actor, input);
+        if (typeof bytesBase64 !== 'string' || !view.contentAvailable || view.authorization !== 'current') return view;
+        return { ...view, fileRetrieval: { via: 'existing-authorized-web-or-http', method: 'POST',
+          path: '/v2/outcome-materials/read', input: { id: view.materialId, version: view.version },
+          currentAuthorizationRequired: true } };
+      }),
     galaxy_outcome_material_inspect: tool(outcomeMaterialReadSchema,
       'Inspect the current proposal and request hash for a material you own or authored; this does not mean it was approved or reused.',
       input => services.outcomeMaterials.inspect(actor, input)),

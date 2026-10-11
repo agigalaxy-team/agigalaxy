@@ -45,7 +45,7 @@ export function projectCaseFacts(rows, parent) {
       const intervention = find('intervention',e.interventionRef);
       if (!intervention) continue;
       const response = { id:eventId,actorId:e.actorId,state:e.state,summary:e.summary,interventionRef:e.interventionRef,
-        relationship:e.actorId===parent.subject_id?'requester':e.actorId===intervention.actorId?'self':'participant',
+        relationship:e.actorId===intervention.actorId?'self':e.actorId===parent.subject_id?'requester':'participant',
         recordEventIds:[...intervention.recordEventIds,eventId] };
       facts.responses.push(response);
       intervention.responses = [...intervention.responses.filter(r=>r.actorId!==response.actorId),response];
@@ -74,10 +74,24 @@ export function projectCaseFacts(rows, parent) {
     }
   }
   facts.scopeVersion = facts.scopes.at(-1)?.version ?? 1;
-  // A newer task goal does not silently change the meaning of an old decision.
-  if(facts.resolution.status!=='unrecorded'&&facts.resolution.scopeVersion!==facts.scopeVersion)
-    facts.resolution={status:'unrecorded',scopeVersion:facts.scopeVersion,priorResolutionId:facts.resolution.id};
+  facts.resolution = currentResolutionView(facts);
   return facts;
+}
+
+// Keep the original decision in resolutions. A corrected supporting Result
+// needs a fresh decision; it never changes the old decision into a failure.
+// currentFacts may contain newer versions that this viewer cannot read. Only
+// the support boundary is returned, never the private version or correction.
+export function currentResolutionView(facts, currentFacts = facts) {
+  const decision = facts.resolutions.at(-1);
+  if (!decision) return { status: 'unrecorded' };
+  if (decision.scopeVersion !== facts.scopeVersion)
+    return { status: 'unrecorded', scopeVersion: facts.scopeVersion, priorResolutionId: decision.id };
+  if (decision.resultRefs.some(ref => latestFact(currentFacts, 'result', ref.id)?.version !== ref.version))
+    return { status: 'unrecorded', scopeVersion: facts.scopeVersion, priorResolutionId: decision.id,
+      currentSupport: 'referenced-result-superseded', currentDecisionAvailable: false, reconfirmationRequired: true,
+      summary: '引用的结果已更正，当前解决程度需要重新确认。' };
+  return decision;
 }
 
 export function factAt(facts, kind, reference) {

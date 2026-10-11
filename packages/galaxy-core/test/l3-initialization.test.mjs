@@ -69,83 +69,26 @@ test('recovery is displayed by command, CLI and native alert without opening ini
   assert.equal(await readFile(join(directory, '.galaxy-reset.json'), 'utf8'), marker);
 });
 
-test('native adapter navigation, literal confirmation and independent connection page', async (context) => {
-  const dir = await mkdtemp(join(tmpdir(), 'galaxy-l3-adapter-'));
-  const prior = process.env.GALAXY_DATA_DIR;
-  process.env.GALAXY_DATA_DIR = dir;
-  context.after(async () => {
-    if (prior === undefined) delete process.env.GALAXY_DATA_DIR;
-    else process.env.GALAXY_DATA_DIR = prior;
-    await rm(dir, { recursive: true, force: true });
-  });
+test('native purpose entry opens without identity creation and prepares the device only after the actual selection', async context => {
+  const dir = await mkdtemp(join(tmpdir(), 'galaxy-purpose-setup-'));
+  const prior = process.env.GALAXY_DATA_DIR; process.env.GALAXY_DATA_DIR = dir;
+  context.after(async () => { if (prior === undefined) delete process.env.GALAXY_DATA_DIR; else process.env.GALAXY_DATA_DIR = prior;
+    await rm(dir, { recursive: true, force: true }); });
   context.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected network'); });
-  const { default: adapter } = await tsImport('../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts', import.meta.url);
-  let page = null;
-  let open;
-  const api = {
-    keymap: { registerLayer: ({ commands }) => {
-      const command = commands.find((item) => item.name === 'galaxy.open');
-      if (command) open = command.run;
-      return () => {};
-    } },
-    ui: {
-      dialog: { setSize() {}, clear() { page = null; }, replace(factory) { page = factory(); } },
-      DialogSelect: (props) => ({ type: 'select', ...props }),
-      DialogAlert: (props) => ({ type: 'alert', ...props }),
-      DialogPrompt: (props) => ({ type: 'prompt', ...props }),
-    },
-  };
-  async function transition(action) {
-    const previous = page;
-    await action();
-    for (let attempt = 0; attempt < 100 && page === previous; attempt++) await delay(10);
-    assert.notEqual(page, previous, 'navigation must complete');
-  }
-  function choose(number) {
-    return transition(() => page.options.find((item) => item.value === number).onSelect());
-  }
-  async function toConfirmation() {
-    await transition(() => open());
-    await choose('1'); // language -> welcome
-    await transition(() => page.onConfirm());
-    assert.equal(page.options.find((item) => item.value === '2').disabled, true);
-    await choose('1'); // Personal -> L3
-    assert.match(page.title, /L3/);
-    await choose('0'); // back to shape
-    await choose('1');
-    await choose('1'); // visibility
-    assert.match(page.title, /接入与可见性/);
-    await choose('4'); // terms are read-only and return
-    await transition(() => page.onConfirm());
-    await choose('1'); // identity
-    await choose('1'); // literal confirmation
-    assert.equal(page.type, 'prompt');
-    assert.match(page.title, /L3/);
-    assert.match(page.title, /未连接/);
-  }
-  await adapter.tui(api);
-  await toConfirmation();
-  assert.deepEqual(await readdir(dir), []);
-  await transition(() => page.onConfirm('确认'));
-  assert.deepEqual(await readdir(dir), []);
-  await transition(() => page.onConfirm());
-  await transition(() => page.onConfirm('取消'));
-  assert.equal(page, null);
-  assert.deepEqual(await readdir(dir), []);
-  await toConfirmation();
-  await transition(() => page.onConfirm('确认初始化'));
-  const status = await getGalaxyConnectionStatus(dir);
-  assert.equal(status.appliedCapabilityProfile, 'l3-foundation');
-  assert.equal(status.enabledModuleIds.length, 5);
-  assert.equal(status.state, 'not-connected');
-  const state = JSON.parse(await readFile(join(dir, 'galaxy-local-state.json'), 'utf8'));
-  assert.deepEqual(state.integration.enabledModuleSnapshot, status.enabledModuleIds);
-  const before = await readFile(join(dir, 'galaxy-local-state.json'), 'utf8');
-  await choose('6');
-  assert.match(page.title, /接入银河/);
-  assert.match(page.message, /未连接/);
-  await transition(() => page.onConfirm());
-  assert.equal(page.type, 'select');
-  assert.equal(await readFile(join(dir, 'galaxy-local-state.json'), 'utf8'), before);
-  assert.equal(globalThis.fetch.mock.callCount(), 0);
+  const { createGalaxyAdapter } = await tsImport('../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts', import.meta.url);
+  let page = null, open;const commands=new Map();
+  const adapter=createGalaxyAdapter(null,{dataDirectory:dir}); context.after(()=>adapter.close());
+  await adapter.tui({keymap:{registerLayer:({commands:entries})=>{for(const entry of entries)commands.set(entry.name,entry);const command=entries.find(c=>c.name==='galaxy.open');if(command)open=command.run;return()=>{};}},
+    ui:{dialog:{setSize(){},clear(){page=null;},replace(fn){page=fn();}},DialogSelect:props=>({type:'select',...props}),DialogAlert:props=>({type:'alert',...props}),DialogPrompt:props=>({type:'prompt',...props})}});
+  async function transition(fn){const old=page;fn();for(let i=0;i<100&&page===old;i++)await delay(10);assert.notEqual(page,old);}
+  const choose=n=>transition(()=>n==='0'?commands.get('galaxy.zero').run():page.options.find(o=>o.value===n).onSelect());
+  await transition(open); assert.match(page.title,/当前工作/);assert.deepEqual(page.options.map(o=>o.title),['[1] 找帮助','[2] 发起求助','[3] 消息','[4] 我的与设置','[5] 回到原工作']);
+  assert.deepEqual(await readdir(dir),[]);
+  await choose('4');await choose('5');assert.match(page.title,/在本机准备身份/);assert.deepEqual(await readdir(dir),[]);
+  await choose('0');assert.deepEqual(await readdir(dir),[]);
+  await choose('4');await choose('5');await choose('1');const status=await getGalaxyConnectionStatus(dir);
+  assert.equal(status.appliedCapabilityProfile,'l3-foundation');assert.equal(status.enabledModuleIds.length,5);assert.equal(status.state,'not-connected');
+  const before=await readFile(join(dir,'galaxy-local-state.json'),'utf8');
+  await choose('4');await choose('6');assert.match(page.message,/未连接/);assert.equal(globalThis.fetch.mock.callCount(),0);
+  await transition(()=>page.onConfirm());assert.equal(await readFile(join(dir,'galaxy-local-state.json'),'utf8'),before);
 });

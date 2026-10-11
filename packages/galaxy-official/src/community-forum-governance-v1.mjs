@@ -1,0 +1,149 @@
+import * as z from 'zod/v4';
+import {ServiceError} from './shared/service-error.mjs';
+import {digest} from './shared/digest.mjs';
+import {assertForumIds} from './shared/community-forum-ids-v1.mjs';
+import {forumStamp,forumSeconds} from './community-forum-permissions-v1.mjs';
+import {forumAccountUsage} from './community-forum-budget-v1.mjs';
+import {lockForumOperation,priorForumOperation,recordForumReceipt,recordForumAudit} from './community-forum-operations-v1.mjs';
+import {forumReportSchema,forumReportEventSchema,forumReportQuerySchema,forumConfigSchema,forumWriteSpec,parseForumPayload} from './shared/community-forum-v1-schema.mjs';
+
+const validate=(schema,input)=>{const parsed=schema.safeParse(input);if(!parsed.success)throw new ServiceError('invalid_forum_request');return parsed.data;};
+export class CommunityForumGovernanceV1 {
+ constructor(access,consents,forum,{moderatorIds=[],accounts}={}){
+  Object.assign(this,{access,consents,forum,accounts});this.moderatorIds=[...new Set(z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(128).parse(moderatorIds))];
+  this.policy=forum.policy;this.permissions=forum.permissions;forum.governance=this;
+ }
+ readScope(actor){return actor.scopes?.includes('assistance')?'assistance':'moderation';}
+ async row(db,id,lock=false){return (await db.query(`SELECT * FROM forum_reports_v1 WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];}
+ parties(row){return [...new Set([row.reporter_id,row.target_author_id].filter(Boolean))];}
+ async knownShared(db,id,others){return !!(await db.query(`SELECT 1 FROM community_account_links a JOIN community_account_links b ON b.account_id=a.account_id
+  WHERE a.subject_id=$1 AND b.subject_id=ANY($2::text[]) LIMIT 1`,[id,others])).rows.length;}
+ async independent(db,id,parties){return this.moderatorIds.includes(id)&&!parties.includes(id)&&!await this.knownShared(db,id,parties);}
+ async eligible(db,parties){const items=[];for(const id of this.moderatorIds)if(await this.independent(db,id,parties))items.push(id);return items;}
+ async targetWithin(db,target,{read=true,lock=false}={}){
+  if(target.kind==='post-version'){
+   if(lock)await this.forum.head(db,target.postId,true);
+   const row=await this.forum.version(db,target.postId,target.versionId,lock);if(!row)throw new ServiceError('not_found',404);
+   return {row,authorId:row.subject_id,view:read?await this.forum.readVersionWithin(db,target.postId,target.versionId):null};
+  }
+  const row=await this.forum.reply(db,target.replyId,lock);if(!row)throw new ServiceError('not_found',404);
+  return {row,authorId:row.subject_id,view:read?await this.forum.readReplyWithin(db,target.replyId):null};
+ }
+ async baseSourceWithin(db,target){
+  const {row}=await this.targetWithin(db,target,{read:false});
+  if(row.state!=='published'||target.kind==='post-version'&&row.post_state!=='published'||!row.payload_text||row.erased_at||row.event_erased)throw new ServiceError('forum_source_unavailable',403);
+  return this.permissions.requireWithin(db,row.permission_id,{visibility:'Public',payloadHash:row.payload_hash,action:target.kind==='reply'?'forum.reply.publish':'forum.post.publish',objectId:target.kind==='reply'?target.replyId:target.versionId});
+ }
+ config(actor,input={}){const q=validate(forumConfigSchema,input);return this.access.runAuthorized(actor,this.readScope(actor),async db=>{
+  const parties=[actor.subjectId];if(q.target){const source=await this.targetWithin(db,q.target,{read:false});parties.push(source.authorId);}
+  const ids=await this.eligible(db,parties.filter(Boolean));
+  return {moderatorIds:ids,configured:ids.length>0,guaranteesResponse:false,maxAppeals:this.policy.maxAppeals,maxPermissionSeconds:this.policy.maxPermissionSeconds,maxGovernanceHideSeconds:this.policy.maxGovernanceHideSeconds,automaticAccountRestriction:false};
+ });}
+ async save(db,actor,{p,consentId,payloadJson,kind,reportId,version,permissionId,accountId,result}){
+  await db.query(`INSERT INTO forum_governance_events_v1(id,operation_id,report_id,subject_id,account_id,version,kind,consent_id,permission_id,payload_text,payload_hash,created_at,resolution,effect_until,result)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,[p.governanceEventId??p.operationId,p.operationId,reportId,actor.subjectId,accountId,version,kind,consentId,permissionId,payloadJson,digest(payloadJson),forumStamp(this.access.now()),p.resolution??null,p.effect?forumStamp(p.effect.until):null,JSON.stringify(result)]);
+ }
+ async finish(db,actor,authorization,{p,consentId,payloadJson,accountId,kind,locator,result,category=null}){
+  await recordForumReceipt(db,actor,{operationId:p.operationId,consentId,payloadJson,accountId,category,locator,result,now:this.access.now(),auditDays:this.policy.auditDays});
+  await recordForumAudit(db,actor,authorization,{operationId:p.operationId,consentId,action:kind==='resolve'?'forum.governance.resolve':kind==='report'?'forum.report.publish':'forum.report.event'});return result;
+ }
+ report(actor,{signedIntent,payloadJson}){
+  const p=parseForumPayload(payloadJson,forumReportSchema,this.policy.maxPayloadBytes),spec=forumWriteSpec('create-report',p);
+  if([...p.summary].length>this.policy.maxReportCodePoints)throw new ServiceError('forum_content_limit',413);
+  return this.access.runResourceWrite(actor,'assistance',{},async(db,authorization)=>{
+   await lockForumOperation(db,p.operationId);const prior=await priorForumOperation(db,actor,p.operationId,payloadJson);if(prior)return prior;
+   await assertForumIds('create-report',actor.subjectId,p);
+   const source=await this.targetWithin(db,p.target,{lock:true});if(source.view.availability!=='available')throw new ServiceError('forum_report_source_unavailable',403);
+   const state=await this.forum.budget.startWithin(db,actor,'report'),eligible=await this.eligible(db,[actor.subjectId,source.authorId]),consentId=await this.forum.consentWithin(db,actor,authorization,signedIntent),
+    permit=await this.permissions.captureWithin(db,actor,{consentId,payloadJson,spec,eventId:p.operationId,accountId:state.account.id,allowedViewers:eligible}),at=forumStamp(this.access.now());
+   await db.query(`INSERT INTO forum_reports_v1(id,subject_id,reporter_id,account_id,target,target_author_id,version,state,created_at)
+    VALUES($1,$2,$2,$3,$4,$5,1,'pending',$6)`,[p.reportId,actor.subjectId,state.account.id,JSON.stringify(p.target),source.authorId,at]);
+   const result={acknowledged:true,reportId:p.reportId,governanceEventId:p.operationId,version:1,state:'pending',handlingState:eligible.some(id=>permit.grant.viewers.includes(id))?'awaiting-independent-handler':'awaiting-authorized-handler',authority:'accepted-operation-only'};
+   await this.save(db,actor,{p,consentId,payloadJson,kind:'report',reportId:p.reportId,version:1,permissionId:permit.id,accountId:state.account.id,result});
+   await this.finish(db,actor,authorization,{p,consentId,payloadJson,accountId:state.account.id,kind:'report',category:'report',locator:{kind:'report',reportId:p.reportId},result});
+   return {...result,quota:await this.forum.budget.finishWithin(db,state)};
+  }).catch(error=>{if(error.code==='23505')throw new ServiceError('forum_operation_conflict',409);throw error;});
+ }
+ async readableEvents(db,actor,row){
+  const rows=(await db.query('SELECT * FROM forum_governance_events_v1 WHERE report_id=$1 ORDER BY version',[row.id])).rows,items=[];
+  for(const event of rows){if(!event.payload_text||event.erased_at)continue;
+   const permitted=await this.permissions.statusWithin(db,event.permission_id,{visibility:'Private',viewerId:actor.subjectId,payloadHash:event.payload_hash});
+   if(permitted.allowed)items.push({operationId:event.operation_id,governanceEventId:event.id,version:event.version,kind:event.kind,authorId:event.subject_id,payload:JSON.parse(event.payload_text),checkedAt:this.access.now()});
+  }return items;
+ }
+ async readWithin(db,actor,id){
+  const row=await this.row(db,id);if(!row)throw new ServiceError('not_found',404);
+  const parties=this.parties(row),events=await this.readableEvents(db,actor,row),independent=await this.independent(db,actor.subjectId,parties);
+  if(!parties.includes(actor.subjectId)&&(!independent||!events.length))throw new ServiceError('not_found',404);
+  const canModerate=!!actor.scopes?.includes('moderation')&&independent&&events.some(event=>['report','supplement','appeal'].includes(event.kind));
+  const narrativeCount=Number((await db.query("SELECT count(*) n FROM forum_governance_events_v1 WHERE report_id=$1 AND kind IN ('report','supplement')",[id])).rows[0].n);
+  const decision=row.decision_event_id?(await db.query('SELECT id,operation_id,version,kind,resolution,effect_until FROM forum_governance_events_v1 WHERE id=$1',[row.decision_event_id])).rows[0]:null;
+  return {reportId:id,target:row.target,version:row.version,state:row.state,
+   handlingState:canModerate?'awaiting-or-recorded-handler':events.length&&this.moderatorIds.length?'pending-or-recorded':'awaiting-authorized-handler',
+   decisionLocator:decision?{governanceEventId:decision.id,operationId:decision.operation_id,version:decision.version,kind:decision.kind,resolution:decision.resolution,effectUntil:decision.effect_until?forumSeconds(decision.effect_until):null}:null,
+   events,canAppeal:parties.includes(actor.subjectId)&&!!row.decision_event_id&&['resolved','withdrawn'].includes(row.state)&&row.appeal_count<this.policy.maxAppeals,
+   canSupplement:row.reporter_id===actor.subjectId&&['pending','appealed'].includes(row.state)&&narrativeCount<this.policy.maxReportEvents,
+   canWithdrawReport:row.reporter_id===actor.subjectId&&row.state!=='withdrawn',canModerate,
+   ...(canModerate?{decisionRecipients:parties.filter(id=>id!==actor.subjectId)}:{}),checkedAt:this.access.now(),guaranteesResponse:false,authority:'configured-role-process; not-real-world-independence'};
+ }
+ get(actor,id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return this.access.runAuthorized(actor,this.readScope(actor),db=>this.readWithin(db,actor,id));}
+ query(actor,input={}){const q=validate(forumReportQuerySchema,input);return this.access.runAuthorized(actor,this.readScope(actor),async db=>{
+  const rows=(await db.query(`SELECT r.id FROM forum_reports_v1 r WHERE ($1::uuid IS NULL OR r.id>$1) AND ($2::jsonb IS NULL OR r.target=$2::jsonb)
+   AND (r.reporter_id=$3 OR r.target_author_id=$3 OR EXISTS(SELECT 1 FROM forum_governance_events_v1 e JOIN forum_permissions_v1 p ON p.id=e.permission_id WHERE e.report_id=r.id AND p.viewers ? $3)) ORDER BY r.id LIMIT 200`,[q.after??null,q.target?JSON.stringify(q.target):null,actor.subjectId])).rows,items=[];let scanned=null;
+  for(const item of rows){scanned=item.id;try{items.push(await this.readWithin(db,actor,item.id));}catch(error){if(error.status!==404)throw error;}if(items.length===q.limit)break;}
+  return {items,nextAfter:items.length===q.limit||rows.length===200?scanned:null,scanTruncated:rows.length===200&&items.length<q.limit,checkedAt:this.access.now()};
+ });}
+ affected(actor,input={}){const q=validate(forumReportQuerySchema,input);return this.access.runAuthorized(actor,'assistance',async db=>{
+  const rows=(await db.query('SELECT id FROM forum_reports_v1 WHERE (reporter_id=$1 OR target_author_id=$1) AND ($2::uuid IS NULL OR id>$2) AND ($3::jsonb IS NULL OR target=$3::jsonb) ORDER BY id LIMIT $4',[actor.subjectId,q.after??null,q.target?JSON.stringify(q.target):null,q.limit+1])).rows,items=[];
+  for(const row of rows.slice(0,q.limit)){const view=await this.readWithin(db,actor,row.id);items.push({reportId:view.reportId,target:view.target,version:view.version,state:view.state,decisionLocator:view.decisionLocator,canAppeal:view.canAppeal,checkedAt:view.checkedAt});}
+  return {items,nextAfter:rows.length>q.limit?items.at(-1).reportId:null,checkedAt:this.access.now()};
+ });}
+ event(actor,id,{signedIntent,payloadJson}){
+  const p=parseForumPayload(payloadJson,forumReportEventSchema,this.policy.maxPayloadBytes);if(p.reportId!==id)throw new ServiceError('forum_report_target_mismatch');
+  if(p.summary&&[...p.summary].length>this.policy.maxReportCodePoints||p.reason&&[...p.reason].length>this.policy.maxReportCodePoints)throw new ServiceError('forum_content_limit',413);
+  const kind=p.kind==='withdraw'?'withdraw-report':p.kind,spec=forumWriteSpec(kind,p),scope=p.kind==='resolve'?'moderation':'assistance',control=p.kind!=='supplement';
+  return this.access.runResourceWrite(actor,scope,{control},async(db,authorization)=>{
+   await lockForumOperation(db,p.operationId);const prior=await priorForumOperation(db,actor,p.operationId,payloadJson);if(prior)return prior;
+   await assertForumIds(kind,actor.subjectId,p);
+   const row=await this.row(db,id,true);if(!row)throw new ServiceError('not_found',404);if(row.version!==p.expectedReportVersion)throw new ServiceError('forum_report_version_conflict',409);
+   const parties=this.parties(row),view=await this.readWithin(db,actor,id),eligible=await this.eligible(db,parties);
+   if(p.kind==='resolve'){
+    if(!view.canModerate)throw new ServiceError('forum_independent_handler_required',403);
+    if(!['pending','appealed'].includes(row.state))throw new ServiceError('forum_report_transition',409);
+    if(p.effect){if(p.resolution!=='accepted'||p.effect.until<=this.access.now()||p.effect.until>this.access.now()+this.policy.maxGovernanceHideSeconds)throw new ServiceError('forum_hide_expiry',409);await this.baseSourceWithin(db,row.target);}
+   }else if(p.kind==='appeal'){
+    if(!view.canAppeal)throw new ServiceError('forum_appeal_unavailable',409);
+   }else if(p.kind==='withdraw'){
+    if(!view.canWithdrawReport)throw new ServiceError('forum_report_transition',409);
+   }else if(!view.canSupplement)throw new ServiceError('forum_report_transition',409);
+   // Narrative cap leaves finite, state-bounded resolution/appeal/withdraw slots.
+   if(row.version>=this.policy.maxReportEvents+2*this.policy.maxAppeals+2)throw new ServiceError('forum_report_event_limit',413);
+   let before=null;
+   if(!control){const account=await this.accounts.resolveWithin(db,actor,{lock:true});if(account.id!==row.account_id)throw new ServiceError('forum_report_account_changed',409);before=await forumAccountUsage(db,row.account_id);}
+   const consentId=await this.forum.consentWithin(db,actor,authorization,signedIntent),allowed=p.kind==='resolve'?[...eligible,...parties]:eligible,
+    permit=await this.permissions.captureWithin(db,actor,{consentId,payloadJson,spec,eventId:p.governanceEventId,accountId:row.account_id,allowedViewers:allowed,requiredViewers:p.kind==='resolve'?parties:[]});
+   if(p.effect&&p.effect.until>permit.publishedUntil)throw new ServiceError('forum_hide_expiry',409);
+   const version=row.version+1,now=this.access.now(),at=forumStamp(now),
+    state=p.kind==='resolve'?'resolved':p.kind==='appeal'?'appealed':p.kind==='withdraw'?'withdrawn':row.state,
+    closed=['resolved','withdrawn'].includes(state)?at:null,result={acknowledged:true,reportId:id,governanceEventId:p.governanceEventId,version,state,authority:'accepted-operation-only'};
+   await this.save(db,actor,{p,consentId,payloadJson,kind:p.kind,reportId:id,version,permissionId:permit.id,accountId:row.account_id,result});
+   await db.query(`UPDATE forum_reports_v1 SET version=$2,state=$3,appeal_count=appeal_count+$4,closed_at=$5,audit_until=$6,
+    decision_event_id=CASE WHEN $7::boolean THEN $8::uuid ELSE decision_event_id END,
+    restriction_event_id=CASE WHEN $7::boolean THEN $9::uuid ELSE restriction_event_id END,
+    restriction_until=CASE WHEN $7::boolean THEN $10::timestamptz ELSE restriction_until END WHERE id=$1`,
+    [id,version,state,p.kind==='appeal'?1:0,closed,closed?forumStamp(now+this.policy.auditDays*86400):null,p.kind==='resolve',p.governanceEventId,p.effect?p.governanceEventId:null,p.effect?forumStamp(p.effect.until):null]);
+   if(p.kind==='withdraw')await db.query(`UPDATE forum_permissions_v1 SET revoked_at=COALESCE(revoked_at,$3) WHERE id IN
+    (SELECT permission_id FROM forum_governance_events_v1 WHERE report_id=$1 AND subject_id=$2 AND kind IN ('report','supplement'))`,[id,actor.subjectId,at]);
+   await this.finish(db,actor,authorization,{p,consentId,payloadJson,accountId:row.account_id,kind:p.kind,locator:{kind:'report',reportId:id},result});
+   if(!control)await this.forum.budget.checkGrowthWithin(db,row.account_id,before);return result;
+  }).catch(error=>{if(error.code==='23505')throw new ServiceError('forum_operation_conflict',409);throw error;});
+ }
+ async hiddenWithin(db,target){
+  const rows=(await db.query(`SELECT r.reporter_id,r.target_author_id,r.restriction_event_id,e.subject_id,e.permission_id,e.payload_hash,e.effect_until FROM forum_reports_v1 r
+   JOIN forum_governance_events_v1 e ON e.id=r.restriction_event_id WHERE r.target=$1::jsonb AND r.restriction_until>$2`,[JSON.stringify(target),forumStamp(this.access.now())])).rows;
+  for(const row of rows){if(!await this.independent(db,row.subject_id,this.parties(row)))continue;
+   const state=await this.permissions.statusWithin(db,row.permission_id,{visibility:'Private',viewerId:row.subject_id,payloadHash:row.payload_hash,action:'forum.governance.resolve',objectId:row.restriction_event_id});
+   if(state.allowed&&row.effect_until&&forumSeconds(row.effect_until)>this.access.now())return true;
+  }return false;
+ }
+}

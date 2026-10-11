@@ -28,7 +28,7 @@ test('HTTP connection waits for a near-future signed second without extending ex
    }});
   await runtime.createIdentity({confirmed:true});clock=f.now-1;
   await runtime.connect({confirmed:true});assert.equal(waits,1);assert.equal(bindings,1);assert.ok(runtime.api.snapshot());
-  runtime.disconnect();clock=f.now-3;
+  await runtime.disconnect();clock=f.now-3;
   await assert.rejects(runtime.connect({confirmed:true}),e=>e.code==='ERR_JWT_CLAIM_VALIDATION_FAILED'&&e.claim==='nbf');
   assert.equal(waits,1);assert.equal(bindings,1,'larger clock error never reaches another binding');
   clock=f.now-1;shortChallenge=true;

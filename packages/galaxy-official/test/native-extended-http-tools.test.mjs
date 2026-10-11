@@ -12,19 +12,20 @@ import {hubToolDefinitions} from '../src/personal-mcp-hubs-v2.mjs';
 import {workerPackUseToolDefinitions} from '../src/personal-mcp-worker-pack-uses-v2.mjs';
 import {informationToolDefinitions} from '../src/personal-mcp-information-v2.mjs';
 import {targetGovernanceToolDefinitions} from '../src/personal-mcp-target-governance-v2.mjs';
+import {moderationToolDefinitions} from '../src/personal-mcp-moderation-v2.mjs';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
 
-const factories=[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions];
+const factories=[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions];
 const invoke=(tools,name,input)=>tools[name].run(tools[name].inputSchema.parse(input));
 
 test('extended native HTTP reuses every canonical capability and preserves signed bytes without model confirmation or attachment bytes',async()=>{
  const calls=[],native=extendedNativeHttpDefinitions({call:async(...args)=>{calls.push(args);return{transport:'synthetic-routing-only'};}});
  const spy=new Proxy(()=>{}, {get:()=>spy,apply:()=>({transport:'canonical-shape-only'})});
  const canonical=Object.assign({},...factories.map(f=>f(spy,null)));
- assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,81);
+ assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,87);
  for(const[name,tool]of Object.entries(native)){
   assert.equal(tool.scope,canonical[name].scope,name);assert.equal(tool.write,canonical[name].write,name);assert.equal(tool.description,canonical[name].description,name);
  }
@@ -34,12 +35,18 @@ test('extended native HTTP reuses every canonical capability and preserves signe
   galaxy_qualification_permission_request:'/v2/qualification/permission-requests/events',galaxy_contribution_publish:'/v2/contributions/publish',
   galaxy_ci_v2_observe:'/v2/ci/requests',galaxy_ci_v2_proof_publish:'/v2/ci/proofs/publish',
   galaxy_hub_events:'/v2/hubs/events',galaxy_hub_peering_events:'/v2/hubs/peering/events',galaxy_worker_pack_use_record:'/v2/builders/pack-uses/events',
-  galaxy_target_governance_report:'/v2/target-governance/reports',galaxy_target_governance_event:'/v2/target-governance/events'};
+  galaxy_target_governance_report:'/v2/target-governance/reports',galaxy_target_governance_event:'/v2/target-governance/events',
+  galaxy_moderation_report:'/v1/moderation/reports'};
  for(const[name,path]of Object.entries(writes)){
   assert.equal(native[name].inputSchema.safeParse({...signed,confirmed:true}).success,false,name);
   await invoke(native,name,signed);assert.deepEqual(calls.at(-1),[path,signed]);
  }
  const id=randomUUID(),hash='a'.repeat(64),source={kind:'case-event',id,eventVersion:1,payloadHash:hash};
+ assert.equal(native.galaxy_moderation_event.inputSchema.safeParse({reportId:id,...signed,confirmed:true}).success,false);
+ await invoke(native,'galaxy_moderation_event',{reportId:id,...signed});assert.deepEqual(calls.at(-1),['/v1/moderation/reports/'+id+'/events',signed]);
+ await invoke(native,'galaxy_moderation_get',{reportId:id});assert.deepEqual(calls.at(-1),['/v1/moderation/reports/'+id+'/read',{}]);
+ await invoke(native,'galaxy_moderation_receipt',{reportId:id,eventId:id,payloadHash:hash});
+ assert.deepEqual(calls.at(-1),['/v1/moderation/reports/'+id+'/receipt',{eventId:id,payloadHash:hash}]);
  const samples={
   galaxy_configuration_v2_read:[{id,version:3},'/v2/configurations/read'],galaxy_configuration_v2_query:[{},'/v2/configurations/query'],
   galaxy_configuration_v2_versions:[{id,afterVersion:1},'/v2/configurations/versions'],galaxy_configuration_v2_receipt:[{operationId:id,payloadHash:hash},'/v2/configurations/receipt'],
@@ -87,8 +94,9 @@ test('extended native HTTP reuses every canonical capability and preserves signe
   galaxy_target_governance_get:[{reportId:id},'/v2/target-governance/'+id,{method:'GET'}],
   galaxy_target_governance_target:[{type:'task',id},'/v2/target-governance/target'],
   galaxy_target_governance_query:[{},'/v2/target-governance/query'],galaxy_target_governance_receipt:[{eventId:id,payloadHash:hash},'/v2/target-governance/receipt'],
+  galaxy_moderation_config:[{},'/v1/moderation/config'],galaxy_moderation_query:[{},'/v1/moderation/reports/query'],
  };
- assert.equal(Object.keys(samples).length+Object.keys(writes).length,Object.keys(native).length,'every canonical leaf has a transport case');
+ assert.equal(Object.keys(samples).length+Object.keys(writes).length+3,Object.keys(native).length,'every canonical leaf has a transport case');
  for(const[name,[input,path,options]]of Object.entries(samples)){
   const parsed=native[name].inputSchema.parse(input);await native[name].run(parsed);assert.deepEqual(calls.at(-1),options?[path,null,options]:[path,parsed],name);
  }

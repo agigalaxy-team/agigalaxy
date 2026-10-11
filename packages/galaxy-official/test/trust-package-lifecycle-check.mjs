@@ -4,7 +4,7 @@ import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion} from '../src/operations/deletion-execute.mjs';
 import {cleanupProductV2Retention} from '../src/operations/lifecycle-retention-v2.mjs';
 
-export function checkTrustLifecycle({admin,worker}={}) {return async({f,p,q,trust,clock,input,ref})=>{
+export function checkTrustLifecycle({admin,worker}={}) {return async({f,p,q,trust,clock,input:_input,ref})=>{
  const db=admin??f.db,workerDb=worker??f.db;
  const own=await f.dataExport.create(f.actor,{id:randomUUID(),datasets:['trust-package-permissions']});
  const exported=await f.dataExport.page(f.actor,{id:own.id,dataset:'trust-package-permissions'});

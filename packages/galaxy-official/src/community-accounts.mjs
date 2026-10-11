@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ServiceError } from './shared/service-error.mjs';
+import {lockControllerMappingsWithin} from './controller-mapping-lock.mjs';
 
 const iso = seconds => new Date(seconds * 1000).toISOString();
 const linkInput = z.strictObject({ subjectId: z.string().min(1).max(128), linkId: z.uuid(),
@@ -21,6 +22,10 @@ export class CommunityAccountRegistry {
     if (!parsed.success) throw new ServiceError('invalid_account_verification');
     const data = parsed.data;
     if (data.endpoint !== this.access.endpoint || data.verifiedAt > this.access.now()) throw new ServiceError('invalid_account_verification');
+    // Mapping writes take the subject key before account upsert/row locks.
+    // Multiple subjects sharing one account therefore never acquire each
+    // other's controller key while holding that account row.
+    await lockControllerMappingsWithin(db,this.access.endpoint,[data.subjectId],{exclusive:true});
     const link = (await db.query(`SELECT * FROM external_identity_links WHERE id=$1 AND subject_id=$2 AND endpoint=$3
       AND issuer=$4 AND external_subject=$5 AND revoked_at IS NULL`,
     [data.linkId, data.subjectId, data.endpoint, data.issuer, data.externalSubject])).rows[0];

@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "currentVersion": "0.1.8",
+  "publicOrigin": "https://agigalaxy.org",
+  "topics": [
+    "overview",
+    "installation",
+    "compatibility",
+    "privacy"
+  ],
+  "versions": [
+    {
+      "version": "v0.1",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/v0.1/overview.md",
+          "sha256": "0aa46d88a20120687778bd501a47dd5417ec7cece2b18008c0c38a535d238655"
+        },
+        "installation": {
+          "path": "versions/v0.1/installation.md",
+          "sha256": "1d9531c4ba9104c59c5ac8d266ff0b659fcf393ced3ab84969543bb3142146ad"
+        },
+        "compatibility": {
+          "path": "versions/v0.1/compatibility.md",
+          "sha256": "988c0acc853017ba711243c4e9c5c421703d4c1621732e18c342c427d7b90b25"
+        },
+        "privacy": {
+          "path": "versions/v0.1/privacy.md",
+          "sha256": "659f7eaba4389feadc14155d154f44d8031cc9094cc06ada53cf8592e50d2025"
+        }
+      }
+    },
+    {
+      "version": "v0.2",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/v0.2/overview.md",
+          "sha256": "d4e10e7ff464766c070eb2c8205faa4aa28a7a771048d0664a510868b27267bd"
+        },
+        "installation": {
+          "path": "versions/v0.2/installation.md",
+          "sha256": "de2e3b25afdd1fdb2798cbfb8d0412702e0fbbabcdc9b769ead89bfe78d783bf"
+        },
+        "compatibility": {
+          "path": "versions/v0.2/compatibility.md",
+          "sha256": "3645f8d59d5835bd61f4a955c847c69482ae16e75d289c6abd701d41002fa65d"
+        },
+        "privacy": {
+          "path": "versions/v0.2/privacy.md",
+          "sha256": "702807a6044c8d0e8dd86c1761d6685175321b6604e585aa4d94808ff78675a5"
+        }
+      }
+    },
+    {
+      "version": "v0.3",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/v0.3/overview.md",
+          "sha256": "71a7c42417e4802acc4c1a1c942f993d55f0af68e56bfb2856526b250882627b"
+        },
+        "installation": {
+          "path": "versions/v0.3/installation.md",
+          "sha256": "05365f3c8cc9f3a57a9337965ba0152d131cc238a1934e13610bf021917ea7ac"
+        },
+        "compatibility": {
+          "path": "versions/v0.3/compatibility.md",
+          "sha256": "31e5686efad0665595a686aad559dda8ef2a3c123cc2866a8842815a222407da"
+        },
+        "privacy": {
+          "path": "versions/v0.3/privacy.md",
+          "sha256": "ec9da285c910c3802444c49689bfce90c68e5e7aae3d007ec2048a62a17e2083"
+        }
+      }
+    },
+    {
+      "version": "v0.4",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/v0.4/overview.md",
+          "sha256": "2154eac0c476b7b1cc89cd50b149a653ab5148bb4c95932b46715a0efda5e625"
+        },
+        "installation": {
+          "path": "versions/v0.4/installation.md",
+          "sha256": "5b9cdc3a714e45e6b9844d99ca8e7434c7e0df4bd25c6ccdb550b6cacec9a393"
+        },
+        "compatibility": {
+          "path": "versions/v0.4/compatibility.md",
+          "sha256": "204a561536ac64f009a9582a638b91eab3010eacdae87337b8092d931fe6745f"
+        },
+        "privacy": {
+          "path": "versions/v0.4/privacy.md",
+          "sha256": "1fedcf2480a6ec17a22df62979076601f99ef4d22b71dfae2cde4ce926baf21a"
+        }
+      }
+    },
+    {
+      "version": "0.1.0",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.0/overview.md",
+          "sha256": "a0c19b0459f2559b5c80a3452ba2767ea387e7a2fe6f01b2aeb59d59670f11e0"
+        },
+        "installation": {
+          "path": "versions/0.1.0/installation.md",
+          "sha256": "2290f8176e640f2a034a8eb14e1eb4ec9bbceff54a35d632864039c50453f6e2"
+        },
+        "compatibility": {
+          "path": "versions/0.1.0/compatibility.md",
+          "sha256": "218807a4095d433cf1c02caf5bb80ce00a7956639179bd05dc4afb99046d4314"
+        },
+        "privacy": {
+          "path": "versions/0.1.0/privacy.md",
+          "sha256": "bcf00a66682896e96ea279e69f5be5aa538d54b4bbb064c89794bbb90f34fd17"
+        }
+      }
+    },
+    {
+      "version": "0.1.1",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.1/overview.md",
+          "sha256": "08308e42126aa9bdb8e970b3cf579e07fec34794ffa9e1b602d8706b0ad86c17"
+        },
+        "installation": {
+          "path": "versions/0.1.1/installation.md",
+          "sha256": "5b6660845f92f656e5f9a36fc30710ffcc65c4a5301ee0113aa5ebf244ba4462"
+        },
+        "compatibility": {
+          "path": "versions/0.1.1/compatibility.md",
+          "sha256": "b2a6d91412d47417dce0211f9faf133eb4b64bda3cdfa1b03ed216cc9b579ac1"
+        },
+        "privacy": {
+          "path": "versions/0.1.1/privacy.md",
+          "sha256": "66c51df84c352c5521f116bcdb9f413b771374676c7e8bd0ea99b0ba6dc77e61"
+        }
+      }
+    },
+    {
+      "version": "0.1.2",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.2/overview.md",
+          "sha256": "b588ef0d48d7f3fc1e98b02713a261b8c2bccea717e8e860059415e6b2ad0b16"
+        },
+        "installation": {
+          "path": "versions/0.1.2/installation.md",
+          "sha256": "86f0a3f8693bd101879532e7cf497a166a0a8b664b1630567cf4f5479425fc26"
+        },
+        "compatibility": {
+          "path": "versions/0.1.2/compatibility.md",
+          "sha256": "f4d36e429146c323c8202b189d1da6b49dc85777690fa3349718aaa7b73e6e9c"
+        },
+        "privacy": {
+          "path": "versions/0.1.2/privacy.md",
+          "sha256": "6a023eb0704903d433f829a0291bb669996429e63b1def5dfb1312acb412eb94"
+        }
+      }
+    },
+    {
+      "version": "0.1.3",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.3/overview.md",
+          "sha256": "e6455bafe50ed8c2a7896bfbe365998e437622f90aebaca7c00ac7112bd08a99"
+        },
+        "installation": {
+          "path": "versions/0.1.3/installation.md",
+          "sha256": "c9acc9fb7735174005e8cb6a576e27d45292812948efc9d8929901af3ce35c30"
+        },
+        "compatibility": {
+          "path": "versions/0.1.3/compatibility.md",
+          "sha256": "d432110b215c6d15526c1da103e0dd050812a53a8370a4e1aa4a07a7f7bdaa6a"
+        },
+        "privacy": {
+          "path": "versions/0.1.3/privacy.md",
+          "sha256": "c455e8bddd883a9185d542868ab3f1ee17ecad38699ee5734c5d757ac5038393"
+        }
+      }
+    },
+    {
+      "version": "0.1.4",
+      "documentDate": null,
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.4/overview.md",
+          "sha256": "aed78647296f551ff9f1de9660624a387ddde72f44d22fbe16bdbe508658b0de"
+        },
+        "installation": {
+          "path": "versions/0.1.4/installation.md",
+          "sha256": "bd47f5bf8d3384a319b70b92c5a18f2ef4197dde065da0f782f02f9d93836951"
+        },
+        "compatibility": {
+          "path": "versions/0.1.4/compatibility.md",
+          "sha256": "b749e8fc4fbad8da08889df48e006e56126e98dff3dca274e80022f348eae3af"
+        },
+        "privacy": {
+          "path": "versions/0.1.4/privacy.md",
+          "sha256": "70c4ab185da13b970bb090c9a4561dcc021c84c11291af1f6480e8f267072966"
+        }
+      }
+    },
+    {
+      "version": "0.1.5",
+      "documentDate": "2026-10-02",
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.5/overview.md",
+          "sha256": "5894687d395f8d5789973cfc062d04df376f3802504b8447509a8d83be758436"
+        },
+        "installation": {
+          "path": "versions/0.1.5/installation.md",
+          "sha256": "47842902ab39fddca9bcb75a473b7106b2c469b432e496ab016fc0a0cb5d20c9"
+        },
+        "compatibility": {
+          "path": "versions/0.1.5/compatibility.md",
+          "sha256": "355f81801746a6a4187cebd29bcf10f4a13257b806f5854af1dc894ebcc6b156"
+        },
+        "privacy": {
+          "path": "versions/0.1.5/privacy.md",
+          "sha256": "e94bff346c94bd5cf658d56bc41f4c624bd07e0603c76975c9f28f6b4c443e85"
+        }
+      }
+    },
+    {
+      "version": "0.1.6",
+      "documentDate": "2026-10-02",
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.6/overview.md",
+          "sha256": "df8be138e6e956621a1905218feb1a368b9faa9732c75e076342001b4fd48f97"
+        },
+        "installation": {
+          "path": "versions/0.1.6/installation.md",
+          "sha256": "aa8b435e8cbc15126ae584bbf57a6e442fd145a012091a5adfd6108671207926"
+        },
+        "compatibility": {
+          "path": "versions/0.1.6/compatibility.md",
+          "sha256": "e0e0c7be095914908638527aae63f3f268c718b09b0526299ea89e5077d95079"
+        },
+        "privacy": {
+          "path": "versions/0.1.6/privacy.md",
+          "sha256": "412cffb758888b95a3d82bcb9ad0b921b59ea54b498f655a19db19b18963ca36"
+        }
+      }
+    },
+    {
+      "version": "0.1.7",
+      "documentDate": "2026-10-08",
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.7/overview.md",
+          "sha256": "8f23e17385b9af5549f34c3e437ec0c6b0f22577e061273814e09d170cab98ab"
+        },
+        "installation": {
+          "path": "versions/0.1.7/installation.md",
+          "sha256": "2d8b5002653ba57a93426815f93a2d6459ae39a8820d6a4956ed1358ea4f3181"
+        },
+        "compatibility": {
+          "path": "versions/0.1.7/compatibility.md",
+          "sha256": "b4da0cf05f7a80d1ccf6f8d592fab797d5ab65a081d6a778ac31fdb11ce46e64"
+        },
+        "privacy": {
+          "path": "versions/0.1.7/privacy.md",
+          "sha256": "13f04c0d5e274d44fd6b59c7a1e4bf1ed0c0184d5ea318d6bbbcb1edcc6d7be8"
+        }
+      }
+    },
+    {
+      "version": "0.1.8",
+      "documentDate": "2026-10-08",
+      "documents": {
+        "overview": {
+          "path": "versions/0.1.8/overview.md",
+          "sha256": "585bda6a118072f3e797657fd833b1d5a88b8b90fb1008de9de41b005100ae0f"
+        },
+        "installation": {
+          "path": "versions/0.1.8/installation.md",
+          "sha256": "09865e39b91609a56010cd33a721de19adbfbb8b10626f97e2f6d9b22316463f"
+        },
+        "compatibility": {
+          "path": "versions/0.1.8/compatibility.md",
+          "sha256": "460700c95007e9ef03086f8cc21150ef8a3d738960bdbed4d01ec53be1396df2"
+        },
+        "privacy": {
+          "path": "versions/0.1.8/privacy.md",
+          "sha256": "7e89c4cbcd1083b03c0392697d761cc6d76ffc9bb136ad970ecef67db94efa0b"
+        }
+      }
+    }
+  ]
+}

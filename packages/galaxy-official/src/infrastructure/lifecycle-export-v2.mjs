@@ -1,8 +1,30 @@
 import { productV2Retention } from './lifecycle-registry-v2.mjs';
 const row = (table, owner, fields, key = 't.id::text', cutoff = 't.created_at') => ({ from: `${table} t`, owner: `t.${owner}`, fields, key, cutoff });
+async function forumEventExport(item,_now,{db,actor,viewServices}){
+ const forum=viewServices.forum;let allowed=false;
+ if(forum&&item.payload_text){
+  if(item.kind==='create-post'||item.kind==='publish-version')allowed=(await forum.readVersionWithin(db,item.post_id,item.version_id)).availability==='available';
+  else if(item.kind==='create-reply')allowed=(await forum.readReplyWithin(db,item.reply_id)).availability==='available';
+  else allowed=(await forum.permissions.statusWithin(db,item.permission_id,{viewerId:actor.subjectId,payloadHash:item.payload_hash})).allowed;
+ }
+ return {...item,payload_text:allowed?item.payload_text:'',contentAvailable:allowed,authority:'current-forum-read-only; original hash is historical'};
+}
+async function forumGovernanceExport(item,_now,{db,actor,viewServices}){
+ const allowed=!!item.payload_text&&!!viewServices.forum&&(await viewServices.forum.permissions.statusWithin(db,item.permission_id,{visibility:'Private',viewerId:actor.subjectId,payloadHash:item.payload_hash})).allowed;
+ return {...item,payload_text:allowed?item.payload_text:'',contentAvailable:allowed,authority:'current-exact-private-forum-permission-only'};
+}
 // Owner submissions do not include the mixed-author Task/Participation snapshot.
 // Those composites are exported only through a fresh authorized-view read.
 export const productV2ExportSources = {
+  'forum-post-heads':row('forum_posts_v1','subject_id','t.id,t.subject_id,t.head_version,t.current_version_id,t.state,t.created_at,t.updated_at,t.erased_at'),
+  'forum-version-locators':row('forum_versions_v1','subject_id','t.id,t.post_id,t.version_number,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at'),
+  'forum-reply-locators':row('forum_replies_v1','subject_id','t.id,t.post_id,t.post_version_id,t.reply_to_id,t.content_revision,t.revision,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at'),
+  'forum-events':{...row('forum_events_v1','subject_id','t.id,t.subject_id,t.kind,t.post_id,t.version_id,t.reply_id,t.payload_text,t.payload_hash,t.result,t.created_at,t.erased_at,p.id permission_id'),from:'forum_events_v1 t LEFT JOIN forum_permissions_v1 p ON p.event_id=t.id',transform:forumEventExport},
+  'forum-permissions':row('forum_permissions_v1','subject_id','t.id,t.event_id,t.consent_id,t.origin_binding_id,t.source_device_id,t.source_key_id,t.accepted_epoch,t.accepted_control_hash,t.signature_hash,t.payload_hash,t.action,t.object_id,t.visibility,t.fields,t.viewers,t.issued_at,t.published_until,t.accepted_at,t.authorization_audit_until,t.revoked_at,t.erased_at,t.policy_hash','t.id::text','t.accepted_at'),
+  'forum-report-locators':row('forum_reports_v1','subject_id','t.id,t.target,t.version,t.state,t.appeal_count,t.decision_event_id,t.restriction_event_id,t.restriction_until,t.created_at,t.closed_at,t.audit_until'),
+  'forum-governance-events':{...row('forum_governance_events_v1','subject_id','t.id,t.operation_id,t.report_id,t.subject_id,t.version,t.kind,t.permission_id,t.payload_text,t.payload_hash,t.created_at,t.erased_at,t.resolution,t.effect_until'),transform:forumGovernanceExport},
+  'forum-write-receipts':row('forum_write_receipts_v1','subject_id','t.operation_id,t.category,t.payload_hash,t.locator,t.result,t.created_at,t.retained_until','t.operation_id::text'),
+  'forum-daily-usage':{from:'forum_daily_usage_v1 t',owner:'(SELECT $1::text WHERE EXISTS(SELECT 1 FROM community_account_links l WHERE l.subject_id=$1 AND l.account_id=t.account_id))',fields:'t.account_id,t.day,t.category,t.used',key:"t.account_id::text||':'||t.day::text||':'||t.category",cutoff:'t.day::timestamp'},
   'outcome-materials-v2':row('outcome_materials_v2','subject_id','t.id,t.subject_id,t.author_id,t.case_id,t.task_id,t.source,t.source_kind,t.audience,t.uses,t.title,t.request_id,t.approval_id,t.revision,t.state,t.created_at,t.request_expires_at,t.approved_at,t.expires_at,t.body_text,t.name,t.media_type,t.byte_size,t.sha256,t.scan_result,t.purge_pending,t.purged_at'),
   'watch-controls':row('watch_controls_v2','subject_id','t.watch_id,t.subject_id,t.room_id,t.task_id,t.purpose,t.revision,t.state,t.current_grant_id,t.current_binding_id,t.expires_at,t.created_at,t.updated_at,t.stopped_at','t.watch_id::text'),
   'watch-control-operations':row('watch_control_operations_v2','subject_id','t.operation_id,t.watch_id,t.subject_id,t.binding_id,t.kind,t.request_hash,t.result,t.created_at','t.operation_id::text'),

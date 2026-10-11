@@ -73,13 +73,7 @@ export class QualificationV2Service{
     for(const id of [...new Set(q.evidence.participationIds)].sort())try{sources.push(await this.participationWithin(db,actor,id,q.subjectId,policy,calculation));}
       catch(error){if(!unavailable(error))throw error;observations.push({kind:'participation',id,state:'unavailable',reason:error.code});}
     for(const ref of q.evidence.externalReviewRefs)try{
-      const reviewed=await this.experienceReviews.readWithin(db,actor,ref),r=reviewed.record;
-      rule(reviewed.referenceStatus==='current'&&r&&reviewed.type==='review','qualification_review_unavailable');
-      rule(reviewed.experienceSubjectId===q.subjectId&&r.capabilityId===policy.capabilityId,'qualification_source_scope_mismatch');
-      rule(Date.parse(r.observedAt)>=1000*(this.access.now()-policy.historyWindowSeconds),'qualification_source_outside_window');
-      sources.push({kind:'external-review',id:ref.id,version:ref.version,group:`external:${reviewed.sourceGroup}`,usable:r.state==='verified-in-scope',
-        reason:r.state==='verified-in-scope'?null:r.state,synthetic:reviewed.synthetic,experienceKind:reviewed.experienceKind,scope:r.scope,
-        reviewerId:reviewed.subjectId,review:'registered-reviewer-scoped-attestation',productionExperienceInferred:reviewed.experienceKind!=='challenge'});
+      sources.push(await this.externalReviewWithin(db,actor,ref,q.subjectId,policy,calculation));
     }catch(error){if(!unavailable(error))throw error;observations.push({kind:'external-review',id:ref.id,state:'unavailable',reason:error.code});}
     for(const id of q.evidence.capsuleUseIds)try{
       const row=(await db.query('SELECT * FROM capsule_uses_v2 WHERE id=$1',[id])).rows[0];const use=await this.capsules.v2.useWithin(db,actor,row);
@@ -106,4 +100,13 @@ export class QualificationV2Service{
       proofMeaning:'policy-matched-ci-observations; not-individual-capability-or-independent-work'};
   }
   evaluate(actor,input){return this.access.runAuthorized(actor,'assistance',db=>this.evaluateWithin(db,actor,input));}
+  async externalReviewWithin(db,actor,ref,subjectId,policy,calculation=null){
+    const reviewed=await this.experienceReviews.readWithin(db,actor,ref,new Set(),calculation?.readEventWithin??null),r=reviewed.record;
+    rule(reviewed.referenceStatus==='current'&&r&&reviewed.type==='review','qualification_review_unavailable');
+    rule(reviewed.experienceSubjectId===subjectId&&r.capabilityId===policy.capabilityId,'qualification_source_scope_mismatch');
+    rule(Date.parse(r.observedAt)>=1000*(this.access.now()-policy.historyWindowSeconds),'qualification_source_outside_window');
+    return{kind:'external-review',id:ref.id,version:ref.version,group:`external:${reviewed.sourceGroup}`,usable:r.state==='verified-in-scope',
+      reason:r.state==='verified-in-scope'?null:r.state,synthetic:reviewed.synthetic,experienceKind:reviewed.experienceKind,scope:r.scope,
+      reviewerId:reviewed.subjectId,review:'registered-reviewer-scoped-attestation',productionExperienceInferred:reviewed.experienceKind!=='challenge'};
+  }
 }

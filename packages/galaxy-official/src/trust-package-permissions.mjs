@@ -20,9 +20,9 @@ export const trustPermissionRevokeSchema=z.strictObject({id:z.uuid(),operationId
 export const trustPermissionQuerySchema=z.strictObject({after:z.uuid().nullable().default(null),role:z.enum(['author','grantee']).default('author')});
 
 export class TrustPackagePermissionService {
-  constructor(access,{cases,verificationRecords,readSourceWithin}={}) {
+  constructor(access,{cases,verificationRecords,ciV2,readSourceWithin}={}) {
     this.access=access;this.endpoint=access.endpoint;this.now=()=>access.now();
-    this.readSourceWithin=readSourceWithin??createTrustSourceReader({cases,verificationRecords});
+    this.readSourceWithin=readSourceWithin??createTrustSourceReader({cases,verificationRecords,ciV2});
   }
   async identityWithin(db,id){
     const subject=await lockSubjectControl(db,id);rule(subject,'trust_identity_unavailable',404);
@@ -137,6 +137,18 @@ export class TrustPackagePermissionService {
     for(const selection of q.selections){
       try {
         this.localSource(selection.ref);let source,permission;
+        if(selection.ref.kind==='ci-proof-v2'){
+          rule(selection.mode==='reference'&&!selection.permissionId,'trust_ci_reference_only',403);
+          this.sourceScope(a,selection.ref);source=await this.readSourceWithin(db,actor,selection.ref);
+          rule(source.profile==='galaxy-ci-proof-v2-reference/1'
+            &&source.associatedSubjectId===actor.subjectId,'trust_ci_associated_subject_required',403);
+          rule(q.expiresAt<=source.sourceExpiresAt,'trust_ci_reference_expiry_exceeds_source',409);
+          const snapshot={ref:source.ref,profile:source.profile,issuer:source.issuer,associatedSubjectId:source.associatedSubjectId,
+            sourceHash:source.sourceHash,sourceSignatureHash:source.sourceSignatureHash,sourceExpiresAt:source.sourceExpiresAt,
+            authority:source.authority,sourceState:source.sourceState,checkedAt:this.now(),mode:'reference',
+            signatureEvidence:'not-provided',referenceBasis:'associated-subject-reference',limitations:source.limitations};
+          items.push({ref:selection.ref,state:'available',snapshot});continue;
+        }
         if(selection.permissionId){
           const row=await this.visibleRowWithin(db,actor,selection.permissionId),p=JSON.parse(row.payload_text);
           rule(p.grantee===actor.subjectId&&same(p.source,selection.ref)&&trustAudienceAllows(p.audience,q.audience)

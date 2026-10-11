@@ -5,7 +5,9 @@ import { ServiceError } from './shared/service-error.mjs';
 import { transaction } from './database.mjs';
 import { bindingControl } from './infrastructure/identity-control-repository.mjs';
 import { targetRestrictionsWithin, assertTargetOperation } from './target-governance-restrictions-v2.mjs';
-import { chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema,chatPageSchema } from './shared/chat-schema.mjs';
+import { chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema,chatPageSchema,chatMessageStatusSchema,chatJoinSchema } from './shared/chat-schema.mjs';
+import {roomRule,roomRuleHash,administrators,assertGovernanceProposal,invitationRule,requireOriginalRule,successionLive} from './chat-room-governance.mjs';
+import {lockControllerMappingsWithin} from './controller-mapping-lock.mjs';
 
 const day=86400, stamp=n=>new Date(n*1000).toISOString(), hash=x=>digest(canonicalize(x));
 const fail=(code,status=409)=>{throw new ServiceError(code,status);};
@@ -28,23 +30,35 @@ export class ChatService {
   const members=await this.members(db,roomId);
   if(member&&!members.some(m=>m.subject_id===actor.subjectId))fail('chat_access_denied',403);
   if(member&&r.parent_room_id)await this.requireRoom(db,actor,r.parent_room_id);
+  // Hold the whole current mapping snapshot until transaction completion,
+  // including an absent/new joining subject. Link/unlink takes the same key
+  // exclusively; a final metadata re-read alone would leave a commit race.
+  await lockControllerMappingsWithin(db,this.access.endpoint,[...members.map(m=>m.subject_id),actor.subjectId]);
   const mapped=[];for(const m of members)mapped.push({...m,controller_ref:await this.resolveControlParty(db,m.subject_id)});
   if(mapped.some(m=>typeof m.controller_ref!=='string'||!m.controller_ref.length))fail('chat_control_relationship_unavailable',503);
-  if(write&&mapped.some((m,i)=>m.controller_ref!==members[i].controller_ref)){
-   for(const m of mapped)await db.query('UPDATE chat_memberships SET controller_ref=$3 WHERE room_id=$1 AND subject_id=$2',[roomId,m.subject_id,m.controller_ref]);
-   await db.query('UPDATE chat_rooms SET member_revision=member_revision+1,revision=revision+1 WHERE room_id=$1',[roomId]);r.member_revision++;r.revision++;
+  if(mapped.some((m,i)=>m.controller_ref!==members[i].controller_ref)){
+   if(write){
+    for(const m of mapped)await db.query('UPDATE chat_memberships SET controller_ref=$3 WHERE room_id=$1 AND subject_id=$2',[roomId,m.subject_id,m.controller_ref]);
+    await db.query('UPDATE chat_rooms SET member_revision=member_revision+1,revision=revision+1 WHERE room_id=$1',[roomId]);
+   }
+   // A read reflects the same current control-party version that the next
+   // locked write will persist. Failed stale writes roll back their refresh.
+   r.member_revision++;r.revision++;
   }
   return {room:r,members:mapped,parties:[...new Set(mapped.map(m=>m.controller_ref))].sort((a,b)=>a<b?-1:a>b?1:0),governance:await targetRestrictionsWithin(db,'room',roomId,this.now())};
  }
  view(ctx){const {room:r,members,parties}=ctx;return{roomId:r.room_id,title:r.title,kind:r.kind,parentRoomId:r.parent_room_id,taskRefs:r.task_refs,
   revision:r.revision,memberRevision:r.member_revision,state:r.state,mode:r.mode,ownerSubjectId:r.owner_subject_id,persistent:r.persistent,
   retentionDays:r.retention_days,historyPolicy:'all-authorized-history',independentMemberCount:parties.length,
+  joinRule:{...roomRule(r,this.now()),ruleHash:roomRuleHash(roomRule(r,this.now()))},administratorSubjectIds:administrators(ctx),successionExpiresAt:r.succession_expires_at,
+  managementAuthority:{basis:'current-room-role-and-explicit-shared-rule',managerLimit:10,privateMaterialsGranted:false,otherAgentControlGranted:false},
   membershipBasis:'explicit-subject-and-verified-control-relationships',connectionCount:null,
   decisionRequired:r.state==='single-member-decision',members:members.map(m=>({subjectId:m.subject_id,joinedAt:m.joined_at,singleMemberPromptDismissed:m.dismissed_revision===r.revision})),
   transportAvailable:this.transport?.available===true,governance:ctx.governance};}
  async project(ctx){if(!this.transport)fail('chat_transport_unavailable',503);return this.transport.project({roomId:ctx.room.room_id,revision:ctx.room.revision,title:ctx.room.title,
   state:ctx.room.state,members:ctx.members.map(m=>m.subject_id)});}
  async create(actor,input){const x=parse(chatCreateSchema,input);return this.run(actor,true,async db=>{
+  await lockControllerMappingsWithin(db,this.access.endpoint,[actor.subjectId]);
   await this.requireAccount(db,actor);
   const old=(await db.query('SELECT * FROM chat_rooms WHERE creator_subject_id=$1 AND operation_id=$2',[actor.subjectId,x.operationId])).rows[0];
   if(old){if(old.request_hash!==hash(x))fail('chat_operation_conflict');return this.view(await this.requireRoom(db,actor,old.room_id));}
@@ -68,17 +82,21 @@ export class ChatService {
   return {rooms,next:rows.length>limit?rooms.at(-1).roomId:null};
  });}
  async proposeDecision(actor,roomId,input){const x=parse(chatDecisionSchema,input);return this.run(actor,true,async db=>{
+  if(x.action==='join-rule'?x.joinRule===undefined:x.joinRule!==undefined)fail('invalid_chat_request',400);
+  await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['chat-decision:'+x.decisionId]);
   const ctx=await this.requireRoom(db,actor,roomId,{write:true}),r=ctx.room;
   const prior=(await db.query('SELECT * FROM chat_decisions WHERE decision_id=$1',[x.decisionId])).rows[0];
-  if(prior){if(prior.room_id!==roomId||prior.proposer_subject_id!==actor.subjectId||prior.request_hash!==hash(x))fail('chat_operation_conflict');return this.decisionView(prior);}
+  if(prior){if(prior.room_id!==roomId||prior.proposer_subject_id!==actor.subjectId||prior.request_hash!==hash(x))fail('chat_operation_conflict');return this.decisionView(prior,ctx,actor,db);}
   if(x.action==='invite')assertTargetOperation(ctx.governance,'invitations-paused');
   if(r.state==='archived'||r.revision!==x.expectedRevision)fail('chat_revision_conflict');
   let parties=ctx.parties;
-  if(['invite','remove','become-owner','transfer-owner'].includes(x.action)&&!x.targetSubjectId)fail('chat_target_required',400);
+  if(['invite','remove','become-owner','transfer-owner','appoint-admin','revoke-admin','successor-owner'].includes(x.action)&&!x.targetSubjectId)fail('chat_target_required',400);
   if(x.action==='invite'&&ctx.members.some(m=>m.subject_id===x.targetSubjectId))fail('chat_already_member');
-  if(['become-owner','transfer-owner'].includes(x.action)&&!ctx.members.some(m=>m.subject_id===x.targetSubjectId))fail('chat_target_not_member');
+  if(['become-owner','transfer-owner','appoint-admin','revoke-admin','successor-owner'].includes(x.action)&&!ctx.members.some(m=>m.subject_id===x.targetSubjectId))fail('chat_target_not_member');
   if(x.action==='become-owner'&&r.mode!=='ownerless')fail('chat_owner_already_exists');
   if(x.action==='transfer-owner'&&r.mode!=='owned')fail('chat_owner_missing');
+  assertGovernanceProposal(ctx,actor,x,this.now());
+  const ruleAuthority=x.action==='invite'?invitationRule(ctx,actor.subjectId,this.now()):null;
   if(x.action==='remove'){
    const target=ctx.members.find(m=>m.subject_id===x.targetSubjectId);if(!target)fail('chat_target_not_member');
    parties=parties.filter(p=>p!==target.controller_ref);if(parties.length<2)fail('chat_two_party_removal_forbidden');
@@ -89,50 +107,104 @@ export class ChatService {
   if(x.action==='invite'){if(!this.consumeInviteWithin)fail('chat_invitation_adapter_unavailable',503);
    await this.consumeInviteWithin(db,actor,{roomId,eventId:x.decisionId,payloadHash:hash(x),recipientId:x.targetSubjectId});}
   const party=ctx.members.find(m=>m.subject_id===actor.subjectId).controller_ref;
+  if(ruleAuthority)parties=[party];
   const votes={[party]:{subjectId:actor.subjectId,choice:'approve'}},approved=parties.every(p=>votes[p]?.choice==='approve');
-  let row=(await db.query(`INSERT INTO chat_decisions(decision_id,room_id,proposer_subject_id,member_revision,required_parties,votes,action,payload,request_hash,state,created_at,expires_at)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,[x.decisionId,roomId,actor.subjectId,r.member_revision,JSON.stringify(parties),JSON.stringify(votes),x.action,JSON.stringify(x),hash(x),approved?'approved':'pending',stamp(this.now()),stamp(this.now()+7*day)])).rows[0];
-  if(approved)row=await this.applyDecision(db,ctx,row);return this.decisionView(row);
+  let row=(await db.query(`INSERT INTO chat_decisions(decision_id,room_id,proposer_subject_id,member_revision,required_parties,votes,action,payload,request_hash,state,created_at,expires_at,authority_rule_version,authority_rule_hash)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,[x.decisionId,roomId,actor.subjectId,r.member_revision,JSON.stringify(parties),JSON.stringify(votes),x.action,JSON.stringify(x),hash(x),approved?'approved':'pending',stamp(this.now()),stamp(this.now()+7*day),ruleAuthority?.version??null,ruleAuthority?.hash??null])).rows[0];
+  if(approved)row=await this.applyDecision(db,ctx,row);return this.decisionView(row,ctx,actor,db);
  });}
- decisionView(d){return{decisionId:d.decision_id,roomId:d.room_id,action:d.action,payload:d.payload,state:d.state,memberRevision:d.member_revision,
-  votes:Object.values(d.votes),requiredPartyCount:d.required_parties.length,expiresAt:d.expires_at};}
- async decisions(actor,roomId){return this.run(actor,false,async db=>{await this.requireRoom(db,actor,roomId);return{decisions:(await db.query('SELECT * FROM chat_decisions WHERE room_id=$1 ORDER BY created_at DESC LIMIT 100',[roomId])).rows.map(d=>this.decisionView(d))};});}
+ async decisionView(d,ctx,actor,db){
+  const member=ctx.members.find(m=>m.subject_id===actor.subjectId),party=member?.controller_ref;
+  // Current controller mapping and time affect what may proceed, never the
+  // saved request, votes or historical state. The write paths still verify
+  // these conditions under their original locks before applying a decision.
+  const effectiveState=['pending','approved'].includes(d.state)
+   ?d.member_revision!==ctx.room.member_revision?'stale':Date.parse(d.expires_at)<=this.now()*1000?'expired':d.state:d.state;
+  const closed=effectiveState==='stale'?'chat_membership_changed':effectiveState==='expired'?'chat_decision_expired':null;
+  const pending=closed??(effectiveState!=='pending'?'chat_decision_unavailable':!member?'chat_access_denied':null);
+  const reasons={approve:pending,reject:pending,cancel:pending,accept:closed,decline:closed};
+  if(!pending){
+   if(!d.required_parties.includes(party))reasons.approve=reasons.reject='chat_vote_not_required';
+   if(actor.subjectId!==d.proposer_subject_id)reasons.cancel='chat_cancel_proposer_required';
+  }
+  const blocked=async(fn)=>{try{await fn();return null;}catch(error){if(error instanceof ServiceError)return error.code;throw error;}};
+  if(!reasons.approve)reasons.approve=await blocked(()=>{
+   if(ctx.room.state==='archived')fail('chat_room_read_only');
+   assertGovernanceProposal(ctx,{subjectId:d.proposer_subject_id},d.payload,this.now());
+   if(d.action==='invite')assertTargetOperation(ctx.governance,'invitations-paused');
+  });
+  if(!closed){
+   const accepting=['invite','become-owner','transfer-owner','appoint-admin','successor-owner'].includes(d.action);
+   const unavailable=effectiveState!=='approved'||!accepting?'chat_decision_unavailable':d.payload.targetSubjectId!==actor.subjectId?'chat_invitation_target_required'
+    :ctx.room.state==='archived'?'chat_decision_unavailable':ctx.room.state==='owner-succession'&&d.action!=='successor-owner'?'chat_room_read_only'
+    :d.action==='successor-owner'&&!successionLive(ctx.room,this.now())?'chat_succession_unavailable':d.action!=='invite'&&!member?'chat_access_denied':null;
+   reasons.accept=reasons.decline=unavailable;
+  }
+  if(!reasons.accept)reasons.accept=await blocked(async()=>{
+   await this.requireAccount(db,actor);
+   assertGovernanceProposal(ctx,{subjectId:d.proposer_subject_id},d.payload,this.now());requireOriginalRule(ctx,d,this.now());
+   if(d.action==='invite'){
+    assertTargetOperation(ctx.governance,'invitations-paused');
+    if(ctx.room.parent_room_id)await this.requireRoom(db,actor,ctx.room.parent_room_id);
+   }
+  });
+  return{decisionId:d.decision_id,roomId:d.room_id,action:d.action,payload:d.payload,state:d.state,effectiveState,memberRevision:d.member_revision,
+   proposerSubjectId:d.proposer_subject_id,votes:Object.values(d.votes),myVote:party&&d.votes[party]?{...d.votes[party]}:null,
+   requiredPartyCount:d.required_parties.length,expiresAt:d.expires_at,
+   canApprove:!reasons.approve,canReject:!reasons.reject,canCancel:!reasons.cancel,canAccept:!reasons.accept,canDecline:!reasons.decline,actionReasons:reasons,
+   ...(d.authority_rule_version?{joinRuleAuthorization:{version:d.authority_rule_version,hash:d.authority_rule_hash}}:{})};
+ }
+ async decisions(actor,roomId){return this.run(actor,false,async db=>{const ctx=await this.requireRoom(db,actor,roomId),rows=(await db.query('SELECT * FROM chat_decisions WHERE room_id=$1 ORDER BY created_at DESC LIMIT 100',[roomId])).rows,decisions=[];
+  for(const row of rows)decisions.push(await this.decisionView(row,ctx,actor,db));return{decisions};});}
  invitations(actor){return this.run(actor,false,async db=>{const rows=(await db.query(`SELECT d.*,r.title FROM chat_decisions d JOIN chat_rooms r USING(room_id)
   WHERE d.payload->>'targetSubjectId'=$1 AND d.state='approved' AND d.expires_at>$2 AND d.member_revision=r.member_revision AND r.state<>'archived'
   ORDER BY d.created_at DESC LIMIT 100`,[actor.subjectId,stamp(this.now())])).rows,invitations=[];
   for(const d of rows){if(d.action==='invite'&&(await targetRestrictionsWithin(db,'room',d.room_id,this.now())).scopes.includes('invitations-paused'))continue;
-   invitations.push({...this.decisionView(d),title:d.title});}return{invitations};});}
+   const ctx=await this.requireRoom(db,actor,d.room_id,{member:false});
+   if(d.member_revision!==ctx.room.member_revision)continue;
+   try{requireOriginalRule(ctx,d,this.now());if(d.action==='successor-owner'&&!successionLive(ctx.room,this.now()))continue;
+    if(ctx.room.state==='owner-succession'&&d.action!=='successor-owner')continue;
+   }catch(error){if(error instanceof ServiceError&&error.status===409)continue;throw error;}
+   invitations.push({...await this.decisionView(d,ctx,actor,db),title:d.title});}return{invitations};});}
  async voteDecision(actor,roomId,{decisionId,choice}){uuid(decisionId);if(!['approve','reject','cancel'].includes(choice))fail('invalid_chat_request',400);return this.run(actor,true,async db=>{
   const ctx=await this.requireRoom(db,actor,roomId,{write:true});let d=(await db.query('SELECT * FROM chat_decisions WHERE decision_id=$1 AND room_id=$2 FOR UPDATE',[decisionId,roomId])).rows[0];
-  if(!d)fail('chat_decision_not_found',404);if(d.state!=='pending')return this.decisionView(d);
+  if(!d)fail('chat_decision_not_found',404);if(d.state!=='pending')return this.decisionView(d,ctx,actor,db);
   if(d.member_revision!==ctx.room.member_revision)d.state='stale';else if(Date.parse(d.expires_at)<=this.now()*1000)d.state='expired';
   else if(choice==='cancel'){if(actor.subjectId!==d.proposer_subject_id)fail('chat_access_denied',403);d.state='cancelled';}
   else{const party=ctx.members.find(m=>m.subject_id===actor.subjectId).controller_ref;if(!d.required_parties.includes(party))fail('chat_access_denied',403);
    d.votes[party]={subjectId:actor.subjectId,choice};d.state=choice==='reject'?'rejected':d.required_parties.every(p=>d.votes[p]?.choice==='approve')?'approved':'pending';}
   await db.query('UPDATE chat_decisions SET votes=$2,state=$3 WHERE decision_id=$1',[d.decision_id,JSON.stringify(d.votes),d.state]);
-  if(d.state==='approved'){if(d.action==='invite')assertTargetOperation(ctx.governance,'invitations-paused');d=await this.applyDecision(db,ctx,d);}return this.decisionView(d);
+  if(d.state==='approved'){assertGovernanceProposal(ctx,{subjectId:d.proposer_subject_id},d.payload,this.now());if(d.action==='invite')assertTargetOperation(ctx.governance,'invitations-paused');d=await this.applyDecision(db,ctx,d);}return this.decisionView(d,ctx,actor,db);
  });}
  async applyDecision(db,ctx,d){const x=d.payload,r=ctx.room;
   // Invitations and ownership transfers require the target's own acceptance.
-  if(['invite','become-owner','transfer-owner'].includes(d.action))return d;
+  if(['invite','become-owner','transfer-owner','appoint-admin','successor-owner'].includes(d.action))return d;
   if(d.action==='remove')await db.query('UPDATE chat_memberships SET left_at=$3 WHERE room_id=$1 AND subject_id=$2',[r.room_id,x.targetSubjectId,stamp(this.now())]);
   if(d.action==='remove')await db.query('UPDATE chat_agent_grants SET revoked_at=$3 WHERE room_id=$1 AND subject_id=$2 AND revoked_at IS NULL',[r.room_id,x.targetSubjectId,stamp(this.now())]);
   if(d.action==='remove'&&r.owner_subject_id===x.targetSubjectId)await db.query("UPDATE chat_rooms SET state='owner-succession',succession_expires_at=$2 WHERE room_id=$1",[r.room_id,stamp(this.now()+7*day)]);
   if(d.action==='retention')await db.query('UPDATE chat_rooms SET retention_days=$2 WHERE room_id=$1',[r.room_id,x.retentionDays]);
   if(d.action==='persistent')await db.query('UPDATE chat_rooms SET persistent=$2 WHERE room_id=$1',[r.room_id,x.persistent]);
+  if(['remove','revoke-admin'].includes(d.action))await db.query('UPDATE chat_rooms SET administrator_ids=$2 WHERE room_id=$1',[r.room_id,JSON.stringify(administrators(ctx).filter(id=>id!==x.targetSubjectId))]);
+  if(d.action==='join-rule'){
+   const current=roomRule(r,this.now()),rule={mode:x.joinRule.mode,version:current.version+1,decisionId:d.decision_id,requestHash:d.request_hash,expiresAt:x.joinRule.expiresAt??null};
+   await db.query('UPDATE chat_rooms SET join_rule=$2 WHERE room_id=$1',[r.room_id,JSON.stringify(rule)]);
+  }
   if(d.action==='dissolve')await db.query("UPDATE chat_rooms SET state='archived' WHERE room_id=$1",[r.room_id]);
-  await db.query(`UPDATE chat_rooms SET revision=revision+1,member_revision=member_revision+$2,updated_at=$3 WHERE room_id=$1`,[r.room_id,d.action==='remove'?1:0,stamp(this.now())]);
+  await db.query(`UPDATE chat_rooms SET revision=revision+1,member_revision=member_revision+$2,updated_at=$3 WHERE room_id=$1`,[r.room_id,['remove','revoke-admin','join-rule'].includes(d.action)?1:0,stamp(this.now())]);
   await db.query("UPDATE chat_decisions SET state='accepted' WHERE decision_id=$1",[d.decision_id]);d.state='accepted';return d;
  }
  async acceptInvite(actor,roomId,{decisionId,accept=true}){uuid(decisionId);if(typeof accept!=='boolean')fail('invalid_chat_request',400);return this.run(actor,true,async db=>{
   if(accept)await this.requireAccount(db,actor);
   const ctx=await this.requireRoom(db,actor,roomId,{member:false,write:true}),r=ctx.room;
   const d=(await db.query('SELECT * FROM chat_decisions WHERE decision_id=$1 AND room_id=$2 FOR UPDATE',[decisionId,roomId])).rows[0];
-  if(!d||!['invite','become-owner','transfer-owner'].includes(d.action)||d.payload.targetSubjectId!==actor.subjectId)fail('chat_access_denied',403);
+  if(!d||!['invite','become-owner','transfer-owner','appoint-admin','successor-owner'].includes(d.action)||d.payload.targetSubjectId!==actor.subjectId)fail('chat_access_denied',403);
   if(d.state==='accepted'){const active=ctx.members.some(m=>m.subject_id===actor.subjectId);
    return{state:'accepted',membershipActive:active,...(active?{room:this.view(ctx)}:{})};}
   if(d.state!=='approved'||r.state==='archived')fail('chat_decision_unavailable');
   if(d.member_revision!==r.member_revision)fail('chat_membership_changed');if(Date.parse(d.expires_at)<=this.now()*1000)fail('chat_invitation_expired');
+  if(r.state==='owner-succession'&&d.action!=='successor-owner')fail('chat_room_read_only');
+  if(d.action==='successor-owner'&&!successionLive(r,this.now()))fail('chat_succession_unavailable');
+  if(accept){assertGovernanceProposal(ctx,{subjectId:d.proposer_subject_id},d.payload,this.now());requireOriginalRule(ctx,d,this.now());}
   if(d.action==='invite'){if(!this.markInviteRespondedWithin)fail('chat_invitation_adapter_unavailable',503);await this.markInviteRespondedWithin(db,{roomId,recipientId:actor.subjectId});}
   if(!accept){await db.query("UPDATE chat_decisions SET state='rejected' WHERE decision_id=$1",[decisionId]);return{state:'rejected'};}
   if(d.action==='invite'){
@@ -144,9 +216,11 @@ export class ChatService {
    const multi=new Set([...ctx.parties,party]).size>1;
    await db.query(`UPDATE chat_rooms SET revision=revision+1,member_revision=member_revision+1,had_multiple=had_multiple OR $2,
     state=CASE WHEN $2 THEN 'active' ELSE state END,updated_at=$3 WHERE room_id=$1`,[roomId,multi,stamp(this.now())]);
+  }else if(d.action==='appoint-admin'){
+   await db.query('UPDATE chat_rooms SET administrator_ids=$2,revision=revision+1,member_revision=member_revision+1,updated_at=$3 WHERE room_id=$1',[roomId,JSON.stringify([...administrators(ctx),actor.subjectId]),stamp(this.now())]);
   }else{
    if(!ctx.members.some(m=>m.subject_id===actor.subjectId))fail('chat_access_denied',403);
-   await db.query("UPDATE chat_rooms SET mode='owned',owner_subject_id=$2,state='active',succession_expires_at=NULL,revision=revision+1,updated_at=$3 WHERE room_id=$1",[roomId,actor.subjectId,stamp(this.now())]);
+   await db.query("UPDATE chat_rooms SET mode='owned',owner_subject_id=$2,administrator_ids=$4,persistent=COALESCE($5,persistent),state='active',succession_expires_at=NULL,revision=revision+1,member_revision=member_revision+1,updated_at=$3 WHERE room_id=$1",[roomId,actor.subjectId,stamp(this.now()),JSON.stringify(administrators(ctx).filter(id=>id!==actor.subjectId)),d.payload.persistent??null]);
   }
   await db.query("UPDATE chat_decisions SET state='accepted' WHERE decision_id=$1",[decisionId]);
   return {state:'accepted',room:this.view(await this.requireRoom(db,actor,roomId))};
@@ -159,10 +233,40 @@ export class ChatService {
   const parties=new Set(ctx.members.filter(m=>m.subject_id!==actor.subjectId).map(m=>m.controller_ref));
   const state=!parties.size?'archived':r.owner_subject_id===actor.subjectId?'owner-succession':parties.size===1&&r.mode==='ownerless'&&r.had_multiple?'single-member-decision':r.state;
   await db.query(`UPDATE chat_rooms SET state=$2,revision=revision+1,member_revision=member_revision+1,updated_at=$3,
-   succession_expires_at=CASE WHEN $2='owner-succession' THEN $4 ELSE succession_expires_at END WHERE room_id=$1`,[roomId,state,stamp(this.now()),stamp(this.now()+7*day)]);
+   administrator_ids=$5,succession_expires_at=CASE WHEN $2='owner-succession' AND state<>'owner-succession' THEN $4 ELSE succession_expires_at END WHERE room_id=$1`,[roomId,state,stamp(this.now()),stamp(this.now()+7*day),JSON.stringify(administrators(ctx).filter(id=>id!==actor.subjectId))]);
   return {left:true,taskParticipationChanged:false};
  });}
  async dismissDecision(actor,roomId){return this.run(actor,true,async db=>{const ctx=await this.requireRoom(db,actor,roomId,{write:true});await db.query('UPDATE chat_memberships SET dismissed_revision=$3 WHERE room_id=$1 AND subject_id=$2',[roomId,actor.subjectId,ctx.room.revision]);return{dismissed:true};});}
+ async joinPreview(actor,roomId){return this.run(actor,false,async db=>{
+  const ctx=await this.requireRoom(db,actor,roomId,{member:false}),rule=roomRule(ctx.room,this.now());
+  if(rule.effectiveMode!=='open'||['archived','owner-succession'].includes(ctx.room.state))fail('chat_access_denied',403);
+  if(ctx.room.parent_room_id)await this.requireRoom(db,actor,ctx.room.parent_room_id);
+  assertTargetOperation(ctx.governance,'invitations-paused');
+  return{roomId,title:ctx.room.title,ruleVersion:rule.version,ruleHash:roomRuleHash(rule),joinRule:rule,
+   retentionDays:ctx.room.retention_days,historyPolicy:'all-authorized-history',requiresVerifiedAccount:true,joiningGrantsOtherMaterials:false,joiningStartsAgent:false};
+ });}
+ async join(actor,roomId,input){const x=parse(chatJoinSchema,input);return this.run(actor,true,async db=>{
+  await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['chat-decision:'+x.operationId]);
+  const ctx=await this.requireRoom(db,actor,roomId,{member:false,write:true}),r=ctx.room;
+  const previous=(await db.query('SELECT * FROM chat_decisions WHERE decision_id=$1',[x.operationId])).rows[0];
+  if(previous){if(previous.action!=='open-join'||previous.room_id!==roomId||previous.proposer_subject_id!==actor.subjectId||previous.request_hash!==hash(x))fail('chat_operation_conflict');
+   const active=ctx.members.some(m=>m.subject_id===actor.subjectId);return{state:'accepted',membershipActive:active,...(active?{room:this.view(ctx)}:{})};}
+  const rule=roomRule(r,this.now());
+  if(rule.effectiveMode!=='open'||['archived','owner-succession'].includes(r.state))fail('chat_access_denied',403);
+  if(rule.version!==x.ruleVersion||roomRuleHash(rule)!==x.ruleHash)fail('chat_join_rule_changed');
+  assertTargetOperation(ctx.governance,'invitations-paused');await this.requireAccount(db,actor);
+  if(r.parent_room_id)await this.requireRoom(db,actor,r.parent_room_id);
+  if(ctx.members.some(m=>m.subject_id===actor.subjectId))fail('chat_already_member');
+  const party=await this.resolveControlParty(db,actor.subjectId);if(typeof party!=='string'||!party)fail('chat_control_relationship_unavailable',503);
+  await db.query(`INSERT INTO chat_memberships(room_id,subject_id,controller_ref,joined_at) VALUES($1,$2,$3,$4)
+   ON CONFLICT(room_id,subject_id) DO UPDATE SET controller_ref=$3,joined_at=$4,left_at=NULL,dismissed_revision=NULL`,[roomId,actor.subjectId,party,stamp(this.now())]);
+  const multi=new Set([...ctx.parties,party]).size>1;
+  await db.query(`UPDATE chat_rooms SET revision=revision+1,member_revision=member_revision+1,had_multiple=had_multiple OR $2,
+   state=CASE WHEN $2 THEN 'active' ELSE state END,updated_at=$3 WHERE room_id=$1`,[roomId,multi,stamp(this.now())]);
+  await db.query(`INSERT INTO chat_decisions(decision_id,room_id,proposer_subject_id,member_revision,required_parties,votes,action,payload,request_hash,state,created_at,expires_at,authority_rule_version,authority_rule_hash)
+   VALUES($1,$2,$3,$4,'[]','{}','open-join',$5,$6,'accepted',$7,$8,$9,$10)`,[x.operationId,roomId,actor.subjectId,r.member_revision,JSON.stringify(x),hash(x),stamp(this.now()),stamp(this.now()+7*day),rule.version,roomRuleHash(rule)]);
+  return{state:'accepted',membershipActive:true,room:this.view(await this.requireRoom(db,actor,roomId))};
+ });}
  async agent(db,actor,roomId,grantId,{send=false}={}){
   if(!grantId)return null;const g=(await db.query('SELECT * FROM chat_agent_grants WHERE grant_id=$1 AND room_id=$2 AND subject_id=$3',[grantId,roomId,actor.subjectId])).rows[0];
   if(!g||g.binding_id!==actor.bindingId||g.revoked_at||Date.parse(g.expires_at)<=this.now()*1000||(send&&g.mode!=='respond'))fail('chat_agent_not_authorized',403);return g;
@@ -248,15 +352,28 @@ export class ChatService {
    await db.query("UPDATE chat_message_refs SET archive_id=$2,state='accepted' WHERE message_id=$1",[id,receipt.archiveId]);return this.receipt({...r,archive_id:receipt.archiveId,state:'accepted'});
   });
  }
- messageStatus(actor,roomId,{clientMessageId}){uuid(clientMessageId);return this.run(actor,false,async db=>{await this.requireRoom(db,actor,roomId);const r=(await db.query('SELECT * FROM chat_message_refs WHERE room_id=$1 AND subject_id=$2 AND client_message_id=$3',[roomId,actor.subjectId,clientMessageId])).rows[0];return r?this.receipt(r):{state:'not-found',acceptedByRoom:false};});}
+ messageStatus(actor,roomId,input){uuid(roomId);const x=parse(chatMessageStatusSchema,input);return this.run(actor,false,async db=>{
+  if(!x.requestHash){await this.requireRoom(db,actor,roomId);const r=(await db.query('SELECT * FROM chat_message_refs WHERE room_id=$1 AND subject_id=$2 AND client_message_id=$3',[roomId,actor.subjectId,x.clientMessageId])).rows[0];return r?this.receipt(r):{state:'not-found',acceptedByRoom:false};}
+  // Read only the original owned request metadata. A former room member can
+  // confirm an operation without retrieving its text, sources or archive body.
+  const base={roomId,...x,checkedAt:stamp(this.now()),currentAccessGranted:false,contentReturned:false,othersReadStatus:'not-asserted',acceptedByRoom:false};
+  const r=(await db.query('SELECT message_id,client_message_id,payload_hash,state,revision,sent_at,expires_at,archive_id,purge_pending FROM chat_message_refs WHERE room_id=$1 AND subject_id=$2 AND client_message_id=$3',[roomId,actor.subjectId,x.clientMessageId])).rows[0];
+  if(!r)return{...base,state:'absent'};if(r.payload_hash!==x.requestHash)return{...base,state:'conflict'};
+  const state=['pending','accepted'].includes(r.state)&&Date.parse(r.expires_at)<=this.now()*1000?'expired':r.state;
+  return{...base,state,messageId:r.message_id,revision:r.revision,sentAt:new Date(r.sent_at).toISOString(),expiresAt:new Date(r.expires_at).toISOString(),
+   acceptedByRoom:state==='accepted',historicalAcceptanceRecorded:!!r.archive_id,archiveCleanupState:r.purge_pending?'pending':['retracted','expired'].includes(r.state)?'recorded-complete':'not-requested'};
+ });}
  async history(actor,roomId,input={}){const x=parse(chatPageSchema,input);return this.run(actor,false,async db=>{
   const ctx=await this.requireRoom(db,actor,roomId);await this.agent(db,actor,roomId,x.agentGrantId);
   const rows=(await db.query(`SELECT m.*,COALESCE(p.hidden,false) AS personally_hidden,
    (m.subject_id<>$2 AND EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id AND d.state IN ('requested','review-needed','approved','partial','primary-erased'))) AS author_quarantined,
    (SELECT s.share_id FROM room_shared_summaries s WHERE s.room_id=m.room_id AND s.subject_id=m.subject_id AND s.share_id=m.client_message_id AND s.notice_hash=m.payload_hash) AS shared_summary_id FROM chat_message_refs m
-   LEFT JOIN chat_message_preferences p ON p.message_id=m.message_id AND p.subject_id=$2 WHERE m.room_id=$1 AND m.sequence>$3
-   ORDER BY m.sequence LIMIT $4`,[roomId,actor.subjectId,x.after,x.limit+1])).rows;
-  const page=rows.slice(0,x.limit);const visible=page.filter(r=>!r.personally_hidden&&!r.author_quarantined&&r.state!=='pending'&&r.state!=='expired'&&Date.parse(r.expires_at)>this.now()*1000&&(!x.author||r.subject_id===x.author)&&(!x.from||Date.parse(r.sent_at)>=Date.parse(x.from))&&(!x.to||Date.parse(r.sent_at)<=Date.parse(x.to)));
+   LEFT JOIN chat_message_preferences p ON p.message_id=m.message_id AND p.subject_id=$2 WHERE m.room_id=$1 AND ${x.latest?"($3::bigint=0 OR m.sequence<$3::bigint)":"m.sequence>$3"}
+   ORDER BY m.sequence ${x.latest?'DESC':'ASC'} LIMIT $4`,[roomId,actor.subjectId,x.latest?(x.before??'0'):x.after,x.limit+1])).rows;
+  // The newest window uses the same current membership, archive and content
+  // checks as forward history. Only its scan direction differs; display order
+  // stays chronological, and reading never advances either user's cursor.
+  const page=rows.slice(0,x.limit);if(x.latest)page.reverse();const visible=page.filter(r=>!r.personally_hidden&&!r.author_quarantined&&r.state!=='pending'&&r.state!=='expired'&&Date.parse(r.expires_at)>this.now()*1000&&(!x.author||r.subject_id===x.author)&&(!x.from||Date.parse(r.sent_at)>=Date.parse(x.from))&&(!x.to||Date.parse(r.sent_at)<=Date.parse(x.to)));
   let contents=[];if(visible.some(r=>r.state==='accepted')){await this.project(ctx);contents=await this.transport.read({roomId,subjectId:actor.subjectId,ids:visible.filter(r=>r.state==='accepted').map(r=>r.archive_id),roomRevision:ctx.room.revision});}
   const byId=new Map(contents.map(m=>[m.archiveId,m]));const messages=[];
   for(const r of visible){const content=byId.get(r.archive_id);if(r.state==='accepted'&&!content)continue;
@@ -265,6 +382,8 @@ export class ChatService {
    messages.push({...this.receipt(r),sequence:String(r.sequence),subjectId:r.subject_id,actorKind:r.actor_kind,agentGrantId:r.agent_grant_id,replyTo:r.reply_to,
     text:r.state==='retracted'?null:content.text,sharedSummaryId:r.state==='accepted'?r.shared_summary_id:null,editedAt:r.edited_at,retractedAt:r.retracted_at});}
   if(this.attachments){const files=await this.attachments.forMessagesWithin(db,actor,messages.map(m=>m.messageId));for(const m of messages)if(files.has(m.messageId))m.attachments=files.get(m.messageId);}
+  if(x.latest)return{messages,next:null,previous:rows.length>x.limit?String(page[0].sequence):null,
+   after:page.length?String(BigInt(page[0].sequence)-1n):'0',scannedThrough:page.length?String(page.at(-1).sequence):'0',complete:rows.length<=x.limit};
   return{messages,next:rows.length>x.limit?String(page.at(-1).sequence):null,scannedThrough:page.length?String(page.at(-1).sequence):x.after,complete:rows.length<=x.limit};
  });}
  async edit(actor,roomId,messageId,input){uuid(messageId);const x=parse(chatEditSchema,input);
@@ -320,7 +439,10 @@ export class ChatService {
    ON CONFLICT(room_id,subject_id,cursor_kind,agent_ref) DO UPDATE SET sequence=GREATEST(chat_cursors.sequence,$5),updated_at=$6 RETURNING sequence`,[roomId,actor.subjectId,kind,agentRef,sequence,stamp(this.now())])).rows[0];return{kind,sequence:String(r.sequence),agentGrantId:agentGrantId??null};
  });}
  async purgeOne(messageId){const r=(await this.db.query('SELECT * FROM chat_message_refs WHERE message_id=$1 AND purge_pending=true',[messageId])).rows[0];if(!r)return;
-  if(!this.transport)fail('chat_transport_unavailable',503);await this.transport.erase({roomId:r.room_id,messageId:r.message_id});
+  if(!this.transport)fail('chat_transport_unavailable',503);const acknowledgement=await this.transport.erase({roomId:r.room_id,messageId:r.message_id});
+  // The actual Prosody erase contract returns this exact positive flag. A
+  // resolved promise or a negative/missing flag cannot clear the retry target.
+  if(acknowledgement?.archiveDeleted!==true)fail('chat_archive_receipt_invalid',502);
   await transaction(this.db,async db=>{
    await db.query('UPDATE chat_message_refs SET purge_pending=false,content_bytes=0 WHERE message_id=$1 AND state IN (\'retracted\',\'expired\')',[messageId]);
    await db.query("UPDATE chat_message_operations SET state='cancelled' WHERE message_id=$1 AND state='pending'",[messageId]);
@@ -342,7 +464,7 @@ export class ChatService {
     const members=await this.members(db,r.room_id),parties=new Set(members.map(m=>m.controller_ref));
     const state=!parties.size?'archived':r.owner_subject_id===subjectId?'owner-succession':parties.size===1&&r.mode==='ownerless'&&r.had_multiple?'single-member-decision':r.state;
     await db.query(`UPDATE chat_rooms SET state=$2,revision=revision+1,member_revision=member_revision+1,updated_at=$3,
-     succession_expires_at=CASE WHEN $2='owner-succession' THEN $4 ELSE succession_expires_at END WHERE room_id=$1`,[r.room_id,state,stamp(this.now()),stamp(this.now()+7*day)]);
+     administrator_ids=$5,succession_expires_at=CASE WHEN $2='owner-succession' AND state<>'owner-succession' THEN $4 ELSE succession_expires_at END WHERE room_id=$1`,[r.room_id,state,stamp(this.now()),stamp(this.now()+7*day),JSON.stringify((r.administrator_ids??[]).filter(id=>id!==subjectId))]);
    }
    await db.query('UPDATE chat_agent_grants SET revoked_at=$2 WHERE subject_id=$1 AND revoked_at IS NULL',[subjectId,stamp(this.now())]);
    await db.query("UPDATE chat_message_refs SET state='retracted',purge_pending=true,retracted_at=COALESCE(retracted_at,$2) WHERE subject_id=$1 AND state IN ('pending','accepted')",[subjectId,stamp(this.now())]);

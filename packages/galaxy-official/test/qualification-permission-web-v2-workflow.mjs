@@ -273,9 +273,9 @@ export async function verifyQualificationPermissionWebV2(
       controls.set(who, { control, browser, connect, storage, helper });
       return helper();
     }
-    const candidate = await clientFor(p),
-      author = await clientFor(f),
-      secondAuthor = await clientFor(q);
+    let candidate = await clientFor(p);
+    let author = await clientFor(f);
+    const secondAuthor = await clientFor(q);
     const cp = controls.get(p),
       ca = controls.get(f),
       call = (who, path, input) =>

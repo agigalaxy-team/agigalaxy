@@ -23,7 +23,7 @@ export const trustPermissionSchema = z.strictObject({ version: z.literal(1), typ
 }).refine(p => p.expiresAt > p.issuedAt && p.expiresAt <= p.issuedAt + 30 * 86400);
 export const trustPermissionProofSchema = z.strictObject({ signed: z.string().max(30000), identity: trustIdentitySchema,
   status: z.enum(['active', 'revoked', 'expired', 'unknown']), checkedAt: second });
-export const trustSourceSnapshotSchema = z.strictObject({ ref: trustSourceRefSchema, authorId: trustSubject, sourceHash: hash,
+const authoredSourceSnapshotSchema = z.strictObject({ ref: trustSourceRefSchema, authorId: trustSubject, sourceHash: hash,
   authority: z.enum(['participant-reported', 'self-asserted', 'verification-record', 'ci-observation']),
   sourceState: z.enum(['current', 'superseded', 'expired', 'revoked', 'unavailable', 'unknown']), checkedAt: second,
   mode: z.enum(['reference', 'copy']), bodyText: z.string().max(48000).optional(),
@@ -34,12 +34,27 @@ export const trustSourceSnapshotSchema = z.strictObject({ ref: trustSourceRefSch
   referenceBasis: z.enum(['own-authored-reference', 'public-reference', 'explicit-trust-permission']),
   limitations: z.array(z.string().max(500)).max(16),
 });
+export const trustCiReferenceSnapshotSchema = z.strictObject({
+  profile:z.literal('galaxy-ci-proof-v2-reference/1'),
+  ref:trustSourceRefSchema.safeExtend({kind:z.literal('ci-proof-v2'),version:z.literal(1)})
+    .refine(ref=>ref.caseId===undefined&&ref.taskId===undefined),
+  issuer:trustOrigin,associatedSubjectId:trustSubject,sourceHash:hash,sourceSignatureHash:hash,
+  sourceExpiresAt:second,authority:z.literal('ci-observation'),sourceState:z.literal('current'),checkedAt:second,
+  mode:z.literal('reference'),signatureEvidence:z.literal('not-provided'),
+  referenceBasis:z.literal('associated-subject-reference'),
+  limitations:z.array(z.string().max(500)).max(16),
+}).refine(source=>source.issuer===source.ref.endpoint&&source.sourceExpiresAt>source.checkedAt);
+// Keep existing authored snapshots byte-compatible. Issuer references have
+// their own strict shape and cannot acquire author/copy/license fields.
+export const trustSourceSnapshotSchema=z.union([authoredSourceSnapshotSchema,trustCiReferenceSnapshotSchema]);
 export const trustClaimSchema = z.strictObject({ id: z.uuid(), text: z.string().trim().min(1).max(4000),
   authority: z.literal('self-asserted'), capabilityVerified: z.literal(false) });
 export const trustPackageInputSchema = z.strictObject({ identity: trustIdentitySchema, keyId: hash, epoch: z.number().int().nonnegative(),
   audience: trustAudienceSchema, issuedAt: second, expiresAt: second,
   claims: z.array(trustClaimSchema).max(50), sources: z.array(trustSourceSnapshotSchema).max(50),
-}).refine(p => p.claims.length + p.sources.length > 0 && p.expiresAt > p.issuedAt && p.expiresAt <= p.issuedAt + 30 * 86400);
+}).refine(p => p.claims.length + p.sources.length > 0 && p.expiresAt > p.issuedAt && p.expiresAt <= p.issuedAt + 30 * 86400
+  &&p.sources.every(source=>source.profile!=='galaxy-ci-proof-v2-reference/1'
+    ||source.associatedSubjectId===p.identity.subjectId&&p.expiresAt<=source.sourceExpiresAt));
 export const trustManifestSchema = z.strictObject({ version: z.literal(1), type: z.literal('galaxy-readable-trust'), packageId: hash,
   subjectId: trustSubject, keyId: hash, epoch: z.number().int().nonnegative(), chainHead: hash.nullable(),
   audience: trustAudienceSchema, issuedAt: second, expiresAt: second,

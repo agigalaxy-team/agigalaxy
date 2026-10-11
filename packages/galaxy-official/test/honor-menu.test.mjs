@@ -14,11 +14,11 @@ test('native Honor pages contributions, CI, risk signals and full references wit
     controller:{cancel(){},async honorRules(){return {rules:[rule]};},async getHonor(input){calls.push(input);return paginateHonor(view,input);}}});
   const choose=title=>{let option=page.options.find(o=>o.title===title);if(!option&&page.options.some(o=>o.title==='下一页')){const n=page.options.find(o=>o.title==='下一页');page.routes[n.number]();option=page.options.find(o=>o.title===title);}assert.ok(option,title);page.routes[option.number]();};
   menu.open();await wait(()=>page.options?.some(o=>o.title===rule.title));choose(rule.title);choose('查看我的贡献卡片');await wait(()=>page.options?.some(o=>o.title==='查看来源贡献'));
-  choose('查看来源贡献');choose(id(1));choose('查看全部引用');await wait(()=>calls.at(-1)?.sourceId===id(1)&&page.kind==='select');choose('下一批引用');
+  choose('查看来源贡献');choose('工作来源 1');choose('查看全部引用');await wait(()=>calls.at(-1)?.sourceId===id(1)&&page.kind==='select');choose('下一批引用');
   await wait(()=>calls.at(-1)?.sourceAfter===8&&page.kind==='select');assert.equal(calls.at(-1).expectedFingerprint,'a'.repeat(64));
   page.onBack();await wait(()=>calls.at(-1)?.sourceAfter===0&&page.kind==='select');page.onBack();choose('下一批贡献');await wait(()=>calls.at(-1)?.after===id(8)&&page.kind==='select');
-  assert.equal(page.options[0].title,id(9));assert.equal(calls.at(-1).expectedFingerprint,'a'.repeat(64));
-  page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看CI依据'));choose('查看CI依据');choose('下一批CI依据');await wait(()=>calls.at(-1)?.proofAfter===id(307)&&page.kind==='select');assert.equal(page.options[0].title,id(308));
+  assert.equal(page.options[0].title,'工作来源 1');assert.equal(calls.at(-1).expectedFingerprint,'a'.repeat(64));choose('工作来源 1');choose('查看准确来源记录');assert.ok(page.message.includes(id(9)));page.onBack();page.onBack();
+  await wait(()=>page.options?.some(o=>o.title==='查看CI依据'));choose('查看CI依据');choose('下一批CI依据');await wait(()=>calls.at(-1)?.proofAfter===id(307)&&page.kind==='select');assert.equal(page.options[0].title,'CI 来源 1');choose('CI 来源 1');assert.ok(!page.title.includes(id(308)));choose('查看准确来源记录');assert.ok(page.message.includes(id(308)));page.onBack();
   page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看风险提示'));choose('查看风险提示');choose('risk-0');choose('查看全部引用');await wait(()=>calls.at(-1)?.riskIndex===0&&page.kind==='select');choose('下一批引用');await wait(()=>calls.at(-1)?.riskReferenceAfter===8&&page.kind==='select');
   page.onBack();await wait(()=>calls.at(-1)?.riskReferenceAfter===0&&page.kind==='select');page.onBack();choose('下一批风险提示');await wait(()=>calls.at(-1)?.riskAfter===8&&page.kind==='select');assert.equal(page.options[0].title,'risk-8');
 });
@@ -47,10 +47,10 @@ test('native Honor views separate current evidence, related parties and suppress
       async honorRanking(){return {status:'suppressed',reason:'insufficient-public-cohort',items:[]};}}});
   const choose=title=>{const option=page.options.find(o=>o.title===title);assert.ok(option,title);page.routes[option.number]();};
   menu.open();await wait(()=>page.options?.some(o=>o.title===rule.title));choose(rule.title);choose('查看我的贡献卡片');await wait(()=>page.options?.some(o=>o.title==='贡献与可靠性分项'));
-  assert.equal(page.title.includes('active'),true);choose('贡献与可靠性分项');assert.ok(page.message.includes('没有全局总分'));assert.ok(page.message.includes('关联方Case数'));page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看来源贡献'));
+  assert.equal(page.title.includes('当前符合本规则'),true);choose('贡献与可靠性分项');assert.ok(page.message.includes('没有全局总分'));assert.ok(page.message.includes('关联方Case数'));assert.ok(page.message.includes('已验收协作: 1'));assert.ok(!page.message.includes('"accepted"'));page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看来源贡献'));
   choose('查看风险提示');assert.ok(page.title.includes('不判定欺诈'));choose('同一Case对应多条协作记录');assert.ok(page.message.includes('acceptance'));assert.ok(page.message.includes('没有提示不代表不存在问题'));page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看来源贡献'));
   choose('查看风险提示');choose('可见协作存在循环验收');assert.ok(page.message.includes('a → b'));assert.ok(page.message.includes('循环验收不等于串通'));page.onBack();await wait(()=>page.options?.some(o=>o.title==='查看来源贡献'));
-  choose('查看来源贡献');choose('assistance');assert.ok(page.message.includes('acceptance'));assert.ok(page.message.includes('issuer-declared-related-party'));
-  page.onBack();await wait(()=>page.options?.some(o=>o.title==='检查公开可见结果'));choose('检查公开可见结果');await wait(()=>page.kind==='select'&&page.title.includes('insufficient-evidence'));assert.equal(calls.at(-1).subjectId,'subject');
+  choose('查看来源贡献');choose('工作来源 1');assert.ok(page.title.includes('已声明关联方'));assert.ok(!page.title.includes('acceptance'));choose('查看准确来源记录');assert.ok(page.message.includes('acceptance'));assert.ok(page.message.includes('issuer-declared-related-party'));
+  page.onBack();page.onBack();await wait(()=>page.options?.some(o=>o.title==='检查公开可见结果'));choose('检查公开可见结果');await wait(()=>page.kind==='select'&&page.title.includes('当前来源不足'));assert.equal(calls.at(-1).subjectId,'subject');
   menu.open();await wait(()=>page.options?.some(o=>o.title===rule.title));choose(rule.title);choose('查看范围内排名');await wait(()=>page.kind==='info'&&page.message.includes('insufficient-public-cohort'));
 });

@@ -7,6 +7,7 @@ import {createApi} from '../src/http.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {postHubPeeringJson} from '../src/public-fetch.mjs';
 import {createPeeringProof} from './hub-ci-proof-fixture.mjs';
+import {samePeeringMaterial} from '../../galaxy-web/src/peering-material.mjs';
 export const hubScopes=['binding','consent','builders','case-teaser','evidence','proof','history','data-export','data-delete'];
 export async function prepareHub(f){const hubId=randomUUID(),d={id:randomUUID(),builderId:hubId,kind:'declare',expectedRevision:0,
   declaration:{...builderDeclaration('hub',f.actor.subjectId),endpoint:f.access.endpoint}};
@@ -49,6 +50,13 @@ export async function peeringWorkflow(database=null,options={}){
     const preview=await call(b,'/v2/hubs/peering/preview',{hubId:bh,agreementId:agreement.id,source});
     assert.ok((await call(b,'/v2/hubs/peering/sources',{hubId:bh,kind:'case-event',parentId:rootId})).items.some(i=>i.source.source.id===intervention.eventId));
     assert.equal(preview.projection.synthetic,true,'root synthetic state follows a child fact');assert.equal(preview.published,false);
+    const originalNow=b.peering.now;b.peering.now=()=>now+1;
+    let reread;try{reread=await call(b,'/v2/hubs/peering/preview',{hubId:bh,agreementId:agreement.id,source});}finally{b.peering.now=originalNow;}
+    assert.notEqual(reread.projection.observedAt,preview.projection.observedAt,'a later read changes observation metadata');
+    assert.equal(samePeeringMaterial(source,preview.projection,reread.projection),true,'the same exact authored fields remain confirmable');
+    assert.equal(samePeeringMaterial(source,preview.projection,{...reread.projection,sourceObject:{...reread.projection.sourceObject,payloadHash:'changed'}}),false);
+    assert.equal(samePeeringMaterial(source,preview.projection,{...reread.projection,projection:{...reread.projection.projection,interventionTypes:['patch']}}),false);
+    assert.equal(samePeeringMaterial(source,preview.projection,{...reread.projection,subjectId:a.actor.subjectId}),false);
     const grant={schemaVersion:2,id:randomUUID(),hubId:bh,kind:'source-grant',agreementId:agreement.id,agreementVersion:1,source,requesterIds:[a.actor.subjectId],expiresAt:now+1000,
       purpose:'selected-peering-read-only',disclosure:'exact-proof-or-selected-nonnarrative-contribution-fields',redactionConfirmed:true};
     const signed=await b.authorize(grant,'hub.publish');await call(b,'/v2/hubs/peering/events',signed);
@@ -60,6 +68,8 @@ export async function peeringWorkflow(database=null,options={}){
     const receipt=await call(b,'/v2/hubs/peering/receipt',{operationId:grant.id,payloadHash:digest(signed.payloadJson)});assert.equal(receipt.state,'recorded');
     assert.equal((await call(b,'/v2/hubs/peering/list',{hubId:bh,kind:'grants'})).items[0].id,grant.id);
     const proof=await createPeeringProof(b,root,intervention),proofGrant={...grant,id:randomUUID(),source:proof.source};
+    const proofPreview=await call(b,'/v2/hubs/peering/preview',{hubId:bh,agreementId:agreement.id,source:proof.source});
+    assert.equal(samePeeringMaterial(proof.source,proofPreview.projection,{...proofPreview.projection,observedAt:proofPreview.projection.observedAt+1}),false,'CI observation time remains part of the exact signed claim');
     assert.equal((await call(b,'/v2/hubs/peering/sources',{hubId:bh,kind:'ci-proof-v2'})).items[0].source.id,proof.source.id);
     await call(b,'/v2/hubs/peering/events',await b.authorize(proofGrant,'hub.publish'));
     const proofPage=await query({after:result.nextCursor});assert.equal(proofPage.items[0].sourceObject.kind,'ci-proof-v2');

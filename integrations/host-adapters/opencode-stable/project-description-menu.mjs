@@ -34,13 +34,13 @@ export function createProjectDescriptionMenu({ projects = [], onChange, select, 
   function edit(draft, offset) {
     if (!isCurrent()) return; generation++;
     const existing = values.some(value => value.id === draft.id);
-    select({ title: label('编辑项目介绍（自述，未经认证）', 'Edit project description (self-declared)') + '\n' + draft.id, options: [
+    select({ title: label('编辑项目介绍','Edit project description') + (draft.title?'\n'+plain(draft.title):''), options: [
       { number: '1', title: label('名称', 'Title'), description: plain(draft.title) },
       { number: '2', title: label('功能简介', 'Function summary'), description: brief(draft.summary) },
       { number: '3', title: label('功能标签', 'Function tags'), description: brief(draft.functions.join(' · ')) },
       { number: '4', title: label('技术标签', 'Technology tags'), description: brief(draft.technologies.join(' · ')) },
       { number: '5', title: label('来源网址', 'Source URL'), description: brief(draft.sourceUrl) },
-      { number: '6', title: label('切换项目／模块', 'Toggle project / module'), description: draft.kind },
+      { number: '6', title: label('切换项目／模块', 'Toggle project / module'), description: draft.kind==='module'?label('模块','Module'):label('项目','Project') },
       { number: '7', title: label('允许作为发现候选', 'Allow discovery candidate'), description: draft.discoverable ? label('是；还需主体开启发现且资料可见', 'Yes; owner opt-in and visible Profile also required') : label('否；不改变已发布资料的可见性', 'No; does not hide published Profile data') },
       ...(existing ? [{ number: '8', title: label('从草稿移除此项', 'Remove from draft') }] : []),
       { number: '9', title: label('完成此项编辑', 'Apply to draft'), description: label('尚未发布', 'Not published yet') },

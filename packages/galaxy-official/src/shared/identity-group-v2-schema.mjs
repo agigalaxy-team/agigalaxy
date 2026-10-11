@@ -22,5 +22,6 @@ export const identityGroupIntentSchema=z.discriminatedUnion('kind',[
 export const identityGroupProofSchema=z.strictObject({schemaVersion:z.literal(2),id:uuid,operationId:uuid,groupId:uuid,payloadHash:hash,
  endpoint:z.string(),subjectId:trustSubject,keyId:hash,epoch:z.number().int().nonnegative(),decision:z.enum(['approve','decline','cancel']),issuedAt:second,expiresAt:second});
 export const identityGroupSubmitSchema=z.strictObject({payloadJson:z.string().min(1).max(100000),proofJson:z.string().min(1).max(2000),signature:z.string().min(1).max(4000)});
-export const identityGroupQuerySchema=z.strictObject({subjectId:trustSubject.optional(),after:uuid.optional(),limit:z.number().int().min(1).max(50).default(20)});
+export const identityGroupQuerySchema=z.strictObject({subjectId:trustSubject.optional(),after:uuid.optional(),limit:z.number().int().min(1).max(50).default(20),
+ includeProposals:z.boolean().default(false),proposalAfter:uuid.optional(),proposalLimit:z.number().int().min(1).max(50).default(20),proposalDirection:z.enum(['all','incoming','outgoing']).default('all')});
 export const identityGroupReceiptSchema=z.strictObject({operationId:uuid,payloadHash:hash});

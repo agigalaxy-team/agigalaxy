@@ -1,5 +1,6 @@
 import { selfDeclaredProfileSchema } from '../../../packages/galaxy-official/src/shared/profile-schema.mjs';
 import { createProjectDescriptionMenu } from './project-description-menu.mjs';
+import {showExactChoice} from './exact-choice.mjs';
 
 export function createProfileMenu({controller,select,prompt,info,language,isCurrent,onBack}){
   const zh=language!=='en-US',label=(a,b)=>zh?a:b;
@@ -69,10 +70,10 @@ export function createProfileMenu({controller,select,prompt,info,language,isCurr
   }
   function confirm(preview){
     generation++;
+    const version=generation;
     const cancel=()=>{generation++;controller.cancel();edit();};
-    prompt({title:`${label('确认自述发布；不是能力认证','Confirm self description; not capability certification')}\n${preview.endpoint}\n${preview.payloadJson}\n${preview.intentJson}\n${preview.confirmation}`,
-      placeholder:preview.confirmation,onCancel:gate(cancel),onConfirm:gate(value=>{
-        if(value!==preview.confirmation){info('Galaxy',label('请输入完整确认文本。','Enter the exact confirmation.'),gate(()=>confirm(preview)));return;}
+    showExactChoice({preview,title:label('保存这份自述','Save this self description'),note:label('这是自己的介绍，不代表能力认证。','This is a self description, not capability certification.'),select,info,language,isCurrent:()=>isCurrent()&&generation===version,
+      onCancel:gate(cancel),onConfirm:gate(value=>{
         void run(()=>controller.executeProfile(preview,value),receipt=>info(label('自述已记录','Self description recorded'),`${label('版本','Revision')}: ${receipt.revision}\n${label('自述不会授予能力认证。','Self description does not confer certification.')}`,gate(home)));
       })});
   }

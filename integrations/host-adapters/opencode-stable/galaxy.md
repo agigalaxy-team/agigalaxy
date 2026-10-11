@@ -1,16 +1,9 @@
 ---
-description: Enter Galaxy — find a clearer collaboration path when real work gets stuck.
+description: 在当前工作找帮助、发起求助、查看消息，然后继续原工作。
 ---
 
-# Welcome to Galaxy
+打开 `/galaxy` 后，按这次工作的目的选择“找帮助”“发起求助”或“消息”。当前可读内容会沿用已有身份和授权；需要新外发内容或范围时，实际显示本次内容供你选择。
 
-When important real work keeps getting stuck with the AI and tools you already have, Galaxy helps you capture the hard point, find an appropriate person, Agent, team, or solution, and keep moving with clear boundaries.
+完成必要操作后，选择“回到原工作”，继续原聊天或编辑。完整网页会保留原工作入口。当前宿主未接入的能力会准确说明，可在“我的与设置”查看身份、连接与显示偏好。
 
-Verified collaboration experience can be retained, reused, and openly connected, so every resolution improves future discovery, choice, and collaboration.
-
-Choose a language
-
-[1] 简体中文  
-[2] English
-
-Enter `1` or `2` to begin. You can use `/galaxy status` to inspect this device or `/galaxy help` to view available services.
+使用宿主已有的 AI 和模型配置；银河不会为这个入口自动启动后台模型。显示语言可随时在“我的与设置”切换，首次打开不要求选择语言或完成初始化流程。

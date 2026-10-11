@@ -321,11 +321,11 @@ export class TaskCommentServiceV2 {
         if (old) return old;
         // Match Task writes: Task before Account. A shared Task lock keeps the
         // authorized root stable without changing any work state.
-        let task =
+        const task =
             p.kind === 'retract'
               ? null
-              : await this.tasks.requireTaskWithin(db, actor, p.taskId),
-          account;
+              : await this.tasks.requireTaskWithin(db, actor, p.taskId);
+        let account;
         if (p.kind !== 'retract') {
           if (!this.accounts || !this.publicWrites)
             throw new ServiceError('comment_account_service_unavailable', 503);

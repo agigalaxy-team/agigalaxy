@@ -1,15 +1,15 @@
 import { createGalaxyAdapter, createGalaxyPlugin } from './galaxy.tui.ts';
 import { createConfiguredRuntime } from './configured-runtime.mjs';
 
-type ConfiguredOptions = Pick<NonNullable<Parameters<typeof createGalaxyAdapter>[1]>, 'readCaseSubmission'> & {
+type ConfiguredOptions = Pick<NonNullable<Parameters<typeof createGalaxyAdapter>[1]>, 'readCaseSubmission' | 'nativeTools' | 'readWorkContext'> & {
   discoveryTransport?: Parameters<typeof createConfiguredRuntime>[1];
 };
 
 // The host owns this instance and calls close() on unload. No global install.
 export function createConfiguredGalaxyAdapter(configuration: Parameters<typeof createConfiguredRuntime>[0],
-  { readCaseSubmission = null, discoveryTransport }: ConfiguredOptions = {}) {
+  { readCaseSubmission = null, discoveryTransport, nativeTools=null, readWorkContext=null }: ConfiguredOptions = {}) {
   const discovery = createConfiguredRuntime(configuration, discoveryTransport);
-  const adapter = createGalaxyAdapter(null, { discovery, dataDirectory: configuration.dataDirectory, readCaseSubmission });
+  const adapter = createGalaxyAdapter(null, { discovery, dataDirectory: configuration.dataDirectory, readCaseSubmission, nativeTools, readWorkContext });
   return adapter;
 }
 

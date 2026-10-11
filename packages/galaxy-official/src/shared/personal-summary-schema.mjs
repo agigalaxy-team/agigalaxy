@@ -14,3 +14,4 @@ export const summaryPreferenceSchema=z.strictObject({expectedRevision:z.number()
 export const summaryPutSchema=z.strictObject({versionId:z.uuid(),summaryId:z.uuid(),roomId:z.uuid(),baseRevision:z.number().int().nonnegative(),
  preferenceRevision:z.number().int().nonnegative(),content:summaryContentSchema,resolveVersionIds:z.array(z.uuid()).max(100).default([])});
 export const summaryPageSchema=z.strictObject({after:z.uuid().optional(),limit:z.number().int().min(1).max(20).default(10)});
+export const summaryReceiptSchema=z.strictObject({summaryId:z.uuid(),versionId:z.uuid()});

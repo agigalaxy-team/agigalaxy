@@ -1,5 +1,6 @@
 import {verifyTrustIdentity,trustHash} from './shared/trust-package-crypto.mjs';
 import {signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
+import {signTrustPackageVcJose} from './shared/trust-package-vc-jose.mjs';
 
 const types=new Set(['galaxy-trust-package-v1+jws','galaxy-trust-source-permission-v1+jws']);
 const fail=code=>Object.assign(new Error(code),{code});
@@ -27,9 +28,12 @@ export function createTrustPackageDeviceAdapter({endpoint,getMaterial,readIdenti
   if(identity.subjectId!==local.subjectId||!Array.isArray(identity.events)||identity.authority!==null&&identity.authority!==endpoint)throw fail('trust_identity_authority_changed');
   const verified=await verifyTrustIdentity(identity),keyId=await trustHash(local.material.publicKeyPem);
   if(!verified.devices.some(d=>d.keyId===keyId&&d.publicKey===local.material.publicKeyPem&&d.epoch===verified.epoch))throw fail('trust_device_not_in_cached_control');
-  return{identity,keyId,epoch:verified.epoch,bindingId:getBinding()?.bindingId,material:local.material};
+  const binding=getBinding();
+  if(binding?.subjectId&&binding.subjectId!==identity.subjectId)throw fail('trust_identity_changed');
+  return{identity,keyId,epoch:verified.epoch,bindingId:binding?.bindingId??null,generation:binding?.generation??null,
+   endpoint,material:local.material};
  }
- const publicContext=({material,...value})=>value;
+ const publicContext=({material:_material,...value})=>value;
  async function current(){return publicContext(await context());}
  async function refreshIdentity(){
   const before=await getMaterial();if(!before?.subjectId)throw fail('trust_identity_required');
@@ -47,5 +51,14 @@ export function createTrustPackageDeviceAdapter({endpoint,getMaterial,readIdenti
   if(after.identity.subjectId!==expected.subjectId||after.keyId!==expected.keyId||after.epoch!==expected.epoch)throw fail('trust_identity_changed');
   return signed;
  }
- return Object.freeze({current,sign,remember,refreshIdentity});
+ const sameVc=(value,expected)=>expected&&value.identity.subjectId===expected.subjectId&&value.keyId===expected.keyId&&value.epoch===expected.epoch
+  &&value.endpoint===expected.endpoint&&value.bindingId===expected.bindingId&&value.generation===expected.generation;
+ async function signVc(preview,expected){
+  const before=await context();if(!sameVc(before,expected))throw fail('trust_vc_identity_changed');
+  const manifest=JSON.parse(preview.package.manifestJson);
+  if(manifest.subjectId!==expected.subjectId||manifest.keyId!==expected.keyId||manifest.epoch!==expected.epoch)throw fail('trust_vc_signer_mismatch');
+  const signed=await signTrustPackageVcJose(preview,before.material.privateKey,{now:now()});
+  if(!sameVc(await current(),expected))throw fail('trust_vc_identity_changed');return signed;
+ }
+ return Object.freeze({current,sign,signVc,remember,refreshIdentity});
 }

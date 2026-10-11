@@ -28,7 +28,7 @@ const refKey = (r) => r.kind + ':' + r.id + ':' + r.payloadHash;
 const same = (a, b) => canonicalize(a) === canonicalize(b);
 const scopeHash = (taskId, authorId, refs) =>
   digest(canonicalize({ taskId, authorId, sourceRefs: sort(refs) }));
-const clean = ({ authorId, label, ...ref }) => ref;
+const clean = ({ authorId: _authorId, label: _label, ...ref }) => ref;
 export class QualificationRequestServiceV2 {
   constructor(
     access,
@@ -103,6 +103,12 @@ export class QualificationRequestServiceV2 {
       );
       rule(result.usable, 'qualification_current_accepted_scope_required');
     }
+    const externalRefs=[...new Map(p.externalReviewRefs.map(ref=>[ref.id+':'+ref.version,ref])).values()]
+      .sort((a,b)=>a.id.localeCompare(b.id)||a.version-b.version);
+    for(const ref of externalRefs){
+      const result=await this.qualification.externalReviewWithin(db,actor,ref,actor.subjectId,policy,trace);
+      rule(result.usable,'qualification_current_accepted_scope_required');
+    }
     const sources = sort([...seen.values()]);
     rule(
       sources.length > 0 && sources.length <= 128,
@@ -114,8 +120,8 @@ export class QualificationRequestServiceV2 {
       recipientId: task.requesterId,
       sources,
       evidence: {
-        participationIds: [...new Set(p.participationIds)].sort(),
-        externalReviewRefs: [],
+        participationIds: [...new Set(p.participationIds)].sort((left,right)=>left<right?-1:left>right?1:0),
+        externalReviewRefs: externalRefs,
         capsuleUseIds: [],
         proofIds: [],
         assistanceIds: [],
@@ -395,6 +401,8 @@ export class QualificationRequestServiceV2 {
       sourceRefs: root.sourceRefs,
       participationIds:
         row.subject_id === actor.subjectId ? root.participationIds : undefined,
+      externalReviewRefs:
+        row.subject_id === actor.subjectId ? root.externalReviewRefs : undefined,
       expiresAt: new Date(row.expires_at).toISOString(),
       history,
       permission,
@@ -492,6 +500,7 @@ export class QualificationRequestServiceV2 {
           const value = await this.sourcesWithin(db, actor, {
               taskId: x.taskId,
               participationIds: x.participationIds,
+              externalReviewRefs: x.externalReviewRefs,
               expiresAt: x.expiresAt,
             }),
             refs = value.sources

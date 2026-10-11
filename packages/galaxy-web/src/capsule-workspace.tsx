@@ -1,435 +1,324 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { createCapsuleWebClient } from './capsule-workspace-client.mjs';
-import {
-  CapsuleAuthoring,
-  CapsulePermissionWorkspace,
-} from './capsule-authoring';
-import { CapsuleApplication } from './capsule-application';
-import { CapsuleConsentControls } from './capsule-consent-controls';
+import {HistoryFields} from './history-facts';
+import {ContentCard,browseReturnPath,browseReturnLabel} from './public-browse-workspace';
+import {ArrowRight,BookOpen,X} from 'lucide-react';
+import {MemberAvatar,memberName,useMemberNames,readableTime} from './conversation-ui';
+import {CapsuleOperationStatus} from './capsule-operation-status';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {createCapsuleWebClient,capsuleDeviceHasScope} from './capsule-workspace-client.mjs';
+import {CapsuleAuthoring,CapsulePermissionWorkspace} from './capsule-authoring';
+import {capsuleInputDraftKey,settleCapsuleInput} from './capsule-authoring-state';
+import {CapsuleAuthorPreview} from './capsule-author-preview';
+import {CapsuleApplication} from './capsule-application';
+import {CapsuleConsentControls} from './capsule-consent-controls';
+import {CapsuleAttributionResponses} from './capsule-attribution-responses';
+import {helpOriginLocator} from './help-origin-client.mjs';
+import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
+import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
+import {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleUseV2Schema} from '../../galaxy-official/src/shared/capsule-v2-schema.mjs';
+import type {CapsuleAuthorMode,CapsuleCaseHistory,CapsuleDetail,CapsuleDirectoryItem,CapsuleDisclosure,CapsuleOperationKind,CapsuleOriginWork,CapsulePermissionView,CapsulePreview,CapsulePreviewContext,CapsulePreviewDisplay,CapsuleReceipt,CapsuleRegisterDraft,CapsuleUses,CapsuleUseView,CapsuleVersionItem,CapsuleVersions,CapsuleWorkspaceClient,CapsuleWorkspaceRuntime} from './capsule-authoring-types';
 
-export const capsuleLabel = (s: string) =>
-  (
-    ({
-      current: '来源当前可用',
-      'source-unavailable': '来源目前不可用',
-      'source-result-superseded': '来源结果已有纠正版本',
-      'application-result-superseded': '应用结果已有纠正版本',
-      'capsule-source-unavailable': '方法来源不可用',
-      'application-source-unavailable': '应用来源不可用',
-      'prior-application-unavailable': '先前应用已不可用',
-      'legacy-v1-source-policy': '历史版本的作者声明来源规则',
-      reference: '加入参考',
-      apply: '实际应用',
-      reverify: '再次验证',
-      succeeded: '报告达到目标',
-      partial: '部分达到',
-      failed: '未达到',
-      inconclusive: '尚无定论',
-      conflicting: '结论冲突',
-      deprecate: '已停用',
-      'security-issue': '安全事项',
-      'resolve-security': '安全事项已处理',
-    }) as any
-  )[s] ?? s;
-export const capsuleError = (e: any) =>
-  (
-    ({
-      capsule_source_permission_required:
-        '某些实际来源还缺原作者许可。请在许可区取得对应授权，或去掉未获准的选定材料。',
-      configuration_content_unavailable:
-        '所选配置内容已撤回或目前不可读。可保留草稿，重新核对选定来源与许可。',
-      capsule_resolution_required:
-        '正式版本需要实际报告达到目标的来源结果。失败或不明确的记录可以继续完善，不能改写成成功。',
-      capsule_unavailable:
-        '这份版本不存在或当前不可读。旧版不会自动替代未获准的新版。',
-      capsule_not_applicable:
-        '当前版本已停用、有安全事项或来源结果已变化，不能新增应用。',
-      capsule_new_case_required:
-        '实际应用应来自另一件真实工作，不把源案例自己算作复用。',
-      capsule_use_already_recorded:
-        '这一条精确应用或再验证已经记录，请刷新查看。',
-      consent_reauthorization_required:
-        '原授权已失效。先查询原操作；当前界面保留原记录，不自动换一个授权重复发布。',
-    }) as any
-  )[e.code ?? e.message] ??
-  e.message ??
-  '操作未完成。';
-export const exactCapsulePath = (id: string, versionId?: string) =>
-  `/app/capsules/${id}${versionId ? `/versions/${versionId}` : ''}`;
+const labels:Record<string,string>={
+  current:'来源当前可用','source-unavailable':'来源目前不可用','source-result-superseded':'来源结果已有纠正版本',
+  'source-currentness-unavailable':'来源结果的当前支持状态未知','application-result-superseded':'应用结果已有纠正版本',
+  'application-currentness-unavailable':'应用结果的当前支持状态未知','capsule-source-unavailable':'方法来源不可用',
+  'application-source-unavailable':'应用来源不可用','prior-application-unavailable':'先前应用已不可用',
+  'legacy-v1-source-policy':'历史版本的作者声明来源规则',reference:'加入参考',apply:'实际应用',reverify:'再次验证',
+  succeeded:'报告达到目标',partial:'部分达到',failed:'未达到',inconclusive:'尚无定论',conflicting:'结论冲突',
+  deprecate:'已停用','security-issue':'安全事项','resolve-security':'安全事项已处理',
+};
+const errors:Record<string,string>={
+  consent_required:'这份内容当前没有可用的展示许可，正文已收起。',
+  capsule_source_permission_required:'某些实际来源还缺原作者许可。请在许可区取得对应授权，或去掉未获准的选定材料。',
+  configuration_content_unavailable:'所选配置内容已撤回或目前不可读。可保留草稿，重新核对选定来源与许可。',
+  capsule_resolution_required:'正式版本需要实际报告达到目标的来源结果。失败或不明确的记录可以继续完善，不能改写成成功。',
+  capsule_unavailable:'这份方法的所选版本当前不可读取。',
+  capsule_not_applicable:'当前版本的状态或来源支持条件不允许新增应用，请重新核对。',
+  capsule_new_case_required:'实际应用应来自另一件真实工作，不把源案例自己算作复用。',
+  capsule_use_already_recorded:'这一条精确应用或再验证已经记录，请刷新查看。',
+  consent_reauthorization_required:'原授权已失效。先查询原操作；当前界面保留原记录，不自动换一个授权重复发布。',
+};
+export const capsuleLabel=(value:string)=>labels[value]??value;
+export function capsuleError(error:unknown){
+  const value=error&&typeof error==='object'?error:null;
+  const code=value&&'code' in value&&typeof value.code==='string'?value.code:'';
+  const message=value&&'message' in value&&typeof value.message==='string'?value.message:'';
+  return (errors[code||message]??message)||'操作未完成。';
+}
+export const exactCapsulePath=(id:string,versionId?:string)=>'/app/capsules/'+id+(versionId?'/versions/'+versionId:'');
 
-export function CapsuleWorkspace({
-  runtime,
-  subjectId,
-  connected,
-  navigate,
-  capsuleId,
-  versionId,
-}: any) {
-  function requiredClient(){if(!client)throw new Error('请先连接当前身份。');return client;}
-  const client = useMemo(
-    () =>
-      runtime
-        ? createCapsuleWebClient({
-            api: runtime.api,
-            getLocal: runtime.getLocal,
-            putLocal: runtime.putLocal,
-            subjectId,
-          })
-        : null,
-    [runtime, subjectId],
-  );
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [notice, setNotice] = useState(''),
-    [query, setQuery] = useState(''),
-    [onlyMine, setOnlyMine] = useState(false);
-  const [items, setItems] = useState<any[]>([]),
-    [next, setNext] = useState<string | null>(null),
-    [loaded, setLoaded] = useState(false),
-    [detail, setDetail] = useState<any>(null),
-    [versions, setVersions] = useState<any>({ items: [] });
-  const [uses, setUses] = useState<any>({ items: [] }),
-    [history, setHistory] = useState<any[]>([]),
-    [historyNext, setHistoryNext] = useState<string | null>(null),
-    [historyLoaded, setHistoryLoaded] = useState(false);
-  const [permissions, setPermissions] = useState<any>({
-      owned: [],
-      granted: [],
-    }),
-    [permissionNext, setPermissionNext] = useState<any>({}),
-    [pending, setPending] = useState<any[]>([]),
-    [preview, setPreview] = useState<any>(null),
-    [mode, setMode] = useState('browse');
-  const epoch = useRef(0),
-    working = useRef(false),
-    writable = !!(client && connected && subjectId);
-  useEffect(() => {
-    epoch.current++;
-    working.current = false;
-    setBusy(false);
-    setDetail(null);
-    setVersions({ items: [] });
-    setUses({ items: [] });
-    setPreview(null);
-    setHistory([]);
-    setHistoryLoaded(false);
-    setHistoryNext(null);
-    setPermissions({ owned: [], granted: [] });
-    setPermissionNext({});
-    setPending([]);
-    setError('');
-    setNotice('');
-    setLoaded(false);
-    setItems([]);
-    setNext(null);
-    setMode('browse');
-    const token = epoch.current;
-    if (client) {
-      if (capsuleId)
-        readDetail(capsuleId, versionId, token).catch((e) => {
-          if (token === epoch.current) setError(capsuleError(e));
-        });
-      else
-        find(undefined, token).catch((e) => {
-          if (token === epoch.current) setError(capsuleError(e));
-        });
-    }
-    if (writable)
-      client
-        .pending()
-        .then((p: any) => {
-          if (token === epoch.current) setPending(p);
-        })
-        .catch(() => {});
-    const reload = () => {
-      if (document.visibilityState !== 'visible' || working.current || !client) return;
-      if (capsuleId) readDetail(capsuleId, versionId, epoch.current).catch(() => {});
-      else find(undefined, epoch.current).catch(() => {});
-      if (writable) client.pending().then((p: any) => { if (epoch.current === token) setPending(p); }).catch(() => {});
+type WorkspaceProps={runtime:CapsuleWorkspaceRuntime|null;subjectId?:string;connected:boolean;navigate:(path:string)=>void;capsuleId?:string;versionId?:string};
+type Mode='browse'|'permissions'|CapsuleAuthorMode;
+type PermissionView='owned'|'granted';
+type PreviewSelection={original:CapsulePreview;display:CapsulePreviewDisplay};
+function requestedMode(writable:boolean,capsuleId?:string):Mode{
+  const mode=new URLSearchParams(location.search).get('mode');
+  if(writable&&(mode==='author'||mode==='permissions'||!!capsuleId&&(mode==='revision'||mode==='maintenance')))return mode;
+  return 'browse';
+}
+function isCapsulePreview(value:unknown):value is CapsulePreview{
+  if(!value||typeof value!=='object'||!('type' in value)||!('payload' in value)
+    ||!('operationId' in value)||typeof value.operationId!=='string'||!('payloadHash' in value)||typeof value.payloadHash!=='string'
+    ||!('endpoint' in value)||typeof value.endpoint!=='string'||!('subjectId' in value)||typeof value.subjectId!=='string'
+    ||!('visibility' in value)||(value.visibility!=='Private'&&value.visibility!=='Public')
+    ||!('viewers' in value)||!Array.isArray(value.viewers)||!value.viewers.every(id=>typeof id==='string'))return false;
+  return value.type==='publication'?capsuleEventV2Schema.safeParse(value.payload).success:
+    value.type==='permission'?capsulePermissionV2Schema.safeParse(value.payload).success:
+    value.type==='use'&&capsuleUseV2Schema.safeParse(value.payload).success;
+}
+function readCapsuleUseRecord(client:CapsuleWorkspaceClient,input:Parameters<CapsuleWorkspaceClient['useRecord']>[0]){
+  return client.useRecord(input);
+}
+export function CapsuleWorkspace(props:WorkspaceProps){
+  const view=useChoiceViewLease(props.runtime,props.subjectId),[navigationVersion,setNavigationVersion]=useState(0);
+  useEffect(()=>{const changed=()=>setNavigationVersion(value=>value+1);addEventListener('popstate',changed);return()=>removeEventListener('popstate',changed);},[]);
+  const connectionKey=JSON.stringify([props.runtime?.api.endpoint,props.subjectId,props.connected,view.key,props.capsuleId,props.versionId,navigationVersion]);
+  return <CapsuleWorkspaceSession key={connectionKey} {...props} connected={props.connected&&!!view.lease} lease={view.lease} connectionKey={connectionKey}/>;
+}
+function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId,versionId,lease,connectionKey}:WorkspaceProps&{lease:ChoiceViewLease|null;connectionKey:string}){
+  const originPath=location.pathname+location.search+location.hash,helpOrigin=useMemo(()=>helpOriginLocator(originPath),[originPath]);
+  const client:CapsuleWorkspaceClient|null=useMemo(()=>{
+    if(!runtime)return null;
+    const value=createCapsuleWebClient({api:runtime.api,getLocal:runtime.getLocal,putLocal:runtime.putLocal,updateLocal:runtime.updateLocal,subjectId:connected&&lease?subjectId??null:null});
+    return{...value,async prepare(type:CapsuleOperationKind,payload:unknown,scope:CapsuleDisclosure){
+      const preview=await value.prepare(type,payload,scope);
+      if(!isCapsulePreview(preview))throw Error('预览的操作类别或内容不一致，请重新核对。');
+      // Keep the exact original object registered in the client's WeakMap.
+      return preview;
+    },execute(preview:CapsulePreview,options:Parameters<CapsuleWorkspaceClient['execute']>[1]){
+      const journal=options.onJournal;
+      return value.execute(preview,{confirmed:options.confirmed,...(journal?{onJournal:async locator=>{await journal(locator);}}:{})});
+    }};
+  },[runtime,subjectId,connected,lease]);
+  const bound=!!(client&&connected&&subjectId&&lease),writable=bound&&!!runtime&&capsuleDeviceHasScope(runtime.api);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),
+    [query,setQuery]=useState(()=>new URLSearchParams(location.search).get('q')??''),
+    [onlyMine,setOnlyMine]=useState(()=>new URLSearchParams(location.search).get('view')==='mine');
+  const [items,setItems]=useState<CapsuleDirectoryItem[]>([]),[next,setNext]=useState<string|null>(null),[loaded,setLoaded]=useState(false),
+    [detail,setDetail]=useState<CapsuleDetail|null>(null),[versions,setVersions]=useState<CapsuleVersions>({items:[]});
+  const [uses,setUses]=useState<CapsuleUses>({items:[]}),[history,setHistory]=useState<CapsuleCaseHistory[]>([]),
+    [historyNext,setHistoryNext]=useState<string|null>(null),[historyLoaded,setHistoryLoaded]=useState(false);
+  const [readError,setReadError]=useState(''),[newerVersion,setNewerVersion]=useState<{versionId:string;version:number}|null>(null),
+    [originWork,setOriginWork]=useState<CapsuleOriginWork|null>(null),[originError,setOriginError]=useState('');
+  const [permissions,setPermissions]=useState<Record<PermissionView,CapsulePermissionView[]>>({owned:[],granted:[]}),
+    [permissionNext,setPermissionNext]=useState<Partial<Record<PermissionView,string|null>>>({}),
+    [selection,setPreview]=useState<PreviewSelection|null>(null),[mode,setMode]=useState<Mode>(()=>requestedMode(writable,capsuleId));
+  const [useOpen,setUseOpen]=useState(false),[lastUsedTarget,setLastUsedTarget]=useState<string|null>(null),
+    useDialog=useRef<HTMLDialogElement>(null),previewDialog=useRef<HTMLDialogElement>(null),previewHeading=useRef<HTMLHeadingElement>(null);
+  const previewContexts=useRef(new WeakMap<CapsulePreview,CapsulePreviewContext>()),
+    draftHandlers=useRef(new Map<string,(receipt:CapsuleReceipt)=>Promise<boolean>>());
+  const registerDraft:CapsuleRegisterDraft=useCallback((key,settle)=>{draftHandlers.current.set(key,settle);return()=>{if(draftHandlers.current.get(key)===settle)draftHandlers.current.delete(key);};},[]);
+  const preview=selection?.original??null,previewDisplay=selection?.display??{},previewOpen=!!preview;
+  const memberNames=useMemberNames(runtime,subjectId,connected,[detail?.authorId,...uses.items.map(use=>use.subjectId),...(preview?.viewers??[]),
+    ...(preview?.type==='publication'&&preview.payload.kind==='version'?preview.payload.contributors:[]),
+    ...(preview?.type==='permission'&&preview.payload.kind==='grant'?preview.payload.grantees:[]),
+    ...(previewDisplay.sources??[]).map(item=>item.authorId),...(previewDisplay.permissions??[]).map(item=>item.authorId),
+    ...(detail?.permissions??[]).map(permission=>permission.authorId),...(detail?.attributions??[]).flatMap(attribution=>[attribution.subjectId,
+      ...(typeof attribution.contributionResponses==='object'?attribution.contributionResponses.responses:[]).map(response=>response.actorId)])]);
+  useEffect(()=>{if(useOpen)useDialog.current?.showModal();else useDialog.current?.close();},[useOpen]);
+  useEffect(()=>{
+    const dialog=previewDialog.current;if(!dialog)return;
+    if(previewOpen){
+      if(dialog.open)return;dialog.showModal();
+      // Native focus would otherwise skip Save's disabled header button.
+      previewHeading.current?.focus({preventScroll:true});dialog.scrollTop=0;
+    }else if(dialog.open)dialog.close();
+  },[previewOpen]);
+  const epoch=useRef(0),active=useRef(true),operation=useRef(0),detailRead=useRef(0),directoryRead=useRef(0),originRead=useRef(0),working=useRef(false),
+    pinnedVersion=useRef<string|undefined>(versionId),detailLoading=useRef(false),usePages=useRef(1),versionPages=useRef(1);
+  const current=useCallback((token:number)=>{if(!active.current||token!==epoch.current)return false;try{lease?.assertCurrent();return true;}catch{return false;}},[lease]);
+  const assertCurrent=useCallback((token:number)=>{if(!current(token))throw Error('页面或身份已改变。');},[current]);
+  const requiredClient=useCallback(()=>{if(!client)throw Error('请先连接当前身份。');assertCurrent(epoch.current);return client;},[client,assertCurrent]);
+  const guard=useCallback(async<T,>(promise:Promise<T>)=>{const token=epoch.current,value=await promise;assertCurrent(token);return value;},[assertCurrent]);
+  const readOrigin=useCallback(async()=>{
+    if(!runtime||!connected||!lease||!helpOrigin?.taskId)throw Error('请先连接原身份，再读取原工作。');
+    const token=epoch.current,ticket=++originRead.current,valid=()=>current(token)&&ticket===originRead.current;
+    const check=()=>{assertCurrent(token);if(ticket!==originRead.current)throw Error('原工作已有更新的核对结果，请重新选择。');};
+    const requireScope=(scope:string)=>{check();if(!capsuleDeviceHasScope(runtime.api,scope))throw Error('当前浏览器设备未获准读取原工作的 '+scope+' 范围，请在已有 Agent 核对所需权限。');};
+    try{
+      requireScope('assistance');
+      const task:CapsuleOriginWork['task']=await runtime.api.call('/v2/tasks/'+helpOrigin.taskId,null,{method:'GET',authenticated:true});check();
+      if(task.taskId!==helpOrigin.taskId||task.schemaVersion!==2)throw Error('原任务位置或版本不一致，请重新读取。');
+      // Use follows current Task/Case authority, including confirmed participants.
+      let facts:CapsuleCaseHistory|null=null;
+      if(task.caseId){requireScope('case-teaser');facts=await runtime.api.call('/v2/cases/'+task.caseId+'/read',{taskId:task.taskId},{authenticated:true});check();}
+      if(facts&&facts.caseId!==task.caseId)throw Error('原任务与工作事实不一致，请重新核对。');
+      const value={task,facts};setOriginWork(value);setOriginError('');return value;
+    }catch(error){if(valid()){setOriginWork(null);setOriginError(capsuleError(error));}throw error;}
+  },[runtime,connected,lease,helpOrigin?.taskId,current,assertCurrent]);
+  const find=useCallback(async(after?:string,token=epoch.current)=>{
+    assertCurrent(token);const ticket=++directoryRead.current,params=new URLSearchParams(location.search);
+    const page=await requiredClient().query({query:params.get('q')??'',...(params.get('view')==='mine'&&subjectId?{authorId:subjectId}:{}),...(after?{after}:{}),limit:12});
+    if(!current(token)||ticket!==directoryRead.current)return;
+    setItems(old=>after?[...old,...page.items]:page.items);setNext(page.nextAfter);setLoaded(true);
+  },[assertCurrent,requiredClient,subjectId,current]);
+  const readDetail=useCallback(async(id=capsuleId,version=versionId,token=epoch.current,preserveInteraction=false)=>{
+    assertCurrent(token);if(!id)throw Error('请选择一份方法。');
+    const source=requiredClient();
+    const ticket=++detailRead.current,selected=version??pinnedVersion.current,valid=()=>{try{assertCurrent(token);return ticket===detailRead.current;}catch{return false;}};
+    const check=()=>{assertCurrent(token);if(ticket!==detailRead.current)throw Error('这份方法已有更新的读取结果。');};
+    detailLoading.current=true;
+    try{
+      if(!preserveInteraction){setDetail(null);setUses({items:[]});setPreview(null);setUseOpen(false);setLastUsedTarget(null);}
+      const readVersionPages=async()=>{
+        let after:string|undefined,page:CapsuleVersions={items:[]};const rows:CapsuleVersionItem[]=[];
+        for(let index=0;index<versionPages.current;index++){check();page=await source.versions({capsuleId:id,limit:50,...(after?{after}:{})});check();rows.push(...page.items);after=page.nextAfter??undefined;if(!after)break;}
+        return{...page,items:rows};
+      };
+      const [reading,readVersions,latest]=await Promise.allSettled([
+        source.get({capsuleId:id,...(selected?{versionId:selected}:{})}),readVersionPages(),
+        selected?source.get({capsuleId:id}):Promise.resolve(null),
+      ]);
+      if(!valid())return;
+      setVersions(readVersions.status==='fulfilled'?readVersions.value:{items:[]});
+      if(reading.status==='rejected'){setDetail(null);setUses({items:[]});setUseOpen(false);setPreview(null);setNewerVersion(null);setReadError(capsuleError(reading.reason));throw reading.reason;}
+      const value=reading.value;pinnedVersion.current=value.versionId;setReadError('');setDetail(value);
+      if(!value.version){setUseOpen(false);setPreview(null);}
+      const currentNumber=value.version?.version??(readVersions.status==='fulfilled'?readVersions.value.items.find(item=>item.versionId===value.versionId)?.version:undefined),
+        newer=latest.status==='fulfilled'?latest.value:null;
+      setNewerVersion(newer?.version&&typeof currentNumber==='number'&&newer.versionId!==value.versionId&&newer.version.version>currentNumber?{versionId:newer.versionId,version:newer.version.version}:null);
+      try{
+        let after:string|undefined,page:CapsuleUses={items:[]};const rows:CapsuleUseView[]=[];
+        for(let index=0;index<usePages.current;index++){check();page=await source.uses({capsuleId:id,versionId:value.versionId,limit:20,...(after?{after}:{})});check();rows.push(...page.items);after=page.nextAfter??undefined;if(!after)break;}
+        if(valid())setUses({...page,items:rows,loaded:true});
+      }catch{if(valid())setUses({items:[],loaded:true,unavailable:true});}
+    }finally{if(ticket===detailRead.current)detailLoading.current=false;}
+  },[capsuleId,versionId,assertCurrent,requiredClient]);
+  useEffect(()=>{
+    const viewEpoch=epoch,mounted=active;mounted.current=true;viewEpoch.current++;const token=viewEpoch.current;
+    const initial=window.setTimeout(()=>{
+      if(connected&&helpOrigin?.taskId)void readOrigin().catch(()=>{});
+      if(!client)return;
+      if(capsuleId)void readDetail(capsuleId,versionId,token).catch(error=>{if(current(token))setReadError(capsuleError(error));});
+      else void find(undefined,token).catch(error=>{if(current(token))setError(capsuleError(error));});
+    },0);
+    const reload=()=>{
+      if(document.visibilityState!=='visible'||working.current||detailLoading.current||!client||!current(token))return;
+      // Public directories stay stable while browsing and paging.
+      if(capsuleId)void readDetail(capsuleId,versionId,token,true).catch(()=>{});
     };
-    const timer = window.setInterval(reload, 20000);
-    document.addEventListener('visibilitychange', reload);
-    return () => {
-      epoch.current++;
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', reload);
-    };
-  }, [client, connected, capsuleId, versionId]);
-  async function guard(p: Promise<any>) {
-    const token = epoch.current,
-      r = await p;
-    if (token !== epoch.current) throw new Error('页面或身份已改变。');
-    return r;
+    const timer=capsuleId?window.setInterval(reload,10000):null;document.addEventListener('visibilitychange',reload);
+    return()=>{mounted.current=false;viewEpoch.current++;window.clearTimeout(initial);if(timer!==null)window.clearInterval(timer);document.removeEventListener('visibilitychange',reload);};
+  },[client,connected,capsuleId,versionId,helpOrigin?.taskId,readOrigin,readDetail,find,current]);
+  async function run(work:()=>Promise<unknown>){
+    const token=epoch.current;if(working.current||!current(token))return;
+    const owner=++operation.current,valid=()=>current(token)&&owner===operation.current;
+    working.current=true;setBusy(true);setError('');setNotice('');
+    try{await work();}catch(error){if(valid())setError(capsuleError(error));}
+    finally{if(valid()){working.current=false;setBusy(false);}}
   }
-  async function run(fn: () => Promise<any>) {
-    if (working.current) return;
-    const token = epoch.current;
-    working.current = true;
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      await fn();
-    } catch (e) {
-      if (token === epoch.current) setError(capsuleError(e));
-    } finally {
-      if (token === epoch.current) {
-        if (writable)
-          try {
-            setPending(await guard(requiredClient().pending()));
-          } catch {}
-        working.current = false;
-        setBusy(false);
-      }
-    }
+  function changeMode(nextMode:Mode){
+    const url=new URL(location.href);if(nextMode==='browse')url.searchParams.delete('mode');else url.searchParams.set('mode',nextMode);
+    if((nextMode==='author'||nextMode==='permissions')&&capsuleId)url.pathname='/app/capsules';
+    setPreview(null);setMode(nextMode);
+    const target=url.pathname+url.search+url.hash;if(url.pathname!==location.pathname)navigate(target);else window.history.replaceState(window.history.state,'',target);
   }
-  async function find(after?: string, token = epoch.current) {
-    const r = await requiredClient().query({
-      query,
-      ...(onlyMine && subjectId ? { authorId: subjectId } : {}),
-      ...(after ? { after } : {}),
-      limit: 12,
-    });
-    if (token !== epoch.current) return;
-    setItems((old) => (after ? [...old, ...r.items] : r.items));
-    setNext(r.nextAfter);
-    setLoaded(true);
+  async function moreVersions(){
+    if(!capsuleId||!versions.nextAfter)return;
+    const page=await guard(requiredClient().versions({capsuleId,after:versions.nextAfter,limit:50}));
+    versionPages.current++;setVersions(old=>({...page,items:[...old.items,...page.items]}));
   }
-  async function readDetail(
-    id = capsuleId,
-    version = versionId,
-    token = epoch.current,
-  ) {
-    setDetail(null);
-    setUses({ items: [] });
-    const [d, v] = await Promise.allSettled([
-      requiredClient().get({ capsuleId: id, ...(version ? { versionId: version } : {}) }),
-      requiredClient().versions({ capsuleId: id, limit: 50 }),
+  async function loadHistory(after?:string){
+    const page=await guard(requiredClient().history(after?{after}:{})),cases=page.items.filter(item=>item.kind==='case-history');
+    setHistory(old=>after?[...old,...cases]:cases);setHistoryNext(page.nextCursor??null);setHistoryLoaded(true);
+  }
+  async function loadPermissions(view:PermissionView,after?:string){
+    const page=await guard(requiredClient().permissions({view,limit:30,...(after?{after}:{})}));
+    setPermissions(old=>({...old,[view]:after?[...old[view],...page.items]:page.items}));
+    setPermissionNext(old=>({...old,[view]:page.nextAfter}));
+  }
+  async function propose(type:CapsuleOperationKind,payload:unknown,disclosure:CapsuleDisclosure,context?:CapsulePreviewContext){
+    const token=epoch.current;assertCurrent(token);
+    const value=await requiredClient().prepare(type,payload,disclosure);assertCurrent(token);
+    if(context)previewContexts.current.set(value,context);
+    setPreview({original:value,display:context?.display??{}});setNotice('');
+  }
+  async function copyCapsuleConnection(){
+    if(!runtime)return;const token=epoch.current;assertCurrent(token);
+    const scopes=[...new Set([...(runtime.api.snapshot()?.scopes??[]).filter((scope:string)=>browserScopes.includes(scope)),'binding','consent','case-teaser','history','assistance','context','capsules'])];
+    const method=detail?.capsuleId&&detail.versionId?{kind:'capsule',id:detail.capsuleId,versionId:detail.versionId}:null;
+    const request={object:helpOrigin?{kind:'task',id:helpOrigin.taskId}:method??{kind:'capsules'},...(helpOrigin&&method?{continueWith:method}:{}),scopes};
+    const text='请用当前已有的银河 Agent 身份调用 galaxy_identity_web_connect，并核对以下公开定位与所需权限：'+JSON.stringify(request)+'。保留同一个银河 ID；请让我在本机审阅页明确批准新的浏览器设备。原设备、本机草稿与原任务仍保留，授权后回到这份精确方法。';
+    try{await navigator.clipboard.writeText(text);assertCurrent(token);setNotice('已复制原任务、所选方法版本与所需权限。交给正在使用的本机 Agent 发起接续，再在本机审阅页批准。');}
+    catch{if(current(token))setNotice(text);}
+  }
+  async function settleMatchingDrafts(receipt:CapsuleReceipt){
+    if(!runtime||!subjectId)return;
+    const id=receipt.capsuleId??capsuleId,version=receipt.versionId??versionId,keys=new Set<string>([
+      capsuleInputDraftKey(runtime.api.endpoint,subjectId,'author'),capsuleInputDraftKey(runtime.api.endpoint,subjectId,'permissions'),
+      ...(id?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'revision',id)]:[]),
+      ...(version?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'maintenance',version)]:[]),
+      ...(receipt.permissionId?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'permission-revoke',receipt.permissionId)]:[]),
+      ...draftHandlers.current.keys(),
     ]);
-    if (token !== epoch.current) return;
-    if (v.status === 'fulfilled') setVersions(v.value);
-    else setVersions({ items: [] });
-    if (d.status === 'rejected') throw d.reason;
-    setDetail(d.value);
-    const u = await requiredClient().uses({
-      capsuleId: id,
-      versionId: d.value.versionId,
-      limit: 20,
-    });
-    if (token === epoch.current) setUses(u);
+    for(const key of keys){const mounted=draftHandlers.current.get(key);if(mounted)await guard(mounted(receipt));else await guard(settleCapsuleInput(runtime,subjectId,key,requiredClient(),receipt));}
   }
-  async function moreVersions() {
-    const r = await guard(
-      requiredClient().versions({ capsuleId, after: versions.nextAfter, limit: 50 }),
-    );
-    setVersions((v: any) => ({ ...r, items: [...v.items, ...r.items] }));
+  async function execute(){
+    if(!preview)return;
+    const chosen=preview,token=epoch.current,context=previewContexts.current.get(chosen);assertCurrent(token);
+    let receipt:CapsuleReceipt;
+    try{receipt=await guard(requiredClient().execute(chosen,{confirmed:true,onJournal:context?.onJournal}));}
+    catch(error){
+      if(current(token)){
+        // Retain the exact journal, then refresh current source authority.
+        setPreview(null);
+        if(capsuleId)try{await readDetail(capsuleId,versionId,token);}catch{}
+        if(current(token)&&connected&&helpOrigin)try{await readOrigin();}catch{}
+      }
+      throw error;
+    }
+    if(context?.onAcknowledged)await guard(context.onAcknowledged(receipt));else await settleMatchingDrafts(receipt);
+    assertCurrent(token);setPreview(null);
+    setNotice(chosen.type==='use'?(chosen.payload.kind==='reference'?'已加入这项工作的参考。':'已记录本次应用。'):'已保存。');
+    if(chosen.type==='use'){setUseOpen(false);setLastUsedTarget(chosen.payload.taskId?'/app/tasks/'+chosen.payload.taskId+'?section=collaboration&view=work':null);}
+    if(chosen.type==='publication')navigate(exactCapsulePath(chosen.payload.capsuleId,chosen.payload.kind==='version'?chosen.payload.id:chosen.payload.versionId));
+    else if(chosen.type==='permission'){await loadPermissions('owned');await loadPermissions('granted');}
+    else if(capsuleId)await readDetail(capsuleId,versionId,token,true);
   }
-  async function loadHistory(after?: string) {
-    const h = await guard(requiredClient().history(after ? { after } : {}));
-    setHistory((old) =>
-      after
-        ? [...old, ...h.items.filter((i: any) => i.kind === 'case-history')]
-        : h.items.filter((i: any) => i.kind === 'case-history'),
-    );
-    setHistoryNext(h.nextCursor);
-    setHistoryLoaded(true);
+  async function readCurrent(kind:string,input:unknown){
+    if(!input||typeof input!=='object')throw Error('缺少所选来源的准确位置。');
+    if(kind==='capsule'&&'capsuleId' in input&&typeof input.capsuleId==='string'&&'versionId' in input&&typeof input.versionId==='string')
+      return guard(requiredClient().get({capsuleId:input.capsuleId,versionId:input.versionId}));
+    if(kind==='case'&&'caseId' in input&&typeof input.caseId==='string')
+      return guard(requiredClient().caseFacts({caseId:input.caseId,...('taskId' in input&&typeof input.taskId==='string'?{taskId:input.taskId}:{})}));
+    if(kind==='use'&&'eventId' in input&&typeof input.eventId==='string'&&'capsuleId' in input&&typeof input.capsuleId==='string'
+      &&'versionId' in input&&typeof input.versionId==='string'&&'caseId' in input&&typeof input.caseId==='string'){
+      return guard(readCapsuleUseRecord(requiredClient(),{eventId:input.eventId,capsuleId:input.capsuleId,versionId:input.versionId,caseId:input.caseId}));
+    }
+    if(kind==='verification'&&'id' in input&&typeof input.id==='string'&&'version' in input&&typeof input.version==='number')
+      return guard(requiredClient().verification({id:input.id,version:input.version}));
+    throw Error('所选来源的位置或版本不完整，请重新选择。');
   }
-  async function loadPermissions(view: string, after?: string) {
-    const p = await guard(
-      requiredClient().permissions({ view, limit: 30, ...(after ? { after } : {}) }),
-    );
-    setPermissions((old: any) => ({
-      ...old,
-      [view]: after ? [...old[view], ...p.items] : p.items,
-    }));
-    setPermissionNext((old: any) => ({ ...old, [view]: p.nextAfter }));
-  }
-  async function propose(type: string, payload: any, disclosure: any) {
-    const p = await guard(requiredClient().prepare(type, payload, disclosure));
-    setPreview(p);
-    setNotice('仅生成本机操作预览，尚未签署或写入。');
-  }
-  async function execute() {
-    if (!preview) return;
-    const chosen = preview;
-    await guard(requiredClient().execute(chosen, { confirmed: true }));
-    setPreview(null);
-    setNotice('原操作已取得精确回执。当前正文和来源状态仍以刷新后的结果为准。');
-    if (chosen.type === 'publication') {
-      navigate(
-        exactCapsulePath(
-          chosen.payload.capsuleId,
-          chosen.payload.kind === 'version'
-            ? chosen.payload.id
-            : chosen.payload.versionId,
-        ),
-      );
-    } else if (chosen.type === 'permission') {
-      await loadPermissions('owned');
-      await loadPermissions('granted');
-    } else if (capsuleId) await readDetail();
-  }
-  const owned = detail?.authorId === subjectId,
-    selectedVersion = versions.items.find(
-      (v: any) => v.versionId === detail?.versionId,
-    );
+  const owned=!!subjectId&&detail?.authorId===subjectId,selectedVersion=versions.items.find(version=>version.versionId===detail?.versionId),
+    appliedPreview=preview?.type==='use'&&preview.payload.kind!=='reference'?preview.payload:null,
+    reverifiedPreview=appliedPreview?.kind==='reverify'?appliedPreview:null;
   return (
-    <section aria-busy={busy}>
-      <div className="eyebrow">把可复用的方法带回自己的工作</div>
-      <h1 className="small">Capsule 方法与应用</h1>
-      <p className="lead">
-        查看问题模式、环境、策略和限制。你的模型解释适用差异，你决定是否采用；银河记录来源和实际工作依据。
-      </p>
-      <div className="button-row">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate('/app/capsules')}
-        >
-          查找方法
-        </Button>
-        <Button
-          type="button"
-          disabled={!writable || busy}
-          onClick={() => {
-            setMode('author');
-            setPreview(null);
-          }}
-        >
-          整理本机草稿
-        </Button>
-        <Button
-          type="button"
-          disabled={!writable || busy}
-          onClick={() => {
-            setMode('permissions');
-            setPreview(null);
-            run(async () => {
-              await loadPermissions('owned');
-              await loadPermissions('granted');
-            });
-          }}
-        >
-          来源许可
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => navigate('/app/rooms')}
-        >
-          普通聊天
-        </Button>
-      </div>
+    <section className={capsuleId?'method-detail':'directory-page'} aria-busy={busy}>
+      {capsuleId&&<a className="back-link" href={browseReturnPath('/app/capsules')} onClick={e=>{e.preventDefault();navigate(browseReturnPath('/app/capsules'));}}>← {browseReturnLabel('/app/capsules')}</a>}
+      <header className="directory-heading"><div><p className="eyebrow">{capsuleId&&mode==='browse'?'方法与经验':'把经验带进下一件工作'}</p><h1 className="small">{mode==='author'?'整理一份方法':mode==='revision'?'编写方法新版本':mode==='maintenance'?'维护方法版本':mode==='permissions'?'来源许可':capsuleId?(detail?.version?.title??'方法详情'):'方法与经验'}</h1><p className="lead">{['author','revision'].includes(mode)?'从实际结果中整理做法，保留适用条件和来源。':mode==='permissions'?'查看收到的许可，或为自己拥有的来源指定使用范围。':capsuleId?detail?.version?.problemPattern:'阅读可以借鉴的做法，了解它从哪里来、在什么条件下适用。'}</p></div>{mode==='browse'&&!capsuleId&&writable&&<Button disabled={busy} onClick={()=>changeMode('author')}>整理一份方法</Button>}</header>
+      {(!capsuleId||mode!=='browse')&&(writable||mode!=='browse')&&<nav className="purpose-tabs method-content-tabs" aria-label="方法内容"><button aria-current={mode==='browse'?'page':undefined} onClick={()=>{changeMode('browse');if(capsuleId)navigate('/app/capsules');}}>浏览方法</button><button aria-current={mode==='author'?'page':undefined} disabled={!writable||busy} onClick={()=>changeMode('author')}>我的草稿</button><button aria-current={mode==='permissions'?'page':undefined} disabled={!writable||busy} onClick={()=>changeMode('permissions')}>来源许可</button>{capsuleId&&['revision','maintenance'].includes(mode)&&<button onClick={()=>changeMode('browse')}>返回当前版本</button>}</nav>}
+      {bound&&!writable&&<aside className="browse-note"><p>当前可以阅读公开方法。记录使用或整理新方法前，需要在已有 AI 中确认浏览器权限。</p><Button type="button" variant="outline" onClick={()=>void copyCapsuleConnection()}>在已有 AI 中继续授权</Button></aside>}
       {error && (
         <div className="message error" role="alert">
           {error}
         </div>
       )}
-      {notice && <output className="message">{notice}</output>}
-      {!connected && (
-        <p className="message">
-          公开版本可以直接阅读。记录应用或整理发布时，请先
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => navigate('/app/settings/identity')}
-          >
-            连接身份
-          </Button>
-          。
-        </p>
-      )}
-      {!!pending.length && (
-        <details open>
-          <summary>原操作回执与本机重试</summary>
-          {pending.map((op) => (
-            <article className="task-card" key={op.operationId}>
-              <p>
-                {op.type === 'publication'
-                  ? '发布或维护'
-                  : op.type === 'use'
-                    ? '引用或应用'
-                    : '来源许可'}{' '}
-                ·{' '}
-                {op.state === 'stopped-local'
-                  ? '已停止本机重试'
-                  : '结果等待核对'}
-              </p>
-              <code>{op.operationId}</code>
-              <div className="button-row">
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    run(async () => {
-                      const r = await guard(requiredClient().reconcile(op.operationId));
-                      setNotice(
-                        r.state === 'acknowledged'
-                          ? '原操作曾经写入。请刷新当前内容；回执不等于来源现在仍可用。'
-                          : '未查到原操作回执；这不能证明尚在途的请求已取消。',
-                      );
-                    })
-                  }
-                >
-                  查询原操作
-                </Button>
-                {op.state !== 'stopped-local' && (
-                  <>
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        run(async () => {
-                          await guard(
-                            requiredClient().retry(op.operationId, { confirmed: true }),
-                          );
-                          setNotice('原操作已确认。请刷新当前内容。');
-                        })
-                      }
-                    >
-                      确认重试原内容
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        run(async () => {
-                          const r = await guard(
-                            requiredClient().stopLocalRetry(op.operationId, {
-                              confirmed: true,
-                            }),
-                          );
-                          setNotice(
-                            r.state === 'acknowledged'
-                              ? '原操作已经写入。'
-                              : '本机正文和签名已移除，不再重试；服务端取消尚未确认。',
-                          );
-                        })
-                      }
-                    >
-                      停止本机重试
-                    </Button>
-                  </>
-                )}
-              </div>
-            </article>
-          ))}
-        </details>
-      )}
+      {capsuleId&&readError&&<div className="message error" role="alert"><p>{readError}</p><Button variant="outline" disabled={busy} onClick={()=>run(()=>readDetail())}>重新读取</Button></div>}
+      {notice && <div className="message"><output>{notice}</output>{lastUsedTarget&&<Button variant="ghost" onClick={()=>navigate(lastUsedTarget)}>回到这项工作<ArrowRight size={14}/></Button>}</div>}
+      {helpOrigin?.returnTo&&<aside className="browse-note"><a href={helpOrigin.returnTo} onClick={e=>{e.preventDefault();navigate(helpOrigin.returnTo!);}}>返回原工作继续处理</a><p>{originWork?`从“${originWork.task.request.title}”继续。引用或应用前，仍需明确选择这份工作作为目标。`:'已保留原任务位置；连接原身份后核对当前可读的工作。'}</p>{originError&&<p role="alert">{originError}</p>}{originWork&&!originWork.task.caseId&&<p>原任务还没有关联实际工作事实。可以继续阅读，或返回原任务记录已经发生的工作。</p>}</aside>}
+      <CapsuleOperationStatus runtime={runtime} subjectId={subjectId} client={client} connected={writable} paused={busy||!!preview} scopeKey={connectionKey} onComplete={async(receipt)=>{const token=epoch.current;assertCurrent(token);await settleMatchingDrafts(receipt);assertCurrent(token);setNotice('上次提交已保存。');if(capsuleId)await readDetail(capsuleId,versionId,epoch.current,true);else await find();}}/>
       {!capsuleId && mode === 'browse' && (
         <>
           <form
             className="search-row"
             onSubmit={(e) => {
               e.preventDefault();
-              run(() => find());
+              const p=new URLSearchParams();if(query.trim())p.set('q',query.trim());if(onlyMine)p.set('view','mine');window.history.replaceState(window.history.state,'','/app/capsules'+(p.size?'?'+p.toString():''));void run(() => find());
             }}
           >
             <Input
-              aria-label="查找 Capsule"
+              aria-label="查找方法"
               value={query}
               maxLength={200}
               onChange={(e) => setQuery(e.target.value)}
@@ -448,34 +337,8 @@ export function CapsuleWorkspace({
               仅我发布的
             </label>
           </form>
-          <div className="result-list">
-            {items.map((item) => (
-              <article className="task-card" key={item.capsuleId}>
-                <h2>{item.title}</h2>
-                <p>{item.problemPattern}</p>
-                <p>
-                  版本 {item.sourceVersion} · {capsuleLabel(item.sourceStatus)}
-                  {item.synthetic ? ' · 演示记录' : ''}
-                  {item.deprecated ? ' · 已停用' : ''}
-                  {item.securityIssue ? ' · 有安全事项' : ''}
-                </p>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    navigate(exactCapsulePath(item.capsuleId, item.versionId))
-                  }
-                >
-                  阅读这一版本
-                </Button>
-              </article>
-            ))}
-          </div>
-          {loaded && !items.length && (
-            <p className="empty-state">
-              当前没有符合条件的可见
-              Capsule。可以继续让模型探索、寻找开放协助，或发布任务；没有记录不代表没有人能帮助。
-            </p>
-          )}
+          <div className="content-grid">{items.map(item=><ContentCard key={item.capsuleId} kind="capsules" item={item} navigate={navigate}/>)}</div>
+          {loaded&&!items.length&&!error&&<div className="directory-empty"><BookOpen size={30}/><h2>{query?'没有找到符合条件的方法':'还没有可浏览的公开方法'}</h2><p>{query?'试试不同的问题模式或标题。':'作者整理并公开方法后，你可以在这里阅读它的做法、适用环境和来源。'}</p><a href="/how-it-works/">了解方法如何成为下一份帮助 <ArrowRight size={15}/></a></div>}
           {next && (
             <Button
               type="button"
@@ -487,277 +350,62 @@ export function CapsuleWorkspace({
           )}
         </>
       )}
-      {capsuleId && (
+      {capsuleId && mode==='browse' && (
         <>
-          <div className="button-row">
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => run(() => readDetail())}
-            >
-              刷新当前来源与版本
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => navigate(exactCapsulePath(capsuleId))}
-            >
-              明确查询最新版
-            </Button>
-          </div>
-          {!!versions.items.length && (
-            <div className="task-card">
-              <h2>可读版本</h2>
-              <p>
-                选择旧版保持原版本，不自动升级。版本列表仅表示当前权限范围。
-              </p>
-              <div className="button-row">
-                {versions.items.map((v: any) => (
-                  <Button
-                    type="button"
-                    variant={
-                      v.versionId === detail?.versionId ? 'default' : 'outline'
-                    }
-                    key={v.versionId}
-                    onClick={() =>
-                      navigate(exactCapsulePath(capsuleId, v.versionId))
-                    }
-                  >
-                    v{v.version} · {capsuleLabel(v.sourceStatus)}
-                  </Button>
-                ))}
-              </div>
-              {versions.nextAfter && (
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => run(moreVersions)}
-                >
-                  更多可读版本
-                </Button>
-              )}
-            </div>
-          )}
-          {detail && (
-            <article className="task-body">
-              <span className="tag">{capsuleLabel(detail.sourceStatus)}</span>
-              {detail.synthetic && (
-                <span className="tag">合成演示，不计真实试点</span>
-              )}
-              {detail.version ? (
-                <>
-                  <h2>
-                    {detail.version.title} · v{detail.version.version}
-                  </h2>
-                  <p>{detail.version.problemPattern}</p>
-                  <dl>
-                    <dt>环境</dt>
-                    <dd>
-                      {detail.version.environment.name} /{' '}
-                      {detail.version.environment.version}
-                    </dd>
-                    <dt>策略与实际做法</dt>
-                    <dd style={{ whiteSpace: 'pre-wrap' }}>
-                      {detail.version.solutionStrategy}
-                    </dd>
-                    <dt>工具 / Skill / MCP</dt>
-                    <dd>
-                      {[
-                        ...detail.version.tools,
-                        ...detail.version.skills,
-                        ...detail.version.mcpRefs,
-                      ].join('、') || '未列出'}
-                    </dd>
-                    <dt>验证方法</dt>
-                    <dd>{detail.version.verificationMethod}</dd>
-                    <dt>适用范围</dt>
-                    <dd>{detail.version.applicableScope}</dd>
-                    <dt>限制与可能失败的条件</dt>
-                    <dd>
-                      <ul>
-                        {detail.version.limitations.map(
-                          (x: string, i: number) => (
-                            <li key={i}>{x}</li>
-                          ),
-                        )}
-                      </ul>
-                    </dd>
-                    <dt>许可</dt>
-                    <dd>
-                      {detail.version.license}；来源许可和共同署名分别成立。
-                    </dd>
-                  </dl>
-                  <details>
-                    <summary>精确来源、参与者与外部链接</summary>
-                    <p>
-                      来源 Case：
-                      <code>{detail.version.sourceResolution.caseId}</code>
-                      ；结果：
-                      <code>{detail.version.sourceResolution.resultId}</code> v
-                      {detail.version.sourceResolution.resultVersion ??
-                        '历史版未独立记录'}
-                    </p>
-                    {(detail.attributions ?? []).map((a: any, i: number) => (
-                      <p key={i}>
-                        {a.subjectId} · {a.source.kind} v{a.source.version}
-                        （来源作者归属，不冒充共同署名同意）
-                      </p>
-                    ))}
-                    {(detail.permissions ?? []).map((p: any) => (
-                      <p key={p.permissionId}>
-                        {p.authorId}：{p.scope}；{p.attribution}
-                      </p>
-                    ))}
-                    {(detail.version.externalReferences ?? []).map((r: any) => (
-                      <p key={r.url}>
-                        {/^https?:\/\//i.test(r.url) ? (
-                          <a href={r.url} target="_blank" rel="noreferrer">
-                            {r.description}
-                          </a>
-                        ) : (
-                          r.description
-                        )}{' '}
-                        · 仅引用链接，未导入原内容；许可：{r.license ?? '未知'}
-                      </p>
-                    ))}
-                  </details>
-                  <p className="muted">
-                    源结果是参与者报告；不等于问题已解决、独立验证通过或专家认证。单纯阅读不会生成应用。
-                  </p>
-                </>
-              ) : (
-                <p className="message">
-                  原来源当前不可用，正文已隐藏。历史操作回执不恢复当前阅读权限。
-                </p>
-              )}
-              {(detail.deprecated ||
-                detail.securityIssue ||
-                !detail.newApplicationAllowed) && (
-                <p className="message">
-                  此版本目前不能新增实际应用或再验证；历史事实保留原状态。
-                </p>
-              )}
-              {(detail.notices ?? []).map((n: any) => (
-                <p key={n.id}>
-                  {capsuleLabel(n.kind)}：{n.summary}
-                </p>
-              ))}
-               {owned && (
-                 <div className="button-row">
-                     <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        setMode('revision');
-                        setPreview(null);
-                      }}
-                    >
-                       {detail.version?'基于此版整理新版本':'用新合法来源整理空白修复版本'}
-                     </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      setMode('maintenance');
-                      setPreview(null);
-                    }}
-                  >
-                    维护这一版本
-                  </Button>
-                </div>
-              )}
+          {!detail&&!readError&&<p className="empty-state"><output>正在打开这份方法…</output></p>}
+          {detail&&<>
+            <div className="method-reading-meta"><MemberAvatar subjectId={detail.authorId}/><span>{memberName(detail.authorId,subjectId,(detail.authorId?memberNames[detail.authorId]:undefined)??undefined)}</span><span>第 {detail.version?.version??selectedVersion?.version??'所选'} 版</span>{detail.synthetic&&<span className="tag">合成演示</span>}{detail.sourceStatus&&detail.sourceStatus!=='current'&&<span>{detail.sourceStatus?capsuleLabel(detail.sourceStatus):'尚未读取'}</span>}</div>
+            {newerVersion&&<p className="method-new-version">另有第 {newerVersion.version} 版可读。<button type="button" className="text-link" onClick={()=>navigate(exactCapsulePath(capsuleId,newerVersion.versionId))}>阅读新版 →</button></p>}
+            <article className="method-prose">
+              {detail.version?<>
+                <p className="method-environment">适用环境：{detail.version.environment.name} / {detail.version.environment.version}</p>
+                <section><h2>做法</h2><p className="reading-prose">{detail.version.solutionStrategy}</p></section>
+                <section><h2>如何验证</h2><p className="reading-prose">{detail.version.verificationMethod}</p></section>
+                <section><h2>适用范围</h2><p className="reading-prose">{detail.version.applicableScope}</p></section>
+                {detail.version.limitations.length>0&&<section><h2>限制与可能失败的条件</h2><ul>{detail.version.limitations.map((value:string,index:number)=><li key={index}>{value}</li>)}</ul></section>}
+                {(detail.version.tools.length+detail.version.skills.length+detail.version.mcpRefs.length)>0&&<section><h2>使用的工具</h2><p>{[...detail.version.tools,...detail.version.skills,...detail.version.mcpRefs].join('、')}</p></section>}
+                <p className="method-license">使用许可：{detail.version.license}</p>
+                {(detail.version.externalReferences??[]).length>0&&<section><h2>延伸阅读</h2>{(detail.version.externalReferences??[]).map((reference)=><p key={reference.url}>{/^https?:\/\//i.test(reference.url)?<a href={reference.url} target="_blank" rel="noreferrer">{reference.description} ↗</a>:reference.description}{reference.license&&<small> · {reference.license}</small>}</p>)}</section>}
+                <details className="method-source-details"><summary>了解来源与署名</summary>
+                  <CapsuleAttributionResponses attributions={detail.attributions} navigate={navigate} subjectId={subjectId} names={memberNames}/>
+                  {(detail.permissions??[]).length>0&&<section className="method-source-permissions"><h3>作者允许怎样使用</h3>{(detail.permissions??[]).map((permission)=><article key={permission.permissionId}><h4>{memberName(permission.authorId,subjectId,memberNames[permission.authorId]??undefined)}</h4><p className="reading-prose">{permission.scope}</p><p className="source-reading-note">署名要求：{permission.attribution} · {permission.license}</p></article>)}</section>}
+                  <details className="source-reference-details"><summary>方法与来源的准确版本</summary><dl><dt>方法</dt><dd>{detail.capsuleId}</dd><dt>这一版</dt><dd>{detail.versionId}</dd><dt>来源工作</dt><dd>{detail.version.sourceResolution.caseId}</dd><dt>来源结果</dt><dd>{detail.version.sourceResolution.resultId} · 第 {detail.version.sourceResolution.resultVersion??'历史未记录'} 版</dd><dt>来源状态</dt><dd>{detail.sourceStatus?capsuleLabel(detail.sourceStatus):'尚未读取'}</dd></dl></details>
+                </details>
+              </>:<p className="message">这份方法的来源当前不可读取，正文已收起。</p>}
+              {detail.sourceStatus==='source-result-superseded'&&<p className="message">原工作已有纠正结果，使用前请结合当前来源判断。</p>}
+              {detail.sourceStatus==='source-currentness-unavailable'&&<p className="message">来源结果的当前状态暂时无法核对。</p>}
+              {(detail.deprecated||detail.securityIssue||!detail.newApplicationAllowed)&&<p className="message">{detail.securityIssue?'这份版本有尚未处理的安全事项。':detail.deprecated?'作者已停用这份版本。':'当前来源暂不支持新增实际应用或再验证。'}</p>}
+              {(detail.notices??[]).map((item)=><p className="message" key={item.id}>{capsuleLabel(item.kind)}：{item.summary}</p>)}
+              {writable&&detail.version&&<div className="method-primary-action"><p>选择一件工作，留下参考或实际采用的记录。</p><Button onClick={()=>setUseOpen(true)}>用于我的工作<ArrowRight size={15}/></Button></div>}
+              {owned&&writable&&<details className="method-owner-actions"><summary>编辑与维护这份方法</summary><div className="button-row"><Button disabled={busy} onClick={()=>changeMode('revision')}>{detail.version?'整理新版本':'选择新来源整理修复版本'}</Button><Button variant="outline" disabled={busy} onClick={()=>changeMode('maintenance')}>维护这一版本</Button><Button variant="ghost" disabled={busy} onClick={()=>changeMode('permissions')}>来源许可</Button></div></details>}
             </article>
-          )}
-          <section>
-            <h2>参考、实际应用与再验证</h2>
-            <p>
-              下列数量仅覆盖当前可见记录。重复查看、同一案例的多条检查不会变成多次成功复用。
-            </p>
-            {uses.counts && (
-              <p>
-                参考 {uses.counts.references} · 实际应用{' '}
-                {uses.counts.applications} · 再验证{' '}
-                {uses.counts.reverifications} · 演示应用{' '}
-                {uses.counts.syntheticApplications} · 当前真实目标案例{' '}
-                {uses.counts.distinctTargetCases}
-              </p>
-            )}
-            {uses.items.map((u: any) => (
-              <article className="task-card" key={u.eventId}>
-                <h3>
-                  {capsuleLabel(u.kind)} · {capsuleLabel(u.sourceStatus)}
-                </h3>
-                <p>{u.subjectId}</p>
-                {u.record ? (
-                  <>
-                    <p>{u.record.note}</p>
-                    {u.record.environment && (
-                      <p>
-                        {u.record.environment.name} /{' '}
-                        {u.record.environment.version}：
-                        {u.record.environmentDifference}
-                      </p>
-                    )}
-                    <p>
-                      {u.reportedOutcome
-                        ? capsuleLabel(u.reportedOutcome)
-                        : '没有声明执行或成功'}
-                    </p>
-                    {u.record.adoptedParts && (
-                      <p>实际采用：{u.record.adoptedParts.join('；')}</p>
-                    )}
-                    {u.verifications?.map((v: any) => (
-                      <p key={`${v.id}:${v.version}`}>
-                        检查 v{v.version}：{v.referenceStatus} ·{' '}
-                        {v.record?.summary ?? '正文当前不可用'}
-                      </p>
-                    ))}
-                    {u.record.taskId && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        onClick={() =>
-                          navigate(`/app/tasks/${u.record.taskId}`)
-                        }
-                      >
-                        返回这项真实任务
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <p>原应用或其来源目前不可用，保留最小记录。</p>
-                )}
-              </article>
-            ))}
-            {uses.nextAfter && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    const page = await guard(
-                      requiredClient().uses({
-                        capsuleId,
-                        versionId: detail.versionId,
-                        after: uses.nextAfter,
-                        limit: 20,
-                      }),
-                    );
-                    setUses((old: any) => ({
-                      ...page,
-                      items: [...old.items, ...page.items],
-                    }));
-                  })
-                }
-              >
-                更多应用记录
-              </Button>
-            )}
+          </>}
+          {versions.items.length>1||versions.nextAfter?<details className="method-versions"><summary>其他可读版本</summary><div className="button-row">{[...versions.items].sort((a,b)=>b.version-a.version).map((item)=><Button type="button" variant={item.versionId===detail?.versionId?'secondary':'outline'} key={item.versionId} disabled={item.versionId===detail?.versionId} onClick={()=>navigate(exactCapsulePath(capsuleId,item.versionId))}>第 {item.version} 版{item.sourceStatus!=='current'?' · '+capsuleLabel(item.sourceStatus):''}</Button>)}</div>{versions.nextAfter&&<Button type="button" variant="ghost" disabled={busy} onClick={()=>run(moreVersions)}>更多可读版本</Button>}</details>:null}
+          {detail&&<section className="method-uses">
+            <h2>大家怎样使用</h2>
+            {uses.unavailable?<p className="empty-state">使用记录暂时无法读取。</p>:!uses.items.length&&<p className="empty-state">{uses.loaded?'还没有当前可读的使用记录。':'正在读取使用记录…'}</p>}
+            <div className="reading-list">{uses.items.map((use)=><article className="method-use-record" key={use.eventId}>
+              <div className="member-line"><MemberAvatar subjectId={use.subjectId}/><div><h3>{memberName(use.subjectId,subjectId,memberNames[use.subjectId]??undefined)}</h3><p className="record-meta">{capsuleLabel(use.kind)}{use.recordedAt?' · '+readableTime(use.recordedAt):''}{use.synthetic?' · 合成演示':''}</p></div></div>
+              {use.record?<>
+                <p className="reading-prose">{use.record.note||'将这份方法加入了工作参考。'}</p>
+                {use.reportedOutcome&&<p className="method-outcome">{capsuleLabel(use.reportedOutcome)}</p>}
+                {use.record.kind!=='reference'&&use.record.adoptedParts.length>0&&<p>实际采用：{use.record.adoptedParts.join('；')}</p>}
+                {use.record.kind!=='reference'&&<p className="record-meta">{use.record.environment.name==='unknown'?'环境未记录':use.record.environment.name}{use.record.environment.version!=='unknown'?' / '+use.record.environment.version:''}{use.record.environmentDifference?' · '+use.record.environmentDifference:''}</p>}
+                {use.sourceStatus!=='current'&&<p className="record-meta">{capsuleLabel(use.sourceStatus)}</p>}
+                {use.capsuleSourceStatus==='source-currentness-unavailable'&&<p className="record-meta">所用方法的来源状态暂时无法核对。</p>}
+                <div className="button-row">{use.record.taskId&&<Button type="button" variant="link" onClick={()=>navigate('/app/tasks/'+use.record?.taskId)}>查看相关工作</Button>}{use.subjectId===subjectId&&<Button type="button" variant="link" onClick={()=>navigate('/app/history')}>我的工作经历</Button>}</div>
+                <details className="technical-details"><summary>使用来源与核对记录</summary>{use.originRef&&use.record.kind!=='reference'&&<p>{use.originRef.kind==='intervention'?'实际介入':'尝试'} · 第 {use.originRef.version} 版 · 结果第 {use.record.resultRef.version} 版</p>}{use.environmentSource==='unknown-origin-conditions'&&<p>原介入没有引用环境配置，环境条件尚不明确。</p>}{use.verifications?.map((verification)=><p key={verification.id+':'+verification.version}>检查第 {verification.version} 版 · {verification.referenceStatus}：{verification.record?.summary??'正文当前不可读'}</p>)}<p>记录 {use.eventId} · {capsuleLabel(use.sourceStatus)}</p></details>
+              </>:<p className="record-meta">这条使用记录的来源当前不可读取。</p>}
+            </article>)}</div>
+            {uses.nextAfter&&<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const page=await guard(requiredClient().uses({capsuleId,versionId:detail.versionId??undefined,after:uses.nextAfter??undefined,limit:20}));usePages.current++;setUses((old)=>({...page,loaded:true,items:[...old.items,...page.items]}));})}>更多使用记录</Button>}
+            {uses.counts&&Object.values(uses.counts).some(value=>typeof value==='number'&&value>0)&&<details className="technical-details"><summary>使用记录统计</summary><dl><dt>加入参考</dt><dd>{uses.counts.references}</dd><dt>实际应用</dt><dd>{uses.counts.applications}</dd><dt>再次验证</dt><dd>{uses.counts.reverifications}</dd><dt>演示应用</dt><dd>{uses.counts.syntheticApplications}</dd><dt>当前真实目标工作</dt><dd>{uses.counts.distinctTargetCases}</dd></dl></details>}
             {writable && detail?.version && (
-              <fieldset disabled={busy || !!preview}>
+              <dialog ref={useDialog} className="workspace-dialog method-use-dialog" onCancel={()=>setUseOpen(false)}><header className="dialog-heading"><div><h2>用于我的工作</h2><p>{detail.version.title} · 版本 {detail.version.version}</p></div><button type="button" className="icon-button" aria-label="关闭方法使用" onClick={()=>setUseOpen(false)}><X size={19}/></button></header>{error&&<p className="message error" role="alert">{error}</p>}{useOpen&&<fieldset disabled={busy || !!preview}>
                 <CapsuleApplication
+                  runtime={runtime}
                   key={detail.versionId}
+                  loadConfiguration={(ref:{id:string;version:number})=>guard(requiredClient().configuration(ref))}
+                  readCurrent={readCurrent}
                   {...{
                     detail,
                     history,
@@ -770,17 +418,22 @@ export function CapsuleWorkspace({
                     run,
                     propose,
                     navigate,
+                    helpOrigin,
+                    originWork,
                   }}
+                  readOrigin={readOrigin}
                 />
-              </fieldset>
+              </fieldset>}</dialog>
             )}
-          </section>
+            {!bound&&detail?.version&&<div className="browse-note"><p>想把这份方法用在自己的工作中？连接身份后可以记录引用和实际应用。</p><a href="/app/settings/identity" onClick={e=>{e.preventDefault();navigate('/app/settings/identity');}}>连接身份后继续 →</a></div>}
+          </section>}
         </>
       )}
-      {writable && ['author', 'revision', 'maintenance'].includes(mode) && (
+      {writable && runtime && client && subjectId && (mode==='author'||((mode==='revision'||mode==='maintenance')&&detail)) && (
         <fieldset disabled={busy || !!preview}>
           <CapsuleAuthoring
-            key={`${mode}:${detail?.versionId ?? 'new'}`}
+            key={`${connectionKey}:${mode}:${detail?.versionId ?? 'new'}`}
+            registerDraft={registerDraft}
             {...{
               runtime,
               client,
@@ -805,9 +458,12 @@ export function CapsuleWorkspace({
           />
         </fieldset>
       )}
-      {writable && mode === 'permissions' && (
+      {writable && runtime && subjectId && mode === 'permissions' && (
         <fieldset disabled={busy || !!preview}>
           <CapsulePermissionWorkspace
+            key={connectionKey}
+            client={client}
+            registerDraft={registerDraft}
             {...{
               runtime,
               subjectId,
@@ -826,129 +482,26 @@ export function CapsuleWorkspace({
           />
         </fieldset>
       )}
-      {preview && (
-        <section className="task-card">
-          <h2>确认这一次操作</h2>
-          <p>
-            {preview.type === 'publication'
-              ? preview.payload.kind === 'version'
-                ? `发布 v${preview.payload.version}：${preview.payload.title}`
-                : `维护：${capsuleLabel(preview.payload.kind)}`
-              : preview.type === 'use'
-                ? capsuleLabel(preview.payload.kind)
-                : preview.payload.kind === 'grant'
-                  ? '授予选定来源许可'
-                  : '撤销选定来源许可'}
-          </p>
-          <p>
-            范围：
-            {preview.visibility === 'Public'
-              ? '面向公众'
-              : '仅本人及下列选定人员'}
-            ；{preview.viewers.join('、') || '无额外阅读者'}。
-          </p>
-          <p>
-            {preview.payload.note ??
-              preview.payload.summary ??
-              preview.payload.scope ??
-              preview.payload.reason ??
-              preview.payload.problemPattern}
-          </p>
-          {preview.payload.solutionStrategy && (
-            <p style={{ whiteSpace: 'pre-wrap' }}>
-              即将发布的策略：{preview.payload.solutionStrategy}
-            </p>
-          )}
-          {preview.payload.sources && (
-            <p>
-              选定来源 {preview.payload.sources.length} 条；获许可人：
-              {preview.payload.grantees.join('、')}。
-              {preview.payload.allowPublic
-                ? '允许按此许可公开选定内容。'
-                : '不允许公开。'}
-            </p>
-          )}
-          {preview.payload.kind === 'version' && (
-            <dl>
-              <dt>问题与范围</dt>
-              <dd>
-                {preview.payload.problemPattern}；
-                {preview.payload.applicableScope}
-              </dd>
-              <dt>环境</dt>
-              <dd>
-                {preview.payload.environment.name} /{' '}
-                {preview.payload.environment.version}
-              </dd>
-              <dt>工具、Skill、MCP</dt>
-              <dd>
-                {[
-                  ...preview.payload.tools,
-                  ...preview.payload.skills,
-                  ...preview.payload.mcpRefs,
-                ].join('、') || '无'}
-              </dd>
-              <dt>验证方法</dt>
-              <dd>{preview.payload.verificationMethod}</dd>
-              <dt>限制</dt>
-              <dd>{preview.payload.limitations.join('；')}</dd>
-              <dt>许可与来源</dt>
-              <dd>
-                {preview.payload.license}；主结果{' '}
-                {preview.payload.sourceResolution.resultId} v
-                {preview.payload.sourceResolution.resultVersion}；附加来源{' '}
-                {preview.payload.sourceRefs.length} 条；许可{' '}
-                {preview.payload.permissionRefs.length} 项；
-                {preview.payload.synthetic ? '合成演示' : '非演示标记'}
-              </dd>
-              <dt>贡献署名</dt>
-              <dd>
-                {preview.payload.contributors.join('、') || '没有新增署名'}
-              </dd>
-              <dt>外部链接</dt>
-              <dd>
-                {preview.payload.externalReferences
-                  .map((r: any) => `${r.description}: ${r.url}`)
-                  .join('；') || '无'}
-              </dd>
-            </dl>
-          )}
+      <dialog ref={previewDialog} aria-labelledby="capsule-preview-title" className="workspace-dialog method-preview-dialog" onCancel={event=>{event.preventDefault();if(!busy)setPreview(null);}}>{preview && (
+        <section className="method-preview">
+          <header className="dialog-heading"><h2 ref={previewHeading} id="capsule-preview-title" tabIndex={-1}>确认这次内容</h2><button type="button" className="icon-button" aria-label="关闭方法预览" disabled={busy} onClick={()=>setPreview(null)}><X size={19}/></button></header>
+          {preview.type!=='use'&&subjectId&&<CapsuleAuthorPreview preview={preview} display={previewDisplay} subjectId={subjectId} names={memberNames}/>}
+          {preview.type==='use'&&<><p>{capsuleLabel(preview.payload.kind)}</p><p>范围：{preview.visibility==='Public'?'面向公众':'仅本人及选定人员'}{preview.viewers.length?'；'+preview.viewers.map((id:string)=>memberName(id,subjectId,memberNames[id]??undefined)).join('、'):''}。</p><p className="reading-prose">{preview.payload.note}</p></>}
           {preview.type === 'use' && (
-            <p>
-              Capsule精确版本：{preview.payload.versionId}；目标Case：
-              {preview.payload.caseId}。
-              {preview.payload.resultRef && (
-                <>
-                  结果 {preview.payload.resultRef.id} v
-                  {preview.payload.resultRef.version} ·{' '}
-                  {capsuleLabel(preview.payload.outcome)}；环境差异：
-                  {preview.payload.environmentDifference}；实际采用：
-                  {preview.payload.adoptedParts.join('；')}。
-                </>
-              )}
-              {preview.payload.verificationRefs && (
-                <>
-                  再验证引用 {preview.payload.verificationRefs.length}{' '}
-                  条精确版本检查。
-                </>
-              )}
-            </p>
+            <>
+              <dl className="fact-details">
+                <dt>选定方法</dt><dd>{detail?.version?.title??'当前所读方法'} · v{detail?.version?.version??'所选版本'}</dd>
+                <dt>原工作</dt><dd>{originWork?.task.caseId===preview.payload.caseId?originWork.task.request.title:history.find((h)=>h.caseId===preview.payload.caseId)?.title??'本人所选的原工作'}</dd>
+                {appliedPreview&&<><dt>原结果</dt><dd>{history.find((h)=>h.caseId===appliedPreview?.caseId)?.results?.find((r)=>r.id===appliedPreview?.resultRef.id&&r.version===appliedPreview?.resultRef.version)?.summary??'所选结果'} · v{appliedPreview.resultRef.version} · {capsuleLabel(appliedPreview.outcome)}</dd><dt>实际采用</dt><dd>{appliedPreview.adoptedParts.join('；')}</dd><dt>环境与差异</dt><dd>{appliedPreview.environment.name==='unknown'?'环境未知':appliedPreview.environment.name} / {appliedPreview.environment.version==='unknown'?'版本未知':appliedPreview.environment.version}；{appliedPreview.environmentDifference}</dd><dt>工作来源</dt><dd>{appliedPreview.originRef?.kind==='intervention'?'实际介入':'尝试'} · v{appliedPreview.originRef?.version}，保留准确的原工作和结果版本。</dd></>}
+                {reverifiedPreview&&<><dt>本次再验证</dt><dd>沿用原应用，引用 {reverifiedPreview.verificationRefs.length} 条指向原结果准确版本的检查。</dd></>}
+              </dl>
+              <details><summary>精确引用与技术详情</summary><HistoryFields value={{capsuleId:preview.payload.capsuleId,versionId:preview.payload.versionId,caseId:preview.payload.caseId,taskId:preview.payload.taskId,originRef:appliedPreview?.originRef,resultRef:appliedPreview?.resultRef,configurationRef:appliedPreview?.configurationRef,priorUseId:reverifiedPreview?.priorUseId,verificationRefs:reverifiedPreview?.verificationRefs,payloadHash:preview.payloadHash}}/></details>
+            </>
           )}
-          {preview.type === 'permission' &&
-            preview.payload.kind === 'grant' && (
-              <p>
-                许可：{preview.payload.license}；依据：{preview.payload.basis}{' '}
-                {preview.payload.licenseReference ?? ''}；署名：
-                {preview.payload.attribution}；额外截止：
-                {preview.payload.expiresAt ?? '未另指定，仍受签名有效期限制'}。
-              </p>
-            )}
-          <p className="muted">
-            本机预览尚未发送。确认后签署这些精确内容；发布不自动证明实际复用、法律权利或共同署名。
-          </p>
+          {error&&<p className="message error" role="alert">{error}</p>}
           <div className="button-row">
             <Button type="button" disabled={busy} onClick={() => run(execute)}>
-              确认以上内容并提交
+              确认保存
             </Button>
             <Button
               type="button"
@@ -956,19 +509,17 @@ export function CapsuleWorkspace({
               disabled={busy}
               onClick={() => setPreview(null)}
             >
-              取消本次预览
+              继续修改
             </Button>
           </div>
         </section>
-      )}
+      )}</dialog>
       {writable && capsuleId && !detail && versions.management && <section className="task-card"><p>本人管理关系仍有效，但当前版本正文不可读取。可重新选择合法来源整理空白新版本，旧授权和旧正文不会恢复。</p><Button type="button" disabled={busy} onClick={()=>{setDetail({capsuleId,versionId:versionId??null,authorId:subjectId,version:null});setMode('revision');setPreview(null);}}>整理空白修复版本</Button></section>}
-      {writable && <CapsuleConsentControls {...{runtime,subjectId,busy,run}} targets={[
-        ...versions.items.filter((v:any)=>v.ownerControl).map((v:any)=>({...v.ownerControl,label:`本人发布版本 v${v.version}`})),
-        ...uses.items.filter((u:any)=>u.ownerControl).map((u:any)=>({...u.ownerControl,label:`本人${capsuleLabel(u.kind)} · ${u.recordedAt}`})),
-      ]} onChanged={async()=>{if(capsuleId)try{await readDetail();}catch(e:any){if(![403,404].includes(e.status))throw e;setDetail(null);setUses({items:[]});setNotice('当前展示已关闭；原事实与授权回执按各自规则保留。');}else await find();}}/>}
-      <p className="return-note">
-        回到原聊天后，由你的模型结合所选版本继续工作。关闭此页不会新增应用，也不会取消已有任务。
-      </p>
+      {writable && runtime && subjectId && (mode==='permissions'||capsuleId&&mode==='browse') && <CapsuleConsentControls {...{runtime,subjectId,busy,run}} targets={[
+        ...versions.items.flatMap(v=>v.ownerControl?[{...v.ownerControl,label:`本人发布版本 v${v.version}`}]:[]),
+        ...uses.items.flatMap(u=>u.ownerControl?[{...u.ownerControl,label:`本人${capsuleLabel(u.kind)} · ${u.recordedAt}`}]:[]),
+      ]} onChanged={async()=>{if(capsuleId)try{await readDetail();}catch(e){if(!e||typeof e!=='object'||!('status' in e)||(e.status!==403&&e.status!==404))throw e;setDetail(null);setUses({items:[]});setNotice('当前展示已关闭；原事实与授权回执按各自规则保留。');}else await find();}}/>}
+
     </section>
   );
 }

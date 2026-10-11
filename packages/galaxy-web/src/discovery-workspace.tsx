@@ -1,73 +1,111 @@
-import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight } from 'lucide-react';
-import { FactDetails } from './fact-details';
+import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {ArrowRight,Search,SlidersHorizontal,X} from 'lucide-react';
+import {FactDetails} from './fact-details';
 import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
-import {projectQueryMemory,projectViewScope} from './project-view-client.mjs';
-
-const purposes = [['conversation', '交流想法'], ['reuse', '寻找可复用内容'], ['collaboration', '共同协作'], ['recruitment', '定向招募']];
-const tags = (value: string) => [...new Set(value.split(/[,，、\n]/).map(item => item.trim()).filter(Boolean))];
-export function DiscoveryWorkspace({ runtime, connected, navigate }: { runtime: any; connected: boolean; navigate: (path: string) => void }) {
-  return <DiscoveryView key={projectViewScope(runtime,connected)} runtime={runtime} connected={connected} navigate={navigate}/>;
+import {projectQueryMemory,projectViewScope,opportunityUnavailable} from './project-view-client.mjs';
+import {useGovernanceDraft} from './governance-presentation';
+import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
+import {discoveryQueryV2Schema,opportunityRefV2Schema} from '../../galaxy-official/src/shared/discovery-schema-v2.mjs';
+import './discovery-workspace.css';
+import type {ProjectRuntime,DiscoveryPage,Opportunity,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail,DiscoveryQuery,DiscoveryPurpose} from './project-workspace-types';
+import {projectErrorText,object,isDiscoveryPurpose} from './project-workspace-types';
+import {bodyFreeOpportunity,contactDraftRuntime} from './help-contact-view-types';
+import type {DiscoveryInput} from './help-contact-view-types';
+const purposes:[DiscoveryPurpose,string][]=[['conversation','交流想法'],['reuse','了解复用'],['collaboration','一起做事'],['recruitment','了解招募']];
+const tags=(value:string)=>[...new Set(value.split(/[,，、\n]/).map(item=>item.trim()).filter(Boolean))];
+type Props={runtime:ProjectRuntime|null;connected:boolean;navigate:(path:string)=>void};
+const errorMessage=(error:unknown)=>({discovery_cursor_unavailable_restart:'这次查找已更新，请重新查找。',discovery_sources_changed_retry:'相关资料已有更新，请重新查找。',discovery_preferences_disabled:'你的交流意愿目前已关闭，可在交流设置中调整。'} as Record<string,string>)[projectErrorText(error,'code')||projectErrorText(error)]??(/[\u3400-\u9fff]/.test(projectErrorText(error))?projectErrorText(error):'暂时无法读取，请稍后重试。');
+function discoveryMemory(raw:unknown):Partial<DiscoveryInput>{
+ if(!object(raw))return {};
+ const result:Partial<DiscoveryInput>={};
+ for(const key of ['title','functions','technologies'] as const)if(typeof raw[key]==='string')result[key]=raw[key];
+ if(Array.isArray(raw.selected))result.selected=raw.selected.filter(isDiscoveryPurpose);
+ if(raw.submittedQuery){const query=discoveryQueryV2Schema.safeParse(raw.submittedQuery);if(query.success)result.submittedQuery={context:query.data.context,purposes:query.data.purposes};}
+ // Only the body-free locator was saved in this query memory.
+ if(object(raw.openedRef)&&raw.openedRef.sourceUnavailable===true&&typeof raw.openedRef.id==='string'&&typeof raw.openedRef.subjectId==='string'&&typeof raw.openedRef.projectId==='string'){
+  const ref=opportunityRefV2Schema.safeParse(raw.openedRef.opportunityRef);
+  // The detail endpoint checks the original opportunity reference again.
+  if(ref.success)result.openedRef={id:raw.openedRef.id,subjectId:raw.openedRef.subjectId,projectId:raw.openedRef.projectId,opportunityRef:ref.data,sourceUnavailable:true};
+ }
+ return result;
 }
-function DiscoveryView({ runtime, connected, navigate }: { runtime: any; connected: boolean; navigate: (path: string) => void }) {
-  const [title, setTitle] = useState(''), [functions, setFunctions] = useState(''), [technologies, setTechnologies] = useState('');
-  const [selected, setSelected] = useState(['conversation', 'collaboration']), [submitted, setSubmitted] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]), [next, setNext] = useState<string | null>(null), [detail, setDetail] = useState<any>(null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [searched, setSearched] = useState(false);
-  const [otherQuery, setOtherQuery] = useState(''), [kind, setKind] = useState('capsule'), [resources, setResources] = useState<any[]>([]);
-  const [capsule, setCapsule] = useState<any>(null);
-  const viewScope=projectViewScope(runtime,connected);
-  useEffect(() => { setItems([]); setDetail(null); setSubmitted(null); setNext(null); setSearched(false); setResources([]);setCapsule(null);
-    const saved=projectQueryMemory(runtime,connected,'discovery');setTitle(saved?.title??'');setFunctions(saved?.functions??'');setTechnologies(saved?.technologies??'');setSelected(saved?.selected??['conversation','collaboration']);
-  }, [runtime, viewScope]);
-  async function read(path:string,input:any){const result=await runtime.api.call(path,input,{authenticated:connected});if(projectViewScope(runtime,connected)!==viewScope)throw new Error('身份或连接已改变，请重新读取。');return result;}
-  async function run(fn: () => Promise<void>) { if (busy) return; setBusy(true); setError(''); try { await fn(); } catch (e: any) { setError(typeof e?.message === 'string' && e.message.trim() ? e.message : '发现操作暂未完成，请稍后重试。'); } finally { setBusy(false); } }
-  async function search(after?: string) {
-    const query = after ? submitted : { context: { kind: 'ephemeral', title, functions: tags(functions), technologies: tags(technologies) }, purposes: selected };
-    const result = await read('/v2/discovery/query', { ...query, limit: 20, ...(after ? { after } : {}) });
-    projectQueryMemory(runtime,connected,'discovery',{title,functions,technologies,selected});
-    setSubmitted(query); setItems(old => after ? [...old, ...result.items] : result.items); setNext(result.nextAfter); setSearched(true); if (!after) setDetail(null);
-  }
-  async function inspect(item: any, experienceAfter?: string) {
-    try{const result = await read('/v2/discovery/detail', { ...submitted, opportunityRef: item.opportunityRef, ...(experienceAfter ? { experienceAfter } : {}) });setDetail(result);}
-    catch(e){setDetail(null);throw e;}
-  }
-  return <section><div className="eyebrow">把当前工作连接到更多帮助</div><h1 className="small">发现匹配</h1><p className="lead">说说正在做什么，查看相关项目、表达参与意愿的人，以及真实经历。一次查询无需先登记项目，也不会替你发出邀请。</p>
-    {error && <div className="message error" role="alert">{error}</div>}
-    <form className="workspace-form" onSubmit={e => { e.preventDefault(); run(() => search()); }}>
-      <label>当前目标<Input required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：为本地工具增加多人协作"/></label>
-      <label>希望相关的功能或方向<Textarea required value={functions} onChange={e => setFunctions(e.target.value)} placeholder="权限管理、网页聊天、代码复核；用逗号分隔，最多 16 项"/></label>
-      <label>技术与环境（可选）<Input value={technologies} onChange={e => setTechnologies(e.target.value)} placeholder="如 React、PostgreSQL"/></label>
-      <fieldset className="purpose-options"><legend>你希望做什么，可以同时存在</legend>{purposes.map(([value, label]) => <label key={value}><input type="checkbox" checked={selected.includes(value)} onChange={e => setSelected(e.target.checked ? [...selected, value] : selected.filter(item => item !== value))}/>{label}</label>)}</fieldset>
-      <Button type="submit" disabled={busy || !runtime || !selected.length}>查找当前可见的机会 <ArrowRight size={16}/></Button><p className="muted">相关性由你和用户端模型判断。愿意接触不等于承诺时间、价格或参与。</p>
-    </form>
-    <div className="result-list">{items.map(item => <article className="task-card" key={item.id}><span className="tag">当前声明与意愿</span><h2>{item.project.title}</h2><p>{item.help.statement}</p><p className="muted">{item.displayName ?? item.subjectId} · 共同方向：{item.help.functions.join('、')} · {item.help.purposes.map((value: string) => purposes.find(p => p[0] === value)?.[1] ?? value).join('、')}</p>
-      <Button variant="outline" disabled={busy} onClick={() => run(() => inspect(item))}>查看真实依据与参与条件</Button></article>)}</div>
-    {searched && !items.length && <div className="empty-state">这一页没有当前可见的机会。可以继续下一范围、调整描述，或发布任务。没有展示历史不代表没有能力。</div>}
-    {next && <Button variant="outline" disabled={busy} onClick={() => run(() => search(next))}>继续查找下一范围</Button>}
-    {detail && <section className="task-body discovery-detail"><h2>{detail.opportunity.project.title}</h2><p>{detail.opportunity.project.summary}</p><p className="muted">以下是这个主体当前允许展示的经历，需要结合环境判断与本次工作的相关性。声明、尝试结果和独立验证分别成立；没有历史也可以开始开放协作。</p>
-      <code className="identity-id">{detail.opportunity.subjectId}</code>
-      <div className="result-list">{detail.experience.items.map((item: any) => <article key={item.key} className="task-card"><h3>{item.title ?? item.kind}</h3><p>{item.summary ?? item.role ?? item.outcome ?? ''}</p><p className="muted">{item.kind} · {item.result?.status ?? item.state ?? ''}</p>
-        <details><summary>查看尝试、介入和结果依据</summary><FactDetails item={item}/></details>
-        {item.taskId && <Button variant="ghost" onClick={() => navigate(`/app/tasks/${item.taskId}`)}>查看关联任务</Button>}
-      </article>)}</div>
-      {!detail.experience.items.length && <p>这一页没有可见经历。可以先了解对方提出的具体帮助与条件。</p>}
-      {(detail.experience.nextCursor??detail.experience.nextAfter) && <Button variant="outline" disabled={busy} onClick={() => run(() => inspect(detail.opportunity, detail.experience.nextCursor??detail.experience.nextAfter))}>更多经历</Button>}
-      <p className="muted">阅读依据不会发出联系请求。你可以带回原聊天比较，也可以在此明确选择下一步。</p>
-      <OpportunityContactWorkspace runtime={runtime} connected={connected} query={submitted} opportunity={detail.opportunity} navigate={navigate}/>
-      <Button variant="outline" onClick={() => navigate('/app/publish')}>发布我的任务</Button>
-    </section>}
-    <details className="room-settings"><summary>另查 Capsule、Worker 与 Hub</summary><p className="muted">已有方法与工具是帮助的一部分，不能替代寻找实际协助者。阅读 Capsule 不会被记成成功复用。</p>
-      <form className="search-row" onSubmit={e => { e.preventDefault(); run(async () => {
-        const result = kind === 'capsule' ? await read('/v2/capsules/query', { query: otherQuery, limit: 10 })
-          : await read('/v1/search/query', { type: kind, query: { query: otherQuery, limit: 8 } }); setResources(result.items);
-      }); }}><Input required aria-label="查找方法与工具" value={otherQuery} onChange={e => setOtherQuery(e.target.value)}/><select aria-label="方法与工具类型" value={kind} onChange={e => setKind(e.target.value)}><option value="capsule">Capsule</option><option value="worker">Worker</option><option value="hub">Hub</option></select><Button type="submit" disabled={!runtime || busy}>查找</Button></form>
-      {resources.map(item => <article className="task-card" key={item.id ?? item.capsuleId}><h3>{item.title}</h3><p>{item.summary}</p>{item.capsuleId ? <Button variant="outline" disabled={busy} onClick={() => run(async () => setCapsule(await read('/v2/capsules/read', { capsuleId: item.capsuleId, versionId: item.versionId })))}>阅读方法及适用限制</Button> : <p className="muted">{item.matchReasons?.join('、')}</p>}</article>)}
-      {capsule && <article className="task-body"><h2>{capsule.version?.title ?? '方法来源当前不可用'}</h2>{capsule.version ? <><p>{capsule.version.problemPattern}</p><p>环境：{capsule.version.environment.name} {capsule.version.environment.version}</p><h3>处理方法</h3><p>{capsule.version.solutionStrategy}</p><h3>适用范围</h3><p>{capsule.version.applicableScope}</p><h3>限制</h3><ul>{capsule.version.limitations.map((item: string) => <li key={item}>{item}</li>)}</ul><h3>核验方式</h3><p>{capsule.version.verificationMethod}</p><p className="muted">许可：{capsule.version.license} · {capsule.synthetic ? '合成案例来源' : '来源按实际记录核对'} · {capsule.newApplicationAllowed ? '可结合环境考虑采用' : '当前不应继续新应用'}</p><p className="muted">阅读不会登记成功复用。实际采用后，由用户端模型协助记录尝试、结果和环境差异。</p></> : <p>引用保留，但源材料已不可读取，不能继续将原内容视为可用方法。</p>}</article>}
-    </details>
-    <div className="button-row"><Button variant="outline" onClick={() => navigate('/app/projects')}>项目与联系</Button><Button variant="outline" onClick={() => navigate('/app/publish')}>发布任务</Button><Button variant="outline" onClick={() => navigate('/app/participate')}>参与任务</Button><Button variant="ghost" onClick={() => navigate('/app/rooms')}>开始普通交流</Button></div>
-  </section>;
+export function DiscoveryWorkspace(props:Props){return <DiscoveryView key={projectViewScope(props.runtime,props.connected)} {...props}/>;}
+function DiscoveryView({runtime,connected,navigate}:Props){
+ const scope=projectViewScope(runtime,connected),subjectId=connected?runtime?.api.snapshot()?.subjectId:undefined;
+ const [initial]=useState<DiscoveryInput>(()=>({title:'',functions:'',technologies:'',selected:['conversation','collaboration'],submittedQuery:null,openedRef:null,...discoveryMemory(projectQueryMemory(runtime,connected,'discovery'))}));
+ const draft=useGovernanceDraft(contactDraftRuntime(runtime),subjectId,connected,'discovery-input:v2',initial),input=useMemo(()=>({...initial,...draft.value}),[initial,draft.value]),inputRef=useRef(input);
+ useEffect(()=>{inputRef.current=input;},[input]);
+ const [items,setItems]=useState<VisibleOpportunity[]>([]),[next,setNext]=useState<string|null>(null),[detail,setDetail]=useState<OpportunityDetail|UnavailableOpportunityDetail|null>(null);
+ const [displayQuery,setDisplayQuery]=useState<DiscoveryQuery|null>(null);
+ const [busy,setBusy]=useState(false),[searching,setSearching]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState('');
+ const [filterChoice,setFilterChoice]=useState<boolean|null>(null),[searched,setSearched]=useState(false);
+ const query=useRef<DiscoveryQuery|null>(null),opened=useRef<VisibleOpportunity|null>(null),pages=useRef(1),historyPages=useRef(1),booted=useRef(false);
+ const life=useRef(0),searchSerial=useRef(0),detailSerial=useRef(0),background=useRef(false),dialog=useRef<HTMLDialogElement>(null);
+ const names=useMemberNames(runtime,subjectId??undefined,connected,[...items.map(item=>item.subjectId),detail?.opportunity?.subjectId]);
+ const person=(item:VisibleOpportunity)=>memberName(item.subjectId,subjectId??undefined,names[item.subjectId]??undefined);
+ const current=(token:number)=>token===life.current&&projectViewScope(runtime,connected)===scope;
+ function change(patch:Partial<DiscoveryInput>){const value={...inputRef.current,...patch};inputRef.current=value;draft.change(patch);projectQueryMemory(runtime,connected,'discovery',value);}
+ async function read<T>(path:string,value:unknown,token:number):Promise<T>{if(!current(token))throw Error('身份或连接已变化，请重新打开查找。');if(!runtime)throw Error('connection_required');const result:T=await runtime.api.call(path,value,{authenticated:connected});if(!current(token))throw Error('身份或连接已变化，请重新打开查找。');return result;}
+ useEffect(()=>{const lifeRef=life,searchRef=searchSerial,detailRef=detailSerial;lifeRef.current++;return()=>{lifeRef.current++;searchRef.current++;detailRef.current++;};},[]);
+ useEffect(()=>{if(detail||detailError)dialog.current?.showModal();else dialog.current?.close();},[detail,detailError]);
+ function closeDetail(){detailSerial.current++;opened.current=null;setDetail(null);setDetailError('');setBusy(false);change({openedRef:null});}
+ function hideSource(item:VisibleOpportunity){const locator=bodyFreeOpportunity(item);opened.current=locator;setItems(old=>old.map(row=>row.id===item.id?locator:row));setDetail({opportunity:locator,experience:{items:[]}});setDetailError('这份介绍或交流意愿已经变化，请重新查找。');}
+ async function inspect(item:VisibleOpportunity,count=1,quiet=false){
+  if(!query.current)return;const token=life.current,serial=++detailSerial.current,selectedQuery=query.current,same=opened.current?.id===item.id;opened.current=item;historyPages.current=count;
+  if(!quiet){setBusy(true);setDetailError('');if(!same)setDetail(null);change({openedRef:bodyFreeOpportunity(item)});}
+  try{
+   let value:OpportunityDetail|null=null,after:string|null=null;const rows:OpportunityDetail['experience']['items']=[];
+   for(let page=0;page<count;page++){value=await read<OpportunityDetail>('/v2/discovery/detail',{...selectedQuery,opportunityRef:item.opportunityRef,...(after?{experienceAfter:after}:{})},token);if(serial!==detailSerial.current)return;rows.push(...value.experience.items);after=value.experience.nextCursor??value.experience.nextAfter??null;if(!after)break;}
+   if(!value||!current(token)||serial!==detailSerial.current)return;value.experience.items=[...new Map(rows.map(row=>[row.key,row])).values()];opened.current=value.opportunity;setDetail(value);setDisplayQuery(selectedQuery);setDetailError('');
+  }catch(reason){if(current(token)&&serial===detailSerial.current){setDetail({opportunity:bodyFreeOpportunity(item),experience:{items:[]}});setDetailError(opportunityUnavailable(reason)?'这份介绍或交流意愿已经变化，请重新查找。':'暂时无法读取这份资料，已收起原内容。可以重试，联系草稿仍保留。');}}
+  finally{if(current(token)&&serial===detailSerial.current&&!quiet)setBusy(false);}
+ }
+ async function search(options:{after?:string;restore?:DiscoveryQuery;quiet?:boolean}={}){
+  if(!runtime||!draft.ready)return;let selectedQuery=options.restore??query.current;
+  if(!options.after&&!options.restore){const value=inputRef.current,result=discoveryQueryV2Schema.safeParse({context:{kind:'ephemeral',title:value.title.trim(),functions:tags(value.functions||value.title),technologies:tags(value.technologies)},purposes:value.selected});if(!result.success){setError('请填写简短的交流方向，并至少选择一种交流方式。多个方向可用逗号分开。');return;}selectedQuery={context:result.data.context,purposes:result.data.purposes};pages.current=1;}
+  if(!selectedQuery)return;const token=life.current,serial=++searchSerial.current;query.current=selectedQuery;
+  if(!options.quiet){setSearching(true);setError('');if(!options.after){detailSerial.current++;opened.current=null;setDetail(null);setDetailError('');setBusy(false);change({submittedQuery:selectedQuery,openedRef:null});}}
+  try{let after=options.after??null;const rows:Opportunity[]=[],count=options.after?1:pages.current;for(let page=0;page<count;page++){const value=await read<DiscoveryPage>('/v2/discovery/query',{...selectedQuery,limit:20,...(after?{after}:{})},token);if(serial!==searchSerial.current)return;rows.push(...value.items);after=value.nextAfter??null;if(!after)break;}if(!current(token)||serial!==searchSerial.current)return;setItems(old=>[...new Map((options.after?[...old,...rows]:rows).map(item=>[item.id,item])).values()]);if(options.after)pages.current++;setNext(after);setSearched(true);setError('');return serial;}
+  catch(reason){if(current(token)&&serial===searchSerial.current){setError(errorMessage(reason));setItems([]);setNext(null);}}
+  finally{if(current(token)&&serial===searchSerial.current&&!options.quiet)setSearching(false);}
+ }
+ const reload=useEffectEvent(async()=>{if(background.current||searching||busy||document.hidden||!query.current)return;background.current=true;try{await search({restore:query.current,quiet:true});if(opened.current)await inspect(opened.current,historyPages.current,true);}finally{background.current=false;}});
+ const restoreSources=useEffectEvent(()=>{
+  if(!draft.ready||booted.current)return;booted.current=true;if(!input.submittedQuery)return;
+  const selectedQuery=input.submittedQuery,restore=input.openedRef,token=life.current,serial=++searchSerial.current,selectionSerial=detailSerial.current;query.current=selectedQuery;
+  // Start with the real original query; publish its current projection only
+  // after the service read, without a synchronous restoration render.
+  void read<DiscoveryPage>('/v2/discovery/query',{...selectedQuery,limit:20},token).then(value=>{
+   if(!current(token)||serial!==searchSerial.current)return;
+   setItems(value.items);setNext(value.nextAfter);setSearched(true);setError('');
+   if(restore&&selectionSerial===detailSerial.current)void inspect(restore,1,true);
+  }).catch(reason=>{if(current(token)&&serial===searchSerial.current){setError(errorMessage(reason));setItems([]);setNext(null);}});
+ });
+ useEffect(()=>{restoreSources();},[draft.ready]);
+ useEffect(()=>{const refresh=()=>void reload(),timer=window.setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[]);
+ const filters=filterChoice??!!(input.functions||input.technologies);
+ const filterCount=(input.functions?1:0)+(input.technologies?1:0),go=(path:string)=>{detailSerial.current++;navigate(path);};
+ return <section className="discovery-page">
+  <header className="discovery-heading"><h1>寻找同行</h1><p>从你关心的方向，找到可以交流的人和项目。</p></header>
+  <form className="discovery-search" onSubmit={event=>{event.preventDefault();void search();}}>
+   <label htmlFor="discovery-topic">想找什么方向</label><div className="discovery-query-row"><Input id="discovery-topic" required maxLength={80} disabled={!draft.ready} value={input.title} onChange={event=>change({title:event.target.value})} placeholder="例如：阅读体验、网页协作"/><Button type="submit" disabled={!runtime||!draft.ready||searching}>{searching?'正在查找…':<><Search size={17}/>查找</>}</Button></div>
+   <button type="button" className="discovery-filter-toggle" aria-expanded={filters} onClick={()=>setFilterChoice(!filters)}><SlidersHorizontal size={15}/>交流方式与筛选{filterCount?' · '+filterCount+' 项限定':''}</button>
+   {filters&&<div className="discovery-filters"><fieldset><legend>希望怎样交流</legend>{purposes.map(([id,title])=><label key={id}><input type="checkbox" checked={input.selected.includes(id)} onChange={event=>change({selected:event.target.checked?[...input.selected,id]:input.selected.filter(value=>value!==id)})}/>{title}</label>)}</fieldset><label htmlFor="discovery-functions">限定方向（可选）<Input id="discovery-functions" value={input.functions} onChange={event=>change({functions:event.target.value})} placeholder="留空时按上面的方向查找"/></label><label htmlFor="discovery-technologies">技术或环境（可选）<Input id="discovery-technologies" value={input.technologies} onChange={event=>change({technologies:event.target.value})} placeholder="例如：React、PostgreSQL"/></label></div>}
+   {draft.status&&!['正在保存…','草稿已保存在本机。','已恢复本机草稿。'].includes(draft.status)&&<output>{draft.status}</output>}
+  </form>
+  {error&&<p className="message error" role="alert">{error}</p>}
+  <div className="discovery-results" aria-busy={searching}>{items.map(item=><article key={item.id} className="discovery-result">{item.sourceUnavailable?<p>这项介绍当前无法读取。</p>:<><div className="person-line"><MemberAvatar subjectId={item.subjectId}/><span>{person(item)}</span></div><h2><button type="button" disabled={busy} onClick={()=>void inspect(item)}>{item.project.title}</button></h2><p className="reading-prose">{item.help.statement}</p><p className="discovery-directions">{item.help.functions.join(' · ')}</p><button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(item)}>了解与联系 <ArrowRight size={15}/></button></>}</article>)}</div>
+  {searched&&!items.length&&!error&&<p className="empty-state">暂时没有找到相关的人或项目，试试更简短的方向词。</p>}{next&&<Button type="button" variant="outline" disabled={searching} onClick={()=>void search({after:next})}>更多结果</Button>}
+  <footer className="discovery-other"><a href={'/app/search?q='+encodeURIComponent(input.title)} onClick={event=>{event.preventDefault();go('/app/search?q='+encodeURIComponent(input.title));}}>查找方法与工具 <ArrowRight size={14}/></a><a href="/app/projects" onClick={event=>{event.preventDefault();go('/app/projects');}}>我的项目与联系 <ArrowRight size={14}/></a></footer>
+  <dialog ref={dialog} className="galaxy-dialog discovery-reading" aria-labelledby="discovery-detail-title" onCancel={event=>{if(event.target===event.currentTarget){event.preventDefault();closeDetail();}}}>
+   <header className="dialog-heading"><span>了解与联系</span><button type="button" className="icon-button" aria-label="关闭项目介绍" onClick={closeDetail}><X size={20}/></button></header>
+   {detailError&&<output className="message">{detailError}<button type="button" className="text-link" disabled={busy} onClick={()=>opened.current&&void inspect(opened.current,historyPages.current)}>重试</button></output>}
+   {detail&&detail.experience&&!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberAvatar subjectId={detail.opportunity.subjectId}/><span>{person(detail.opportunity)}</span></div><h2 id="discovery-detail-title">{detail.opportunity.project.title}</h2><p className="discovery-intro reading-prose">{detail.opportunity.project.summary}</p>{detail.opportunity.help.statement!==detail.opportunity.project.summary&&<p className="reading-prose">{detail.opportunity.help.statement}</p>}
+    <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><details key={item.key}><summary>{item.title??'这项工作'}</summary><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></details>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
+   </>}
+   {detail&&<OpportunityContactWorkspace runtime={runtime} connected={connected} subjectId={subjectId} query={displayQuery} opportunity={detail.opportunity} navigate={go} onSourceUnavailable={()=>hideSource(detail.opportunity)} onNeedIdentity={()=>go('/app/settings/identity')}/>}
+  </dialog>
+ </section>;
 }

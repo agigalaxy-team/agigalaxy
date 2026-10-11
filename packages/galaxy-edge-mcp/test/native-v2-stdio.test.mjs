@@ -1,3 +1,4 @@
+import {nativeData} from './native-result.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
@@ -25,12 +26,17 @@ for(const mode of ['2025-11-25','2026-07-28','browser-fallback'])test('real inde
   const request=(method,params)=>new Promise((resolve,reject)=>{const id=++sequence;pending.set(id,{resolve,timeout:setTimeout(()=>reject(new Error('stdio timeout: '+stderr)),8000)});write({jsonrpc:'2.0',id,method,params:{...params,...(modern?{_meta:meta}:{})}});});
   if(!modern){const initialized=await request('initialize',{protocolVersion:protocol,capabilities,clientInfo:{name:'synthetic-user-host',version:'1'}});
    assert.equal(initialized.result.serverInfo.name,'galaxy-native-v2');write({jsonrpc:'2.0',method:'notifications/initialized'});}
-  const tools=await request('tools/list',{});for(const name of ['galaxy_task_v2_create','galaxy_context_v2_grant','galaxy_watch_stop','galaxy_summary_local_save','galaxy_device_accept','galaxy_chat_agent_grant','galaxy_help_return'])assert.ok(tools.result.tools.some(t=>t.name===name));
-  assert.equal(tools.result.tools.filter(t=>t.name.startsWith('galaxy_a2a_')).length,mode==='browser-fallback'?5:0);
+  const tools=await request('tools/list',{});for(const name of ['galaxy_task_v2_create','galaxy_context_v2_grant','galaxy_watch_stop','galaxy_summary_local_save','galaxy_device_accept','galaxy_chat_agent_grant','galaxy_help_return',
+   'galaxy_help_prepare_action','galaxy_help_execute_action','galaxy_summary_sync_reconcile','galaxy_summary_binding_refresh','galaxy_summary_sync_pull','galaxy_summary_sync_resolve','galaxy_summary_cloud_delete','galaxy_personal_summary_receipt'])assert.ok(tools.result.tools.some(t=>t.name===name),name);
+  const a2aTools=new Set(tools.result.tools.filter(t=>t.name.startsWith('galaxy_a2a_')).map(t=>t.name));
+  assert.deepEqual(a2aTools,new Set(mode==='browser-fallback'?[
+   'galaxy_a2a_abort_local','galaxy_a2a_execute','galaxy_a2a_peers','galaxy_a2a_prepare','galaxy_a2a_read',
+   'galaxy_a2a_work_abort_local','galaxy_a2a_work_execute','galaxy_a2a_work_prepare','galaxy_a2a_work_read',
+  ]:[]));
   for(const name of ['galaxy_configuration_v2_read','galaxy_attachment_read'])assert.ok(tools.result.tools.some(t=>t.name===name),name);
   if(mode==='browser-fallback'){
    const listed=await request('tools/call',{name:'galaxy_a2a_peers',arguments:{}});
-   const peers=JSON.parse(listed.result.content[0].text);assert.equal(peers[0].id,'synthetic-peer');
+   const peers=nativeData(listed.result);assert.equal((peers.items??peers)[0].id,'synthetic-peer');
    assert.ok(!JSON.stringify(peers).includes('authentication'));assert.ok(!JSON.stringify(peers).includes('credential'));
   }
   const call=async(name,args={})=>{let reply=await request('tools/call',{name,arguments:args});assert.ok(!reply.error,JSON.stringify(reply.error));
@@ -39,12 +45,12 @@ for(const mode of ['2025-11-25','2026-07-28','browser-fallback'])test('real inde
     assert.ok(changed.error||changed.result?.isError,'changed payload cannot consume original choice');
     reply=await request('tools/call',{name,arguments:args,
     requestState:reply.result.requestState,inputResponses:{choice:{action:accepted?'accept':'decline',...(accepted?{content:{confirm:true}}:{})}}});assert.ok(!reply.error,JSON.stringify(reply.error));}
-   let result=JSON.parse(reply.result.content[0].text);
+   let result=nativeData(reply.result);
    if(result.state==='user-choice-needs-browser'){
-    elicited++;reviewUrl=result.url;const page=await fetch(reviewUrl);assert.equal(page.status,200);const html=await page.text();assert.ok(html.includes('银河 · 本机操作审阅'));assert.ok(!html.includes('PRIVATE KEY'));
+    elicited++;reviewUrl=result.url;const page=await fetch(reviewUrl);assert.equal(page.status,200);const html=await page.text();assert.ok(html.includes('当前宿主的本机选择'));assert.ok(!html.includes('<pre>'));assert.ok(!html.includes('PRIVATE KEY'));
     const blocked=await fetch(reviewUrl,{method:'POST',headers:{origin:'https://foreign.example','content-type':'application/x-www-form-urlencoded'},body:'action=allow'});assert.equal(blocked.status,403);
     const choice=await fetch(reviewUrl,{method:'POST',headers:{origin:new URL(reviewUrl).origin,'content-type':'application/x-www-form-urlencoded'},body:'action='+(accepted?'allow':'decline')});assert.equal(choice.status,200);
-    reply=await request('tools/call',{name,arguments:args});result=JSON.parse(reply.result.content[0].text);
+    reply=await request('tools/call',{name,arguments:args});result=nativeData(reply.result);
    }
    return result;};
   const before=await call('galaxy_native_status');assert.equal(before.connected,false);await assert.rejects(stat(dataDirectory),{code:'ENOENT'});

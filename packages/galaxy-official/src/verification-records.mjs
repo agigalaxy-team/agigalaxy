@@ -1,4 +1,5 @@
-import {verificationEventSchema,evidenceStatusQuerySchema,evidenceVersionRef} from './shared/verification-record-schema.mjs';
+import {verificationEventSchema,evidenceStatusQuerySchema,evidenceVersionRef,
+  verificationOperationReceiptQuerySchema,verificationOperationReceiptResultSchema} from './shared/verification-record-schema.mjs';
 import {verificationRecordRepository} from './infrastructure/verification-record-repository.mjs';
 import {caseRepository} from './infrastructure/case-repository.mjs';
 import {projectCaseFacts,latestFact,publicFactView} from './domain/intervention.mjs';
@@ -77,12 +78,28 @@ export class VerificationRecordService {
       rule(object&&object.subject_id===actor.subjectId&&object.case_id===data.caseId&&object.object_type===type,'record_not_found',404);
       const duplicate=await repo.operation(data.operationId);
       if(duplicate){rule(duplicate.object_id===data.id&&duplicate.payload_hash===hash&&duplicate.consent_id===request.consentId,'record_conflict');
-        return this.receipt(object,duplicate);}
+        const receipt=this.receiptView(object,duplicate);
+        if(duplicate.payload.kind==='verification'){
+          const current=await this.readWithin(db,actor,{type,id:data.id,version:duplicate.version});
+          // Ordinary replay still requires current sources. It is not a minimal
+          // historical receipt endpoint and cannot restore revoked access.
+          rule(current.record!==null,current.reason??'evidence_reference_unavailable');
+          receipt.synthetic=current.synthetic;
+        }
+        return receipt;}
       rule(object.version===data.expectedVersion,'record_version_changed');
       rule(object.state==='active','record_revoked');
       if(object.version>0)rule(data.reason,'correction_reason_required',422);
       const previous=object.version?await repo.event(data.id,object.version):null;
       if(previous?.context.synthetic)rule(data.synthetic,'synthetic_mismatch',422);
+      if(previous?.payload.kind==='verification'&&data.kind==='verification'&&!data.synthetic){
+        const prior=await this.readWithin(db,actor,{type,id:data.id,version:previous.version});
+        // A false stored legacy projection does not prove a non-synthetic
+        // history. With unavailable sources no downgrade can be established;
+        // an explicit true correction can still replace those old sources.
+        rule(prior.record!==null,prior.reason??'evidence_reference_unavailable');
+        rule(prior.synthetic!==true,'synthetic_mismatch',422);
+      }
       if(previous&&data.kind!=='revoke'){
         rule((previous.payload.taskId??null)===(data.taskId??null)&&(previous.payload.participationId??null)===(data.participationId??null),
           'record_context_changed');
@@ -108,8 +125,13 @@ export class VerificationRecordService {
         rule(feedback?['accepted','partially-accepted','rejected','comment','inconclusive'].includes(data.observation)
           :['passed','failed','inconclusive'].includes(data.observation),'observation_method_mismatch',422);
         if(!feedback)rule(data.evidenceRefs.length>0,'supporting_evidence_required',422);
-        for(const ref of data.evidenceRefs)await this.requireReferenceWithin(db,actor,{kind:'evidence',...ref},{caseId:data.caseId});
-        derived={...derived,sourceStrength:feedback?'participant-feedback':data.method==='local-test'||data.method.endsWith('-test')
+        let sourceSynthetic=fact.synthetic===true;
+        for(const ref of data.evidenceRefs){
+          const source=await this.requireReferenceWithin(db,actor,{kind:'evidence',...ref},{caseId:data.caseId});
+          sourceSynthetic ||= source.synthetic===true;
+        }
+        derived={...derived,synthetic:derived.synthetic||sourceSynthetic,
+          sourceStrength:feedback?'participant-feedback':data.method==='local-test'||data.method.endsWith('-test')
           ?'user-side-test-report':'user-side-scoped-report',
           recordedRelationship:fact.actorId===actor.subjectId?'self':requesterId===actor.subjectId?'requester':'task-participant',
           declaredRelationship:data.relationship,relationshipIndependentlyVerified:false,targetAuthor:fact.actorId,
@@ -117,12 +139,12 @@ export class VerificationRecordService {
       }
       await repo.append(data,request.consentId,request.payloadJson,hash,derived);
       await repo.dependencies(data);await repo.audit(actor,data,request.consentId,authorization);
-      return this.receipt({...object,version:data.expectedVersion+1,state:data.kind==='revoke'?'revoked':'active'},
+      return this.receiptView({...object,version:data.expectedVersion+1,state:data.kind==='revoke'?'revoked':'active'},
         {version:data.expectedVersion+1,payload:data,context:derived});
     });
   }
 
-  receipt(object,event){return {id:object.id,type:object.object_type,version:event.version,operationId:event.payload.operationId,
+  receiptView(object,event){return {id:object.id,type:object.object_type,version:event.version,operationId:event.payload.operationId,
     state:event.payload.kind==='revoke'?'revoked':'recorded',currentVersion:object.version,currentState:object.state,
     sourceStrength:event.context.sourceStrength??null,independentExecutionVerified:false,capabilityVerified:false,
     taskOutcomeVerified:false,synthetic:event.context.synthetic};}
@@ -158,15 +180,25 @@ export class VerificationRecordService {
     rule(!event.payload.expiresAt||Date.parse(event.payload.expiresAt)>this.now()*1000,'evidence_expired');
     const key=`${kind}:${ref.id}:${version}`;rule(!visited.has(key),'circular_evidence_reference',422);visited.add(key);
     try{
+      let sourceSynthetic=context.facts.synthetic===true;
       if(kind==='verification'){
-        await this.targetWithin(db,actor,event.payload.target,{caseId:object.case_id,scopeVersion:scopeVersion??event.payload.scopeVersion,latest:true,visited});
-        for(const evidence of event.payload.evidenceRefs)await this.requireReferenceWithin(db,actor,{kind:'evidence',...evidence},{caseId:object.case_id,visited});
+        const target=await this.targetWithin(db,actor,event.payload.target,{caseId:object.case_id,scopeVersion:scopeVersion??event.payload.scopeVersion,latest:true,visited});
+        sourceSynthetic ||= target.fact.synthetic===true;
+        for(const evidence of event.payload.evidenceRefs){
+          const source=await this.requireReferenceWithin(db,actor,{kind:'evidence',...evidence},{caseId:object.case_id,visited});
+          sourceSynthetic ||= source.synthetic===true;
+        }
       }
-      return this.view(object,event);
+      return this.view(object,event,sourceSynthetic);
     }finally{visited.delete(key);}
   }
 
-  view(object,event){return {...this.receipt(object,event),record:publicFactView(event.payload),provenance:event.context,
+  view(object,event,sourceSynthetic=false){
+    // The signed payload remains the subject's declaration. Effective source
+    // provenance is rebuilt under current permission, including legacy rows
+    // whose stored projection did not propagate an Evidence marker.
+    const context={...event.context,synthetic:event.context.synthetic===true||event.payload.synthetic===true||sourceSynthetic};
+    return {...this.receiptView(object,{...event,context}),record:publicFactView(event.payload),provenance:context,
     integrity:'payload-hash-matches-storage',authorization:'current',externalOwnershipVerified:false,
     availability:{record:'available',upstream:'not-checked',upstreamRevocation:'unknown'},revocation:object.state==='revoked'?'revoked':'not-revoked'};}
 
@@ -181,7 +213,7 @@ export class VerificationRecordService {
     rule(context.parent.state!=='withdrawn','case_unavailable');
     // Historical reports remain accessible under their own live consent. Their
     // status is not upgraded to the current version or source state.
-    const view=this.view(object,event);
+    const view=this.view(object,event,context.facts.synthetic===true);
     if(object.state==='revoked'&&actor.subjectId!==object.subject_id)return {id,type,version:selected,currentVersion:object.version,
       referenceStatus:'revoked',record:null,capabilityVerified:false,taskOutcomeVerified:false};
     view.current=object.state==='active'&&object.version===selected;
@@ -190,7 +222,13 @@ export class VerificationRecordService {
     if(type==='verification'&&event.payload.kind!=='revoke'){
       try{
         const target=await this.targetWithin(db,actor,event.payload.target,{caseId:object.case_id,scopeVersion:event.payload.scopeVersion});
-        for(const evidence of event.payload.evidenceRefs)await this.requireReferenceWithin(db,actor,{kind:'evidence',...evidence},{caseId:object.case_id});
+        let sourceSynthetic=target.fact.synthetic===true;
+        for(const evidence of event.payload.evidenceRefs){
+          const source=await this.requireReferenceWithin(db,actor,{kind:'evidence',...evidence},{caseId:object.case_id});
+          sourceSynthetic ||= source.synthetic===true;
+        }
+        view.synthetic ||= sourceSynthetic;
+        view.provenance.synthetic=view.synthetic;
         view.targetCurrentVersion=target.currentVersion;
         if(target.currentVersion!==event.payload.target.version){view.referenceStatus='target-version-changed';view.current=false;}
       }catch(error){if(!(error instanceof ServiceError))throw error;
@@ -205,6 +243,25 @@ export class VerificationRecordService {
   async get(actor,ref){
     try{evidenceStatusQuerySchema.parse({refs:[ref]});}catch{throw new ServiceError('invalid_record_reference');}
     return this.access.runAuthorized(actor,'evidence',db=>this.readWithin(db,actor,ref));
+  }
+  async receipt(actor,input){
+    let query;try{query=verificationOperationReceiptQuerySchema.parse(input);}catch{throw new ServiceError('invalid_verification_receipt_query');}
+    return this.access.runAuthorized(actor,'evidence',async db=>{
+      // Do not load payload, old Consent, Case or dependencies. The owner was
+      // established at the original accepted write. Historical acceptance is
+      // not current material permission, verification validity or resolution.
+      const row=(await db.query(`SELECT e.operation_id,e.object_id,e.version,e.payload_hash,e.created_at,o.object_type
+        FROM verification_events e JOIN verification_objects o ON o.id=e.object_id
+        WHERE e.operation_id=$1 AND o.subject_id=$2`,[query.operationId,actor.subjectId])).rows[0];
+      const state=!row?'absent':row.object_id!==query.id||row.object_type!==query.type||row.payload_hash!==query.payloadHash
+        ?'conflict':'acknowledged';
+      const result={...query,state,authority:'accepted-operation-only',audience:'owner-only',
+        currentAccessGranted:false,contentReturned:false,sourceAccessChecked:false};
+      if(state==='acknowledged')result.receipt={...query,version:row.version,acceptedAt:new Date(row.created_at).toISOString()};
+      else if(state==='absent')result.absenceMeaning='no-retained-owner-operation';
+      else result.reason='original-operation-mismatch';
+      return verificationOperationReceiptResultSchema.parse(result);
+    });
   }
   async status(actor,request){
     let query;try{query=evidenceStatusQuerySchema.parse(request);}catch{throw new ServiceError('invalid_evidence_status_query');}

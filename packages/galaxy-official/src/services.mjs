@@ -1,3 +1,5 @@
+import { CommunityForumV1 } from './community-forum-v1.mjs';
+import { CommunityForumGovernanceV1 } from './community-forum-governance-v1.mjs';
 import { BuilderService } from './builders.mjs';
 import { BuilderSupportV2Service } from './builder-support-v2.mjs';
 import { WorkerPackUseServiceV2 } from './worker-pack-uses-v2.mjs';
@@ -28,6 +30,7 @@ import { SearchV2Service } from './search-v2.mjs';
 import {InformationServiceV2} from './information-v2.mjs';
 import {InformationWatchServiceV2} from './information-watches-v2.mjs';
 import { ChoiceSnapshotServiceV2 } from './choice-snapshots-v2.mjs';
+import { createReceiptStatusService } from './receipt-status.mjs';
 import { ChoiceSourceReaderV2 } from './choice-source-reader-v2.mjs';
 import { SearchIndex } from './search-index.mjs';
 import { ProfileService } from './profile.mjs';
@@ -51,6 +54,7 @@ import { ServiceError } from './shared/service-error.mjs';
 import {WatchControlV2Service} from './watch-control-v2.mjs';
 import { OutcomeMaterialServiceV2 } from './outcome-material-v2.mjs';
 import { NotificationInboxService } from './notification-inbox.mjs';
+import { ModerationNotificationAdapter } from './moderation-notifications.mjs';
 import { PersonalSummaryService, createSummarySourceReader } from './personal-summaries.mjs';
 import { ProjectV2Service } from './projects-v2.mjs';
 import { ContactV2Service } from './contacts-v2.mjs';
@@ -63,6 +67,8 @@ import { ChatSharedSummaryService } from './chat-shared-summaries.mjs';
 import { RecruitmentV2Service } from './recruitment-v2.mjs';
 import { CiObservationV2Service } from './ci-observation-v2.mjs';
 import { TaskCommentServiceV2 } from './task-comments-v2.mjs';
+import { TaskOwnerReadServiceV2 } from './task-owner-read-v2.mjs';
+import { TaskOwnerControlServiceV2 } from './task-owner-control-v2.mjs';
 import { CommentGovernanceServiceV2 } from './comment-governance-v2.mjs';
 import { TargetGovernanceServiceV2 } from './target-governance-v2.mjs';
 import { ConfigurationServiceV2 } from './configurations-v2.mjs';
@@ -74,7 +80,7 @@ import {postHubPeeringJson} from './public-fetch.mjs';
 import { verifyEnvelope } from './signed-envelope.mjs';
 
 export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
-  now = () => Math.floor(Date.now() / 1000), operator, region, manifestProfile = {}, resourceBudgetPolicy, communityPolicy, incident=null, identityProviders = [], chatTransport = null, attachmentConfiguration=null, experienceReviewers = [],
+  now = () => Math.floor(Date.now() / 1000), operator, region, manifestProfile = {}, resourceBudgetPolicy, communityPolicy, forumPolicy, incident=null, identityProviders = [], chatTransport = null, attachmentConfiguration=null, experienceReviewers = [],
   allowedScopes = ['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'history', 'assistance', 'context', 'notifications', 'moderation', 'capsules', 'builders', 'audit', 'audit-review', 'data-export', 'data-delete'],
   capabilities = ['binding', 'sessions', 'docs-mcp'], auditReaderIds = [], auditReviewerIds = [], qualificationPolicies = [], moderatorIds = [], honorRules = [], builderAssessorIds = [], conformanceSuitePins = [], consentPolicy, repositories = {}, evidenceSource = githubEvidenceSource, retirement = createRetirementController(null, { endpoint, now }) }) {
   const signing = { endpoint, signingKey, kid, trustedKeys, now };
@@ -90,25 +96,29 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const consents = new ConsentService(access, { additionalPolicy: consentPolicy });
   const communityAccounts = new CommunityAccountRegistry(access, identityProviders);
   const publicWrites = new PublicWriteService(access, communityAccounts, communityPolicy);
+  const forum = new CommunityForumV1(access,consents,{accounts:communityAccounts,publicWrites,policy:forumPolicy});
+  const forumGovernance = new CommunityForumGovernanceV1(access,consents,forum,{accounts:communityAccounts,moderatorIds});
   const profiles=new ProfileService(access,consents);
   const evidence = new EvidenceService(access, consents, { source: evidenceSource, lockEvidenceWrite: repositories.lockEvidenceWrite });
   const proofs = new ProofService(access, consents, evidence, { sign: proofSigner.sign, lockEvidenceRead: repositories.lockEvidenceRead });
   const capsules = new CapsuleService(access, consents, proofs);
   const cases = new CaseService(access, consents); cases.capsules = capsules;
   const assistance = new AssistanceService(access, consents);
+  const taskOwnerRead = new TaskOwnerReadServiceV2(access, consents);
+  const taskOwnerControl = new TaskOwnerControlServiceV2(access, consents, {tasks:assistance,ownerRead:taskOwnerRead});
   assistance.publicWrites = publicWrites;
   assistance.communityAccounts = communityAccounts;
   cases.tasks = assistance;
   assistance.cases = cases;
   assistance.facts = cases;
   const verificationRecords = new VerificationRecordService(access, consents, { cases, tasks: assistance, proofs });
-  const trustPackages = new TrustPackagePermissionService(access,{cases,verificationRecords});
   evidence.records = verificationRecords;
   const configurations = new ConfigurationServiceV2(access, consents);
   cases.configurations = configurations;
   cases.verifications = verificationRecords;
   const ciV2 = new CiObservationV2Service(access, consents, { records: verificationRecords, sign: proofSigner.sign, verifyEnvelope, source: evidenceSource });
   verificationRecords.ciV2 = ciV2;
+  const trustPackages = new TrustPackagePermissionService(access,{cases,verificationRecords,ciV2});
   const qualification = new QualificationService(access, proofs, assistance, qualificationPolicies);
   const experienceReviews = new ExperienceReviewService(access, consents, { reviewers: experienceReviewers,
     resolveControllerWithin: async (tx, subjectId) => {
@@ -160,7 +170,8 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   capsules.v2 = new CapsuleServiceV2(capsules, { cases, verificationRecords, configurations, outcomeMaterials,
     readSelectedWithin: (tx, actor, ref) => chat.readSelectedWithin(tx, actor, ref) });
   const discovery = new DiscoveryService(access, profiles, notifications);
-  const inbox = new NotificationInboxService({ access, notifications, chat, tasks: assistance });
+  const inbox = new NotificationInboxService({ access, notifications, chat, tasks: assistance,
+    moderationNotifications: new ModerationNotificationAdapter(moderation) });
   const qualificationRequests=new QualificationRequestServiceV2(access,consents,{qualification:qualification.v2,calculations:qualificationCalculations,tasks:assistance,inbox});
   inbox.qualificationRequests=qualificationRequests;
   const comments = new TaskCommentServiceV2(access, consents, assistance, { accounts: communityAccounts, publicWrites, inbox });
@@ -178,14 +189,15 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   discovery.v2.recruitment = recruitment;
   search.v2 = new SearchV2Service(access, { history: history.v2, capsules: capsules.v2, ciV2, assistance, discovery: discovery.v2, legacy: search });
   const choices = new ChoiceSnapshotServiceV2(access,{sourceReader:new ChoiceSourceReaderV2(search.v2)});
+  const receiptStatus = createReceiptStatusService({db,endpoint,signingKey,kid,trustedKeys,now,retirement,choiceSnapshots:choices});
   const information=new InformationServiceV2(access,{search:search.v2,honor:honor.v2});
   const informationWatches=new InformationWatchServiceV2(access,{information,retirement});
   inbox.informationWatches=informationWatches;
   const contacts = new ContactV2Service(access, { consents, discovery: discovery.v2, inbox, publicWrites,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor), createRoomWithin: createChatContactAdapter(chat) });
-  return { targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
+  return { forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
     identity: new IdentityLinkService(access, identityProviders, { accountRegistry: communityAccounts }), communityAccounts, publicWrites, verificationRecords, chat,
-    watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
-    proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),
+    receiptStatus,watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
+    proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { forum,forumGovernance, choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),
     manifest: new ManifestService({ ...manifestProfile, endpoint, kid, now, signer: manifestSigner, operator, region, capabilities }) };
 }

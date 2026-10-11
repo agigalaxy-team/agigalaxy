@@ -6,7 +6,7 @@ import {NotificationService} from '../src/notifications.mjs';
 import {NotificationInboxService} from '../src/notification-inbox.mjs';
 import {subjectResourceUsage,defaultResourceBudgetPolicy} from '../src/infrastructure/resource-budgets.mjs';
 export async function summaryFixture(options={}){
- const transport={available:true,project:async()=>{},send:async x=>({archiveId:x.messageId}),erase:async()=>({deleted:true})};
+ const transport={available:true,project:async()=>{},send:async x=>({archiveId:x.messageId}),erase:async()=>({archiveDeleted:true})};
  const f=await chatFixture({...options,transport,scopes:['binding','notifications']}),{chat,people:[a,b]}=f;
  const roomId=randomUUID();await chat.create(a,{roomId,operationId:randomUUID(),title:'Personal ordinary discussion'});await invite(chat,a,roomId,b);
  const message=await chat.send(a,roomId,{clientMessageId:randomUUID(),text:'Compare two valid approaches'});

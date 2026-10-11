@@ -1,0 +1,52 @@
+.identity-settings-page{min-width:0}
+.identity-settings-page>.back-link{margin-bottom:16px}
+.identity-recovery-flow{max-width:680px}
+.galaxy-site .identity-recovery-flow>h1{margin-bottom:18px}
+.identity-recovery-step{max-width:640px;margin:20px 0 30px;min-width:0;scroll-margin-top:100px}
+.galaxy-site .identity-recovery-step>p,.galaxy-site .identity-recovery-step .workspace-form>p{margin:0;font-size:14px;line-height:1.8}
+.galaxy-site .identity-recovery-step .workspace-form{max-width:none;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;gap:18px}
+.galaxy-site .identity-recovery-step .workspace-form>label{display:grid;gap:8px;margin:0;font-size:14px}
+.identity-recovery-step input{min-height:44px}
+.identity-recovery-step .recovery-visibility{margin-top:-10px;font-size:12px;min-height:30px;color:var(--g-accent)}
+.galaxy-site .identity-recovery-step .recovery-boundary{font-size:12px;color:var(--g-muted);line-height:1.8;margin:0}
+.galaxy-site .identity-recovery-step .button-row{margin:0;gap:10px;flex-wrap:wrap}
+.identity-recovery-step .button-row>button,.recovery-save-actions>button{min-height:42px}
+.recovery-save-panel{display:grid;gap:16px}
+.protected-recovery-code{padding:16px 18px;border:1px solid var(--g-line);border-radius:10px;background:var(--g-soft);min-width:0}
+.protected-recovery-code>div{display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:13px;color:var(--g-muted)}
+.protected-recovery-code .text-link{min-height:32px;font-size:12px;color:var(--g-accent)}
+.recovery-mask{display:block;padding:7px 0 5px;letter-spacing:.12em;font-size:18px;color:var(--g-muted);user-select:none}
+.galaxy-site .protected-recovery-code .recovery-code{display:block;width:100%;max-width:100%;min-height:106px;margin:8px 0 0;padding:12px;border:1px solid var(--g-line);border-radius:7px;background:white;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.8;overflow-wrap:anywhere;resize:vertical}
+.galaxy-site .identity-recovery-step .recovery-note{font-size:12px;line-height:1.7;color:var(--g-muted);margin:0}
+.recovery-save-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px}
+.identity-current-panel{padding:14px 0 22px;border-bottom:1px solid var(--g-line)}
+.galaxy-site .identity-current-panel>h2,.galaxy-site .identity-recovery-setting h2{margin:0 0 8px;font-size:17px}
+.galaxy-site .identity-current-panel>p,.galaxy-site .identity-recovery-setting p{margin:0;font-size:13px;line-height:1.8;color:var(--g-muted)}
+.galaxy-site .identity-current-panel>.button-row{margin:16px 0 12px}
+.identity-reference{margin:12px 0 0;font-size:12px;color:var(--g-muted)}
+.identity-reference>summary{padding:6px 0;cursor:pointer}
+.identity-reference .identity-id{display:block;margin:8px 0;font-size:12px;overflow-wrap:anywhere}
+.galaxy-site .identity-reference>p{font-size:12px;overflow-wrap:anywhere;margin:8px 0}
+.identity-recovery-setting{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;align-items:center;padding:22px 0;border-bottom:1px solid var(--g-line)}
+.identity-recovery-setting>button{min-height:40px}
+.identity-recovery-setting>.recovery-existing-link{grid-column:1/-1;justify-self:start;font-size:12px;color:var(--g-accent);min-height:32px}
+.identity-settings-page .identity-choice-grid{margin:22px 0}
+.identity-settings-page .identity-continuity{max-width:640px;margin:18px 0;min-width:0}
+.identity-continuity-item{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin:12px 0}
+.galaxy-site .identity-continuity-item>p{margin:0;font-size:13px;line-height:1.7;color:var(--g-muted)}
+.identity-continuity-details{margin:10px 0;font-size:12px;color:var(--g-muted)}
+.identity-continuity-details>summary{padding:5px 0;cursor:pointer}
+.identity-continuity-details>div{padding:8px 0}
+.galaxy-site .identity-continuity-details p{margin:0 0 5px;font-size:12px}
+.identity-continuity-details code{font-size:11px;overflow-wrap:anywhere}
+@media(max-width:680px){
+ .identity-recovery-step{margin:16px 0 25px;scroll-margin-top:84px}
+ .galaxy-site .identity-recovery-step .workspace-form{gap:16px}
+ .identity-recovery-step .recovery-visibility{min-height:36px;margin-top:-12px}
+ .protected-recovery-code{padding:13px 15px}
+ .protected-recovery-code .text-link{min-height:36px}
+ .identity-recovery-step .button-row>button,.recovery-save-actions>button{min-height:44px;max-width:100%;white-space:normal}
+ .identity-recovery-setting{grid-template-columns:minmax(0,1fr);gap:10px;padding:20px 0}
+ .identity-recovery-setting>button{justify-self:start}
+ .identity-current-panel .button-row{gap:10px;flex-wrap:wrap}
+}

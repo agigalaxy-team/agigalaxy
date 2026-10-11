@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { moderationReportSchema,moderationEventSchema,moderatorIdsSchema } from './shared/moderation-schema.mjs';
+import { moderationReportSchema,moderationEventSchema,moderatorIdsSchema,moderationReceiptSchema } from './shared/moderation-schema.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
@@ -13,11 +13,23 @@ export class ModerationService {
   constructor(access,consents,assistance,moderatorIds=[],evidence=null){Object.assign(this,{access,consents,assistance,evidence});this.moderatorIds=moderatorIdsSchema.parse(moderatorIds);}
   isModerator(id){return this.moderatorIds.includes(id);}
   config(actor){return this.access.runAuthorized(actor,'moderation',async()=>({moderatorIds:[...this.moderatorIds],canModerate:this.isModerator(actor.subjectId),reportTargets:['assistance','case'],evidenceRevalidation:Boolean(this.evidence),verifierParticipation:1,guaranteesResolution:false}));}
+  async storedPayloadWithin(db,row,schema,subjectId=row.subject_id){
+    if(typeof row.payload_text!=='string'||digest(row.payload_text)!==row.payload_hash){
+      const consent=(await db.query('SELECT revoked_at,expires_at FROM consents WHERE id=$1 AND subject_id=$2',[row.consent_id,subjectId])).rows[0];
+      // Only a provably withdrawn/expired source may lack its original bytes.
+      // Corruption of a still-live source remains an integrity failure.
+      if(consent&&(consent.revoked_at||Date.parse(consent.expires_at)<=this.access.now()*1000))return null;
+      throw new ServiceError('stored_integrity_mismatch',500);
+    }
+    try{return schema.parse(JSON.parse(row.payload_text));}catch{throw new ServiceError('stored_integrity_mismatch',500);}
+  }
   async loadReport(db,id,write=false){
     const row=(await db.query(`SELECT * FROM moderation_reports WHERE id=$1${write?' FOR UPDATE':''}`,[id])).rows[0];
     if(!row)return null;
     const recorded=(await db.query('SELECT * FROM moderation_events WHERE report_id=$1 ORDER BY version LIMIT 100',[id])).rows;
-    return {...row,recorded,verifiers:projectModerationVerifiers(recorded)};
+    const reportData=await this.storedPayloadWithin(db,row,moderationReportSchema,row.reporter_id),projectable=[];
+    for(const event of recorded){const payload=await this.storedPayloadWithin(db,event,moderationEventSchema);if(payload)projectable.push({...event,payload});}
+    return {...row,recorded,reportData,verifiers:projectModerationVerifiers(projectable)};
   }
   independentModerator(actor,row){return this.isModerator(actor.subjectId)&&!moderationParties(row).includes(actor.subjectId)&&!row.verifiers.some(v=>v.subjectId===actor.subjectId);}
   async liveVerifierInvitation(db,row,actorId,invitationId){
@@ -27,8 +39,9 @@ export class ModerationService {
     if(!canReadProjection(grant,{viewerId:actorId,now:this.access.now()}))throw new ServiceError('verifier_invitation_unavailable',403);
     return JSON.parse(invitation.payload_text);
   }
-  async verifierSource(db,row,actorId){
-    const report=JSON.parse(row.payload_text);
+  async verifierSource(db,row,actorId,sourceTarget=null){
+    const report=sourceTarget??row.reportData;
+    if(!report)throw new ServiceError('not_found',404);
     if(row.case_id){
       await readModerationCaseTarget(db,{caseId:row.case_id,viewerId:actorId,consents:this.consents,endpoint:this.access.endpoint,now:this.access.now()});
       if(report.evidenceId)await this.evidenceTarget(db,actorId,row.case_id,report.targetEventId,report.evidenceId);
@@ -114,7 +127,7 @@ export class ModerationService {
       if(row.version!==payload.expectedVersion)throw new ServiceError('moderation_version_conflict',409);
       let verificationJob=null;
       if(payload.kind==='revalidate'){
-        const report=JSON.parse(row.payload_text);
+        const report=row.reportData;if(!report)throw new ServiceError('moderation_source_unavailable',409);
         if(!row.case_id||report.evidenceId!==payload.evidenceId)throw new ServiceError('moderation_evidence_target_mismatch',409);
         await readModerationCaseTarget(db,{caseId:row.case_id,viewerId:actor.subjectId,consents:this.consents,endpoint:this.access.endpoint,now:this.access.now()});
         await this.evidenceTarget(db,actor.subjectId,row.case_id,report.targetEventId,payload.evidenceId);
@@ -138,8 +151,8 @@ export class ModerationService {
       return {reportId:id,eventId:payload.id,version};
     });
   }
-  async readWithin(db,actor,id){
-    const row=await this.loadReport(db,id);if(!row||!this.allowed(actor,row))throw new ServiceError('not_found',404);
+  async readWithin(db,actor,id,preloaded=null){
+    const row=preloaded??await this.loadReport(db,id);if(!row||!this.allowed(actor,row))throw new ServiceError('not_found',404);
     const visible=async(subjectId,consentId,eventId,payloadJson)=>{try{const grant=await this.grant(db,subjectId,consentId,eventId,payloadJson);return canReadProjection(grant,{viewerId:actor.subjectId,now:this.access.now()});}catch(error){if(!(error instanceof ServiceError))throw error;return false;}};
     const canRead=await visible(row.reporter_id,row.consent_id,id,row.payload_text),events=[];
     const recorded=row.recorded,own=row.verifiers.find(v=>v.subjectId===actor.subjectId),independent=this.independentModerator(actor,row),parties=moderationParties(row);
@@ -151,11 +164,11 @@ export class ModerationService {
       }
     const invitation=own?events.find(event=>event.id===own.invitationId):null;
     let verifierSourceAvailable=false;
-    if(own&&invitation){try{await this.verifierSource(db,row,actor.subjectId);verifierSourceAvailable=true;}catch(error){if(!(error instanceof ServiceError))throw error;}}
+    if(own&&invitation){try{await this.verifierSource(db,row,actor.subjectId,invitation.target);verifierSourceAvailable=true;}catch(error){if(!(error instanceof ServiceError))throw error;}}
     const target=row.case_id?{caseId:row.case_id}: {assistanceId:row.assistance_id};
     let revalidation=null;
-    const reportPayload=JSON.parse(row.payload_text);
-    if(row.case_id&&reportPayload.evidenceId&&this.evidence&&canRead){
+    const reportPayload=canRead?row.reportData:null;
+    if(row.case_id&&reportPayload?.evidenceId&&this.evidence){
       try{
         await this.evidenceTarget(db,actor.subjectId,row.case_id,reportPayload.targetEventId,reportPayload.evidenceId);
         const latest=await currentVerificationJob(db,reportPayload.evidenceId,this.evidence.source.jobKind);
@@ -168,7 +181,8 @@ export class ModerationService {
     if(row.case_id&&(canRead||invitation)){
       try{
         const current=await readModerationCaseTarget(db,{caseId:row.case_id,viewerId:actor.subjectId,consents:this.consents,endpoint:this.access.endpoint,now:this.access.now()});
-        const reported=JSON.parse(row.payload_text);
+        const reported=reportPayload??invitation?.target;
+        if(!reported)throw new ServiceError('not_found',404);
         source={caseId:row.case_id,reportedVersion:reported.caseVersion,currentVersion:current.parent.version,targetEventId:reported.targetEventId,
           targetEvent:current.rows.find(event=>event.id===reported.targetEventId)?.payload??null};
       }catch(error){if(!(error instanceof ServiceError))throw error;}
@@ -176,7 +190,7 @@ export class ModerationService {
     return {reportId:id,...target,version:row.version,state:row.state,paused:row.paused,
       ...(row.case_id?{source,revalidation,canRevalidate:Boolean(source&&revalidation&&independent),authority:'moderation-process',automaticallyVerified:false,
         pauseEffect:'hold-linked-collaboration-and-its-derived-eligibility; source-events-and-signed-CI-facts-unchanged'}:{}),
-      report:canRead?JSON.parse(row.payload_text):null,events,
+      report:reportPayload,events,
       ...(this.isModerator(actor.subjectId)||own?{reporterId:row.reporter_id,participantIds:parties.filter(id=>id!==row.reporter_id)}:{}),
       verifierParticipation:{version:1,own:own?{...own,scope:invitation?.scope??null,target:invitation?.target??null}:null,
         ...(this.isModerator(actor.subjectId)?{assignments:row.verifiers}:{}),sourceAvailable:verifierSourceAvailable,
@@ -190,15 +204,48 @@ export class ModerationService {
       canModerate:independent};
   }
   get(actor,id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return this.access.runAuthorized(actor,'moderation',db=>this.readWithin(db,actor,id));}
+  receipt(actor,input){
+    const parsed=moderationReceiptSchema.safeParse(input);if(!parsed.success)throw new ServiceError('invalid_moderation_receipt',400);
+    const query=parsed.data;
+    return this.access.runAuthorized(actor,'moderation',async db=>{
+      const base={...query,authority:'accepted-operation-only',currentAccessGranted:false,contentReturned:false,independenceVerified:false,capabilityVerified:false};
+      // Do not loadReport/readWithin: both read private payloads and project
+      // other participants. Historical acceptance grants no current access.
+      const rows=(await db.query(`SELECT id, id AS report_id, payload_hash, 1 AS version FROM moderation_reports WHERE id=$1 AND reporter_id=$2
+        UNION ALL SELECT id, report_id, payload_hash, version FROM moderation_events WHERE id=$1 AND subject_id=$2`,[query.eventId,actor.subjectId])).rows;
+      if(!rows.length)return{...base,state:'absent'};
+      const row=rows.find(record=>record.report_id===query.reportId&&record.payload_hash===query.payloadHash);
+      if(!row)return{...base,state:'conflict'};
+      return{...base,state:'acknowledged',receipt:{reportId:query.reportId,eventId:query.eventId,version:row.version}};
+    });
+  }
+  async visibleReportsWithin(db,actor,{caseId=null,assistanceId=null,after=null,limit}){
+    const visible=[];let scanned=after;
+    while(visible.length<limit){
+      // A coarse metadata filter avoids parsing unrelated private sources. It
+      // does not confer access: the canonical participation projection below
+      // still checks the actual invitation target and surviving original facts.
+      const candidates=(await db.query(`SELECT r.id FROM moderation_reports r WHERE ($1::uuid IS NULL OR r.case_id=$1)
+        AND ($2::uuid IS NULL OR r.assistance_id=$2) AND ($3::uuid IS NULL OR r.id>$3)
+        AND ($4::boolean OR r.reporter_id=$5::text OR r.participant_ids ? $5::text
+          OR EXISTS(SELECT 1 FROM moderation_events e LEFT JOIN consents c ON c.id=e.consent_id
+            WHERE e.report_id=r.id AND (e.subject_id=$5::text OR c.intent->'viewers' ? $5::text)))
+        ORDER BY r.id LIMIT 100`,[caseId,assistanceId,scanned,this.isModerator(actor.subjectId),actor.subjectId])).rows;
+      for(const candidate of candidates){const row=await this.loadReport(db,candidate.id);
+        if(row&&this.allowed(actor,row)){visible.push(row);if(visible.length===limit)break;}}
+      if(visible.length===limit||candidates.length<100)break;
+      scanned=candidates.at(-1).id;
+    }
+    return visible;
+  }
   async caseContextWithin(db,actor,caseId){
     const context={version:1,authority:'viewer-authorized-moderation',automaticallyVerified:false,items:[],coverage:'up-to-20-visible-reports; latest-10-visible-events-per-report'};
     if(!actor)return context;
     try{await readModerationCaseTarget(db,{caseId,viewerId:actor.subjectId,consents:this.consents,endpoint:this.access.endpoint,now:this.access.now()});}
     catch(error){if(error instanceof ServiceError)return context;throw error;}
-    const rows=(await db.query(`SELECT id FROM moderation_reports r WHERE case_id=$1 AND ($2 OR reporter_id=$3 OR participant_ids ? $3 OR EXISTS
-      (SELECT 1 FROM moderation_events e WHERE e.report_id=r.id AND e.payload_text::jsonb->>'kind'='invite-verifier' AND e.payload_text::jsonb->>'verifierId'=$3)) ORDER BY id LIMIT 20`,[caseId,this.isModerator(actor.subjectId),actor.subjectId])).rows;
+    const rows=await this.visibleReportsWithin(db,actor,{caseId,limit:20});
     for(const row of rows){
-      const record=await this.readWithin(db,actor,row.id);
+      const record=await this.readWithin(db,actor,row.id,row);
       context.items.push({reportId:record.reportId,version:record.version,state:record.state,paused:record.paused,
         report:record.report,events:record.events.slice(-10),revalidation:record.revalidation??null,
         source:record.source?{reportedVersion:record.source.reportedVersion,currentVersion:record.source.currentVersion,targetEventId:record.source.targetEventId}:null});
@@ -210,10 +257,7 @@ export class ModerationService {
       .refine(value=>!(value.assistanceId&&value.caseId)).safeParse(input);
     if(!parsed.success)throw new ServiceError('invalid_moderation_query');const query=parsed.data;
     return this.access.runAuthorized(actor,'moderation',async db=>{
-      const rows=(await db.query(`SELECT id,assistance_id,case_id,version,state,paused FROM moderation_reports r WHERE ($1::uuid IS NULL OR assistance_id=$1) AND ($2::uuid IS NULL OR id>$2)
-        AND ($3 OR reporter_id=$4 OR participant_ids ? $4 OR EXISTS (SELECT 1 FROM moderation_events e WHERE e.report_id=r.id
-          AND e.payload_text::jsonb->>'kind'='invite-verifier' AND e.payload_text::jsonb->>'verifierId'=$4))
-        AND ($6::uuid IS NULL OR case_id=$6) ORDER BY id LIMIT $5`,[query.assistanceId??null,query.after??null,this.isModerator(actor.subjectId),actor.subjectId,query.limit+1,query.caseId??null])).rows;
+      const rows=await this.visibleReportsWithin(db,actor,{caseId:query.caseId??null,assistanceId:query.assistanceId??null,after:query.after??null,limit:query.limit+1});
       return {items:rows.slice(0,query.limit).map(row=>({reportId:row.id,...(row.case_id?{caseId:row.case_id}:{assistanceId:row.assistance_id}),version:row.version,state:row.state,paused:row.paused})),nextAfter:rows.length>query.limit?rows[query.limit-1].id:null};
     });
   }

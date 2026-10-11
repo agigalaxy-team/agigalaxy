@@ -16,3 +16,17 @@ export const choicePutSchema=z.strictObject({snapshotId:z.uuid(),versionId:z.uui
 export const choiceGetSchema=z.strictObject({snapshotId:z.uuid()});
 export const choicePageSchema=z.strictObject({after:z.uuid().optional(),limit:z.number().int().min(1).max(20).default(8)});
 export const choiceDeleteSchema=z.strictObject({snapshotId:z.uuid(),expectedRevision:z.number().int().nonnegative()});
+// A transport preference revision and source witnesses are not the accepted
+// business intent. Keep the same parsed defaults and hash input as original put.
+export function choicePutIntent(input){const {preferenceRevision:_preferenceRevision,witnesses:_witnesses,...intent}=choicePutSchema.parse(input);return intent;}
+export const choiceReceiptQuerySchema=z.strictObject({snapshotId:z.uuid(),versionId:z.uuid(),requestHash:z.string().regex(/^[0-9a-f]{64}$/)});
+const receiptCommon={...choiceReceiptQuerySchema.shape,authority:z.literal('accepted-operation-only'),audience:z.literal('owner-only'),
+ currentAccessGranted:z.literal(false),contentReturned:z.literal(false),sourceAccessChecked:z.literal(false)};
+export const choiceReceiptResultSchema=z.discriminatedUnion('state',[
+ z.strictObject({...receiptCommon,state:z.literal('acknowledged'),receipt:z.strictObject({snapshotId:z.uuid(),versionId:z.uuid(),
+  requestHash:z.string().regex(/^[0-9a-f]{64}$/),baseRevision:z.number().int().nonnegative(),revision:z.number().int().nonnegative(),
+  storedState:z.enum(['current','conflict','superseded','expired','deleted','invalidated']),acceptedAt:z.iso.datetime(),contentExpiresAt:z.iso.datetime(),
+  contentRetentionDue:z.boolean()})}),
+ z.strictObject({...receiptCommon,state:z.literal('absent'),absenceMeaning:z.literal('no-retained-owner-operation')}),
+ z.strictObject({...receiptCommon,state:z.literal('conflict'),reason:z.literal('original-operation-mismatch')})
+]).superRefine((x,c)=>{if(x.state==='acknowledged'&&['snapshotId','versionId','requestHash'].some(k=>x[k]!==x.receipt[k]))c.addIssue({code:'custom',message:'Original Choice receipt mismatch'});});

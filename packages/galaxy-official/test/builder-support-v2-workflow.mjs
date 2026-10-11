@@ -31,6 +31,16 @@ export async function verifyBuilderSupportV2Workflow(db=null,options={}){
     await f.builders.publish(f.actor,await f.authorize(original,'builder.publish',{visibility:'Public',purpose:'public-profile'}));
     const initial=await read(builderId),event=fields=>({id:randomUUID(),builderId,expectedRevision:1,declarationId:initial.declarationId,declarationHash:initial.declarationHash,...fields});
     assert.equal(initial.support.state,'not-declared');assert.equal(initial.pack.actualUseCount,null);
+    assert.equal(initial.canSubmitReport,false);
+    assert.equal((await f.builders.v2.get(f.actor,{builderId})).canSubmitReport,false);
+    assert.equal((await f.builders.v2.get(other.actor,{builderId})).canSubmitReport,false);
+    assert.equal((await f.builders.v2.get(assessor.actor,{builderId})).canSubmitReport,true);
+    f.builders.assessorIds.add(f.actor.subjectId);
+    assert.equal((await f.builders.v2.get(f.actor,{builderId})).canSubmitReport,false,'owner remains unable to report on their own registration');
+    f.builders.assessorIds.delete(f.actor.subjectId);
+    f.builders.assessorIds.delete(assessor.actor.subjectId);
+    assert.equal((await f.builders.v2.get(assessor.actor,{builderId})).canSubmitReport,false,'current configuration removal changes the projection');
+    f.builders.assessorIds.add(assessor.actor.subjectId);
     const profile=await publish(event({kind:'support-profile',support:supportFor(declaration)}));
     assert.equal((await read(builderId)).support.testedScopes.every(item=>item.state==='not-tested'),true);
     assert.deepEqual((await call('/v2/builders/support/events',profile.auth)).body,profile.receipt);

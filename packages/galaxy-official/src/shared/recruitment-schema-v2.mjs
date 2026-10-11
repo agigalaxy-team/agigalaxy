@@ -15,3 +15,16 @@ export const recruitmentEventV2Schema=z.discriminatedUnion('kind',[
 export const recruitmentEnvelopeV2Schema=z.strictObject({consentId:z.uuid(),payloadJson:z.string().min(2).max(10000)});
 export const recruitmentQueryV2Schema=z.strictObject({view:z.enum(['discover','managed']).default('discover'),context:queryContextV2Schema.optional(),
  after:z.string().min(1).max(4096).nullable().default(null),limit:z.number().int().min(1).max(20).default(20)}).refine(x=>x.view!=='discover'||!!x.context);
+
+export const recruitmentOperationReceiptQuerySchema=z.strictObject({recruitmentId:z.uuid(),operationId:z.uuid(),
+ payloadHash:z.string().regex(/^[0-9a-f]{64}$/)});
+const receiptCommon={schemaVersion:z.literal(2),query:recruitmentOperationReceiptQuerySchema,
+ authority:z.literal('accepted-operation-only'),audience:z.literal('owner-only'),currentAccessGranted:z.literal(false),
+ contentReturned:z.literal(false),sourceAccessChecked:z.literal(false)};
+export const recruitmentOperationReceiptResultSchema=z.discriminatedUnion('state',[
+ z.strictObject({...receiptCommon,state:z.literal('acknowledged'),receipt:z.strictObject({
+  ...recruitmentOperationReceiptQuerySchema.shape,revision:positive,acceptedAt:z.iso.datetime()})}),
+ z.strictObject({...receiptCommon,state:z.literal('absent'),absenceMeaning:z.literal('no-retained-owner-operation')}),
+ z.strictObject({...receiptCommon,state:z.literal('conflict'),reason:z.literal('original-operation-mismatch')})
+]).superRefine((value,ctx)=>{if(value.state==='acknowledged'&&['recruitmentId','operationId','payloadHash'].some(key=>value.query[key]!==value.receipt[key]))
+ ctx.addIssue({code:'custom',message:'Original Recruitment receipt mismatch'});});

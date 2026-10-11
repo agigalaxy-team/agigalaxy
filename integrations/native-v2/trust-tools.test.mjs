@@ -1,3 +1,4 @@
+import {nativeData} from '../../packages/galaxy-edge-mcp/test/native-result.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
@@ -23,10 +24,10 @@ test('real stdio TrustPackage choice writes six exact local files and imports of
   const rpc=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;outstanding.set(id,{resolve,timer:setTimeout(()=>reject(new Error('stdio timeout '+stderr)),10000)});
    child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
   const call=async(name,args={})=>{const response=await rpc('tools/call',{name,arguments:args});assert.ok(!response.error,JSON.stringify(response.error));
-   const result=JSON.parse(response.result.content[0].text);assert.ok(!response.result.isError,JSON.stringify(result));return result;};
+   const result=nativeData(response.result);assert.ok(!response.result.isError,JSON.stringify(result));return result;};
   await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'synthetic-independent-trust-client',version:'1'}});
   child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})+'\n');
-  const listed=await rpc('tools/list');assert.equal(listed.result.tools.filter(t=>t.name.startsWith('galaxy_trust_native_')).length,8);
+  const listed=await rpc('tools/list');assert.equal(listed.result.tools.filter(t=>t.name.startsWith('galaxy_trust_native_')).length,9);
   async function choose(name,args,action='allow'){
    const response=await call(name,args);assert.equal(response.state,'user-choice-needs-browser');reviewUrl=response.url;
    const html=await(await fetch(reviewUrl)).text();assert.ok(!html.includes('PRIVATE KEY'));
@@ -44,6 +45,27 @@ test('real stdio TrustPackage choice writes six exact local files and imports of
   const path=exported.files.find(p=>p.endsWith('galaxy-trust-package.json')),container=JSON.parse(await readFile(path,'utf8'));
   const imported=await call('galaxy_trust_native_import',{package:container});assert.equal(imported.integrity,'valid');assert.equal(imported.capabilityVerified,false);assert.equal(imported.currentRevocationChecked,false);
   const replay=await call('galaxy_trust_native_execute',{operationId:prepared.operationId});assert.equal(replay.state,'completed');assert.deepEqual(replay.receipt.files,exported.files);
+  const vcPrepared=await call('galaxy_trust_native_prepare',{action:'vc-package',package:container});
+  const vcExported=await choose('galaxy_trust_native_execute',{operationId:vcPrepared.operationId});
+  assert.equal(vcExported.files.length,8);assert.equal(vcExported.issuerAuthority,'self-issued-package-attestation');
+  assert.equal(vcExported.currentStatus,'unknown');assert.equal(vcExported.capabilityVerified,false);
+  const bundle=JSON.parse(await readFile(vcExported.files.find(p=>/galaxy-trust-vc-jose-[a-f0-9]+\.json$/.test(p)),'utf8'));
+  assert.deepEqual(bundle.package,container);assert.equal(bundle.mediaType,'application/vc+jwt');
+  const manifest=JSON.parse(container.manifestJson),identity=JSON.parse(container.files['identity.json']);
+  const importInput={bundle,issuerPin:{issuer:manifest.subjectId,kid:manifest.keyId,publicKeyPem:identity.genesisProof.publicKeyPem},
+   audience:manifest.subjectId,expectedSubject:manifest.subjectId};
+  const vcImported=await choose('galaxy_trust_native_import_vc',importInput);
+  assert.equal(vcImported.integrity,'valid');assert.equal(vcImported.networkRequests,0);assert.equal(vcImported.importedBusinessFacts,0);
+  assert.equal(vcImported.currentRevocationChecked,false);assert.equal(vcImported.onlineAccessGranted,false);
+  const vcReplay=await call('galaxy_trust_native_execute',{operationId:vcPrepared.operationId});
+  assert.equal(vcReplay.state,'completed');assert.deepEqual(vcReplay.receipt.files,vcExported.files);
+  assert.deepEqual((await call('galaxy_trust_native_recover',{action:'last-vc-export'})).bundle,bundle);
+  const wrongPin={...importInput,issuerPin:{...importInput.issuerPin,publicKeyPem:pair.publicKey.export({type:'spki',format:'pem'})}};
+  const wrongPreview=await call('galaxy_trust_native_import_vc',wrongPin);
+  assert.equal(wrongPreview.state,'user-choice-needs-browser');
+  await fetch(wrongPreview.url,{method:'POST',headers:{Origin:new URL(wrongPreview.url).origin,'Content-Type':'application/x-www-form-urlencoded'},body:'action=allow'});
+  const rejected=await rpc('tools/call',{name:'galaxy_trust_native_import_vc',arguments:wrongPin});
+  assert.equal(rejected.result.isError,true,'a reviewed wrong issuer key still cannot validate the signature');
   const state=await call('galaxy_native_status');assert.equal(state.connected,false);assert.equal(stderr.includes('UNEXPECTED_NETWORK'),false);
   child.stdin.end();if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));child=null;await assert.rejects(fetch(reviewUrl));
  }finally{if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await new Promise(resolve=>child.once('exit',resolve));}await rm(directory,{recursive:true,force:true});}

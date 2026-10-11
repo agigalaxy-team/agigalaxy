@@ -4,6 +4,7 @@ import {CompactSign} from 'jose';
 import {createBrowserClient,browserScopes} from '../../../galaxy-official/src/browser-client.mjs';
 import {createIdentityControlClient} from '../../../galaxy-core/src/domain/identity-control-client.mjs';
 import {createIdentityDeviceHandoff} from '../../../galaxy-core/src/domain/identity-device-handoff.mjs';
+import {createIdentityDeviceManagement} from '../../../galaxy-core/src/domain/identity-device-management.mjs';
 import {signIdentityPayload,identityKeyId} from '../../../galaxy-core/src/domain/identity-material.mjs';
 import {getLocalSnapshot,initializeGalaxyIntegration,getGalaxyCommandSurface} from '../../../galaxy-core/src/local-store.mjs';
 import {resolveGalaxyInitialization} from '../../../galaxy-core/src/integration-modules.mjs';
@@ -12,8 +13,10 @@ import {createHelpRuntimeV2} from '../../../galaxy-official/src/help-runtime-v2.
 import {verifyGalaxyGenesis} from '../../../galaxy-core/src/galaxy-guid.mjs';
 import {createNativeStore} from './store.mjs';
 import {createNativeNavigation} from './navigation.mjs';
+import {isWebIdentityTargetPath,webIdentityProtocol,webIdentityProofType,webIdentityTtlSeconds} from './web-identity-handoff.mjs';
 import {createTrustPackageClient} from '../../../galaxy-official/src/trust-package-client.mjs';
 import {createTrustPackageDeviceAdapter} from '../../../galaxy-official/src/trust-package-device-adapter.mjs';
+import {createReceiptStatusClient,createReceiptStatusDeviceSigner} from '../../../galaxy-official/src/receipt-status-client.mjs';
 import {createIdentityGroupClientV2} from '../../../galaxy-official/src/identity-group-client-v2.mjs';
 import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/identity-group-device-signer-v2.mjs';
 
@@ -25,7 +28,14 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
  const sign=async(payload,type)=>{if(!active)throw new Error('native_identity_required');
   const device=await store.get('device:'+active.subjectId+':'+active.deviceId);if(!device?.privateKey)throw new Error('native_device_key_unavailable');
   return signIdentityPayload(payload,device.privateKey,{type});};
- const api=createBrowserClient({endpoint,trustedKeys,fetch,sign,now});
+ // Fence a connection/close ABA even when both ordinary snapshots are null.
+ // Numeric generation remains owned by the canonical browser API.
+ let receiptLifecycle={};
+ const browserApi=createBrowserClient({endpoint,trustedKeys,fetch,sign,now});
+ const api=Object.freeze({...browserApi,
+  connect:async(...args)=>{const result=await browserApi.connect(...args);receiptLifecycle={};return result;},
+  disconnect:()=>{receiptLifecycle={};return browserApi.disconnect();},
+  close:()=>{receiptLifecycle={};return browserApi.close();}});
  const send=(url,o={})=>{if(!url.startsWith(endpoint+'/'))throw new Error('native_origin_changed');
   return api.call(url.slice(endpoint.length),o.bodyJson===undefined?undefined:JSON.parse(o.bodyJson),{method:o.method??'POST',authenticated:false,...(o.signal?{signal:o.signal}:{})});};
  const saveActive=async value=>{api.disconnect();await store.put(activeKey,value);active=value;};
@@ -40,6 +50,34 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   readIdentity:subjectId=>store.get('native-trust-identity:'+endpoint+':'+subjectId),
   writeIdentity:(subjectId,value)=>store.put('native-trust-identity:'+endpoint+':'+subjectId,value),fetchIdentity:fetchPublicControl});
  async function publicControl(subjectId){const state=await fetchPublicControl(subjectId);await trustDevice.remember(state);return state;}
+ function captureReceiptLease(requireOwner=true){
+  const owner=active,lifecycle=receiptLifecycle,binding=api.snapshot();
+  const changed=()=>{throw Object.assign(new Error('receipt_status_authority_changed'),{code:'receipt_status_authority_changed'});};
+  const check=()=>{const current=api.snapshot();
+   if(closed||requireOwner&&!owner||active!==owner||receiptLifecycle!==lifecycle||(binding===null)!==(current===null)
+    ||binding&&['subjectId','endpoint','bindingId','generation'].some(k=>binding[k]!==current?.[k]))changed();};
+  check();return Object.freeze({subjectId:owner?.subjectId??null,deviceId:owner?.deviceId??null,endpoint,
+   bindingId:binding?.bindingId??null,generation:binding?.generation??null,assertCurrent:check});
+ }
+ const deviceManagement=createIdentityDeviceManagement({endpoint,send,store,getActive:()=>active,captureLease:()=>captureReceiptLease(),now});
+ const receiptStatus=Object.freeze({captureLease:()=>captureReceiptLease(),query:async(input,options={})=>{
+  const owner=active,lease=captureReceiptLease(),check=lease.assertCurrent;
+  const getContext=async()=>{check();const current=await trustDevice.current();check();
+   if(current.identity.subjectId!==owner.subjectId)throw new Error('receipt_status_authority_changed');
+   return{subjectId:owner.subjectId,endpoint,control:{deviceId:current.epoch===0?null:owner.deviceId,keyId:current.keyId,epoch:current.epoch},
+    bindingId:lease.bindingId,generation:lease.generation};};
+  const signReceiptStatus=createReceiptStatusDeviceSigner({endpoint,trustedKeys,now,getContext,
+   getPrivateKey:async()=>{check();const material=await store.get('device:'+owner.subjectId+':'+owner.deviceId);check();
+    if(!material?.privateKey)throw new Error('receipt_status_device_key_unavailable');return material.privateKey;}});
+  check();const result=await createReceiptStatusClient({endpoint,trustedKeys,now,fetch,getContext,signReceiptStatus}).query(input,options);check();return result;
+ }});
+ // Trusted Worker composition reuses the canonical signer and saved-Consent
+ // protocol. It cannot establish a connection or approve a model-supplied action.
+ const workerAuthorization=Object.freeze(Object.fromEntries(['call','prepareAuthorization','submitAuthorization','reconcileAuthorization'].map(method=>[method,async(...args)=>{
+  const lease=captureReceiptLease();
+  if(!lease.bindingId||api.snapshot()?.subjectId!==lease.subjectId)throw new Error('native_connection_choice_required');
+  lease.assertCurrent();const result=await api[method](...args);lease.assertCurrent();return result;
+ }])));
  async function localIdentity(){const s=await getLocalSnapshot(dataDirectory);if(s.recoveryRequired)throw new Error('local_initialization_requires_recovery');
   if(!s.identity||!verifyGalaxyGenesis(s.identity.id,s.identity.genesisProof))throw new Error('local_identity_required');return s.identity;}
  async function initialize(input,{confirmed=false}={}){if(!confirmed)throw new Error('local_initialization_choice_required');
@@ -91,7 +129,14 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   try{const result=await api.submitAuthorization(saved.prepared,{confirmed:true,reconcile:true});await store.put(key,{...saved,state:'active'});return{requestId:input.requestId,...result,state:'active'};}
   catch(error){await store.put(key,{...saved,state:'result-unknown'});throw error;}
  }
- const navigation=createNativeNavigation({website,store,openBrowser,now,refresh:async object=>{
+ const navigation=createNativeNavigation({website,store,openBrowser,now,captureLease:async()=>{
+  const lease=captureReceiptLease(false),current=await status();lease.assertCurrent();
+  const subjectId=current.identity??null;
+  return Object.freeze({...lease,subjectId,assertCurrent:async()=>{
+   lease.assertCurrent();const current=await status();lease.assertCurrent();
+   if((current.identity??null)!==subjectId)throw Object.assign(new Error('receipt_status_authority_changed'),{code:'receipt_status_authority_changed'});
+  }});
+ },refresh:async object=>{
   if(object.kind==='task')return call('/v2/tasks/'+object.id,undefined,{method:'GET'});
   if(object.kind==='room')return call('/v2/chat/rooms/'+object.id+'/read',{});
   if(object.kind==='project')return call('/v2/projects/'+object.id,undefined,{method:'GET'});
@@ -111,22 +156,69 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   matchesAuthorization:sameAuthorization,isAuthorizationCurrent:async auth=>!closed&&sameAuthorization(auth),invalidateAuthorization:()=>api.disconnect()};
  const helpSend=(url,options)=>{if(!url.startsWith(endpoint+'/'))throw new Error('native_origin_changed');return call(url.slice(endpoint.length),JSON.parse(options.bodyJson),{signal:options.signal});};
  const helpRead=(url,options)=>{if(!url.startsWith(endpoint+'/'))throw new Error('native_origin_changed');return call(url.slice(endpoint.length),undefined,{method:'GET',signal:options.signal});};
- const helpFlow=Object.freeze(Object.fromEntries(['start','get','query','compose','select','pause','publish','reconcile','refresh','returnToTask','forget'].map(method=>[method,async(...args)=>{
+ const helpFlow=Object.freeze(Object.fromEntries(['start','get','query','compose','select','pause','publish','reconcile','refresh','returnToTask','forget','review','actionPreview','prepareAction','executeAction','reconcileAction'].map(method=>[method,async(...args)=>{
   if(closed)throw new Error('native_runtime_closed');const subjectId=(await status()).identity;if(!subjectId)throw new Error('native_identity_required');
-  if(helpSubject!==subjectId){helpInstance=createHelpRuntimeV2({dataDirectory,endpoint,subjectId,now,sessions:helpSessions,send:helpSend,read:helpRead,
+  if(helpSubject!==subjectId){helpInstance=createHelpRuntimeV2({dataDirectory,endpoint,subjectId,now,sessions:helpSessions,send:helpSend,read:helpRead,authorize:input=>authorize(input,{confirmed:true}),
    readIdentityWithin:async directory=>{const current=await store.readWithin(directory,activeKey);return current?{id:current.subjectId,genesisProof:current.genesisProof}:readJson(localPaths(directory).identity,null);}});helpSubject=subjectId;}
   return helpInstance[method](...args);
  }])));
  const trustLocalKey=async name=>'native-trust:'+endpoint+':'+(await trustDevice.current()).identity.subjectId+':'+name;
- const trustPackages=Object.freeze({...createTrustPackageClient({api:{call,snapshot:api.snapshot,endpoint},now,current:trustDevice.current,sign:trustDevice.sign,
-  getLocal:async name=>store.get(await trustLocalKey(name)),putLocal:async(name,value)=>store.put(await trustLocalKey(name),value)}),refreshIdentity:trustDevice.refreshIdentity});
+ const trustPackages=Object.freeze({...createTrustPackageClient({api:{call,snapshot:api.snapshot,endpoint},now,current:trustDevice.current,sign:trustDevice.sign,signVc:trustDevice.signVc,captureLease:()=>captureReceiptLease(false),
+  getLocal:async(name,originalSubjectId)=>store.get(originalSubjectId===undefined?await trustLocalKey(name):'native-trust:'+endpoint+':'+originalSubjectId+':'+name),
+  putLocal:async(name,value,originalSubjectId)=>store.put(originalSubjectId===undefined?await trustLocalKey(name):'native-trust:'+endpoint+':'+originalSubjectId+':'+name,value)}),refreshIdentity:trustDevice.refreshIdentity,
+  captureLease:async()=>{const lease=captureReceiptLease(false),current=await trustDevice.current();lease.assertCurrent();
+   return Object.freeze({...lease,subjectId:current.identity.subjectId,keyId:current.keyId,epoch:current.epoch});}});
  let groupSubject=null,groupClient=null;
  const groupSigner=createIdentityGroupDeviceSignerV2({endpoint,current:trustDevice.refreshIdentity,getMaterial:async()=>{if(closed||!active)throw new Error('identity_group_identity_changed');const selected=active,material=await store.get('device:'+selected.subjectId+':'+selected.deviceId);if(active!==selected||!material)throw new Error('identity_group_identity_changed');return material;}});
  function identityGroups(){const subjectId=active?.subjectId;if(closed||!subjectId)return null;
   if(groupSubject!==subjectId){groupSubject=subjectId;const check=()=>{if(closed||active?.subjectId!==subjectId)throw new Error('identity_group_identity_changed');};
    groupClient=createIdentityGroupClientV2({api:{call,snapshot:api.snapshot,endpoint},subjectId,now,sign:groupSigner,getLocal:async name=>{check();const v=await store.get('native-identity-group:'+endpoint+':'+subjectId+':'+name);check();return v;},putLocal:async(name,value)=>{check();await store.put('native-identity-group:'+endpoint+':'+subjectId+':'+name,value);check();}});}
   return groupClient;}
- return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,authorize,navigation,status,helpFlow,trustPackages,get identityGroups(){return identityGroups();},
+ async function prepareWebIdentityContext(scopes){
+  const lease=captureReceiptLease(),binding=api.snapshot();
+  if(!lease.bindingId||binding?.subjectId!==lease.subjectId)throw new Error('native_connection_choice_required');
+  if(!Array.isArray(scopes)||!scopes.includes('binding')||new Set(scopes).size!==scopes.length||scopes.some(scope=>!browserScopes.includes(scope)))throw new Error('web_identity_scopes_invalid');
+  const selectedScopes=[...scopes];
+  async function readControl(){
+   lease.assertCurrent();const state=await publicControl(lease.subjectId);lease.assertCurrent();
+   const material=await store.get('device:'+lease.subjectId+':'+lease.deviceId);lease.assertCurrent();
+   const current=state.devices?.find(d=>d.device_id===lease.deviceId&&d.status==='active'&&d.epoch===state.epoch);
+   if(state.authority!==endpoint||state.subjectId!==lease.subjectId||!current||current.public_key!==material?.publicKeyPem
+    ||selectedScopes.some(scope=>!current.scopes.includes(scope)&&!current.scopes.includes('*')))throw new Error('web_identity_current_native_control_required');
+   return state;
+  }
+  const state=await readControl(),current=state.devices.find(d=>d.device_id===lease.deviceId);
+  const context={endpoint,website,subjectId:lease.subjectId,controller:{deviceId:lease.deviceId,keyId:current.key_id,epoch:state.epoch,chainHead:state.chainHead},scopes:selectedScopes};
+  async function assertControl(){
+   const latest=await readControl(),controller=latest.devices.find(d=>d.device_id===lease.deviceId);
+   if(latest.epoch!==context.controller.epoch||latest.chainHead!==context.controller.chainHead||controller.key_id!==context.controller.keyId)throw new Error('web_identity_native_control_changed');
+   return latest;
+  }
+  async function signContext(payloadJson){
+   let body;try{body=JSON.parse(payloadJson);}catch{throw new Error('web_identity_intent_invalid');}
+   const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+   let bridge;try{bridge=new URL(body.bridgeOrigin);}catch{throw new Error('web_identity_intent_invalid');}
+   if(body.protocol!==webIdentityProtocol||body.version!==1||!uuid(body.handoffId)||!uuid(body.navigationId)||!uuid(body.nonce)
+    ||bridge.protocol!=='http:'||bridge.hostname!=='127.0.0.1'||!bridge.port||bridge.origin!==body.bridgeOrigin||bridge.username||bridge.password
+   ||!isWebIdentityTargetPath(body.context?.targetPath)||!Number.isSafeInteger(body.context?.expiresAt)
+    ||body.context.expiresAt<=now()||body.context.expiresAt>now()+webIdentityTtlSeconds)throw new Error('web_identity_intent_invalid');
+   const descriptor=body.context.existingDevice;
+   if(descriptor!==null&&(!descriptor||Array.isArray(descriptor)||Object.keys(descriptor).sort((a,b)=>a<b?-1:a>b?1:0).join(',')!=='deviceId,keyId,subjectId'
+    ||descriptor.subjectId!==context.subjectId||!uuid(descriptor.deviceId)||typeof descriptor.keyId!=='string'||!/^[a-f0-9]{64}$/.test(descriptor.keyId)))throw new Error('web_identity_existing_device_invalid');
+   const expected=JSON.stringify({protocol:webIdentityProtocol,version:1,handoffId:body.handoffId,navigationId:body.navigationId,nonce:body.nonce,bridgeOrigin:body.bridgeOrigin,
+    context:{endpoint,website,subjectId:context.subjectId,controller:context.controller,scopes:selectedScopes,expiresAt:body.context.expiresAt,targetPath:body.context.targetPath,existingDevice:descriptor}});
+   if(expected!==payloadJson)throw new Error('web_identity_intent_invalid');
+   const fresh=await assertControl();
+   if(descriptor){const device=fresh.devices.find(item=>item.device_id===descriptor.deviceId&&item.status==='active'&&item.epoch===fresh.epoch);
+    // This descriptor identifies the website's existing held key. Requested
+    // extra scopes still require a new public offer and explicit Native approval;
+    // completion independently checks the actually authorized target's scopes.
+    if(!device||device.key_id!==descriptor.keyId||await identityKeyId(device.public_key)!==descriptor.keyId)throw new Error('web_identity_existing_device_control_required');}
+   const signature=await sign(payloadJson,webIdentityProofType);await assertControl();return signature;
+  }
+  return{context,assertCurrent:lease.assertCurrent,assertControl,readControl,signContext,...(openBrowser?{openBrowser}:{})};
+ }
+ return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,get identityGroups(){return identityGroups();},
   authorizationExists:async input=>{const r=await store.get('native-authorization:'+endpoint+':'+input.requestId);return !!r&&JSON.stringify(r.input)===JSON.stringify(input);},
   device:{pending:handoff.pending,offer:handoff.createOffer,approve:handoff.approveOffer,accept:handoff.acceptApproval,reconcile:handoff.reconcile,cancel:handoff.cancel,
    previewOffer:handoff.previewOffer,previewApproval:handoff.previewApproval},

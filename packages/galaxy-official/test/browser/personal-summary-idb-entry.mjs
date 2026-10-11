@@ -21,4 +21,5 @@ async function test(){let stores=[];const prior=JSON.parse(sessionStorage.getIte
    compareAndSwap:true,declineRetained:true,cloudRequests:0,modelCalls:0,syntheticDatabaseDeleted:true,userAgent:navigator.userAgent},null,2);
  }catch(error){output.textContent=JSON.stringify({passed:false,error:String(error)});stores.forEach(s=>s.close());}
 }
-document.querySelector('button').addEventListener('click',()=>test());if(sessionStorage.getItem(marker))test();
+const run=()=>test().catch(error=>{output.textContent=JSON.stringify({passed:false,error:String(error)});});
+document.querySelector('button').addEventListener('click',run);if(sessionStorage.getItem(marker))await run();

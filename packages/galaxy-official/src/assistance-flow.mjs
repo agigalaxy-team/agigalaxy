@@ -11,10 +11,14 @@ export function createAssistanceFlow({ endpoint, sessions, signIntent, consentSe
   const consents = createConsentClient({ endpoint, readAuthorization: () => sessions.readAuthorization(endpoint), signIntent, send: consentSend, now });
   const assistance = createAssistanceClient({ endpoint, sessions, send: assistanceSend, read: assistanceRead });
   const operations = new WeakMap(), signing = new Set();
-  async function prepare(input) {
+  async function prepare(input, {draftPreview=false} = {}) {
     const authorization = await sessions.readAuthorization(endpoint);
     if (!authorization || !['consent', 'assistance'].every(scope => authorization.scopes.includes(scope)))
       throw new Error('Assistance and Consent authorization required.');
+    if (draftPreview) {
+      if (!journal?.previewRequestDraft || input.request || input.assistanceId || input.event) throw new Error('Editable Assistance request draft required.');
+      input = await journal.previewRequestDraft({subjectId:authorization.subjectId,id:input.draftId,expectedRevision:input.draftRevision,now:now()});
+    }
     let payload, visibility = 'Private', viewers = [];
     if (input.request && !input.assistanceId && !input.event) {
       if(input.eventVisibility!==undefined)throw new Error('Event visibility applies only to a contribution event.');
@@ -61,20 +65,21 @@ export function createAssistanceFlow({ endpoint, sessions, signIntent, consentSe
       recipient: endpoint, fields: Object.keys(payload), visibility, viewers,
       payloadHash: createHash('sha256').update(payloadJson).digest('hex'), policyVersion: '0.1', issuedAt,
       expiresAt: Math.min(issuedAt + 2592000, authorization.bindingExpiresAt) };
-    return prepareExact(payloadJson, intent, authorization, input.draftId, input.draftRevision);
+    return prepareExact(payloadJson, intent, authorization, input.draftId, input.draftRevision, draftPreview);
   }
-  async function prepareExact(payloadJson, intent, authorization, draftId, draftRevision) {
+  async function prepareExact(payloadJson, intent, authorization, draftId, draftRevision, deferDraftCommit=false) {
     const payload = JSON.parse(payloadJson), eventId = payload.event?.id ?? payload.id;
     const consentPreview = consents.prepare(intent), request = { consentId: intent.id, payloadJson };
     const actionPreview = assistance.prepare(request);
-    if (journal) {
+    if (journal && !deferDraftCommit) {
       const saved = await journal.save({ subjectId: authorization.subjectId, payloadJson, intent: JSON.parse(consentPreview.intentJson), draftId, draftRevision });
       if (saved.status === 'acknowledged') throw new Error('Assistance event already acknowledged.');
     }
     const hash = createHash('sha256').update(JSON.stringify([endpoint, consentPreview.intentJson, payloadJson])).digest('hex');
     const preview = Object.freeze({ endpoint, assistanceId: payload.assistanceId ?? payload.id, eventId,
       payloadJson, intentJson: consentPreview.intentJson, confirmation: `CONFIRM COLLABORATION ${eventId} ${hash}` });
-    operations.set(preview, { authorization, consentPreview, actionPreview, state: 'prepared' });
+    operations.set(preview, { authorization, consentPreview, actionPreview, state: 'prepared',
+      deferredDraft:deferDraftCommit?{draftId,draftRevision}:null, journalCommitted:!deferDraftCommit });
     return preview;
   }
   function cancel(preview) {
@@ -94,6 +99,13 @@ export function createAssistanceFlow({ endpoint, sessions, signIntent, consentSe
     };
     try {
       await check();
+      if (operation.deferredDraft) {
+        const saved = await journal.save({subjectId:operation.authorization.subjectId,payloadJson:preview.payloadJson,
+          intent:JSON.parse(preview.intentJson),...operation.deferredDraft});
+        if (saved.status === 'acknowledged') throw new Error('Assistance event already acknowledged.');
+        operation.journalCommitted = true;
+        await check();
+      }
       if (journal) await journal.mark(preview.eventId, operation.authorization.subjectId, 'submitting');
       await check(); signing.add(preview.intentJson);
       await consents.execute(operation.consentPreview, operation.consentPreview.confirmation);
@@ -105,7 +117,7 @@ export function createAssistanceFlow({ endpoint, sessions, signIntent, consentSe
       operation.state = 'completed'; return receipt;
     } catch (error) {
       if (operation.state !== 'canceled') operation.state = 'failed';
-      if (journal) try { await journal.mark(preview.eventId, operation.authorization.subjectId, 'unknown'); } catch {}
+      if (journal && operation.journalCommitted) try { await journal.mark(preview.eventId, operation.authorization.subjectId, 'unknown'); } catch {}
       throw error;
     }
     finally { signing.delete(preview.intentJson); }
@@ -139,6 +151,6 @@ export function createAssistanceFlow({ endpoint, sessions, signIntent, consentSe
       {...previous,id:randomUUID(),bindingId:authorization.bindingId,issuedAt,expiresAt:Math.min(issuedAt + 2592000, authorization.bindingExpiresAt)};
     return prepareExact(record.payloadJson, intent, authorization);
   }
-  return Object.freeze({ prepare, execute, cancel, isSigningIntent: payload => signing.has(payload),
+  return Object.freeze({ prepare, ...(journal?.previewRequestDraft?{prepareDraft:input=>prepare(input,{draftPreview:true})}:{}), execute, cancel, isSigningIntent: payload => signing.has(payload),
     ...(journal ? { list: () => journal.list(), forget: id => journal.forget(id), reconcile, prepareRetry } : {}) });
 }

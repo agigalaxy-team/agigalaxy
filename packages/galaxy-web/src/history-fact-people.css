@@ -1,0 +1,29 @@
+/* Shared history reading styles travel with HistoryFacts in every entry. */
+.history-facts{max-width:100%;overflow-wrap:anywhere}
+.history-fact-tabs{display:flex;gap:24px;border-bottom:1px solid #e3dce9;margin:4px 0 24px;overflow-x:auto}
+.history-fact-tabs button{flex-shrink:0;background:none;border:0;border-bottom:2px solid transparent;padding:13px 2px;color:#776b82;cursor:pointer}
+.history-fact-tabs button[aria-pressed=true]{border-color:#7960bb;color:#50367b}
+.history-fact-section{margin:24px 0 32px}
+.history-fact-section>h3{font-size:17px;margin:0 0 18px}
+.history-timeline{padding-left:20px;border-left:2px solid #ece6f4;margin-left:6px}
+.history-fact-item{position:relative;margin:0 0 26px}
+.history-timeline>.history-fact-item:before{content:'';position:absolute;width:10px;height:10px;background:#a18cbf;border:2px solid #fff;border-radius:50%;left:-26px;top:5px}
+.history-fact-item h4{margin:0 0 8px;font-size:16px}
+.history-fact-item p{white-space:pre-wrap;margin:8px 0;line-height:1.75}
+.history-fact-item .fact-byline{font-size:12px;color:#807288}
+.history-fact-item .fact-note{font-size:13px;border-left:2px solid #d6c6e7;padding-left:12px;color:#72617d}
+.history-fact-item details{margin-top:12px;border:0;padding:0}
+.history-fact-item summary{font-size:13px;color:#776585;cursor:pointer}
+.history-fact-context{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-top:14px;padding:14px 18px;background:#f7f5fa;font-size:13px}
+.history-fact-context dt{color:#7d7087;font-size:12px;margin-bottom:5px}
+.history-fact-context dd{margin:0;line-height:1.7;white-space:pre-wrap}
+.history-source-notes{font-size:14px;color:#71657c;line-height:1.8;max-width:720px}
+.history-source-notes li{margin:8px 0}
+.history-source-download{display:inline-flex;gap:8px;align-items:center;border:1px solid #d8cee3;border-radius:7px;padding:9px 13px;background:#fff;color:#674e8a;cursor:pointer}
+
+.galaxy-site .history-fact-author{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;color:var(--g-muted)}
+.galaxy-site .history-fact-author .member-avatar{width:25px;height:25px;flex:none}
+.galaxy-site .history-fact-author .member-avatar svg{width:14px;height:14px}
+.galaxy-site .history-fact-author strong{font-size:12px;font-weight:500;overflow-wrap:anywhere}
+
+@media(max-width:700px){.history-fact-tabs{gap:16px}.history-fact-tabs button{font-size:13px;padding:12px 1px}.history-fact-context{grid-template-columns:minmax(0,1fr);padding:14px}.history-fact-section{margin:20px 0 28px}}

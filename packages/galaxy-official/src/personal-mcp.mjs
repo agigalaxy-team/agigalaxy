@@ -33,6 +33,8 @@ import {informationToolDefinitions} from './personal-mcp-information-v2.mjs';
 import { commentToolDefinitions } from './personal-mcp-comments-v2.mjs';
 import { contextV2ToolDefinitions } from './personal-mcp-context-v2.mjs';
 import { outcomeMaterialToolDefinitions } from './personal-mcp-outcome-materials-v2.mjs';
+import { trustPackageToolDefinitions } from './personal-mcp-trust-package.mjs';
+import {moderationToolDefinitions} from './personal-mcp-moderation-v2.mjs';
 
 const id=z.strictObject({id:z.uuid()});
 const signed=z.strictObject({signed:z.string().min(1).max(16384)});
@@ -50,6 +52,7 @@ function definitions(services,actor) {
     ...hubToolDefinitions(services,actor),
     ...factToolDefinitions(services,actor),
     ...chatToolDefinitions(services,actor),
+    ...moderationToolDefinitions(services,actor),
     ...attachmentToolDefinitions(services,actor),
     ...capsuleToolDefinitions(services,actor),
     ...configurationToolDefinitions(services,actor),
@@ -63,6 +66,7 @@ function definitions(services,actor) {
     ...commentToolDefinitions(services,actor),
     ...contextV2ToolDefinitions(services,actor),
     ...outcomeMaterialToolDefinitions(services,actor),
+    ...trustPackageToolDefinitions(services,actor),
     galaxy_account_quotas:tool('binding',z.strictObject({}),'Read verified Account status and current daily public task/comment/invitation quotas; this is not professional qualification.',()=>services.publicWrites.status(actor)),
     galaxy_connection_status:tool('binding',z.strictObject({}),'Read the current Galaxy subject, binding and allowed scopes.',
       ()=>services.access.runAuthorized(actor,'binding',async(_db,authorization)=>({subjectId:actor.subjectId,bindingId:actor.bindingId,

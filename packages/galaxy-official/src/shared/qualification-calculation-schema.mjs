@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 import {qualificationEvidenceV2Schema} from './qualification-v2-schema.mjs';
 const subject=z.string().regex(/^GUID[0-9A-Z]{28}$/);
-export const qualificationSourceGrantRef=z.strictObject({kind:z.enum(['case-event','task-event']),id:z.uuid(),
+export const qualificationSourceGrantRef=z.strictObject({kind:z.enum(['case-event','task-event','experience-event']),id:z.uuid(),
   eventVersion:z.literal(1),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)});
 const sourceRefs=z.array(qualificationSourceGrantRef).min(1).max(128);
 const common={id:z.uuid(),taskId:z.uuid(),candidateId:subject,recipientId:subject,purpose:z.literal('this-task-eligibility-computation-only'),

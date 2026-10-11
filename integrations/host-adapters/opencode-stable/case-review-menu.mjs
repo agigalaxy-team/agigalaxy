@@ -1,4 +1,5 @@
 import { nextCaseReviewStates } from '../../../packages/galaxy-official/src/domain/case-review.mjs';
+import {showExactChoice} from './exact-choice.mjs';
 
 export function createCaseReviewMenu({controller,caseId,sourceVersion,select,prompt,info,language,isCurrent,onBack}){
   const zh=language!=='en-US',label=(a,b)=>zh?a:b,plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,1200);
@@ -50,10 +51,10 @@ export function createCaseReviewMenu({controller,caseId,sourceVersion,select,pro
     `${event.version} · ${plain(event.kind)} · ${plain(event.id)}`,()=>begin(event.id,review),plain(event.title??event.summary??event.approach)]),home);}
   function confirm(preview){
     generation++;
+    const previewVersion=generation;
     const cancel=()=>{controller.cancel();edit();};
-    prompt({title:`${label('确认所有者说明（非独立裁决）','Confirm owner statement (not an independent decision)')}\n${preview.endpoint}\n${preview.payloadJson}\n${preview.intentJson}\n${preview.confirmation}`,
-      placeholder:preview.confirmation,onCancel:guard(cancel),onConfirm:guard(value=>{
-        if(value!==preview.confirmation){message(label('请输入完整确认文本。','Enter the exact confirmation.'),()=>confirm(preview));return;}
+    showExactChoice({preview,title:label('保存本次工作说明','Save this work statement'),note:label('这是所有者的说明，不代表独立裁决。','This is the owner’s statement, not an independent decision.'),select,info,language,isCurrent:()=>isCurrent()&&generation===previewVersion,
+      onCancel:guard(cancel),onConfirm:guard(value=>{
         void run(()=>controller.executeCaseReview(preview,value),receipt=>message(`${label('已追加事件；原记录保留','Event appended; original record retained')}\n${receipt.eventId}\n${label('来源版本','Source version')}: ${receipt.version}`));
       })});
   }

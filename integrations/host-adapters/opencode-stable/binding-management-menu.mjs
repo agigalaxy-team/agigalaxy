@@ -1,3 +1,4 @@
+import {showExactChoice} from './exact-choice.mjs';
 export function createBindingManagementMenu({controller,select,prompt,info,language,isCurrent,onBack}){
   const label=(zh,en)=>language==='en-US'?en:zh;
   let generation=0;const current=v=>isCurrent()&&generation===v;
@@ -32,10 +33,8 @@ export function createBindingManagementMenu({controller,select,prompt,info,langu
   function revoke(bindingId,back){void run(()=>controller.prepareBindingRevoke(bindingId),preview=>{
     const version=++generation;
     const leave=()=>{if(current(version)){generation++;controller.cancel();back();}};
-    prompt({title:`${label('撤销目标及影响','Revocation target and effects')}\n${preview.previewJson}\n${label('关联会话及授权将失效；如撤销当前绑定，本机会话会断开。输入下方完整确认文本。','Related sessions and grants lose access. Revoking the current binding ends this local session. Enter the exact confirmation below.')}`,
-      placeholder:preview.confirmation,onCancel:leave,onConfirm:value=>{
+    showExactChoice({preview,title:label('撤销所选设备连接','Revoke the selected device connection'),select,info,language,isCurrent:()=>current(version),onCancel:leave,onConfirm:value=>{
         if(!current(version))return;generation++;
-        if(value!==preview.confirmation){controller.cancel();return message(label('确认文本不匹配；未提交。','Confirmation did not match; not submitted.'),back);}
         void run(()=>controller.executeBindingRevoke(preview,value),result=>message(label('指定绑定已撤销。','The selected binding was revoked.'),result.currentSessionEnded?onBack:back),
           ()=>message(label('若提交期间网络中断，请重新读取该绑定状态；不会自动重试。','If the network failed during submission, refresh the binding status. No automatic retry.'),onBack));
       }});

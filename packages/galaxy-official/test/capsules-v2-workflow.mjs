@@ -63,7 +63,7 @@ export async function verifyCapsuleV2Workflow(db,{testHttp=false,...options}={})
     await f.capsules.recordUseV2(p.actor,await p.authorize(reverify,'capsule.use'));
     uses=await f.capsules.usesV2(p.actor,{capsuleId:v.capsuleId});assert.equal(uses.items.find(i=>i.kind==='reverify').verifications[0].referenceStatus,'current');
     assert.equal(uses.counts.independentlyVerifiedReuseCases,0);
-    const {observedAt,...revokeBase}=base;
+    const {observedAt:_observedAt,...revokeBase}=base;
     await f.verificationRecords.submit(p.actor,await eg(p,{...revokeBase,id:e.id,operationId:randomUUID(),kind:'revoke',objectType:'evidence',expectedVersion:1,reason:'撤回测试记录'}));
     uses=await f.capsules.usesV2(p.actor,{capsuleId:v.capsuleId});assert.equal(uses.items.find(i=>i.kind==='reverify').verifications[0].referenceStatus,'dependency-unavailable');
     const notice={schemaVersion:2,id:randomUUID(),kind:'deprecate',capsuleId:v.capsuleId,versionId:v.id,expectedRevision:1,summary:'方法不再推荐'};

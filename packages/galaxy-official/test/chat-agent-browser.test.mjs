@@ -6,7 +6,8 @@ import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
 import {createChatAgentClient} from '../../galaxy-web/src/chat-agent-client.mjs';
 
-const store=()=>{const values=new Map();return {get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value))};};
+const store=()=>{const values=new Map();return {get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value)),
+ update:async(key,updater)=>{const next=updater(structuredClone(values.get(key)));if(next&&typeof next.then==='function')throw Error('synchronous_update_required');values.set(key,structuredClone(next));return structuredClone(next);}};};
 test('HTTP room Agent grants recover lost receipts, isolate members and keep child room access separate',async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)});
  // Account availability is not under test: no synthetic account is written.

@@ -137,3 +137,14 @@ GRANT UPDATE(version,state,restriction_scopes,restriction_until,restriction_even
 -- Selected watch controls only. Exact operation receipts are immutable.
 GRANT SELECT,INSERT ON watch_controls_v2,watch_control_operations_v2 TO galaxy_api;
 GRANT UPDATE(revision,state,current_grant_id,current_binding_id,expires_at,updated_at,stopped_at) ON watch_controls_v2 TO galaxy_api;
+
+-- Independent ordinary forum. Immutable signed event/evidence bytes cannot be
+-- rewritten by the API. Only finite CAS heads and explicit revocation mutate.
+GRANT SELECT,INSERT ON forum_posts_v1,forum_versions_v1,forum_replies_v1,forum_events_v1,forum_permissions_v1,forum_reports_v1,forum_governance_events_v1,forum_daily_usage_v1,forum_write_receipts_v1 TO galaxy_api;
+GRANT UPDATE(head_version,current_version_id,state,updated_at) ON forum_posts_v1 TO galaxy_api;
+GRANT UPDATE(state) ON forum_versions_v1 TO galaxy_api;
+GRANT UPDATE(state,revision) ON forum_replies_v1 TO galaxy_api;
+GRANT UPDATE(revoked_at) ON forum_permissions_v1 TO galaxy_api;
+GRANT UPDATE(version,state,appeal_count,decision_event_id,restriction_event_id,restriction_until,closed_at,audit_until) ON forum_reports_v1 TO galaxy_api;
+GRANT UPDATE(used) ON forum_daily_usage_v1 TO galaxy_api;
+GRANT UPDATE(revocation_kind,revocation_control_event_id,revocation_request_id) ON bindings TO galaxy_api;

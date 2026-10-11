@@ -1,3 +1,4 @@
+import {showExactChoice} from './exact-choice.mjs';
 export function createAuditMenu({ controller, select, prompt, info, language, isCurrent, onBack, availableScopes = [] }) {
   const zh = language !== 'en-US', label = (a, b) => zh ? a : b;
   const plain = value => String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').slice(0, 180);
@@ -65,10 +66,10 @@ export function createAuditMenu({ controller, select, prompt, info, language, is
       actions: values.actions.split(/[,，]/).map(value => value.trim()).filter(Boolean) }), preview => {
       const cancel = () => { generation++; controller.cancel(); home(); };
       let submitted = false;
-      prompt({ title: `${label('确认限时审计授权', 'Confirm time-limited audit approval')}\n${preview.endpoint}\n${preview.payloadJson}\n${preview.confirmation}`,
-        placeholder: preview.confirmation, onCancel: cancel, onConfirm: value => {
+      const previewVersion=generation;
+      showExactChoice({preview,title:label('允许本次限时记录查询','Allow this time-limited record access'),select,info,language,isCurrent:()=>isCurrent()&&generation===previewVersion&&!submitted,
+        onCancel: cancel, onConfirm: value => {
           if (!isCurrent() || submitted) return;
-          if (value !== preview.confirmation) { cancel(); return; }
           submitted = true;
           void run(() => controller.executeAudit(preview, value), result => message(`${label('授权已记录', 'Approval recorded')}: ${result.id}`, grants));
         } });

@@ -110,7 +110,7 @@ export class IdentityControlService {
         [event.id,event.subjectId,sequence,epoch,event.kind,event.previousEventHash,eventHash,event.payloadText,event.controllerSignature,event.newDeviceProof,event.signerKeyId,acceptedAt]);
       if(request.kind==='recover'){
         await db.query("UPDATE device_authorizations SET status='revoked',revoked_at=$2 WHERE subject_id=$1 AND status='active'",[request.subjectId,acceptedAt]);
-        await db.query('UPDATE bindings SET revoked_at=$2 WHERE subject_id=$1 AND revoked_at IS NULL',[request.subjectId,acceptedAt]);
+        await db.query("UPDATE bindings SET revoked_at=$2,revocation_kind='recovery',revocation_control_event_id=$3,revocation_request_id=$3 WHERE subject_id=$1 AND revoked_at IS NULL",[request.subjectId,acceptedAt,request.operationId]);
         await db.query(`UPDATE access_credentials SET revoked_at=$2 WHERE binding_id IN (SELECT id FROM bindings WHERE subject_id=$1) AND revoked_at IS NULL`,[request.subjectId,acceptedAt]);
       }
       if(request.newDevice){
@@ -131,7 +131,7 @@ export class IdentityControlService {
           if(!others.length&&!recovery)throw new ServiceError('identity_last_controller',409);
         }
         await db.query("UPDATE device_authorizations SET status='revoked',revoked_at=$2 WHERE device_id=$1",[request.deviceId,acceptedAt]);
-        await db.query('UPDATE bindings SET revoked_at=$2 WHERE device_id=$1 AND revoked_at IS NULL',[request.deviceId,acceptedAt]);
+        await db.query("UPDATE bindings SET revoked_at=COALESCE(revoked_at,$2),revocation_kind='device-revoked',revocation_control_event_id=$3,revocation_request_id=$3 WHERE device_id=$1 AND (revoked_at IS NULL OR revocation_kind='recovery')",[request.deviceId,acceptedAt,request.operationId]);
         await db.query('UPDATE access_credentials SET revoked_at=$2 WHERE device_id=$1 AND revoked_at IS NULL',[request.deviceId,acceptedAt]);
       }
       if(request.nextRecoveryPublicKey){
@@ -163,7 +163,17 @@ export class IdentityControlService {
     const commit=parse(controlCommitSchema,input);
     const operation=await one(this.db,'SELECT * FROM identity_control_operations WHERE id=$1',[commit.operationId]);
     if(!operation)throw new ServiceError('identity_operation_unknown',404);
-    if(operation.state==='committed'){await this.#receiptProof(this.db,operation,commit);return operation.receipt;}
+    if(operation.state==='committed'){
+      // The approving controller does not possess the joining device's proof.
+      // Only this read accepts its exact recorded approval, and only while the
+      // original signer still has current identity management authority.
+      if(operation.request.kind==='authorize-device'&&!commit.newDeviceProof){
+        const event=await one(this.db,'SELECT * FROM subject_control_events WHERE id=$1',[operation.id]);
+        if(!event||event.controller_signature!==commit.controllerSignature)throw new ServiceError('identity_control_proof_invalid',401);
+        await this.#currentOperationProof(this.db,operation,commit.controllerSignature);
+      }else await this.#receiptProof(this.db,operation,commit);
+      return operation.receipt;
+    }
     if(operation.request.newDevice&&commit.newDeviceProof)await verifyControlSignature(commit.newDeviceProof,operation.request.newDevice.publicKeyPem,operation.challenge_text);
     else await this.#currentOperationProof(this.db,operation,commit.controllerSignature);
     return {operationId:operation.id,subjectId:operation.subject_id,state:operation.state==='requested'&&Date.parse(operation.expires_at)<=this.now()*1000?'expired':operation.state};

@@ -1,80 +1,184 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {peeringAgreementSchema,peeringSummaryFields} from '../../galaxy-official/src/shared/hub-peering-v2-schema.mjs';
-type Props={client:any;hubId:string;owner:boolean;subjectId:string;onPending:()=>void};
-const fieldNames:Record<string,string>={eventType:'贡献类型',actorId:'本人银河 ID',role:'当次角色',interventionTypes:'实际介入方式',scopeVersion:'当次范围版本',reportedOutcome:'作者报告的结果',time:'记录时间'};
-export function HubPeeringWorkspace({client,hubId,owner,subjectId,onPending}:Props){
-  const [connections,setConnections]=useState<any[]>([]),[connectionAfter,setConnectionAfter]=useState<string|null>(null),[agreementId,setAgreementId]=useState('');
-  const [agreements,setAgreements]=useState<any[]>([]),[agreementAfter,setAgreementAfter]=useState<string|null>(null),[grants,setGrants]=useState<any[]>([]),[grantAfter,setGrantAfter]=useState<string|null>(null);
-  const [localParty,setLocalParty]=useState<any>(null),[peerParty,setPeerParty]=useState(''),[agreementText,setAgreementText]=useState('');
-  const [kind,setKind]=useState('case-event'),[parentId,setParentId]=useState(''),[sources,setSources]=useState<any[]>([]),[sourceAfter,setSourceAfter]=useState<string|null>(null),[source,setSource]=useState<any>(null);
-  const [fields,setFields]=useState<string[]>(['eventType','actorId']),[readers,setReaders]=useState(''),[sourcePreview,setSourcePreview]=useState<any>(null),[preview,setPreview]=useState<any>(null);
-  const [result,setResult]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
-  const epoch=useRef(0),running=useRef(false);
-  useEffect(()=>{epoch.current++;setConnections([]);setAgreements([]);setGrants([]);setSources([]);setResult(null);setPreview(null);setSourcePreview(null);setSource(null);setAgreementId('');setLocalParty(null);setAgreementText('');setPeerParty('');setError('');setBusy(false);},[client,hubId,subjectId]);
-  useEffect(()=>{if(!result?.expiresAt)return;const t=setTimeout(()=>setResult(null),Math.max(0,result.expiresAt*1000-Date.now()));return()=>clearTimeout(t);},[result]);
-  const run=async(fn:(valid:()=>boolean)=>Promise<void>)=>{if(running.current)return;const token=epoch.current,valid=()=>token===epoch.current;running.current=true;setBusy(true);setError('');setMessage('');
-    try{await fn(valid);}catch(e:any){if(valid())setError((typeof e?.message==='string'&&e.message.trim()?e.message:'操作暂未完成，请核对原操作。'));}finally{running.current=false;if(valid())setBusy(false);}};
+import {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSummaryFields} from '../../galaxy-official/src/shared/hub-peering-v2-schema.mjs';
+import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
+import {useGovernanceDraft} from './governance-presentation';
+import {CiProofView,ciTime} from './ci-proof-view';
+import {samePeeringMaterial} from './peering-material.mjs';
+import {PeeringAgreementEditor,preparePeeringAgreement} from './hub-peering-settings';
+import './peering-ci.css';
+import type {HubClient,HubClientEvent,HubLocator,HubMember,HubRuntime} from './hub-workspace-types';
+import {hubErrorField} from './hub-workspace-types';
+import type {PeeringChoice,PeeringConnection,PeeringEvent,PeeringInput,PeeringMaterial,PeeringOwned,PeeringParty,PeeringPreview,PeeringQuery,PeeringSource,PeeringWork,PeeringAgreement} from './hub-peering-state';
+type Props={client:HubClient;runtime:HubRuntime;hubId:string;owner:boolean;subjectId:string;members?:HubMember[];availableActions?:string[];isCurrent:()=>boolean;onPending:()=>void};
+const fieldNames:Record<string,string>={eventType:'贡献类型',actorId:'记录作者',role:'当次角色',interventionTypes:'实际介入方式',scopeVersion:'当次范围版本',reportedOutcome:'作者报告的结果',time:'记录时间'};
+const factNames:Record<string,string>={'case-created':'记录一项工作',intervention:'参与工作','result-recorded':'记录结果','task-created':'发起求助','participation-proposed':'提出参与范围',confirm:'开始参与',deliver:'提供成果',accept:'接收成果','requester-feedback':'反馈本次参与','ci-observation-proof':'CI 运行证明',requester:'发起人',helper:'参与者',author:'作者',diagnosis:'诊断',verification:'验证',advice:'建议',patch:'修复',review:'复核','context-addition':'补充背景','tool-introduction':'引入工具',takeover:'接续工作',partial:'部分完成',failed:'未成功',succeeded:'报告成功',inconclusive:'尚无定论'};
+const blank:PeeringInput={tab:'browse',agreementId:'',kind:'case-event',parentId:'',source:null,fields:['eventType','actorId'],readers:[] as string[],extraReaders:'',peopleQuery:'',peerParty:'',agreementText:''};
+const sourceKey=(source:PeeringSource|null)=>source?.kind==='ci-proof-v2'?source.id:source?.source.id;
+const workKey=(work:PeeringWork)=>work.taskId?'task-event:'+work.taskId:work.caseId?'case-event:'+work.caseId:'';
+const workTitle=(work:PeeringWork)=>work?.request?.title??work?.title??work?.summary??'已有工作';
+function workOptions(works:PeeringWork[],kind:string){
+  const found=new Map<string,{id:string;title:string;priority:number}>();
+  for(const work of works){
+    const id=kind==='task-event'?work.taskId:kind==='case-event'?work.caseId:null;if(!id)continue;
+    const caseTitle=work.kind==='case-history'&&typeof work.title==='string'?work.title.trim():'';
+    const taskTitle=work.taskId?workTitle(work):'';
+    const title=kind==='task-event'?workTitle(work):caseTitle||(taskTitle?taskTitle+'的工作记录':'已有工作记录');
+    const priority=caseTitle?2:taskTitle?1:0,previous=found.get(id);
+    if(!previous||priority>previous.priority)found.set(id,{id,title,priority});
+  }
+  return [...found.values()];
+}
+const peerName=(endpoint:string)=>{try{return new URL(endpoint).host;}catch{return endpoint;}};
+const label=(value:unknown)=>{const text=typeof value==='string'||typeof value==='number'?String(value):'未记录';return factNames[text]??text;};
+const errorText=(error:unknown)=>({
+  hub_member_required:'当前社区尚未向你开放互联查询，请先查看自己的加入范围。',
+  hub_scope_required:'当前加入范围未包含互联查询，可以在“我的加入范围”核对。',
+  peering_source_unavailable:'这份来源现在无法读取，请重新选择当前可分享的记录。',
+  peering_source_author_required:'这里仅能选择本人提供的记录。',
+  peering_kind_not_agreed:'这条连接当前未约定分享这种材料，请选择其他来源或连接。',
+  peering_scope_changed:'双方约定已经变化，请重新读取当前连接后继续。',
+  peering_response_expired:'本次材料的核对时间已到，页面会重新读取当前状态。',
+  peering_rate_limited:'对方服务要求稍后再读，页面会按当前连接继续核对。',
+  peering_grant_scope_mismatch:'许可范围或有效期已经变化，请重新预览这份材料。',
+  consent_reauthorization_required:'原操作需要你重新确认，请查看页面上的原内容后继续。',
+} as Record<string,string>)[hubErrorField(error,'code')||hubErrorField(error,'message')]??(/[\u3400-\u9fff]/.test(hubErrorField(error,'message'))?hubErrorField(error,'message'):'暂时无法读取这部分内容，已有输入仍保留。');
+function MaterialView({value,subjectId,names,technical=true}:{value:PeeringMaterial|null;subjectId:string;names:Record<string,string|null>;technical?:boolean}){
+  if(!value)return null;if(value.signed)return <CiProofView value={value} technical={technical}/>;const projection=value.projection;
+  if(!projection)return <p>当前无法读取这份材料的内容。</p>;
+  const show=(key:string,field:string|number|string[]|null)=>field==null?'本条未记录':key==='actorId'&&typeof field==='string'?memberName(field,subjectId,names[field]??undefined):key==='time'?ciTime(field):Array.isArray(field)?field.map(label).join('、')||'本条未记录':label(field);
+  return <div><h4>{label(projection.eventType)}</h4>{value.synthetic===true&&<p className="browse-note">这是合成演示资料。</p>}<dl className="material-facts">{Object.entries(projection).map(([key,field])=><div key={key}><dt>{fieldNames[key]??key}</dt><dd>{show(key,field)}</dd></div>)}</dl><p className="permission-line">分享范围仅包含上面列出的字段。工作标题、过程文字和原始任务正文均未包含在本次材料中。</p>{technical&&<details className="technical-details"><summary>原始字段与精确来源</summary><pre>{JSON.stringify(value,null,2)}</pre></details>}</div>;
+}
+function AgreementView({agreement}:{agreement:PeeringAgreement|null}){
+  if(!agreement)return null;
+  return <div><h3>两个服务直接互联</h3>{agreement.parties.map(party=><p key={party.endpoint}>{party.endpoint}</p>)}<dl className="material-facts"><div><dt>允许的材料</dt><dd>{agreement.sourceKinds.map((kind:string)=>kind==='ci-proof-v2'?'CI 运行证明':'作者选定的贡献字段').join('、')}</dd></div><div><dt>用途</dt><dd>了解可提供帮助的依据</dd></div><div><dt>本次约定至</dt><dd>{ciTime(agreement.expiresAt)}</dd></div><div><dt>读取上限</dt><dd>每分钟 {agreement.ratePerMinute} 次，每页最多 {agreement.pageSize} 项</dd></div></dl><p className="permission-line">双方仍分别决定自己的成员、材料许可和评价。原任务正文不随互联开放；收到材料不自动改变能力或结果认定。</p></div>;
+}
+export function HubPeeringActionView({event,material,peer,subjectId,names}:{event:PeeringEvent;material?:PeeringMaterial;peer?:string;subjectId:string;names:Record<string,string|null>}){
+  if(event.kind==='peer-approve')return <AgreementView agreement={event.agreement}/>;
+  if(event.kind==='peer-exit')return <><h3>退出这条互联</h3>{peer&&<p>{peer}</p>}<p>确认后，本方关闭这条互联范围。另一方继续按自己的规则运行。</p></>;
+  if(event.kind==='source-revoke')return <><h3>撤销这份材料的互联许可</h3><p>确认后，对方不能再凭这项许可读取材料。原始工作记录及其他单独授权保持各自状态。</p></>;
+  return <><h3>分享这一份{event.source?.kind==='ci-proof-v2'?' CI 运行证明':'贡献摘要'}</h3>{peer&&<p>通过 {peer} 读取</p>}{material?<MaterialView value={material} subjectId={subjectId} names={names}/>:<p>仅分享{event.source?.kind==='ci-proof-v2'?'选定的 CI 原证明':(event.source?.fields??[]).map((field:string)=>fieldNames[field]??field).join('、')}。</p>}<h4>允许读取的人</h4><div className="peering-people">{event.requesterIds?.map((id:string)=><div className="peering-person" key={id}><MemberAvatar subjectId={id}/><span>{memberName(id,subjectId,names[id]??undefined)}</span></div>)}</div><p>本次许可至 {ciTime(event.expiresAt)}。读取时仍须满足双方约定和原材料的当前权限。</p></>;
+}
+export function HubPeeringRecoveryView({client,event,subjectId,names,isCurrent}:{client:HubClient;event:HubClientEvent;subjectId:string;names:Record<string,string|null>;isCurrent:()=>boolean}){
+  const parsed=peeringEventSchema.safeParse(event);if(!parsed.success)return <p>当前原操作不是互联内容，请读取其准确范围。</p>;
+  return <HubPeeringRecoverySession key={event.id} client={client} event={parsed.data} subjectId={subjectId} names={names} isCurrent={isCurrent}/>;
+}
+function HubPeeringRecoverySession({client,event,subjectId,names,isCurrent}:{client:HubClient;event:PeeringEvent;subjectId:string;names:Record<string,string|null>;isCurrent:()=>boolean}){
+  const [current,setCurrent]=useState<PeeringPreview|null>(null),[failed,setFailed]=useState(false);
+  const readOriginal=useEffectEvent(async()=>event.kind==='source-grant'?client.peering('preview',{hubId:event.hubId,agreementId:event.agreementId,source:event.source}):null);
+  const originalIsCurrent=useEffectEvent(isCurrent);
+  useEffect(()=>{let active=true,reading=false;const refresh=()=>{if(!active||reading||document.hidden)return;reading=true;void readOriginal().then(value=>{if(active&&originalIsCurrent()){setCurrent(value);setFailed(false);}}).catch(()=>{if(active&&originalIsCurrent()){setCurrent(null);setFailed(true);}}).finally(()=>{reading=false;});};refresh();const timer=setInterval(refresh,20000);document.addEventListener('visibilitychange',refresh);return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[client,event.id]);
+  return <><HubPeeringActionView event={event} material={current?.projection} peer={current?.peer} subjectId={subjectId} names={names}/>{failed&&<p>原来源当前无法重新读取；以下原操作仍按当时选择的精确来源和字段保留。</p>}</>;
+}
+export function HubPeeringWorkspace({client,runtime,hubId,owner,subjectId,members=[],availableActions=[],isCurrent,onPending}:Props){
+  const draft=useGovernanceDraft<PeeringInput,HubLocator>(runtime,subjectId,true,'hub-peering-input:v1:'+JSON.stringify([runtime.api.endpoint,subjectId,hubId]),blank),input=draft.value;
+  const inputRef=useRef(input);useEffect(()=>{inputRef.current=input;},[input]);
+  const [connections,setConnections]=useState<PeeringConnection[]>([]),[connectionAfter,setConnectionAfter]=useState<string|null>(null),[connectionsReady,setConnectionsReady]=useState(false);
+  const [works,setWorks]=useState<PeeringWork[]>([]),[workMore,setWorkMore]=useState<Record<string,string|null>>({}),[worksReady,setWorksReady]=useState(false),[workError,setWorkError]=useState('');
+  const [contacts,setContacts]=useState<string[]>([]),[contactAfter,setContactAfter]=useState<string|null>(null),[peopleReady,setPeopleReady]=useState(false),[peopleError,setPeopleError]=useState('');
+  const [sources,setSources]=useState<{source:PeeringSource;eventType:string;synthetic:boolean|null}[]>([]),[sourceAfter,setSourceAfter]=useState<string|null>(null),[sourcesReady,setSourcesReady]=useState(false);
+  const [agreements,setAgreements]=useState<PeeringOwned<Extract<PeeringEvent,{kind:'peer-approve'}>>[]>([]),[agreementAfter,setAgreementAfter]=useState<string|null>(null),[agreementsReady,setAgreementsReady]=useState(false);
+  const [grants,setGrants]=useState<PeeringOwned<Extract<PeeringEvent,{kind:'source-grant'}>>[]>([]),[grantAfter,setGrantAfter]=useState<string|null>(null),[grantsReady,setGrantsReady]=useState(false);
+  const [localParty,setLocalParty]=useState<PeeringParty|null>(null),[sourceRecord,setSourceRecord]=useState<(PeeringPreview&{fingerprint:string})|null>(null),[sourceError,setSourceError]=useState('');
+  const [queryRecord,setQueryRecord]=useState<{agreementId:string;value:PeeringQuery}|null>(null),[queryState,setQueryState]=useState(''),[queryError,setQueryError]=useState(''),[querying,setQuerying]=useState(false);
+  const [preview,setPreview]=useState<PeeringChoice|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+  const counters=useRef({epoch:0,source:0,material:0,query:0}),running=useRef(false),queryingRef=useRef<{id:string;token:number}|null>(null);
+  const cursor=useRef({after:0,ids:[] as string[],deferred:[] as string[]}),dialog=useRef<HTMLDialogElement>(null),dialogHeading=useRef<HTMLHeadingElement>(null);
+  const canQuery=availableActions.includes('peering-query'),canShare=availableActions.includes('peering-share'),canApprove=availableActions.includes('peer-approve'),peopleSearch=input.peopleQuery??'';
+  const agreementId=input.agreementId||(connections.length===1?connections[0].agreementId:'');
+  const agreementRef=useRef(agreementId);useEffect(()=>{agreementRef.current=agreementId;},[agreementId]);
+  const selectedConnection=connections.find(item=>item.agreementId===agreementId);
+  const readerIds=[...new Set<string>([...(input.readers??[]),...String(input.extraReaders??'').split(/\s+/).filter(Boolean)])];
+  const people=[...new Set<string>([...members.map(item=>item.memberId),...contacts,...readerIds])];
+  const names=useMemberNames(runtime,subjectId,true,[...people,...(queryRecord?.agreementId===agreementId?queryRecord.value.items:[]).flatMap(item=>item.subjectId?[item.subjectId]:[]),...(preview?.event.kind==='source-grant'?preview.event.requesterIds:[]),...grants.flatMap(item=>item.record?.requesterIds??[])]);
+  const selectedSource:PeeringSource|null=input.source?{...input.source,...(input.source.kind==='contribution-summary'?{fields:input.fields}:{})}:null;
+  const selectableWorks=workOptions(works,input.kind);
+  const sourceFingerprint=JSON.stringify([agreementId,selectedSource]);
+  const sourcePreview=canShare&&input.tab==='share'&&sourceRecord?.fingerprint===sourceFingerprint?sourceRecord:null;
+  const result=canQuery&&input.tab==='browse'&&queryRecord?.agreementId===agreementId?queryRecord.value:null;
+  const [now,setNow]=useState(Date.now);
+  useEffect(()=>{const next=Math.min(...[...grants,...agreements].map(item=>item.expiresAt*1000).filter(time=>time>now));if(!Number.isFinite(next))return;const timer=setTimeout(()=>setNow(Date.now()),Math.min(2147483647,Math.max(0,next-Date.now()+1)));return()=>clearTimeout(timer);},[grants,agreements,now]);
+  const readersValid=readerIds.length>0&&readerIds.length<=16&&readerIds.every(id=>/^GUID[0-9A-Z]{28}$/.test(id));
+  function change(patch:Partial<PeeringInput>){if((patch.kind!==undefined&&patch.kind!==input.kind)||(patch.parentId!==undefined&&patch.parentId!==input.parentId)){counters.current.source++;setSources([]);setSourceAfter(null);setSourcesReady(false);}setError('');setMessage('');setPreview(null);draft.change(patch);}
+  async function read(path:string,payload:object){const token=counters.current.epoch,lease=runtime.receiptStatus.captureLease();lease.assertCurrent();if(!isCurrent())throw Error('连接已变化，请重新打开社区。');const value=await runtime.api.call(path,payload);lease.assertCurrent();if(token!==counters.current.epoch||!isCurrent())throw Error('连接已变化，请重新打开社区。');return value;}
+  async function run(fn:(valid:()=>boolean)=>Promise<void>){if(running.current)return;const token=counters.current.epoch,valid=()=>token===counters.current.epoch&&isCurrent();if(!valid())return;running.current=true;setBusy(true);setError('');setMessage('');try{await fn(valid);}catch(e){if(valid())setError(errorText(e));}finally{running.current=false;if(valid())setBusy(false);}}
+  async function settleDraft(){const tab=inputRef.current.tab,removed=await draft.settle(locator=>client.receiptFor(locator));if(removed&&isCurrent()){draft.change({tab});setPreview(null);setSourceRecord(null);setMessage('原来的互联内容已保存。');void loadConnections();void loadOwned(tab==='settings'?'agreements':'grants');}return removed;}
+  async function loadConnections(after?:string){const token=counters.current.epoch;try{const page=await client.peering('connections',{hubId,limit:20,...(after?{after}:{})});if(token!==counters.current.epoch||!isCurrent())return;setConnections(old=>after?[...old,...page.items]:page.items);setConnectionAfter(page.nextCursor);setConnectionsReady(true);}catch(e){if(token===counters.current.epoch&&isCurrent()){setConnectionsReady(true);setError(errorText(e));}}}
+  async function loadWorks(view?:string,after?:string){const token=counters.current.epoch;setWorkError('');try{const kinds=view?[view]:['requested','participating','history'];const pages=await Promise.allSettled(kinds.map(async kind=>({kind,page:await read(kind==='history'?'/v2/history/query':'/v2/tasks/query',{...(kind==='history'?{subjectId,timeWindow:{kind:'all-visible'}}:{view:kind}),limit:20,...(after?{after}:{})})})));
+    const fetched:PeeringWork[]=[],next:Record<string,string|null>={};let failed=false;for(const page of pages){if(page.status==='rejected'){failed=true;continue;}const {kind,page:value}=page.value;fetched.push(...(kind==='history'?value.items.filter((item:PeeringWork)=>item.kind==='case-history'):value.items));next[kind]=value.nextCursor??value.nextAfter??null;}
+    if(token!==counters.current.epoch||!isCurrent())return;setWorks(old=>[...new Map([...(view?old:[]),...fetched].filter(item=>workKey(item)).map(item=>[workKey(item),item])).values()]);setWorkMore(old=>({...old,...next}));setWorksReady(true);if(failed)setWorkError('部分工作暂未读取成功，已读取的内容仍可选择。');
+  }catch{if(token===counters.current.epoch&&isCurrent()){setWorksReady(true);setWorkError('暂时无法读取你的工作记录。');}}}
+  async function loadPeople(after?:string){const token=counters.current.epoch;setPeopleError('');try{const page=await read('/v2/contacts/query',{direction:'both',limit:50,...(after?{after}:{})});if(token!==counters.current.epoch)return;const ids=page.items.filter((item:{state:string})=>item.state==='accepted').map((item:{initiatorId:string;recipientId:string})=>item.initiatorId===subjectId?item.recipientId:item.initiatorId);setContacts(old=>[...new Set<string>(after?[...old,...ids]:ids)]);setContactAfter(page.nextAfter??null);setPeopleReady(true);}catch{if(token===counters.current.epoch&&isCurrent()){setContacts([]);setPeopleReady(true);setPeopleError('联系人暂时无法读取。');}}}
+  async function loadSources(after?:string){const token=++counters.current.source,kind=inputRef.current.kind,parentId=inputRef.current.parentId;setSourcesReady(false);setSourceError('');if(kind!=='ci-proof-v2'&&!parentId){setSources([]);setSourceAfter(null);setSourcesReady(true);return;}
+    try{const page=await client.peering('sources',{hubId,kind,...(kind==='ci-proof-v2'?{}:{parentId}),limit:20,...(after?{after}:{})});if(token!==counters.current.source||kind!==inputRef.current.kind||parentId!==inputRef.current.parentId||!isCurrent())return;setSources(old=>after?[...old,...page.items]:page.items);setSourceAfter(page.nextCursor);setSourcesReady(true);}catch(e){if(token===counters.current.source&&kind===inputRef.current.kind&&parentId===inputRef.current.parentId&&isCurrent()){setSourcesReady(true);setSources([]);setSourceError(errorText(e));}}}
+  async function loadOwned(which:'agreements'|'grants',after?:string){const token=counters.current.epoch;try{if(which==='grants'){const page=await client.peering('list',{hubId,kind:which,limit:20,...(after?{after}:{})});if(token!==counters.current.epoch||!isCurrent())return;setGrants(old=>after?[...old,...page.items]:page.items);setGrantAfter(page.nextCursor);setGrantsReady(true);}else{const page=await client.peering('list',{hubId,kind:which,limit:20,...(after?{after}:{})});if(token!==counters.current.epoch||!isCurrent())return;setAgreements(old=>after?[...old,...page.items]:page.items);setAgreementAfter(page.nextCursor);setAgreementsReady(true);}}catch(e){if(token===counters.current.epoch&&isCurrent())setError(errorText(e));}}
+  async function query(after=0,recheck:string[]=[]){const id=agreementRef.current;if(!id||queryingRef.current?.id===id||!isCurrent())return;const token=++counters.current.query;queryingRef.current={id,token};setQuerying(true);setQueryError('');setQueryRecord(null);setQueryState('reading');
+    try{const value=await client.peering('query',{hubId,agreementId:id,queryId:crypto.randomUUID(),after,recheck:[...new Set(recheck)].slice(0,20)});if(token!==counters.current.query||id!==agreementRef.current||!isCurrent())return;setQueryRecord({agreementId:id,value});setQueryState(value.state==='unknown'?'unknown':'current');if(value.state!=='unknown')cursor.current={after:value.nextCursor,ids:(value.items??[]).map(item=>item.grantId).slice(0,20),deferred:value.deferredRecheck??[]};}
+    catch(e){if(token===counters.current.query&&id===agreementRef.current&&isCurrent()){setQueryState('unknown');setQueryError(errorText(e));}}finally{if(queryingRef.current?.token===token)queryingRef.current=null;if(token===counters.current.query&&isCurrent())setQuerying(false);}}
+  const loadConnectionState=useEffectEvent(()=>{if(canQuery||canShare)void loadConnections();});
+  const settleOriginal=useEffectEvent(settleDraft);
+  const loadTab=useEffectEvent(()=>{if(input.tab==='share'){if(!worksReady)void loadWorks();if(!peopleReady)void loadPeople();if(!grantsReady)void loadOwned('grants');}if(input.tab==='settings'&&owner){if(!agreementsReady)void loadOwned('agreements');if(!localParty){const token=counters.current.epoch;void client.peering('party',{hubId}).then(value=>{if(token===counters.current.epoch&&isCurrent())setLocalParty(value.party);}).catch(e=>{if(token===counters.current.epoch&&isCurrent())setError(errorText(e));});}}});
+  const loadSourceChoices=useEffectEvent(()=>{if(canShare&&input.tab==='share')void loadSources();});
+  const refreshSource=useEffectEvent(async()=>{if(!selectedSource||!agreementId||running.current)return;const token=++counters.current.material;try{const value=await client.peering('preview',{hubId,agreementId,source:selectedSource});if(token===counters.current.material&&isCurrent()){setSourceRecord({...value,fingerprint:sourceFingerprint});setSourceError('');}}catch(e){if(token===counters.current.material&&isCurrent()){setSourceRecord(null);setPreview(old=>old?.event.kind==='source-grant'?null:old);setSourceError(errorText(e));}}});
+  useEffect(()=>{counters.current.epoch++;const state=counters.current;void Promise.resolve().then(()=>loadConnectionState());return()=>{state.epoch++;state.source++;state.material++;state.query++;};},[client,hubId,canQuery,canShare]);
+  useEffect(()=>{if(!draft.ready||!draft.attempt)return;let reading=false;const tick=()=>{if(reading||running.current||document.hidden)return;reading=true;void settleOriginal().catch(()=>{}).finally(()=>{reading=false;});};tick();const timer=setInterval(tick,12000);document.addEventListener('visibilitychange',tick);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',tick);};},[draft.ready,draft.attempt]);
+  useEffect(()=>{if(draft.ready)void Promise.resolve().then(()=>loadTab());},[draft.ready,input.tab,owner]);
+  useEffect(()=>{if(draft.ready)void Promise.resolve().then(()=>loadSourceChoices());},[draft.ready,input.tab,input.kind,input.parentId,canShare]);
+  useEffect(()=>{if(!draft.ready||!canShare||input.tab!=='share')return;let reading=false,active=true;const state=counters.current;
+    const refresh=()=>{if(!active||reading||document.hidden)return;reading=true;void refreshSource().finally(()=>{reading=false;});};refresh();const timer=setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);return()=>{active=false;state.material++;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[draft.ready,input.tab,sourceFingerprint,canShare]);
+  useEffect(()=>{if(!sourcePreview)return;const expiresAt=Math.min(sourcePreview.maxExpiresAt,sourcePreview.projection?.expiresAt??Infinity);const timer=window.setTimeout(()=>{setSourceRecord(null);setPreview(old=>old?.event.kind==='source-grant'?null:old);setSourceError('所选材料或连接已经到期，请选择当前可用的范围。');},Math.max(0,expiresAt*1000-Date.now()));return()=>window.clearTimeout(timer);},[sourcePreview]);
+  const refreshQuery=useEffectEvent(()=>{if(running.current)return;const current=cursor.current;void query(current.after,[...current.deferred,...current.ids]);});
+  useEffect(()=>{counters.current.query++;cursor.current={after:0,ids:[],deferred:[]};if(!draft.ready||!canQuery||input.tab!=='browse'||!agreementId)return;
+    let cancelled=false,lastStarted=0;const state=counters.current;const refresh=()=>{if(cancelled||document.hidden||Date.now()-lastStarted<65000)return;lastStarted=Date.now();refreshQuery();};refresh();const timer=setInterval(refresh,65000);document.addEventListener('visibilitychange',refresh);
+    return()=>{cancelled=true;state.query++;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[draft.ready,input.tab,agreementId,canQuery]);
+  useEffect(()=>{if(!result?.expiresAt)return;const timer=window.setTimeout(()=>{setQueryRecord(null);setQueryState('expired');},Math.max(0,result.expiresAt*1000-Date.now()));return()=>window.clearTimeout(timer);},[result]);
+  useEffect(()=>{if(!preview){dialog.current?.close();return;}dialog.current?.showModal();const frame=requestAnimationFrame(()=>{dialogHeading.current?.focus({preventScroll:true});if(dialog.current)dialog.current.scrollTop=0;});return()=>cancelAnimationFrame(frame);},[preview]);
   const base=(kind:string)=>({schemaVersion:2,id:crypto.randomUUID(),hubId,kind});
-  const selectedSource=()=>source?.kind==='contribution-summary'?{...source,fields}:source;
-  async function listConnections(next?:string){await run(async valid=>{const p=await client.peering('connections',{hubId,...(next?{after:next}:{})});if(valid()){setConnections(x=>next?[...x,...p.items]:p.items);setConnectionAfter(p.nextCursor);}});}
-  async function owned(which:'agreements'|'grants',next?:string){await run(async valid=>{const p=await client.peering('list',{hubId,kind:which,...(next?{after:next}:{})});if(valid()){
-    if(which==='agreements'){setAgreements(x=>next?[...x,...p.items]:p.items);setAgreementAfter(p.nextCursor);}else{setGrants(x=>next?[...x,...p.items]:p.items);setGrantAfter(p.nextCursor);}}});}
-  async function findSources(next?:string){await run(async valid=>{const p=await client.peering('sources',{hubId,kind,...(kind==='ci-proof-v2'?{}:{parentId:parentId.trim()}),...(next?{after:next}:{})});
-    if(valid()){setSources(x=>next?[...x,...p.items]:p.items);setSourceAfter(p.nextCursor);}});}
-  async function query(after=0,recheck:string[]=[]){await run(async valid=>{setResult(null);const p=await client.peering('query',{hubId,agreementId:agreementId.trim(),queryId:crypto.randomUUID(),after,recheck});if(valid())setResult(p);});}
-  function prepareAgreement(){const agreement=peeringAgreementSchema.parse(JSON.parse(agreementText));setPreview({...base('peer-approve'),expectedVersion:agreement.version-1,agreement});}
-  return <section className="task-card"><h2>向已选社区查询获准的帮助依据</h2><p>互联可返回原始 CI 观察证明和作者明确选定的贡献摘要。普通阅读、加入社区和公开任务都不会自动授权跨社区分享。</p>
-    <Button type="button" disabled={busy} onClick={()=>listConnections()}>查看本次可选直连范围</Button>
-    {connections.map(c=><div key={c.agreementId}><p>{c.peer} · 第 {c.version} 版 · 需实际查询确认对端状态</p><Button type="button" disabled={busy} onClick={()=>{setAgreementId(c.agreementId);setResult(null);setSourcePreview(null);}}>选择此范围</Button></div>)}
-    {connectionAfter&&<Button type="button" disabled={busy} onClick={()=>listConnections(connectionAfter)}>更多范围</Button>}
-    <label>双方约定的范围 ID<input value={agreementId} onChange={e=>{setAgreementId(e.target.value);setResult(null);setSourcePreview(null);}}/></label>
-    <Button type="button" disabled={busy||!agreementId.trim()} onClick={()=>query()}>查询当前获准材料</Button>
-    {result&&<div><p>{result.state==='unknown'?'对端状态或查询结果未确认。本次不沿用旧结果。':'本次返回已核对的选定材料；不构成独立能力认证。'}</p>
-      {result.checkedAt&&<p>核对时间 {new Date(result.checkedAt*1000).toLocaleString()}；本页结果仅在该短期核对窗口显示。</p>}
-      {result.items?.map((item:any)=><article key={item.grantId}><p>来源许可 {item.grantId}：{item.state==='current'?'当前可读':'已无法取得；不保留原正文'}</p>
-        {item.state==='current'&&<><p>来源签发方：{item.issuer} · {item.synthetic===true?'合成验证材料':item.synthetic===null?'演示属性未确认':'未标记为合成材料'}</p>
-          {item.projection?<dl>{Object.entries(item.projection).map(([k,v])=><React.Fragment key={k}><dt>{fieldNames[k]??k}</dt><dd>{typeof v==='string'?v:JSON.stringify(v)}</dd></React.Fragment>)}</dl>
-            :<p>原始 CI 观察证明已保留签发方签名；代码托管方观察结果不等于第三方专家验证。</p>}
-          <details><summary>精确来源和原签名</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(item,null,2)}</pre></details></>}
-      </article>)}
-      {result.items?.length===0&&result.state!=='unknown'&&<p>本次没有对你开放的材料；这不表示没有帮助能力或没有贡献。</p>}
-      {result.hasMore&&<Button type="button" disabled={busy} onClick={()=>query(result.nextCursor)}>下一页</Button>}
-      {result.deferredRecheck?.length>0&&<div><p>部分来源尚未在本次大小限制内重新核对，不将其视为可用或已删除。</p><Button type="button" disabled={busy} onClick={()=>query(result.nextCursor,result.deferredRecheck)}>继续核对剩余来源</Button></div>}
-      {result.items?.length>0&&<Button type="button" disabled={busy} onClick={()=>query(result.nextCursor,result.items.map((i:any)=>i.grantId).slice(0,20))}>重新核对当前页来源</Button>}
+  async function prepareGrant(){await run(async()=>{if(!canShare||!sourcePreview||sourcePreview.fingerprint!==sourceFingerprint||!readersValid)throw Error('请先核对当前材料与接收人。');draft.change({agreementId});const saved=await draft.snapshot(),expiresAt=Math.min(sourcePreview.maxExpiresAt,sourcePreview.projection?.expiresAt??Infinity,Math.floor(Date.now()/1000)+86400);if(expiresAt<=Date.now()/1000)throw Error('这份来源或连接已经到期，请重新读取。');
+    const event=peeringEventSchema.parse({...base('source-grant'),agreementId,agreementVersion:sourcePreview.agreementVersion,source:sourcePreview.source,requesterIds:readerIds,expiresAt,purpose:'selected-peering-read-only',disclosure:'exact-proof-or-selected-nonnarrative-contribution-fields',redactionConfirmed:true});setPreview({event,material:sourcePreview.projection,peer:sourcePreview.peer,revision:saved.revision});});}
+  async function submit(chosen:PeeringChoice|null=preview){await run(async valid=>{if(!chosen)return;const event=chosen.event;if(event.kind==='source-grant'&&event.expiresAt<=Date.now()/1000)throw Error('本次预览已经到期，请返回重新读取。');
+    if(event.kind==='peer-exit'){const fresh=await client.peering('read',{hubId,agreementId:event.agreementId});if(!valid())return;if(fresh.state==='exited'){await loadOwned('agreements');setMessage('这条互联已经退出。');return;}if(fresh.version!==event.expectedVersion)throw Error('互联约定刚有更新，请阅读当前约定后再退出。');}
+    if(event.kind==='source-grant'){const fresh=await client.peering('preview',{hubId,agreementId:event.agreementId,source:event.source});if(!valid())return;if(fresh.agreementVersion!==event.agreementVersion||fresh.maxExpiresAt<event.expiresAt||!samePeeringMaterial(event.source,chosen.material,fresh.projection))throw Error('当前材料或互联范围已变化，请返回重新预览。');}
+    if(event.kind==='peer-approve'){const fresh=await client.peering('party',{hubId});if(!valid())return;const party=event.agreement.parties.find(item=>item.endpoint===fresh.party.endpoint&&item.hubId===hubId);if(!party||JSON.stringify(peeringPartySchema.parse(party))!==JSON.stringify(peeringPartySchema.parse(fresh.party)))throw Error('本方公开身份已有变化，原约定仍保留，请按当前身份重新准备。');}
+    try{await client.submit(event,{family:'peering',confirmed:true,onJournal:async locator=>{if(!valid())throw Error('连接已变化。');if(chosen.revision)await draft.attach(locator,chosen.revision);}});if(!valid())return;await settleDraft();if(!valid())return;setPreview(null);setQueryRecord(null);setSourceRecord(null);setMessage(event.kind==='source-grant'?'这份材料的许可已保存。':event.kind==='source-revoke'?'这份互联许可已撤销。':event.kind==='peer-exit'?'已退出这条互联。':'本方已确认这份约定，对端仍须分别确认。');void loadConnections();void loadOwned(event.kind.startsWith('source-')?'grants':'agreements');}finally{if(valid())onPending();}});}
+  if(!draft.ready)return <p><output>{draft.status||'正在读取你的互联选择…'}</output></p>;
+  return <section className="peering-workspace" aria-busy={busy}>
+    <header className="peering-heading"><div><h2>社区互联</h2><p>查看另一社区向你开放的材料，或为自己选定的一份记录设置分享范围。</p></div></header>
+    <nav className="scope-tabs" aria-label="互联内容">{[['browse','向我开放的材料'],['share','分享我的记录'],...(owner?[['settings','配置互联']]:[])].map(([value,title])=><button key={value} aria-current={input.tab===value?'page':undefined} disabled={busy} onClick={()=>change({tab:value})}>{title}</button>)}</nav>
+    {error&&<p role="alert">{error}</p>}{message&&<p><output>{message}</output></p>}
+    {input.tab!=='settings'&&<div className="workspace-form"><label>连接到的服务<select value={agreementId} disabled={busy||!connectionsReady} onChange={e=>change({agreementId:e.target.value})}><option value="">选择一条当前连接</option>{connections.map(item=><option value={item.agreementId} key={item.agreementId}>{peerName(item.peer)} · 至 {ciTime(item.expiresAt)}</option>)}{agreementId&&!selectedConnection&&<option value={agreementId}>此前选择的连接，当前列表中不可用</option>}</select></label>
+      {!connectionsReady&&<p><output>正在读取当前可用连接…</output></p>}{connectionsReady&&!connections.length&&<p className="empty-state">当前没有向你开放的连接。加入范围和双方约定生效后，可在这里选择。</p>}{connectionAfter&&<Button variant="outline" onClick={()=>loadConnections(connectionAfter)}>更多连接</Button>}
+      <details className="technical-details"><summary>使用已知的互联约定</summary><label>约定 ID<input value={input.agreementId} onChange={e=>change({agreementId:e.target.value.trim()})}/></label><Button variant="ghost" onClick={()=>loadConnections()}>重新读取连接</Button></details>
     </div>}
-    <details><summary>选择本人可分享的具体材料</summary><p>原文权限保持独立。先选来源和字段，再指定对端银河 ID；保存不会计为成功复用。</p>
-      <select value={kind} onChange={e=>{setKind(e.target.value);setSources([]);setSource(null);setSourcePreview(null);}}><option value="case-event">本人 Case 贡献</option><option value="task-event">本人 Task 贡献</option><option value="ci-proof-v2">本人已发布的 CI 观察证明</option></select>
-      {kind!=='ci-proof-v2'&&<label>{kind==='case-event'?'Case':'Task'} ID<input value={parentId} onChange={e=>{setParentId(e.target.value);setSource(null);setSourcePreview(null);}}/></label>}
-      <Button type="button" disabled={busy||kind!=='ci-proof-v2'&&!parentId.trim()} onClick={()=>findSources()}>查找本人精确来源</Button>
-      {sources.map((s,i)=><div key={i}><p>{s.eventType} · {s.source.id??s.source.source.id}</p><Button type="button" disabled={busy} onClick={()=>{setSource(s.source);setSourcePreview(null);setFields(['eventType','actorId']);}}>选取此来源</Button></div>)}
-      {sourceAfter&&<Button type="button" disabled={busy} onClick={()=>findSources(sourceAfter)}>更多来源</Button>}
-      {source?.kind==='contribution-summary'&&<fieldset><legend>只披露选中的结构字段</legend>{peeringSummaryFields.map(f=><label key={f}><input type="checkbox" checked={fields.includes(f)} disabled={['eventType','actorId'].includes(f)} onChange={e=>{setFields(x=>e.target.checked?[...new Set([...x,f])]:x.filter(y=>y!==f));setSourcePreview(null);}}/>{fieldNames[f]}</label>)}</fieldset>}
-      <label>允许读取的对端银河 ID（每行一项）<textarea value={readers} onChange={e=>{setReaders(e.target.value);setPreview(null);}}/></label>
-      <Button type="button" disabled={busy||!source||!agreementId.trim()} onClick={()=>run(async valid=>{const p=await client.peering('preview',{hubId,agreementId:agreementId.trim(),source:selectedSource()});if(valid())setSourcePreview(p);})}>预览精确披露内容</Button>
-      {sourcePreview&&<><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(sourcePreview.projection,null,2)}</pre><p>本次许可最多持续 24 小时，并受双方范围、原材料权限与到期时间限制。</p>
-        <Button type="button" disabled={busy||!readers.trim()} onClick={()=>setPreview({...base('source-grant'),agreementId:agreementId.trim(),agreementVersion:sourcePreview.agreementVersion,source:sourcePreview.source,
-          requesterIds:[...new Set(readers.split(/\s+/).filter(Boolean))],expiresAt:Math.min(sourcePreview.maxExpiresAt,Math.floor(Date.now()/1000)+86400),purpose:'selected-peering-read-only',disclosure:'exact-proof-or-selected-nonnarrative-contribution-fields',redactionConfirmed:true})}>预览本次许可</Button></>}
-      <Button type="button" disabled={busy} onClick={()=>owned('grants')}>本人已给出的许可</Button>{grants.map(g=><div key={g.id}><p>{g.id} · {g.state} · 到期 {new Date(g.expiresAt*1000).toLocaleString()}</p>
-        {g.state!=='revoked'&&<Button type="button" disabled={busy} onClick={()=>setPreview({...base('source-revoke'),grantId:g.id})}>撤销这项许可</Button>}</div>)}{grantAfter&&<Button type="button" disabled={busy} onClick={()=>owned('grants',grantAfter)}>更多许可</Button>}
-    </details>
-    {owner&&<details><summary>运营者配置直接互联</summary><p>双方各自确认完全相同的约定。公钥需按双方选定的渠道核对；填入地址或报告不会证明独立运营、上线或兼容。</p>
-      <Button type="button" disabled={busy} onClick={()=>run(async valid=>{const p=await client.peering('party',{hubId});if(valid())setLocalParty(p.party);})}>读取本服务公开身份字段</Button>
-      {localParty&&<><label>可交给对方核对的本方公开字段<textarea readOnly value={JSON.stringify(localParty,null,2)}/></label><label>对方明确提供的公开字段<textarea value={peerParty} onChange={e=>setPeerParty(e.target.value)}/></label>
-        <Button type="button" disabled={busy||!peerParty.trim()} onClick={()=>run(async()=>{const other=JSON.parse(peerParty),now=Math.floor(Date.now()/1000),parties=[localParty,other].sort((a,b)=>a.endpoint.localeCompare(b.endpoint));
-          const draft={profile:'galaxy-direct-proof/1',id:crypto.randomUUID(),version:1,parties,sourceKinds:['contribution-summary','ci-proof-v2'],purpose:'help-discovery',ratePerMinute:10,pageSize:5,
-            expiresAt:Math.min(now+86400,...parties.flatMap(p=>p.keys.map((k:any)=>k.notAfter))),responseMaxAgeSeconds:120,cache:'no-response-body-retention',route:'direct',officialProtocolFee:0,
-            localEvaluationAuthority:'no-automatic-capability-upgrade',rawTaskContext:'excluded',intake:'each-party-hub-private-intake'};setAgreementText(JSON.stringify(peeringAgreementSchema.parse(draft),null,2));})}>生成可共同审阅的约定草稿</Button></>}
-      <label>双方约定的完整 JSON（也可粘贴对方发来的精确版本）<textarea value={agreementText} onChange={e=>{setAgreementText(e.target.value);setPreview(null);}}/></label>
-      <Button type="button" disabled={busy||!agreementText.trim()} onClick={()=>run(async()=>prepareAgreement())}>预览本地确认</Button>
-      <Button type="button" disabled={busy} onClick={()=>owned('agreements')}>查看本方已有约定</Button>{agreements.map(a=><article key={a.id}><p>{a.id} · 第 {a.version} 版 · {a.state}</p>
-        {a.record?.agreement&&<Button type="button" disabled={busy} onClick={()=>setAgreementText(JSON.stringify(a.record.agreement,null,2))}>载入原约定</Button>}
-        {a.state!=='exited'&&<Button type="button" disabled={busy} onClick={()=>setPreview({...base('peer-exit'),agreementId:a.id,expectedVersion:a.version})}>退出此互联</Button>}</article>)}
-      {agreementAfter&&<Button type="button" disabled={busy} onClick={()=>owned('agreements',agreementAfter)}>更多约定</Button>}
-    </details>}
-    {preview&&<div><h3>确认本次明确范围</h3><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(preview,null,2)}</pre><p>只提交这份原始内容和本机签署的许可。未知结果会保留原操作，先在页面底部核对回执。</p>
-      <Button type="button" disabled={busy} onClick={()=>run(async valid=>{try{const r=await client.submit(preview,{family:'peering',confirmed:true});if(valid()){setPreview(null);setResult(null);setMessage('已记录本次操作；对端状态仍须实际查询。');if(r.kind==='peer-approve')setAgreementId(r.objectId);}}finally{onPending();}})}>确认并签署提交</Button>
-      <Button type="button" disabled={busy} variant="ghost" onClick={()=>setPreview(null)}>取消</Button></div>}
-    {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
+    {input.tab==='browse'&&!canQuery&&<p className="empty-state">当前加入范围没有开放互联查询，可以在“我的加入范围”查看。</p>}
+    {input.tab==='browse'&&canQuery&&agreementId&&<section className="peering-section" aria-label="当前开放材料">
+      {querying&&<p><output>正在读取对方当前向你开放的材料…</output></p>}{queryError&&<p role="alert">{queryError}<Button variant="ghost" disabled={querying} onClick={()=>query(cursor.current.after,[...cursor.current.deferred,...cursor.current.ids])}>重新读取</Button></p>}
+      {queryState==='unknown'&&!queryError&&<p>对方暂未返回可确认的结果，页面会继续读取。</p>}{queryState==='expired'&&<p>上一轮核对时间已到，正在等待下一轮读取。</p>}
+
+      {result?.items?.map(item=><article className="peering-record" key={item.grantId}>{item.state==='current'?<><div className="member-line"><MemberAvatar subjectId={item.subjectId??''}/><strong>{memberName(item.subjectId??'',subjectId,item.subjectId?names[item.subjectId]??undefined:undefined)}</strong></div><MaterialView value={item} subjectId={subjectId} names={names}/></>:<p>这项材料当前已无法读取。</p>}</article>)}
+      {result?.items?.length===0&&queryState==='current'&&<p className="empty-state">还没有向你共享的材料。</p>}{result?.sourceGroups?.some(group=>group.conflicts?.length)&&<p className="browse-note">部分证明指向同一次运行，但提交版本或结论存在差异；不能把它们视作多份独立依据。</p>}{!!result?.deferredRecheck?.length&&<p>其余已选来源将在下一轮继续核对。</p>}{result?.hasMore&&<Button variant="outline" disabled={querying} onClick={()=>query(result.nextCursor)}>更多材料</Button>}
+    </section>}
+    {input.tab==='share'&&<div>{!canShare&&<p className="empty-state">当前社区范围未开放新的材料分享，原选择仍保留。</p>}
+      <section className="peering-section workspace-form"><h3>选择本人记录</h3><label>记录类型<select value={input.kind} disabled={busy} onChange={e=>change({kind:e.target.value,parentId:'',source:null,fields:['eventType','actorId']})}><option value="case-event">工作过程与结果</option><option value="task-event">求助中的参与记录</option><option value="ci-proof-v2">已发布的 CI 运行证明</option></select></label>
+        {input.kind!=='ci-proof-v2'&&<><label>相关工作<select value={input.parentId} disabled={busy||!worksReady} onChange={e=>change({parentId:e.target.value,source:null})}><option value="">选择自己参与过的工作</option>{selectableWorks.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}{input.parentId&&!selectableWorks.some(item=>item.id===input.parentId)&&<option value={input.parentId}>此前选择的工作，等待重新读取</option>}</select></label>
+          {!worksReady&&<p>正在读取你的工作…</p>}{workError&&<p>{workError}<Button variant="ghost" onClick={()=>loadWorks()}>重试</Button></p>}{Object.entries(workMore).filter(([,after])=>after).map(([kind,after])=><Button key={kind} variant="outline" onClick={()=>loadWorks(kind,after!)}>{kind==='history'?'更多工作记录':kind==='requested'?'更多发起的求助':'更多参与的求助'}</Button>)}
+          <details className="technical-details"><summary>补充已知工作</summary><label>{input.kind==='case-event'?'工作':'求助'} ID<input value={input.parentId} onChange={e=>change({parentId:e.target.value.trim(),source:null})}/></label></details></>}
+        {(input.kind==='ci-proof-v2'||input.parentId)&&<><h4>选择其中一条本人记录</h4>{!sourcesReady&&<p><output>正在读取可选记录…</output></p>}{sources.map(item=><label className="peering-choice" key={sourceKey(item.source)}><input type="radio" name="peering-source" checked={sourceKey(input.source)===sourceKey(item.source)} onChange={()=>change({source:item.source,fields:['eventType','actorId']})}/><span>{label(item.eventType)}<small>{item.synthetic===true?'合成演示记录':'本人提供的记录'} · {sourceKey(item.source)?.slice(-8)}</small></span></label>)}{sourcesReady&&!sources.length&&!sourceError&&<p className="empty-state">这个范围中暂时没有本人当前可分享的记录。</p>}{sourceAfter&&<Button variant="outline" onClick={()=>loadSources(sourceAfter)}>更多本人记录</Button>}</>}
+        {input.source?.kind==='contribution-summary'&&<fieldset className="check-list"><legend>本次披露的字段</legend>{peeringSummaryFields.map(field=><label key={field} className="check-label"><input type="checkbox" checked={input.fields.includes(field)} disabled={['eventType','actorId'].includes(field)} onChange={e=>change({fields:e.target.checked?[...new Set([...input.fields,field])]:input.fields.filter((item:string)=>item!==field)})}/>{fieldNames[field]}</label>)}</fieldset>}
+        {sourceError&&<p role="alert">{sourceError}</p>}{input.source&&!agreementId&&<p>选择一条连接后，将显示这份材料实际可披露的内容。</p>}{canShare&&sourcePreview&&<div className="peering-material-preview"><p className="eyebrow">对方实际能读到的内容</p><MaterialView value={sourcePreview.projection} subjectId={subjectId} names={names}/></div>}
+      </section>
+      <section className="peering-section workspace-form"><h3>允许哪些人读取</h3><p className="permission-line">从已知的人中选择接收人。对方仍须通过约定服务发起读取，选中姓名不会改变其社区成员范围。</p><label>查找姓名<input type="search" value={peopleSearch} onChange={e=>change({peopleQuery:e.target.value})} placeholder="筛选已知的人"/></label>
+        <div className="peering-people">{people.filter(id=>memberName(id,subjectId,names[id]??undefined).toLowerCase().includes(peopleSearch.toLowerCase())||id.includes(peopleSearch)).map(id=><label className="peering-choice peering-person" key={id}><input type="checkbox" checked={readerIds.includes(id)} disabled={!readerIds.includes(id)&&readerIds.length>=16} onChange={e=>change({readers:e.target.checked?[...new Set([...input.readers,id])]:input.readers.filter((person:string)=>person!==id),extraReaders:String(input.extraReaders??'').split(/\s+/).filter((person:string)=>person&&person!==id).join('\n')})}/><MemberAvatar subjectId={id}/><span>{memberName(id,subjectId,names[id]??undefined)}</span></label>)}</div>
+        {!peopleReady&&<p>正在读取联系人…</p>}{peopleError&&<p>{peopleError}<Button variant="ghost" onClick={()=>loadPeople()}>重试</Button></p>}{contactAfter&&<Button variant="outline" onClick={()=>loadPeople(contactAfter)}>更多联系人</Button>}
+        <details className="technical-details"><summary>补充其他已知身份</summary><label>对方的银河 ID，每行一项<textarea value={input.extraReaders} onChange={e=>change({extraReaders:e.target.value})}/></label></details>{!!readerIds.length&&!readersValid&&<p role="alert">请检查所填身份是否完整；一次最多选择 16 人。</p>}<p className="ci-draft-note"><output>{draft.status}</output></p><Button disabled={busy||!canShare||!sourcePreview||sourcePreview.fingerprint!==sourceFingerprint||!readersValid} onClick={prepareGrant}>预览本次分享</Button>
+      </section>
+      <section className="peering-section"><h3>已给出的许可</h3>{!grantsReady&&<p>正在读取已有许可…</p>}{grantsReady&&!grants.length&&<p>尚未在这条社区范围内分享材料。</p>}{grants.map(grant=><article className="peering-record" key={grant.id}><h4>{grant.record?.source?.kind==='ci-proof-v2'?'CI 运行证明':'贡献摘要'}</h4><p>{grant.state==='revoked'?'已撤销':grant.expiresAt*1000<=now?'已到期':'许可已保存'} · {ciTime(grant.expiresAt)}</p>{grant.record?.requesterIds&&<p>接收人：{grant.record.requesterIds.map((id:string)=>memberName(id,subjectId,names[id]??undefined)).join('、')}</p>}{grant.state!=='revoked'&&grant.expiresAt*1000>now&&<Button variant="outline" disabled={busy} onClick={()=>void submit({event:peeringEventSchema.parse({...base('source-revoke'),grantId:grant.id})})}>撤销这份许可</Button>}<details className="technical-details"><summary>许可的原范围</summary><pre>{JSON.stringify(grant,null,2)}</pre></details></article>)}{grantAfter&&<Button variant="outline" onClick={()=>loadOwned('grants',grantAfter)}>更多许可</Button>}</section>
+    </div>}
+    {input.tab==='settings'&&owner&&<div>
+      <PeeringAgreementEditor input={input} change={change} localParty={localParty} agreements={agreements.map(item=>({...item,record:item.record??undefined}))} busy={busy} canApprove={canApprove} onError={setError} onPreview={async agreement=>{await run(async()=>{const parsed=peeringAgreementSchema.parse(agreement);draft.change({agreementText:JSON.stringify(parsed,null,2)});const saved=await draft.snapshot();setPreview({event:peeringEventSchema.parse({...base('peer-approve'),expectedVersion:parsed.version-1,agreement:parsed}),revision:saved.revision});});}}/>
+      <p className="ci-draft-note"><output>{draft.status}</output></p>
+      <section className="peering-section"><h3>本方已有约定</h3>{!agreementsReady&&<p>正在读取约定…</p>}{agreementsReady&&!agreements.length&&<p>尚未确认互联约定。</p>}{agreements.map(agreement=><article className="peering-record" key={agreement.id}>{agreement.record?.agreement?<AgreementView agreement={agreement.record.agreement}/>:<p>原约定当前无法完整读取。</p>}<p>第 {agreement.version} 版 · {agreement.state==='exited'?'已退出':agreement.expiresAt*1000<=now?'已到期':'本方已确认'}</p><div className="button-row">{agreement.record?.agreement&&<Button variant="outline" disabled={busy||!canApprove||!localParty} onClick={()=>void run(async()=>{const latest=await client.peering('read',{hubId,agreementId:agreement.id});if(!latest.agreement)throw Error('原约定当前无法读取。');const party=localParty;if(!party)throw Error('本方公开身份当前未读取。');const remote=latest.agreement.parties.find(item=>item.endpoint!==party.endpoint);if(!remote)throw Error('这份约定的对方服务当前无法确认。');change({agreementText:JSON.stringify(preparePeeringAgreement(party,remote,latest.agreement),null,2),peerParty:JSON.stringify(remote,null,2)});})}>修改下一版约定</Button>}{agreement.state!=='exited'&&<Button variant="ghost" disabled={busy} onClick={()=>void submit({event:peeringEventSchema.parse({...base('peer-exit'),agreementId:agreement.id,expectedVersion:agreement.version})})}>退出互联</Button>}</div></article>)}{agreementAfter&&<Button variant="outline" onClick={()=>loadOwned('agreements',agreementAfter)}>更多约定</Button>}</section>
+    </div>}
+    <dialog ref={dialog} className="peering-dialog" aria-labelledby="peering-confirm-title" onCancel={e=>{e.preventDefault();if(!busy)setPreview(null);}}>{preview&&<><p className="eyebrow">确认本次范围</p><h2 id="peering-confirm-title" ref={dialogHeading} tabIndex={-1}>{preview.event.kind==='source-grant'?'分享这一份材料':preview.event.kind==='peer-approve'?'确认双方约定':'确认范围变化'}</h2><HubPeeringActionView event={preview.event} material={preview.material} peer={preview.peer} subjectId={subjectId} names={names}/>{error&&<p role="alert">{error}</p>}<details className="technical-details"><summary>精确提交内容</summary><pre>{JSON.stringify(preview.event,null,2)}</pre></details><div className="button-row"><Button disabled={busy} onClick={()=>void submit()}>{busy?'正在保存…':'确认并保存'}</Button><Button variant="outline" disabled={busy} onClick={()=>setPreview(null)}>返回修改</Button></div></>}</dialog>
   </section>;
 }

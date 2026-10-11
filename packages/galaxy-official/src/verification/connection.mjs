@@ -49,6 +49,27 @@ export async function verifyBindingReceipt(document, { challenge, endpoint, trus
   return opened;
 }
 
+// Reopening a device needs a fresh short-lived session, not a different
+// binding. This public receipt is checked against the same local choice;
+// neither its signature nor a stored ID can authorize another owner or scope.
+export async function verifyExistingBindingReceipt(document, { request, endpoint, trustedKeys, now }) {
+  exact(document, 'bindingId,receipt');
+  if (!uuid(document.bindingId)) throw new Error('Invalid binding receipt.');
+  const opened = await verifyEnvelope(document.receipt, options('binding-receipt', endpoint, trustedKeys, now, 86400));
+  const data = opened.data;
+  exact(data, 'bindingId,subjectId,publicKeyFingerprint,installationId,endpoint,scopes,expiresAt,revokePath,auditReference,control');
+  if (opened.id !== document.bindingId || data.bindingId !== document.bindingId
+    || data.subjectId !== request.subjectId || data.installationId !== request.installationId
+    || data.endpoint !== endpoint || !isDeepStrictEqual(data.scopes, request.scopes)
+    || !isDeepStrictEqual(data.control, request.control)
+    || data.publicKeyFingerprint !== await digest(request.genesisProof.publicKeyPem)
+    || !Number.isSafeInteger(data.expiresAt) || data.expiresAt !== opened.expiresAt
+    || data.expiresAt <= now || data.expiresAt > opened.issuedAt + 86400
+    || data.revokePath !== `/v1/bindings/${document.bindingId}/revoke` || !uuid(data.auditReference))
+    throw new Error('Existing binding receipt mismatch.');
+  return opened;
+}
+
 export async function verifySessionChallenge(document, { binding, credentialHash, endpoint, trustedKeys, now }) {
   exact(document, 'challenge');
   if (typeof credentialHash !== 'string' || !/^[a-f0-9]{64}$/.test(credentialHash)) throw new Error('Invalid credential hash.');
