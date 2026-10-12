@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, ArrowUp, ArrowUpRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, Send, X } from 'lucide-react';
 import { PersonalSummaryWorkspace } from './personal-summary-workspace';
 import { ChatAgentWorkspace } from './chat-agent-workspace';
+import {AgentWorkContinuation} from './agent-work-continuation';
 import { AgentParticipants } from './agent-participants';
 import { ChatAttachmentComposer, ChatAttachmentFiles } from './chat-attachments-workspace';
 import { OutcomeMaterialWorkspace } from './outcome-material-workspace';
@@ -99,7 +100,7 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   function leaveTo(destination:string|(()=>void)){rememberPosition();const token=active.current;void draft.flush().then(()=>{if(current(token)){if(typeof destination==='string')navigate(destination);else destination();}}).catch(()=>{if(current(token)){setErrorMessage('本机暂时无法保存这份输入，请留在本页重新保存后继续。');composer.current?.focus({preventScroll:true});}});}
   const navigationHandler=useRef<(destination:string|(()=>void))=>void>(()=>{});
   useLayoutEffect(()=>{navigationHandler.current=leaveTo;});
-  useLayoutEffect(()=>registerShellNavigation?.(viewLease,path=>navigationHandler.current(path),action=>navigationHandler.current(action)),[registerShellNavigation,viewLease,roomId,search]);
+  useLayoutEffect(()=>draft.ready?registerShellNavigation?.(viewLease,path=>navigationHandler.current(path),action=>navigationHandler.current(action)):undefined,[registerShellNavigation,viewLease,roomId,search,draft.ready]);
   function changeView(nextSearch:string,remember=true){rememberPosition();if(remember&&nextSearch!==searchRef.current)reading.remember(nextSearch,searchRef.current);navigate(`/app/rooms/${roomId}${nextSearch}`);}
   function locateMessage(messageId:string){changeView(chatSearchString({keyword:filter,after,message:messageId}));setPanel(null);}
   function returnReading(){const previous=reading.back(searchRef.current);changeView(previous??(locatedMessage&&filter?chatSearchString({keyword:filter,after}):''),false);}
@@ -338,7 +339,7 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
         {error&&<p className="message error" role="alert">{error}</p>}
         {currentDecisions.length>0&&<section><h3>成员请求</h3>{currentDecisions.map(renderDecision)}</section>}
         {previousDecisions.length>0&&<section><details className="member-change-history"><summary>以前的成员变更</summary>{previousDecisions.map(renderDecision)}</details></section>}
-        <section><h3>AI 参与</h3><AgentParticipants runtime={runtime} roomId={room.roomId} /><ChatAgentWorkspace key={room.roomId} runtime={runtime} room={room} navigate={leaveTo} /></section>
+        <section><h3>AI 参与</h3><AgentWorkContinuation runtime={runtime} subjectId={subjectId} object={{kind:'room',id:room.roomId}} title={roomLabel(room)} purpose="回到这段对话，按已有授权和当前问题继续处理；先确认需要使用的消息与材料"/><AgentParticipants runtime={runtime} roomId={room.roomId} /><ChatAgentWorkspace key={room.roomId} runtime={runtime} room={room} navigate={leaveTo} /></section>
         <section><h3>对话设置</h3><p>当前消息保留 {room.retentionDays} 天。更改只影响后续消息。</p><div className="button-row"><select aria-label="消息保留时间" value={retention} onChange={event => setRetention(event.target.value==='7'?7:event.target.value==='30'?30:90)}><option value={7}>7 天</option><option value={30}>30 天</option><option value={90}>90 天</option></select><Button variant="outline" disabled={busy || !!pending} onClick={() => run(() => propose({ action: 'retention', retentionDays: retention }))}>更改保留时间</Button></div><Button variant="ghost" disabled={busy || !!pending} onClick={() => run(() => propose({ action: 'persistent', persistent: !room.persistent }))}>{room.persistent ? '关闭长期对话' : '设为长期对话'}</Button>{room.decisionRequired && <div className="message"><p>其他成员已退出。你可以保留这段对话。</p><Button variant="outline" disabled={busy} onClick={() => run(() => runtime.api.call(roomPath + '/dismiss', {}))}>继续保留</Button><Button variant="ghost" disabled={busy || !!pending} onClick={() => run(() => propose({ action: 'become-owner', targetSubjectId: subjectId }))}>成为房主</Button></div>}</section>
         <section className="conversation-leave"><Button variant="ghost" onClick={() => leaveTo('/app/governance?targetType=room&targetId=' + room.roomId)}>举报这段对话</Button><Button variant="ghost" disabled={busy || !!pending} onClick={() => setAction({ kind: 'dissolve' })}>发起解散</Button><Button variant="outline" disabled={busy} onClick={() => setAction({ kind: 'leave' })}>退出对话</Button></section>
       </div>}

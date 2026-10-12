@@ -33,7 +33,11 @@ export async function createReconstructionFlowPreview({directory,certificate,key
  let prior=null;try{const value=JSON.parse(await readFile(metadataFile,'utf8'));if(resolve(value.directory) !== resolve(directory)||value.endpoint!==endpoint)throw Error('local_scene_original_storage_mismatch');prior=value;}
  catch(reason){if(reason.code!=='ENOENT')throw reason;}
  const db=new PGlite(join(directory,'database')),servers=[],people=[],trace=[],publications=[];
- if(prior){const previous=JSON.parse(await readFile(join(reportDirectory,'shared-scene-before-reload-verify.json'),'utf8'));trace.push(...previous.trace);}
+ let earlierTraceAvailable=!prior;
+ if(prior){
+  try{const previous=JSON.parse(await readFile(join(reportDirectory,'shared-scene-before-reload-verify.json'),'utf8'));trace.push(...previous.trace);earlierTraceAvailable=true;}
+  catch(reason){if(reason.code!=='ENOENT')throw reason;}
+ }
  const lost={publication:false,event:false,consent:false,profile:false,...(chatTransport?{chatSend:false,chatEdit:false}:{})};let stopped=false;
  await migrate(db);await mkdir(reportDirectory,{recursive:true});
  const issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/local-synthetic'],{emailVerified:true});
@@ -138,7 +142,7 @@ export async function createReconstructionFlowPreview({directory,certificate,key
   const chatOperations=(await db.query('SELECT operation_id,room_id,message_id,subject_id,kind,request_hash,state FROM chat_message_operations ORDER BY created_at')).rows;
   const chatAttachments=(await db.query('SELECT id,room_id,subject_id,request_hash,byte_size,sha256,state,message_id,scan_result,revoked_at,purged_at,uploaded_at,expires_at FROM chat_attachments ORDER BY created_at,id')).rows;
   return{checkedAt:new Date().toISOString(),endpoint,origins,roles:people.map(({name,role,origin,subjectId})=>({name,role,origin,subjectId})),seeds:publications,
-   tasks,events,profileStatements,chatRooms,chatMessages,chatOperations,chatAttachments,trace:[...trace],lostResponseArmed:{...lost},attachmentsSupported:services.attachments.specification().supported,chatTransportAvailable:chatTransport?.available===true};
+   tasks,events,profileStatements,chatRooms,chatMessages,chatOperations,chatAttachments,trace:[...trace],earlierTraceAvailable,lostResponseArmed:{...lost},attachmentsSupported:services.attachments.specification().supported,chatTransportAvailable:chatTransport?.available===true};
  }
  function landing(person){const chatControls=chatTransport?'<p><a href="/app/rooms">消息与对话</a></p><p>聊天正文由独立真实 Prosody MUC/MAM 保存；'+(attachmentConfiguration?'附件由任务隔离代理接入真实私有加密存储与 ClamAV 检查，仅用于明确的合成文件。':'附件扫描与上传未配置。')+'</p><button data-loss="chatSend">下一条聊天消息成功后断开一次回应</button><button data-loss="chatEdit">下一次消息编辑成功后断开一次回应</button>':'';
   return '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河共享本地体验</title><style>body{font:16px system-ui;line-height:1.7;max-width:800px;margin:40px auto;padding:0 20px}button,a{font:inherit;margin:6px 10px 6px 0}button{padding:10px 16px}output{display:block;white-space:pre-wrap}</style>'+

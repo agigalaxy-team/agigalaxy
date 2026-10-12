@@ -30,6 +30,10 @@ export async function verifyProjectsV2(database=null,options={}) {
     assert.equal((await request(f,'/v2/projects',created.grant)).replayed,true);
     assert.equal((await f.db.query('SELECT payload_text FROM profile_statements WHERE id=$1',[statement.id])).rows[0].payload_text,legacy.payloadJson);
     const initial=await read();assert.equal(initial.ownerId,f.actor.subjectId);assert.equal(initial.source.sourceStatementId,statement.id);assert.equal(initial.legalOwnershipVerified,false);
+    const portfolio=await request(null,'/v2/projects/portfolio/query',{ownerId:f.actor.subjectId});
+    assert.deepEqual(portfolio.items.map(item=>item.projectId),[projectId]);
+    assert.equal(portfolio.readingGrantsContact,false);
+    assert.equal((await request(null,'/v2/projects/directory/query',{})).items.some(item=>item.projectId===projectId),false);
     await update(p,'revise',{patch:{summary:'No permission'}},403);
     await update(f,'grant-role',{subjectId:p.actor.subjectId,role:'editor'});revision++;
     const editor=await request(p,'/v2/projects/'+projectId);assert.equal(editor.permissions.edit,true);assert.equal(editor.permissions.represent,false);assert.equal(editor.permissions.agentControl,false);
@@ -83,6 +87,7 @@ export async function verifyProjectsV2(database=null,options={}) {
     assert.equal(detail.opportunity.opportunityRef.sourceKind,'project');
     await request(p,`/v2/projects/${projectId}/preferences/save`,{expectedRevision:0,preferences:{enabled:false}});
     assert.equal((await request(null,'/v2/discovery/query',queryInput)).items.some(item=>item.projectId===projectId),false);
+    assert.ok((await request(null,'/v2/projects/portfolio/query',{ownerId:p.actor.subjectId})).items.some(item=>item.projectId===projectId),'an invitation preference does not erase a publicly shared work');
     assert.ok((await request(null,'/v2/discovery/query',queryInput)).items.some(item=>item.projectId===publicDeclaration.projectId),'project setting must not disable another project');
     await request(p,`/v2/projects/${projectId}/preferences/save`,{expectedRevision:1,preferences:null});
     assert.equal((await request(null,'/v2/discovery/query',queryInput)).items.some(item=>item.projectId===projectId),true);

@@ -3,6 +3,7 @@ import {mountCompactPanel,compactCss} from './view.mjs';
 import {mountWorkerPanel} from './worker-view.mjs';
 import {workerComponentResult} from './worker-result.mjs';
 import {mountHostViewPreferences} from './host-view-preferences.mjs';
+import {hostWorkContinuation,hostDirectionContinuation} from './host-continuation.mjs';
 const style=document.createElement('style');style.textContent=compactCss;document.head.append(style);
 const app=new App({name:'Galaxy help panel',version:'0.1.0'},{});
 const preferences=mountHostViewPreferences(app,document.getElementById('galaxy'));
@@ -13,9 +14,9 @@ const controls={
  supportsOpenLink:()=>!!app.getHostCapabilities()?.openLinks,
  openLink:async url=>{if(!app.getHostCapabilities()?.openLinks)throw new Error('host_open_links_unavailable');return app.openLink({url});},
  supportsHandoff:()=>!!app.getHostCapabilities()?.updateModelContext,
- handoff:async refs=>{if(!app.getHostCapabilities()?.updateModelContext)throw new Error('host_model_context_unavailable');await app.updateModelContext({content:[{type:'text',text:JSON.stringify({kind:'galaxy-return-to-current-work',...refs,meaning:'Continue the original work using current permitted references. No task cancellation, success assertion or new authorization.'})}]});},
+ handoff:async(refs,view)=>{if(!app.getHostCapabilities()?.updateModelContext)throw new Error('host_model_context_unavailable');await app.updateModelContext(hostWorkContinuation(refs,view));},
  selectPath:async choice=>{if(!app.getHostCapabilities()?.updateModelContext)throw new Error('host_model_context_unavailable');
-  await app.updateModelContext({content:[{type:'text',text:JSON.stringify({kind:'galaxy-help-direction-selection',...choice,meaning:'User selected a direction, not a publication/contact/payment authorization. Continue in the original chat using the current permitted data.'})}]});}
+  await app.updateModelContext(hostDirectionContinuation(choice));}
 };
 let mode='help',view=mountCompactPanel(document.getElementById('galaxy'),controls);
 app.addEventListener('toolresult',result=>{

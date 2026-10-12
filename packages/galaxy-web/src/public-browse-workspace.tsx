@@ -5,22 +5,24 @@ import {discoveryTarget} from './discovery-navigation';
 import {TaskCurrentCard,TaskMaterialNotice,taskViewTitle} from './task-material-view';
 import './discovery-home.css';
 import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {CommunityHighlights} from './community-highlights';
+import {profileSubject} from './profile-navigation.mjs';
 import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from './directory-reading-state.mjs';
 
 type Props={runtime:Awaited<ReturnType<typeof createWebRuntime>>|null;navigate:(path:string)=>void};
 type Kind='tasks'|'capsules'|'projects';
 export type TaskBrowseItem={taskId:string;state:string;request:{title:string;summary:string};synthetic?:boolean};
-type CapsuleBrowseItem={capsuleId:string;versionId:string;sourceVersion:number;title:string;problemPattern:string;sourceStatus:string;deprecated:boolean;securityIssue:boolean;synthetic?:boolean};
-type ProjectBrowseItem={projectId:string;document:{title:string;summary:string;kind:string;functions:string[]};synthetic?:boolean};
+export type CapsuleBrowseItem={capsuleId:string;versionId:string;sourceVersion:number;title:string;problemPattern:string;sourceStatus:string;deprecated:boolean;securityIssue:boolean;synthetic?:boolean};
+export type ProjectBrowseItem={projectId:string;document:{title:string;summary:string;kind:string;functions:string[]};synthetic?:boolean};
 export type BrowsePage<T>={items:T[];nextAfter:string|null};
 type ContentEntry={kind:'tasks';item:TaskBrowseItem}|{kind:'capsules';item:CapsuleBrowseItem}|{kind:'projects';item:ProjectBrowseItem};
 const directories={tasks:{title:'正在找帮助',subtitle:'看看有哪些你能参与的事。',path:'/app/participate',endpoint:'/v2/tasks/query'},capsules:{title:'方法与经验',subtitle:'读一份做法，带回自己的工作。',path:'/app/capsules',endpoint:'/v2/capsules/query'},projects:{title:'项目与模块',subtitle:'了解大家正在做什么。',path:'/app/projects',endpoint:'/v2/projects/directory/query'}};
 const labels:Record<string,string>={open:'正在征集',closed:'已结束',canceled:'已取消',current:'来源当前可用','source-unavailable':'来源目前不可用','source-result-superseded':'来源已有纠正版本','source-currentness-unavailable':'来源结果的当前支持状态未知'};
 export function browseReturnPath(fallback:string){
  const value=history.state?.browseReturn;if(typeof value!=='string')return fallback;
-  try{const url=new URL(value,location.origin);return url.origin===location.origin&&['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information','/app/bookmarks'].includes(url.pathname)?url.pathname+url.search+url.hash:fallback;}catch{return fallback;}
+  try{const url=new URL(value,location.origin);return url.origin===location.origin&&(['/app/','/app/work','/app/find','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information','/app/bookmarks'].includes(url.pathname)||!!profileSubject(url.pathname))?url.pathname+url.search+url.hash:fallback;}catch{return fallback;}
 }
-export function browseReturnLabel(fallback:string){const url=new URL(browseReturnPath(fallback),location.origin),path=url.pathname;if(path==='/app/participate'&&url.searchParams.get('view')==='requested')return '我发布的求助';if(path==='/app/participate'&&url.searchParams.get('view')==='participating')return '我参与的工作';return ({'/app/':'发现','/app/work':'我的工作','/app/search':'查找结果','/app/match':'寻找同行','/app/history':'经历与贡献','/app/participate':'求助目录','/app/capsules':'方法目录','/app/projects':'项目目录','/app/community':'社区','/app/rooms':'对话列表','/app/notifications':'通知','/app/information':'资料与关注','/app/bookmarks':'我的收藏'} as Record<string,string>)[path]??'上一页';}
+export function browseReturnLabel(fallback:string){const url=new URL(browseReturnPath(fallback),location.origin),path=url.pathname;if(profileSubject(path))return url.searchParams.get('section')==='experience'?'人物完整经历':'人物资料';if(path==='/app/participate'&&url.searchParams.get('view')==='requested')return '我发布的求助';if(path==='/app/participate'&&url.searchParams.get('view')==='participating')return '我参与的工作';return ({'/app/':'发现','/app/work':'我的工作','/app/find':'查找结果','/app/search':'方法与工具','/app/match':'寻找同行','/app/history':'经历与贡献','/app/participate':'求助目录','/app/capsules':'方法目录','/app/projects':'项目目录','/app/community':'社区','/app/rooms':'对话列表','/app/notifications':'通知','/app/information':'资料与关注','/app/bookmarks':'我的收藏'} as Record<string,string>)[path]??'上一页';}
 function contentKey(entry:ContentEntry){return entry.kind==='tasks'?entry.item.taskId:entry.kind==='capsules'?entry.item.capsuleId:entry.item.projectId;}
 export function ContentCard(props:ContentEntry&{navigate:(path:string)=>void;runtime?:Props['runtime'];saveForLater?:React.ReactNode}){
  return props.kind==='tasks'?<TaskCurrentCard runtime={props.runtime} task={props.item}>{item=><ReadableContentCard {...props} item={item}/>}</TaskCurrentCard>:<ReadableContentCard {...props}/>;
@@ -70,18 +72,19 @@ function BrowseSectionRead({runtime,navigate,kind,retry}:Props&{kind:Kind;retry:
 export function PublicBrowseWorkspace({runtime,navigate}:Props){
  const [query,setQuery]=useState(()=>{try{return sessionStorage.getItem('galaxy-discovery-query')??'';}catch{return '';}});
  const requestedQuery=new URLSearchParams(location.search).get('q');
- useEffect(()=>{if(requestedQuery?.trim())navigate(discoveryTarget('/app/search',requestedQuery));},[requestedQuery,navigate]);
+ useEffect(()=>{if(requestedQuery?.trim())navigate(discoveryTarget('/app/find',requestedQuery));},[requestedQuery,navigate]);
  const go=(event:React.MouseEvent<HTMLAnchorElement>,target:string)=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(target);}};
  if(requestedQuery?.trim())return <output className="reading-status">正在打开这次查找…</output>;
  const peopleTarget=discoveryTarget('/app/match',query);
  return <section className="explore-page">
   <header className="explore-intro"><p className="eyebrow">从感兴趣的事开始</p><h1>发现内容，也发现同行。</h1><p>找一份可借鉴的经验，认识同路的人，或继续一件具体的事。</p>
-   <search><form className="explore-search" onSubmit={event=>{event.preventDefault();navigate(discoveryTarget('/app/search',query));}}><label className="sr-only" htmlFor="explore-query">查找银河内容</label><Search size={20}/><input id="explore-query" type="search" maxLength={200} placeholder="搜索目标、做法或感兴趣的方向" value={query} onChange={event=>{setQuery(event.target.value);try{sessionStorage.setItem('galaxy-discovery-query',event.target.value);}catch{/* Typing remains available without browser storage. */}}}/><button type="submit">查找内容 <ArrowRight size={16}/></button></form></search>
+   <search><form className="explore-search" onSubmit={event=>{event.preventDefault();navigate(discoveryTarget('/app/find',query));}}><label className="sr-only" htmlFor="explore-query">查找银河内容</label><Search size={20}/><input id="explore-query" type="search" maxLength={160} placeholder="搜索讨论、做法、项目或求助" value={query} onChange={event=>{setQuery(event.target.value);try{sessionStorage.setItem('galaxy-discovery-query',event.target.value);}catch{/* Typing remains available without browser storage. */}}}/><button type="submit">查找内容 <ArrowRight size={16}/></button></form></search>
    <div className="explore-next"><span>想从人开始？</span><a href={peopleTarget} onClick={event=>go(event,peopleTarget)}>寻找同行与项目 <ArrowRight size={14}/></a></div>
   </header>
   <nav className="explore-places" aria-label="浏览内容类别">{([['/app/community','社区讨论',MessagesSquare],['/app/capsules','方法与经验',BookOpen],['/app/participate','正在找帮助',UsersRound],['/app/projects','项目与模块',Layers]] as const).map(([target,title,Icon])=><a key={target} href={target} onClick={event=>go(event,target)}><Icon size={19}/>{title}<ArrowUpRight size={14}/></a>)}</nav>
-  <div className="explore-content"><BrowseSection {...{runtime,navigate}} kind="tasks"/><BrowseSection {...{runtime,navigate}} kind="capsules"/></div>
+  <div className="explore-content"><CommunityHighlights {...{runtime,navigate}}/><BrowseSection {...{runtime,navigate}} kind="capsules"/></div>
   <BrowseSection {...{runtime,navigate}} kind="projects"/>
+  <BrowseSection {...{runtime,navigate}} kind="tasks"/>
   <aside className="explore-continue"><div><h2>带着自己的问题来，也可以。</h2><p>利用已有的背景找帮助，收到回应后继续交流和工作。</p></div><a href="/app/publish" onClick={event=>go(event,'/app/publish')}>发起求助 <ArrowRight size={16}/></a></aside>
   <nav className="explore-reading-links" aria-label="了解银河"><a href="/how-it-works/">怎样使用银河 <ArrowUpRight size={14}/></a><a href="/downloads/">在自己的 AI 中继续 <ArrowUpRight size={14}/></a><a href="/privacy/">资料与隐私 <ArrowUpRight size={14}/></a></nav>
  </section>;

@@ -70,7 +70,8 @@ export class CapsuleSourcesV2 {
       const rootDependency = { key: `case-event:${root.id}`, authorId: root.subject_id };
       if (ref.kind === 'case-root') {
         capsuleRule(ref.id === root.id && ref.version === 1, 'capsule_source_version_mismatch');
-        return { ref, authorId: root.subject_id, dependencies: [rootDependency], synthetic: facts.synthetic, sourceState: 'current' };
+        return { ref, authorId: root.subject_id, dependencies: [rootDependency], synthetic: facts.synthetic, sourceState: 'current',
+          caseReading: { title: root.payload.title ?? null, summary: root.payload.summary ?? null } };
       }
       if (['attempt', 'intervention', 'result'].includes(ref.kind)) {
         const fact = await this.cases.requireFactWithin(db, actor, rows, facts, ref.kind, ref, { latest });
@@ -103,6 +104,29 @@ export class CapsuleSourcesV2 {
       return { ref, authorId: record.record.reportedBy, record, dependencies: unique(dependencies), synthetic: record.synthetic,
         sourceState: 'current', rightsScope: 'registered-report-metadata-only; external-linked-content-rights-not-inferred' };
     } finally { visited.delete(key); }
+  }
+  async resolutionReadingWithin(db, actor, resolution) {
+    const viewer = actor ?? { subjectId: null };
+    const resultRef = { kind: 'result', id: resolution.resultId, version: resolution.resultVersion, caseId: resolution.caseId };
+    const reading = { case: { status: 'unavailable' }, result: { status: 'unavailable', ref: resultRef } };
+    const unavailable = error => error instanceof ServiceError && [403, 404, 409, 422, 503].includes(error.status);
+    // A published method does not grant its readers access to the publisher's
+    // original work. Resolve only this exact root/result under the reader's ACL.
+    try {
+      const rows = await caseRepository(db).events(resolution.caseId);
+      const root = rows.find(row => ['case', 'case-created'].includes(row.kind));
+      capsuleRule(root, 'capsule_source_unavailable', 403);
+      const ref = { kind: 'case-root', id: root.id, version: 1, caseId: resolution.caseId };
+      const source = await this.sourceWithin(db, viewer, ref);
+      reading.case = { status: 'available', ref, authorId: source.authorId, ...source.caseReading };
+    } catch (error) { if (!unavailable(error)) throw error; }
+    try {
+      const source = await this.sourceWithin(db, viewer, resultRef);
+      reading.result = { status: 'available', ref: resultRef, authorId: source.authorId,
+        summary: source.fact.summary, reportedOutcome: source.fact.reportedOutcome,
+        limitations: source.fact.limitations, currentness: source.currentness };
+    } catch (error) { if (!unavailable(error)) throw error; }
+    return reading;
   }
   async permissionWithin(db, actor, id, { allowRevoked = false } = {}) {
     const row = (await db.query('SELECT * FROM capsule_permissions WHERE id=$1 FOR SHARE', [id])).rows[0];

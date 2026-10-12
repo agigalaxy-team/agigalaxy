@@ -38,6 +38,11 @@ export async function verifyCapsuleV2Workflow(db,{testHttp=false,...options}={})
     assert.equal((await tools.galaxy_capsule_v2_preview.run({payload:v})).readyForPublicPublication,true);
     assert.equal(Number((await f.db.query('SELECT count(*) FROM capsules WHERE id=$1',[v.capsuleId])).rows[0].count),0);
     const signed=await f.authorize(v,'capsule.publish',publicView);await tools.galaxy_capsule_v2_publish.run(signed);
+    const ownSource=(await f.capsules.getV2(f.actor,{capsuleId:v.capsuleId,versionId:v.id})).sourceReading;
+    assert.equal(ownSource.case.summary,source.r.summary);assert.equal(ownSource.result.summary,source.result.summary);
+    assert.equal(ownSource.result.ref.version,1);
+    const otherSource=(await f.capsules.getV2(p.actor,{capsuleId:v.capsuleId,versionId:v.id})).sourceReading;
+    assert.equal(otherSource.case.status,'unavailable');assert.equal(otherSource.result.status,'unavailable');
     const found=await f.search.v2.query(null,{type:'capsule',query:{query:v.title}});
     assert.equal(found.items[0].source.versionId,v.id);assert.equal(found.items[0].source.version,v.version);
     assert.equal(found.items[0].record.authorId,f.actor.subjectId);assert.equal(found.items[0].applied,false);

@@ -5,8 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { createContextClientV2 } from '../../galaxy-official/src/context-v2-client.mjs';
 import { MemberAvatar, memberName, readableTime, useMemberNames } from './conversation-ui';
 import {checkedContextDraft,recordErrorField} from './record-workspace-types';
+import {contextMaterialMatchesWork} from './task-context-reading.mjs';
 import type {ContextClient,ContextComposeInput,ContextEvent,ContextGrantChoice,ContextMaterialInput,ContextPending,ContextPreview,ContextReceipt,ContextRenewal,ContextTask,ContextView,RecordRuntime} from './record-workspace-types';
-type Props={task:ContextTask;runtime:RecordRuntime;subjectId?:string;connected:boolean};
+type Props={task:ContextTask;runtime:RecordRuntime;subjectId?:string;connected:boolean;initialGrantId?:string|null;onReadingChange?:(grantId:string|null)=>void};
 
 const statusNames: Record<string, string> = {
   pending: '等待接收', accepted: '已接收', declined: '已婉拒', revoked: '已撤回', expired: '已到期',
@@ -22,20 +23,21 @@ const errorText = (error: unknown) => ({
   context_payload_too_large: '选定的文字过长，请减少一些片段后再预览。',
 } as Record<string,string>)[recordErrorField(error,'code')] ?? (recordErrorField(error,'name') === 'ZodError' ? '请补全材料名称、文字和本次接收范围。' : recordErrorField(error,'message') || '材料暂未处理完成，请稍后重试。');
 const material = () => ({ id: crypto.randomUUID(), label: '', mediaType: 'text/plain' as const, content: '' });
-const roleName = (role: string) => ({diagnosis:'分析问题',advice:'提供建议',context:'提供背景',tool:'提供工具',patch:'提供修改',review:'审阅',verification:'验证检查',takeover:'接续完成','main-responsible':'主要负责人'} as Record<string,string>)[role] ?? role;
+const roleName = (role: string) => ({contribution:'一起参与',diagnosis:'分析问题',advice:'提供建议',context:'提供背景',tool:'提供工具',patch:'提供修改',review:'审阅',verification:'验证检查',takeover:'接续完成','main-responsible':'主要负责人'} as Record<string,string>)[role] ?? role;
+const currentMaterial=(view:ContextView):ContextView=>view.contextAccessGranted&&view.metadata.expiresAt<=Date.now()/1000?{...view,contextAccessGranted:false,materials:[],state:'expired'}:view;
 
 export function ContextWorkspace(props:Props) {
   const connection = props.runtime?.api.snapshot();
   return <ContextSession key={JSON.stringify([props.runtime?.api.endpoint, props.subjectId, connection?.bindingId, connection?.generation, props.task.taskId])} {...props}/>;
 }
-function ContextSession({ task, runtime, subjectId, connected }:Props) {
+function ContextSession({ task, runtime, subjectId, connected, initialGrantId=null, onReadingChange }:Props) {
   const client = useMemo<ContextClient|null>(() => connected && runtime && subjectId ? createContextClientV2({ api: runtime.api, getLocal: runtime.getLocal, putLocal: runtime.putLocal }) : null, [runtime, subjectId, connected]);
   const [items, setItems] = useState<ContextView[]>([]), [pending, setPending] = useState<ContextPending[]>([]), [nextAfter, setNextAfter] = useState<string|null>(null), [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [creating, setCreating] = useState(false), [step, setStep] = useState(0), [selected, setSelected] = useState<string[]>([]), [materials, setMaterials] = useState<ContextMaterialInput[]>([]), [minutes, setMinutes] = useState('60');
-  const [preview, setPreview] = useState<ContextPreview|null>(null), [renewal, setRenewal] = useState<ContextRenewal|null>(null), [opened, setOpened] = useState<ContextView|null>(null), [openedId, setOpenedId] = useState<string|null>(null);
+  const [preview, setPreview] = useState<ContextPreview|null>(null), [renewal, setRenewal] = useState<ContextRenewal|null>(null), [opened, setOpened] = useState<ContextView|null>(null), [openedId, setOpenedId] = useState<string|null>(initialGrantId);
   const [operationErrors, setOperationErrors] = useState<Record<string,string>>({});
-  const lifecycle = useRef({generation:0,reading:0,working:false}), openId = useRef<string|null>(null);
+  const lifecycle = useRef({generation:0,reading:0,working:false}), openId = useRef<string|null>(initialGrantId);
   const confirmation = useRef<HTMLDialogElement>(null), reader = useRef<HTMLDialogElement>(null), editor = useRef<HTMLElement>(null);
   const owner = task.requesterId === subjectId;
   const eligible = (task.participations ?? []).filter((p):p is NonNullable<ContextTask['participations']>[number]&{agreedScope:string;scopeEventId:string} => p.subjectId !== subjectId && p.scopeAvailable !== false && !!p.agreedScope && !!p.scopeEventId && ['active','delivered','accepted'].includes(p.state));
@@ -81,17 +83,18 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
     const token=lifecycle.current.generation,ticket=++lifecycle.current.reading,currentOpen=openId.current;
     if (currentOpen) setOpened(null);
     const page=await client.query({taskId:task.taskId,...(after?{after}:{}),limit:20});
-    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading) return;
+    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading || !navigator.onLine || document.hidden) return;
     setItems(previous => after ? [...previous.filter(x=>!page.items.some(y=>y.metadata.grantId===x.metadata.grantId)),...page.items] : page.items);
     setNextAfter(page.nextAfter??null); setLoaded(true);
     const local=await client.pending();
-    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading) return;
+    if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading || !navigator.onLine || document.hidden) return;
     setPending(local);
     if (currentOpen && openId.current===currentOpen) {
       const view=await client.get(currentOpen);
-      if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&openId.current===currentOpen)setOpened(view);
+      if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&openId.current===currentOpen&&navigator.onLine&&!document.hidden)setOpened(checkedMaterial(view));
     }
   }
+  function checkedMaterial(view:ContextView){if(!contextMaterialMatchesWork(view,task.taskId,subjectId))throw Error('这份材料不属于当前工作或当前身份，请回到材料列表。');return currentMaterial(view);}
   async function reconcilePending(valid:()=>boolean) {
     if (!client) return;
     const local=await client.pending(); if(!valid())return;
@@ -112,19 +115,26 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
     try { await fn(valid); } catch(reason) { if(valid())setError(errorText(reason)); }
     finally { if(valid()){try{const local=await client.pending();if(valid())setPending(local);}catch{}setBusy(false);}lifecycle.current.working=false; }
   }
-  const refreshOnTick=useEffectEvent(()=>{if(!client||document.hidden||lifecycle.current.working)return;void run(async valid=>{await reconcilePending(valid);if(valid())await load();});});
+  const refreshOnTick=useEffectEvent(()=>{if(!client||document.hidden||!navigator.onLine||lifecycle.current.working)return;void run(async valid=>{await reconcilePending(valid);if(valid())await load();});});
   useEffect(() => {
     const control=lifecycle.current;control.generation++;
     const refresh=()=>refreshOnTick();
     refresh();const timer=setInterval(refresh,20000);document.addEventListener('visibilitychange',refresh);
     return()=>{control.generation++;control.reading++;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
   },[client,task.taskId]);
+  useEffect(()=>{
+    const control=lifecycle.current,hide=()=>{control.reading++;setOpened(null);},resume=()=>{hide();refreshOnTick();};
+    window.addEventListener('offline',hide);window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
+    return()=>{window.removeEventListener('offline',hide);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
+  },[client]);
   const readVersion=useEffectEvent(()=>{if(client&&!lifecycle.current.working)void run(()=>load());});
   useEffect(()=>{readVersion();},[task.version]);
-  function closeReader(){openId.current=null;setOpenedId(null);setOpened(null);}
-  async function openMaterial(id:string,valid:()=>boolean){openId.current=id;setOpenedId(id);setOpened(null);const view=await client!.get(id);if(valid()&&openId.current===id)setOpened(view);}
+  const readLocation=useEffectEvent((id:string|null)=>{if(openId.current===id)return;openId.current=id;lifecycle.current.reading++;setOpenedId(id);setOpened(null);if(id)refreshOnTick();});
+  useEffect(()=>{readLocation(initialGrantId);},[initialGrantId]);
+  function closeReader(){openId.current=null;lifecycle.current.reading++;setOpenedId(null);setOpened(null);onReadingChange?.(null);}
+  async function openMaterial(id:string,valid:()=>boolean){const ticket=++lifecycle.current.reading;openId.current=id;setOpenedId(id);setOpened(null);onReadingChange?.(id);const view=await client!.get(id);if(valid()&&ticket===lifecycle.current.reading&&openId.current===id&&navigator.onLine&&!document.hidden)setOpened(checkedMaterial(view));}
   function begin(){setCreating(true);setPreview(null);if(!materials.length)showDraft({materials:[material()],selected:[],minutes:'60',step:0});}
-  async function prepare(valid:()=>boolean,clock:()=>number) {
+  async function prepare(valid:()=>boolean,clock:()=>number,send=false) {
     await draftQueue.current;checkDraft();if(!valid())return;const draftRevision=draftHead.current;
     const recipients=eligible.filter(p=>selected.includes(p.participationId));
     if(!recipients.length)throw Error('请选择至少一位已经确认工作范围的参与者。');
@@ -135,16 +145,16 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
       const payload:ContextGrantChoice['payload']={schemaVersion:2,id:crypto.randomUUID(),taskId:task.taskId,participationId:p.participationId,participantId:p.subjectId,scopeVersion:p.scopeVersion,scopeEventId:p.scopeEventId,expiresAt,materials:structuredClone(materials)};
       const prepared=await client!.prepareGrant(payload);if(!valid())return;drafts.push({prepared,payload,recipient:p});
     }
-    if(valid())setPreview({kind:'grants',drafts,draftRevision});
+    if(valid()){const chosen:ContextPreview={kind:'grants',drafts,draftRevision};if(send)await commit(valid,chosen);else setPreview(chosen);}
   }
-  async function prepareEvent(item:ContextView,kind:ContextEvent['kind'],valid:()=>boolean) {
+  async function prepareEvent(item:ContextView,kind:ContextEvent['kind'],valid:()=>boolean,execute=false) {
     const current=await client!.get(item.metadata.grantId,{metadataOnly:true});if(!valid())return;
     if(kind!=='revoke'&&current.state!=='pending')throw Error('这份材料的状态已改变，请查看当前结果。');
     const prepared=await client!.prepareEvent(kind,current.metadata);
-    if(valid())setPreview({kind,drafts:[{prepared,metadata:current.metadata,materials:current.materials}]});
+    if(valid()){const chosen:ContextPreview={kind,drafts:[{prepared,metadata:current.metadata,materials:current.materials}]};if(execute){if(kind==='accept'){openId.current=current.metadata.grantId;setOpenedId(current.metadata.grantId);setOpened(null);}await commit(valid,chosen);}else setPreview(chosen);}
   }
-  async function commit(valid:()=>boolean) {
-    const chosen=preview;if(!chosen)return;let completed=0;const failures:string[]=[];
+  async function commit(valid:()=>boolean,chosen=preview) {
+    if(!chosen)return;let completed=0;const failures:string[]=[];
     if(chosen.kind==='grants'){await markDraftAttempt(chosen);if(!valid())return;}
     for(const draft of chosen.drafts){
       try{await client!.execute(draft.prepared,{confirmed:true});completed++;}
@@ -154,8 +164,9 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
     setPreview(null);
     if(chosen.kind==='grants')await settleDraft();
     await load();if(!valid())return;
-    setNotice(chosen.kind==='grants'?completed?'已向 '+completed+' 位参与者发送资料，等待各自接收。':'发送暂未完成，正在保留本次资料。':chosen.kind==='accept'?'已接收，可以打开材料正文。':chosen.kind==='decline'?'已婉拒这份材料。':'已撤回这份材料。');
+    setNotice(chosen.kind==='grants'?completed?'已向 '+completed+' 位参与者发送资料，等待各自接收。':'发送暂未完成，正在保留本次资料。':chosen.kind==='accept'?'已接收，正在打开获准正文。':chosen.kind==='decline'?'已婉拒这份材料。':'已撤回这份材料。');
     if(failures.length)setError([...new Set(failures)].join('；'));
+    if(chosen.kind==='accept'&&completed>0&&!failures.length&&valid()&&openId.current===chosen.drafts[0].metadata.grantId)await openMaterial(chosen.drafts[0].metadata.grantId,valid);
   }
   async function reviewOperation(op:ContextPending,valid:()=>boolean){
     const review=await client!.reviewAuthorization(op.operationId);if(!valid())return;
@@ -179,7 +190,7 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
         return <article key={m.grantId} className="material-row">
           <div className="member-line"><MemberAvatar subjectId={owner?m.participantId:m.ownerId}/><div><h4>{title}</h4><p>{owner?'给 '+name(m.participantId):'来自 '+name(m.ownerId)} · {statusNames[item.state]??'当前不可用'}</p></div></div>
           <p className="record-meta">{['pending','accepted'].includes(item.state)?'可阅读至':'原定有效至'} {readableTime(m.expiresAt)}</p>
-          <div className="button-row">{m.participantId===subjectId&&item.state==='pending'&&<><Button disabled={busy||activePending.length>0} onClick={()=>run(valid=>prepareEvent(item,'accept',valid))}>查看并接收</Button><button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'decline',valid))}>婉拒</button></>}
+          <div className="button-row">{m.participantId===subjectId&&item.state==='pending'&&<><Button disabled={busy||activePending.length>0} onClick={()=>run(valid=>prepareEvent(item,'accept',valid,true))}>接收并阅读</Button><button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'decline',valid,true))}>婉拒</button></>}
           {(m.ownerId===subjectId||item.state==='accepted')&&['pending','accepted'].includes(item.state)&&<Button variant="outline" disabled={busy} onClick={()=>run(valid=>openMaterial(m.grantId,valid))}>打开材料</Button>}
           {m.ownerId===subjectId&&!['revoked','source-erased'].includes(item.state)&&<button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'revoke',valid))}>撤回</button>}</div>
           <details className="technical-details"><summary>交接范围与准确引用</summary><p>参与范围第 {m.scopeVersion} 版；提供者 {m.ownerId}；接收者 {m.participantId}。</p><p>材料 {m.grantId}；摘要 {m.materialsHash}</p></details>
@@ -190,17 +201,17 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
     {creating&&<section className="material-editor" ref={editor} style={{scrollMarginTop:'6rem'}}>
       <button className="back-link" onClick={()=>setCreating(false)}>← 回到材料列表</button>
       {draftStatus&&<p className="record-meta"><output>{draftStatus}</output></p>}
-      <nav className="flow-steps" aria-label="交接资料步骤"><button aria-current={step===0?'step':undefined} onClick={()=>changeDraft({step:0},false)}>1. 选择资料</button><button aria-current={step===1?'step':undefined} onClick={()=>changeDraft({step:1},false)}>2. 接收者与时间</button></nav>
-      <form className="workspace-form" onSubmit={event=>{event.preventDefault();if(step===0){changeDraft({step:1},false);return;}void run(valid=>prepare(valid,()=>Date.now()));}}>
-        <h4 tabIndex={-1}>{step===0?'要交接哪些文字？':'给谁阅读，保留多久？'}</h4>
-        {step===0?<>{materials.map((m,index)=><fieldset key={m.id}><legend>材料 {index+1}</legend><label htmlFor={materialFieldId+'-'+m.id+'-name'}>材料名称<Input id={materialFieldId+'-'+m.id+'-name'} required maxLength={160} value={m.label} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,label:event.target.value}:x)})}/></label><label htmlFor={materialFieldId+'-'+m.id+'-text'}>要交接的文字<Textarea id={materialFieldId+'-'+m.id+'-text'} required maxLength={4000} value={m.content} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,content:event.target.value}:x)})}/></label>{materials.length>1&&<button type="button" className="text-link" onClick={()=>changeDraft({materials:materials.filter(x=>x.id!==m.id)})}>移除这份材料</button>}</fieldset>)}{materials.length<8&&<Button type="button" variant="outline" onClick={()=>changeDraft({materials:[...materials,material()]})}>添加另一份材料</Button>}</>:<>
+      <form className="workspace-form" onSubmit={event=>{event.preventDefault();void run(valid=>prepare(valid,()=>Date.now(),true));}}>
+        <h4 tabIndex={-1}>把这次需要的资料交给对方</h4>
+        {materials.map((m,index)=><fieldset disabled={busy} key={m.id}><legend>材料 {index+1}</legend><label htmlFor={materialFieldId+'-'+m.id+'-name'}>材料名称<Input id={materialFieldId+'-'+m.id+'-name'} required maxLength={160} value={m.label} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,label:event.target.value}:x)})}/></label><label htmlFor={materialFieldId+'-'+m.id+'-text'}>要交接的文字<Textarea id={materialFieldId+'-'+m.id+'-text'} required maxLength={4000} value={m.content} onChange={event=>changeDraft({materials:materials.map(x=>x.id===m.id?{...x,content:event.target.value}:x)})}/></label>{materials.length>1&&<button type="button" className="text-link" onClick={()=>changeDraft({materials:materials.filter(x=>x.id!==m.id)})}>移除这份材料</button>}</fieldset>)}{materials.length<8&&<Button type="button" variant="outline" disabled={busy} onClick={()=>changeDraft({materials:[...materials,material()]})}>添加另一份材料</Button>}
+        <fieldset disabled={busy}>
           <fieldset><legend>接收者</legend>{eligible.map(p=><label className="material-recipient check-label" key={p.participationId}><input type="checkbox" checked={selected.includes(p.participationId)} onChange={event=>changeDraft({selected:event.target.checked?[...selected,p.participationId]:selected.filter(id=>id!==p.participationId)})}/><MemberAvatar subjectId={p.subjectId}/><span><strong>{name(p.subjectId)}</strong><small>{roleName(p.role)} · {p.agreedScope}</small></span></label>)}</fieldset>
           <p className="record-meta">所选的人分别收到同一组材料，各自确认接收。</p>
           <label>可阅读多久<select value={['60','1440','10080'].includes(minutes)?minutes:'custom'} onChange={event=>changeDraft({minutes:event.target.value==='custom'?'120':event.target.value})}><option value="60">1 小时</option><option value="1440">1 天</option><option value="10080">7 天</option><option value="custom">自定时间</option></select></label>
           {!['60','1440','10080'].includes(minutes)&&<label htmlFor={minutesId}>分钟数<Input id={minutesId} type="number" required min={5} max={43200} value={minutes} onChange={event=>changeDraft({minutes:event.target.value})}/></label>}
           <p className="record-meta">到期或参与范围改变后，这里的正文停止读取；对方已另行保存的副本不在此删除。</p>
-        </>}
-        <div className="button-row">{step>0&&<Button type="button" variant="outline" onClick={()=>changeDraft({step:0},false)}>上一步</Button>}<Button type="submit" disabled={busy||activePending.length>0||!draftReady}>{step===0?'继续':'预览交接内容'}</Button></div>
+        </fieldset>
+        <div className="button-row"><Button type="button" variant="ghost" disabled={busy||activePending.length>0||!draftReady} onClick={()=>void run(valid=>prepare(valid,()=>Date.now()))}>预览</Button><Button type="submit" disabled={busy||activePending.length>0||!draftReady}>发送给所选参与者</Button></div>
       </form>
     </section>}
     {waiting.length>0&&<section className="operation-status" aria-label="材料发送状态">{waiting.map(op=><article key={op.operationId}>
@@ -220,7 +231,7 @@ function ContextSession({ task, runtime, subjectId, connected }:Props) {
     </dialog>
     <dialog ref={reader} className="workspace-dialog material-dialog" onCancel={closeReader}>{openedId&&<>
       <header className="dialog-heading"><span>工作材料</span><button className="icon-button" aria-label="关闭工作材料" onClick={closeReader}>×</button></header>
-      {opened?<><p className="record-meta">{statusNames[opened.state]??'当前不可用'}</p>{opened.contextAccessGranted?(opened.materials??[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>):<p>当前没有读取正文的授权。</p>}</>:<p>正在核对当前材料与可读范围…</p>}
+      {opened?<><p className="record-meta">{statusNames[opened.state]??'当前不可用'}</p>{opened.contextAccessGranted?(opened.materials??[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>):<p>当前没有读取正文的授权。</p>}</>:<p>{navigator.onLine?'正在核对当前材料与可读范围…':'当前离线，连接恢复后会重新读取获准材料。'}</p>}
       {error&&<p className="message error" role="alert">{error}</p>}
     </>}</dialog>
   </section>;

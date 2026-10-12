@@ -91,6 +91,46 @@ test('current sources, field grants, hiding and archive suppress directory witho
   await h.page();assert.deepEqual((await h.f.db.query('SELECT payload_text,payload_hash FROM project_events_v2 WHERE operation_id=$1',[final.event.operationId])).rows[0],stored);
 }));
 
+test('an author portfolio lists existing public work while contact is off, with owner-scoped paging and unchanged public permissions',{timeout:60000},()=>harness(async h=>{
+  const first=await h.create(h.f,{...document,title:'Unfinished poem',technologies:[]},'10000000-0000-4000-8000-000000000001');
+  const second=await h.create(h.f,{...document,title:'Paper pattern',technologies:[]},'10000000-0000-4000-8000-000000000002');
+  const privateWork=await h.create(h.f,{...document,title:'PRIVATE-WORK'},randomUUID(),{visibility:'Private'});
+  const unlisted=await h.create(h.f,{...document,title:'UNLISTED-WORK',discoverable:false});
+  const other=await h.create(h.b,{...document,title:'OTHER-AUTHOR'});
+  const portfolio=(input={},actor=null,status=200)=>h.request(actor,'/v2/projects/portfolio/query',{ownerId:h.f.actor.subjectId,...input},status);
+  const before=await h.snapshot(),one=await portfolio({limit:1});
+  assert.deepEqual(one.items.map(item=>item.projectId),[first.event.projectId]);assert.ok(one.nextAfter);
+  assert.equal((await h.page()).items.length,0,'not accepting contact remains authoritative for matching');
+  const two=await portfolio({limit:1,after:one.nextAfter});assert.deepEqual(two.items.map(item=>item.projectId),[second.event.projectId]);assert.equal(two.nextAfter,null);
+  assert.deepEqual((await portfolio({},h.f)).items,(await portfolio()).items,'an owner cannot expand the public portfolio');
+  for(const forbidden of [privateWork.event.projectId,unlisted.event.projectId,other.event.projectId])assert.ok(!JSON.stringify(await portfolio()).includes(forbidden));
+  assert.equal(one.readingGrantsContact,false);assert.equal(one.readingGrantsMembership,false);assert.equal(one.items[0].discovery,undefined);
+  assert.equal(await h.snapshot(),before,'reading does not duplicate work or create contact preferences');
+  await portfolio({ownerId:h.b.actor.subjectId,limit:1,after:one.nextAfter},null,409);
+  await h.page({limit:1,after:one.nextAfter},null,409);
+  await portfolio({ownerId:'not-an-identity'},null,400);await portfolio({purpose:'conversation'},null,400);
+  await h.write(h.f,second.event.projectId,'archive');assert.equal((await portfolio()).items.length,1);
+  await h.f.consents.revoke(h.f.actor,first.envelope.consentId);assert.equal((await portfolio()).items.length,0);
+}));
+
+test('a limited contact direction never becomes an offer of every related skill, and disjoint wishes do not match',{timeout:60000},()=>harness(async h=>{
+  const source=await h.create(h.f,{...document,functions:['Alpha','Beta']});
+  const target=await h.create(h.b,{...document,functions:['Alpha','Beta']});
+  await h.wish(h.f,{enabled:true,functions:['Beta']});await h.wish(h.b,{enabled:true});
+  await h.localWish(h.b,target.event.projectId,{enabled:true,purposes:['conversation'],functions:['Alpha']});
+  const input={context:{kind:'ephemeral',title:'Discuss one selected direction',functions:['Alpha','Beta'],technologies:[]},purposes:['conversation']};
+  const anonymous=await h.request(null,'/v2/discovery/query',input),item=anonymous.items.find(item=>item.projectId===target.event.projectId);
+  assert.deepEqual(item.match.sharedFunctions,['alpha','beta'],'similarity remains an explanation of the work');
+  assert.deepEqual(item.help.functions,['alpha'],'the invitation reflects only the currently allowed direction');
+  const own=await h.request(h.f,'/v2/discovery/query',{...input,context:{kind:'project',projectId:source.event.projectId}});
+  assert.equal(own.items.some(item=>item.projectId===target.event.projectId),false,'each side matching a different direction is not mutual willingness');
+  await h.localWish(h.f,source.event.projectId,{enabled:true,purposes:['conversation'],functions:['Alpha','Beta']});
+  const joined=await h.request(h.f,'/v2/discovery/query',{...input,context:{kind:'project',projectId:source.event.projectId}});
+  assert.deepEqual(joined.items.find(item=>item.projectId===target.event.projectId).help.functions,['alpha']);
+  const ref=item.opportunityRef;await h.localWish(h.b,target.event.projectId,{enabled:false});
+  await h.request(null,'/v2/discovery/detail',{...input,opportunityRef:ref},404);
+}));
+
 test('current owner global, project and temporary willingness restricts directory purposes and public functions only',{timeout:60000},()=>harness(async h=>{
   const created=await h.create(h.f,{...document,functions:['Alpha','Beta']}),id=created.event.projectId;
   assert.equal((await h.page()).items.length,0);await h.detail(id);

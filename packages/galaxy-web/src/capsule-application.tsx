@@ -1,24 +1,30 @@
 import React, { useCallback, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import {applicationResults,exactApplicationOrigin,matchingPriorApplications,originConfigurationRefs,applicationEnvironment} from './capsule-application-model.mjs';
+import {applicationResults,exactApplicationOrigin,matchingPriorApplications,originConfigurationRefs,applicationEnvironment,isCapsuleCaseFacts} from './capsule-application-model.mjs';
 import {memberName,useMemberNames} from './conversation-ui';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
+import {useGovernanceDraft} from './governance-presentation';
+import {capsuleInputDraftKey} from './capsule-authoring-state';
+import {useRegisteredCapsuleDraft} from './capsule-authoring-shared';
 import {capsuleUseV2Schema} from '../../galaxy-official/src/shared/capsule-v2-schema.mjs';
-import type {CapsuleAuthorRuntime,CapsuleCaseHistory,CapsuleConfigurationView,CapsuleDetail,CapsuleOriginLocator,CapsuleOriginWork,CapsuleRead,CapsuleRun,CapsuleUse,CapsuleUses,CapsuleUseView,CapsuleVerificationView} from './capsule-authoring-types';
+import type {CapsuleAuthorClient,CapsuleAuthorRuntime,CapsuleCaseHistory,CapsuleConfigurationView,CapsuleDetail,CapsuleLocator,CapsuleOriginLocator,CapsuleOriginWork,CapsulePropose,CapsuleRead,CapsuleRegisterDraft,CapsuleRun,CapsuleUse,CapsuleUses,CapsuleUseView,CapsuleVerificationView} from './capsule-authoring-types';
 
 type ExactRef={id:string;version:number};
 type ApplicationRead=CapsuleCaseHistory|CapsuleRead|CapsuleUseView|CapsuleVerificationView;
+type ApplicationDraft={kind:CapsuleUse['kind'];caseId:string;resultKey:string;note:string;difference:string;parts:string;selected:string[];priorId:string;visibility:'Private'|'Public';viewers:string[];configurationKey:string};
 type Props={
  runtime:CapsuleAuthorRuntime|null;detail:CapsuleDetail;history:CapsuleCaseHistory[];historyLoaded:boolean;historyNext:string|null;
+ client:Pick<CapsuleAuthorClient,'receiptFor'>;registerDraft?:CapsuleRegisterDraft;
  loadHistory:(after?:string)=>Promise<unknown>;loadConfiguration:(ref:ExactRef)=>Promise<CapsuleConfigurationView>;
  readCurrent:(kind:string,input:unknown)=>Promise<ApplicationRead>;uses:CapsuleUses;subjectId?:string;busy:boolean;run:CapsuleRun;
- propose:(kind:'use',payload:CapsuleUse,scope:{visibility:'Private'|'Public';viewers:string[]})=>Promise<void>;
+ propose:CapsulePropose;
  navigate:(path:string)=>void;helpOrigin?:CapsuleOriginLocator|null;originWork:CapsuleOriginWork|null;readOrigin:()=>Promise<CapsuleOriginWork>;
 };
 const ref = (x: ExactRef) => ({ id: x.id, version: x.version }), key = (x: ExactRef) => `${x.id}:${x.version}`;
+const outcomeLabel=(value:string|undefined)=>({succeeded:'达到目标',partial:'部分达到',failed:'未达到',inconclusive:'尚无定论',conflicting:'结论冲突'} as Record<string,string>)[value??'']??'未说明结果';
 function currentCase(value:ApplicationRead):CapsuleCaseHistory{
- if('kind' in value&&'caseId' in value&&!('eventId' in value))return value;
+ if(isCapsuleCaseFacts(value))return value;
  throw Error('原工作当前不可读取，请重新核对。');
 }
 function currentCapsule(value:ApplicationRead):CapsuleRead{
@@ -37,17 +43,20 @@ export function CapsuleApplication(props:Props){
  const view=useChoiceViewLease(props.runtime,props.subjectId);
  return view.lease&&props.runtime&&props.subjectId?<ApplicationForm key={view.key} {...props} runtime={props.runtime} subjectId={props.subjectId} lease={view.lease}/>:null;
 }
-function ApplicationForm({runtime,detail,history,historyLoaded,historyNext,loadHistory,loadConfiguration,readCurrent,uses,subjectId,busy,run,propose,navigate,helpOrigin,originWork,readOrigin,lease}:Omit<Props,'runtime'|'subjectId'>&{runtime:CapsuleAuthorRuntime;subjectId:string;lease:ChoiceViewLease}){
+function ApplicationForm({runtime,client,registerDraft,detail,history,historyLoaded,historyNext,loadHistory,loadConfiguration,readCurrent,uses,subjectId,busy,run,propose,navigate,helpOrigin,originWork,readOrigin,lease}:Omit<Props,'runtime'|'subjectId'>&{runtime:CapsuleAuthorRuntime;subjectId:string;lease:ChoiceViewLease}){
  const epoch=useRef(0),inputId=useId();
  useEffect(()=>{const viewEpoch=epoch;viewEpoch.current++;return()=>{viewEpoch.current++;};},[]);
  const check=useCallback((token:number)=>{lease.assertCurrent();if(epoch.current!==token)throw Error('方法使用页面已关闭或身份已变化。');},[lease]);
  const ensureHistory=useEffectEvent(async()=>{if(!historyLoaded)await run(async()=>{await loadHistory();});});
  useEffect(()=>{void ensureHistory();},[]);
- const [kind,setKind]=useState<CapsuleUse['kind']>('reference'),[caseId,setCaseId]=useState(''),[resultKey,setResultKey]=useState(''),
-  [note,setNote]=useState(''),[difference,setDifference]=useState(''),[parts,setParts]=useState(''),
-  [selected,setSelected]=useState<string[]>([]),[priorId,setPriorId]=useState(''),[visibility,setVisibility]=useState<'Private'|'Public'>('Private'),
-  [viewers,setViewers]=useState<string[]>([]),[configurationKey,setConfigurationKey]=useState(''),
-  [configurationRead,setConfigurationRead]=useState<{choice:string;value:CapsuleConfigurationView|null;error:string}|null>(null);
+ const [initial]=useState<ApplicationDraft>(()=>({kind:'reference',caseId:'',resultKey:'',note:'',difference:'',parts:'',selected:[],priorId:'',visibility:'Private',viewers:[],configurationKey:''}));
+ const draftKey=capsuleInputDraftKey(runtime.api.endpoint,subjectId,'use',detail.capsuleId+':'+detail.versionId),draft=useGovernanceDraft<ApplicationDraft,CapsuleLocator>(runtime,subjectId,true,draftKey,initial),draftRef=useRegisteredCapsuleDraft(draft,draftKey,client,registerDraft);
+ const {kind,caseId,resultKey,note,difference,parts,selected,priorId,visibility,viewers,configurationKey}={...initial,...draft.value};
+ const setKind=(kind:CapsuleUse['kind'])=>draft.change({kind}),setCaseId=(caseId:string)=>draft.change({caseId}),setResultKey=(resultKey:string)=>draft.change({resultKey}),
+  setNote=(note:string)=>draft.change({note}),setDifference=(difference:string)=>draft.change({difference}),setParts=(parts:string)=>draft.change({parts}),
+  setSelected=(selected:string[])=>draft.change({selected}),setPriorId=(priorId:string)=>draft.change({priorId}),setVisibility=(visibility:'Private'|'Public')=>draft.change({visibility}),
+  setViewers=(viewers:string[])=>draft.change({viewers}),setConfigurationKey=(configurationKey:string)=>draft.change({configurationKey});
+ const [configurationRead,setConfigurationRead]=useState<{choice:string;value:CapsuleConfigurationView|null;error:string}|null>(null);
  const originalFacts:CapsuleCaseHistory|null=originWork?.facts&&originWork.task.caseId?{...history.find(c=>c.caseId===originWork.task.caseId),...originWork.facts,caseId:originWork.task.caseId,title:originWork.task.request.title,requesterId:originWork.task.requesterId,taskIds:[originWork.task.taskId]}:null;
  const availableHistory=originalFacts?[originalFacts,...history.filter(c=>c.caseId!==originalFacts.caseId)]:history;
  const source=availableHistory.find(c=>c.caseId===caseId),results=applicationResults(source,subjectId),result=results.find(r=>key(r)===resultKey),
@@ -71,6 +80,7 @@ function ApplicationForm({runtime,detail,history,historyLoaded,historyNext,loadH
   environment=origin?configurationRef&&!currentConfiguration?null:applicationEnvironment(origin,configurationRef,currentConfiguration):null;
  async function prepare(){
   const token=epoch.current;check(token);
+  const saved=await draft.snapshot();check(token);
   if(!source)throw Error('请选择本人已有的真实工作记录。');
   if(!detail.versionId||!detail.authorId)throw Error('原方法准确版本和作者尚未读到，请重新核对。');
   let selectedTaskId=source.taskIds?.length===1?source.taskIds[0]:null;
@@ -99,11 +109,12 @@ function ApplicationForm({runtime,detail,history,historyLoaded,historyNext,loadH
     payload=capsuleUseV2Schema.parse({...applied,kind,priorUseId:priorId,verificationRefs});
    }else payload=capsuleUseV2Schema.parse({...applied,kind});
   }
-  check(token);await propose('use',payload,{visibility,viewers:visibility==='Private'?viewers:[]});
+  check(token);await propose('use',payload,{visibility,viewers:visibility==='Private'?viewers:[]},{draftKey,display:{},onJournal:async locator=>draftRef.current.attach(locator,saved.revision),onAcknowledged:async receipt=>draftRef.current.settle(async locator=>locator.operationId===(receipt.operationId??receipt.eventId)?client.receiptFor(locator):null)});
  }
   return (
     <section className="method-application">
-      <fieldset disabled={busy} style={{minWidth:0}}>
+      <fieldset disabled={busy||!draft.ready} style={{minWidth:0}}>
+        {draft.status&&<p className="record-meta"><output>{draft.status}</output></p>}
         {helpOrigin&&<div className="browse-note"><p>原任务：{originWork?.task.request.title??'等待核对当前可读记录'}。选择它作为目标只准备本次引用或应用，不会补造尝试或结果。</p><Button type="button" onClick={()=>run(async()=>{const token=epoch.current;check(token);const current=await readOrigin();check(token);if(!current.task.caseId||!current.facts)throw new Error('原任务还没有可选的实际工作事实，请返回原任务继续处理。');setCaseId(current.task.caseId);setResultKey('');setSelected([]);setViewers([]);setPriorId('');setConfigurationKey('');})}>选择原工作作为目标</Button></div>}
         <div className="button-row">
           {!historyLoaded&&<p><output>正在读取我的工作…</output></p>}
@@ -198,14 +209,14 @@ function ApplicationForm({runtime,detail,history,historyLoaded,historyNext,loadH
                   <option value="">选择已经记录的结果</option>
                   {results.map(r => (
                     <option key={key(r)} value={key(r)}>
-                      {r.summary} · {r.origin?.kind==='intervention'?'介入':'尝试'} · v{r.version} · {r.reportedOutcome}
+                      {r.summary} · {r.origin?.kind==='intervention'?'介入':'尝试'} · 第 {r.version} 版 · {outcomeLabel(r.reportedOutcome)}
                     </option>
                   ))}
                 </select>
               </label>
               {result && (
                 <p className="message">
-                  原记录报告：{result.reportedOutcome}；环境：
+                  原记录报告：{outcomeLabel(result.reportedOutcome)}；环境：
                   {environment?.name==='unknown'?'未知':environment?.name??'等待核对'} /{' '}
                   {environment?.version==='unknown'?'未知':environment?.version??'等待核对'}
                   。{origin?.kind==='intervention'&&!configurationRef?'这项介入未选定原记录中的配置，不能推断与方法环境相同。':''}本表保留原来源与结果的准确版本。

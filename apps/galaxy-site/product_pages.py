@@ -42,9 +42,9 @@ def render_product_pages(site):
         '<section class="home-purpose"><p class="home-kicker">欢迎来到银河</p>'
         '<h1>找经验，找同伴。<br><em>让眼前的事继续向前。</em></h1>'
         '<p class="home-description">读一份方法，聊一个想法，或为正在做的事找些帮助。</p>'
-        '<form class="home-search" action="/app/search" method="get" role="search">'
+        '<form class="home-search" action="/app/find" method="get" role="search">'
         '<label class="sr-only" for="galaxy-search">搜索银河公开内容</label>'
-        + icon("search") + '<input id="galaxy-search" name="q" type="search" maxlength="200" placeholder="你对什么感兴趣？" autocomplete="off">'
+        + icon("search") + '<input id="galaxy-search" name="q" type="search" maxlength="160" placeholder="你对什么感兴趣？" autocomplete="off">'
         '<button type="submit">搜索</button></form>'
         '<a class="home-browse" href="/app/">先随便看看 ' + arrow + '</a></section>'
         '<nav class="home-paths" aria-label="从感兴趣的内容开始">'
@@ -61,7 +61,7 @@ def render_product_pages(site):
         + section("有想法，就聊聊", '<p>在帖子里提问和回复，或与相关的人继续对话。闲聊、分享作品和讨论一个兴趣，都可以独立进行。</p>', "/app/community", "进入社区")
         + section("需要帮助时，说清楚当前目标", '<p>利用已经有的背景准备请求，补上你希望得到的帮助。选择要分享的内容后发布，收到回应再决定怎样继续交流。</p>', "/app/publish", "发起求助")
         + section("把有用的结果带回去", '<p>读到的方法、收到的建议和实际文件都可以回到原来的事情中使用。真实经历保留来处，下一次寻找帮助时也有更多依据。</p>')
-        + '<aside class="reading-note"><h2>自己的 AI，自己的选择</h2><p>你的模型负责理解、整理和建议。银河提供信息、交流和数据服务；手工浏览、发帖和聊天也可以直接使用。</p><a href="/network/">了解开放网络 ' + arrow + '</a></aside>')
+        + '<aside class="reading-note"><h2>自己的 AI，自己的选择</h2><p>在具体内容里选择“用自己的 AI 继续”，把这次请求交给已经连接同一银河身份的 AI。它会读取当前允许使用的内容，你可以随时返回原页面接着做。</p><p>你的模型负责理解、整理和建议。银河提供信息、交流和数据服务；手工浏览、发帖和聊天也可以直接使用。</p><a href="/network/">了解开放网络 ' + arrow + '</a></aside>')
 
     page("/start/", "开始使用", "直接在网页浏览，或从自己的AI工作中使用银河。",
         intro("从方便的地方开始。", "网页可以直接浏览；使用自己的 AI 时，也能从原聊天中进入。")

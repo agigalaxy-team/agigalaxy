@@ -3,11 +3,11 @@ const base='https://galaxy.invalid';
 /** @param {unknown} value @returns {value is string} */
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
 const fail=message=>{throw Error(message);};
-const originRoute=path=>['/app/search','/app/match','/app/publish','/app/capsules'].includes(path)||/^\/app\/capsules\/[a-f0-9-]{36}(?:\/versions\/[a-f0-9-]{36})?$/i.test(path);
+const originRoute=path=>['/app/find','/app/search','/app/match','/app/publish','/app/capsules'].includes(path)||/^\/app\/capsules\/[a-f0-9-]{36}(?:\/versions\/[a-f0-9-]{36})?$/i.test(path);
 export function taskOriginReturn(taskId,value){
  if(!uuid(taskId))return null;
  try{if(typeof value==='string'&&value.startsWith('/')&&!value.startsWith('//')){const url=new URL(value,base);if(url.origin===base&&url.pathname===`/app/tasks/${taskId}`)return url.pathname+url.search+url.hash;}}catch{}
- return `/app/tasks/${taskId}?section=collaboration`;
+ return `/app/tasks/${taskId}?section=collaboration&view=work`;
 }
 // Route values are locators only. Current ownership and source access are read
 // again before they can become an explicitly selected publication origin.

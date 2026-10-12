@@ -29,7 +29,7 @@ export type CapsuleSourceItem={
  view?:{record:CapsuleSourceText|null;subjectId?:string};
 };
 export type CapsuleCaseHistory={
- kind:string;caseId:string;title?:string;summary?:string;background?:string;synthetic?:boolean;requesterId?:string;taskIds?:string[];
+ kind?:string;caseId:string;title?:string;summary?:string;background?:string;synthetic?:boolean;requesterId?:string;taskIds?:string[];
  events?:{eventId:string;reportedBy?:string;payload:CapsuleSourceText&{kind:string}}[];
  attempts?:CapsuleCaseFact[];interventions?:CapsuleCaseFact[];results?:CapsuleCaseFact[];
  verificationRecords?:{referenceStatus:string;type:'evidence'|'verification';id:string;version:number;record:CapsuleVerificationText|null}[];
@@ -85,6 +85,7 @@ export type CapsuleAttribution=NonNullable<Parameters<typeof CapsuleAttributionR
 export type CapsuleSourcePermission={permissionId:string;authorId:string;scope:string;attribution:string;license:string};
 export type CapsuleDetail={
  capsuleId:string;versionId:string|null;authorId?:string;version:CapsuleStoredVersion|null;
+ sourceReading?:{case:{status:'available'|'unavailable';ref?:CapsuleSourceRef;title?:string;summary?:string;authorId?:string};result:{status:'available'|'unavailable';ref:CapsuleSourceRef;summary?:string;reportedOutcome?:string;limitations?:string;authorId?:string;currentness?:string}};
  sourceStatus?:string;deprecated?:boolean;securityIssue?:boolean;newApplicationAllowed?:boolean;synthetic?:boolean|null;
  permissions?:CapsuleSourcePermission[];attributions?:CapsuleAttribution[];notices?:{id:string;kind:string;summary:string}[];ownerControl?:CapsuleOwnerControl;
 };

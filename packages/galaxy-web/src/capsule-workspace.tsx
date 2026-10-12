@@ -13,13 +13,16 @@ import {CapsuleAuthorPreview} from './capsule-author-preview';
 import {CapsuleApplication} from './capsule-application';
 import {CapsuleConsentControls} from './capsule-consent-controls';
 import {CapsuleAttributionResponses} from './capsule-attribution-responses';
+import {CapsuleSourceReading} from './capsule-source-reading';
 import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {AgentWorkContinuation} from './agent-work-continuation';
 import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from './directory-reading-state.mjs';
 import {helpOriginLocator} from './help-origin-client.mjs';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleUseV2Schema} from '../../galaxy-official/src/shared/capsule-v2-schema.mjs';
 import type {CapsuleAuthorMode,CapsuleCaseHistory,CapsuleDetail,CapsuleDirectoryItem,CapsuleDisclosure,CapsuleOperationKind,CapsuleOriginWork,CapsulePermissionView,CapsulePreview,CapsulePreviewContext,CapsulePreviewDisplay,CapsuleReceipt,CapsuleRegisterDraft,CapsuleUses,CapsuleUseView,CapsuleVersionItem,CapsuleVersions,CapsuleWorkspaceClient,CapsuleWorkspaceRuntime} from './capsule-authoring-types';
+import './capsule-reading.css';
 
 const labels:Record<string,string>={
   current:'来源当前可用','source-unavailable':'来源目前不可用','source-result-superseded':'来源结果已有纠正版本',
@@ -270,6 +273,7 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
       capsuleInputDraftKey(runtime.api.endpoint,subjectId,'author'),capsuleInputDraftKey(runtime.api.endpoint,subjectId,'permissions'),
       ...(id?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'revision',id)]:[]),
       ...(version?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'maintenance',version)]:[]),
+      ...(id&&version?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'use',id+':'+version)]:[]),
       ...(receipt.permissionId?[capsuleInputDraftKey(runtime.api.endpoint,subjectId,'permission-revoke',receipt.permissionId)]:[]),
       ...draftHandlers.current.keys(),
     ]);
@@ -382,34 +386,35 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
           {detail&&<>
             <div className="method-reading-meta"><MemberAvatar subjectId={detail.authorId}/><span>{memberName(detail.authorId,subjectId,(detail.authorId?memberNames[detail.authorId]:undefined)??undefined)}</span><span>第 {detail.version?.version??selectedVersion?.version??'所选'} 版</span>{detail.synthetic&&<span className="tag">合成演示</span>}{detail.sourceStatus&&detail.sourceStatus!=='current'&&<span>{detail.sourceStatus?capsuleLabel(detail.sourceStatus):'尚未读取'}</span>}</div>
             {detail.version&&detail.versionId&&<SaveForLaterButton runtime={runtime} connected={bound} subjectId={subjectId} reference={{kind:'capsule',capsuleId:detail.capsuleId,versionId:detail.versionId}} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
+            {detail.version&&detail.versionId&&<AgentWorkContinuation runtime={runtime} subjectId={subjectId} object={{kind:'capsule',id:detail.capsuleId,versionId:detail.versionId}} title={detail.version.title+' · 第 '+detail.version.version+' 版'} purpose="根据这一版方法的做法、适用条件与来源，判断如何用于我原来的事情" returnTo={exactCapsulePath(detail.capsuleId,detail.versionId)+location.search+location.hash} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
             {newerVersion&&<p className="method-new-version">另有第 {newerVersion.version} 版可读。<button type="button" className="text-link" onClick={()=>navigate(exactCapsulePath(capsuleId,newerVersion.versionId))}>阅读新版 →</button></p>}
+            {detail.version&&<nav className="method-reading-index" aria-label="这份方法的阅读位置"><a href="#method-fit">适用与限制</a><a href="#method-steps">具体做法</a><a href="#method-sources">来源与署名</a><a href="#method-uses">使用与结果</a></nav>}
             <article className="method-prose">
               {detail.version?<>
-                <p className="method-environment">适用环境：{detail.version.environment.name} / {detail.version.environment.version}</p>
-                <section><h2>做法</h2><p className="reading-prose">{detail.version.solutionStrategy}</p></section>
+                <section id="method-fit" className="method-fit"><h2>适用与限制</h2><p className="reading-prose">{detail.version.applicableScope}</p><p className="method-environment">原方法的环境：{detail.version.environment.name} / {detail.version.environment.version}</p>{detail.version.limitations.length>0&&<div className="method-limitations"><h3>需要留意的条件</h3><ul>{detail.version.limitations.map((value:string,index:number)=><li key={index}>{value}</li>)}</ul></div>}</section>
+                <section id="method-steps"><h2>具体做法</h2><p className="reading-prose">{detail.version.solutionStrategy}</p></section>
                 <section><h2>如何验证</h2><p className="reading-prose">{detail.version.verificationMethod}</p></section>
-                <section><h2>适用范围</h2><p className="reading-prose">{detail.version.applicableScope}</p></section>
-                {detail.version.limitations.length>0&&<section><h2>限制与可能失败的条件</h2><ul>{detail.version.limitations.map((value:string,index:number)=><li key={index}>{value}</li>)}</ul></section>}
                 {(detail.version.tools.length+detail.version.skills.length+detail.version.mcpRefs.length)>0&&<section><h2>使用的工具</h2><p>{[...detail.version.tools,...detail.version.skills,...detail.version.mcpRefs].join('、')}</p></section>}
                 <p className="method-license">使用许可：{detail.version.license}</p>
                 {(detail.version.externalReferences??[]).length>0&&<section><h2>延伸阅读</h2>{(detail.version.externalReferences??[]).map((reference)=><p key={reference.url}>{/^https?:\/\//i.test(reference.url)?<a href={reference.url} target="_blank" rel="noreferrer">{reference.description} ↗</a>:reference.description}{reference.license&&<small> · {reference.license}</small>}</p>)}</section>}
-                <details className="method-source-details"><summary>了解来源与署名</summary>
+                <section id="method-sources" className="method-source-reading"><h2>来源与署名</h2>
+                  <CapsuleSourceReading reading={detail.sourceReading} navigate={navigate}/>
                   <CapsuleAttributionResponses attributions={detail.attributions} navigate={navigate} subjectId={subjectId} names={memberNames}/>
                   {(detail.permissions??[]).length>0&&<section className="method-source-permissions"><h3>作者允许怎样使用</h3>{(detail.permissions??[]).map((permission)=><article key={permission.permissionId}><h4>{memberName(permission.authorId,subjectId,memberNames[permission.authorId]??undefined)}</h4><p className="reading-prose">{permission.scope}</p><p className="source-reading-note">署名要求：{permission.attribution} · {permission.license}</p></article>)}</section>}
                   <details className="source-reference-details"><summary>方法与来源的准确版本</summary><dl><dt>方法</dt><dd>{detail.capsuleId}</dd><dt>这一版</dt><dd>{detail.versionId}</dd><dt>来源工作</dt><dd>{detail.version.sourceResolution.caseId}</dd><dt>来源结果</dt><dd>{detail.version.sourceResolution.resultId} · 第 {detail.version.sourceResolution.resultVersion??'历史未记录'} 版</dd><dt>来源状态</dt><dd>{detail.sourceStatus?capsuleLabel(detail.sourceStatus):'尚未读取'}</dd></dl></details>
-                </details>
+                </section>
               </>:<p className="message">这份方法的来源当前不可读取，正文已收起。</p>}
               {detail.sourceStatus==='source-result-superseded'&&<p className="message">原工作已有纠正结果，使用前请结合当前来源判断。</p>}
               {detail.sourceStatus==='source-currentness-unavailable'&&<p className="message">来源结果的当前状态暂时无法核对。</p>}
               {(detail.deprecated||detail.securityIssue||!detail.newApplicationAllowed)&&<p className="message">{detail.securityIssue?'这份版本有尚未处理的安全事项。':detail.deprecated?'作者已停用这份版本。':'当前来源暂不支持新增实际应用或再验证。'}</p>}
               {(detail.notices??[]).map((item)=><p className="message" key={item.id}>{capsuleLabel(item.kind)}：{item.summary}</p>)}
-              {writable&&detail.version&&<div className="method-primary-action"><p>选择一件工作，留下参考或实际采用的记录。</p><Button onClick={()=>setUseOpen(true)}>用于我的工作<ArrowRight size={15}/></Button></div>}
+              {writable&&detail.version&&<div className="method-primary-action"><p>已经加入某项工作的参考，或实际采用过这份方法？可以保留这次使用的具体范围和结果。</p><Button onClick={()=>setUseOpen(true)}>记录我的使用<ArrowRight size={15}/></Button></div>}
               {owned&&writable&&<details className="method-owner-actions"><summary>编辑与维护这份方法</summary><div className="button-row"><Button disabled={busy} onClick={()=>changeMode('revision')}>{detail.version?'整理新版本':'选择新来源整理修复版本'}</Button><Button variant="outline" disabled={busy} onClick={()=>changeMode('maintenance')}>维护这一版本</Button><Button variant="ghost" disabled={busy} onClick={()=>changeMode('permissions')}>来源许可</Button></div></details>}
             </article>
           </>}
           {versions.items.length>1||versions.nextAfter?<details className="method-versions"><summary>其他可读版本</summary><div className="button-row">{[...versions.items].sort((a,b)=>b.version-a.version).map((item)=><Button type="button" variant={item.versionId===detail?.versionId?'secondary':'outline'} key={item.versionId} disabled={item.versionId===detail?.versionId} onClick={()=>navigate(exactCapsulePath(capsuleId,item.versionId))}>第 {item.version} 版{item.sourceStatus!=='current'?' · '+capsuleLabel(item.sourceStatus):''}</Button>)}</div>{versions.nextAfter&&<Button type="button" variant="ghost" disabled={busy} onClick={()=>run(moreVersions)}>更多可读版本</Button>}</details>:null}
-          {detail&&<section className="method-uses">
-            <h2>大家怎样使用</h2>
+          {detail&&<section id="method-uses" className="method-uses">
+            <h2>使用记录与实际结果</h2><p className="method-use-meaning">加入参考表示把这一版带进工作；实际应用和再次验证分别保留采用的部分、条件与报告结果。</p>
             {uses.unavailable?<p className="empty-state">使用记录暂时无法读取。</p>:!uses.items.length&&<p className="empty-state">{uses.loaded?'还没有当前可读的使用记录。':'正在读取使用记录…'}</p>}
             <div className="reading-list">{uses.items.map((use)=><article className="method-use-record" key={use.eventId}>
               <div className="member-line"><MemberAvatar subjectId={use.subjectId}/><div><h3>{memberName(use.subjectId,subjectId,memberNames[use.subjectId]??undefined)}</h3><p className="record-meta">{capsuleLabel(use.kind)}{use.recordedAt?' · '+readableTime(use.recordedAt):''}{use.synthetic?' · 合成演示':''}</p></div></div>
@@ -426,10 +431,12 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
             </article>)}</div>
             {uses.nextAfter&&<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const page=await guard(requiredClient().uses({capsuleId,versionId:detail.versionId??undefined,after:uses.nextAfter??undefined,limit:20}));usePages.current++;setUses((old)=>({...page,loaded:true,items:[...old.items,...page.items]}));})}>更多使用记录</Button>}
             {uses.counts&&Object.values(uses.counts).some(value=>typeof value==='number'&&value>0)&&<details className="technical-details"><summary>使用记录统计</summary><dl><dt>加入参考</dt><dd>{uses.counts.references}</dd><dt>实际应用</dt><dd>{uses.counts.applications}</dd><dt>再次验证</dt><dd>{uses.counts.reverifications}</dd><dt>演示应用</dt><dd>{uses.counts.syntheticApplications}</dd><dt>当前真实目标工作</dt><dd>{uses.counts.distinctTargetCases}</dd></dl></details>}
-            {writable && detail?.version && (
+            {writable && client && detail?.version && (
               <dialog ref={useDialog} className="workspace-dialog method-use-dialog" onCancel={()=>setUseOpen(false)}><header className="dialog-heading"><div><h2>用于我的工作</h2><p>{detail.version.title} · 版本 {detail.version.version}</p></div><button type="button" className="icon-button" aria-label="关闭方法使用" onClick={()=>setUseOpen(false)}><X size={19}/></button></header>{error&&<p className="message error" role="alert">{error}</p>}{useOpen&&<fieldset disabled={busy || !!preview}>
                 <CapsuleApplication
                   runtime={runtime}
+                  client={client}
+                  registerDraft={registerDraft}
                   key={detail.versionId}
                   loadConfiguration={(ref:{id:string;version:number})=>guard(requiredClient().configuration(ref))}
                   readCurrent={readCurrent}

@@ -8,6 +8,7 @@ import { createCommunityForumClient, forumDraftPayload, forumError, forumScopeKe
 import { forumReplyPath, forumTaskPath, forumVersionPath, normalizeForumOrigin } from './community-forum-origin.mjs';
 import { MemberAvatar, MemberLink, memberName, useMemberNames } from './conversation-ui';
 import { SaveForLaterButton } from './reading-bookmarks-workspace';
+import {AgentWorkContinuation} from './agent-work-continuation';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {chatErrorCode,type ChatRuntime} from './chat-workspace-types';
 import {forumBodyParagraphs,forumBrowseFocus,forumBrowsePath,forumBrowseSelection,forumLinkLabel,readForumBrowsePosition,saveForumBrowsePosition,readForumPages as readPages} from './community-forum-browse.mjs';
@@ -138,6 +139,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const [pendingReason,setPendingReason]=useState(''),retryDialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{if(retryPreview)retryDialog.current?.showModal();else retryDialog.current?.close();},[retryPreview]);
   const [postOptions, setPostOptions] = useState(false);
+  const [editorOpen,setEditorOpen]=useState(compose),[discardDraft,setDiscardDraft]=useState(false);
   const recoveryWorking = useRef(false);
   const [policyRead, setPolicy] = useState<{draftId:string;value:ForumQuota['policy']}|null>(null), [publicationRead, setPublicationUntil] = useState<{draftId:string;value:number}|null>(null);
   const [preparationFailure, setPreparationError] = useState<{draftId:string;reason:unknown}|null>(null);
@@ -261,7 +263,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     if (!client) return;
     if (formRef.current) throw Error('这里已有本机稿。先继续它，或明确取消编辑，再开始另一份。');
     const value = newForumDraft(kind, target, values), saved = await client.draft.save(value);
-    if (current()) { formRef.current = saved; setForm(saved); setRetryPreview(null); setSaveFailed(false); setSaveMessage('内容仅保存到此浏览器。'); requestAnimationFrame(() => { if (current()) { editor.current?.scrollIntoView({ block: 'start' }); editor.current?.querySelector<HTMLElement>('input,textarea')?.focus({ preventScroll: true }); } }); }
+    if (current()) { formRef.current = saved; setForm(saved); setEditorOpen(true);setDiscardDraft(false);setRetryPreview(null); setSaveFailed(false); setSaveMessage('内容仅保存到此浏览器。'); requestAnimationFrame(() => { if (current()) { editor.current?.scrollIntoView({ block: 'start' }); editor.current?.querySelector<HTMLElement>('input,textarea')?.focus({ preventScroll: true }); } }); }
   }
   function change<K extends keyof ForumDraftValues>(field: K, value: ForumDraftValues[K]) {
     if (!client || !formRef.current || busy || draftLoading||!current()) return;
@@ -342,7 +344,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     const source = await client.version(postId,forumTargetString(detail.locator.versionId)), head = await client.post(postId);
     if (!current()) return;
     if (!isAvailable(source) || source.authorId !== subjectId) throw Error('只能从当前可读的本人版本准备更新。');
-    await begin('publish-version', { postId, expectedHeadVersion: head.headVersion, versionId: source.locator.versionId },
+    await begin('publish-version', { postId, expectedHeadVersion: head.headVersion, versionId: source.locator.versionId,versionNumber:source.locator.versionNumber },
       { title: source.payload.title, body: source.payload.body, linksText: source.payload.links.join('\n'),topic:source.payload.topic??'unclassified' });
   }
   async function withdraw(kind:'withdraw-post'|'withdraw-reply',value:ForumOwnedPost|ForumOwnedReply|ForumReplyView){
@@ -396,6 +398,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   useEffect(()=>{void autoReply().catch(readFailure);},[connected,subjectId,draftLoaded,detailVersionId]);
   const selected = replyId ? parent : detail;
   const selectedId = selected?.locator?.versionId;
+  const selectedNumber=selected?.locator.versionNumber;
+  const earlierVersion=!!selected?.currentVersionId&&selected.currentVersionId!==selectedId;
   const displayNames=useMemberNames(runtime,subjectId,connected,[...items.map(item=>item.authorId),detail?.authorId,replyDetail?.authorId,parent?.authorId,...replies.map(item=>item.authorId),...(retryPreview?.viewers??[])]);
   const forumName=(id?:string)=>memberName(id,subjectId,id?displayNames[id]??undefined:undefined);
   const own = !!subjectId && detail?.authorId === subjectId;
@@ -418,6 +422,9 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     }
   }
   const morePosts=next&&<div className="forum-load-more"><Button variant="outline" disabled={busy} onClick={()=>run(loadMore)}>继续读取</Button></div>;
+  function resumeDraft(){setEditorOpen(true);setDiscardDraft(false);requestAnimationFrame(()=>{editor.current?.scrollIntoView({block:'start'});editor.current?.querySelector<HTMLElement>('input,textarea')?.focus({preventScroll:true});});}
+  async function keepDraft(){await client!.draft.flush();if(!current())return;setEditorOpen(false);setDiscardDraft(false);setNotice('草稿已留在此浏览器，可以稍后继续。');if(compose)go(feedPath);}
+  async function removeDraft(){const value=formRef.current;if(!value||value.operationId)return;if(await client!.draft.clear({id:value.id,revision:value.revision})){if(current()&&formRef.current===value){formRef.current=null;setForm(null);setDiscardDraft(false);setEditorOpen(false);setNotice('这份未提交草稿已删除。');if(compose)go(feedPath);}}else throw Error('草稿已变化，请先读取当前内容后再决定。');}
   function card(value: ForumCardView, owned = false) {
     const locator = value.locator, available = isAvailable(value), path = owned ? `/app/community/posts/${locator.postId}?manage=1` : targetPath(locator) ?? `/app/community/posts/${locator.postId}`;
     const category=available?forumTopics.find(item=>item.id===value.topic):null;
@@ -431,7 +438,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const displayReply = (value: ForumReplyView) => <article className="forum-reply" id={'reply-' + value.locator.replyId} key={value.locator.replyId}>
     <div className="forum-meta"><MemberLink subjectId={value.authorId} name={forumName(value.authorId)} ownId={subjectId} navigate={go} avatar/><PostTime createdAt={value.createdAt}/>{link(forumReplyPath(value.locator.replyId)!, '查看此条')}</div>
     {isAvailable(value) ? <>{value.payload.replyTo && <p className="reply-context">回复 {link(forumReplyPath(value.payload.replyTo.replyId)!, '先前的讨论')}</p>}<Body body={value.payload.body}/></> : <p>{states[value.availability] ?? '当前无法读取这条回复。'}</p>}
-    {isAvailable(value) && <div className="button-row">{isAvailable(selected) && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
+    {isAvailable(value) && <div className="button-row">{isAvailable(selected) && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId,versionNumber:selectedNumber }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
       {value.authorId === subjectId ? <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-reply', value))}>撤回我的回复</Button> : <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => startReport(value))}>私有举报</Button>}</div>}
   </article>;
 
@@ -442,6 +449,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {reportId&&<h1 className="small">举报与处理</h1>}
     {error && <div className="message error" role="alert">{error}<AccountVerificationPrompt required={verificationRequired} navigate={go} /><Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重新读取当前内容</Button></div>}
     {notice && <output className="message">{notice}</output>}
+    {form&&!editorOpen&&!draftLoading&&<aside className="forum-draft-return" aria-label="未提交的草稿"><div><strong>{form.kind==='publish-version'?'这篇帖子的修改尚未发表':form.kind==='create-reply'?'你有尚未发出的回复':'你有尚未提交的草稿'}</strong><p>{form.title||labels[form.kind]} · 仅保存在此浏览器</p></div><Button variant="outline" disabled={busy} onClick={resumeDraft}>继续编辑</Button></aside>}
     {(!connected && (compose || form || reportId || section !== 'all')) && needConnection}
     {compose && subjectId && !form && !draftLoading && draftLoaded && <Button disabled={busy} onClick={() => run(() => begin('create-post',{},selectedTopic?{topic:selectedTopic.id}:{}))}>开始写这条帖子</Button>}
     {subjectId && !draftLoading && !draftLoaded && <Button variant="outline" disabled={busy} onClick={() => run(()=>readDraft())}>重新读取本机稿</Button>}
@@ -466,12 +474,13 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {(postId&&detail||replyId&&replyDetail) && <>
       {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<><ArrowLeft size={14}/>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}{!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article className="forum-post">
         <div className="forum-meta"><MemberLink subjectId={detail.authorId} name={forumName(detail.authorId)} ownId={subjectId} navigate={go} avatar/><PostTime createdAt={detail.createdAt} updatedAt={isAvailable(detail)?detail.versionCreatedAt:undefined}/>{isAvailable(detail)&&link(forumBrowsePath({topic:detail.topic??'unclassified'}),forumTopics.find(topic=>topic.id===detail.topic)?.label??'未分类','forum-topic-label')}</div>
-        {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><div className="forum-post-body"><Body body={detail.payload.body}/><Links links={detail.payload.links} titled/></div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
+        {isAvailable(detail) ? <><h1>{detail.payload.title}</h1>{(earlierVersion||versions.length>1)&&<div className="forum-version-context"><p>{earlierVersion?'正在阅读较早公开的内容':detail.currentVersionId===selectedId?'正在阅读最新公开的内容':'正在阅读这次发表的内容'}{selectedNumber? ' · 第 '+selectedNumber+' 版':''}。这里的回复保留在这次发表的内容下。</p>{earlierVersion&&link(forumVersionPath(postId!,detail.currentVersionId)!,'阅读更新后的内容','text-link')}</div>}<div className="forum-post-body"><Body body={detail.payload.body}/><Links links={detail.payload.links} titled/></div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
         {isAvailable(detail) && <div className="forum-post-actions"><Button disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
           <SaveForLaterButton runtime={runtime} subjectId={subjectId} connected={connected} reference={{kind:'forum-post',postId:detail.locator.postId}} onNeedIdentity={()=>go('/app/settings/identity')}/>
           {own && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(()=>startVersion())}>编辑帖子</Button>}
           <button className="forum-options-toggle" aria-expanded={postOptions} onClick={()=>setPostOptions(value=>!value)}>帖子资料</button></div>}
-        {postOptions&&<section className="forum-post-details" aria-label="帖子资料"><h2>版本与相关操作</h2><nav className="forum-versions" aria-label="帖子版本">{versions.map(value=>link(forumVersionPath(postId!,value.locator.versionId)!,`版本 ${value.locator.versionNumber}${value.locator.versionId===selectedId?' · 当前':''}`))}{versionNext!==null&&<Button variant="ghost" disabled={busy} onClick={()=>run(async()=>{const page=await client!.versions(postId!,{afterVersion:versionNext});if(current()){versionPages.current++;setVersions(old=>[...old,...page.items]);setVersionNext(page.nextAfterVersion??null);}})}>更早版本</Button>}</nav><p className="muted">{detail.publishedUntil&&<>此版公开至 {date(detail.publishedUntil)}。</>}各次更新保留相应讨论。</p><div className="button-row">
+        {isAvailable(detail)&&selectedId&&<AgentWorkContinuation runtime={runtime} subjectId={subjectId} object={{kind:'post',id:detail.locator.postId,versionId:selectedId}} title={detail.payload.title} purpose="接着阅读这次发表的内容，围绕我的问题理解、整理或准备回应" onNeedIdentity={()=>go('/app/settings/identity')}/>}
+        {postOptions&&<section className="forum-post-details" aria-label="帖子资料"><h2>版本与相关操作</h2><nav className="forum-versions" aria-label="帖子版本">{versions.map(value=>link(forumVersionPath(postId!,value.locator.versionId)!,`版本 ${value.locator.versionNumber}${value.locator.versionId===selectedId?' · 正在阅读':''}`))}{versionNext!==null&&<Button variant="ghost" disabled={busy} onClick={()=>run(async()=>{const page=await client!.versions(postId!,{afterVersion:versionNext});if(current()){versionPages.current++;setVersions(old=>[...old,...page.items]);setVersionNext(page.nextAfterVersion??null);}})}>更早版本</Button>}</nav><p className="muted">{detail.publishedUntil&&<>此版公开至 {date(detail.publishedUntil)}。</>}各次更新保留相应讨论。</p><div className="button-row">
           <Button variant="ghost" disabled={busy} onClick={() => run(async () => { const value = await client!.version(postId!,forumTargetString(selectedId)); if (!isAvailable(value)) throw Error('此版本当前不可读，不能继续采用它准备任务。'); if (current()) go(forumTaskPath({ postId, versionId: selectedId, returnTo: location.pathname + location.hash },{selectMaterial:value.authorId===subjectId})); })}>为这件事准备任务</Button>
           {!own&&<Button variant="ghost" disabled={busy||!!form} onClick={()=>run(()=>startReport(detail))}>举报</Button>}{own&&link(`/app/community/posts/${postId}?manage=1`,'管理我的版本')}</div></section>}
       </article>}
@@ -479,7 +488,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       {ownPost && <section className="forum-card" aria-label="本人帖子管理"><h2>我的帖子管理</h2><p>这里是本人记录。公开版本不可读时，仍可核对其许可与撤回范围。</p><div className="button-row">{ownPost.state !== 'withdrawn' && <><Button disabled={busy || !!form} onClick={() => run(() => begin('publish-version', { postId, expectedHeadVersion: ownPost.headVersion }))}>写一个新版本</Button><Button variant="outline" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-post', ownPost))}>撤回整条帖子</Button></>}</div>
         {ownPost.versionLocators.map((value) => <article className="forum-reply" key={value.locator.versionId}><h3>{link(forumVersionPath(postId!, value.locator.versionId)!, `第 ${value.locator.versionNumber} 版`)}</h3><p>公开许可至 {date(value.publishedUntil)}。{value.availability !== 'available' && (states[value.availability] ?? '当前不可读。')}</p><div className="button-row"><Button variant="ghost" disabled={busy} onClick={() => run(async () => { const result = await client!.permission(value.permissionId); if (current()) setPermission(result); })}>核对此版许可</Button>{value.state !== 'withdrawn' && ownPost.state !== 'withdrawn' && <Button variant="outline" disabled={busy || !!form} onClick={() => run(() => begin('withdraw-version', { postId, versionId: value.locator.versionId, expectedHeadVersion: ownPost.headVersion }))}>撤回此版</Button>}</div></article>)}<PermissionDetail value={permission} />
       </section>}
-      {!replyId&&detail&&<section className="forum-replies" aria-label="这版帖子的回复"><h2>讨论{replies.length>0&&<span>{replies.length}{replyNext?'+':''}</span>}</h2>{!isAvailable(detail)&&<p className="muted">原帖当前不可读，已有回复按各自的公开范围展示。</p>}{replies.map(displayReply)}{!replies.length&&<p className="forum-discussion-empty">还没有回复，分享你的想法吧。</p>}{replyNext&&<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const page=await client!.replies({postId:forumTargetString(postId),postVersionId:forumTargetString(selectedId),after:replyNext});if(current()){replyPages.current++;setReplies(old=>[...old,...page.items]);setReplyNext(page.nextAfter??null);}})}>更多回复</Button>}{isAvailable(detail)&&!form&&<button className="forum-reply-start" onClick={()=>run(()=>begin('create-reply',{postId,versionId:selectedId,versionNumber:detail.locator.versionNumber}))}><MemberAvatar subjectId={subjectId}/><span>写下你的回复…</span><MessageCircle size={18}/></button>}</section>}
+      {!replyId&&detail&&<section className="forum-replies" aria-label="这版帖子的回复"><h2>{versions.length>1&&selectedNumber?'第 '+selectedNumber+' 版下的讨论':'讨论'}{replies.length>0&&<span>{replies.length}{replyNext?'+':''}</span>}</h2>{!isAvailable(detail)&&<p className="muted">原帖当前不可读，已有回复按各自的公开范围展示。</p>}{replies.map(displayReply)}{!replies.length&&<p className="forum-discussion-empty">还没有回复，分享你的想法吧。</p>}{replyNext&&<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const page=await client!.replies({postId:forumTargetString(postId),postVersionId:forumTargetString(selectedId),after:replyNext});if(current()){replyPages.current++;setReplies(old=>[...old,...page.items]);setReplyNext(page.nextAfter??null);}})}>更多回复</Button>}{isAvailable(detail)&&!form&&<button className="forum-reply-start" onClick={()=>run(()=>begin('create-reply',{postId,versionId:selectedId,versionNumber:detail.locator.versionNumber}))}><MemberAvatar subjectId={subjectId}/><span>写下你的回复…</span><MessageCircle size={18}/></button>}</section>}
       <footer className="forum-reading-return">{link(returnPath,<><ArrowLeft size={15} aria-hidden/>继续浏览{returnLabel==='社区'?'社区帖子':returnLabel}</>)}</footer>
     </>}
 
@@ -491,8 +500,9 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     </section>}
 
     {subjectId && draftLoading && <output>正在读取这处本机稿…</output>}
-    {subjectId && !draftLoading && form && <section ref={editor} className="forum-editor" aria-label="社区本机稿"><h2>{form.kind === 'create-reply' ? '写回复' : form.kind === 'publish-version' ? '编辑帖子' : labels[form.kind]}</h2>
+    {subjectId && !draftLoading && form && editorOpen && <section ref={editor} className="forum-editor" aria-label="社区本机稿"><h2>{form.kind === 'create-reply' ? '写回复' : form.kind === 'publish-version' ? '编辑帖子' : labels[form.kind]}</h2>
       
+      {publicWrite(form.kind)&&<div className="forum-draft-context"><p>这是你的私人草稿。只有点击“公开发表”才会把这段内容公开。</p>{form.kind==='publish-version'&&<p>从{form.target.versionNumber?'第 '+form.target.versionNumber+' 版':'已发表的内容'}继续修改；已公开的正文与回复保持原样。</p>}{form.kind==='create-reply'&&form.target.versionNumber&&<p>回复第 {form.target.versionNumber} 版的内容。</p>}</div>}
       {form.operationId && <p className="message">这份稿已关联原提交。先查询原结果或停止本机重试，再准备新的内容。</p>}
       <form className="workspace-form" onSubmit={event => { event.preventDefault(); const selectedAt=Math.floor(Date.now()/1000);void run(()=>prepare(selectedAt)); }}><fieldset disabled={busy || !!form.operationId}>
         {['create-post','publish-version'].includes(form.kind)&&<div className="forum-publication-topic"><label htmlFor={fieldId+'-topic'}>发布到<select id={fieldId+'-topic'} aria-label="发布主题" required={form.kind==='create-post'} value={form.kind==='create-post'?(forumTopics.some(topic=>topic.id===form.topic)?form.topic:''):form.topic??'unclassified'} onChange={event=>change('topic',event.target.value?forumReadTopicSchema.parse(event.target.value):undefined)}>{form.kind==='create-post'?<option value="" disabled>选择一个主题</option>:<option value="unclassified">未分类</option>}{forumTopics.map(topic=><option key={topic.id} value={topic.id}>{topic.label}</option>)}</select></label><p>{forumTopics.find(topic=>topic.id===form.topic)?.description??(form.kind==='publish-version'?'沿用原帖的未分类状态，也可以为这次更新选择一个主题。':'选一个适合的主题，让感兴趣的人更容易找到这篇帖子。')}</p></div>}
@@ -508,7 +518,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       {needsAccount(form.kind) && quota?.accountVerified === false && <div className="message"><p>发表前需要完成一次账号验证。正在编辑的内容保留在此浏览器。</p><AccountVerificationPrompt required navigate={go} /></div>}
       {form.kind === 'create-report' && governance && !governance.moderatorIds.length && <p>当前没有可接收此记录的处理者，将保留待处理状态，不承诺响应时间。</p>}
       {!form.operationId && !publicWrite(form.kind) && !form.kind.startsWith('withdraw-') && governance && <p className="muted">{form.kind === 'resolve' ? '这份独立处理理由会告知举报者和目标作者。' : `这份说明只向当前获准的 ${governance.moderatorIds.length} 位处理者披露，目标作者不会因此获得举报者说明。`} 私有内容按本次明确许可读取，最长 {Math.floor(governance.maxPermissionSeconds / 86400)} 天；记录被接受不代表已经解决。</p>}
-      <div className="button-row"><Button type="submit" disabled={busy || !connected || !!form.operationId || !!pendingActive || saveFailed || publicWrite(form.kind) && !publicationUntil}>{publicWrite(form.kind) ? '公开发表' : form.kind.startsWith('withdraw-') ? '确认撤回' : form.kind === 'create-report' ? '提交私有举报' : form.kind === 'appeal' ? '提交申诉' : '提交私有记录'}</Button><Button type="button" variant="ghost" disabled={busy} onClick={() => run(async () => { const value = formRef.current;if(!value)return; if (await client!.draft.clear({id:value.id,revision:value.revision})) { if (current() && formRef.current === value) { formRef.current = null; setForm(null); setSaveMessage('已取消这份本机编辑。原服务端事实不受影响。'); } } else throw Error('本机稿已变化，本次没有清除它。'); })}>取消编辑</Button></div></form>
+      <div className="button-row"><Button type="submit" disabled={busy || !connected || !!form.operationId || !!pendingActive || saveFailed || publicWrite(form.kind) && !publicationUntil}>{publicWrite(form.kind) ? '公开发表' : form.kind.startsWith('withdraw-') ? '确认撤回' : form.kind === 'create-report' ? '提交私有举报' : form.kind === 'appeal' ? '提交申诉' : '提交私有记录'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>run(keepDraft)}>暂存并返回</Button><button type="button" className="text-link" disabled={busy||!!form.operationId} onClick={()=>setDiscardDraft(true)}>放弃草稿</button></div></form>
+      {discardDraft&&<div className="forum-discard-choice" role="alert"><p>删除这份尚未提交的草稿？已发表的内容会保留。</p><div className="button-row"><Button variant="outline" disabled={busy} onClick={()=>setDiscardDraft(false)}>保留草稿</Button><Button variant="ghost" disabled={busy} onClick={()=>run(removeDraft)}>删除这份草稿</Button></div></div>}
       <output className={saveFailed ? 'message error' : 'muted'}>{saveMessage}</output>
       {saveFailed && <Button variant="outline" disabled={busy} onClick={() => run(readDraft)}>重新读取本机版本</Button>}
     </section>}

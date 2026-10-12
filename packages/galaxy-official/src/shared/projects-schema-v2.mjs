@@ -35,3 +35,8 @@ export const projectDirectoryQueryV2Schema = z.strictObject({
   limit:z.number().int().min(1).max(20).default(20),
   after:z.string().min(1).max(2048).nullable().default(null),
 });
+export const projectPortfolioQueryV2Schema = z.strictObject({
+  ownerId:subjectId,
+  limit:z.number().int().min(1).max(20).default(20),
+  after:z.string().min(1).max(2048).nullable().default(null),
+});

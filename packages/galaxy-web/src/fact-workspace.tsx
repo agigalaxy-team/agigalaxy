@@ -906,7 +906,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
         {attempts.map(item=><article className="work-entry" key={refsKey(item)}>
           <header><MemberAvatar subjectId={item.actorId}/><div><MemberLink subjectId={item.actorId} ownId={subjectId} name={memberNames[item.actorId]??undefined} navigate={navigate}/><span>{attemptStates[item.status]??'尝试'}</span></div></header>
           <p className="reading-prose work-entry-body">{item.strategy}</p>
-          {item.summary&&<div className="work-observation"><small>这次尝试的结果</small><p className="reading-prose">{item.summary}</p></div>}
+          {item.summary?<div className="work-observation"><small>记录到的实际观察</small><p className="reading-prose">{item.summary}</p></div>:<p className="muted">这条尝试尚未记录实际观察。</p>}
           <details className="work-context"><summary>输入与工作环境</summary>{item.inputScopeSummary&&<p className="reading-prose">{item.inputScopeSummary}</p>}{typeof item.environment==='object'&&<p>{item.environment.name==='unknown'?'环境未提供':item.environment.name}{item.environment.version&&item.environment.version!=='unknown'?' · '+item.environment.version:''}</p>}{item.configurationCondition&&<p>{item.configurationCondition.record?item.configurationCondition.record.title+' · 第 '+item.configurationCondition.version+' 版':item.configurationCondition.sourceStatus==='not-recorded'?'当时未记录配置，具体条件仍未知。':item.configurationCondition.sourceStatus==='revoked'?'当时的配置已撤回，详情当前不可读。':'配置详情当前不可读。'}</p>}{!!item.permissionScope?.length&&<p>操作范围：{item.permissionScope.join('；')}</p>}</details>
           <footer>{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose(item.status==='running'?'attempt-end':'attempt-correct',item)}>{item.status==='running'?'写下尝试结果':'更正记录'}</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果<ArrowRight size={14}/></button></>}<details className="work-record-file"><summary>记录信息</summary><p>第 {item.version} 版</p><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></details></footer>
         </article>)}
@@ -1024,7 +1024,8 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
           )}
           {action.kind === 'attempt-start' && (
             <>
-              {field('打算怎么做', 'strategy')}
+              {field('正在尝试的做法', 'strategy')}
+              <p className="permission-line">这里只记录已经开始的尝试；尚未采用的建议可以留在讨论中。</p>
               {field('实际使用的环境；未知可留空', 'environment', false, 160)}
               {field('环境版本；未知可留空', 'environmentVersion', false, 80)}
               {field('实际使用哪些输入', 'inputScope')}

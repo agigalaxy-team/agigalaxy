@@ -3,7 +3,7 @@ import {ArrowLeft,ArrowRight,BookOpen,Globe2,Share2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {getContributionClient} from './contribution-client.mjs';
-import {HistoryWorkspace} from './history-workspace';
+import {HistoryWorkspace,type HistoryForm} from './history-workspace';
 import {useCurrentTaskMaterialTree} from './task-material-view';
 import {recordErrorField} from './record-workspace-types';
 import type {ContributionClient,ContributionCursor,ContributionLocal,ContributionPrevious,ContributionPreview,ContributionPreviewData,ContributionProjection,ContributionPurpose,ContributionReceipt,ContributionSelectedRef,ContributionSelection,ContributionSourceItem,ContributionSourcesPage,ContributionStatus,ContributionWork,ContributionWorksPage,ContributionWorkView,RecordRuntime,RequesterPage,RequesterRecord} from './record-workspace-types';
@@ -42,12 +42,18 @@ export function RequesterRecords({runtime,connected,subjectId,viewerId}:{runtime
 }
 export function ContributionWorkspace({runtime,connected,subjectId,navigate}:Props){
  const params=new URLSearchParams(window.location.search),target=params.get('subjectId')??params.get('subject')??subjectId,view=params.get('view')??'history';
+ const appliedSearch:HistoryForm={query:(params.get('q')??'').slice(0,200),timeWindow:['90-days','365-days','custom'].includes(params.get('period')??'')?params.get('period')!:'all-visible',from:params.get('from')??'',before:params.get('before')??''};
+ const searchKey=JSON.stringify(appliedSearch),[searchState,setSearchState]=useState({key:searchKey,form:appliedSearch}),searchForm=searchState.key===searchKey?searchState.form:appliedSearch;
+ if(searchState.key!==searchKey)setSearchState({key:searchKey,form:appliedSearch});
+ const setSearchForm=(form:HistoryForm)=>setSearchState({key:searchKey,form});
+ function historyPath(changes:Record<string,string|null>){const next=new URLSearchParams(params);next.delete('view');for(const [name,value] of Object.entries(changes)){if(value===null)next.delete(name);else next.set(name,value);}return '/app/history'+(next.size?'?'+next:'');}
+ const searchHistory=(form:HistoryForm)=>navigate(historyPath({q:form.query||null,period:form.timeWindow==='all-visible'?null:form.timeWindow,from:form.from||null,before:form.before||null,record:null}));
  const own=!!subjectId&&target===subjectId,context=runtime?.api.snapshot?.();
  const [,observeConnection]=useState('');useEffect(()=>{const read=()=>observeConnection(JSON.stringify(runtime?.api?.snapshot?.()??{})),timer=window.setInterval(read,1000);document.addEventListener('visibilitychange',read);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',read);};},[runtime]);
  const key=`${runtime?.api.endpoint}:${subjectId}:${context?.bindingId}:${context?.generation}:${connected}`;
  const url=(next:string)=>'/app/history'+(next==='history'?'': '?view='+next)+(target&&target!==subjectId?(next==='history'?'?':'&')+'subjectId='+encodeURIComponent(target):'');
  return <section className="contribution-page"><header className="profile-heading"><h1 className="small">经历与贡献</h1>{own&&view!=='sharing'&&<Button variant="outline" onClick={()=>navigate(url('sharing'))}><Share2 size={16}/>公开设置</Button>}</header>
-  {view==='sharing'&&own?<ContributionSharing key={key} runtime={runtime} connected={connected} subjectId={subjectId} navigate={navigate}/>:<><nav className="work-filter-links" aria-label="经历内容">{[['history','工作经历'],['requests','发起的工作']].map(([value,text])=><a key={value} href={url(value)} aria-current={view===value?'page':undefined} onClick={event=>{event.preventDefault();navigate(url(value));}}>{text}</a>)}</nav>{view==='requests'&&runtime&&target?<RequesterRecords key={key+target} runtime={runtime} connected={connected} viewerId={subjectId} subjectId={target}/>:<HistoryWorkspace key={key+target} runtime={runtime} connected={connected} subjectId={subjectId} targetSubjectId={target} navigate={navigate}/>}</>}
+  {view==='sharing'&&own?<ContributionSharing key={key} runtime={runtime} connected={connected} subjectId={subjectId} navigate={navigate}/>:<><nav className="work-filter-links" aria-label="经历内容">{[['history','工作经历'],['requests','发起的工作']].map(([value,text])=><a key={value} href={url(value)} aria-current={view===value?'page':undefined} onClick={event=>{event.preventDefault();navigate(url(value));}}>{text}</a>)}</nav>{view==='requests'&&runtime&&target?<RequesterRecords key={key+target} runtime={runtime} connected={connected} viewerId={subjectId} subjectId={target}/>:<HistoryWorkspace key={key+target+searchKey} runtime={runtime} connected={connected} subjectId={subjectId} targetSubjectId={target} navigate={navigate} recordKey={params.get('record')??undefined} onRecordChange={record=>navigate(historyPath({record}))} searchForm={searchForm} onSearchFormChange={setSearchForm} appliedSearch={appliedSearch} onSearch={searchHistory}/>}</>}
  </section>;
 }
 function ContributionSharing({runtime,connected,subjectId,navigate}:Props){

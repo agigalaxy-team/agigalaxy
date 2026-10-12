@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { discoveryQueryV2Schema, discoveryDetailV2Schema, sameOpportunityRef } from './shared/discovery-schema-v2.mjs';
 import { historyV2QuerySchema } from './shared/history-v2-schema.mjs';
 import { defaultDiscoveryPreferences } from './shared/discovery-schema.mjs';
-import { effectiveDiscovery, matchProjects } from './domain/discovery-match.mjs';
+import { effectiveDiscovery, matchProjects, contactFunctions } from './domain/discovery-match.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
 import { transaction } from './database.mjs';
@@ -86,7 +86,7 @@ export class DiscoveryV2Service {
         projectId: project.id, project, displayName: profile.selfDeclared.displayName ?? null,
         participant: { subjectId: row.subject_id, kind: 'unknown', kindSource: 'not-declared-in-current-profile' },
         classification: 'self-declared', capabilityVerified: false, match,
-        help: { statement: project.summary, functions: match.sharedFunctions, purposes: match.purposes,
+        help: { statement: project.summary, functions: contactFunctions(match.sharedFunctions,context.wish,wish), purposes: match.purposes,
           basis: 'current-project-declaration-and-expressed-discovery-willingness', commitment: 'not-contacted' },
         contactState: 'welcome', willingness: { classification: 'expressed-preference', revision: saved.revision,
           purposes: match.purposes, temporaryUntil: wish.temporaryUntil, requiresRecipientAcceptance: true },
@@ -107,7 +107,7 @@ export class DiscoveryV2Service {
         displayName:profile.selfDeclared.displayName??null,
         participant:{subjectId:row.subject_id,kind:project.participantKind,kindSource:'self-declared-project-document'},
         classification:'self-declared',capabilityVerified:false,match,
-        help:{statement:project.summary,functions:match.sharedFunctions,purposes:match.purposes,basis:'current-project-declaration-and-expressed-discovery-willingness',commitment:'not-contacted'},
+        help:{statement:project.summary,functions:contactFunctions(match.sharedFunctions,context.wish,specific),purposes:match.purposes,basis:'current-project-declaration-and-expressed-discovery-willingness',commitment:'not-contacted'},
         contactState:'welcome',willingness:{classification:'expressed-preference',purposes:match.purposes,temporaryUntil:specific.temporaryUntil,requiresRecipientAcceptance:true},
         sources:[{sourceKind:'project',projectId:project.id,revision:view.revision,...view.source,recordedAt:new Date(record.created_at).toISOString(),sourceUrl:project.sourceUrl??null}],
         experience:{status:'not-loaded',refs:[],lookup:'discovery-detail',absenceMeaning:'not-a-history-or-capability-judgment'},nextActions:['inspect','consider-contact'],invitationSent:false,roomJoined:false});

@@ -22,7 +22,7 @@ function ResultSource({source,facts,client,navigate}:{source:WorkSourceRef;facts
 export function WorkResultReading({item,facts,client,subjectId,names,navigate,download,children}:{item:WorkResult;facts:WorkFacts;client:WorkFactClient;subjectId:string;names:Record<string,string|null>;navigate:(path:string)=>void;download:()=>void;children?:React.ReactNode}){
  const origin=(item.origin.kind==='intervention'?facts.interventions:facts.attempts).find(source=>source.id===item.origin.id&&source.version===item.origin.version);
  return <article className="work-entry result-reading" aria-label="结果正文">
-  <header><MemberLink subjectId={item.actorId} ownId={subjectId} name={names[item.actorId]??undefined} navigate={navigate} avatar/><span>{outcomes[item.reportedOutcome]??'结果'} · 本人记录</span></header>
+  <header><MemberLink subjectId={item.actorId} ownId={subjectId} name={names[item.actorId]??undefined} navigate={navigate} avatar/><span>这段工作的结果：{outcomes[item.reportedOutcome]??'尚无判断'} · 本人记录</span></header>
   <p className="reading-prose work-entry-body">{item.summary}</p>
   {item.limitations&&<section className="work-observation"><h3>适用范围与未完成的部分</h3><p className="reading-prose">{item.limitations}</p></section>}
   {children}

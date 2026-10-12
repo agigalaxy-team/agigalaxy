@@ -4,12 +4,20 @@ import {randomUUID} from 'node:crypto';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {tsImport} from 'tsx/esm/api';
+import {registerHooks} from 'node:module';
 import {assistanceRequestSchema} from '../../galaxy-official/src/shared/assistance-schema.mjs';
 import {taskRequestV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 // Plain Node supports erased .ts types, but JSX needs the installed compiler.
 // Load the actual component in this scoped import; keep the rendering and all
 // original v1/v2 assertions on the product implementation.
-const {TaskRequestReading,taskReadingSection,taskRequestIntro}=await tsImport('../src/task-request-reading.tsx',import.meta.url);
+// SSR checks actual JSX and permissions selections; stylesheet rendering is
+// observed separately in the isolated browser, not implemented by this test.
+const stylesheetHook=registerHooks({load(url,context,nextLoad){return new URL(url).pathname.endsWith('.css')?{format:'module',source:'export {};',shortCircuit:true}:nextLoad(url,context);}});
+let TaskRequestReading,taskReadingSection,taskRequestIntro,selectedRequestAttempts;
+try{
+ ({TaskRequestReading,taskReadingSection,taskRequestIntro}=await tsImport('../src/task-request-reading.tsx',import.meta.url));
+ ({selectedRequestAttempts}=await tsImport('../src/task-request-background.tsx',import.meta.url));
+}finally{stylesheetHook.deregister();}
 
 const legacy=()=>{
  const request=assistanceRequestSchema.parse({id:randomUUID(),caseId:randomUUID(),title:'原来的求助',
@@ -46,5 +54,12 @@ test('modern task reading retains its full goal, current situation and expected 
  assert.equal(taskRequestIntro(task),'当前简要说明');
  assert.equal(taskReadingSection(task,'collaboration'),'collaboration');
  assert.ok(!html.includes('历史版本求助'));
+});
+
+test('handoff reading selects only exact permitted attempts, preserving historical and missing references without substituting newer text',()=>{
+ const original={id:randomUUID(),version:2,actorId:'original-author',strategy:'当时正在尝试的做法',status:'running'},later={...original,version:3,strategy:'后来修改的做法'},unselected={...original,id:randomUUID(),strategy:'未选择的私有背景'};
+ const references=[{id:original.id,version:2},{id:unselected.id,version:1},{id:original.id,version:2}],facts={attempts:[original,later,unselected]},before=structuredClone({references,facts});
+ const selected=selectedRequestAttempts(facts,references);assert.equal(selected.length,2);assert.equal(selected[0].attempt.strategy,original.strategy);assert.equal(selected[1].attempt,null);
+ assert.deepEqual(selectedRequestAttempts({attempts:[later]},references).map(row=>row.attempt),[null,null]);assert.deepEqual({references,facts},before);
 });
 

@@ -19,6 +19,7 @@ import { createPurposeMenu } from './purpose-menu.mjs';
 import { showExactChoice } from './exact-choice.mjs';
 import {readableDialogSelect} from './dialog-reading.mjs';
 import {sourceReadingText} from './source-reading.mjs';
+import {hostReadingPages} from './host-reading-pages.mjs';
 
 const MODULE_LABELS: Record<string, string> = {
   'galaxy-id': '银河 ID 与本地身份卡',
@@ -185,15 +186,17 @@ return {
       }
       commands.push(
         { name: 'galaxy.exit', title: '退出 Galaxy', run: () => onEscape?.() },
-        { name: 'galaxy.help', title: 'Galaxy 交互规则', run: () => onHelp?.() },
       );
+      if (onHelp) commands.push({ name: 'galaxy.help', title: 'Galaxy 交互规则', run: onHelp });
       if (includeZero) {
         commands.push({ name: 'galaxy.zero', title: 'Galaxy 返回或退出', run: () => (routes[0] ?? closeGalaxy)() });
       }
       bindings.push(
         { key: 'escape', cmd: 'galaxy.exit', desc: '退出 Galaxy' },
-        { key: 'question', cmd: 'galaxy.help', desc: '交互规则' },
       );
+      // Text prompts must retain every typed character. Only an actual help
+      // action owns its literal shortcut; "question" is not a host key name.
+      if (onHelp) bindings.push({ key: '?', cmd: 'galaxy.help', desc: '交互规则' });
       if (includeZero) bindings.push({ key: '0', cmd: 'galaxy.zero', desc: '返回或退出 Galaxy' });
       const disposeLayer = api.keymap.registerLayer({ mode: 'modal', commands, bindings });
       let disposed = false;
@@ -233,6 +236,14 @@ return {
         } }),
         cleanup,
       );
+    }
+
+    function showReading(title: string, message: string, onConfirm: Action) {
+      const pages=hostReadingPages(message,{width:api.renderer?.width??80,height:api.renderer?.height??24});
+      const render=(index:number):void=>showInfo(pages.length>1?`${title} · ${index+1}/${pages.length}`:title,pages[index],()=>{
+        if(index+1<pages.length)render(index+1);else onConfirm();
+      });
+      render(0);
     }
 
     function showPrompt({ title, placeholder, value, onConfirm, onCancel = closeGalaxy }: Prompt) {
@@ -1136,14 +1147,14 @@ return {
         routes:{1:async()=>{try{const initialized=await store.initializeGalaxyIntegration(dataDirectory,{initializationPath:'personal-galaxy',source:'opencode-native-tui'});await showConsole(initialized);}catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}}},onBack:onReturn});
     }
 
-    function purpose(kind: 'search' | 'messages' | 'publish' | 'community', onBack: Action) {
+    function purpose(kind: 'search' | 'messages' | 'publish' | 'community' | 'continueWeb', onBack: Action) {
       const version=++connectionGeneration;
       purposeMenu?.close();
       if(!nativeTools&&kind==='search'&&!connectionController?.querySearch){
         return showSelect({title:activeLanguage==='zh-CN'?'找帮助\n当前宿主尚未接入可查询的银河服务。':'Find help\nThis host has no connected Galaxy search service.',
           options:[{number:'1',title:activeLanguage==='zh-CN'?'接入银河':'Connect to Galaxy'},{number:'2',title:activeLanguage==='zh-CN'?'回到原工作':'Return to original work'}],routes:{1:()=>showConnection(onBack),2:closeGalaxy},onBack});
       }
-      purposeMenu=createPurposeMenu({nativeTools,controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
+      purposeMenu=createPurposeMenu({nativeTools,controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,readInfo:showReading,language:activeLanguage,
         isCurrent:()=>!closed&&version===connectionGeneration,onBack,onReturnWork:returnToWork,readWorkContext:currentWorkContext});
       purposeMenu[kind]();
     }
@@ -1159,6 +1170,7 @@ return {
           { number: '2', title: chinese ? '发起求助' : 'Ask for help', description: chinese ? '沿用当前工作准备需要的协助。' : 'Prepare a request from the current work.' },
           { number: '3', title: chinese ? '消息' : 'Messages', description: chinese ? '查看对话，做必要回复。' : 'Read conversations and reply when needed.' },
           ...(nativeTools ? [{ number: '6', title: chinese ? '逛社区' : 'Browse community', description: chinese ? '按主题阅读讨论，保留原工作。' : 'Browse discussions by topic and retain your original work.' }] : []),
+          ...(nativeTools ? [{ number: '7', title: chinese ? '接着网页里的事情' : 'Continue the selected web content', description: chinese ? '沿用网页选择的材料和当前目的。' : 'Use the selected web material and current purpose.' }] : []),
           { number: '4', title: chinese ? '我的与设置' : 'My settings', description: chinese ? '身份、连接、资料和显示偏好。' : 'Identity, connection, data and display preferences.' },
           { number: '5', title: chinese ? '回到原工作' : 'Return to original work', description: '' },
         ],
@@ -1169,6 +1181,7 @@ return {
           4: () => showSettings(reopen),
           5: closeGalaxy,
           6: () => purpose('community',reopen),
+          7: () => purpose('continueWeb',reopen),
           0: closeGalaxy,
         },
         onBack: closeGalaxy,

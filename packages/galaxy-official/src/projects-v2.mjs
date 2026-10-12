@@ -1,6 +1,6 @@
 import canonicalize from 'canonicalize';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { projectEventV2Schema, projectEnvelopeV2Schema, projectDocumentV2Schema, projectPreferenceV2Schema, projectDirectoryQueryV2Schema } from './shared/projects-schema-v2.mjs';
+import { projectEventV2Schema, projectEnvelopeV2Schema, projectDocumentV2Schema, projectPreferenceV2Schema, projectDirectoryQueryV2Schema, projectPortfolioQueryV2Schema } from './shared/projects-schema-v2.mjs';
 import { discoveryPreferencesSchema, defaultDiscoveryPreferences } from './shared/discovery-schema.mjs';
 import { effectiveDiscovery, normalizeFunction } from './domain/discovery-match.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
@@ -245,28 +245,39 @@ export class ProjectV2Service {
     const latest=(await db.query('SELECT * FROM project_events_v2 WHERE operation_id=$1',[row.document_event_id])).rows[0];
     const grant=await this.grantWithin(db,latest);
     if(!canReadProjection(grant,{viewerId:null,projection:'history',now:this.access.now()})||!view.document.discoverable)return null;
+    const document=Object.fromEntries(directoryFields.filter(field=>Object.hasOwn(view.document,field)).map(field=>[field,view.document[field]]));
+    const item={projectId,ownerId:view.ownerId,document,classification:'self-declared',capabilityVerified:false,legalOwnershipVerified:false,
+      source:{kind:'project',projectId,fieldSources:view.source.fieldSources.filter(source=>directoryFields.includes(source.field))}};
+    // A public body of work remains readable when its author pauses contact.
+    // Only the separate opportunity flow can express current contact willingness.
+    if(options.portfolio)return item;
     const wish=await this.effectiveWishWithin(db,view.ownerId,projectId);
     if(!wish.enabled||options.purpose&&!wish.purposes.includes(options.purpose)||options.kind&&view.document.kind!==options.kind)return null;
     const publicFunctions=[...new Set(view.document.functions.map(normalizeFunction))].sort((left,right)=>left<right?-1:left>right?1:0);
     const allowedFunctions=wish.functions.length?publicFunctions.filter(value=>wish.functions.includes(value)):publicFunctions;
     if(!allowedFunctions.length)return null;
     if(options.query&&!normalizeFunction([view.document.title,view.document.summary,...view.document.functions].join('\n')).includes(options.query))return null;
-    const document=Object.fromEntries(directoryFields.filter(field=>Object.hasOwn(view.document,field)).map(field=>[field,view.document[field]]));
-    return {projectId,ownerId:view.ownerId,document,classification:'self-declared',capabilityVerified:false,legalOwnershipVerified:false,
+    return {...item,
       discovery:{purposes:wish.purposes,functions:allowedFunctions,functionsRestricted:wish.functions.length>0,
-        temporaryUntil:wish.temporaryUntil,contactRequiresCurrentCheck:true},
-      source:{kind:'project',projectId,fieldSources:view.source.fieldSources.filter(source=>directoryFields.includes(source.field))}};
+        temporaryUntil:wish.temporaryUntil,contactRequiresCurrentCheck:true}};
   }
   publicDirectory(actor,input) {
-    const parsed=projectDirectoryQueryV2Schema.safeParse(input);
-    if(!parsed.success)fail('invalid_project_directory_query',400);
-    const options={...parsed.data,query:normalizeFunction(parsed.data.query)},viewerId=actor?.subjectId??null;
-    const queryHash=digest(canonicalize({query:options.query,kind:options.kind??null,purpose:options.purpose??null,limit:options.limit}));
+    return this.publicCollection(actor,input,false);
+  }
+  publicPortfolio(actor,input) {
+    return this.publicCollection(actor,input,true);
+  }
+  publicCollection(actor,input,portfolio) {
+    const parsed=(portfolio?projectPortfolioQueryV2Schema:projectDirectoryQueryV2Schema).safeParse(input);
+    if(!parsed.success)fail(portfolio?'invalid_project_portfolio_query':'invalid_project_directory_query',400);
+    const options={...parsed.data,portfolio,query:normalizeFunction(parsed.data.query??'')},viewerId=actor?.subjectId??null;
+    const queryHash=digest(canonicalize({query:options.query,kind:options.kind??null,purpose:options.purpose??null,limit:options.limit,
+      ...(portfolio?{collection:'portfolio',ownerId:options.ownerId}:{})}));
     const cursor=options.after?this.openDirectoryCursor(options.after,queryHash,viewerId):null,startAfter=cursor?.startAfter??'';
     return this.run(actor,async db=>{
       // The raw scan is finite. Its position can include private objects, so only
       // the authenticated encrypted cursor carries it; no counts or ranks leak.
-      const rows=(await db.query("SELECT id FROM projects_v2 WHERE state='active' AND ($1='' OR id::text>$1) ORDER BY id LIMIT $2",[startAfter,directoryWindowSize+1])).rows;
+      const rows=(await db.query("SELECT id FROM projects_v2 WHERE state='active' AND ($1='' OR id::text>$1) AND ($3::text IS NULL OR owner_id=$3) ORDER BY id LIMIT $2",[startAfter,directoryWindowSize+1,portfolio?options.ownerId:null])).rows;
       const scanned=rows.slice(0,directoryWindowSize),visible=[];
       for(const row of scanned){try{const item=await this.directoryItemWithin(db,row.id,options);if(item)visible.push(item);}catch(error){if(!unavailable(error))throw error;}}
       const sourceHash=digest(canonicalize(visible));

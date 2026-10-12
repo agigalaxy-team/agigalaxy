@@ -70,8 +70,8 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   else{browserChoice=null;browserChoiceUrl=null;box.append(el('p','本次选择地址不可用。请回到原工作重新取得当前内容。','muted'));}
   scheduleChoice();
  }
- async function finish(){clearTimeout(timer);const a=current?.selected?.association,p=current?.preview,r=current?.actionResult;
-  if(handoff&&supportsHandoff())await handoff({associationId:a?.associationId??p?.associationId??r?.associationId??null,...(a2a?{peerId:peerId()}:{pack:a?.pack??p?.pack??null}),taskId:a?.taskId??null,caseId:a?.caseId??p?.caseId??null,attempt:a?.attempt??p?.attempt??null});
+ async function finish(){clearTimeout(timer);if(busy)return;const refreshed=await read();if(!refreshed)return;const a=refreshed.selected?.association,p=refreshed.preview,r=refreshed.actionResult;
+  if(handoff&&supportsHandoff())await handoff({associationId:a?.associationId??p?.associationId??r?.associationId??null,...(a2a?{peerId:peerId()}:{pack:a?.pack??p?.pack??null}),taskId:a?.taskId??null,caseId:a?.caseId??p?.caseId??null,attempt:a?.attempt??p?.attempt??null},refreshed);
   status.textContent='可以回到原工作继续。';
  }
  function resultForm(selected){const state=selected.peer?.peer?.state??selected.peer?.status;
@@ -89,11 +89,11 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
  }
  function receive(response){if(destroyed)return;const next=workerComponentResult(response);
   if(response?.isError){showError(new Error(next.error??'worker_host_unavailable'));return;}
-  if(next?.state==='user-choice-needs-browser'){showBrowserChoice(next);return;}
+   if(next?.state==='user-choice-needs-browser'){showBrowserChoice(next).catch(showError);return;}
   if(next?.kind!==(a2a?'galaxy-a2a-panel':'galaxy-worker-panel')||next.schemaVersion!==1)return;
   const id=next.selected?.association?.associationId??next.preview?.associationId??next.actionResult?.associationId??null;
   const nextScope=JSON.stringify([next.ownerScope??next.viewId,id]);if(nextScope!==scope){summaryDraft='';outcomeDraft='inconclusive';limitsDraft='';restoredResult=null;scope=nextScope;}
-  const visible=value=>{const {viewId,checkedAt,...rest}=value??{};return JSON.stringify(rest);};
+   const visible=value=>{const {viewId:_viewId,checkedAt:_checkedAt,...rest}=value??{};return JSON.stringify(rest);};
   if(!browserChoice&&current&&visible(next)===visible(current)){current=next;if(next.selected?.peer?.peer?.taskId&&!terminal.has(next.selected.peer.peer.state))scheduleRead();return;}
   const active=doc.activeElement?.dataset?.editor,selection=doc.activeElement?.selectionStart;
   const expanded=[...root.querySelectorAll('details[open]')].map(n=>n.querySelector('summary')?.textContent);

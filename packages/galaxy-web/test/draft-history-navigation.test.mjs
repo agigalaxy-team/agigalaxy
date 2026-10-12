@@ -118,6 +118,32 @@ test('failed native replay keeps the original route and can retry without a seco
   h.reject(false);h.navigation.resume();saved(h.initial,1);assert.deepEqual(h.accepted,[h.one]);
 });
 
+test('a shell click before lazy editor registration is preserved and leaves only after its draft is saved',()=>{
+  const h=historyHarness(),mounted=editor();let destination='';
+  h.select({isCurrent:()=>true,leave:()=>{}});
+  assert.equal(h.navigation.leave(()=>{destination='community';},true),true);
+  assert.equal(destination,'');assert.equal(h.held.at(-1),'fallback');
+  h.select(mounted.selection);h.navigation.resume();assert.equal(destination,'');
+  saved(mounted);saved(mounted);assert.equal(destination,'community');assert.equal(h.held.at(-1),null);
+});
+
+test('rapid shell clicks keep the latest destination; identity changes and new routes cancel old pending work',()=>{
+  const h=historyHarness(),mounted=editor();let destination='',valid=true;
+  h.select({isCurrent:()=>valid,leave:()=>{}});
+  h.navigation.leave(()=>{destination='community';},true);h.navigation.leave(()=>{destination='messages';},true);
+  h.select(mounted.selection);h.navigation.resume();saved(mounted);assert.equal(destination,'messages');
+  h.select({isCurrent:()=>valid,leave:()=>{}});h.navigation.leave(()=>{destination='stale';},true);
+  valid=false;h.select(editor().selection);h.navigation.resume();assert.equal(destination,'messages');
+  h.navigation.leave(()=>{destination='old-route';},true);h.at(h.one);h.navigation.changed();h.navigation.resume();
+  assert.equal(destination,'messages');
+});
+
+test('ordinary reading without an editor never holds a shell action',()=>{
+  const h=historyHarness();h.select(null);
+  assert.equal(h.navigation.leave(()=>assert.fail('Caller handles ordinary navigation'),true),false);
+  assert.equal(h.initial.saves.length,0);
+});
+
 test('fragment reading keeps the existing page while query changes still require saving',()=>{
   const h=historyHarness(),anchor={route:h.origin.route.split('#')[0]+'#main-content',key:'anchor'};
   const hash=intent(anchor);h.navigation.navigate(hash.event);assert.equal(hash.prevented(),false);h.at(anchor);h.navigation.pop();assert.equal(h.initial.saves.length,0);

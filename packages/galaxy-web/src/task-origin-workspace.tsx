@@ -28,15 +28,17 @@ function TaskOriginPickerSession({runtime,connected,locator,selection,busy,sourc
  const scoped=source?.client===client&&source?.taskId===taskId&&source.slot===slot?source:null,view=scoped?.value??null,error=scoped?.error??'',reading=!!client&&!!taskId&&!scoped;
  const attemptsSource=view?.attempts??[],names=useMemberNames(runtime,connection?.subjectId,connected,attemptsSource.map(item=>item.actorId));
  useEffect(()=>{
-  let active=true,reading=false;
+  let active=true,reading=false,readGeneration=0;
   const read=async(initial=false)=>{
-   if(!client||!taskId||!active||reading||(!initial&&busyRef.current)||document.hidden)return;reading=true;
-   try{const value=await client.read(taskId);if(active)setSource({client,taskId,slot,value,error:''});}
-   catch{if(active)setSource({client,taskId,slot,value:null,error:'原工作目前无法读取。已选关联仍保留，可以稍后继续，也可以取消关联后独立发布。'});}
-   finally{reading=false;}
+   if(!client||!taskId||!active||reading||(!initial&&busyRef.current)||document.hidden||!navigator.onLine)return;reading=true;const ticket=++readGeneration;
+   try{const value=await client.read(taskId);if(active&&ticket===readGeneration&&!document.hidden&&navigator.onLine)setSource({client,taskId,slot,value,error:''});}
+   catch{if(active&&ticket===readGeneration)setSource({client,taskId,slot,value:null,error:'原工作目前无法读取。已选关联仍保留，可以稍后继续，也可以取消关联后独立发布。'});}
+   finally{if(ticket===readGeneration)reading=false;}
   };
-  void read(true);const timer=setInterval(()=>void read(),20000),visible=()=>void read();document.addEventListener('visibilitychange',visible);
-  return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
+  const hide=()=>{readGeneration++;reading=false;if(client&&taskId)setSource({client,taskId,slot,value:null,error:'原工作暂时无法核对，原关联和本页文字仍保留。连接恢复后会重新读取。'});};
+  const visible=()=>{hide();void read();};
+  void read(true);const timer=setInterval(()=>void read(),20000);document.addEventListener('visibilitychange',visible);window.addEventListener('offline',hide);window.addEventListener('online',visible);
+  return()=>{active=false;readGeneration++;clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('offline',hide);window.removeEventListener('online',visible);};
  },[client,taskId,slot]);
  useEffect(()=>()=>client?.close(),[client]);
  if(!taskId)return null;

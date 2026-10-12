@@ -6,9 +6,11 @@ import {MemberLink,memberName,useMemberNames} from './conversation-ui';
 import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
 import {browseReturnPath,browseReturnLabel} from './public-browse-workspace';
 import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {AgentWorkContinuation} from './agent-work-continuation';
 import {isDiscoveryPurpose,object,projectErrorText} from './project-workspace-types';
 import type {ProjectRuntime,ProjectView,ProjectViewClient,DiscoveryPurpose,DiscoveryQuery,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail} from './project-workspace-types';
 import {createProjectViewClient,projectQueryMemory,projectViewScope,hasIndependentProject,opportunityUnavailable,opportunityLocator} from './project-view-client.mjs';
+import './project-detail-workspace.css';
 
 type Props={projectId:string;runtime:ProjectRuntime|null|undefined;subjectId:string|null;connected:boolean;navigate:(path:string)=>void};
 const purposes:readonly (readonly [DiscoveryPurpose,string])[]=[['conversation','交流想法'],['reuse','了解可复用内容'],['collaboration','共同协作'],['recruitment','了解持续角色需求']];
@@ -22,7 +24,7 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
  const [query,setQuery]=useState<DiscoveryQuery|null>(null),[items,setItems]=useState<VisibleOpportunity[]>([]),[next,setNext]=useState<string|null>(null),[searched,setSearched]=useState(false),[coverage,setCoverage]=useState<{windowLimited:boolean}|null>(null),[readDetail,setDetail]=useState<OpportunityDetail|UnavailableOpportunityDetail|null>(null);
  const detail=useCurrentTaskMaterialTree(runtime,readDetail);
  const wantsContact=new URLSearchParams(location.search).get('action')==='contact';
- const [direct,setDirect]=useState<{project:ProjectView;query:DiscoveryQuery;detail:OpportunityDetail|{opportunity:UnavailableOpportunityDetail['opportunity']}}|null>(null),[directError,setDirectError]=useState('');
+ const [direct,setDirect]=useState<{project:ProjectView;query:DiscoveryQuery;detail:OpportunityDetail|{opportunity:UnavailableOpportunityDetail['opportunity']}}|null>(null),[directError,setDirectError]=useState(''),[contactRead,setContactRead]=useState(false),[contactUnavailable,setContactUnavailable]=useState(false);
  const [relatedOpen,setRelatedOpen]=useState(false);
  const detailDialog=useRef<HTMLDialogElement>(null);
  const names=useMemberNames(runtime??null,subjectId??undefined,connected,[...(project?.ownerId?[project.ownerId]:[]),...items.map(item=>item.subjectId),...(detail?.opportunity?.subjectId?[detail.opportunity.subjectId]:[])]);
@@ -37,12 +39,12 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
   catch(e){commit(()=>{setProject(null);setLoaded(true);setItems([]);setDetail(null);setQuery(null);setSearched(false);setDirect(prior=>prior?{...prior,detail:{opportunity:locateOpportunity(prior.detail.opportunity)}}:null);});throw opportunityUnavailable(e)?new Error('目前无法读取这份项目资料。'):e;}}
  async function prepareDirect(commit:(action:()=>void)=>void){
   await load(commit);
-  try{const value=await client!.contactForProject(projectId);commit(()=>{setProject(value.project);setDirect(value);setDirectError('');});}
-  catch(e:unknown){commit(()=>{setDirect(prior=>prior?{...prior,detail:{opportunity:locateOpportunity(prior.detail.opportunity)}}:null);setDirectError(opportunityUnavailable(e)?'对方目前没有开放这个项目的联系入口。':projectErrorText(e)?projectErrorText(e):'当前联系条件暂未取得，请稍后重试。');});if(opportunityUnavailable(e))await load(commit);}
+  try{const value=await client!.contactForProject(projectId);commit(()=>{setProject(value.project);setDirect(value);setDirectError('');setContactRead(true);setContactUnavailable(false);});}
+  catch(e:unknown){commit(()=>{setDirect(prior=>prior?{...prior,detail:{opportunity:locateOpportunity(prior.detail.opportunity)}}:null);setContactRead(true);setContactUnavailable(opportunityUnavailable(e));setDirectError(opportunityUnavailable(e)?'目前没有开放这个项目的联系入口。':'当前联系范围暂时无法读取。');});if(opportunityUnavailable(e))await load(commit);}
  }
  function openDirect(){const params=new URLSearchParams(location.search);params.set('action','contact');navigate('/app/projects/'+projectId+'?'+params.toString()+'#project-contact');}
  function hideDirectSource(){setDirect(prior=>prior?{...prior,detail:{opportunity:locateOpportunity(prior.detail.opportunity)}}:null);void run(load);}
- const refreshProject=useEffectEvent(()=>{if(client&&!working.current)void run(wantsContact?prepareDirect:load);});
+ const refreshProject=useEffectEvent(()=>{if(client&&!working.current)void run(prepareDirect);});
  useEffect(()=>{
   if(!client)return;
   refreshProject();
@@ -58,22 +60,25 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
    setCoverage(result.result.coverage??result.result);if(!after)setDetail(null);projectQueryMemory(runtime,connected,'project:'+projectId,{purposes:result.query.purposes});});
  });}
  function hideSource(item:VisibleOpportunity){const locator=locateOpportunity(item);setItems(old=>old.map(row=>row.id===item.id?locator:row));setDetail({opportunity:locator,experience:{items:[]}});}
- const projectDocument=project?.document;
+ const projectDocument=project?.document,currentContact=direct&&!direct.detail.opportunity.sourceUnavailable?direct.detail.opportunity:null;
+ const contactLabels=purposes.filter(([id])=>currentContact?.help.purposes.includes(id)).map(([,label])=>label);
  return <section className="project-reading-page"><a href={browseReturnPath('/app/projects')} className="back-link" onClick={event=>{event.preventDefault();navigate(browseReturnPath('/app/projects'));}}>← {browseReturnLabel('/app/projects')}</a>
   <header className="directory-heading"><div><p className="eyebrow">{projectDocument?.kind==='module'?'模块':'项目'}</p><h1 className="small">{projectDocument?.title??'项目介绍'}</h1></div></header>
   {error&&<p className="message error" role="alert">{error}</p>}{loaded&&!project&&<Button type="button" variant="outline" disabled={busy||!client} onClick={()=>run(load)}>重新读取</Button>}
   {!loaded&&!error&&<p><output>正在读取项目介绍…</output></p>}
   {project&&<article className="project-public-reading">
    <div className="person-line"><MemberLink subjectId={project.ownerId} name={name(project.ownerId)} ownId={subjectId??undefined} navigate={navigate} avatar/><span>分享的{projectDocument?.kind==='module'?'模块':'项目'}</span></div>
-   <p className="record-meta">{project.state==='active'?'进行中':project.state==='archived'?'已归档':project.state} · {project.visibility==='Public'?'公开介绍':'按所选范围分享'}</p>
-   {projectDocument?<><p className="lead reading-prose">{projectDocument.summary}</p><h2>可以做什么</h2><p className="reading-prose">{projectDocument.functions.join('、')}</p>{projectDocument.technologies.length>0&&<><h2>使用的技术</h2><p>{projectDocument.technologies.join('、')}</p></>}
+   <p className="record-meta">{project.state==='archived'?'已归档 · ':''}{project.visibility==='Public'?'公开介绍':'按所选范围分享'} · 第 {project.revision} 次资料更新</p>
+   {projectDocument?<><p className="lead reading-prose">{projectDocument.summary}</p><section className="project-content-section"><h2>作品内容与涉及方向</h2><ul className="project-content-functions">{projectDocument.functions.map((item,index)=><li key={index}>{item}</li>)}</ul></section>{projectDocument.technologies.length>0&&<section className="project-content-section"><h2>使用的工具与技术</h2><p>{projectDocument.technologies.join('、')}</p></section>}
     {projectDocument.sourceUrl&&/^https?:\/\//.test(projectDocument.sourceUrl)&&<p><a href={projectDocument.sourceUrl} target="_blank" rel="noopener noreferrer">查看项目来源 ↗</a></p>}
    </>:<p>你已收到管理转交邀请，请先请原管理者分享必要的项目介绍。</p>}
-   <div className="button-row">{projectDocument&&project.state==='active'&&project.ownerId!==subjectId&&!wantsContact&&<Button type="button" onClick={openDirect}>联系这个项目</Button>}
+   <div className="button-row">
     {projectDocument&&<SaveForLaterButton runtime={runtime??null} connected={connected} subjectId={subjectId??undefined} reference={{kind:'project',projectId}} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
+    {projectDocument&&<AgentWorkContinuation runtime={runtime??null} subjectId={subjectId??undefined} object={{kind:'project',id:projectId}} title={projectDocument.title} purpose="理解这份作品的现状、内容和当前交流范围，继续我原来的事情" returnTo={location.pathname+location.search+location.hash} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
     {(project.permissions?.edit||project.permissions?.represent||(project.management?.transfers?.length??0)>0)&&<Button type="button" variant="outline" onClick={()=>navigate('/app/projects?section=projects&projectId='+projectId)}>{project.management?.transfers?.length?'查看管理与转交':'管理项目'}</Button>}
     {projectDocument&&project.state==='active'&&!relatedOpen&&<button type="button" className="text-link" onClick={()=>setRelatedOpen(true)}>寻找相关项目</button>}
    </div>
+   {projectDocument&&project.state==='active'&&project.ownerId!==subjectId&&<section className="project-current-invitation" aria-label="当前交流范围"><h2>关于这份作品的交流</h2>{currentContact?<>{currentContact.help.statement!==projectDocument.summary&&<p className="reading-prose">{currentContact.help.statement}</p>}{contactLabels.length>0&&<p className="project-contact-purpose">{contactLabels.join(' · ')}</p>}{currentContact.help.functions.length>0&&<p>当前愿意聊的话题：{currentContact.help.functions.join('、')}</p>}{currentContact.willingness.temporaryUntil&&<p className="record-meta">本次开放至 {new Date(currentContact.willingness.temporaryUntil).toLocaleDateString('zh-CN')}</p>}{!wantsContact&&currentContact.contactState==='welcome'&&<Button type="button" onClick={openDirect}>按这个范围联系</Button>}{currentContact.contactState!=='welcome'&&<p className="record-meta">目前暂不接收新的联系。</p>}</>:contactRead?<><p className="person-muted">{directError}</p>{!contactUnavailable&&<button type="button" className="text-link" disabled={busy} onClick={()=>void run(prepareDirect)}>重新读取交流范围</button>}</>:<p className="person-muted"><output>正在读取当前交流范围…</output></p>}</section>}
    <details className="technical-details"><summary>项目资料与管理信息</summary><p>当前版本 {project.revision} · {projectDocument?.discoverable?'允许参与发现':'未参与新的发现'}</p><p>本人角色：{project.ownRoles?.map((role:string)=>roleNames[role]??role).join('、')||'项目阅读者'}</p>{projectDocument?.participantKind&&projectDocument.participantKind!=='unknown'&&<p>发布者说明的参与身份：{({human:'个人',agent:'Agent',team:'团队',tool:'工具',organization:'组织',service:'服务'} as Record<string,string>)[projectDocument.participantKind]??projectDocument.participantKind}</p>}<p>项目编号 {projectId}</p><p>管理者 {project.ownerId}</p>
     {project.source&&<><p>来源 {project.source.sourceStatementId??'独立项目介绍'} · 当前资料事件 {project.source.documentEventId}</p>{project.source.fieldSources?.map(source=><p key={source.field}>{({title:'名称',summary:'介绍',functions:'功能',technologies:'技术',sourceUrl:'来源地址'} as Record<string,string>)[source.field]??source.field}：{source.subjectId} · {source.operationId}</p>)}</>}
     <button type="button" className="text-link" disabled={!client||busy} onClick={()=>run(load)}>重新读取项目</button>

@@ -30,7 +30,7 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
  if(!inWork&&/^\/app\/(tasks|capsules|projects)\/[^/]+/.test(path)&&typeof history.state?.browseReturn==='string'){
   try{const origin=new URL(history.state.browseReturn,location.origin);inWork=origin.origin===location.origin&&workRoute(origin.pathname,origin.search);}catch{/* An invalid return locator does not change the current section. */}
  }
- const current=(target:string)=>target==='/app/'?!inWork&&(path==='/app'||path==='/app/'||/^\/app\/(participate|tasks|capsules|projects|search|match)(\/|$)/.test(path))
+ const current=(target:string)=>target==='/app/'?!inWork&&(path==='/app'||path==='/app/'||/^\/app\/(participate|tasks|capsules|projects|find|search|match)(\/|$)/.test(path))
   :target==='/app/work'?inWork
   :target==='/app/rooms'?path===target||path.startsWith(target+'/')||path==='/app/notifications'
   :target==='/app/account'?path===target||path.startsWith('/app/settings/')||path==='/app/history'||path==='/app/bookmarks'

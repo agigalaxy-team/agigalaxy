@@ -134,13 +134,13 @@ export function createDraftHistoryNavigation(ports) {
       const selection = ports.selectLeave(current.route);
       if (selection) { pending.selection = selection; flush(pending); }
     },
-    /** Shell navigation/disconnect while held still saves under the original registration. */
-    leave(/** @type {()=>void} */ action) {
+    /** Shell navigation can wait for the editor to mount, then save through its actual registration. */
+    leave(/** @type {()=>void} */ action, includeCurrent = false) {
       if (!active) return false;
       if (pending && !pending.selection.isCurrent()) clear();
-      if (!pending && current.route !== ports.read().route) {
+      if (!pending && (includeCurrent || current.route !== ports.read().route)) {
         const selection = ports.selectLeave(current.route);
-        if (selection) pending = { mode: 'fallback', origin: current, target: ports.read(), selection, replaying: false };
+        if (selection) { pending = { mode: 'fallback', origin: current, target: ports.read(), selection, replaying: false }; ports.held('fallback'); }
       }
       if (!pending) return false;
       pending.after = { point: ports.read(), action }; flush(pending); return true;

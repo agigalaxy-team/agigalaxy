@@ -18,7 +18,7 @@ export function agentGrantEditorInput(form:AgentForm,selectedAt:number):AgentFor
 }
 export type AgentAttempt={kind:'grant';grantId:string;bindingId:string;mode:AgentMode;expiresAt:number};
 export type AgentSelection={input:AgentGrantInput;original:AgentGrantRef|null;draftRevision:string|null};
-export type AgentPreview={kind:'inspect';grant:AgentGrant}|{kind:'unavailable'}|{kind:'changed';grant:AgentGrant|null;original?:AgentGrantRef;action?:'edit'|'revoke'}|{kind:'retry';record:AgentOperation;target?:AgentGrant|null}|{kind:'switch-editor';next:Partial<AgentForm>}|{kind:'child';title:string};
+export type AgentPreview={kind:'inspect';grant:AgentGrant}|{kind:'unavailable'}|{kind:'changed';grant:AgentGrant|null;original?:AgentGrantRef;action?:'edit'|'revoke'}|{kind:'retry';record:AgentOperation;target?:AgentGrant|null}|{kind:'switch-editor';next:Partial<AgentForm>};
 export type AgentDisplay=Partial<AgentGrant>;
 export type AgentClient={
  list:(roomId:string,input?:{grantId?:string;after?:string;limit?:number})=>Promise<{items:AgentGrant[];next:string|null}>;

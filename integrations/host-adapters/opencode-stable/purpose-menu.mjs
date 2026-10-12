@@ -7,6 +7,8 @@ import {createNativeTaskMenu} from './task-native-menu.mjs';
 import {createProjectDiscoveryMenu} from './project-discovery-menu.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 import {nativeConfigurationMessage} from '../../../packages/galaxy-edge-mcp/src/native-v2/configuration.mjs';
+import {workContinuationLinkFromText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work-continuation-link.mjs';
+import {continuationResultText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work-continuation.mjs';
 
  const unwrap=result=>{if(result?.isError)throw new Error(result.structuredContent?.error??'current_content_unavailable');if(result?.structuredContent)return result.structuredContent;try{return JSON.parse(result.content[0].text);}catch{return result;}};
 const plain=value=>String(value??'').replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu,' ').slice(0,16000);
@@ -16,12 +18,13 @@ const fingerprint=status=>JSON.stringify(status.connectionChoice
 
 // Optional foreground Native bridge, supplied by the host. No service, model,
 // identity, account or connection is silently created to populate the menu.
-export function createPurposeMenu({nativeTools,controller,select,prompt,info,language='zh-CN',isCurrent,onBack,onReturnWork=onBack,readWorkContext}){
+export function createPurposeMenu({nativeTools,controller,select,prompt,info,readInfo=info,language='zh-CN',isCurrent,onBack,onReturnWork=onBack,readWorkContext}){
  const zh=language!=='en-US',label=(cn,en)=>zh?cn:en;let version=0,owner=null,navigationId=null,capsuleMenu=null,a2aMenu=null,projectMenu=null,taskMenu=null,messageTimer=null;
  const stopMessages=()=>{clearTimeout(messageTimer);messageTimer=null;};
  const alive=v=>isCurrent()&&(v===undefined||v===version);
  const menu=(title,entries,back=onBack,offset=0)=>{if(!alive())return;stopMessages();const v=++version,routes={};const options=entries.slice(offset,offset+8).map(([title,fn,description=''],i)=>{routes[i+1]=()=>{if(alive(v))fn();};return{number:String(i+1),title,description};});if(offset+8<entries.length){options.push({number:'9',title:label('其他内容','More content'),description:''});routes[9]=()=>menu(title,entries,back,offset+8);}select({title,options,routes,onBack:()=>{if(alive(v))(offset?()=>menu(title,entries,back,Math.max(0,offset-8)):back)();}});};
  const message=(title,text,back=onBack)=>{if(!alive())return;stopMessages();const v=++version;info(title,text,()=>{if(alive(v))back();});};
+ const readingMessage=(title,text,back=onBack)=>{if(!alive())return;stopMessages();const v=++version;readInfo(title,text,()=>{if(alive(v))back();});};
  async function native(name,args={}){
   const before=unwrap(await nativeTools.call('galaxy_native_status',{}));if(owner!==null&&owner!==fingerprint(before))throw Error('current_identity_changed');owner??=fingerprint(before);
   const data=unwrap(await nativeTools.call(name,args));const after=unwrap(await nativeTools.call('galaxy_native_status',{}));if(owner!==fingerprint(after))throw Error('current_identity_changed');return data;
@@ -200,6 +203,26 @@ export function createPurposeMenu({nativeTools,controller,select,prompt,info,lan
    isCurrent:()=>alive(v),onBack:back,onReturnWork,readWorkContext,openLink:nativeTools?.openLink});return capsuleMenu;}
  function methods(){if(!nativeTools)return message(label('方法','Methods'),label('这个入口尚未提供 Native 方法工具。请从原工作使用已配置的银河工具。','This entry has no Native method tools. Use the configured Galaxy tools from the original work.'));methodMenu().home();}
  function community(){if(!nativeTools)return onBack();void openObject({kind:'community'});}
+ async function continueWeb(){
+  if(!nativeTools)return onBack();stopMessages();const v=++version;
+  let context=null;try{context=await readWorkContext?.();}catch{/* A missing host background does not replace the selected web request. */}if(!alive(v))return;
+  const existing=workContinuationLinkFromText(context?.query);
+  const read=link=>void run(()=>native('galaxy_work_continue',{link}),result=>{
+   const title=result.sources?.find(source=>source.role==='current'&&source.state==='available')?.title??label('网页里的这件事','The selected web content');
+   const body=continuationResultText(result);
+   readingMessage(title,body,()=>menu(title,[[label('放回原工作继续','Continue in the original work'),()=>void run(()=>native('galaxy_work_continue',{link}),fresh=>{
+    const currentTitle=fresh.sources?.find(source=>source.role==='current'&&source.state==='available')?.title??label('网页里的这件事','The selected web content');
+    return onReturnWork({title:currentTitle,content:continuationResultText(fresh),sourceUrl:fresh.returnUrl});
+   },()=>read(link))],
+    [label('阅读当前内容','Read current content'),()=>read(link)],...(nativeTools.openLink?[[label('回到原网页','Return to the original web page'),()=>void nativeTools.openLink(result.returnUrl)]]:[])],onBack));
+  },()=>continueWeb());
+  if(existing)return read(existing);
+  prompt({title:label('粘贴网页里的 AI 接续请求','Paste the AI continuation request from the website'),placeholder:'',value:'',onCancel:onBack,onConfirm:value=>{
+   if(!alive(v))return;const link=workContinuationLinkFromText(value);
+   if(!link)return message(label('还没有找到这次网页选择','The selected web content was not found'),label('在原内容旁点击“用自己的 AI 继续”，把复制的完整请求贴到这里即可。原宿主输入保留，不需要填写编号或 JSON。','Choose “Continue with my AI” beside the web content and paste its complete copied request here. Your original host input is retained; no IDs or JSON are needed.'),continueWeb);
+   read(link);
+  }});
+ }
  function external(){if(!nativeTools)return onBack();stopMessages();a2aMenu?.close();const v=++version;a2aMenu=createNativeA2aMenu({call:(name,args)=>native(name,args),select,prompt,info,language,isCurrent:()=>alive(v),onBack,onReturnWork,onOpenLink:nativeTools.openLink,readWorkContext});a2aMenu.home();}
- return Object.freeze({search,messages,publish,identity,methods,community,external,projects,openObject,close(){version++;stopMessages();owner=null;navigationId=null;capsuleMenu?.close();a2aMenu?.close();projectMenu?.close();taskMenu?.close();}});
+ return Object.freeze({search,messages,publish,identity,methods,community,continueWeb,external,projects,openObject,close(){version++;stopMessages();owner=null;navigationId=null;capsuleMenu?.close();a2aMenu?.close();projectMenu?.close();taskMenu?.close();}});
 }

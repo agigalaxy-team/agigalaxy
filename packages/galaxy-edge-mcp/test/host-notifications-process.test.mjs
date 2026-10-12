@@ -10,7 +10,9 @@ import {createWindowsNotificationChannel} from '../src/native-v2/notifications/w
 async function subprocessFixture(body, run) {
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-notification-')), file = join(directory, 'fixture.mjs'), children = [], spawns = [];
   await writeFile(file, "import readline from 'node:readline';let first=true;const lines=readline.createInterface({input:process.stdin});lines.on('line',line=>{if(!first){process.exit(0);return;}first=false;const input=JSON.parse(line);" + body + '});');
-  const channel = createWindowsNotificationChannel({command: process.execPath, platform: 'win32', timeoutMs: 150,
+  // Include OS process startup and CI scheduling; the protocol assertions below
+  // still require a real shown event and reject an accepted-only response.
+  const channel = createWindowsNotificationChannel({command: process.execPath, platform: 'win32', timeoutMs: 5000,
     spawnProcess: (command, args, options) => { spawns.push({command, args, options}); const child = spawn(command, [file], options); children.push(child); return child; }});
   try { await run(channel, spawns); } finally {
     await channel.close(); assert.ok(children.every(child => child.exitCode !== null || child.signalCode !== null), 'Every owned real Node child exited');

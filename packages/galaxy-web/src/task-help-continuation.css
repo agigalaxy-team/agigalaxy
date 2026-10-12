@@ -136,6 +136,14 @@
 .galaxy-site .request-help-unavailable>p{margin:0 0 9px}
 .galaxy-site .request-help-unavailable>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0}
 .galaxy-site .request-help-unavailable>div>span{overflow-wrap:anywhere}
+.galaxy-site .request-selected-attempts{margin-top:30px;max-width:850px}
+.galaxy-site .request-selected-attempts>ol{list-style:none;margin:16px 0 0;padding:0}
+.galaxy-site .request-selected-attempts li{padding:20px 0;border-top:1px solid var(--g-line)}
+.galaxy-site .request-selected-attempts article>header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.galaxy-site .request-selected-attempts article>header>span{font-size:12px;color:#82708d}
+.galaxy-site .request-selected-attempts h3{font-size:14px;margin:20px 0 7px}
+.galaxy-site .request-selected-attempts p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9}
+.galaxy-site .request-selected-attempts details{margin-top:14px}
 @media(max-width:600px){
  .galaxy-site .request-work-origin{padding-top:16px}
  .galaxy-site .request-work-origin>header{gap:10px;margin-bottom:12px}

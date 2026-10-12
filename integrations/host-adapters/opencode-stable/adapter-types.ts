@@ -10,6 +10,7 @@ export type HostWorkContext = { query?: string; origin?: { host: string; workRef
   a2a?: { peerId: string; attemptId: string; attemptVersion: number; text: string } };
 type Command = { name: string; title: string; run: Action; desc?: string; category?: string; namespace?: string; slashName?: string; slashAliases?: string[] };
 export interface StableHostApi {
+  renderer?: { readonly width: number; readonly height: number };
   lifecycle?: { readonly signal: AbortSignal; onDispose(handler: Action): Action };
   // Public OpenCode TUI SDK. Appending keeps the host's unsent input and does
   // not submit it or select/start a model.

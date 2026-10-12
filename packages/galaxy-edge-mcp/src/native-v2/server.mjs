@@ -30,6 +30,7 @@ import {workerPanelResult} from '../../../../integrations/native-v2/compact-app/
 import {presentNativeResult} from './presentation.mjs';
 import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './reading-bookmarks.mjs';
 import {readProfileDisplayNames} from '../../../galaxy-official/src/profile-display-names.mjs';
+import {registerWorkContinuationTools} from './work-continuation.mjs';
 
 export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifact,watchHost,watchHostDriverFactory,notificationOptions}={}){
  const configuredHost=createConfiguredWatchHost(watchHost,{createDriver:watchHostDriverFactory});
@@ -98,6 +99,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
  registerNativeCapsuleWorkTools(server,{runtime,review:reviewOperation});
  registerNativeWorkSelectionTools(server,{runtime});
  registerNativeContactWorkTools(server,{runtime,review:reviewOperation});
+  registerWorkContinuationTools(server,{runtime});
  const register=(name,schema,description,run,{write=false,needsChoice=false,getReviewScope,singleUseChoice=false}={})=>server.registerTool(name,{inputSchema:schema,description,annotations:{readOnlyHint:!write}},async(input,ctx)=>{
   try{currentSubject=(await runtime.status()).identity??'';if(needsChoice){const scopeKey=getReviewScope?.();return await reviewOperation(name,input,ctx,()=>{
    if(getReviewScope&&scopeKey!==getReviewScope())throw Error('native_choice_scope_changed');return run(input);

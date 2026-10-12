@@ -13,6 +13,7 @@ const ChatWorkspace = lazy(() => import('./chat-workspace').then(module => ({def
 const ContactOriginWorkspace = lazy(() => import('./contact-origin-workspace').then(module => ({default: module.ContactOriginWorkspace})));
 const AccountSettings = lazy(() => import('./account-settings').then(module => ({default: module.AccountSettings})));
 const DiscoveryWorkspace = lazy(() => import('./discovery-workspace').then(module => ({default: module.DiscoveryWorkspace})));
+const ContentSearchWorkspace = lazy(() => import('./content-search-workspace').then(module => ({default: module.ContentSearchWorkspace})));
 const TaskCollaboration = lazy(() => import('./task-collaboration').then(module => ({default: module.TaskCollaboration})));
 const FactReceiptRecovery = lazy(() => import('./fact-workspace').then(module => ({default: module.FactReceiptRecovery})));
 const TaskOperationRecovery = lazy(() => import('./task-operation-recovery').then(module => ({default: module.TaskOperationRecovery})));
@@ -31,6 +32,7 @@ import {TaskAgentIdentityPrompt} from './task-agent-identity-prompt';
 import {createTaskPageView,type TaskPageTask} from './task-page-view';
 import {useCurrentTaskProjection,taskViewTitle,TaskMaterialNotice} from './task-material-view';
 import {TaskRequestReading,taskReadingSection} from './task-request-reading';
+import {AgentWorkContinuation} from './agent-work-continuation';
 import './task-help-continuation.css';
 import {readTaskResult} from './task-result-navigation.mjs';
 import {MemberLink,useMemberNames} from './conversation-ui';
@@ -59,7 +61,7 @@ import './identity-recovery.css';
 import { SiteShell, StartPage, PageLoading } from './site-shell';
 const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));
 const PersonProfile = lazy(() => import('./person-profile').then(module => ({default: module.PersonProfile})));
-import {profileSubject,profileNavigationState} from './profile-navigation.mjs';
+import {profileSubject,profileNavigationState,profileReturnNavigationState} from './profile-navigation.mjs';
 const WorkOverview = lazy(() => import('./account-center').then(module => ({default: module.WorkOverview})));
 import {ProjectDirectoryWorkspace,browseReturnPath,browseReturnLabel} from './public-browse-workspace';
 import {TaskTerms} from './task-budget-fields';
@@ -336,7 +338,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
       requestAnimationFrame(()=>{const control=document.getElementById('identity-recovery-save');control?.scrollIntoView({block:'start'});control?.focus({preventScroll:true});});
     });
   }
-  const navigate = (target: string) => {
+  const navigate = (target: string, options?:{profileReturn?:boolean}) => {
     const from = location.pathname + location.search + location.hash;
     readingPositions.current.set(location.pathname + location.search, window.scrollY);
     history.replaceState({ ...history.state, scrollY: window.scrollY }, '', location.href);
@@ -350,28 +352,18 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if (enteringIdentity && new URL(target, location.origin).searchParams.get('section') === 'account') setAccountVerificationVisit(value => value + 1);
     const targetPath=new URL(target,location.origin).pathname;
     const fromParameters=new URLSearchParams(location.search);
-    const fromDirectory=['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/bookmarks','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)&&!fromParameters.has('mode')&&!fromParameters.has('compose');
+    const fromDirectory=(['/app/','/app/work','/app/find','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/bookmarks','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)||!!profileSubject(location.pathname)&&!profileSubject(targetPath))&&!fromParameters.has('mode')&&!fromParameters.has('compose');
     const toObject=/^\/app\/(tasks|capsules|projects|community|rooms|people)\/[^/]+/.test(targetPath);
     const browseReturn=fromDirectory&&toObject?from:(enteringIdentity||toObject?history.state?.browseReturn:undefined);
-    history.pushState({from,...profileNavigationState(from,target,history.state??{}),...(identityReturn?{identityReturn}:{}),...(browseReturn?{browseReturn}:{})}, '', target);
+    const readingState=options?.profileReturn?profileReturnNavigationState(history.state??{}):{...profileNavigationState(from,target,history.state??{}),...(browseReturn?{browseReturn}:{})};
+    history.pushState({from,...readingState,...(identityReturn?{identityReturn}:{})}, '', target);
     draftHistory.current?.changed();
     const route=destination.pathname+destination.search;
     restoreReading.current={route,y:readingPositions.current.get(route)??0};
     setPath(location.pathname); setRouteSearch(location.search); setRouteHash(location.hash); setError(''); setNotice(''); window.scrollTo(0, 0);
   };
   const navigateFromShell = (target:string) => {
-    if(draftHistory.current?.leave(()=>navigate(target)))return;
-    const chatRegistration=chatShellNavigation.current;
-    if(runtime&&chatRegistration?.runtime===runtime&&chatRegistration.route===location.pathname+location.search+location.hash){
-      try{chatRegistration.lease.assertCurrent();}catch{navigate(target);return;}
-      chatRegistration.handler(target);return;
-    }
-    if(location.pathname!=='/app/publish'||!runtime){navigate(target);return;}
-    const registration=taskShellNavigation.current,scope=runtime.taskDraftScope();
-    const taskSessionExpected=!scope.closed&&scope.subjectId===(status?.identity?.subjectId??null);
-    if(!registration&&!taskSessionExpected){navigate(target);return;}
-    if(registration?.runtime===runtime&&!scope.closed&&registration.scopeKey===scope.key
-      &&registration.route===location.pathname+location.search+location.hash)registration.handler(target);
+    if(!draftHistory.current?.leave(()=>navigate(target),true))navigate(target);
   };
   const selectHistoryLeave=useCallback((origin:string)=>{
     const selected=identityRuntime.current,chatRegistration=chatShellNavigation.current,view=shellStatus.current;
@@ -435,7 +427,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if(!requested||requested.route!==path+routeSearch)return;
     let done=false;
     const restore=()=>{if(done)return;const anchor=location.hash&&location.hash!=='#main-content'?document.getElementById(location.hash.slice(1)):null;
-      if(anchor){anchor.scrollIntoView({block:'center'});done=true;}
+      if(anchor){const margins=getComputedStyle(anchor),available=innerHeight-(parseFloat(margins.scrollMarginTop)||0)-(parseFloat(margins.scrollMarginBottom)||0);anchor.scrollIntoView({block:anchor.getBoundingClientRect().height>available?'start':'center'});done=true;}
       else if(!routeHash&&document.documentElement.scrollHeight-innerHeight>=requested.y){window.scrollTo(0,requested.y);done=true;}
     };
     const observer=new MutationObserver(restore);observer.observe(document.getElementById('main-content')!,{childList:true,subtree:true});
@@ -474,18 +466,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if(!runtime)return;
     const selected=runtime,origin=location.pathname+location.search+location.hash;
     const disconnect=()=>{if(identityRuntime.current!==selected||location.pathname+location.search+location.hash!==origin)return;void run(async()=>{await selected.disconnect();setNotice('已退出本次连接。');});};
-    if(draftHistory.current?.leave(disconnect))return;
-    const chatRegistration=chatShellNavigation.current;
-    if(chatRegistration?.runtime===selected&&chatRegistration.route===origin){
-      try{chatRegistration.lease.assertCurrent();}catch{disconnect();return;}
-      chatRegistration.leaveAction(()=>{if(chatShellNavigation.current===chatRegistration)disconnect();});return;
-    }
-    if(location.pathname==='/app/publish'){
-      const registration=taskShellNavigation.current,scope=selected.taskDraftScope();
-      if(registration?.runtime===selected&&!scope.closed&&registration.scopeKey===scope.key&&registration.route===origin){registration.leaveAction(()=>{if(taskShellNavigation.current===registration)disconnect();});return;}
-      if(!scope.closed&&scope.subjectId===(status?.identity?.subjectId??null))return;
-    }
-    disconnect();
+    if(!draftHistory.current?.leave(disconnect,true))disconnect();
   }
   useEffect(()=>{if(!runtime)return;let active=true;const timer=setInterval(()=>runtime.resumeConnection().catch(()=>null).then(()=>runtime.status()).then(value=>{if(active)setStatus(value);}).catch(()=>{}),15000);return()=>{active=false;clearInterval(timer);};},[runtime]);
   const taskDetails=useCallback(async(id:string,quiet=false)=>{const loaded=await taskPage.refresh(id,quiet);if(loaded)setError('');},[taskPage]);
@@ -549,7 +530,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const governanceTargetType = projectParameters.get('targetType'), governanceTargetId = projectParameters.get('targetId');
   const governanceTarget = (governanceTargetType === 'task' || governanceTargetType === 'room') && /^[0-9a-f-]{36}$/.test(governanceTargetId ?? '')
     ? { type: governanceTargetType as 'task' | 'room', id: governanceTargetId! } : undefined;
-  const knownPath = path === '/app' || path === '/app/' || path === '/app/account' || path === '/app/work' || entries.some(entry => entry.path === path)
+  const knownPath = path === '/app' || path === '/app/' || path === '/app/find' || path === '/app/account' || path === '/app/work' || entries.some(entry => entry.path === path)
     || /^\/app\/(?:tasks|rooms)\/[0-9a-f-]{36}$/.test(path) || !!capsuleRoute || !!projectRoute || !!personSubject || !!qualificationPermissionRoute || !!packUseRoute || !!informationRoute || !!governanceRoute || !!reviewRoute || forumPage;
   const hasDisplayedCode=!!newCode&&newCodeOwner===currentIdentityOwner;
   const savingRecoveryCode=hasDisplayedCode&&codePanelOpen;
@@ -576,6 +557,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
           <FactReceiptRecovery key={`fact-receipt:${path}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}:${status?.connection?.generation??''}`} runtime={runtime} subjectId={status?.identity?.subjectId} taskId={path.split('/').at(-1)!} connected={connected}/>
         </section>}
         {path === '/app/match' && <DiscoveryWorkspace key={routeSearch} runtime={runtime} connected={connected} navigate={navigate}/>}
+        {path === '/app/find' && <ContentSearchWorkspace key={routeSearch} runtime={runtime} navigate={navigate} search={routeSearch}/>}
         {path === '/app/search' && <HelpSearchWorkspace key={routeSearch} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate}/>}
         {qualificationPermissionRoute && <QualificationPermissionWorkspace key={`${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}:${qualificationPermissionRoute[1] ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} initialRequestId={qualificationPermissionRoute[1]} onNeedIdentity={needIdentity}/>}
         {capsuleRoute && <CapsuleWorkspace key={`${status?.endpoint ?? ''}:${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? 'disconnected'}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} capsuleId={capsuleRoute[1]} versionId={capsuleRoute[2]}/>}
@@ -585,14 +567,14 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {path === '/app/publish' && <TaskPublishWorkspace key={`${routeSearch}:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${status?.localDraftGeneration ?? ''}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} onNeedIdentity={needIdentity} registerShellNavigation={registerTaskShellNavigation}/>}
         {task && <section className={'task-page'+(readingTaskResult?' task-result-page':'')}>{readingTaskResult?<a className="result-task-context" href={'/app/tasks/'+task.taskId} onClick={event=>{event.preventDefault();navigate('/app/tasks/'+task.taskId);}}>来自求助：{taskViewTitle(task)}</a>:<><a className="back-link" href={browseReturnPath('/app/participate')} onClick={e=>{e.preventDefault();navigate(browseReturnPath('/app/participate'));}}><ArrowLeft size={16}/>{browseReturnLabel('/app/participate')}</a><span className="tag">{stateNames[task.state] ?? task.state}</span><h1 className="small">{taskViewTitle(task)}</h1></>}{taskSection==='overview'&&<TaskAuthor runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} task={task} navigate={navigate}/>}
           {task.schemaVersion===2&&!readingTaskResult&&<nav className="task-tabs" aria-label="当前求助">{[['overview','详情'],['collaboration','协作'],['comments','讨论']].map(([id,title])=><button key={id} aria-current={taskSection===id?'page':undefined} onClick={()=>navigate(`/app/tasks/${task.taskId}?section=${id}`)}>{title}</button>)}</nav>}
-          {taskSection==='overview'&&<section className="request-detail-body" aria-label="求助详情"><TaskMaterialNotice task={task}/><TaskRequestReading task={task}/><footer className="task-read-actions"><TaskTerms request={task.request}/>{task.view!=='requester'&&task.schemaVersion===2&&<Button onClick={()=>navigate(`/app/tasks/${task.taskId}?section=apply`)}>{task.state==='open'?'我可以提供帮助':'查看参与情况'}<ArrowRight size={15}/></Button>}</footer></section>}
+          {taskSection==='overview'&&<section className="request-detail-body" aria-label="求助详情"><TaskMaterialNotice task={task}/><TaskRequestReading task={task} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate}/><footer className="task-read-actions"><TaskTerms request={task.request}/>{task.view!=='requester'&&task.schemaVersion===2&&<Button onClick={()=>navigate(`/app/tasks/${task.taskId}?section=apply`)}>{task.state==='open'?'我可以提供帮助':'查看参与情况'}<ArrowRight size={15}/></Button>}</footer></section>}
           {taskSection==='apply'&&<section className="task-apply"><button className="back-link" onClick={()=>navigate(`/app/tasks/${task.taskId}`)}><ArrowLeft size={16}/>返回任务详情</button><TaskApplication key={`${task.taskId}:${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} refresh={() => taskDetails(task.taskId)} onNeedIdentity={needIdentity}/></section>}
           {taskSection==='collaboration'&&task.schemaVersion===2&&<div role="tabpanel" aria-label="参与与交付"><TaskCollaboration key={`${task.taskId}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} refresh={() => taskDetails(task.taskId)}/></div>}
           {taskSection==='comments'&&<div role="tabpanel" aria-label="讨论"><TaskCommentsWorkspace key={`comments:${task.taskId}:${status?.endpoint}:${status?.identity?.subjectId ?? "anonymous"}:${status?.identity?.deviceId??""}:${status?.connection?.bindingId??""}:${status?.connection?.generation??""}`} task={task} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/></div>}
           <TaskOperationRecovery key={`recovery:${task.taskId}:${status?.identity?.subjectId ?? "visitor"}:${status?.connection?.bindingId ?? ""}`} runtime={runtime} connected={connected} taskId={task.taskId} managedFeedback={taskSection==='collaboration'&&(!projectParameters.get('view')||projectParameters.get('view')==='people')&&(task.participations??[]).some(participant=>requesterFeedbackAvailable(task,participant,status?.identity?.subjectId))} onComplete={() => taskDetails(task.taskId)}/>
           {task.schemaVersion===2&&<TaskOriginReturn runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} task={task} navigate={navigate}/>}
           {task.schemaVersion===2&&<CommunityTaskReturn key={`forum-return:${task.taskId}:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}`} runtime={runtime} connected={connected} subjectId={status?.identity?.subjectId} task={task} navigate={navigate}/>}
-          <details className="return-note"><summary>在自己的 AI 中继续这项任务</summary><p>让你的模型按同一任务链接刷新当前状态。关闭网页不会取消任务。</p></details></section>}
+          <AgentWorkContinuation runtime={runtime} subjectId={status?.identity?.subjectId} object={{kind:'task',id:task.taskId}} title={taskViewTitle(task)} purpose="接着这项求助，理解当前问题、已取得的结果与还缺少的材料" onNeedIdentity={needIdentity}/></section>}
         {/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path) && task && <Button variant="outline" disabled={!connected} onClick={() => navigate('/app/governance?targetType=task&targetId=' + task.taskId)}>举报与处理</Button>}
         {/\/app\/rooms(?:\/[0-9a-f-]{36})?$/.test(path) && <ChatWorkspace key={path + (status?.identity?.subjectId ?? '')} runtime={runtime} roomId={/^\/app\/rooms\/([0-9a-f-]{36})$/.exec(path)?.[1]} search={routeSearch} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigate} needIdentity={needIdentity} registerShellNavigation={registerChatShellNavigation}/> }
         {path === '/app/notifications' && <NotificationWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
@@ -609,7 +591,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {path === '/app/history' && <ContributionWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/settings/summaries' && <PersonalSummaryWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/account' && <AccountOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
-        {personSubject && <PersonProfile runtime={runtime} subjectId={status?.identity?.subjectId} targetSubjectId={personSubject} connected={connected} search={routeSearch} navigate={navigate}/>}
+        {personSubject && <PersonProfile runtime={runtime} subjectId={status?.identity?.subjectId} targetSubjectId={personSubject} connected={connected} search={routeSearch} navigate={navigate} onReturn={target=>navigate(target,{profileReturn:true})}/>}
         {path === '/app/work' && <WorkOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/settings/identity' && !agentIdentityEntry && projectParameters.get('section')==='account' && <section><button className="back-link" onClick={()=>navigate(returnPath)}><ArrowLeft size={16}/>回到原目标</button><h1 className="small">账号验证</h1><p className="lead">管理当前银河身份关联的验证账号。</p>{!connected&&<div className="browse-note"><p>{status?.identity?'先连接已有身份，再查看验证入口。':'先建立或接回银河身份，再继续验证账号。'}</p><Button onClick={()=>navigate('/app/settings/identity?continue=account')}>{status?.identity?'连接已有身份':'建立或接回身份'}</Button></div>}<AccountSettings key={[status?.endpoint,status?.identity?.subjectId,status?.identity?.deviceId,status?.connection?.bindingId,status?.connection?.generation].join(':')} runtime={runtime} connected={connected}/></section>}
         {path === '/app/settings/identity' && agentIdentityEntry && <AgentIdentityWorkspace key={path+routeSearch} runtime={runtime} entry={agentIdentityEntry} identity={status?.identity??null} connection={status?.connection??null} navigate={navigate} onChange={async()=>{if(runtime)setStatus(await runtime.status());}} onManual={()=>{navigate('/app/settings/identity?deviceRequest=original');openIdentityMethod('device');}}/>}

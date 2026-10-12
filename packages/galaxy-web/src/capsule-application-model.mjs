@@ -1,4 +1,11 @@
 import {currentCapsuleFacts} from './capsule-workspace-client.mjs';
+/** @param {unknown} value @returns {value is import('./capsule-authoring-types').CapsuleCaseHistory} */
+export function isCapsuleCaseFacts(value){
+ return !!value&&typeof value==='object'&&'caseId' in value&&typeof value.caseId==='string'
+  &&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.caseId)
+  &&'attempts' in value&&Array.isArray(value.attempts)&&'interventions' in value&&Array.isArray(value.interventions)
+  &&'results' in value&&Array.isArray(value.results)&&!('eventId' in value);
+}
 /** @param {{id:string;version:number|string}|null|undefined} ref */
 export const exactFactKey=ref=>ref?`${ref.id}:${ref.version}`:'';
 /**

@@ -119,6 +119,7 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
  // Apps already supply their carefully scoped human presentation and private
  // component metadata. Do not turn it back into a second generic summary.
  if(data.kind==='galaxy-worker-panel'||data.kind==='galaxy-a2a-panel'||data.kind==='galaxy-help-panel'||data.schemaVersion===1&&data.viewId)return result;
+ if(data.kind==='galaxy-work-continuation'||name==='galaxy_work_continue')return result;
  const lines=[],specific=result.isError||data.error?null:communityResultLines(name,data)??bookmarkResultLines(name,data);
  if(result.isError||data.error){const code=data.error??'';
   lines.push(/(?:identity|connection)_required|local_identity_required/.test(code)?'当前设备尚未接入所需身份或服务。可以在原工作按需要接续身份，再继续。':

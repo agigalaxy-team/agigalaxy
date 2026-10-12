@@ -1,6 +1,11 @@
 export const normalizeFunction = value => value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase();
 const tags = values => [...new Set(values.map(normalizeFunction))].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
 
+export function contactFunctions(sharedFunctions, sourceWish, candidateWish) {
+  const source=tags(sourceWish.functions),candidate=tags(candidateWish.functions);
+  return sharedFunctions.filter(value=>(!source.length||source.includes(value))&&(!candidate.length||candidate.includes(value)));
+}
+
 export function effectiveDiscovery(preferences, now) {
   const temporary = preferences.temporary && preferences.temporary.until > now ? preferences.temporary : null;
   return {
@@ -17,7 +22,7 @@ export function matchProjects(source, candidate, sourceWish, candidateWish) {
   const left = tags(source.functions), right = tags(candidate.functions);
   const sharedFunctions = left.filter(value => right.includes(value));
   if (!purposes.length || !sharedFunctions.length) return null;
-  if ([sourceWish, candidateWish].some(wish => wish.functions.length && !sharedFunctions.some(value => wish.functions.includes(value)))) return null;
+  if (!contactFunctions(sharedFunctions,sourceWish,candidateWish).length) return null;
   const leftTech = tags(source.technologies), rightTech = tags(candidate.technologies);
   return {
     method: 'functional-tags-v1',

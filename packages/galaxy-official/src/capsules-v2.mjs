@@ -188,6 +188,7 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
       ...ownControl(actor,current.row,'publication'),
       ...(ownState ? { revision: ownState.revision } : {}),
       sourceStatus: current.sourceStatus, permissions: current.source.permissions, attributions: await this.attributionsWithin(db, actor, current.source.attributions),
+      ...(current.payload.schemaVersion === 2 ? { sourceReading: await this.resolutionReadingWithin(db, actor, current.payload.sourceResolution) } : {}),
       deprecated: current.deprecated, securityIssue: current.securityIssue, notices: current.notices,
       newApplicationAllowed: !current.deprecated && !current.securityIssue && current.source.sourceCurrent,
       synthetic: current.source.synthetic, compatibility: current.compatibility,

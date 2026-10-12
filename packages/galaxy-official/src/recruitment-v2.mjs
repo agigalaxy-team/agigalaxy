@@ -1,6 +1,6 @@
 import { recruitmentEnvelopeV2Schema,recruitmentEventV2Schema,recruitmentQueryV2Schema,
  recruitmentOperationReceiptQuerySchema,recruitmentOperationReceiptResultSchema } from './shared/recruitment-schema-v2.mjs';
-import { matchProjects } from './domain/discovery-match.mjs';
+import { matchProjects, contactFunctions } from './domain/discovery-match.mjs';
 import { canReadProjection } from './domain/consent-policy.mjs';
 import { digest } from './shared/digest.mjs';
 import { ServiceError } from './shared/service-error.mjs';
@@ -77,7 +77,7 @@ export class RecruitmentV2Service {
   return{id:digest(JSON.stringify(ref)),opportunityRef:ref,subjectId:row.contact_subject_id,projectId:row.project_id,
    recruitmentId:row.id,project:{...view.document,id:row.project_id,kind:'role-requirement'},recruitment:view,
    participant:{subjectId:row.contact_subject_id,kind:'unknown',kindSource:'project-representative; human-or-agent-not-inferred'},classification:'declared-role-requirement',capabilityVerified:false,match,
-   help:{statement:view.document.summary,functions:match.sharedFunctions,purposes:['recruitment'],basis:'explicit-current-role-requirement-and-representative-authority',commitment:'not-contacted'},
+   help:{statement:view.document.summary,functions:contactFunctions(match.sharedFunctions,context.wish,wish),purposes:['recruitment'],basis:'explicit-current-role-requirement-and-representative-authority',commitment:'not-contacted'},
    contactState:'welcome',willingness:{classification:'explicit-recruitment-publication',purposes:['recruitment'],temporaryUntil:wish.temporaryUntil,requiresRecipientAcceptance:true},
    sources:[view.originalSource],experience:{status:'not-loaded',refs:[],lookup:'discovery-detail',absenceMeaning:'no-history-is-not-ineligibility'},
    nextActions:['inspect','consider-contact'],invitationSent:false,roomJoined:false};

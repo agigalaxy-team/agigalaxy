@@ -166,10 +166,10 @@ export function createRoutes({ readingBookmarks,forum,forumGovernance,receiptSta
     const projectRead = /^\/v2\/projects\/([0-9a-f-]{36})$/.exec(url.pathname);
     if (projects && request.method === 'GET' && projectRead)
       return send(200, await projects.get(await authenticate(request, access, 'history', true), projectRead[1]));
-    if (projects && request.method === 'POST' && url.pathname === '/v2/projects/directory/query') {
+    if (projects && request.method === 'POST' && ['/v2/projects/directory/query','/v2/projects/portfolio/query'].includes(url.pathname)) {
       const actor = await authenticate(request, access, 'history', true), input = await body(request, null);
       consumeSearchPage(actor, input?.after);
-      return send(200, await projects.publicDirectory(actor, input));
+      return send(200, await projects[url.pathname === '/v2/projects/portfolio/query'?'publicPortfolio':'publicDirectory'](actor, input));
     }
     const projectPreference = /^\/v2\/projects\/([0-9a-f-]{36})\/preferences\/(read|save)$/.exec(url.pathname);
     if (projects && request.method === 'POST' && (url.pathname === '/v2/projects' || url.pathname === '/v2/projects/query' || projectPreference)) {
