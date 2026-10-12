@@ -18,8 +18,10 @@ test('native Profile menu separates self claims and facts, defaults private and 
   stale('Late overwritten text');assert.equal(page.options.find(o=>o.number==='2').description,'New about');
   page.routes[6]();await waitFor(()=>page.kind==='select'&&page.options.some(o=>o.title==='允许本次内容与范围'));
   assert.equal(prepared.visibility,'Private');assert.deepEqual(prepared.viewers,[]);assert.equal(prepared.expectedRevision,0);
-  assert.ok(page.title.includes('New about'));assert.equal(executed,0);
-  page.routes[2]();assert.equal(executed,0);page.onConfirm();
+  const scope=page.options.find(option=>option.number==='1').description;
+  assert.ok(scope.includes('New about'));assert.match(scope,/仅自己/);assert.equal(executed,0);
+  page.routes[2]();assert.equal(page.kind,'info');assert.ok(page.message.includes(JSON.stringify(prepared.selfDeclared)));
+  assert.equal(executed,0);page.onConfirm();
   page.routes[1]();await waitFor(()=>page.kind==='info'&&executed===1);
   page.onConfirm();await waitFor(()=>page.kind==='select');
   page.routes[1]();page.routes[7]();assert.equal(executed,1);

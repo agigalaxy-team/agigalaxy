@@ -24,8 +24,11 @@ test('native Case review selects an exact target, previews disclosure and ignore
   assert.deepEqual(f.prepared.review,{type:'dispute',state:'opened'});assert.equal(f.prepared.reason,'Explain source');
   const staleConfirmation=f.page.routes[1];f.page.onBack();staleConfirmation();assert.equal(f.executed,0);
   f.page.routes[3]();f.page.routes[2]();f.page.routes[5]();await waitFor(()=>f.page.kind==='select'&&f.page.options.some(o=>o.title==='允许本次内容与范围'));
-  assert.equal(f.prepared.visibility,'Public');assert.ok(f.page.title.includes('Owner dispute statement'));
-  f.page.routes[2]();assert.equal(f.executed,0);f.page.onConfirm();f.page.routes[1]();
+  assert.equal(f.prepared.visibility,'Public');
+  const scope=f.page.options.find(option=>option.number==='1').description;
+  assert.ok(scope.includes('Owner dispute statement'));assert.match(scope,/所有人/);
+  f.page.routes[2]();assert.equal(f.page.kind,'info');assert.ok(f.page.message.includes(JSON.stringify(f.prepared)));
+  assert.equal(f.executed,0);f.page.onConfirm();f.page.routes[1]();
   await waitFor(()=>f.page.kind==='info'&&f.executed===1);assert.match(f.page.message,/原记录保留/);f.page.onConfirm();assert.equal(f.active,false);
 });
 test('native review offers legal lifecycle transitions and requires a fresh history version',async()=>{

@@ -57,9 +57,9 @@ async function fixture(){
    const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await server.connect(serverTransport);await sdk.connect(clientTransport);
    let lost=false,writes=0;
    const raw=(name,args)=>sdk.callTool({name,arguments:args});
-   const call=async(name,args)=>{const result=await raw(name,args);if(result.isError)throw Object.assign(new Error(content(result)),{code:content(result)});
+   const call=async(name,args)=>{const result=await raw(name,args);if(result.isError){const code=result.structuredContent?.error??content(result);throw Object.assign(new Error(code),{code});}
     if(name==='galaxy_task_v2_owner_control'){writes++;if(lost){lost=false;throw new Error('synthetic MCP response lost after actual commit');}}
-    return JSON.parse(content(result));};
+    assert.ok(result.structuredContent);return result.structuredContent;};
    const value={sdk,server,raw,call,lose:()=>{lost=true;},writes:()=>writes};hosts.push(value);return value;};
   const sign=async(who,payloadJson,action,objectId,options={})=>{
    const prepared=await who.runtime.api.prepareAuthorization(payloadJson,{action,objectId,visibility:'Private',viewers:[],expiresAt:f.now+7200,confirmed:true,...options});

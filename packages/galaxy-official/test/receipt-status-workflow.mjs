@@ -48,7 +48,7 @@ export async function receiptStatusFixture({ database = null, migrateDatabase = 
       return response;
     };
     runtime = await createWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, { now: () => current, fetch: transport,
-      store: { get: async key => data.get(key), put: async (key, value) => data.set(key, value) } });
+      store: { get: async key => data.get(key), put: async (key, value) => data.set(key, value),update:memoryAtomicUpdate(data) } });
     await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
     const identity = (await runtime.status()).identity;
     const material = data.get(`device:${identity.subjectId}:${identity.deviceId}`);
@@ -110,3 +110,4 @@ export async function verifyReceiptStatusExpiredContinuity(database = null, opti
       retainedRowsUnchanged: true, statusDeadlineEnforced: true, localStore: 'Map', identity: 'synthetic', database: database ? 'caller-supplied' : 'PGlite' };
   } finally { await t.close(); }
 }
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

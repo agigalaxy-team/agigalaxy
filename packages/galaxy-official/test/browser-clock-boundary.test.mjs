@@ -8,7 +8,7 @@ import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
 test('HTTP connection waits for a near-future signed second without extending expiry or duplicating binding',async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000});
  let runtime,clock=f.now,waits=0,bindings=0,shortChallenge=false,cancelWait=false;
- const values=new Map(),store={get:async k=>structuredClone(values.get(k)),put:async(k,v)=>values.set(k,structuredClone(v))};
+ const values=new Map(),store={get:async k=>structuredClone(values.get(k)),put:async(k,v)=>values.set(k,structuredClone(v)),update:memoryAtomicUpdate(values)};
  try{
   await new Promise(r=>api.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${api.address().port}`;
   const fetcher=async(url,options)=>{
@@ -39,3 +39,4 @@ test('HTTP connection waits for a near-future signed second without extending ex
   assert.equal(bindings,1);assert.equal(runtime.api.snapshot(),null);
  }finally{runtime?.close();await new Promise(r=>api.close(r));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

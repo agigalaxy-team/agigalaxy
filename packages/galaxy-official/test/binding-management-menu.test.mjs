@@ -21,7 +21,10 @@ test('native installation list carries pagination and filtering, then requires e
   f.choose('其他绑定');assert.ok(f.page().title.includes('不支持保留原ID换钥'));f.choose('查看此安装实例的全部绑定');
   await wait(()=>f.queries.length===3&&f.page()?.kind==='select');assert.equal(f.queries[2].installationId,f.installationId);
   f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='select'&&f.page().options.some(o=>o.title==='允许本次内容与范围'));
-  assert.ok(f.page().title.includes(f.id)&&f.page().title.includes(f.installationId));assert.equal(f.writes(),0);
+  const scope=f.page().options.find(option=>option.number==='1').description;
+  assert.ok(scope.includes(f.id)&&scope.includes(f.installationId));assert.equal(f.writes(),0);
+  f.page().routes[2]();assert.equal(f.page().kind,'info');assert.ok(f.page().text.includes(f.preview.previewJson));assert.equal(f.writes(),0);
+  f.page().onBack();
   const oldAllow=f.page().routes[1];f.page().onBack();assert.equal(f.writes(),0);assert.equal(f.canceled(),1);oldAllow();assert.equal(f.writes(),0);
   await wait(()=>f.page()?.kind==='select');f.choose('其他绑定');f.choose('预览撤销此绑定');await wait(()=>f.page()?.kind==='select'&&f.page().options.some(o=>o.title==='允许本次内容与范围'));
   const confirmed=f.page();confirmed.routes[1]();await wait(()=>f.writes()===1&&f.page()?.kind==='info'&&f.page().text.includes('已撤销'));

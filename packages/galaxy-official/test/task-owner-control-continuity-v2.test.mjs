@@ -57,7 +57,7 @@ async function fixture({retiring=false}={}){
   const receipt=(task,p)=>runtime.api.call('/v2/tasks/receipt',{taskId:task.taskId,eventId:p.operationId,payloadHash:p.payloadHash});
   const original=task=>f.db.query('SELECT id,subject_id,payload_text,payload_hash,consent_id,version FROM task_events WHERE task_id=$1 ORDER BY version',[task.taskId]).then(r=>r.rows);
   const peer=async()=>{const data=new Map(),r=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
-   store:{get:async key=>structuredClone(data.get(key)),put:async(key,v)=>data.set(key,structuredClone(v))},now:()=>f.now,
+   store:{get:async key=>structuredClone(data.get(key)),put:async(key,v)=>data.set(key,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
    fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});peers.push(r);await r.createIdentity({confirmed:true});await r.connect({confirmed:true});return r;};
   const raw=async(path,body,credential)=>{const r=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',
    ...(credential?{authorization:`Bearer ${credential}`}:{})},body:JSON.stringify(body)});return{status:r.status,body:await r.json()};};
@@ -207,3 +207,4 @@ test('owner control HTTP rejects extra keys and anonymous calls and never permit
   h.retire(4);await assert.rejects(h.execute(task,request),code('service_retired'));assert.equal((await h.original(task)).length,1);
  }finally{await h.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

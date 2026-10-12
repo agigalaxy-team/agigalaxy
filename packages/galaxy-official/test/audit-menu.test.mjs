@@ -26,6 +26,11 @@ test('native audit menu reads bounded pages, exports explicitly and confirms the
   for (const value of [readerId, subjectId, 'query,export', 'incident-001', '600']) page.onConfirm(value);
   await wait(() => page.kind === 'select' && page.options.some(o=>o.title==='允许本次内容与范围'));
   assert.deepEqual(prepared.subjectIds, [subjectId]); assert.deepEqual(prepared.actions, ['query', 'export']); assert.equal(approvals, 0);
-  assert.ok(page.title.includes(readerId));assert.ok(page.title.includes(subjectId));assert.equal(page.title.includes(preview.confirmation),false);
+  const scope = page.options.find(option => option.number === '1').description;
+  assert.ok(scope.includes(readerId)); assert.ok(scope.includes(subjectId)); assert.match(scope, /query/); assert.match(scope, /export/);
+  assert.equal(page.title.includes(preview.confirmation), false);
+  page.routes[2](); assert.equal(page.kind, 'info'); assert.ok(page.message.includes(preview.payloadJson)); assert.equal(approvals, 0);
+  page.onBack(); const oldAllow = page.routes[1];
   page.routes[1](); await wait(() => approvals === 1); assert.equal(prepared.lifetimeSeconds, 600);
+  oldAllow(); assert.equal(approvals, 1);
 });

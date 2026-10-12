@@ -35,6 +35,8 @@ import { contextV2ToolDefinitions } from './personal-mcp-context-v2.mjs';
 import { outcomeMaterialToolDefinitions } from './personal-mcp-outcome-materials-v2.mjs';
 import { trustPackageToolDefinitions } from './personal-mcp-trust-package.mjs';
 import {moderationToolDefinitions} from './personal-mcp-moderation-v2.mjs';
+import {communityToolDefinitions} from './personal-mcp-community-v1.mjs';
+import {readingBookmarkToolDefinitions} from './personal-mcp-reading-bookmarks-v1.mjs';
 
 const id=z.strictObject({id:z.uuid()});
 const signed=z.strictObject({signed:z.string().min(1).max(16384)});
@@ -53,6 +55,8 @@ function definitions(services,actor) {
     ...factToolDefinitions(services,actor),
     ...chatToolDefinitions(services,actor),
     ...moderationToolDefinitions(services,actor),
+    ...communityToolDefinitions(services,actor),
+    ...readingBookmarkToolDefinitions(services,actor),
     ...attachmentToolDefinitions(services,actor),
     ...capsuleToolDefinitions(services,actor),
     ...configurationToolDefinitions(services,actor),

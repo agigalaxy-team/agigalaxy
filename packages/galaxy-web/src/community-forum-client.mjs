@@ -2,11 +2,13 @@ import * as z from 'zod/v4';
 import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 import { forumWriteSpec } from '../../galaxy-official/src/shared/community-forum-v1-schema.mjs';
 import { bindForumIds } from '../../galaxy-official/src/shared/community-forum-ids-v1.mjs';
+import { forumTopicSchema,forumReadTopicSchema } from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 
 const draftSchema = z.strictObject({
   id: z.uuid(), revision: z.number().int().positive(),
   kind: z.enum(['create-post', 'publish-version', 'create-reply', 'withdraw-post', 'withdraw-version', 'withdraw-reply', 'create-report', 'supplement', 'withdraw-report', 'appeal', 'resolve']),
   title: z.string().default(''), body: z.string().default(''), linksText: z.string().default(''),
+  topic: forumReadTopicSchema.optional(),
   category: z.enum(['spam', 'harassment', 'privacy', 'misleading', 'other']).default('other'),
   target: z.record(z.string(), z.union([z.string(), z.number(), z.null()])).default({}),
   replyTo: z.strictObject({ replyId: z.uuid(), contentRevision: z.literal(1) }).nullable().default(null),
@@ -36,7 +38,8 @@ export function forumDraftPayload(value, { maxPermissionSeconds, maxGovernanceHi
   const draft = draftSchema.parse(value), target = draft.target;
   const base = { schemaVersion: 1, operationId: crypto.randomUUID() };
   const content = () => ({ versionId: crypto.randomUUID(), title: draft.title.trim(), body: draft.body.trim(),
-    links: draft.linksText.split(/\r?\n/).map(line => line.trim()).filter(Boolean), publishedUntil: now + maxPermissionSeconds });
+    links: draft.linksText.split(/\r?\n/).map(line => line.trim()).filter(Boolean), publishedUntil: now + maxPermissionSeconds,
+    ...(forumTopicSchema.safeParse(draft.topic).success?{topic:draft.topic}:{}) });
   switch (draft.kind) {
     case 'create-post': return { ...base, postId: crypto.randomUUID(), expectedHeadVersion: 0, ...content() };
     case 'publish-version': return { ...base, postId: target.postId, expectedHeadVersion: target.expectedHeadVersion, ...content() };
@@ -60,6 +63,9 @@ export function forumDraftPayload(value, { maxPermissionSeconds, maxGovernanceHi
 }
 
 export function forumError(reason) {
+  if (reason?.name === 'TypeError' && ['Failed to fetch', 'fetch failed', 'NetworkError when attempting to fetch resource.', 'Load failed'].includes(reason.message)) {
+    return '暂时无法连接社区，请检查网络后重试。';
+  }
   return ({ forum_scope_changed: '身份或连接已改变，请重新打开并核对原稿。', receipt_status_authority_changed: '身份或连接已改变；原稿和原操作仍分别保留。',
     connection_required: '请先连接当前身份。本机稿仍保留。', account_verification_required: '这次发表需要完成账号验证，本机稿已经保留。',
     verified_account_required: '这次发表需要完成账号验证，本机稿已经保留。', invalid_forum_payload: '请检查必填内容、字数、链接和准确目标后，再确认发表。',
@@ -83,6 +89,7 @@ export function forumError(reason) {
     consent_reauthorization_required: '原连接的授权不能继续。先查询原结果，再明确选择用当前连接继续同一操作。',
     not_found: '没有读到这项内容，或当前身份没有查看权限。', request_timeout: '等待超时，原结果可能尚未返回，请查询原操作。',
     forum_original_status_unavailable: '草稿所指的原操作暂不能核对。原记录仍保留，请先查询原结果，或明确停止本机重试。',
+    forum_cursor_mismatch: '浏览条件已改变，请从当前主题重新读取列表。',
   })[reason?.code ?? reason?.message] ?? (reason?.issues ? '请检查文字、链接和目标是否完整。' : reason?.message ?? '本次操作没有完成，请稍后重试。');
 }
 
@@ -317,6 +324,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
 
   return Object.freeze({
     check, draft, close() { closed = true; },
+    topics: () => publicCall('/v2/community/topics', null, 'GET'),
     posts: input => publicCall('/v2/community/posts/query', input ?? {}),
     post: postId => publicCall(`/v2/community/posts/${z.uuid().parse(postId)}`, null, 'GET'),
     version: (postId, versionId) => publicCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions/${z.uuid().parse(versionId)}`, null, 'GET'),

@@ -13,19 +13,21 @@ import {workerPackUseToolDefinitions} from '../src/personal-mcp-worker-pack-uses
 import {informationToolDefinitions} from '../src/personal-mcp-information-v2.mjs';
 import {targetGovernanceToolDefinitions} from '../src/personal-mcp-target-governance-v2.mjs';
 import {moderationToolDefinitions} from '../src/personal-mcp-moderation-v2.mjs';
+import {communityToolDefinitions} from '../src/personal-mcp-community-v1.mjs';
+import {readingBookmarkToolDefinitions} from '../src/personal-mcp-reading-bookmarks-v1.mjs';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
 
-const factories=[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions];
+const factories=[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions,communityToolDefinitions,readingBookmarkToolDefinitions];
 const invoke=(tools,name,input)=>tools[name].run(tools[name].inputSchema.parse(input));
 
 test('extended native HTTP reuses every canonical capability and preserves signed bytes without model confirmation or attachment bytes',async()=>{
  const calls=[],native=extendedNativeHttpDefinitions({call:async(...args)=>{calls.push(args);return{transport:'synthetic-routing-only'};}});
  const spy=new Proxy(()=>{}, {get:()=>spy,apply:()=>({transport:'canonical-shape-only'})});
  const canonical=Object.assign({},...factories.map(f=>f(spy,null)));
- assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,87);
+ assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,97);
  for(const[name,tool]of Object.entries(native)){
   assert.equal(tool.scope,canonical[name].scope,name);assert.equal(tool.write,canonical[name].write,name);assert.equal(tool.description,canonical[name].description,name);
  }
@@ -48,6 +50,11 @@ test('extended native HTTP reuses every canonical capability and preserves signe
  await invoke(native,'galaxy_moderation_receipt',{reportId:id,eventId:id,payloadHash:hash});
  assert.deepEqual(calls.at(-1),['/v1/moderation/reports/'+id+'/receipt',{eventId:id,payloadHash:hash}]);
  const samples={
+  galaxy_community_owned:[{topic:'technology'},'/v2/community/posts/owned'],
+  galaxy_bookmarks:[{kind:'forum-post'},'/v2/reading-bookmarks/query'],
+  galaxy_bookmark_status:[{reference:{kind:'forum-post',postId:id}},'/v2/reading-bookmarks/status'],
+  galaxy_bookmark_command:[{operationId:id,reference:{kind:'forum-post',postId:id},saved:true,expectedRevision:0},'/v2/reading-bookmarks/command'],
+  galaxy_bookmark_receipt:[{operationId:id,payloadHash:hash},'/v2/reading-bookmarks/receipt'],
   galaxy_configuration_v2_read:[{id,version:3},'/v2/configurations/read'],galaxy_configuration_v2_query:[{},'/v2/configurations/query'],
   galaxy_configuration_v2_versions:[{id,afterVersion:1},'/v2/configurations/versions'],galaxy_configuration_v2_receipt:[{operationId:id,payloadHash:hash},'/v2/configurations/receipt'],
   galaxy_builder_support_read:[{builderId:id},'/v2/builders/support/read'],galaxy_builder_pack_export:[{builderId:id,manifestId:id},'/v2/builders/pack/export'],
@@ -96,10 +103,26 @@ test('extended native HTTP reuses every canonical capability and preserves signe
   galaxy_target_governance_query:[{},'/v2/target-governance/query'],galaxy_target_governance_receipt:[{eventId:id,payloadHash:hash},'/v2/target-governance/receipt'],
   galaxy_moderation_config:[{},'/v1/moderation/config'],galaxy_moderation_query:[{},'/v1/moderation/reports/query'],
  };
- assert.equal(Object.keys(samples).length+Object.keys(writes).length+3,Object.keys(native).length,'every canonical leaf has a transport case');
+ assert.equal(Object.keys(samples).length+Object.keys(writes).length+3+5,Object.keys(native).length,'every canonical leaf has a transport case or local catalog check');
  for(const[name,[input,path,options]]of Object.entries(samples)){
   const parsed=native[name].inputSchema.parse(input);await native[name].run(parsed);assert.deepEqual(calls.at(-1),options?[path,null,options]:[path,parsed],name);
  }
+ const publicReads={
+  galaxy_community_query:[{topic:'technology',query:'selected topic'},'/v2/community/posts/query'],
+  galaxy_community_replies:[{postId:id,postVersionId:id},'/v2/community/replies/query'],
+  galaxy_community_versions:[{postId:id},'/v2/community/posts/'+id+'/versions'],
+ };
+ for(const[name,[input,path]]of Object.entries(publicReads)){
+  const parsed=native[name].inputSchema.parse(input);await native[name].run(parsed);
+  const expected=name==='galaxy_community_versions'?{limit:parsed.limit}:parsed;
+  assert.deepEqual(calls.at(-1),[path,expected,{authenticated:false}],name);
+ }
+ await invoke(native,'galaxy_community_read',{postId:id});
+ assert.deepEqual(calls.at(-1),['/v2/community/posts/'+id,undefined,{method:'GET',authenticated:false}]);
+ await invoke(native,'galaxy_community_read',{postId:id,versionId:id});
+ assert.deepEqual(calls.at(-1),['/v2/community/posts/'+id+'/versions/'+id,undefined,{method:'GET',authenticated:false}]);
+ const beforeCatalog=calls.length,topics=await invoke(native,'galaxy_community_topics',{});
+ assert.equal(calls.length,beforeCatalog);assert.equal(topics.items.length,5);assert.equal(topics.legacyTopic.id,'unclassified');
  assert.deepEqual(Object.keys(native).filter(n=>n.startsWith('galaxy_attachment_')).sort(),['galaxy_attachment_config','galaxy_attachment_owned','galaxy_attachment_read','galaxy_attachment_revoke']);
  assert.equal(native.galaxy_attachment_read.inputSchema.safeParse({attachmentId:id,base64:'payload'}).success,false);
  assert.equal(native.galaxy_attachment_owned.inputSchema.safeParse({roomId:id,path:'C:/private/file'}).success,false);

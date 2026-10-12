@@ -1,4 +1,5 @@
 import {dispatchCommunityForum} from './community-forum-http.mjs';
+import {dispatchReadingBookmarks} from './reading-bookmarks-http.mjs';
 import {dispatchHubs} from './hub-http.mjs';
 import {dispatchInformation} from './information-http.mjs';
 import {dispatchTargetGovernance} from './target-governance-http.mjs';
@@ -15,10 +16,11 @@ import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../
 import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
 import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
     if(await dispatchCommunityForum({forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
+    if(await dispatchReadingBookmarks({readingBookmarks,access,request,requestId,url,send,consumeSearchPage}))return;
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/challenges')
       return send(201,await receiptStatus.challenge(await body(request,null)));
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/query')

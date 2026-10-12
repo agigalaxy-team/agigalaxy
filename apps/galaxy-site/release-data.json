@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.18",
-  "releaseId": "0.1.18",
+  "version": "0.1.19",
+  "releaseId": "0.1.19",
   "component": "site",
-  "backendRelease": "0.1.13",
+  "backendRelease": "0.1.14",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -36,24 +36,24 @@
     "stableRelease": false
   },
   "completeBusinessAcceptance": false,
-  "publicApiObservedAt": "2026-10-11T22:12:07.163909+00:00",
+  "publicApiObservedAt": "2026-10-12T07:53:14.764380+00:00",
   "nativeClientDownload": {
-    "revision": "0.1.10",
+    "revision": "0.1.11",
     "channel": "development-candidate",
-    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.10/",
+    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.11/",
     "keysUrl": "https://agigalaxy.org/releases/keys.json",
     "kid": "galaxy-release-20260911",
     "jwkThumbprint": "mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4",
-    "signatureExpiresAt": "2026-11-10T21:45:28.000Z",
+    "signatureExpiresAt": "2026-11-11T07:33:26.000Z",
     "actualHostAcceptance": false,
     "humanAcceptance": false,
     "stableRelease": false,
     "package": {
       "name": "@galaxy/native-client",
-      "version": "0.1.10",
-      "filename": "galaxy-native-client-0.1.10.tgz",
-      "sha256": "60a8064170bf9d69b16b9ef0201e3df5be05a651d5653619d85401af46854286",
-      "bytes": 641792,
+      "version": "0.1.11",
+      "filename": "galaxy-native-client-0.1.11.tgz",
+      "sha256": "29c985621d81e904907cdc2e113cf1ae5ac809866c1b242443c9eb5b0b4919c4",
+      "bytes": 649957,
       "exports": [
         "./runtime",
         "./server",
@@ -68,13 +68,13 @@
         "canonicalize": "4.0.0",
         "@modelcontextprotocol/ext-apps": "2.0.0"
       },
-      "lockSha256": "9c38332cc4153d1d11d0c4c82a4cd66ba5ace5865dcf22aeb4740a568ecdcdd8",
-      "sourceHashesSha256": "28d29013ead57ca53632b03c6c955abc3c3ef2615f22d3639a716b8251e7a792"
+      "lockSha256": "b923391f978482fce4fdf03527ab203f27302a1c5c112a998c134ccc54a1fe0e",
+      "sourceHashesSha256": "bd8197dfcec24d5ed9305a02ebf7c8048b62299d97441e2a3f329c79984c9372"
     },
     "guides": {
-      "installation": "/docs/native-client/0.1.10/installation.md",
-      "hosts": "/docs/native-client/0.1.10/hosts.md",
-      "runtime": "/docs/native-client/0.1.10/runtime.md"
+      "installation": "/docs/native-client/0.1.11/installation.md",
+      "hosts": "/docs/native-client/0.1.11/hosts.md",
+      "runtime": "/docs/native-client/0.1.11/runtime.md"
     }
   },
   "historicalAccountObservation": {
@@ -85,28 +85,28 @@
     "verifiedIdentityProviderCount": 0
   },
   "observedDeployment": {
-    "releaseId": "0.1.13",
-    "observedAt": "2026-10-11T22:12:07.163909+00:00",
-    "schema": 81,
+    "releaseId": "0.1.14",
+    "observedAt": "2026-10-12T07:53:14.764380+00:00",
+    "schema": 83,
     "checks": {
       "healthz": {
         "status": 200,
-        "release": "0.1.13"
+        "release": "0.1.14"
       },
       "readyz": {
         "status": 200,
-        "release": "0.1.13"
+        "release": "0.1.14"
       },
       ".well-known/galaxy-network.json": {
         "status": 200,
-        "release": "0.1.13"
+        "release": "0.1.14"
       }
     },
-    "reportSha256": "cc000f1438accceb951e1b32554ac70011d30a9a572acee0d90bf69a0365f8df"
+    "reportSha256": "e8bf6db8ca98cc753db6ecdcdca1a497856336259630b30fcb5ad60cb17ffa3a"
   },
   "targetCompatibility": {
-    "apiRelease": "0.1.13",
-    "serviceArtifactSha256": "7ae906b05388fbe8cb1a7409b41d74656169724532f6db779e7a6099b9f10d45",
+    "apiRelease": "0.1.14",
+    "serviceArtifactSha256": "2e05182d331b3fc102b1dd9e70049a2666ff0c8a731d496c2f11345391c82726",
     "publicationProved": true
   },
   "currentAccountAvailability": {
@@ -257,10 +257,30 @@
         }
       },
       "reportSha256": "0257586cab85545a015e248503698ad2e1e62388244f773903681043eb9512a7"
+    },
+    {
+      "releaseId": "0.1.13",
+      "observedAt": "2026-10-11T22:12:07.163909+00:00",
+      "schema": 81,
+      "checks": {
+        "healthz": {
+          "status": 200,
+          "release": "0.1.13"
+        },
+        "readyz": {
+          "status": 200,
+          "release": "0.1.13"
+        },
+        ".well-known/galaxy-network.json": {
+          "status": 200,
+          "release": "0.1.13"
+        }
+      },
+      "reportSha256": "cc000f1438accceb951e1b32554ac70011d30a9a572acee0d90bf69a0365f8df"
     }
   ],
   "webGuides": {
     "accountAndComments": "https://agigalaxy.org/docs/web/0.1.11/account-and-comments.html",
-    "community": "https://agigalaxy.org/docs/web/0.1.12/community.html"
+    "community": "https://agigalaxy.org/docs/web/0.1.19/community.md"
   }
 }

@@ -104,6 +104,7 @@ def render_product_pages(site):
         '<a href="/how-it-works/"><h2>找帮助与交流</h2><p>发现经验、参与讨论、继续自己的工作。</p>' + arrow + '</a>'
         '<a href="/privacy/"><h2>资料与隐私</h2><p>分享、同步、设备、导出和删除。</p>' + arrow + '</a>'
         '<a href="' + escape(guides["installation"], quote=True) + '"><h2>安装客户端</h2><p>把银河接入所选的 AI 宿主。</p>' + arrow + '</a></nav>'
+        + (section("浏览与回找", '<p>按主题搜索讨论，继续草稿与阅读，收藏帖子、方法、项目和人物。</p>', site['GUIDE_PAGES']['community'], "社区与收藏说明") if site.get('GUIDE_PAGES', {}).get('community') else '')
         + section("开发与开放接入", '<p>协议与字段为实际接入提供参考。当前产品入口、版本化接口和旧发行说明各有自己的适用范围。</p>', "/app/builders", "打开建设者入口")
         + '<div class="reading-resources"><a href="/docs/builders-support-v2.md">接口说明</a><a href="/llms.txt">Agent 文档索引</a><a href="/docs/v0.4/overview.md">历史 v0.4 概览</a><a href="/changelog.md">发行记录</a></div>')
 
@@ -121,6 +122,7 @@ def render_product_pages(site):
         '<section class="missing-page"><span aria-hidden="true">404</span><h1>这里没有找到内容。</h1><p>地址可能已经改变，可以继续浏览或搜索。</p><a class="button" href="/app/">回到发现 ' + arrow + '</a><a class="text-link" href="/app/community">看看社区</a></section>')
     site["write"]("404.html", (out / "404/index.html").read_text(encoding="utf-8"))
 
+    community = metadata.get('webGuides', {}).get('community')
     guides = raw_guides
     site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。\n\n用户自己的模型负责理解、总结和判断，银河提供数据与交流服务。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
-    site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")
+    site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")

@@ -3,6 +3,8 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='galaxy_api') THEN CREATE ROLE galaxy_api NOLOGIN; END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO galaxy_api;
+GRANT SELECT,INSERT ON reading_bookmarks_v1,reading_bookmark_operations_v1 TO galaxy_api;
+GRANT UPDATE(saved,revision,saved_at,updated_at) ON reading_bookmarks_v1 TO galaxy_api;
 GRANT SELECT,INSERT ON task_materials_v1 TO galaxy_api;
 GRANT UPDATE(body_text,erased_at) ON task_materials_v1 TO galaxy_api;
 GRANT SELECT,INSERT ON chat_attachments TO galaxy_api;

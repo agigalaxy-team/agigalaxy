@@ -5,6 +5,8 @@ import {digest} from './shared/digest.mjs';
 import {assertForumIds} from './shared/community-forum-ids-v1.mjs';
 import {CommunityForumPermissionsV1,forumStamp,forumSeconds} from './community-forum-permissions-v1.mjs';
 import {CommunityForumBudgetV1} from './community-forum-budget-v1.mjs';
+import {forumTopics,forumUnclassifiedTopic} from './shared/community-forum-topics-v1.mjs';
+import {forumPageFor,forumPageAfter,forumMatchesQuery} from './community-forum-page-v1.mjs';
 import {defaultForumPolicy,forumPolicySchema,forumPolicyHash} from './community-forum-policy-v1.mjs';
 import {lockForumOperation,priorForumOperation,recordForumReceipt,recordForumAudit,forumReceiptWithin} from './community-forum-operations-v1.mjs';
 import {forumWriteSpec,parseForumPayload,forumCreatePostSchema,forumPublishVersionSchema,forumCreateReplySchema,
@@ -19,9 +21,11 @@ export class CommunityForumV1 {
   this.budget=new CommunityForumBudgetV1(access,accounts,publicWrites,{policy:this.policy,policyHash:this.policyHash});
  }
  clock(){return this.access.now();}
+ topics(){return {items:forumTopics,unclassified:forumUnclassifiedTopic,checkedAt:this.clock()};}
  async consentWithin(db,actor,authorization,signedIntent){return (await this.consents.createWithin(db,actor,signedIntent,authorization,{forum:true})).consentId;}
  async head(db,id,lock=false){return (await db.query(`SELECT * FROM forum_posts_v1 WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];}
- async version(db,postId,versionId,lock=false){return (await db.query(`SELECT v.*,e.payload_text,e.erased_at event_erased,p.state post_state,p.head_version,p.current_version_id
+ async version(db,postId,versionId,lock=false){return (await db.query(`SELECT v.*,e.payload_text,e.erased_at event_erased,p.state post_state,p.head_version,p.current_version_id,
+  p.created_at post_created_at,p.updated_at post_updated_at
   FROM forum_versions_v1 v JOIN forum_posts_v1 p ON p.id=v.post_id LEFT JOIN forum_events_v1 e ON e.id=v.publication_event_id
   WHERE v.id=$1 AND v.post_id=$2${lock?' FOR UPDATE OF v':''}`,[versionId,postId])).rows[0];}
  async reply(db,id,lock=false){return (await db.query(`SELECT r.*,e.payload_text,e.erased_at event_erased FROM forum_replies_v1 r
@@ -60,8 +64,8 @@ export class CommunityForumV1 {
    const headVersion=kind==='create-post'?1:head.head_version+1,locator={kind:'post-version',postId:p.postId,versionId:p.versionId,versionNumber:number},
     result={acknowledged:true,postId:p.postId,versionId:p.versionId,versionNumber:number,headVersion,permissionId:permit.id,publishedUntil:p.publishedUntil,authority:'accepted-operation-only'};
    await this.saveEvent(db,actor,{p,consentId,payloadJson,kind,accountId:state.account.id,result});
-   await db.query(`INSERT INTO forum_versions_v1(id,post_id,subject_id,account_id,version_number,publication_event_id,permission_id,payload_hash,published_until,state,created_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',$10)`,[p.versionId,p.postId,actor.subjectId,state.account.id,number,p.operationId,permit.id,digest(payloadJson),forumStamp(p.publishedUntil),at]);
+   await db.query(`INSERT INTO forum_versions_v1(id,post_id,subject_id,account_id,version_number,publication_event_id,permission_id,payload_hash,published_until,state,created_at,topic)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',$10,$11)`,[p.versionId,p.postId,actor.subjectId,state.account.id,number,p.operationId,permit.id,digest(payloadJson),forumStamp(p.publishedUntil),at,p.topic??null]);
    await db.query('UPDATE forum_posts_v1 SET current_version_id=$2,head_version=$3,updated_at=$4 WHERE id=$1',[p.postId,p.versionId,headVersion,at]);
    await this.complete(db,actor,authorization,{p,consentId,payloadJson,kind:'forum.post.publish',accountId:state.account.id,category:state.quota.category,locator,result});
    return {...result,quota:await this.budget.finishWithin(db,state)};
@@ -130,7 +134,10 @@ export class CommunityForumV1 {
   const state=await this.permissions.statusWithin(db,row.permission_id,{visibility:'Public',payloadHash:row.payload_hash,action:'forum.post.publish',objectId:versionId});
   if(!state.allowed||!row.payload_text||row.erased_at||row.event_erased)return unavailable(locator,state.reasons.includes('content-expired')?'expired':'unavailable',now);
   if(await this.hiddenWithin(db,{kind:'post-version',postId,versionId}))return unavailable(locator,'unavailable',now);
-  return {locator,authorId:row.subject_id,headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload:JSON.parse(row.payload_text),
+  const payload=JSON.parse(row.payload_text);
+  if((row.topic??null)!==(payload.topic??null))return unavailable(locator,'unavailable',now);
+  return {locator,authorId:row.subject_id,headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload,
+   topic:payload.topic??'unclassified',createdAt:forumSeconds(row.post_created_at),versionCreatedAt:forumSeconds(row.created_at),updatedAt:forumSeconds(row.post_updated_at),
    permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),checkedAt:now,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
  }
  async readReplyWithin(db,id,{parent=true}={}){
@@ -142,7 +149,7 @@ export class CommunityForumV1 {
   if(await this.hiddenWithin(db,{kind:'reply',replyId:id,contentRevision:1}))return unavailable(locator,'unavailable',now);
   let parentAvailability='unavailable';if(parent)try{parentAvailability=(await this.readVersionWithin(db,row.post_id,row.post_version_id)).availability;}catch(error){if(error.status!==404)throw error;}
   return {locator,authorId:row.subject_id,revision:row.revision,availability:'available',payload:JSON.parse(row.payload_text),permissionId:row.permission_id,
-   publishedUntil:forumSeconds(row.published_until),checkedAt:now,parentAvailability,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
+   publishedUntil:forumSeconds(row.published_until),createdAt:forumSeconds(row.created_at),checkedAt:now,parentAvailability,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
  }
  async versionsWithin(db,id,input={}){
   const q=validate(forumVersionsQuerySchema,input),head=await this.head(db,id);if(!head)throw new ServiceError('not_found',404);
@@ -160,10 +167,43 @@ export class CommunityForumV1 {
  getPost(id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return transaction(this.access.db,db=>this.headWithin(db,id));}
  getReply(id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return transaction(this.access.db,db=>this.readReplyWithin(db,id));}
  versions(id,input={}){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return transaction(this.access.db,db=>this.versionsWithin(db,id,input));}
- query(input={}){const q=validate(forumPostsQuerySchema,input);return transaction(this.access.db,async db=>{
+ async ownedSummaryWithin(db,actor,id){
+  const head=await this.head(db,id);if(!head||head.subject_id!==actor.subjectId)throw new ServiceError('not_found',404);
+  const current=head.current_version_id?await this.readVersionWithin(db,id,head.current_version_id):null;
+  const base={locator:{kind:'post',postId:id},authorId:actor.subjectId,headVersion:head.head_version,currentVersionId:head.current_version_id,
+   state:head.state,createdAt:forumSeconds(head.created_at),updatedAt:forumSeconds(head.updated_at),checkedAt:this.clock()};
+  if(current?.availability!=='available')return {...base,availability:head.state==='withdrawn'?'withdrawn':current?.availability??'unavailable'};
+  return {...current,...base};
+ }
+ /** @param {{subjectId:string}|null} [actor] */
+ async browseWithin(db,q,page,actor=null){
+  // Topic/time indexes locate candidates. Keyword matching happens only after
+  // current source checks, so an expired cached body cannot affect matches.
+  // The 200-candidate budget has an explicit continuation, never a false end.
+  const rows=(await db.query(`SELECT p.id,p.created_at FROM forum_posts_v1 p
+   LEFT JOIN forum_versions_v1 v ON v.id=p.current_version_id AND v.post_id=p.id
+   WHERE (($1::text IS NOT NULL AND p.subject_id=$1::text) OR
+    ($1::text IS NULL AND p.state='published' AND v.state='published' AND v.erased_at IS NULL AND v.published_until>$5::timestamptz))
+   AND ($2::text IS NULL OR COALESCE(v.topic,'unclassified')=$2::text)
+   AND ($3::timestamptz IS NULL OR (p.created_at,p.id)<($3::timestamptz,$4::uuid))
+   ORDER BY p.created_at DESC,p.id DESC LIMIT 201`,[actor?.subjectId??null,q.topic??null,page.afterAt,page.afterId,forumStamp(this.clock())])).rows;
+  const items=[];let scanned=null,processed=0;
+  for(const row of rows.slice(0,200)){
+   scanned=row;processed++;
+   const view=actor?await this.ownedSummaryWithin(db,actor,row.id):await this.headWithin(db,row.id);
+   const match=actor&&q.topic===undefined&&!q.query||forumMatchesQuery(view,q);
+   if(match&&(actor||view.availability==='available'))items.push(view);
+   if(items.length===q.limit)break;
+  }
+  const more=processed<rows.length;
+  return {items,nextAfter:more&&scanned?forumPageAfter(page,scanned):null,scanTruncated:more&&processed===200&&items.length<q.limit,
+   order:page.order,checkedAt:this.clock()};
+ }
+ query(input={}){const q=validate(forumPostsQuerySchema,input),page=forumPageFor(q);return transaction(this.access.db,async db=>{
+  if(page.order==='published')return this.browseWithin(db,q,page);
   const rows=(await db.query("SELECT id FROM forum_posts_v1 WHERE state='published' AND ($1::uuid IS NULL OR id>$1) ORDER BY id LIMIT 200",[q.after??null])).rows,items=[];let scanned=null;
   for(const row of rows){scanned=row.id;const view=await this.headWithin(db,row.id);if(view.availability==='available')items.push(view);if(items.length===q.limit)break;}
-  return {items,nextAfter:items.length===q.limit||rows.length===200?scanned:null,scanTruncated:rows.length===200&&items.length<q.limit,checkedAt:this.clock()};
+  return {items,nextAfter:items.length===q.limit||rows.length===200?scanned:null,scanTruncated:rows.length===200&&items.length<q.limit,order:page.order,checkedAt:this.clock()};
  });}
  replies(input){const q=validate(forumRepliesQuerySchema,input);return transaction(this.access.db,async db=>{
   if(!await this.version(db,q.postId,q.postVersionId))throw new ServiceError('not_found',404);
@@ -182,9 +222,11 @@ export class CommunityForumV1 {
   const row=await this.reply(db,id);if(!row||row.subject_id!==actor.subjectId)throw new ServiceError('not_found',404);const view=await this.readReplyWithin(db,id);
   return {locator:view.locator,authorId:actor.subjectId,revision:row.revision,state:row.state,permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),availability:view.availability,checkedAt:this.clock()};
  });}
- owned(actor,input={}){const q=validate(forumPostsQuerySchema,input);return this.access.runAuthorized(actor,'assistance',async db=>{
+ owned(actor,input={}){const q=validate(forumPostsQuerySchema,input),page=forumPageFor(q,actor.subjectId);return this.access.runAuthorized(actor,'assistance',async db=>{
+  if(page.order==='published')return this.browseWithin(db,q,page,actor);
   const rows=(await db.query('SELECT id,head_version,current_version_id,state FROM forum_posts_v1 WHERE subject_id=$1 AND ($2::uuid IS NULL OR id>$2) ORDER BY id LIMIT $3',[actor.subjectId,q.after??null,q.limit+1])).rows;
-  return {items:rows.slice(0,q.limit).map(row=>({locator:{kind:'post',postId:row.id},headVersion:row.head_version,currentVersionId:row.current_version_id,state:row.state,authorId:actor.subjectId,checkedAt:this.clock()})),nextAfter:rows.length>q.limit?rows[q.limit-1].id:null,checkedAt:this.clock()};
+  const items=[];for(const row of rows.slice(0,q.limit))items.push(await this.ownedSummaryWithin(db,actor,row.id));
+  return {items,nextAfter:rows.length>q.limit?rows[q.limit-1].id:null,order:page.order,checkedAt:this.clock()};
  });}
  receipt(actor,input){const p=validate(forumReceiptSchema,input);return this.access.runAuthorized(actor,actor.scopes?.includes('assistance')?'assistance':'moderation',db=>forumReceiptWithin(db,actor,p));}
 }

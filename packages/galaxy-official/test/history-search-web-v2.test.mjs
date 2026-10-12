@@ -27,7 +27,7 @@ test('history browser queries real visible facts and more than 64 loaded search 
       origin:{kind:'intervention',id:intervention.eventId,version:1},deliverableRefs:[],reportedOutcome:'failed',summary:'Failed synthetic result',limitations:'No production execution'};
     const resultGrant=await put(result);
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))},now:()=>f.now,
+    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
       fetch:async(url,options)=>{calls.push(new URL(url).pathname);return fetch(origin+new URL(url).pathname,options);}});
     history=createHistoryClient(runtime);search=createHelpSearchClient(runtime);
     const request=prepareHistoryQuery({subjectId:f.actor.subjectId,query:'History-browser',environment:'Windows',limit:50});
@@ -55,3 +55,4 @@ test('history browser queries real visible facts and more than 64 loaded search 
     await runtime.createIdentity({confirmed:true});await assert.rejects(history.query(request),/history_identity_changed/);
   }finally{history?.close();search?.close();runtime?.close();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

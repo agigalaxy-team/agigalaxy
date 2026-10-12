@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
+import {tsImport} from 'tsx/esm/api';
 import {assistanceRequestSchema} from '../../galaxy-official/src/shared/assistance-schema.mjs';
 import {taskRequestV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
-import {TaskRequestReading,taskReadingSection,taskRequestIntro} from '../src/task-request-reading.tsx';
+// Plain Node supports erased .ts types, but JSX needs the installed compiler.
+// Load the actual component in this scoped import; keep the rendering and all
+// original v1/v2 assertions on the product implementation.
+const {TaskRequestReading,taskReadingSection,taskRequestIntro}=await tsImport('../src/task-request-reading.tsx',import.meta.url);
 
 const legacy=()=>{
  const request=assistanceRequestSchema.parse({id:randomUUID(),caseId:randomUUID(),title:'原来的求助',

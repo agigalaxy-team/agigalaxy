@@ -109,6 +109,13 @@ def render_versioned_guides(site, metadata):
     if not guides:
         return {}
     source_pages = {source: page_path(source) for source in guides.values()}
+    community = metadata.get('webGuides', {}).get('community')
+    if community:
+        parsed = urlsplit(community)
+        if parsed.netloc and (parsed.scheme != 'https' or parsed.netloc != 'agigalaxy.org'):
+            raise ValueError('Community guide must belong to the public website')
+        community = parsed.path
+        source_pages[community] = page_path(community)
     version = metadata['nativeClientDownload']['package']['version']
     for kind, source in guides.items():
         raw_path = site['OUT'] / source.lstrip('/')
@@ -124,4 +131,18 @@ def render_versioned_guides(site, metadata):
                 '<a class="guide-original" href="' + escape(source, quote=True) + '">供 Agent 读取的 Markdown 原文</a></aside>' +
                 '<article class="guide-body" aria-label="' + escape(LABELS[kind], quote=True) + '">' + content + '</article></div>')
         site['page'](source_pages[source], title, 'Native ' + version + ' 的' + LABELS[kind] + '，按当前目的阅读与操作。', body)
-    return {kind: source_pages[source] for kind, source in guides.items()}
+    result = {kind: source_pages[source] for kind, source in guides.items()}
+    if community:
+        raw_path = site['OUT'] / community.lstrip('/')
+        if raw_path.is_symlink() or not raw_path.is_file():
+            raise ValueError('Community guide source missing')
+        title, content, headings = render_markdown(raw_path.read_text(encoding='utf-8'), community, source_pages)
+        sections = ''.join('<a href="#' + anchor + '">' + escape(label) + '</a>' for level, anchor, label in headings if level == 2)
+        body = ('<div class="guide-breadcrumb"><a href="/docs/">使用说明</a><span aria-hidden="true"> / </span><span>社区与收藏</span></div>' +
+                '<header class="guide-heading"><h1>' + escape(title) + '</h1></header>' +
+                '<div class="guide-layout"><aside class="guide-contents"><nav aria-label="本页目录"><strong>本页内容</strong>' + sections + '</nav>' +
+                '<a class="guide-original" href="' + escape(community, quote=True) + '">供 Agent 读取的 Markdown 原文</a></aside>' +
+                '<article class="guide-body" aria-label="社区与收藏说明">' + content + '</article></div>')
+        site['page'](source_pages[community], title, '按主题找到讨论，接续阅读并找回收藏。', body)
+        result['community'] = source_pages[community]
+    return result

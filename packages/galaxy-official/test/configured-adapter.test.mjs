@@ -91,7 +91,7 @@ for (const networkType of ['official','hub']) test(`native configured ${networkT
   t.after(() => adapter.close());
   await adapter.tui(api);
   const openConnection = async () => {
-    command('galaxy.open'); await wait(() => viewText().includes('当前工作'));
+    command('galaxy.open'); await wait(() => page?.kind === 'select' && page.options.some(option => option.value === '1' && option.title.includes('找帮助')));
     assert.ok(page.options.some(option => option.title.includes('回到原工作')));
     command('galaxy.choose.4'); await wait(() => viewText().includes('我的与设置'));
     command('galaxy.choose.6');
@@ -104,21 +104,21 @@ for (const networkType of ['official','hub']) test(`native configured ${networkT
   assert.equal(writes, 0); assert.ok(viewText().includes(endpoint));
   command('galaxy.choose.1'); command('galaxy.exit');
   await new Promise(resolve => setTimeout(resolve, 20)); assert.equal(page, null); assert.equal(writes, 0);
-  await openConnection(); await wait(() => viewText().includes('no-session'));
+  await openConnection(); await wait(() => viewText().includes('没有本机会话'));
   command('galaxy.choose.1'); await wait(() => page?.kind === 'select' && page.options.some(option => option.title.includes('允许这次连接')));
-  command('galaxy.choose.1'); await wait(() => page?.kind === 'select' && viewText().includes('session-local'));
+  command('galaxy.choose.1'); await wait(() => page?.kind === 'select' && viewText().includes('本机会话可用'));
   assert.equal(writes, 4);
   command('galaxy.choose.3');assert.ok(page.options.some(option=>option.title.includes('本人设备与绑定')));command('galaxy.choose.5');
   await wait(() => page?.kind === 'select' && page.title.startsWith('本机绑定回执'));
   assert.equal(page.options.filter(option=>option.value&&!option.disabled).length, 1); command('galaxy.choose.1');
   assert.match(page.message, /仅本机历史/); assert.equal(writes, 4); assert.equal(reads, 1);
-  command('galaxy.exit'); await openConnection(); await wait(() => viewText().includes('session-local'));
+  command('galaxy.exit'); await openConnection(); await wait(() => viewText().includes('本机会话可用'));
   command('galaxy.choose.2'); assert.match(viewText(), /服务信息签名有效/); assert.equal(reads, 1);
   release = null; const pending = command('galaxy.choose.1'); assert.equal(reads, 2);
   command('galaxy.exit'); assert.equal(page, null); release(); await pending;
   assert.equal(page, null);
   await openConnection(); assert.match(viewText(), /读取已取消/);
-  page.options[0].onSelect(); adapter.close();
+  page.options.find(option => option.value === '1').onSelect(); adapter.close();
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(reads, 2); assert.equal(page, null); assert.equal(layers.length, 0);
   await assert.rejects(adapter.tui(api));

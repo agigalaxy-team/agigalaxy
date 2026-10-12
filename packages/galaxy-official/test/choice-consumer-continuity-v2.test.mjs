@@ -20,7 +20,8 @@ async function fixture() {
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
     runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
       store:{get:async key=>{const value=structuredClone(data.get(key));if(onGet)await onGet(key,value);return value;},
-        put:async(key,value)=>{data.set(key,structuredClone(value));if(onPut)await onPut(key,value);}},
+        put:async(key,value)=>{data.set(key,structuredClone(value));if(onPut)await onPut(key,value);},
+        update:memoryAtomicUpdate(data,async(key,value)=>{if(onPut)await onPut(key,value);})},
       fetch:async(url,options)=>{const path=new URL(url).pathname;if(path==='/v2/choice-snapshots/put')writes.push(JSON.parse(options.body));const response=await fetch(origin+path,options);
         if(path==='/v2/choice-snapshots/put'&&dropAfterPut){dropAfterPut=false;throw new Error('synthetic lost ACK after actual put');}return response;}});
     await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
@@ -136,3 +137,4 @@ test('A confirmed cloud deletion does not turn an unknown earlier version into a
     assert.equal((await cloud.get(t.choice.id)).deleted,true);assert.equal(t.writes.length,1);assert.equal('content' in locator,false);
   }finally{cloud?.close();await t.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

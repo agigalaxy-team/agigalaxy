@@ -14,7 +14,7 @@ test('Two real web runtimes retain draft base, reconcile lost sync response and 
   const grant=await f.authorize(root,'case.teaser.publish',{objectId:id,visibility:'Public',purpose:'public-profile'});await f.cases.submitV2(f.actor,grant);
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
   const config={endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},wire=async(url,options)=>{const path=new URL(url).pathname;if(path==='/v2/choice-snapshots/put')writes.push(JSON.parse(options.body));const response=await fetch(origin+path,options);if(drop&&path==='/v2/choice-snapshots/put'){drop=false;throw new Error('synthetic lost response after server write');}return response;};
-  const store=data=>({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))});const aData=new Map();
+  const store=data=>({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)});const aData=new Map();
   a=await createWebRuntime(config,{store:store(aData),fetch:wire,now:()=>f.now});await a.createIdentity({confirmed:true});await a.connect({confirmed:true});
   // Synthetic same authorized identity in two independent runtime caches; this
   // exercises version conflicts, not a claim of physical device-enrolment QA.
@@ -49,3 +49,4 @@ test('Two real web runtimes retain draft base, reconcile lost sync response and 
   assert.equal((await ca.preferences()).enabled,false);
  }finally{ca?.close();cb?.close();ha?.close();hb?.close();a?.close();b?.close();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

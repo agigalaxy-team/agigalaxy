@@ -3,7 +3,7 @@ import {ContentCard,browseReturnPath,browseReturnLabel} from './public-browse-wo
 import {ArrowRight,BookOpen,X} from 'lucide-react';
 import {MemberAvatar,memberName,useMemberNames,readableTime} from './conversation-ui';
 import {CapsuleOperationStatus} from './capsule-operation-status';
-import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {createCapsuleWebClient,capsuleDeviceHasScope} from './capsule-workspace-client.mjs';
@@ -13,6 +13,8 @@ import {CapsuleAuthorPreview} from './capsule-author-preview';
 import {CapsuleApplication} from './capsule-application';
 import {CapsuleConsentControls} from './capsule-consent-controls';
 import {CapsuleAttributionResponses} from './capsule-attribution-responses';
+import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from './directory-reading-state.mjs';
 import {helpOriginLocator} from './help-origin-client.mjs';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
@@ -70,10 +72,14 @@ function isCapsulePreview(value:unknown):value is CapsulePreview{
 function readCapsuleUseRecord(client:CapsuleWorkspaceClient,input:Parameters<CapsuleWorkspaceClient['useRecord']>[0]){
   return client.useRecord(input);
 }
+function capsuleDirectoryScope(endpoint:string|undefined,subjectId:string|undefined,bindingId:string|undefined){
+  const params=new URLSearchParams(location.search);
+  return JSON.stringify(['capsules',endpoint,subjectId,bindingId,params.get('q')??'',params.get('view')==='mine']);
+}
 export function CapsuleWorkspace(props:WorkspaceProps){
   const view=useChoiceViewLease(props.runtime,props.subjectId),[navigationVersion,setNavigationVersion]=useState(0);
   useEffect(()=>{const changed=()=>setNavigationVersion(value=>value+1);addEventListener('popstate',changed);return()=>removeEventListener('popstate',changed);},[]);
-  const connectionKey=JSON.stringify([props.runtime?.api.endpoint,props.subjectId,props.connected,view.key,props.capsuleId,props.versionId,navigationVersion]);
+  const connectionKey=JSON.stringify([props.runtime?.api.endpoint,props.subjectId,props.connected,view.key,props.capsuleId,props.versionId,navigationVersion,!props.capsuleId?location.search:'']);
   return <CapsuleWorkspaceSession key={connectionKey} {...props} connected={props.connected&&!!view.lease} lease={view.lease} connectionKey={connectionKey}/>;
 }
 function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId,versionId,lease,connectionKey}:WorkspaceProps&{lease:ChoiceViewLease|null;connectionKey:string}){
@@ -127,6 +133,8 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
   },[previewOpen]);
   const epoch=useRef(0),active=useRef(true),operation=useRef(0),detailRead=useRef(0),directoryRead=useRef(0),originRead=useRef(0),working=useRef(false),
     pinnedVersion=useRef<string|undefined>(versionId),detailLoading=useRef(false),usePages=useRef(1),versionPages=useRef(1);
+  const initialDirectoryScope=capsuleDirectoryScope(runtime?.api.endpoint,subjectId,runtime?.api.snapshot()?.bindingId),
+    directoryPages=useRef(0),directoryRestore=useRef(!!directoryReadingState(initialDirectoryScope).anchorId);
   const current=useCallback((token:number)=>{if(!active.current||token!==epoch.current)return false;try{lease?.assertCurrent();return true;}catch{return false;}},[lease]);
   const assertCurrent=useCallback((token:number)=>{if(!current(token))throw Error('页面或身份已改变。');},[current]);
   const requiredClient=useCallback(()=>{if(!client)throw Error('请先连接当前身份。');assertCurrent(epoch.current);return client;},[client,assertCurrent]);
@@ -149,10 +157,23 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
   },[runtime,connected,lease,helpOrigin?.taskId,current,assertCurrent]);
   const find=useCallback(async(after?:string,token=epoch.current)=>{
     assertCurrent(token);const ticket=++directoryRead.current,params=new URLSearchParams(location.search);
-    const page=await requiredClient().query({query:params.get('q')??'',...(params.get('view')==='mine'&&subjectId?{authorId:subjectId}:{}),...(after?{after}:{}),limit:12});
+    const scope=capsuleDirectoryScope(runtime?.api.endpoint,subjectId,runtime?.api.snapshot()?.bindingId),
+      depth=after?1:directoryReadingState(scope).depth,rows:CapsuleDirectoryItem[]=[];
+    let cursor=after??null,pages=0;
+    for(let index=0;index<depth;index++){
+      const page=await requiredClient().query({query:params.get('q')??'',...(params.get('view')==='mine'&&subjectId?{authorId:subjectId}:{}),...(cursor?{after:cursor}:{}),limit:12});
+      if(!current(token)||ticket!==directoryRead.current)return;
+      rows.push(...page.items);cursor=page.nextAfter;pages++;if(!cursor)break;
+    }
     if(!current(token)||ticket!==directoryRead.current)return;
-    setItems(old=>after?[...old,...page.items]:page.items);setNext(page.nextAfter);setLoaded(true);
-  },[assertCurrent,requiredClient,subjectId,current]);
+    directoryPages.current=after?directoryPages.current+pages:pages;
+    setItems(old=>[...new Map((after?[...old,...rows]:rows).map(item=>[item.capsuleId,item])).values()]);setNext(cursor);setLoaded(true);
+    rememberDirectoryReading(scope,Math.max(1,directoryPages.current),directoryReadingState(scope).anchorId);
+  },[assertCurrent,requiredClient,subjectId,current,runtime]);
+  useLayoutEffect(()=>{
+    if(capsuleId||!loaded||!directoryRestore.current)return;
+    directoryRestore.current=false;return restoreDirectoryReading(initialDirectoryScope);
+  },[capsuleId,loaded,initialDirectoryScope]);
   const readDetail=useCallback(async(id=capsuleId,version=versionId,token=epoch.current,preserveInteraction=false)=>{
     assertCurrent(token);if(!id)throw Error('请选择一份方法。');
     const source=requiredClient();
@@ -293,6 +314,10 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
   const owned=!!subjectId&&detail?.authorId===subjectId,selectedVersion=versions.items.find(version=>version.versionId===detail?.versionId),
     appliedPreview=preview?.type==='use'&&preview.payload.kind!=='reference'?preview.payload:null,
     reverifiedPreview=appliedPreview?.kind==='reverify'?appliedPreview:null;
+  const directoryParams=new URLSearchParams(location.search),appliedQuery=directoryParams.get('q')??'',appliedMine=directoryParams.get('view')==='mine';
+  function openDirectoryItem(item:CapsuleDirectoryItem,path:string){
+    rememberDirectoryReading(capsuleDirectoryScope(runtime?.api.endpoint,subjectId,runtime?.api.snapshot()?.bindingId),Math.max(1,directoryPages.current),'directory-capsules-'+item.capsuleId);navigate(path);
+  }
   return (
     <section className={capsuleId?'method-detail':'directory-page'} aria-busy={busy}>
       {capsuleId&&<a className="back-link" href={browseReturnPath('/app/capsules')} onClick={e=>{e.preventDefault();navigate(browseReturnPath('/app/capsules'));}}>← {browseReturnLabel('/app/capsules')}</a>}
@@ -337,7 +362,8 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
               仅我发布的
             </label>
           </form>
-          <div className="content-grid">{items.map(item=><ContentCard key={item.capsuleId} kind="capsules" item={item} navigate={navigate}/>)}</div>
+          {(appliedQuery||appliedMine)&&<p className="browse-note">当前范围：{appliedMine?'我发布的方法':'所有当前可读方法'}{appliedQuery?' · '+appliedQuery:''} <button type="button" disabled={busy} onClick={()=>navigate('/app/capsules')}>清除，浏览全部方法</button></p>}
+          <div className="content-grid">{items.map(item=><ContentCard key={item.capsuleId} kind="capsules" item={item} navigate={path=>openDirectoryItem(item,path)} saveForLater={<SaveForLaterButton runtime={runtime} connected={bound} subjectId={subjectId} reference={{kind:'capsule',capsuleId:item.capsuleId,versionId:item.versionId}} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}/>)}</div>
           {loaded&&!items.length&&!error&&<div className="directory-empty"><BookOpen size={30}/><h2>{query?'没有找到符合条件的方法':'还没有可浏览的公开方法'}</h2><p>{query?'试试不同的问题模式或标题。':'作者整理并公开方法后，你可以在这里阅读它的做法、适用环境和来源。'}</p><a href="/how-it-works/">了解方法如何成为下一份帮助 <ArrowRight size={15}/></a></div>}
           {next && (
             <Button
@@ -355,6 +381,7 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
           {!detail&&!readError&&<p className="empty-state"><output>正在打开这份方法…</output></p>}
           {detail&&<>
             <div className="method-reading-meta"><MemberAvatar subjectId={detail.authorId}/><span>{memberName(detail.authorId,subjectId,(detail.authorId?memberNames[detail.authorId]:undefined)??undefined)}</span><span>第 {detail.version?.version??selectedVersion?.version??'所选'} 版</span>{detail.synthetic&&<span className="tag">合成演示</span>}{detail.sourceStatus&&detail.sourceStatus!=='current'&&<span>{detail.sourceStatus?capsuleLabel(detail.sourceStatus):'尚未读取'}</span>}</div>
+            {detail.version&&detail.versionId&&<SaveForLaterButton runtime={runtime} connected={bound} subjectId={subjectId} reference={{kind:'capsule',capsuleId:detail.capsuleId,versionId:detail.versionId}} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
             {newerVersion&&<p className="method-new-version">另有第 {newerVersion.version} 版可读。<button type="button" className="text-link" onClick={()=>navigate(exactCapsulePath(capsuleId,newerVersion.versionId))}>阅读新版 →</button></p>}
             <article className="method-prose">
               {detail.version?<>

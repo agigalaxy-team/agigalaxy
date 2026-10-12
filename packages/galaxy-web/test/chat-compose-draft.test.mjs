@@ -16,7 +16,7 @@ test('legacy text and exact compose choices survive reopening; another person’
  const reply={...source(f.subjectId),text:'controlled source must never be persisted'},file=attachment();
  a.change({reply,attachments:[file],edit:{...source(f.subjectId),revision:3,text:'my own edited words'}});await a.flush();a.close();
  assert.equal(JSON.stringify(f.canonical()).includes('controlled source'),false);
- const reopened=f.store();await reopened.start();assert.equal(reopened.read().value.text,'my unsent words');assert.deepEqual(reopened.read().value.reply,((({text,...rest})=>rest)(reply)));assert.deepEqual(reopened.read().value.attachments,[file]);assert.equal(reopened.read().value.edit.text,'my own edited words');
+ const reopened=f.store();await reopened.start();assert.equal(reopened.read().value.text,'my unsent words');assert.deepEqual(reopened.read().value.reply,((({text:_text,...rest})=>rest)(reply)));assert.deepEqual(reopened.read().value.attachments,[file]);assert.equal(reopened.read().value.edit.text,'my own edited words');
 });
 test('two tabs retain both inputs across refresh and merge only untouched choices',async()=>{
  const f=fixture(),a=f.store('a'),b=f.store('b');await Promise.all([a.start(),b.start()]);

@@ -78,6 +78,21 @@ async function fixture({legacyFault=null,legacyKind='cancel',legacySpaced=false}
 }
 const input={kind:'cancel',reason:'Explicit synthetic original work cancellation'};
 
+test('receipt kind/participation metadata and unknown fields cannot falsely acknowledge the retained original control',async()=>{
+ const h=await fixture();try{
+  const client=createTaskOwnerControlClient(h.runtime,h.task.taskId,{now:()=>h.f.now}),preview=await client.prepare(input);h.loseAck();
+  await assert.rejects(client.confirm(preview,{confirmed:true}));const writes=h.writes.length;
+  for(const change of [{kind:'close'},{participationId:randomUUID()},{participationVersion:-1},{contentReturned:true}]){
+   const r={...h.runtime,api:{...h.runtime.api,call:async(path,...args)=>{const value=await h.runtime.api.call(path,...args);
+    return path==='/v2/tasks/receipt'?{...value,...change}:value;}}};
+   const corrupt=createTaskOwnerControlClient(r,h.task.taskId,{now:()=>h.f.now});
+   await assert.rejects(corrupt.reconcile(),error=>error.code==='task_owner_control_record_invalid');corrupt.close();
+   assert.equal((await h.journal())[0].pending.operationId,preview.operationId);assert.equal(h.writes.length,writes);assert.equal(await h.count(),1);
+  }
+  assert.equal((await client.reconcile()).state,'acknowledged');assert.equal((await h.journal())[0].pending,null);assert.equal(h.writes.length,writes);
+ }finally{await h.close();}
+});
+
 test('same-ID recovery reads partial original facts then separately confirms the durable precise control intent',async()=>{
  const h=await fixture();try{const reader=createTaskOwnerReadClient(h.runtime,h.task.taskId,{now:()=>h.f.now}),p=await reader.prepare();
   const partial=await reader.read(p,{confirmed:true});assert.equal(partial.taskWriteGranted,false);assert.equal(partial.events[0].payloadJson,h.original.payloadJson);

@@ -8,7 +8,7 @@ import {browserScopes} from '../src/browser-client.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 test('Browser help composition and local choice versions use actual API, survive source failure and never imply application or cloud sync',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();
-  const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))};
+  const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)};
   let runtime,client,taskFailure=true;const requests=[];
   try{
     const id=randomUUID(),root={schemaVersion:2,kind:'case-created',eventId:id,caseId:id,expectedVersion:0,actorId:f.actor.subjectId,
@@ -45,3 +45,4 @@ test('Browser help composition and local choice versions use actual API, survive
     taskFailure=false;
   }finally{client?.close();runtime?.close();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

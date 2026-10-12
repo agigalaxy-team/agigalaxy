@@ -139,7 +139,10 @@ export async function nativeWorkerFixture() {
     }
     await createComposition();
     const raw = (name, args = {}) => composition.sdk.callTool({ name, arguments: args });
-    const call = async (name, args) => { const response = await raw(name, args), data = JSON.parse(response.content[0].text);
+    // Successful Worker panels expose structuredContent. The directly composed
+    // choice protocol and its errors retain their original JSON text envelope.
+    const machine = response => response.structuredContent ?? JSON.parse(response.content[0].text);
+    const call = async (name, args) => { const response = await raw(name, args), data = machine(response);
       assert.equal(response.isError ?? false, false, JSON.stringify(data)); return data; };
     const prepare = async input => (await call('galaxy_worker_host_prepare', input)).preview;
     const choose = async (preview, answer = 'allow') => {
@@ -147,7 +150,11 @@ export async function nativeWorkerFixture() {
       const first = await call('galaxy_worker_host_execute', input);
       if (first.kind === 'galaxy-worker-panel') return first;
       assert.equal(first.state, 'user-choice-needs-browser');
-      const html = await (await fetch(first.url)).text(); assert.ok(html.includes(preview.associationId));
+      const html = await (await fetch(first.url)).text(); assert.ok(html.includes('下载本次完整操作'));
+      const diagnostic = await (await fetch(first.url+'?download=1')).json();
+      assert.equal(diagnostic.input.preview.associationId,preview.associationId);
+      assert.equal(diagnostic.input.previewHash,preview.previewHash);
+      assert.deepEqual(diagnostic.input.preview.exact,preview.exact);
       const response = await fetch(first.url, { method: 'POST', headers: { Origin: new URL(first.url).origin,
         'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=' + answer });
       assert.equal(response.status, 200);
@@ -232,7 +239,7 @@ export async function verifyNativeWorkerPack() {
     const unknownInput = { ...await x.fact('原Worker请求已执行但ACK未知'), text: JSON.stringify({ operation: 'sum', values: [7, 8] }) };
     const unknown = await x.prepare(unknownInput); x.processWorker.state.loseSendAck = true;
     const unknownResult = await x.chooseRaw(unknown); assert.equal(unknownResult.isError, true);
-    assert.equal(JSON.parse(unknownResult.content[0].text).associationId, unknown.associationId);
+    assert.equal((unknownResult.structuredContent ?? JSON.parse(unknownResult.content[0].text)).associationId, unknown.associationId);
     await x.restart();
     assert.equal((await x.flow.read(unknown.associationId)).peer.status, 'unknown');
     const repeated = await x.raw('galaxy_worker_host_prepare', unknownInput); assert.equal(repeated.isError, true);

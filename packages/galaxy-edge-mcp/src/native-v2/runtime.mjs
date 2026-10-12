@@ -165,7 +165,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
  async function ensure(){await syncSelection();
   const permission=selection.permission;if(!permission?.enabled||permission.subjectId!==active?.subjectId||permission.deviceId!==active?.deviceId)throw new Error('native_connection_choice_required');
   if(api.snapshot())return;await connect({confirmed:true,restore:true});}
- async function call(path,input,options){await ensure();const lease=await sharedLease();
+ async function call(path,input,options){if(options?.authenticated!==false)await ensure();const lease=await sharedLease();
   try{const result=await api.call(path,input,options);await lease.assertCurrent();return result;}
   catch(error){await lease.assertCurrent();throw error;}}
  async function authorize(input,{confirmed=false}={}){
@@ -191,6 +191,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   if(object.kind==='room')return call('/v2/chat/rooms/'+object.id+'/read',{});
   if(object.kind==='project')return call('/v2/projects/'+object.id,undefined,{method:'GET'});
   if(object.kind==='capsule')return call('/v2/capsules/read',{capsuleId:object.id,...(object.versionId?{versionId:object.versionId}:{})});
+  if(object.kind==='post')return call('/v2/community/posts/'+object.id+(object.versionId?'/versions/'+object.versionId:''),undefined,{method:'GET',authenticated:false});
   return{state:'browser-detail-required',object};}});
  async function status({restoreSelected=false}={}){await syncSelection();let connectionError=null;
   if(restoreSelected&&!api.snapshot()&&selection.permission?.enabled===true){

@@ -55,9 +55,9 @@ test('native adapter filters history and confirms authorized and local-draft sub
     await initializeGalaxyIntegration(directory, { profile: 'coding-case', source: 'test' });
     await createGalaxyAdapter(controller, { readCaseSubmission: async () => draft }).tui(api);
     const openConnection = async () => {
-      command('galaxy.open'); await wait(() => viewText().includes('当前工作'));
+      command('galaxy.open'); await wait(() => page?.kind === 'select' && page.options.some(option => option.value === '1' && option.title.includes('找帮助')));
       command('galaxy.choose.4'); await wait(() => viewText().includes('我的与设置'));
-      command('galaxy.choose.6'); await wait(() => viewText().includes('session-local'));
+      command('galaxy.choose.6'); await wait(() => viewText().includes('本机会话可用'));
     };
     await openConnection();
     command('galaxy.choose.4'); await wait(() => viewText().includes('履历筛选'));
@@ -92,7 +92,7 @@ test('native adapter filters history and confirms authorized and local-draft sub
     command('galaxy.choose.1');await wait(()=>page.kind==='alert');page.onConfirm();await wait(()=>viewText().includes('履历后续操作'));
     command('galaxy.choose.5');await wait(()=>viewText().includes('Case独立处理'));assert.match(viewText(),/case/);
     command('galaxy.zero');await wait(()=>viewText().includes('可见履历'));
-    command('galaxy.zero'); await wait(() => viewText().includes('session-local'));
+    command('galaxy.zero'); await wait(() => viewText().includes('本机会话可用'));
     command('galaxy.choose.5'); await wait(() => page.kind === 'select' && page.options.some(option => option.title.includes('允许本次内容与范围')));
     assert.match(viewText(), /Selected work revision/); assert.equal(submissions.length, 0);
     command('galaxy.choose.2'); await wait(() => page.kind === 'alert');
@@ -104,15 +104,15 @@ test('native adapter filters history and confirms authorized and local-draft sub
     assert.equal(submissions[0].confirmation, 'CONFIRM fixture');
     await oldAllow(); assert.equal(submissions.length, 1);
     await wait(() => page.kind === 'alert' && page.message.includes('工作内容已保存'));
-    page.onConfirm(); await wait(() => viewText().includes('session-local'));
+    page.onConfirm(); await wait(() => viewText().includes('本机会话可用'));
     command('galaxy.choose.6'); await wait(() => viewText().includes('本地草稿'));
     command('galaxy.choose.1'); assert.match(viewText(), /选择可见性/);
     command('galaxy.choose.2'); await wait(() => page.kind === 'select' && page.options.some(option => option.title.includes('允许本次内容与范围')));
     assert.match(viewText(), /可见范围：所有人/); assert.equal(publications.length, 0);
     command('galaxy.choose.1'); await wait(() => publications.length === 1);
     assert.equal(publications[0].confirmation, 'PUBLISH fixture');
-    await wait(()=>page.kind==='alert');page.onConfirm();await wait(()=>viewText().includes('session-local'));
-    command('galaxy.choose.3');await wait(()=>viewText().includes('数据管理'));
+    await wait(()=>page.kind==='alert');page.onConfirm();await wait(()=>viewText().includes('本机会话可用'));
+    command('galaxy.choose.3');await wait(()=>viewText().includes('设备与本人资料'));
     assert.ok(page.options.some(option=>option.title.includes('我的资料')));
     command('galaxy.choose.6');await wait(()=>page.kind==='select'&&viewText().includes('我的资料'));
     assert.match(viewText(),/自述（未经认证）/);assert.match(viewText(),/事实派生履历/);

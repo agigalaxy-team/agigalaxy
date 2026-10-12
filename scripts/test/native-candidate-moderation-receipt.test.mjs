@@ -35,7 +35,7 @@ test('fixed native artifact calls the canonical original moderation receipt over
   const [ct,st]=InMemoryTransport.createLinkedPair();await server.connect(st);await client.connect(ct);
   const list=await client.listTools();assert.equal(list.tools.find(t=>t.name==='galaxy_moderation_receipt')?.annotations?.readOnlyHint,true);
   const query={reportId:report.id,eventId:report.id,payloadHash:digest(signed.payloadJson)};
-  const invoke=async args=>{const result=await client.callTool({name:'galaxy_moderation_receipt',arguments:args});assert.notEqual(result.isError,true,JSON.stringify(result));return JSON.parse(result.content[0].text);};
+  const invoke=async args=>{const result=await client.callTool({name:'galaxy_moderation_receipt',arguments:args});assert.notEqual(result.isError,true,JSON.stringify(result));assert.ok(result.structuredContent);return result.structuredContent;};
   const accepted=await invoke(query);assert.equal(accepted.state,'acknowledged');assert.deepEqual(accepted.receipt,{reportId:report.id,eventId:report.id,version:1});
   assert.equal(accepted.currentAccessGranted,false);assert.equal(accepted.contentReturned,false);assert.equal(JSON.stringify(accepted).includes(report.summary),false);
   assert.deepEqual(calls[0],{path:'/v1/moderation/reports/'+report.id+'/receipt',input:{eventId:report.id,payloadHash:query.payloadHash}});

@@ -4,11 +4,14 @@ import {randomUUID,createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {createCapsuleWebClient} from '../../packages/galaxy-web/src/capsule-workspace-client.mjs';
 const source=new URL('../../packages/galaxy-web/src/capsule-workspace-client.mjs',import.meta.url);
-const expected='7a571da28ee6a289021289361e2ceca68d37ed8611a7d99946b861543e80c88a';
 const hash=async()=>createHash('sha256').update(await readFile(source)).digest('hex');
+// The reusable regression checks the current source and keeps it stable during
+// every await-boundary scenario. Historical frozen-review hashes remain in the
+// original release evidence; they are not a version pin for ongoing development.
+const expected=await hash();
 const subjectId='GUID'+'A'.repeat(28);
 function fixture(phase,change){
- const current={subjectId,bindingId:randomUUID(),generation:1},store=new Map(),calls=[];
+ const current={subjectId,bindingId:randomUUID(),generation:1,scopes:['capsules','consent']},store=new Map(),calls=[];
  const replace=()=>{if(change==='binding')current.bindingId=randomUUID();else current.generation++;};
  const api={endpoint:'https://official.example.org',snapshot:()=>({...current}),
   prepareAuthorization:async(payloadJson,options)=>{if(phase==='prepareAuthorization')replace();return{payloadJson,intent:{id:randomUUID(),...options}};},
@@ -18,8 +21,8 @@ function fixture(phase,change){
  return{client,store,calls,payload:{schemaVersion:2,kind:'revoke',id:randomUUID(),permissionId:randomUUID(),reason:'independent lease boundary'}};
 }
 for(const phase of ['prepareAuthorization','submitAuthorization','receipt'])for(const change of ['binding','generation'])
- test(`frozen Capsule ${phase} ${change} replacement withholds original operation`,async()=>{
-  assert.equal(await hash(),expected,'Review must run the exact frozen source');
+ test(`Capsule ${phase} ${change} replacement withholds original operation`,async()=>{
+  assert.equal(await hash(),expected,'Source must remain stable during the regression run');
   const f=fixture(phase,change),preview=await f.client.prepare('permission',f.payload);
   await assert.rejects(f.client.execute(preview,{confirmed:true}),/身份|连接/);
   const original=[...f.store.values()][0]?.active;

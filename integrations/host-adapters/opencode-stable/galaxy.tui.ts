@@ -1136,7 +1136,7 @@ return {
         routes:{1:async()=>{try{const initialized=await store.initializeGalaxyIntegration(dataDirectory,{initializationPath:'personal-galaxy',source:'opencode-native-tui'});await showConsole(initialized);}catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}}},onBack:onReturn});
     }
 
-    function purpose(kind: 'search' | 'messages' | 'publish', onBack: Action) {
+    function purpose(kind: 'search' | 'messages' | 'publish' | 'community', onBack: Action) {
       const version=++connectionGeneration;
       purposeMenu?.close();
       if(!nativeTools&&kind==='search'&&!connectionController?.querySearch){
@@ -1158,6 +1158,7 @@ return {
           { number: '1', title: chinese ? '找帮助' : 'Find help', description: chinese ? '说明目标，直接查看当前可用的帮助。' : 'Describe a goal and read currently available help.' },
           { number: '2', title: chinese ? '发起求助' : 'Ask for help', description: chinese ? '沿用当前工作准备需要的协助。' : 'Prepare a request from the current work.' },
           { number: '3', title: chinese ? '消息' : 'Messages', description: chinese ? '查看对话，做必要回复。' : 'Read conversations and reply when needed.' },
+          ...(nativeTools ? [{ number: '6', title: chinese ? '逛社区' : 'Browse community', description: chinese ? '按主题阅读讨论，保留原工作。' : 'Browse discussions by topic and retain your original work.' }] : []),
           { number: '4', title: chinese ? '我的与设置' : 'My settings', description: chinese ? '身份、连接、资料和显示偏好。' : 'Identity, connection, data and display preferences.' },
           { number: '5', title: chinese ? '回到原工作' : 'Return to original work', description: '' },
         ],
@@ -1167,6 +1168,7 @@ return {
           3: () => purpose('messages',reopen),
           4: () => showSettings(reopen),
           5: closeGalaxy,
+          6: () => purpose('community',reopen),
           0: closeGalaxy,
         },
         onBack: closeGalaxy,

@@ -64,6 +64,7 @@ const WorkOverview = lazy(() => import('./account-center').then(module => ({defa
 import {ProjectDirectoryWorkspace,browseReturnPath,browseReturnLabel} from './public-browse-workspace';
 import {TaskTerms} from './task-budget-fields';
 const CommunityForumWorkspace = lazy(() => import('./community-forum-workspace').then(module => ({default: module.CommunityForumWorkspace})));
+const ReadingBookmarksWorkspace = lazy(() => import('./reading-bookmarks-workspace').then(module => ({default: module.ReadingBookmarksWorkspace})));
 const CommunityTaskReturn = lazy(() => import('./community-forum-workspace').then(module => ({default: module.CommunityTaskReturn})));
 
 type Runtime = Awaited<ReturnType<typeof createWebRuntime>>;
@@ -76,6 +77,7 @@ function TaskAuthor({runtime,subjectId,connected,task,navigate}:{runtime:Runtime
 }
 const entries = [{ path: '/app/match', label: '发现匹配', icon: Compass }, { path: '/app/publish', label: '发布任务', icon: Plus },
   { path: '/app/community', label: '社区', icon: MessagesSquare },
+  { path: '/app/bookmarks', label: '我的收藏', icon: FileText },
   { path: '/app/participate', label: '参与任务', icon: Handshake }, { path: '/app/rooms', label: '聊天', icon: MessagesSquare },
   { path: '/app/projects', label: '项目与联系', icon: Compass },
   { path: '/app/history', label: '履历与贡献', icon: Compass },
@@ -348,7 +350,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     if (enteringIdentity && new URL(target, location.origin).searchParams.get('section') === 'account') setAccountVerificationVisit(value => value + 1);
     const targetPath=new URL(target,location.origin).pathname;
     const fromParameters=new URLSearchParams(location.search);
-    const fromDirectory=['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)&&!fromParameters.has('mode')&&!fromParameters.has('compose');
+    const fromDirectory=['/app/','/app/work','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/bookmarks','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)&&!fromParameters.has('mode')&&!fromParameters.has('compose');
     const toObject=/^\/app\/(tasks|capsules|projects|community|rooms|people)\/[^/]+/.test(targetPath);
     const browseReturn=fromDirectory&&toObject?from:(enteringIdentity||toObject?history.state?.browseReturn:undefined);
     history.pushState({from,...profileNavigationState(from,target,history.state??{}),...(identityReturn?{identityReturn}:{}),...(browseReturn?{browseReturn}:{})}, '', target);
@@ -561,9 +563,10 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         <Suspense fallback={<PageLoading label="正在打开页面…"/>}>
         {!knownPath && <section><h1 className="small">找不到这个页面</h1><p>链接没有对应的银河页面。可以回到首页选择入口，或让原聊天中的模型核对对象地址。</p><Button onClick={() => navigate('/app/')}>回到首页</Button></section>}
         {(path === '/app/' || path === '/app') && <StartPage runtime={runtime} navigate={navigate}/>}
-        {forumPage && runtime && <CommunityForumWorkspace key={`forum:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} postId={forumPostRoute?.[1]} versionId={forumPostRoute?.[2]} replyId={forumReplyRoute?.[1]} reportId={forumReportRoute?.[1]} section={projectParameters.get('section') ?? 'all'} compose={projectParameters.get('compose') === 'post'} manage={projectParameters.get('manage') === '1'}/>}
+        {forumPage && runtime && <CommunityForumWorkspace key={`forum:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} postId={forumPostRoute?.[1]} versionId={forumPostRoute?.[2]} replyId={forumReplyRoute?.[1]} reportId={forumReportRoute?.[1]} section={projectParameters.get('section') ?? 'all'} compose={projectParameters.get('compose') === 'post'} manage={projectParameters.get('manage') === '1'} routeSearch={routeSearch} browseReturn={browseReturnPath('/app/community')} browseReturnLabel={browseReturnLabel('/app/community')}/>}
         {!runtime&&!configError&&path!=='/app/'&&path!=='/app'&&<PageLoading label="正在读取连接与本机资料…"/>}
         {runtime&&<>
+        {path==='/app/bookmarks'&&<ReadingBookmarksWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} onNeedIdentity={needIdentity} search={routeSearch}/>}
         {taskLoading&&!task&&/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)&&<PageLoading label="正在读取这项求助…"/>}
         {!taskLoading&&!task&&runtime&&/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)&&<section className={connected&&recoverTaskRecords?'task-records-return':'object-unavailable'}>
           {connected&&recoverTaskRecords?<><button className="back-link" onClick={()=>setRecoverTaskRecords(false)}>← 返回原请求入口</button>

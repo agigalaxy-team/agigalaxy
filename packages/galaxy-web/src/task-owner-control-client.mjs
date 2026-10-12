@@ -55,12 +55,15 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
   await validateRecord(lease,value);return value;
  }
  function validateReceipt(record,receipt,exactVersion=true){
-  const keys=new Set(['taskId','eventId','payloadHash','state','checkedAt','version','participationVersion','authority']);
+  const keys=new Set(['taskId','eventId','payloadHash','state','checkedAt','version','participationVersion','participationId','kind','authority']);
   if(!receipt||Object.keys(receipt).some(k=>!keys.has(k))||!['absent','acknowledged','conflict'].includes(receipt.state)
    ||receipt.taskId!==taskId||receipt.eventId!==record.operationId||receipt.payloadHash!==record.payloadHash
    ||receipt.authority!=='accepted-event-only; not-current-authorization'||!Number.isSafeInteger(receipt.checkedAt)
    ||receipt.state==='acknowledged'&&(!Number.isSafeInteger(receipt.version)||receipt.version<1
-    ||exactVersion&&receipt.version!==record.expectedTaskVersion+1))invalid();return receipt;
+    ||exactVersion&&receipt.version!==record.expectedTaskVersion+1)
+   ||receipt.kind!==undefined&&receipt.kind!==record.kind
+   ||receipt.participationId!==undefined&&receipt.participationId!==null&&(!uuid(receipt.participationId)||['cancel','close'].includes(record.kind))
+   ||receipt.participationVersion!==undefined&&receipt.participationVersion!==null&&(!Number.isSafeInteger(receipt.participationVersion)||receipt.participationVersion<1))invalid();return receipt;
  }
  const query=async(lease,record)=>validateReceipt(record,await wait(lease,()=>runtime.api.call('/v2/tasks/receipt',ref(record))));
  const legacyBlocked=()=>fail('task_owner_control_legacy_pending','请先查询原任务队列中的准确操作；未知或冲突不会另建授权。需要另起操作时，请先独立停止原本机重试并核对原回执。');

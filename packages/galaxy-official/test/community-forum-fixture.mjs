@@ -11,13 +11,13 @@ import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {createServices} from '../src/services.mjs';
 
-export async function communityForumFixture({policy,resourceBudgetPolicy,endpoint='https://official.example.org'}={}){
- const clock={now:Math.floor(Date.now()/1000)},scopes=['binding','consent','assistance','moderation','data-export','data-delete','history','case-teaser','context','notifications'];
+export async function communityForumFixture({policy,resourceBudgetPolicy,endpoint='https://official.example.org',scopes=['binding','consent','assistance','moderation','data-export','data-delete','history','case-teaser','context','notifications'],database=null,migrateDatabase=true}={}){
+ const clock={now:Math.floor(Date.now()/1000)};
  const issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/forum-fixture'],{emailVerified:true});let owner,api;
  try{
   const provider=await createOidcLoginProvider({id:'forum-fixture',name:'Isolated real OIDC fixture',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/identity/callback/forum-fixture',allowLoopbackHttp:true,now:()=>clock.now});
   const options={now:clock.now,endpoint,identityProviders:[provider],resourceBudgetPolicy,syntheticCommunityQuota:false};
-  owner=await serviceFixture(scopes,null,options);
+  owner=await serviceFixture(scopes,database,{...options,migrateDatabase});
   const responder=await serviceFixture(scopes,owner.db,{...options,migrateDatabase:false}),moderator=await serviceFixture(['binding','consent','moderation','data-export'],owner.db,{...options,migrateDatabase:false});
   // Rebuild production services with one actual signer whose clock also moves.
   // Altering service.now alone leaves the old signing closure at fixture time.
@@ -53,6 +53,6 @@ export async function communityForumFixture({policy,resourceBudgetPolicy,endpoin
   }
   async function post(overrides={},who=owner){const p={schemaVersion:1,operationId:randomUUID(),postId:randomUUID(),expectedHeadVersion:0,versionId:randomUUID(),title:'Independent ordinary discussion',body:'A useful question without a Task, model or history prerequisite.',links:[],publishedUntil:clock.now+2592000,...overrides};return prepare(who,p.expectedHeadVersion===0?'create-post':'publish-version',p);}
   async function reply(p,overrides={},who=responder){return prepare(who,'create-reply',{schemaVersion:1,operationId:randomUUID(),replyId:randomUUID(),postId:p.postId,postVersionId:p.versionId,expectedRevision:0,body:'An exact-version reply.',publishedUntil:clock.now+2592000,replyTo:null,...overrides});}
-  return {owner,responder,moderator,forum,governance,db:owner.db,issuer,clock,origin,request,ok,login,authorize,prepare,write,reconnect,post,reply,close:async()=>{api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await issuer.close();await owner.db.close();}};
- }catch(error){if(api){api.closeAllConnections();await new Promise(resolve=>api.close(resolve));}await issuer.close();if(owner)await owner.db.close();throw error;}
+  return {owner,responder,moderator,forum,governance,db:owner.db,issuer,clock,origin,request,ok,login,authorize,prepare,write,reconnect,post,reply,close:async()=>{api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await issuer.close();if(!database)await owner.db.close();}};
+ }catch(error){if(api){api.closeAllConnections();await new Promise(resolve=>api.close(resolve));}await issuer.close();if(owner&&!database)await owner.db.close();throw error;}
 }

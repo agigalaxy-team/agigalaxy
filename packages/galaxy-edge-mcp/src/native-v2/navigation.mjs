@@ -1,14 +1,22 @@
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import * as z from 'zod/v4';
+import {forumReadTopicSchema} from '../../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 export const navigationSchema=z.strictObject({object:z.discriminatedUnion('kind',[
  z.strictObject({kind:z.enum(['task','room','project']),id:z.uuid()}),
  z.strictObject({kind:z.literal('capsule'),id:z.uuid(),versionId:z.uuid().optional()}),
- z.strictObject({kind:z.enum(['match','publish','participate','messages','identity','privacy','search','capsules','summaries','notifications'])})]),
+ z.strictObject({kind:z.literal('post'),id:z.uuid(),versionId:z.uuid().optional()}),
+ z.strictObject({kind:z.literal('community'),topic:forumReadTopicSchema.optional(),query:z.string().trim().min(1).max(160).optional()}),
+ z.strictObject({kind:z.enum(['bookmarks','match','publish','participate','messages','identity','privacy','search','capsules','summaries','notifications'])})]),
  origin:z.strictObject({host:z.string().min(1).max(80),workRef:z.string().min(1).max(500)}).optional()});
-const routes={task:'tasks',room:'rooms',messages:'rooms',project:'projects',capsule:'capsules',capsules:'capsules',match:'match',publish:'publish',participate:'participate',identity:'settings/identity',privacy:'settings/privacy',search:'search',summaries:'settings/summaries',notifications:'notifications'};
+const routes={task:'tasks',room:'rooms',messages:'rooms',project:'projects',capsule:'capsules',capsules:'capsules',post:'community/posts',community:'community',bookmarks:'bookmarks',match:'match',publish:'publish',participate:'participate',identity:'settings/identity',privacy:'settings/privacy',search:'search',summaries:'settings/summaries',notifications:'notifications'};
 const fail=code=>{throw Object.assign(new Error(code),{code});};
-const pathFor=object=>'/app/'+routes[object.kind]+(object.id?'/'+object.id:'')+(object.versionId?'/versions/'+object.versionId:'');
+const pathFor=object=>{
+ const path='/app/'+routes[object.kind]+(object.id?'/'+object.id:'')+(object.versionId?'/versions/'+object.versionId:'');
+ if(object.kind!=='community')return path;
+ const query=new URLSearchParams();if(object.topic)query.set('topic',object.topic);if(object.query)query.set('q',object.query);
+ return path+(query.size?'?'+query:'');
+};
 const sourceUnavailable=e=>([403,404,410,429].includes(e?.status)||e?.status>=500&&e?.status<600)
  &&!['unauthorized','binding_revoked','invalid_session','session_expired','access_denied'].includes(e?.code??e?.message);
 const sourceCode=e=>/^[a-z0-9_:-]{1,100}$/.test(e?.code??e?.message??'')?e.code??e.message:'navigation_source_unavailable';
@@ -45,8 +53,11 @@ export function createNativeNavigation({website,store,openBrowser=platformOpen,r
   if(parsed.object.id){try{
    data=await refresh(parsed.object);await lease?.assertCurrent();
    const field=parsed.object.kind+'Id';
-   if(owner&&(data?.[field]!==parsed.object.id||parsed.object.versionId&&data?.versionId!==parsed.object.versionId))fail('navigation_source_reference_mismatch');
-   current=true;
+   const reference=parsed.object.kind==='post'?data?.locator:data;
+   if(owner&&(reference?.[field]!==parsed.object.id||parsed.object.versionId&&reference?.versionId!==parsed.object.versionId))fail('navigation_source_reference_mismatch');
+   if(parsed.object.kind==='post'&&data?.availability!=='available'){
+    sourceError=['withdrawn','expired','unavailable'].includes(data?.availability)?'forum_content_'+data.availability:'forum_content_unavailable';data=null;
+   }else current=true;
   }catch(e){await lease?.assertCurrent();if(!sourceUnavailable(e))throw e;data=null;sourceError=sourceCode(e);}}
   await lease?.assertCurrent();
   return{navigationId,origin:parsed.origin??null,object:parsed.object,data,current,sourceError,

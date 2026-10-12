@@ -25,6 +25,9 @@ async function forumGovernanceExport(item,_now,{db,actor,viewServices}){
 // Owner submissions do not include the mixed-author Task/Participation snapshot.
 // Those composites are exported only through a fresh authorized-view read.
 export const productV2ExportSources = {
+  'chat-human-message-reads':row('chat_human_message_reads','subject_id','t.room_id,t.subject_id,t.message_id,t.read_at',"t.room_id::text||':'||t.subject_id||':'||t.message_id::text",'t.read_at'),
+  'reading-bookmarks':row('reading_bookmarks_v1','subject_id','t.id,t.subject_id,t.reference_key,t.reference,t.saved,t.revision,t.created_at,t.saved_at,t.updated_at'),
+  'reading-bookmark-operations':row('reading_bookmark_operations_v1','subject_id','t.subject_id,t.operation_id,t.request_hash,t.result,t.created_at','t.operation_id::text'),
   'task-materials':{...row('task_materials_v1','subject_id','t.material_id,t.task_id,t.subject_id,t.root_event_id,t.consent_id,t.descriptor,t.body_text,t.text_hash,t.created_at,t.expires_at,t.erased_at','t.material_id::text'),transform:taskMaterialExport},
   'forum-post-heads':row('forum_posts_v1','subject_id','t.id,t.subject_id,t.head_version,t.current_version_id,t.state,t.created_at,t.updated_at,t.erased_at'),
   'forum-version-locators':row('forum_versions_v1','subject_id','t.id,t.post_id,t.version_number,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at'),
@@ -116,7 +119,7 @@ export const productV2ExportSources = {
   'chat-memberships': row('chat_memberships','subject_id','t.room_id,t.subject_id,t.controller_ref,t.joined_at,t.left_at,t.dismissed_revision',"t.room_id::text||':'||t.subject_id",'t.joined_at'),
   'chat-message-receipts': row('chat_message_refs','subject_id','t.message_id,t.sequence,t.room_id,t.subject_id,t.client_message_id,t.payload_hash,t.actor_kind,t.agent_grant_id,t.archive_id,t.reply_to,t.state,t.revision,t.sent_at,t.expires_at,t.edited_at,t.retracted_at,t.purge_pending,t.content_bytes','t.message_id::text','t.sent_at'),
   'chat-message-operations': row('chat_message_operations','subject_id',"t.operation_id,t.room_id,t.message_id,t.subject_id,t.kind,t.request_hash,t.created_at,t.state,t.previous_content_bytes,t.target_content_bytes,t.base_revision,t.result->>'revision' AS result_revision,t.result->>'editedAt' AS result_edited_at",'t.operation_id::text'),
-  'chat-cursors': row('chat_cursors','subject_id','t.room_id,t.subject_id,t.cursor_kind,t.agent_ref,t.sequence,t.updated_at',"t.room_id::text||':'||t.subject_id||':'||t.cursor_kind||':'||md5(t.agent_ref)",'t.updated_at'),
+  'chat-cursors': row('chat_cursors','subject_id','t.room_id,t.subject_id,t.cursor_kind,t.agent_ref,t.sequence,t.accepted_order,t.updated_at',"t.room_id::text||':'||t.subject_id||':'||t.cursor_kind||':'||md5(t.agent_ref)",'t.updated_at'),
   'chat-message-preferences': row('chat_message_preferences','subject_id','t.room_id,t.subject_id,t.message_id,t.hidden,t.updated_at',"t.room_id::text||':'||t.subject_id||':'||t.message_id::text",'t.updated_at'),
   'chat-agent-grants': row('chat_agent_grants','subject_id','t.grant_id,t.room_id,t.subject_id,t.binding_id,t.mode,t.primary_responder,t.expires_at,t.revoked_at,t.created_at','t.grant_id::text'),
   'capsule-permissions': row('capsule_permissions','subject_id','t.id,t.subject_id,t.consent_id,t.payload_text,t.payload_hash,t.revoked_at,t.revoke_id,t.revoke_consent_id,t.revoke_payload_text,t.revoke_payload_hash,t.created_at'),

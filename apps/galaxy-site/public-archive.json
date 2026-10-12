@@ -1,6 +1,6 @@
 {
   "origin": "https://agigalaxy.org",
-  "siteRelease": "0.1.16",
+  "siteRelease": "0.1.19",
   "files": {
     "changelog.md": "27194058c661c2e3e9912c8717e0ea2a5e860c7bfb71af6bd60d316f5139e8ea",
     "docs/0.1.0/compatibility.md": "218807a4095d433cf1c02caf5bb80ce00a7956639179bd05dc4afb99046d4314",
@@ -255,6 +255,16 @@
     "downloads/native-client/0.1.10/package-files.json": "adddcca28a19874a7fe38f326c738d53046e583ece6df4c028f9aca13d62e1c2",
     "downloads/native-client/0.1.10/package-metadata.json": "9c674f2cbba3510041acea6eda17f8922a2315ca9ff1e61f632951298236e45d",
     "downloads/native-client/0.1.10/verify-native-client-download.mjs": "63ca45d2136d34998dcab26c3d951fc697175937581db47190066ee13c1b6084",
-    "downloads/native-client/0.1.10/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc"
+    "downloads/native-client/0.1.10/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc",
+    "downloads/native-client/0.1.11/galaxy-native-client-0.1.11.tgz": "29c985621d81e904907cdc2e113cf1ae5ac809866c1b242443c9eb5b0b4919c4",
+    "downloads/native-client/0.1.11/release.jws": "aa071d2f8afe3b264f11d14ba427ffdd6b6e076871ac920d72e7ea9e792d8b73",
+    "downloads/native-client/0.1.11/release.json": "9c6878aa44b5ebc1cc44c1912949d13d903320a6c1ed0ecc05ef5388d7f8842e",
+    "downloads/native-client/0.1.11/protocol-report.json": "88f09e54a9a47ebacede4f216ce067421399da779ac82486ef01d6220ffa502e",
+    "downloads/native-client/0.1.11/package-lock.json": "b923391f978482fce4fdf03527ab203f27302a1c5c112a998c134ccc54a1fe0e",
+    "downloads/native-client/0.1.11/source-hashes.json": "bd8197dfcec24d5ed9305a02ebf7c8048b62299d97441e2a3f329c79984c9372",
+    "downloads/native-client/0.1.11/package-files.json": "b252f22872908e91b719c0bc100197ab37f43f7a50ff4cd3f80366fbeffcb615",
+    "downloads/native-client/0.1.11/package-metadata.json": "5f196f86a98c3ecb4e7263c463facc9cb4736e1009100744c16b75aa2a7d800d",
+    "downloads/native-client/0.1.11/verify-native-client-download.mjs": "63ca45d2136d34998dcab26c3d951fc697175937581db47190066ee13c1b6084",
+    "downloads/native-client/0.1.11/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc"
   }
 }

@@ -5,6 +5,7 @@ import {FactDetails} from './fact-details';
 import {MemberLink,memberName,useMemberNames} from './conversation-ui';
 import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
 import {browseReturnPath,browseReturnLabel} from './public-browse-workspace';
+import {SaveForLaterButton} from './reading-bookmarks-workspace';
 import {isDiscoveryPurpose,object,projectErrorText} from './project-workspace-types';
 import type {ProjectRuntime,ProjectView,ProjectViewClient,DiscoveryPurpose,DiscoveryQuery,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail} from './project-workspace-types';
 import {createProjectViewClient,projectQueryMemory,projectViewScope,hasIndependentProject,opportunityUnavailable,opportunityLocator} from './project-view-client.mjs';
@@ -69,6 +70,7 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
     {projectDocument.sourceUrl&&/^https?:\/\//.test(projectDocument.sourceUrl)&&<p><a href={projectDocument.sourceUrl} target="_blank" rel="noopener noreferrer">查看项目来源 ↗</a></p>}
    </>:<p>你已收到管理转交邀请，请先请原管理者分享必要的项目介绍。</p>}
    <div className="button-row">{projectDocument&&project.state==='active'&&project.ownerId!==subjectId&&!wantsContact&&<Button type="button" onClick={openDirect}>联系这个项目</Button>}
+    {projectDocument&&<SaveForLaterButton runtime={runtime??null} connected={connected} subjectId={subjectId??undefined} reference={{kind:'project',projectId}} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
     {(project.permissions?.edit||project.permissions?.represent||(project.management?.transfers?.length??0)>0)&&<Button type="button" variant="outline" onClick={()=>navigate('/app/projects?section=projects&projectId='+projectId)}>{project.management?.transfers?.length?'查看管理与转交':'管理项目'}</Button>}
     {projectDocument&&project.state==='active'&&!relatedOpen&&<button type="button" className="text-link" onClick={()=>setRelatedOpen(true)}>寻找相关项目</button>}
    </div>

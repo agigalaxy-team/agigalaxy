@@ -41,7 +41,7 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   await native.connect({confirmed:true});await native.disconnect();await exportOffline(native,id,1);
   native.close();native=await createNativeRuntime({...config,dataDirectory:directory,website:'https://galaxy.example',fetch:fetcher,now:()=>f.now});
   await exportOffline(native,id,1);
-  const records=new Map(),store={get:async key=>records.get(key),put:async(key,value)=>records.set(key,value)};
+  const records=new Map(),store={get:async key=>records.get(key),put:async(key,value)=>records.set(key,value),update:memoryAtomicUpdate(records)};
   web=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});
   await web.createIdentity({confirmed:true});await web.connect({confirmed:true});const browserId=(await web.status()).identity.subjectId;
   await web.disconnect();await exportOffline(web,browserId,1);
@@ -55,3 +55,4 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   await rm(target,{recursive:true,force:true});
  }
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

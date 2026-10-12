@@ -29,7 +29,8 @@ async function fixture({retiring=false}={}){
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
   runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
    store:{get:async k=>{const v=structuredClone(data.get(k));if(onGet)await onGet(k,v);return v;},
-    put:async(k,v)=>{data.set(k,structuredClone(v));if(onPut)await onPut(k,v);}},
+    put:async(k,v)=>{data.set(k,structuredClone(v));if(onPut)await onPut(k,v);},
+    update:memoryAtomicUpdate(data,async(k,v)=>{if(onPut)await onPut(k,v);})},
    fetch:async(url,options)=>{const path=new URL(url).pathname;
     if(path==='/v2/choice-snapshots/put')puts.push(JSON.parse(options.body));
     if(path==='/v2/choice-snapshots/receipt'){receipts.push(JSON.parse(options.body));if(offline)throw new Error('synthetic receipt offline');}
@@ -196,3 +197,4 @@ test('Queued original receipt reads retain the connection selected at enqueue an
   assert.equal(t.receipts.length,0);assert.equal(t.puts.length,1);assert.deepEqual(await t.pending(),original);
  }finally{release?.();await t.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

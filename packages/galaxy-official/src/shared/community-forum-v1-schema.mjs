@@ -1,5 +1,6 @@
 import * as z from 'zod/v4';
 import {ServiceError} from './service-error.mjs';
+import {forumTopicSchema,forumReadTopicSchema} from './community-forum-topics-v1.mjs';
 
 const uuid=z.uuid(),positive=z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 // Limits are explicitly Unicode code points, not user-perceived graphemes.
@@ -7,7 +8,7 @@ const validText=value=>Array.from(value).every(point=>point.length!==1||point.ch
 const text=max=>z.string().refine(value=>value.trim().length>0&&validText(value)&&Array.from(value).length<=max,'Invalid text length or Unicode');
 const link=z.string().refine(value=>{try{const url=new URL(value);return Array.from(value).length<=2048&&['https:','http:'].includes(url.protocol)&&!!url.hostname&&!url.username&&!url.password;}catch{return false;}},'Invalid public link');
 const base={schemaVersion:z.literal(1),operationId:uuid};
-const content={versionId:uuid,title:text(160),body:text(8000),links:z.array(link).max(8),publishedUntil:positive};
+const content={versionId:uuid,title:text(160),body:text(8000),links:z.array(link).max(8),publishedUntil:positive,topic:forumTopicSchema.optional()};
 export const forumCreatePostSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:z.literal(0),...content});
 export const forumPublishVersionSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:positive,...content});
 export const forumWithdrawPostSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:positive});
@@ -28,7 +29,8 @@ export const forumResolveSchema=z.strictObject({...event,kind:z.literal('resolve
  effect:z.strictObject({kind:z.literal('hide-version'),until:positive}).nullable()});
 export const forumReportEventSchema=z.discriminatedUnion('kind',[forumSupplementSchema,forumWithdrawReportSchema,forumAppealSchema,forumResolveSchema]);
 const page={after:uuid.optional(),limit:z.number().int().min(1).max(50).default(20)};
-export const forumPostsQuerySchema=z.strictObject(page);
+export const forumPostsQuerySchema=z.strictObject({after:z.string().min(1).max(1536).optional(),limit:page.limit,
+ topic:forumReadTopicSchema.optional(),query:z.string().trim().max(160).default(''),order:z.enum(['published','id']).optional()});
 export const forumVersionsQuerySchema=z.strictObject({afterVersion:z.number().int().nonnegative().optional(),limit:page.limit});
 export const forumRepliesQuerySchema=z.strictObject({postId:uuid,postVersionId:uuid,...page});
 export const forumReportQuerySchema=z.strictObject({target:forumTargetSchema.optional(),after:uuid.optional(),limit:z.number().int().min(1).max(30).default(10)});

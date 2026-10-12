@@ -33,7 +33,7 @@ test('captured native bundle calls both exact Case receipts over MCP and authent
   for(const name of ['galaxy_case_v2_receipt','galaxy_task_case_link_receipt'])
    assert.equal(list.tools.find(t=>t.name===name)?.annotations?.readOnlyHint,true);
   const eventQuery={caseId:id,eventId:id,payloadHash:digest(signed.payloadJson)};
-  const invoke=async(name,args)=>{const reply=await client.callTool({name,arguments:args});assert.notEqual(reply.isError,true,JSON.stringify(reply));return JSON.parse(reply.content[0].text);};
+  const invoke=async(name,args)=>{const reply=await client.callTool({name,arguments:args});assert.notEqual(reply.isError,true,JSON.stringify(reply));assert.ok(reply.structuredContent);return reply.structuredContent;};
   const result=await invoke('galaxy_case_v2_receipt',eventQuery);
   assert.equal(result.state,'acknowledged');assert.equal(result.currentAccessGranted,false);
   assert.equal(JSON.stringify(result).includes(event.summary),false);

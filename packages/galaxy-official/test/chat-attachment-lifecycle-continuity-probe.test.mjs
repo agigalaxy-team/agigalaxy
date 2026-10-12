@@ -35,7 +35,8 @@ test('diagnostic: same GUID reconnect while original attachment journal is read 
       const value = structuredClone(records.get(key));
       if (hook && key.includes(':chat-attachment-operation:')) { const once = hook; hook = null; await once(); }
       return value;
-    }, put: async (key, value) => { records.set(key, structuredClone(value)); await putHook?.(key, value); } };
+    }, put: async (key, value) => { records.set(key, structuredClone(value)); await putHook?.(key, value); },
+    update: memoryAtomicUpdate(records,async(key,value)=>{await putHook?.(key,value);}) };
     runtime = await createWebRuntime({ endpoint: f.bindings.endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: fetcher, now: () => f.now });
     await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
     const room = await runtime.chat.create({ title: 'Attachment old intent lease diagnostic' }, { confirmed: true });
@@ -117,3 +118,4 @@ test('diagnostic: attachment content cannot return bytes after expiry crosses du
       independentFileState: 'available', ownExportStatus: 200, currentAuthorizationRechecked: true }));
   } finally { await closeServer(server); await f.close(); }
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

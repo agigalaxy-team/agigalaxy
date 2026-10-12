@@ -8,7 +8,7 @@ import { sha256Hex } from '../src/shared/web-primitives.mjs';
 import { createServices } from '../src/services.mjs';
 import { generateKeyPairSync } from 'node:crypto';
 
-function store() { const values = new Map(); return { get: async key => structuredClone(values.get(key)), put: async (key,value) => { values.set(key,structuredClone(value)); } }; }
+function store() { const values = new Map(); return { get: async key => structuredClone(values.get(key)), put: async (key,value) => { values.set(key,structuredClone(value)); }, update:memoryAtomicUpdate(values) }; }
 test('browser privacy flow verifies selected export pages, partial/cancel outcomes and durable signed deletion acknowledgements', async () => {
   const f = await serviceFixture(browserScopes, null, { now: Math.floor(Date.now()/1000) });
   let at = f.now;
@@ -68,3 +68,4 @@ test('browser privacy flow verifies selected export pages, partial/cancel outcom
     assert.equal((await runtime.privacy.queryDeletion()).items.length,2);
   } finally {runtime?.close();other?.close();await new Promise(resolve=>server.close(resolve));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

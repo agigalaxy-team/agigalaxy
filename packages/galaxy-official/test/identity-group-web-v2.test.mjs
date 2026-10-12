@@ -10,7 +10,7 @@ test('two actual WebRuntime device signers approve the same group; restart recon
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000),syntheticCommunityQuota:false});
  const key=generateKeyPairSync('ed25519'),trustedKeys=new Map([['identity-group-web',{publicKeyPem:key.publicKey.export({type:'spki',format:'pem'}),notBefore:f.now-1,notAfter:f.now+86400,revoked:false}]]);
  const services=createServices({db:f.db,endpoint:f.access.endpoint,kid:'identity-group-web',signingKey:key.privateKey,trustedKeys,allowedScopes:browserScopes,operator:'Synthetic',region:'isolated',now:()=>f.now}),server=createApi({...services,rateLimit:1000});
- const dataA=new Map(),dataB=new Map(),store=data=>({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))});let a,b,writes=0,drop=true;
+ const dataA=new Map(),dataB=new Map(),store=data=>({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)});let a,b,writes=0,drop=true;
  try{await new Promise(r=>server.listen(0,'127.0.0.1',r));const local='http://127.0.0.1:'+server.address().port,config={endpoint:f.access.endpoint,trustedKeys};
   const wire=async(url,init)=>{const path=new URL(url).pathname,res=await fetch(local+path,init);if(path==='/v2/identity-groups/submit'){writes++;if(drop&&res.status===200){drop=false;throw Error('Synthetic lost WebRuntime identity group ACK');}}return res;};
   const options=data=>({store:store(data),fetch:wire,now:()=>f.now});
@@ -27,3 +27,4 @@ test('two actual WebRuntime device signers approve the same group; restart recon
   console.log(JSON.stringify({event:'identity_group_web_runtime_verified',actualWebRuntime:true,actualWebCryptoDeviceSigning:true,twoIndependentCurrentKeys:true,restartSameJournal:true,originalAckReconciled:true,businessWrites:2,mutatedPreviewRejected:true,localStore:'synthetic-Map-not-IndexedDB',actualBrowserDom:false,cloudModelCalls:0}));
  }finally{a?.close();b?.close();if(server.listening)await new Promise(r=>server.close(r));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

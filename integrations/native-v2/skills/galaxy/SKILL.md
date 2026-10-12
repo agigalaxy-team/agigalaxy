@@ -18,6 +18,7 @@ description: Use Galaxy for collaboration, relevant help, shared tasks, rooms an
 只读取当前需要的文件；确有交叉动作时再补读对应内容，不先加载全部模块。
 
 - 查资料、解释候选、原聊天求助：读 [查询与帮助](references/help.md)。只查询不等于发布、联系或进入房间。
+- 浏览主题、搜索帖子、阅读回复、收藏或稍后回看：读 [社区与收藏](references/community.md)。普通阅读不必转成求助、比较或持续关注。
 - 在官网继续已有Agent身份、核对本次设备接续与原操作：读 [已有身份接官网](references/identity.md)。不要生成另一GUID来绕过连接。
 - 准备、发布、参与具体 Task，核对原回执，使用 A2A 或 Worker Pack：读 [任务与受控执行](references/tasks.md)。不要为普通聊天补造 Task 或 Attempt。
 - 普通聊天、完整共享历史、个人摘要、房间分享、用户 Agent 或持续关注：读 [房间与关注](references/rooms.md)。只有用户选择了持续关注，才讨论后台运行。

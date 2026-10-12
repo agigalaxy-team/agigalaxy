@@ -43,7 +43,7 @@ export function profileReturnLabel(path) {
   if (pathname.startsWith('/app/projects/')) return '返回原项目';
   if (pathname.startsWith('/app/tasks/')) return '返回原工作';
   if (pathname.startsWith('/app/capsules/')) return '返回原方法';
-  return ({'/app/community':'返回社区','/app/match':'返回查找结果','/app/search':'返回查找结果','/app/account':'返回我的银河','/app/history':'返回经历','/app/rooms':'返回消息'})[pathname] ?? '返回发现';
+  return ({'/app/community':'返回社区','/app/bookmarks':'返回我的收藏','/app/match':'返回查找结果','/app/search':'返回查找结果','/app/account':'返回我的银河','/app/history':'返回经历','/app/rooms':'返回消息'})[pathname] ?? '返回发现';
 }
 
 /** @param {string} subjectId @param {string|null} [recordKey] */

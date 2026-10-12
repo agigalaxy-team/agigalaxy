@@ -4,6 +4,8 @@ export const lifecyclePolicyVersion = 'galaxy-retention/v1-product-v2';
 const exclusiveAccount = account => `${account} IN (SELECT l.account_id FROM community_account_links l WHERE l.subject_id=$1)
   AND NOT EXISTS(SELECT 1 FROM community_account_links other WHERE other.account_id=${account} AND other.subject_id<>$1)`;
 export const productV2DeletionTargets = {
+  chat_human_message_reads:'t.subject_id=$1',
+  reading_bookmarks_v1:'t.subject_id=$1',reading_bookmark_operations_v1:'t.subject_id=$1',
   task_materials_v1:'t.subject_id=$1',
   forum_posts_v1:'t.subject_id=$1',forum_versions_v1:'t.subject_id=$1',forum_replies_v1:'t.subject_id=$1',forum_events_v1:'t.subject_id=$1',
   forum_permissions_v1:'t.subject_id=$1',forum_reports_v1:'t.subject_id=$1',forum_governance_events_v1:'t.subject_id=$1',forum_write_receipts_v1:'t.subject_id=$1',
@@ -53,6 +55,9 @@ export const lifecycleManagedTables = ['lifecycle_erasure_records'];
 // body deletion receipt. Their adapter adds actual controlled-copy results.
 export const chatDelegatedTables = ['chat_rooms','chat_memberships','chat_decisions','chat_message_refs','chat_message_operations','chat_cursors','chat_message_preferences','chat_agent_grants','chat_attachments','outcome_materials_v2','outcome_material_events_v2'];
 export const productV2Retention = Object.freeze({
+  readingBookmarks:{tables:['reading_bookmarks_v1','reading_bookmark_operations_v1'],category:'owner-private-object-reference',automaticExpiry:null,
+    contentStored:false,sourceRead:'current source permission and expiry checked on each read; saving grants no new source access',
+    deletion:'explicit removal hides the reference; revision and operation receipts prevent late retries from restoring it; account deletion erases both owned tables'},
   taskMaterials:{tables:['task_materials_v1'],category:'finite-current-source-task-context',
     contentExpiry:'minimum of exact selected source, material descriptor and Task root permission; every reader rechecks current source',
     temporary:'pending review or unknown historical cause hides without erasing; separately proven revoke/expiry takes precedence',

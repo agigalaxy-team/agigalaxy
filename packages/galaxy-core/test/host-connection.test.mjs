@@ -42,9 +42,15 @@ test('injected connection uses actual native selection over the exact preview an
   const choose = number => transition(() => page.options.find(item => item.value === number).onSelect());
   await transition(() => commands.get('galaxy.open')());
   await choose('4');await choose('6');
-  assert.match(page.title, /no-session/);
+  assert.match(page.title, /连接与专业入口/);
+  assert.match(page.options.find(item => item.value === '').description, /没有本机会话/);
+  await choose(''); assert.equal(page.type, 'alert'); assert.match(page.message, /没有本机会话/);
+  assert.ok(page.message.includes(preview.endpoint)); assert.equal(executes, 0);
+  await transition(() => page.onConfirm());
   await choose('1');
   assert.equal(page.type, 'select'); assert.equal(page.title.includes(preview.requestJson),false);assert.equal(executes,0);
+  await choose(''); assert.equal(page.type, 'alert'); assert.ok(page.message.includes(preview.endpoint)); assert.equal(executes, 0);
+  await transition(() => page.onConfirm());
   await choose('2');assert.equal(page.type,'alert');assert.ok(page.message.includes(preview.requestJson));
   await transition(()=>page.onConfirm());assert.equal(executes,0);
   await choose('1');

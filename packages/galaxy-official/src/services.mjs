@@ -1,4 +1,5 @@
 import { CommunityForumV1 } from './community-forum-v1.mjs';
+import {ReadingBookmarksV1} from './reading-bookmarks-v1.mjs';
 import {TaskMaterialServiceV1} from './task-material-v1.mjs';
 import { CommunityForumGovernanceV1 } from './community-forum-governance-v1.mjs';
 import { BuilderService } from './builders.mjs';
@@ -186,6 +187,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const sharedSummaries = new ChatSharedSummaryService({ db, access, chat });
   const projects = new ProjectV2Service(access, { consents, profiles, notifications,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor) });
+  const readingBookmarks = new ReadingBookmarksV1(access, {forum, capsules: capsules.v2, projects, profiles});
   discovery.v2 = new DiscoveryV2Service(access, { profiles, projects, inbox, notifications, history: history.v2 });
   const recruitment = new RecruitmentV2Service(access, { projects, consents, discovery: discovery.v2, assistance, inbox, publicWrites });
   discovery.v2.recruitment = recruitment;
@@ -197,7 +199,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   inbox.informationWatches=informationWatches;
   const contacts = new ContactV2Service(access, { consents, discovery: discovery.v2, inbox, publicWrites,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor), createRoomWithin: createChatContactAdapter(chat) });
-  return { taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
+  return { readingBookmarks,taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
     identity: new IdentityLinkService(access, identityProviders, { accountRegistry: communityAccounts }), communityAccounts, publicWrites, verificationRecords, chat,
     receiptStatus,watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
     proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { forum,forumGovernance, choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),

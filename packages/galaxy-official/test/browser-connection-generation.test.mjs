@@ -9,7 +9,7 @@ test('real HTTP connection generations distinguish rebinds and never revive a di
   const f = await serviceFixture(browserScopes, null, { now: Math.floor(Date.now() / 1000) });
   const api = createApi({ ...f, rateLimit: 1000 });
   const values = new Map(), store = { get: async key => structuredClone(values.get(key)),
-    put: async (key, value) => { values.set(key, structuredClone(value)); } };
+    put: async (key, value) => { values.set(key, structuredClone(value)); }, update: memoryAtomicUpdate(values) };
   let runtime, rejectChallenge = false, holdChallenge, enteredChallenge;
   try {
     await new Promise(resolve => api.listen(0, '127.0.0.1', resolve));
@@ -52,3 +52,4 @@ test('real HTTP connection generations distinguish rebinds and never revive a di
     assert.ok(runtime.api.snapshot().generation > third.generation);
   } finally { runtime?.close(); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close(); }
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

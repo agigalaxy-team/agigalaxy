@@ -9,7 +9,7 @@ import {getContributionClient} from '../../galaxy-web/src/contribution-client.mj
 
 test('actual browser identity and signed contribution operations recover lost Consent, publication and revoke replies without changing selected fields',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();
-  const store={get:async key=>structuredClone(data.get(key)),put:async(key,value)=>{data.set(key,structuredClone(value));}};
+  const store={get:async key=>structuredClone(data.get(key)),put:async(key,value)=>{data.set(key,structuredClone(value));},update:memoryAtomicUpdate(data)};
   let runtime,loseConsent=false,loseWrite=false;
   try{
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
@@ -43,3 +43,4 @@ test('actual browser identity and signed contribution operations recover lost Co
     runtime.api.disconnect();await assert.rejects(client.local(),/身份或连接已变化/);
   }finally{runtime?.close();api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

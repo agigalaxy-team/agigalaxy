@@ -4,6 +4,7 @@ import {createProfileClient} from './profile-client.mjs';
 import {createHistoryClient} from './history-client.mjs';
 import {HistoryWorkspace,type HistoryForm} from './history-workspace';
 import {PersonProfileEditor} from './person-profile-editor';
+import {SaveForLaterButton} from './reading-bookmarks-workspace';
 import {historyRoleLabel} from './history-facts';
 import {MemberAvatar,memberName} from './conversation-ui';
 import {profilePath,profileExperiencePath,profileReturn,profileReturnLabel} from './profile-navigation.mjs';
@@ -64,6 +65,7 @@ function PersonSession({runtime,connected,subjectId,targetSubjectId,search,navig
  return <article className="person-profile" aria-busy={loading}>
   <Link to={back} navigate={navigate} className="person-return"><ArrowLeft size={16}/>{profileReturnLabel(back)}</Link>
   <header className="person-identity"><span className="person-portrait" aria-hidden="true"><MemberAvatar subjectId={targetSubjectId} own={own}/></span><div><p className="eyebrow">{own?'我的个人资料':'个人资料'}</p><h1>{profile?.displayName??memberName(targetSubjectId)}</h1></div>{own&&<div className="person-identity-actions"><Link to={editorPath} navigate={navigate} className="person-edit-link"><Pencil size={15}/>编辑资料</Link><Link to="/app/account" navigate={navigate} className="person-self-link">我的银河<ArrowUpRight size={14}/></Link></div>}</header>
+  {!own&&profile?.profileSource&&!declarationUnavailable&&<SaveForLaterButton runtime={runtime} connected={connected} subjectId={subjectId} reference={{kind:"person",subjectId:targetSubjectId}} onNeedIdentity={()=>navigate("/app/settings/identity")}/>}
   {saved&&<output className="person-updated">资料已更新。</output>}
   <nav className="person-tabs" aria-label="个人资料">{[['overview','概览'],['experience','经历与贡献'],['projects','项目']].map(([id,title])=><Link key={id} to={sectionPath(id)} navigate={navigate} aria-current={section===id?'page':undefined}>{title}</Link>)}</nav>
   {loading&&!profile&&<output>正在读取资料…</output>}{error&&<p className="person-read-error" role="alert">{error}<button type="button" onClick={retry}>重试</button></p>}

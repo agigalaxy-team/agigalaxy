@@ -55,7 +55,7 @@ test('actual native server registers configured Worker tools lazily, keeps ordin
     assert.equal((await sdk.readResource({ uri: artifact.manifest.uri })).contents[0].text, html);
     const raw = (name, args) => sdk.callTool({ name, arguments: args });
     const call = async (name, args) => { const result = await raw(name, args);
-      assert.equal(result.isError ?? false, false, JSON.stringify(result)); return JSON.parse(result.content[0].text); };
+      assert.equal(result.isError ?? false, false, JSON.stringify(result)); assert.ok(result.structuredContent); return result.structuredContent; };
     assert.equal((await raw('galaxy_worker_host_read', { action: 'list' })).isError, true);
     assert.equal(x.requests.length, before, 'discovery and unconnected reads cannot connect');
     assert.equal((await x.processWorker.observations()).starts, 0);

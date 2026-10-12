@@ -33,11 +33,11 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
  const current=(target:string)=>target==='/app/'?!inWork&&(path==='/app'||path==='/app/'||/^\/app\/(participate|tasks|capsules|projects|search|match)(\/|$)/.test(path))
   :target==='/app/work'?inWork
   :target==='/app/rooms'?path===target||path.startsWith(target+'/')||path==='/app/notifications'
-  :target==='/app/account'?path===target||path.startsWith('/app/settings/')||path==='/app/history'
+  :target==='/app/account'?path===target||path.startsWith('/app/settings/')||path==='/app/history'||path==='/app/bookmarks'
   :path===target||path.startsWith(target+'/');
  const link=(target:string,label:string)=><a key={target} href={target} aria-current={current(target)?'page':undefined} onClick={event=>follow(event,target)}>{label}</a>;
  const brand=<a href="/" className="site-brand" aria-label="银河首页"><GalaxyMark/><span>银河<small>GALAXY</small></span></a>;
- const accountLinks=connected?[['/app/account','我的资料'],['/app/history','经历与贡献'],['/app/community?section=owned','我的帖子'],['/app/community?section=reports','内容处理记录'],['/app/settings/identity','设置']]:[['/app/settings/identity',subjectId?'连接已有身份':'登录 / 开始使用'],['/app/account','我的银河']];
+ const accountLinks=connected?[['/app/account','我的资料'],['/app/bookmarks','我的收藏'],['/app/history','经历与贡献'],['/app/community?section=owned','我的帖子'],['/app/community?section=reports','内容处理记录'],['/app/settings/identity','设置']]:[['/app/settings/identity',subjectId?'连接已有身份':'登录 / 开始使用'],['/app/account','我的银河']];
  const settings=path==='/app/account'||path.startsWith('/app/settings/');
  const helpTarget=carryHelpOrigin('/app/search',path+search+location.hash),publishTarget=carryHelpOrigin('/app/publish',path+search+location.hash);
  return <div className="galaxy-workspace galaxy-site"><a href="#main-content" className="site-skip">跳到内容</a>

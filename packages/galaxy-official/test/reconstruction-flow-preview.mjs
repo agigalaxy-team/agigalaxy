@@ -26,7 +26,7 @@ async function input(request){let text='';for await(const chunk of request){text
 // Shared normal UI and production services. No API response replacement, no
 // verified-state injection, and no message transport double. Only identities,
 // the OIDC interaction account and declared work samples are synthetic.
-export async function createReconstructionFlowPreview({directory,certificate,key,reportDirectory,ports=[5240,5241,5242],chatTransport=null,attachmentConfiguration=null}={}){
+export async function createReconstructionFlowPreview({directory,certificate,key,reportDirectory,ports=[5240,5241,5242],chatTransport=null,attachmentConfiguration=null,forumPolicy}={}){
  if(!isAbsolute(directory??'')||!isAbsolute(certificate??'')||!isAbsolute(key??'')||!isAbsolute(reportDirectory??''))throw Error('local_scene_absolute_paths_required');
  const origins=ports.slice(0,2).map(port=>'https://127.0.0.1:'+port),endpoint='https://127.0.0.1:'+ports[2];
  const metadataFile=join(reportDirectory,'shared-scene-status.json');
@@ -42,7 +42,7 @@ export async function createReconstructionFlowPreview({directory,certificate,key
  const previousPins=prior?JSON.parse(await readFile(prior.publicConfiguration,'utf8')).signingKeys:[];
  const signer=generateKeyPairSync('ed25519'),kid='local-reconstruction-'+randomUUID(),trustedKeys=new Map([...previousPins.map(pin=>[pin.kid,pin]),[kid,{publicKeyPem:signer.publicKey.export({type:'spki',format:'pem'}),notBefore:seconds()-1,notAfter:seconds()+7*86400,revoked:false}]]);
  const services=createServices({db,endpoint,signingKey:signer.privateKey,kid,trustedKeys,operator:'本地合成共享现场',region:'local',now:seconds,
-  identityProviders:[provider],allowedScopes:browserScopes,chatTransport,attachmentConfiguration});
+  identityProviders:[provider],allowedScopes:browserScopes,chatTransport,attachmentConfiguration,forumPolicy});
  const api=createApi({...services,browserOrigins:origins,rateLimit:1000,releaseId:'local-reconstruction-20261012'});
  const tls={cert:await readFile(certificate),key:await readFile(key)},dispatch=api.listeners('request')[0];
  const authority=createHttpsServer(tls,(request,response)=>{

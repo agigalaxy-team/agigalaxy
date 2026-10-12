@@ -9,6 +9,8 @@ import {workerPackUseToolDefinitions} from '../../../galaxy-official/src/persona
 import {informationToolDefinitions} from '../../../galaxy-official/src/personal-mcp-information-v2.mjs';
 import {targetGovernanceToolDefinitions} from '../../../galaxy-official/src/personal-mcp-target-governance-v2.mjs';
 import {moderationToolDefinitions} from '../../../galaxy-official/src/personal-mcp-moderation-v2.mjs';
+import {communityToolDefinitions} from '../../../galaxy-official/src/personal-mcp-community-v1.mjs';
+import {readingBookmarkToolDefinitions} from '../../../galaxy-official/src/personal-mcp-reading-bookmarks-v1.mjs';
 
 // Canonical input, authority/scope and write semantics are reused unchanged.
 // Existing signed Consent bytes go directly to the API; this transport neither
@@ -18,6 +20,13 @@ export function extendedNativeHttpDefinitions(api){
  const post=path=>(_actor,input={})=>api.call(path,input);
  const group=(prefix,mapping)=>Object.fromEntries(Object.entries(mapping).map(([method,path])=>[method,post(prefix+path)]));
  const services={
+  readingBookmarks:group('/v2/reading-bookmarks/',{status:'status',command:'command',query:'query',receipt:'receipt'}),
+  forum:{query:input=>api.call('/v2/community/posts/query',input,{authenticated:false}),
+   getPost:postId=>api.call('/v2/community/posts/'+postId,undefined,{method:'GET',authenticated:false}),
+   getVersion:(postId,versionId)=>api.call('/v2/community/posts/'+postId+'/versions/'+versionId,undefined,{method:'GET',authenticated:false}),
+   replies:input=>api.call('/v2/community/replies/query',input,{authenticated:false}),
+   versions:(postId,input)=>api.call('/v2/community/posts/'+postId+'/versions',input,{authenticated:false}),
+   owned:post('/v2/community/posts/owned')},
   configurations:group('/v2/configurations/',{submit:'events',get:'read',query:'query',versions:'versions',receipt:'receipt'}),
   builders:{...group('/v1/builders/',{get:'read',owned:'owned/query',receipt:'events/receipt',notices:'notices/query'}),
    v2:group('/v2/builders/',{get:'support/read',publish:'support/events',exportPack:'pack/export',manifest:'pack/manifest'})},
@@ -43,5 +52,5 @@ export function extendedNativeHttpDefinitions(api){
   ciV2:group('/v2/ci/',{receipt:'receipts',submit:'requests',get:'requests/read',revokeRequest:'requests/revoke',preview:'proofs/preview',publish:'proofs/publish',getProof:'proofs/read',revokeProof:'proofs/revoke'}),
   attachments:{specification:()=>api.call('/v2/chat/attachments/config',{}),...group('/v2/chat/attachments/',{get:'read',queryOwn:'query',revoke:'revoke'})},
  };
- return Object.assign({},...[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions].map(factory=>factory(services,null)));
+ return Object.assign({},...[configurationToolDefinitions,builderToolDefinitions,qualificationToolDefinitions,honorToolDefinitions,ciToolDefinitions,attachmentToolDefinitions,hubToolDefinitions,workerPackUseToolDefinitions,informationToolDefinitions,targetGovernanceToolDefinitions,moderationToolDefinitions,communityToolDefinitions,readingBookmarkToolDefinitions].map(factory=>factory(services,null)));
 }

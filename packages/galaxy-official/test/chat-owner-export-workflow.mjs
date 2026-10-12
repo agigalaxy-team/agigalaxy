@@ -30,6 +30,7 @@ export async function verifyChatOwnerMetadataExport(database = null, options = {
         VALUES($1,$2,$3,$4,'edit','synthetic','{"revision":2,"editedAt":"2026-09-13T00:00:00Z","futurePrivateField":"NOT_EXPORTED"}',$5,'pending',12,19,1)`,[operationId,roomId,messageId,subjectId,at]);
       await admin.query("INSERT INTO chat_cursors(room_id,subject_id,cursor_kind,agent_ref,updated_at) VALUES($1,$2,'agent','agent:示例',$3)",[roomId,subjectId,at]);
       await admin.query('INSERT INTO chat_message_preferences(room_id,subject_id,message_id,hidden,updated_at) VALUES($1,$2,$3,true,$4)',[roomId,subjectId,messageId,at]);
+      await admin.query('INSERT INTO chat_human_message_reads(room_id,subject_id,message_id,read_at) VALUES($1,$2,$3,$4)',[roomId,subjectId,messageId,at]);
       await admin.query("INSERT INTO chat_agent_grants(grant_id,room_id,subject_id,binding_id,mode,expires_at,created_at) VALUES($1,$2,$3,$4,'read',$5,$6)",[randomUUID(),roomId,subjectId,who.actor.bindingId,later,at]);
     }
     const ticket = await f.dataExport.create(f.actor,{id:randomUUID(),datasets});
@@ -45,6 +46,7 @@ export async function verifyChatOwnerMetadataExport(database = null, options = {
     assert.equal(String(operation.previous_content_bytes),'12'); assert.equal(String(operation.target_content_bytes),'19'); assert.equal(operation.base_revision,1);
     assert.equal(operation.result_revision,'2'); assert.equal('result' in operation,false);
     assert.equal(pages['chat-message-receipts'].items[0].message_id,owned[0].messageId);
+    assert.equal(pages['chat-human-message-reads'].items[0].message_id,owned[0].messageId);
     assert.equal(pages['chat-proposal-receipts'].items[0].decision_id,owned[0].decisionId);
     const serialized = JSON.stringify(pages);
     assert.equal(serialized.includes('NOT_EXPORTED'),false);

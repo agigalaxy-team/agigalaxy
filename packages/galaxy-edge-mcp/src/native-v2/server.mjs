@@ -28,6 +28,7 @@ import {registerNativeContactWorkTools} from '../../../../integrations/native-v2
 import {registerNativeA2aWorkTools} from '../../../../integrations/native-v2/a2a-work-tools.mjs';
 import {workerPanelResult} from '../../../../integrations/native-v2/compact-app/worker-result.mjs';
 import {presentNativeResult} from './presentation.mjs';
+import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './reading-bookmarks.mjs';
 import {readProfileDisplayNames} from '../../../galaxy-official/src/profile-display-names.mjs';
 
 export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifact,watchHost,watchHostDriverFactory,notificationOptions}={}){
@@ -152,6 +153,9 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
  register('galaxy_chat_agent_revoke',z.strictObject({roomId:z.uuid(),grantId:z.uuid()}),'Revoke an owned room Agent grant. Future service calls are denied; the host must separately confirm an already running model stopped.',
   ({roomId,...x})=>runtime.api.call('/v2/chat/rooms/'+roomId+'/agent-revoke',x),{write:true});
  const definitions=nativeHttpDefinitions(runtime.api);
+ register('galaxy_bookmark_set',nativeBookmarkSetSchema,
+  'Save or remove a private bookmark for the user’s selected post, exact method version, project or person. Handles revisions, stable operation IDs and lost responses automatically. This does not follow updates, infer interests, create work or extend source permission.',
+  createNativeBookmarkSetter(runtime),{write:true});
  // These operations introduce a new user-selected scope; ordinary delegated
  // sends/queries, exact signed payloads and same-operation retries do not.
  const choices=new Set(['galaxy_personal_summary_preferences_save','galaxy_personal_summary_delete','galaxy_inbox_options_save','galaxy_chat_create','galaxy_chat_vote','galaxy_chat_propose','galaxy_chat_accept_invitation','galaxy_chat_leave','galaxy_project_v2_preferences_save','galaxy_choice_preferences_save','galaxy_choice_delete']);

@@ -43,7 +43,7 @@ test('built native SDK uses persisted current device after restart to recover on
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await server.connect(serverTransport);await sdk.connect(clientTransport);
   const tool=(await sdk.listTools()).tools.find(x=>x.name==='galaxy_native_receipt_status');assert.ok(tool);assert.equal(tool.annotations.readOnlyHint,true);
   const start=t.requests.length,result=await sdk.callTool({name:tool.name,arguments:operation});assert.notEqual(result.isError,true);
-  const receipt=JSON.parse(result.content[0].text);assert.equal(receipt.state,'acknowledged');assert.equal(receipt.contentReturned,false);assert.equal(receipt.currentAccessGranted,false);
+  const receipt=result.structuredContent;assert.ok(receipt);assert.equal(receipt.state,'acknowledged');assert.equal(receipt.contentReturned,false);assert.equal(receipt.currentAccessGranted,false);
   assert.equal(receipt.versionId,operation.versionId);assert.equal(receipt.requestHash,operation.requestHash);assert.equal(JSON.stringify(receipt).includes('Private built-native'),false);
   assert.deepEqual(t.requests.slice(start).map(x=>x.path),['/v2/receipt-status/challenges','/v2/receipt-status/query']);
   assert.ok(t.requests.slice(start).every(x=>!x.authorization));assert.equal(runtime.api.snapshot(),null);

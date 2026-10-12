@@ -199,6 +199,7 @@ export function createPurposeMenu({nativeTools,controller,select,prompt,info,lan
   capsuleMenu=createNativeCapsuleMenu({call:(name,args)=>native(name,args),select,prompt,info,language,
    isCurrent:()=>alive(v),onBack:back,onReturnWork,readWorkContext,openLink:nativeTools?.openLink});return capsuleMenu;}
  function methods(){if(!nativeTools)return message(label('方法','Methods'),label('这个入口尚未提供 Native 方法工具。请从原工作使用已配置的银河工具。','This entry has no Native method tools. Use the configured Galaxy tools from the original work.'));methodMenu().home();}
+ function community(){if(!nativeTools)return onBack();void openObject({kind:'community'});}
  function external(){if(!nativeTools)return onBack();stopMessages();a2aMenu?.close();const v=++version;a2aMenu=createNativeA2aMenu({call:(name,args)=>native(name,args),select,prompt,info,language,isCurrent:()=>alive(v),onBack,onReturnWork,onOpenLink:nativeTools.openLink,readWorkContext});a2aMenu.home();}
- return Object.freeze({search,messages,publish,identity,methods,external,projects,openObject,close(){version++;stopMessages();owner=null;navigationId=null;capsuleMenu?.close();a2aMenu?.close();projectMenu?.close();taskMenu?.close();}});
+ return Object.freeze({search,messages,publish,identity,methods,community,external,projects,openObject,close(){version++;stopMessages();owner=null;navigationId=null;capsuleMenu?.close();a2aMenu?.close();projectMenu?.close();taskMenu?.close();}});
 }

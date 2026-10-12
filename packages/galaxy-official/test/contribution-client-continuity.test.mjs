@@ -15,7 +15,7 @@ async function fixture(){
   let runtime,onPut,onGet,loseWrite=false,offlineStatus=false;
   const writes=[];
   const store={get:async key=>{const value=structuredClone(data.get(key));await onGet?.(key,value);return value;},
-    put:async(key,value)=>{data.set(key,structuredClone(value));await onPut?.(key,value);}};
+    put:async(key,value)=>{data.set(key,structuredClone(value));await onPut?.(key,value);},update:memoryAtomicUpdate(data,async(key,value)=>{await onPut?.(key,value);})};
   try{
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
     runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
@@ -193,3 +193,4 @@ test('real signed publication and lost ACK project Honor and requester facts, th
     await assert.rejects(f.runtime.api.call('/v2/contributions/read',{source,purpose:'requester-history'},{authenticated:false}),error=>error.code==='consent_required');
   }finally{await f.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

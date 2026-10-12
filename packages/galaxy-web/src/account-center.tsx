@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowRight,ArrowUpRight,Award,BookOpen,BriefcaseBusiness,ChevronLeft,FileText,KeyRound,MessageSquare,Pencil,Settings,ShieldCheck,UserRound} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,Award,Bookmark,BookOpen,BriefcaseBusiness,ChevronLeft,FileText,KeyRound,MessageSquare,Pencil,Settings,ShieldCheck,UserRound} from 'lucide-react';
 import {createProfileClient} from './profile-client.mjs';
 import {HomeContinuityWorkspace} from './home-continuity-workspace';
 import {profilePath} from './profile-navigation.mjs';
@@ -48,6 +48,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
  const destinations=[
   {to:'/app/work',icon:BriefcaseBusiness,title:'我的工作',description:'继续求助和参与的事情'},
   {to:'/app/community?section=owned',icon:MessageSquare,title:'我的帖子',description:'讨论、想法与分享'},
+  {to:'/app/bookmarks',icon:Bookmark,title:'我的收藏',description:'找回帖子、方法、项目与人物'},
   {to:'/app/history',icon:BookOpen,title:'经历与贡献',description:'看完整过程和实际结果'},
  ];
  return <section className="profile-overview" aria-busy={busy}>

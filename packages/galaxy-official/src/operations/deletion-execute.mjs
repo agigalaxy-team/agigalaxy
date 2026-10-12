@@ -32,7 +32,9 @@ export const deletionTargets = {
 const auditTables = new Set(['audit_events','audit_access_grants','audit_reads','data_export_reads']);
 // Issuer policy history is shared operator data. Retained membership references
 // are counted in the receipt, rather than silently deleting another issuer's rule.
-const excluded = ['schema_migrations','search_index_control','recovery_state','deletion_requests','deletion_events','deletion_executions','deletion_replays','runtime_config_events','honor_rule_versions', ...lifecycleManagedTables];
+// The directory counter contains one global ordering number, no subject data.
+// Each subject's individual read markers remain ordinary owned deletion targets.
+const excluded = ['schema_migrations','search_index_control','chat_directory_clock','recovery_state','deletion_requests','deletion_events','deletion_executions','deletion_replays','runtime_config_events','honor_rule_versions', ...lifecycleManagedTables];
 const quote = value => { if(!/^[a-z_][a-z0-9_]*$/.test(value))throw new Error('Unsupported database identifier');return `"${value}"`; };
 const counts = values => Object.fromEntries(Object.keys(deletionTargets).map(name=>[name,values[name]??0]));
 const sum = values => Object.values(values).reduce((total,value)=>total+value,0);

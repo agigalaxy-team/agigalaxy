@@ -51,7 +51,7 @@ async function fixture({retiring=false}={}) {
     const permit=async p=>sign(p.payloadJson,'task.owner-read',JSON.parse(p.payloadJson).operationId,{expiresAt:p.expiresAt});
     const read=(task,request)=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-read`,request);
     const peer=async()=>{const data=new Map(),r=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
-      store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v))},now:()=>f.now,
+      store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
       fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});peers.push(r);
       await r.createIdentity({confirmed:true});await r.connect({confirmed:true});return r;};
     const raw=async(path,input,credential)=>{const response=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',
@@ -210,3 +210,4 @@ test('owner reading permit binds the current device, exact event versions, priva
     await assert.rejects(h.read(task,fresh),code('task_owner_read_source_unavailable'),'fresh Consent never revives an explicit original revocation');
   }finally{await h.close();}
 });
+import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

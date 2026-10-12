@@ -42,7 +42,7 @@ async function fixture(){
    for(const name of ['config','query','get','report','event','receipt'])assert.ok(inventory.some(x=>x.name==='galaxy_moderation_'+name));
    assert.equal(inventory.find(x=>x.name==='galaxy_choice_receipt').annotations.readOnlyHint,true);
    return {call:async(name,input)=>{
-    const result=await client.callTool({name,arguments:input});const body=JSON.parse(result.content[0].text);
+    const result=await client.callTool({name,arguments:input});assert.ok(result.structuredContent);const body=result.structuredContent;
     if(result.isError)throw Object.assign(new Error(body.error??'MCP failure'),{status:lastStatus});return body;
    }};
   };

@@ -1,5 +1,6 @@
 // Human text and exact machine data share one result without making people
 // inspect transport records. This module has no authority or side effects.
+import {communityResultLines,bookmarkResultLines} from './community-presentation.mjs';
 const labels = {title:'标题',summary:'内容',text:'内容',description:'说明',purpose:'用途',goal:'目标',currentSituation:'目前情况',requestedScope:'需要的帮助',limitations:'限制',message:'消息',name:'名称',displayName:'名称',fileName:'文件',filename:'文件',reason:'说明',resultSummary:'结果',notes:'补充说明',value:'结果',values:'输入',inputCount:'输入数量',operation:'处理方式',delayMs:'所选等待（毫秒）',selectedDelayMs:'所选等待（毫秒）',about:'简介',claimedCapabilities:'自报能力',problemPattern:'适用问题',solutionStrategy:'解决方法',applicableScope:'适用范围',verificationMethod:'验证方法',tools:'工具',skills:'技能',mcpRefs:'连接工具',license:'许可证',approach:'方法',strategy:'方法',problem:'问题说明',attemptedApproaches:'已有尝试',scope:'范围',note:'补充说明',environmentDifference:'环境差异',issuer:'登录服务',externalSubject:'外部账户',providerId:'登录服务标识',modelFamily:'模型系列',inputScopeSummary:'输入范围',permissionScope:'权限范围',requestedFields:'所选字段',reasonCode:'追查事项',actions:'允许的操作'};
 labels.adoptedParts='实际采用的部分';
 labels.proposal='协助说明';
@@ -67,15 +68,17 @@ export function describeNativeChoice(name,input) {
  const preview=input?.preview??input??{};let contactPayload;
  if(name==='galaxy_contact_work_execute'&&typeof preview.payloadJson==='string'){try{contactPayload=JSON.parse(preview.payloadJson);}catch{/* Opaque bytes stay in diagnostics; no fields are guessed. */}}
  const payload=contactPayload??(/^galaxy_a2a_(?:work_)?execute$/.test(name)&&['result',undefined].includes(preview.action)?a2aParticipantContent(preview):preview.exact?.payload??preview.payload??preview);
- const title=name==='galaxy_help_execute_action'&&preview.kind==='task-event'&&payload.event?.kind==='apply'?'发送这份协助说明'
+ const a2aResultAuthorization=name==='galaxy_a2a_execute'&&preview.kind==='result'?preview.authorization:null;
+ const title=name==='galaxy_a2a_execute'&&preview.kind==='result'?'保留这次结果'
+  :name==='galaxy_help_execute_action'&&preview.kind==='task-event'&&payload.event?.kind==='apply'?'发送这份协助说明'
   :name==='galaxy_capsule_work_execute'?({publish:'保存这份方法',apply:'记录这次实际应用',reverify:'记录这次再次验证',reference:'在原工作引用这份方法'}[preview.action]??'继续这份方法')
   :name==='galaxy_a2a_work_execute'?({send:'发送本次所选内容',reply:'发送这次补充内容',cancel:'停止这次工作',result:'保留这次结果'}[preview.action]??'继续本次选择')
   :name==='galaxy_contact_work_execute'?({send:'发起这次联系',accept:'接受这次交流',decline:'谢绝这次交流',withdraw:'撤回这次联系'}[preview.action]??'处理这次联系')
   :(name==='galaxy_panel_action_execute'||name==='galaxy_help_action_execute'||name==='galaxy_help_execute_action')?({'publish-task':'发布这份请求','task-event':'更新这次求助','participation-propose':'申请这次参与','participation-event':'更新参与情况','context-grant':'分享这些材料','context-event':'调整材料范围'}[preview.kind]??nativeOperationLabel(name)):nativeOperationLabel(name),rows=authoredRows(name==='galaxy_contact_work_execute'?{title:payload.roomTitle??preview.relatedContact?.title,
    purpose:({conversation:'交流想法',reuse:'了解复用',collaboration:'一起做事',recruitment:'了解招募'}[payload.purpose??preview.relatedContact?.purpose]),note:payload.note||preview.relatedContact?.note,goal:payload.context?.kind==='ephemeral'?payload.context.title:undefined}
    :/^galaxy_a2a_(?:work_)?execute$/.test(name)&&(preview.action??preview.kind)==='result'?payload:preview);
- const visibility=preview.visibility??payload.visibility??input.visibility;
- const recipients=preview.recipientNames??preview.recipients??preview.viewers??preview.recipientIds??payload.viewers??input.viewers;
+ const visibility=a2aResultAuthorization?.visibility??preview.visibility??payload.visibility??input.visibility;
+ const recipients=a2aResultAuthorization?.viewers??preview.recipientNames??preview.recipients??preview.viewers??preview.recipientIds??payload.viewers??input.viewers;
  const scope=input?.mode??preview.mode;
  const sections=[];
  if(name==='galaxy_native_initialize')sections.push({label:'保存在这台设备',text:'稳定身份和设备密钥。连接服务与外发内容按需要另行选择。'});
@@ -93,7 +96,7 @@ export function describeNativeChoice(name,input) {
  if(recipients?.length)sections.push({label:'接收方',text:recipients.every(v=>typeof v==='string'&&!v.startsWith('GUID'))?recipients.join('、'):`本次选择的 ${recipients.length} 位成员`});
  if(scope)sections.push({label:'AI 可以做什么',text:({read:'读取这段对话',draft:'读取并准备草稿',respond:'在这段对话中回复'}[scope]??scope)});
  if(input?.enabled!==undefined)sections.push({label:'私人同步',text:input.enabled?'开启本次所选笔记的私人同步':'停止后续私人同步'});
- const expires=name==='galaxy_contact_work_execute'?preview.consentExpiresAt:input?.expiresAt??preview.expiresAt??preview.authorizationExpiresAt;
+ const expires=name==='galaxy_contact_work_execute'?preview.consentExpiresAt:a2aResultAuthorization?.expiresAt??input?.expiresAt??preview.expiresAt??preview.authorizationExpiresAt;
  if(expires){const date=new Date(typeof expires==='number'&&expires<1e12?expires*1000:expires);if(Number.isFinite(date.getTime()))sections.push({label:name==='galaxy_contact_work_execute'?'本次内容授权有效至':'有效至',text:date.toLocaleString('zh-CN')});}
  const identityRefs=[],refs=new Set();
  if(/identity|device/.test(name)){const walk=value=>{if(!value||typeof value!=='object')return;for(const [key,item]of Object.entries(value)){
@@ -116,7 +119,7 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
  // Apps already supply their carefully scoped human presentation and private
  // component metadata. Do not turn it back into a second generic summary.
  if(data.kind==='galaxy-worker-panel'||data.kind==='galaxy-a2a-panel'||data.kind==='galaxy-help-panel'||data.schemaVersion===1&&data.viewId)return result;
- const lines=[];
+ const lines=[],specific=result.isError||data.error?null:communityResultLines(name,data)??bookmarkResultLines(name,data);
  if(result.isError||data.error){const code=data.error??'';
   lines.push(/(?:identity|connection)_required|local_identity_required/.test(code)?'当前设备尚未接入所需身份或服务。可以在原工作按需要接续身份，再继续。':
    /identity|binding|connection/.test(code)?'当前身份或连接已变化，请在原工作重新取得当前允许的内容。':
@@ -128,6 +131,7 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
  else if(name==='galaxy_command'){lines.push('在原聊天说明想取得的帮助，沿用当前工作继续。可找帮助、发起求助、查看消息或回到原工作。');if(data.state==='recovery-required')lines.push('本机有尚未完成的恢复操作，请先保留当前资料并检查恢复状态。');}
  else if(name==='galaxy_native_status'){lines.push(nativeConnectionMessage(data));}
  else if(name==='galaxy_native_initialize'&&data.initialized){lines.push(data.existingIdentityPreserved?'已沿用已有身份完成这台设备的准备。':'这台设备的稳定身份已准备好。');lines.push('可以继续原工作；连接和外发范围按需要选择。');}
+ else if(specific){lines.push(...specific);}
  else{
   if(data.url)lines.push(data.launched?'已请求打开当前内容。':'可以打开当前内容：',data.url);
   const state=nativeStateLabel(data.state??data.status??data.receipt?.state);if(state)lines.push(state+'。');

@@ -2,6 +2,7 @@ import {createServer} from 'node:http';
 import {randomBytes,createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {nativeIdentityScopeGroups} from './identity-scope-presentation.mjs';
+import {forumReadTopicSchema} from '../../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 
 export const webIdentityProtocol='galaxy-web-identity-handoff';
 export const webIdentityProofType='galaxy-web-identity-handoff-v1+jws';
@@ -23,6 +24,8 @@ function targetDescription(path){
  if(path.startsWith('/app/capsules'))return '阅读与使用方法。';
  if(path.startsWith('/app/rooms/'))return '继续原来的对话。';
  if(path.startsWith('/app/projects/'))return '继续查看原项目。';
+ if(path.startsWith('/app/community'))return '继续阅读原来的社区内容。';
+ if(path==='/app/bookmarks')return '继续查看自己的收藏。';
  return '继续原来选择的银河页面。';
 }
 
@@ -30,6 +33,12 @@ export function isWebIdentityTargetPath(path){
  if(typeof path!=='string'||path.length>1500||!path.startsWith('/app/')||/[\\#]/.test(path))return false;
  if(path.includes('?')){
   const parts=path.split('?');if(parts.length!==2||parts[0].includes('%'))return false;
+  if(parts[0]==='/app/community'){
+   const parameters=new URLSearchParams(parts[1]),topic=parameters.get('topic'),query=parameters.get('q'),canonical=new URLSearchParams();
+   if(topic!==null){if(!forumReadTopicSchema.safeParse(topic).success)return false;canonical.set('topic',topic);}
+   if(query!==null){if(!query.trim()||query!==query.trim()||query.length>160||/[\p{Cc}\u202a-\u202e\u2066-\u2069]/u.test(query))return false;canonical.set('q',query);}
+   return canonical.size>0&&parts[1]===canonical.toString();
+  }
   if(parts[0]==='/app/search'){
    const parameters=new URLSearchParams(parts[1]),query=parameters.get('q'),taskId=parameters.get('sourceTask');
    if([...parameters.keys()].join(',')!=='q,sourceTask,returnTo'||typeof query!=='string'||!query.trim()||query!==query.trim()||query.length>200
@@ -45,9 +54,9 @@ export function isWebIdentityTargetPath(path){
   return parts[1]===new URLSearchParams({sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}).toString();
  }
  if(path.includes('%'))return false;
- const object=/^\/app\/(?:tasks|rooms|projects)\/([^/]+)$/i.exec(path),capsule=/^\/app\/capsules\/([^/]+)(?:\/versions\/([^/]+))?$/i.exec(path);
+ const object=/^\/app\/(?:tasks|rooms|projects)\/([^/]+)$/i.exec(path),capsule=/^\/app\/(?:capsules|community\/posts)\/([^/]+)(?:\/versions\/([^/]+))?$/i.exec(path);
  return !!object&&uuid(object[1])||!!capsule&&uuid(capsule[1])&&(!capsule[2]||uuid(capsule[2]))
-  ||/^\/app\/(?:match|publish|participate|search|capsules|notifications|settings\/(?:privacy|summaries))$/.test(path);
+  ||/^\/app\/(?:community|bookmarks|match|publish|participate|search|capsules|notifications|settings\/(?:privacy|summaries))$/.test(path);
 }
 function existingDevice(value,context){
  if(value===null)return null;

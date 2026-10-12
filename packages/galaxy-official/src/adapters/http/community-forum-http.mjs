@@ -19,6 +19,7 @@ async function actorFor(request,access,requestId,scope='assistance',either=false
 export async function dispatchCommunityForum({forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage=()=>{}}){
  if(!forum||!url.pathname.startsWith('/v2/community/'))return false;
  const path=url.pathname,method=request.method;
+ if(method==='GET'&&path==='/v2/community/topics'){send(200,forum.topics());return true;}
  // Public reads deliberately ignore any credential, including insufficient
  // or stale Task credentials. No credential is consumed or disconnected.
  const post=/^\/v2\/community\/posts\/([0-9a-f-]{36})$/.exec(path),

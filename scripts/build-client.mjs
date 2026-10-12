@@ -45,7 +45,7 @@ const allowed = new Set(['discovery-client.mjs', 'connection-client.mjs', 'conse
   'identity-link-client.mjs', 'shared/identity-link-schema.mjs',
   'binding-management-client.mjs', 'shared/binding-management-schema.mjs',
   'assistance-client.mjs', 'shared/assistance-schema.mjs', 'shared/qualification-schema.mjs',
-  'case-client.mjs', 'shared/cases-schema.mjs',
+  'case-client.mjs', 'shared/cases-schema.mjs', 'shared/task-material-v1-schema.mjs',
   'trust-store.mjs', 'session-memory.mjs', 'binding-status-client.mjs', 'host-connection-controller.mjs', 'verification/envelope.mjs', 'verification/manifest.mjs', 'verification/keyring.mjs',
   'verification/connection.mjs', 'verification/identity-control.mjs', 'domain/identity-control.mjs', 'shared/trust-package-control-chain-engine.mjs', 'shared/identity-control-schema.mjs', 'shared/trust-package-control-schema-factory.mjs', 'shared/product-v2-export-datasets.mjs', 'shared/task-schema-v2.mjs', 'shared/qualification-v2-schema.mjs', 'shared/web-primitives.mjs', 'shared/envelope-policy.mjs', 'shared/consents-schema.mjs',
   'shared/service-error.mjs', 'domain/consent-policy.mjs'].map(name => base + name));

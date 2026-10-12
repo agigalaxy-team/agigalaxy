@@ -37,14 +37,16 @@ test('host disposal clears modal state and delayed callbacks; cached plugin can 
   });
   const first = host();
   await plugin.tui(first.api); await first.open();
-  assert.match(first.page.title, /当前工作/);
-  first.page.options[0].onSelect(); // A real native selection defers its next page.
+  assert.match(first.page.title, /银河/);
+  assert.equal(first.page.options.find(option => option.value === '1').title, '[1] 找帮助');
+  first.page.options.find(option => option.value === '1').onSelect(); // A real native selection defers its next page.
   first.dispose(); await delay(30);
   assert.equal(first.page, null); assert.equal(first.commands.size, 0); assert.equal(first.cleanups.size, 0);
   assert.equal(disconnects, 1);
   const second = host();
   await plugin.tui(second.api); await second.open();
-  assert.equal(instances, 2); assert.match(second.page.title, /当前工作/);
+  assert.equal(instances, 2); assert.match(second.page.title, /银河/);
+  assert.equal(second.page.options.find(option => option.value === '1').title, '[1] 找帮助');
   second.dispose(); second.dispose();
   assert.equal(disconnects, 2); assert.deepEqual(await readdir(directory), []);
 });
