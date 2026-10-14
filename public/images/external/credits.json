@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "acquiredAt": "2026-10-14",
+  "purpose": "Two related content covers for existing external editorial readings. These are source images, not Galaxy member works or generated product demonstrations.",
+  "images": [
+    {
+      "id": "webb-pillars",
+      "file": "webb-pillars.png",
+      "src": "/images/external/webb-pillars.png",
+      "title": "Pillars of Creation (NIRCam Image)",
+      "alt": "韦布近红外影像中的创生之柱：金褐色尘埃柱与密集星光",
+      "sourceUrl": "https://science.nasa.gov/asset/webb/pillars-of-creation-nircam-image/",
+      "assetUrl": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/10/STScI-01GGF8H15VZ09MET9HFBRQX4S3.png?w=520&h=901&fit=crop&crop=faces%2Cfocalpoint",
+      "credit": "NASA, ESA, CSA, STScI; Image Processing: Joseph DePasquale (STScI), Anton Koekemoer (STScI), Alyssa Pagan (STScI)",
+      "license": "NASA image and media usage guidelines: informational/editorial use with source acknowledgement; no endorsement is implied.",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "licenseEvidence": "The official image page provides the complete credit above and no third-party copyright restriction for this image. NASA's image guidelines allow educational or informational web use and factual editorial use with acknowledgement, subject to their restrictions.",
+      "transformation": "Unmodified bytes from the official page's 520 × 901 responsive image; layout may crop the display as a thumbnail.",
+      "mediaType": "image/png",
+      "width": 520,
+      "height": 901,
+      "frames": 1,
+      "bytes": 1275597,
+      "sha256": "05bdae9c4da1743dfd19a82aadf13c3ff95239f56adee7c0c6c64dd788e2faf3"
+    },
+    {
+      "id": "alice",
+      "file": "alice-mad-tea-party.gif",
+      "src": "/images/external/alice-mad-tea-party.gif",
+      "title": "Mad Tea Party — The Tenniel Illustrations for Carroll's Alice in Wonderland",
+      "alt": "John Tenniel 原版插图：爱丽丝与三月兔、疯帽匠围坐在茶桌旁",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/114",
+      "galleryUrl": "https://www.gutenberg.org/files/114/114-h/114-h.htm",
+      "readingUrl": "https://www.gutenberg.org/ebooks/11",
+      "assetUrl": "https://www.gutenberg.org/files/114/114-h/images/alice25a.gif",
+      "credit": "插图：John Tenniel；电子版制作：Geof Pawlicki、Jim Chamings（Project Gutenberg）",
+      "license": "Public domain in the USA, as identified by Project Gutenberg for eBook 114. No worldwide public-domain claim is made.",
+      "licenseUrl": "https://www.gutenberg.org/policy/permission.html",
+      "licenseEvidence": "The official eBook 114 record identifies John Tenniel (1820–1914), lists the item as Still Image / GIF files, credits Geof Pawlicki and Jim Chamings, and marks copyright as Public domain in the USA. The official gallery identifies image 25 as Mad Tea Party.",
+      "transformation": "Unmodified official GIF, one static frame. The reading link remains the existing Alice's Adventures in Wonderland eBook 11.",
+      "mediaType": "image/gif",
+      "width": 640,
+      "height": 487,
+      "frames": 1,
+      "bytes": 26866,
+      "sha256": "870a5cf21b6a73090b69d71f04bd2dbf2dd494de3aec69d0c82484d350ca253e"
+    }
+  ]
+}

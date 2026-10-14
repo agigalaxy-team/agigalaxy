@@ -32,6 +32,40 @@ def resolved_file_path(path):
     return Path(windows_filesystem_path(str(resolved))) if os.name == 'nt' else resolved
 
 
+def copy_example_images(output):
+    """Publish only the named, attributed covers used by community examples."""
+    directory = ROOT.parent.parent / 'public' / 'images' / 'examples'
+    resolved_directory = resolved_file_path(directory)
+    if directory.is_symlink() or not resolved_directory.is_relative_to(resolved_file_path(ROOT.parent.parent)):
+        raise ValueError('Example images must stay in the repository')
+    for name in ('reading-lamp.png', 'travel-journal.png', 'reading-room.png', 'credits.json'):
+        source = directory / name
+        if source.is_symlink() or not resolved_file_path(source).is_relative_to(resolved_directory):
+            raise ValueError('Example image escaped its source directory: ' + name)
+        target = output / 'images' / 'examples' / name
+        if target.is_symlink() or not resolved_file_path(target).is_relative_to(output):
+            raise ValueError('Example image escaped the selected output: ' + name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+
+
+def copy_external_images(output):
+    """Publish only the two verified editorial covers and their attribution."""
+    directory = ROOT.parent.parent / 'public' / 'images' / 'external'
+    resolved_directory = resolved_file_path(directory)
+    if directory.is_symlink() or not resolved_directory.is_relative_to(resolved_file_path(ROOT.parent.parent)):
+        raise ValueError('External images must stay in the repository')
+    for name in ('webb-pillars.png', 'alice-mad-tea-party.gif', 'credits.json'):
+        source = directory / name
+        if source.is_symlink() or not resolved_file_path(source).is_relative_to(resolved_directory):
+            raise ValueError('External image escaped its source directory: ' + name)
+        target = output / 'images' / 'external' / name
+        if target.is_symlink() or not resolved_file_path(target).is_relative_to(output):
+            raise ValueError('External image escaped the selected output: ' + name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
@@ -129,8 +163,10 @@ def main():
     chrome.OUT = output
     chrome.PREVIEW = preview
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
-    for name in ('site.css', 'navigation.js'):
+    for name in ('site.css', 'navigation.js', 'home-experience.css', 'home-experience.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
+    copy_example_images(output)
+    copy_external_images(output)
     site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview}
     guide_pages = render_versioned_guides(site, metadata)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})

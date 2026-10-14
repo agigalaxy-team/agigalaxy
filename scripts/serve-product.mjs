@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const website = path.join(root, 'apps/galaxy-site/dist');
 const web = path.join(root, 'packages/galaxy-web/dist');
-const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.md': 'text/plain', '.txt': 'text/plain', '.xml': 'application/xml', '.tgz': 'application/gzip' };
+const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.md': 'text/plain', '.txt': 'text/plain', '.xml': 'application/xml', '.tgz': 'application/gzip' };
 
 async function publicConfiguration() {
   if (!process.env.GALAXY_WEB_CONFIG_FILE) throw new Error('Missing GALAXY_WEB_CONFIG_FILE');
@@ -59,7 +59,8 @@ export function productMiddleware({ development = false } = {}) {
         response.end(await readFile(path.join(website, '404.html')).catch(() => Buffer.from('Run npm run build before starting the product preview.')));
         return;
       }
-      response.writeHead(200, { 'content-type': (mime[path.extname(target)] ?? 'application/octet-stream') + (target.endsWith('.tgz') ? '' : '; charset=utf-8'), 'cache-control': 'no-store' });
+      const contentType = mime[path.extname(target)] ?? 'application/octet-stream';
+      response.writeHead(200, { 'content-type': contentType + (/^(text\/|application\/(?:json|xml))/.test(contentType) ? '; charset=utf-8' : ''), 'cache-control': 'no-store' });
       response.end(request.method === 'HEAD' ? undefined : content);
     } catch { response.writeHead(400); response.end('Invalid preview request.'); }
   };

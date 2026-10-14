@@ -82,3 +82,26 @@
 @media(max-width:680px){.guide-breadcrumb{padding-top:24px}.guide-tabs{gap:10px 20px;font-size:14px}.guide-heading{padding:26px 0 22px}.guide-layout{display:block;padding-bottom:35px}.guide-contents{position:static;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--line)}.guide-contents nav{display:flex;flex-wrap:wrap;gap:8px 20px;padding-bottom:12px}.guide-contents strong{flex-basis:100%}.guide-original{font-size:13px;padding-top:12px}.guide-body{font-size:16px}.guide-body h2{font-size:22px;margin-top:30px;padding-top:22px}.guide-body pre{padding:14px}.guide-table table{font-size:14px}}
 @media(max-width:950px){.header-inner{gap:28px}.site-header nav{gap:23px}.home-paths{gap:20px}.home-paths>a{gap:12px}.home-help{padding:25px}.home-help-actions{gap:14px}.home-help h2{font-size:21px}.reading-section{grid-template-columns:175px minmax(0,1fr);gap:24px}}
 @media(max-width:680px){.home-purpose{padding:38px 0 27px}.home-kicker{font-size:12px;margin-bottom:16px}.home-purpose h1{font-size:29px}.home-description{font-size:14px;margin:19px 0 23px}.home-search{padding:6px 6px 6px 13px;gap:9px}.home-search input{font-size:15px}.home-search button{padding:9px 18px}.home-paths{grid-template-columns:1fr;gap:0;padding:0 0 26px}.home-paths>a{align-items:center;padding:19px 0}.home-paths h2{font-size:17px;margin-bottom:3px}.home-paths p{font-size:13px}.home-help{display:block;padding:23px;margin:0 0 30px}.home-help h2{font-size:21px}.home-help p{font-size:13px}.home-help-actions{margin-top:20px;gap:22px}.home-ai{flex-wrap:wrap;gap:12px;margin-bottom:35px;padding:0}.home-ai>div:nth-child(2){flex:1;min-width:220px}.home-ai h2{font-size:17px}.home-ai p{font-size:13px}.home-ai>a{margin:0 0 0 62px}.reading-intro{padding:35px 0 27px}.reading-intro p{font-size:14px}.reading-section{grid-template-columns:1fr;gap:12px;padding:23px 0}.reading-section h2{font-size:19px}.reading-section p{font-size:14px}.entry-choices{grid-template-columns:1fr;gap:0;margin-bottom:15px}.entry-choices h2{font-size:22px}.reading-note{padding:23px;margin-bottom:30px}.policy-list>div{grid-template-columns:85px 1fr;gap:13px}.network-picture{grid-template-columns:1fr;gap:8px}.network-picture>div{padding:17px}.network-picture>.network-arrow{transform:rotate(90deg);line-height:24px}.network-picture strong{margin:5px 0}.download-focus{grid-template-columns:1fr;padding:23px;gap:26px}.download-focus>aside{border-left:0;border-top:1px solid #d9d1e5;padding:22px 0 0}.guide-list{grid-template-columns:1fr;gap:0}.missing-page{padding:40px 0 60px}.missing-page h1{font-size:25px}.site-help{display:none}}
+
+/* Shared white-and-pale-pink palette selected on 2026-10-14. */
+:root {--ink:#202735;--muted:#68717f;--paper:#fff;--line:#e9ecf0;--accent:#9d496a;--dark:#202735;--pink:#f8e5ed;--soft:#fff5f8}
+body,.site-header,.site-footer {background:#fff}
+.site-header {backdrop-filter:none;border-color:var(--line)}
+a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible {outline-color:#bb7c98}
+::selection {background:#f8e1ec;color:#202735}
+.brand>span {display:block;line-height:1.2}
+.brand small {display:block;margin-top:4px;letter-spacing:.25em;color:var(--ink)}
+.brand svg circle:last-child {fill:#d8a9be;stroke:#fff}
+.header-inner {height:74px}
+.site-header nav {margin-inline:auto;justify-content:center}
+.header-actions .site-enter {display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 18px;border:1px solid #f2d9e4;background:var(--pink);color:#392c36;border-radius:7px;font-size:13px;white-space:nowrap}
+.header-actions .site-enter:hover {background:#f4dbe6;color:#392c36}
+.button,.home-search button {background:var(--pink);color:#392c36;border:1px solid #f2d9e4}
+.button:hover,.home-search button:hover {background:#f4dbe6;color:#392c36}
+.button.secondary {background:#fff;border-color:var(--line);color:var(--ink)}
+.reading-note,.download-focus,.network-picture>div,.home-help {background:#fff;border:1px solid var(--line)}
+.purpose-symbol {background:var(--soft);color:#805268}
+.guide-body a,.guide-breadcrumb a,.guide-original {color:var(--accent)}
+.guide-table:focus-visible,.guide-body pre:focus-visible {outline-color:#bb7c98}
+.guide-body pre {background:#f8f9fb;border-color:var(--line)}
+@media(max-width:680px) {.header-actions .site-enter{min-height:38px;padding:7px 12px}.header-inner{height:68px}.site-header nav{margin-inline:0}}

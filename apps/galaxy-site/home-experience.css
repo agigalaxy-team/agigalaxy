@@ -1,0 +1,259 @@
+/* The public homepage example is isolated from the application's real content. */
+.galaxy-home {
+  --gh-ink:#202735;
+  --gh-muted:#68717f;
+  --gh-line:#e9ecf0;
+  --gh-soft:#fff5f8;
+  --gh-pink:#f8e5ed;
+  --gh-accent:#9d496a;
+  color:var(--gh-ink);
+  padding-bottom:38px;
+  font-size:14px;
+  line-height:1.7;
+}
+.galaxy-home [hidden] {display:none!important}
+.galaxy-home h1,.galaxy-home h2,.galaxy-home h3,.galaxy-home p {margin:0}
+.galaxy-home p {color:var(--gh-muted)}
+.galaxy-home button {font:inherit;color:inherit;text-align:left;touch-action:manipulation}
+.galaxy-home button,.galaxy-home a { -webkit-tap-highlight-color:transparent }
+.galaxy-home button:focus-visible,.galaxy-home a:focus-visible,.galaxy-home input:focus-visible {
+  outline:3px solid #bb7c98;outline-offset:4px;
+}
+.galaxy-home .gh-hero {text-align:center;padding:68px 0 48px}
+.galaxy-home .gh-hero h1 {font-size:clamp(31px,4.1vw,48px);font-weight:680;letter-spacing:-.045em;line-height:1.35}
+.galaxy-home .gh-hero h1 span {display:inline-block}
+.galaxy-home .gh-hero-actions {display:flex;justify-content:center;gap:15px;flex-wrap:wrap;margin-top:28px}
+.galaxy-home .gh-button {display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 24px;background:#fff;border:1px solid var(--gh-line);border-radius:7px;font-weight:550;color:var(--gh-ink)}
+.galaxy-home .gh-primary {background:var(--gh-pink);border-color:var(--gh-pink)}
+.galaxy-home .gh-button:hover {background:var(--gh-soft);border-color:#efdae3}
+.galaxy-home .gh-primary:hover {background:#f5dce7}
+.galaxy-home .gh-demo {border-top:1px solid var(--gh-line);border-bottom:1px solid var(--gh-line);padding:20px 0 28px}
+.galaxy-home .gh-stage-label {display:flex;justify-content:space-between;gap:15px;color:var(--gh-muted);font-size:13px;margin-bottom:24px}
+.galaxy-home .gh-stage {display:grid;grid-template-columns:1.08fr 1fr;align-items:stretch}
+.galaxy-home .gh-panel {min-width:0;padding:10px 28px 12px 18px}
+.galaxy-home .gh-identity {display:flex;gap:16px;align-items:center;margin-bottom:24px}
+.galaxy-home .gh-identity h2 {font-size:25px;font-weight:650;line-height:1.4}
+.galaxy-home .gh-identity p {font-size:13px;margin-top:4px}
+.galaxy-home .gh-monogram {display:inline-grid;place-items:center;width:58px;height:58px;flex-shrink:0;border-radius:19px;background:var(--gh-soft);color:var(--gh-accent);font-size:27px;line-height:1.2}
+.galaxy-home .gh-mini {width:34px;height:34px;border-radius:11px;font-size:16px}
+.galaxy-home .gh-tabs {display:flex;gap:22px;align-items:center;border-bottom:1px solid var(--gh-line);margin-bottom:17px}
+.galaxy-home .gh-tabs button {position:relative;background:none;border:0;min-height:46px;padding:9px 0 12px;color:var(--gh-muted);font-size:14px;white-space:nowrap}
+.galaxy-home .gh-tabs button::after {content:"";position:absolute;bottom:-1px;left:0;right:0;height:2px;background:transparent}
+.galaxy-home .gh-tabs button[aria-selected="true"] {color:var(--gh-ink);font-weight:600}
+.galaxy-home .gh-tabs button[aria-selected="true"]::after {background:#c27799}
+.galaxy-home .gh-tabs button:hover {color:var(--gh-accent)}
+.galaxy-home .gh-tab-space {min-height:358px}
+.galaxy-home .gh-records {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.galaxy-home .gh-record {display:grid;min-width:0;width:100%;min-height:190px;padding:0;background:#fff;border:1px solid var(--gh-line);border-radius:7px;overflow:hidden;transition:border-color 180ms ease}
+.galaxy-home .gh-record-front,.galaxy-home .gh-record-back {grid-area:1/1;min-width:0}
+.galaxy-home .gh-cover {display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;height:115px;background:#fafbfc;padding:14px 15px}
+.galaxy-home .gh-paper-icon {width:26px;height:32px;color:#f6dce6;transition:transform 300ms ease}
+.galaxy-home .gh-paper-lines {color:#ce88a5}
+.galaxy-home .gh-cover strong {font-size:12px;font-weight:550}
+.galaxy-home .gh-cover small {font-size:11px;color:var(--gh-muted)}
+.galaxy-home .gh-record-info {display:block;padding:12px}
+.galaxy-home .gh-record-info strong {display:block;font-size:13px;font-weight:550;line-height:1.5}
+.galaxy-home .gh-record-info small {display:block;font-size:11px;color:var(--gh-muted);margin-top:5px}
+.galaxy-home .gh-record-back {display:flex;flex-direction:column;justify-content:center;gap:12px;padding:15px 13px;background:var(--gh-soft)}
+.galaxy-home .gh-record-back strong {font-size:13px;font-weight:600}
+.galaxy-home .gh-record-back span {font-size:12px;line-height:1.8}
+.galaxy-home .gh-record-back small {font-size:11px;color:var(--gh-muted)}
+.galaxy-home .gh-record:hover,.galaxy-home .gh-record[aria-expanded="true"] {border-color:#dbadc0;background:var(--gh-soft)}
+.galaxy-home .gh-record:hover .gh-paper-icon,.galaxy-home .gh-record:focus-visible .gh-paper-icon {transform:translateY(-4px) rotate(-4deg)}
+.galaxy-home .gh-subtitle {font-size:14px;font-weight:550;margin:19px 0 9px}
+.galaxy-home .gh-discussions {display:grid;gap:9px}
+.galaxy-home .gh-discussion {display:block;width:100%;min-height:66px;padding:10px 13px;background:#fff;border:1px solid var(--gh-line);border-radius:7px}
+.galaxy-home .gh-discussion strong {display:block;font-size:13px;font-weight:500;line-height:1.5}
+.galaxy-home .gh-discussion small {font-size:12px;color:var(--gh-muted);margin-top:3px}
+.galaxy-home .gh-discussion:hover,.galaxy-home .gh-discussion[aria-expanded="true"] {background:#fbfcfd}
+.galaxy-home .gh-excerpt {display:block;font-size:13px;margin-top:8px;color:#545e6c}
+.galaxy-home .gh-tab-note {margin-top:22px;font-size:13px}
+.galaxy-home .gh-history {display:grid;gap:15px}
+.galaxy-home .gh-history-record {padding:18px;text-align:left;border:1px solid var(--gh-line);border-left:2px solid #e1b4c7;border-radius:6px;background:#fff;min-height:148px}
+.galaxy-home .gh-history-record strong {display:block;font-size:15px;font-weight:550;margin:9px 0}
+.galaxy-home .gh-history-record small,.galaxy-home .gh-excerpt-hint {font-size:12px;color:var(--gh-muted)}
+.galaxy-home :is(.gh-record,.gh-discussion,.gh-history-record).gh-source-linked {border-color:#dbadc0;background:var(--gh-soft)}
+.galaxy-home .gh-ai-panel {border-left:1px solid var(--gh-line);padding-left:28px;padding-right:18px;display:flex;flex-direction:column;gap:19px}
+.galaxy-home .gh-ai-header {display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:58px}
+.galaxy-home .gh-ai-heading {display:flex;gap:12px;align-items:center}
+.galaxy-home .gh-ai-heading h2 {font-size:21px;font-weight:600}
+.galaxy-home .gh-ai-header>small {font-size:12px;color:var(--gh-muted);white-space:nowrap}
+.galaxy-home .gh-question {align-self:flex-end;padding:11px 16px;border-radius:10px 10px 3px 10px;background:var(--gh-soft);max-width:95%;font-size:14px;margin-top:1px;min-height:46px}
+.galaxy-home .gh-answer {padding:16px 18px;background:#f8f9fb;border-radius:8px;font-size:14px;line-height:1.9;min-height:96px}
+.galaxy-home .gh-source-title {display:flex;justify-content:space-between;gap:12px;color:var(--gh-muted);font-size:12px;margin-bottom:9px}
+.galaxy-home .gh-source-title span:last-child {color:var(--gh-accent)}
+.galaxy-home .gh-sources {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-height:137px}
+.galaxy-home .gh-source {display:flex;flex-direction:column;justify-content:flex-start;gap:8px;min-height:137px;padding:13px;background:#fff;border:1px solid var(--gh-line);border-radius:7px}
+.galaxy-home .gh-source strong {font-size:13px;line-height:1.6;font-weight:550}
+.galaxy-home .gh-source small {font-size:12px;color:var(--gh-muted)}
+.galaxy-home .gh-source-action {margin-top:5px}
+.galaxy-home .gh-source-excerpt {font-size:13px;line-height:1.8;color:#545e6c}
+.galaxy-home .gh-source:hover,.galaxy-home .gh-source[aria-expanded="true"] {border-color:#dfb5c8;background:#fffbfd}
+.galaxy-home .gh-prompts {margin-top:auto;padding-top:3px}
+.galaxy-home .gh-prompts>span {display:block;font-size:12px;color:var(--gh-muted);margin-bottom:8px}
+.galaxy-home .gh-prompt-row {display:flex;flex-wrap:wrap;gap:7px}
+.galaxy-home .gh-prompt {min-height:44px;padding:9px 10px;border:1px solid var(--gh-line);border-radius:6px;background:#fff;font-size:12px}
+.galaxy-home .gh-prompt:hover,.galaxy-home .gh-prompt[aria-pressed="true"] {background:var(--gh-soft);border-color:#f3dce6;color:var(--gh-accent)}
+.galaxy-home .gh-modules {margin-top:47px}
+.galaxy-home .gh-section-heading {display:flex;align-items:baseline;gap:16px;margin-bottom:22px}
+.galaxy-home .gh-section-heading h2 {font-size:29px;font-weight:650;letter-spacing:-.03em}
+.galaxy-home .gh-section-heading p {font-size:13px}
+.galaxy-home .gh-feature-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
+.galaxy-home .gh-feature {display:grid;min-width:0;min-height:386px;border:1px solid var(--gh-line);border-radius:8px;background:#fff}
+.galaxy-home .gh-feature-front,.galaxy-home .gh-feature-back {grid-area:1/1;min-height:386px;width:100%;min-width:0;border-radius:8px}
+.galaxy-home .gh-feature-front {padding:0;background:#fff;border:0;display:flex;flex-direction:column}
+.galaxy-home .gh-feature-front:focus-visible {outline-offset:4px}
+.galaxy-home .gh-feature-front:hover .gh-feature-title,.galaxy-home .gh-feature-front:focus-visible .gh-feature-title {color:var(--gh-accent)}
+.galaxy-home .gh-feature-caption {display:flex;flex-direction:column;gap:7px;padding:20px 22px 24px}
+.galaxy-home .gh-feature-caption>small {font-size:13px;color:var(--gh-muted)}
+.galaxy-home .gh-feature-title {font-size:21px;font-weight:620;letter-spacing:-.035em;line-height:1.55}
+.galaxy-home .gh-feature-caption>span {font-size:14px;color:var(--gh-muted)}
+.galaxy-home .gh-graphic {display:block;position:relative;width:100%;min-height:224px;overflow:hidden;border-radius:8px 8px 0 0;background:linear-gradient(180deg,#fff 0%,#fff 78%,#fdfdfe 100%)}
+.galaxy-home .gh-graphic-label {display:block;position:absolute;left:15px;right:15px;bottom:13px;font-size:12px;text-align:center;color:var(--gh-muted)}
+.galaxy-home .gh-data-piece {position:absolute;display:block;left:12%;top:34px;width:68%;height:111px;padding:15px;border:1px solid var(--gh-line);border-radius:5px;background:#fff;font-size:13px;box-shadow:0 3px 14px #24314603;transition:transform 400ms ease}
+.galaxy-home .gh-data-piece:nth-child(2) {left:23%;top:65px;background:var(--gh-soft);border-color:#fae7ef}
+.galaxy-home .gh-data-piece small {font-size:12px;color:var(--gh-muted);margin-top:16px}
+.galaxy-home .gh-feature:hover .gh-data-piece:first-child,.galaxy-home .gh-feature:focus-within .gh-data-piece:first-child {transform:translate(-8px,-7px)}
+.galaxy-home .gh-feature:hover .gh-data-piece:nth-child(2),.galaxy-home .gh-feature:focus-within .gh-data-piece:nth-child(2) {transform:translate(8px,6px)}
+.galaxy-home .gh-identity-badge {position:absolute;left:20px;right:20px;top:22px;padding:11px 12px;background:#fff;border:1px solid var(--gh-line);border-radius:6px;display:flex;align-items:center;gap:11px;font-size:13px;font-weight:550}
+.galaxy-home .gh-history-chip {position:absolute;display:block;left:28px;right:22px;top:105px;padding:8px 13px;border-left:2px solid #e7b6cb;background:#f8f9fb;font-size:12px;transition:transform 400ms ease,background 400ms ease}
+.galaxy-home .gh-history-chip:nth-of-type(3) {top:149px;border-left-color:#e9cad7}
+.galaxy-home .gh-feature:hover .gh-history-chip:nth-of-type(3),.galaxy-home .gh-feature:focus-within .gh-history-chip:nth-of-type(3) {transform:translate(5px,-4px);background:var(--gh-soft)}
+.galaxy-home .gh-ai-piece {position:absolute;display:block;left:20px;top:27px;max-width:calc(100% - 45px);padding:9px 13px;background:#f8f9fb;border-radius:5px;font-size:12px;transition:transform 400ms ease}
+.galaxy-home .gh-ai-piece:nth-child(2) {left:34px;top:73px;background:var(--gh-soft)}
+.galaxy-home .gh-ai-window {position:absolute;display:block;left:26px;right:22px;top:129px;padding:13px 14px;background:#fff;border:1px solid var(--gh-line);border-radius:5px;font-size:12px;color:var(--gh-muted)}
+.galaxy-home .gh-feature:hover .gh-ai-piece:first-child,.galaxy-home .gh-feature:focus-within .gh-ai-piece:first-child {transform:translate(9px,4px)}
+.galaxy-home .gh-feature:hover .gh-ai-piece:nth-child(2),.galaxy-home .gh-feature:focus-within .gh-ai-piece:nth-child(2) {transform:translate(12px,-2px)}
+.galaxy-home .gh-feature-back {display:flex;flex-direction:column;gap:13px;padding:18px;background:#fff}
+.galaxy-home .gh-feature-top {display:flex;justify-content:space-between;align-items:center;gap:8px}
+.galaxy-home .gh-feature-top h3 {font-size:17px;font-weight:600;line-height:1.5}
+.galaxy-home .gh-close {min-height:44px;min-width:44px;flex-shrink:0;padding:7px 1px;border:0;background:none;color:var(--gh-muted);font-size:12px;text-align:right;text-decoration:underline;text-underline-offset:4px}
+.galaxy-home .gh-choice-row,.galaxy-home .gh-checks {display:flex;flex-wrap:wrap;gap:8px}
+.galaxy-home .gh-choice {min-height:44px;padding:8px 12px;border:1px solid var(--gh-line);border-radius:6px;background:#fff;font-size:13px}
+.galaxy-home .gh-choice[aria-pressed="true"] {background:var(--gh-soft);border-color:#f1d5e2;color:var(--gh-accent)}
+.galaxy-home .gh-paper-preview {display:flex;flex-direction:column;gap:10px;min-height:189px;padding:16px;border:1px solid var(--gh-line);border-radius:6px;background:#fcfcfd}
+.galaxy-home .gh-paper-preview strong {font-size:14px;font-weight:600}
+.galaxy-home .gh-paper-preview p {font-size:13px;line-height:1.85;color:#545e6c}
+.galaxy-home .gh-paper-preview small {font-size:12px;color:var(--gh-muted);line-height:1.6}
+.galaxy-home .gh-context {display:grid;gap:12px;min-height:189px;padding:14px;border:1px solid var(--gh-line);border-radius:6px}
+.galaxy-home .gh-context-heading {display:flex;align-items:center;gap:11px}
+.galaxy-home .gh-context-heading strong {font-size:14px;font-weight:600}
+.galaxy-home .gh-context-heading small {font-size:12px;color:var(--gh-muted)}
+.galaxy-home .gh-context-record {font-size:12px;padding:8px 10px;border-left:2px solid #e7b6cb;background:#f8f9fb}
+.galaxy-home .gh-check {display:flex;align-items:center;gap:7px;min-height:44px;padding:8px 9px;background:#fff;border:1px solid var(--gh-line);border-radius:6px;font-size:12px;cursor:pointer}
+.galaxy-home .gh-check input {width:16px;height:16px;margin:0;accent-color:var(--gh-accent)}
+.galaxy-home .gh-mini-answer {padding:13px;border:1px solid var(--gh-line);background:#f8f9fb;border-radius:6px;min-height:95px;font-size:13px;line-height:1.8}
+.galaxy-home .gh-mini-sources {display:flex;flex-wrap:wrap;gap:7px;min-height:44px}
+.galaxy-home .gh-mini-source {min-height:44px;padding:8px 9px;border:1px solid #f7e2ec;border-radius:5px;background:var(--gh-soft);font-size:12px;color:var(--gh-accent)}
+.galaxy-home .gh-mini-source[aria-expanded="true"] {background:var(--gh-pink)}
+.galaxy-home .gh-mini-excerpt-space {min-height:53px}
+.galaxy-home .gh-mini-excerpt {font-size:12px;line-height:1.8}
+.galaxy-home .gh-local-note {font-size:11px;margin-top:auto;line-height:1.7}
+.galaxy-home .gh-community {display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:35px;padding:24px;border:1px solid var(--gh-line);border-radius:8px}
+.galaxy-home .gh-community>div {display:flex;align-items:baseline;gap:19px;flex-wrap:wrap}
+.galaxy-home .gh-community h2 {font-size:23px;font-weight:600}
+.galaxy-home .gh-community p {font-size:14px}
+.galaxy-home .gh-community a {display:inline-flex;align-items:center;gap:10px;min-height:44px;flex-shrink:0;color:var(--gh-accent);font-size:14px}
+.galaxy-home .gh-community svg {width:19px;height:19px}
+.galaxy-home .gh-connect {display:grid;grid-template-columns:1fr 1.05fr;gap:48px;padding:55px 23px 25px;align-items:center}
+.galaxy-home .gh-connect h2 {font-size:29px;font-weight:650;line-height:1.5;letter-spacing:-.035em;margin-bottom:10px}
+.galaxy-home .gh-connect>div>p {font-size:14px;max-width:390px}
+.galaxy-home .gh-entry-options {display:flex;gap:10px;flex-wrap:wrap;margin-top:23px}
+.galaxy-home .gh-entry-options button {min-height:44px;padding:9px 15px;border:1px solid var(--gh-line);border-radius:6px;background:#fff;font-size:14px;color:var(--gh-muted)}
+.galaxy-home .gh-entry-options button[aria-pressed="true"] {background:var(--gh-soft);border-color:#f8e0ea;color:var(--gh-accent)}
+.galaxy-home .gh-entry-link {display:inline-flex;align-items:center;min-height:44px;margin-top:12px;font-size:14px;text-decoration:underline;text-underline-offset:5px}
+.galaxy-home .gh-entry-screen {border:1px solid var(--gh-line);border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 8px 24px #24314603}
+.galaxy-home .gh-window-head {display:flex;align-items:center;gap:5px;padding:12px 16px;background:#f8f9fb;border-bottom:1px solid #f2f3f6}
+.galaxy-home .gh-window-head i {width:6px;height:6px;border-radius:50%;background:#bcc3cc}
+.galaxy-home .gh-window-head i:first-child {background:#d995b2}
+.galaxy-home .gh-window-head small {margin-left:auto;color:var(--gh-muted);font-size:11px;letter-spacing:.04em}
+.galaxy-home .gh-window-content {display:flex;align-items:center;gap:17px;padding:29px 27px;min-height:147px}
+.galaxy-home .gh-window-content strong {display:block;font-size:18px;font-weight:600;margin-bottom:5px}
+.galaxy-home .gh-window-content p {font-size:13px;line-height:1.8}
+.galaxy-home .gh-window-caption {padding:0 27px 24px;font-size:12px}
+.galaxy-home .gh-footnote {margin-top:23px;text-align:center;font-size:12px}
+.galaxy-home .gh-support-links {display:flex;justify-content:center;flex-wrap:wrap;gap:9px 23px;margin-top:11px;font-size:12px;color:var(--gh-muted)}
+.galaxy-home .gh-support-links a {display:inline-flex;align-items:center;min-height:44px}
+@media(max-width:1000px) {
+  .galaxy-home .gh-panel {padding-left:0;padding-right:22px}
+  .galaxy-home .gh-ai-panel {padding-left:22px;padding-right:0}
+  .galaxy-home .gh-feature-grid {gap:15px}
+  .galaxy-home .gh-feature-caption {padding:18px 17px 21px}
+  .galaxy-home .gh-feature-title {font-size:19px}
+  .galaxy-home .gh-feature-back {padding:15px}
+  .galaxy-home .gh-feature-top h3 {font-size:16px}
+  .galaxy-home .gh-connect {padding-inline:0;gap:30px}
+  .galaxy-home .gh-connect h2 {font-size:26px}
+}
+@media(max-width:760px) {
+  .galaxy-home .gh-hero {padding:45px 0 35px}
+  .galaxy-home .gh-stage {grid-template-columns:1fr}
+  .galaxy-home .gh-stage-label {margin-bottom:20px}
+  .galaxy-home .gh-panel {padding:4px 0 22px}
+  .galaxy-home .gh-ai-panel {padding:25px 0 0;border-left:0;border-top:1px solid var(--gh-line)}
+  .galaxy-home .gh-tab-space {min-height:354px}
+  .galaxy-home .gh-answer {min-height:86px}
+  .galaxy-home .gh-prompts {padding-top:0}
+  .galaxy-home .gh-feature-grid {grid-template-columns:1fr}
+  .galaxy-home .gh-feature,.galaxy-home .gh-feature-front,.galaxy-home .gh-feature-back {min-height:386px}
+  .galaxy-home .gh-graphic {min-height:230px}
+  .galaxy-home .gh-data-piece {left:14%;width:63%;height:116px}
+  .galaxy-home .gh-data-piece:nth-child(2) {left:24%;top:69px}
+  .galaxy-home .gh-feature-title {font-size:23px}
+  .galaxy-home .gh-feature-caption {padding:18px 23px 23px}
+  .galaxy-home .gh-feature-back {padding:21px}
+  .galaxy-home .gh-feature-top h3 {font-size:20px}
+  .galaxy-home .gh-feature-back .gh-local-note {font-size:12px}
+  .galaxy-home .gh-modules {margin-top:32px}
+  .galaxy-home .gh-community {margin-top:24px;padding:20px;align-items:flex-start}
+  .galaxy-home .gh-community>div {display:block}
+  .galaxy-home .gh-community h2 {font-size:21px;margin-bottom:6px}
+  .galaxy-home .gh-community p {font-size:13px}
+  .galaxy-home .gh-connect {grid-template-columns:1fr;padding-top:37px;gap:23px}
+  .galaxy-home .gh-connect h2 {font-size:27px}
+  .galaxy-home .gh-entry-screen {max-width:100%}
+}
+@media(max-width:420px) {
+  .galaxy-home .gh-hero h1 {font-size:30px;line-height:1.5}
+  .galaxy-home .gh-hero-actions {gap:10px;margin-top:22px}
+  .galaxy-home .gh-button {padding-inline:17px;font-size:13px}
+  .galaxy-home .gh-stage-label {font-size:12px;gap:10px}
+  .galaxy-home .gh-identity {gap:12px}
+  .galaxy-home .gh-identity h2 {font-size:23px}
+  .galaxy-home .gh-identity p {font-size:12px}
+  .galaxy-home .gh-monogram {width:49px;height:49px;border-radius:15px;font-size:24px}
+  .galaxy-home .gh-mini {width:33px;height:33px;border-radius:10px;font-size:15px}
+  .galaxy-home .gh-tabs {gap:21px}
+  .galaxy-home .gh-tabs button {font-size:13px}
+  .galaxy-home .gh-records {gap:7px}
+  .galaxy-home .gh-record {min-height:182px}
+  .galaxy-home .gh-cover {padding:11px 8px;height:111px}
+  .galaxy-home .gh-record-info {padding:10px 7px}
+  .galaxy-home .gh-record-info strong {font-size:12px}
+  .galaxy-home .gh-record-info small {font-size:10px}
+  .galaxy-home .gh-record-back {padding:10px 8px;gap:8px}
+  .galaxy-home .gh-record-back strong,.galaxy-home .gh-record-back span {font-size:12px}
+  .galaxy-home .gh-record-back small {font-size:10px}
+  .galaxy-home .gh-source {padding:11px 10px;min-height:149px}
+  .galaxy-home .gh-source strong {font-size:12px}
+  .galaxy-home .gh-source small {font-size:11px}
+  .galaxy-home .gh-source-excerpt {font-size:12px}
+  .galaxy-home .gh-prompt {padding:9px 8px}
+  .galaxy-home .gh-section-heading {align-items:flex-start;gap:9px}
+  .galaxy-home .gh-section-heading h2 {font-size:25px;white-space:nowrap}
+  .galaxy-home .gh-section-heading p {font-size:12px;padding-top:7px}
+  .galaxy-home .gh-feature-back {padding:18px}
+  .galaxy-home .gh-feature-top h3 {font-size:18px}
+  .galaxy-home .gh-community {display:block}
+  .galaxy-home .gh-community a {margin-top:8px}
+  .galaxy-home .gh-entry-options {gap:8px}
+  .galaxy-home .gh-entry-options button {padding:9px 12px;font-size:13px}
+  .galaxy-home .gh-window-content {padding:25px 18px;gap:12px}
+  .galaxy-home .gh-window-content strong {font-size:16px}
+  .galaxy-home .gh-window-caption {padding-inline:18px}
+  .galaxy-home .gh-footnote {font-size:11px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .galaxy-home *,.galaxy-home *::before,.galaxy-home *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .galaxy-home .gh-paper-icon,.galaxy-home .gh-data-piece,.galaxy-home .gh-history-chip,.galaxy-home .gh-ai-piece {transform:none!important}
+}
