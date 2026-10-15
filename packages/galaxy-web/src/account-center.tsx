@@ -17,7 +17,7 @@ export function SettingsLayout({path,search,subjectId,navigate,children}:Props){
  const current=path==='/app/settings/identity'&&new URLSearchParams(search).get('section')==='account'?path+'?section=account':path;
  const profile=profilePath(subjectId);
  const personal=[['/app/account','概览',Home],[profile?profile+'?edit=1':'/app/settings/identity','个人资料',UserRound],['/app/work','我的工作',BriefcaseBusiness],['/app/community?section=owned','我的帖子',MessageSquare],['/app/bookmarks','我的收藏',Bookmark],['/app/history','经历与贡献',BookOpen]] as const;
- return <div className="settings-layout selected-account-layout"><aside className="settings-sidebar selected-account-sidebar"><h2>我的银河</h2><nav aria-label="账户栏目">{personal.map(([url,title,Icon])=><NavLink key={url+'-'+title} to={url} navigate={navigate} aria-current={url===current?'page':undefined}><Icon size={19}/>{title}</NavLink>)}</nav><nav className="selected-account-settings" aria-label="账户设置">{settings.map(([url,title])=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}>{title}</NavLink>)}</nav></aside><div className={'settings-content'+(path==='/app/account'?' selected-account-content':'')}>{children}</div></div>;
+ return <div className="settings-layout selected-account-layout"><aside className="settings-sidebar selected-account-sidebar"><h2>账户</h2><nav aria-label="账户栏目">{personal.map(([url,title,Icon])=><NavLink key={url+'-'+title} to={url} navigate={navigate} aria-current={url===current?'page':undefined}><Icon size={19}/>{title}</NavLink>)}</nav><nav className="selected-account-settings" aria-label="账户设置">{settings.map(([url,title])=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}>{title}</NavLink>)}</nav></aside><div className={'settings-content'+(path==='/app/account'?' selected-account-content':'')}>{children}</div></div>;
 }
 
 type AccountProps={runtime?:AccountRuntime|null;subjectId?:string;connected:boolean;hasIdentity:boolean;navigate:Go};
@@ -55,7 +55,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
   {to:'/app/history',icon:BookOpen,title:'经历与贡献',description:'看完整过程和实际结果'},
  ];
  return <section className="profile-overview selected-account" aria-busy={busy}>
-  <header className="profile-heading"><h1 className="small">账户中心</h1><NavLink to="/app/settings/identity" navigate={navigate} className="profile-settings-link"><Settings size={18}/>设置</NavLink></header>
+  <header className="profile-heading"><h1 className="small">概览</h1><NavLink to="/app/settings/identity" navigate={navigate} className="profile-settings-link"><Settings size={18}/>设置</NavLink></header>
   <div className="profile-intro"><span className="profile-avatar" aria-hidden="true">{profile?.displayName?Array.from(profile.displayName).slice(0,1):<UserRound size={34}/>}</span><div>
    <h2>{profile?.displayName??(hasIdentity?'我的个人资料':'欢迎来到银河')}</h2>
    {profile?.about?<p className="profile-about">{profile.about}</p>:<p>{hasIdentity?'在这里继续自己的交流与工作。':'浏览经验、参与讨论，遇到问题时找到帮助。'}</p>}
@@ -79,7 +79,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
  </section>;
 }
 export function WorkOverview({runtime,subjectId,connected,navigate}:Pick<AccountProps,'runtime'|'subjectId'|'connected'|'navigate'>){
- return <section className="personal-work"><header className="profile-heading"><h1 className="small">我的工作</h1><NavLink to="/app/publish" navigate={navigate} className="primary-action">发起求助</NavLink></header>
+ return <section className="personal-work"><header className="profile-heading"><h1 className="small">工作概览</h1><NavLink to="/app/publish" navigate={navigate} className="primary-action">发起求助</NavLink></header>
   <nav className="work-filter-links" aria-label="查看我的工作">{[['/app/participate?view=requested','我发布的'],['/app/participate?view=participating','我参与的'],['/app/rooms','对话']].map(([to,title])=><NavLink key={to} to={to} navigate={navigate}>{title}</NavLink>)}</nav>
   {!connected?<div className="personal-empty"><BriefcaseBusiness size={32}/><h2>从上次的事情继续</h2><p>使用自己的身份，查看参与的工作和回应。</p><NavLink to="/app/settings/identity" navigate={navigate} className="primary-action">继续使用</NavLink></div>:<HomeContinuityWorkspace runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate}/>}
   <section className="work-library"><h2>继续整理与使用</h2><nav>{[['/app/projects?section=projects','我的项目','持续推进的目标与参与机会'],['/app/projects?section=contacts','邀请与联系人','查看发出和收到的联系'],['/app/capsules?mode=author','我的方法','整理、修订与分享经验'],['/app/history','经历与贡献','回看实际过程和结果'],['/app/information','资料与关注','继续查找和跟进相关信息'],['/app/configurations','工作环境','复用已经记录的配置'],['/app/qualification-permissions','材料使用许可','管理具体材料和使用范围']].map(([to,title,description])=><NavLink key={to} to={to} navigate={navigate}><span><strong>{title}</strong><small>{description}</small></span></NavLink>)}</nav></section>

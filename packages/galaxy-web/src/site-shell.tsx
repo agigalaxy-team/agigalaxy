@@ -5,6 +5,7 @@ import {PublicBrowseWorkspace} from './public-browse-workspace';
 import {ReadingDetails,ReadingSummary} from './reading-details';
 const SettingsLayout=lazy(()=>import('./account-center').then(module=>({default:module.SettingsLayout})));
 import {carryHelpOrigin} from './help-origin-client.mjs';
+import {workspaceLocation} from './workspace-location.mjs';
 import type {createWebRuntime} from './runtime.mjs';
 import './selected-shell.css';
 
@@ -47,7 +48,7 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
   else go('/app/find'+(query?'?q='+encodeURIComponent(query):''));
  };
  const publishTarget=carryHelpOrigin('/app/publish',path+search+location.hash);
- const activeTitle=community?'社区':messages?'消息':settings?'我的银河':inWork?'我的工作':path==='/app/bookmarks'?'收藏':'银河';
+ const activeTitle=workspaceLocation(path);
  const railLink=([target,label,Icon]:readonly[string,string,typeof Home])=><a key={target} href={target} aria-current={current(target)?'page':undefined} onClick={event=>follow(event,target)}><Icon size={22}/><span>{label}</span></a>;
  return <div className="galaxy-workspace galaxy-site selected-shell"><a href="#main-content" className="site-skip">跳到内容</a>
   <aside className="selected-global-rail" aria-label="银河全局导航">
@@ -56,7 +57,7 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
    <nav className="selected-rail-secondary" aria-label="接入与设置">{secondary.map(railLink)}</nav>
   </aside>
   <header className="site-app-header selected-app-header"><div className="site-header-inner">
-   <p className="selected-context-title">{activeTitle}</p>
+   <p className="selected-context-title" aria-label={'当前位置：银河 · '+activeTitle}><span>银河</span><span className="selected-context-divider" aria-hidden="true">·</span><span>{activeTitle}</span></p>
    <search className="selected-header-search"><form onSubmit={searchContents}><Search size={18}/><input key={community?search:'public-search'} name="q" type="search" maxLength={160} defaultValue={community?new URLSearchParams(search).get('q')??'':''} placeholder={community?'搜索社区内容':'搜索公开内容'} aria-label={community?'搜索社区内容':'搜索银河公开内容'}/></form></search>
    <div className="selected-header-actions">
     <ReadingDetails key={path+search} className="selected-function-directory"><ReadingSummary>功能目录</ReadingSummary>

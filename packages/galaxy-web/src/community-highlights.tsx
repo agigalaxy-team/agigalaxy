@@ -81,15 +81,18 @@ function CommunityReadingSidebarView({preferenceKey,navigate,posts=[],source='ga
 
 export function CommunityExternalWorkspace({runtime,subjectId,navigate,routeSearch=''}:Props&{subjectId?:string;routeSearch?:string}){
  const {topic,query,format}=communitySelection(routeSearch),[search,setSearch]=useState(query),selection=forumTopics.find(item=>item.id===topic);
+ const formatName=({all:'外部精选',work:'精选作品',method:'精选方法',article:'精选文章'})[format];
+ const title=query?`“${query}”的搜索结果`:selection?.label??(topic==='unclassified'?'未分类精选':formatName);
+ const description=query?'搜索范围：'+['外部精选',selection?.label??(topic==='unclassified'?'未分类':''),format!=='all'?formatName:''].filter(Boolean).join(' · '):topic||format!=='all'?`${formatName}，打开原站阅读。`:'从公开文章、作品与方法中选读。';
  const target=(changes:{topic?:string;query?:string;format?:CommunityFormat}={})=>communityBrowsePath({source:'external',topic,query,format,...changes});
  const readings=filterExternalReadings(topic,query,format);
  return <section className="forum-workspace forum-discovery forum-external-workspace">
-  <div className="forum-heading"><div><h1 className="small">社区</h1><p>从一个话题开始，也让想法继续。</p></div></div>
+  <div className="forum-heading"><div><h1 className="small" style={{overflowWrap:'anywhere'}}>{title}</h1><p>{description}</p></div></div>
   <nav className="forum-tabs" aria-label="社区内容"><ReadingLink target={communityBrowsePath({topic,query})} navigate={navigate}>银河讨论</ReadingLink><ReadingLink target={target()} navigate={navigate} aria-current="page" className="active">外部精选</ReadingLink></nav>
   <div className="forum-discovery-layout"><section className="forum-results" aria-label="外部精选内容">
    <div className="forum-feed-toolbar"><span className="forum-order-label">编辑选读</span><nav className="forum-formats" aria-label="精选内容形式">{([['all','全部'],['work','作品'],['method','方法'],['article','文章']] as const).map(([id,label])=><ReadingLink key={id} target={target({format:id})} navigate={navigate} aria-current={format===id?'page':undefined}>{label}</ReadingLink>)}</nav></div>
    <search><form className="forum-search" onSubmit={event=>{event.preventDefault();navigate(target({query:search}));}}><label><span className="forum-search-label">搜索外部精选</span><input type="search" aria-label="搜索外部精选" maxLength={160} value={search} onChange={event=>setSearch(event.target.value)} placeholder={selection?'在'+selection.label+'中搜索':'搜索外部精选的标题与摘要'}/></label><button type="submit"><Search size={16} aria-hidden/><span>搜索</span></button></form></search>
-   {(topic||query)&&<div className="forum-search-context"><p>{selection?.label??(topic==='unclassified'?'未分类':'')}{query&&<> · 搜索“{query}”</>}</p><ReadingLink target={target({topic:'',query:''})} navigate={navigate}>清除筛选</ReadingLink></div>}
+   {(topic||query)&&<div className="forum-search-context"><ReadingLink target={target({topic:'',query:''})} navigate={navigate}>清除筛选</ReadingLink></div>}
    <p className="forum-source-note">外部公开内容 · 独立摘要 · 打开原站阅读，不是银河成员帖子</p>
    <div className="forum-feed forum-external-feed">{readings.map(item=><article className="forum-card forum-content-row" key={item.id}><ContentCover image={item.image} href={item.url}/><div className="forum-card-copy"><h2><a href={item.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{item.title}</a></h2><p className="forum-excerpt">{item.summary}</p><div className="forum-meta"><span className="forum-external-source">{item.source}</span><span>{forumTopics.find(value=>value.id===item.topic)?.label}</span><span>{({work:'作品',method:'方法',article:'文章'})[item.format]}</span></div><ExternalCoverCredit id={item.id}/></div></article>)}</div>
    {!readings.length&&<div className="forum-result-empty"><h2>这里暂时没有相符的外部精选</h2><p>试试其他频道或关键词，也可以清除筛选。</p><ReadingLink target={communityBrowsePath({source:'external'})} navigate={navigate}>浏览全部外部精选</ReadingLink></div>}

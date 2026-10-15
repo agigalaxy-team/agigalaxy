@@ -125,7 +125,7 @@ export function AccountSettings({runtime, connected}: {runtime: Runtime | null; 
     try { const url = new URL(login.authorizationUrl); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; } catch { return null; } })();
   const originals = visible ? view.originals.filter(record => record.id !== login?.id) : [];
 
-  return <section className="account-settings account-verification"><header className="history-heading"><div><h2>账号验证</h2><p>使用已有账号完成验证，继续发布和交流。</p></div>{visible&&view.quota?.accountVerified&&<span className="verification-done">已完成验证</span>}</header>
+  return <section className="account-settings account-verification"><header className="history-heading"><div><p>使用已有账号完成验证，继续发布和交流。</p></div>{visible&&view.quota?.accountVerified&&<span className="verification-done">已完成验证</span>}</header>
     {error&&(visible||!scope&&!scopeChanged)&&<p className="message error" role="alert">{error}</p>}
     {visible&&readError&&<p className="message error" role="alert">部分账号资料暂时没有读到。<Button variant="ghost" disabled={busy} onClick={()=>void refresh()}>重试</Button></p>}
     {visible&&notice&&<output className="privacy-notice">{notice}</output>}

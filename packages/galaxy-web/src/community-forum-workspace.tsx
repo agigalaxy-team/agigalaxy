@@ -101,8 +101,10 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const isFeed=!postId&&!replyId&&!reportId&&!compose;
   const {topic,query}=forumBrowseSelection(routeSearch,forumTopics.map(value=>value.id));
   const selectedTopic=forumTopics.find(value=>value.id===topic);
-  const topicTitle=selectedTopic?.label??(topic==='unclassified'?'未分类':'全部帖子');
+  const topicTitle=selectedTopic?.label??(topic==='unclassified'?'未分类帖子':'全部讨论');
   const topicDescription=selectedTopic?.description??(topic==='unclassified'?'这些帖子还没有选择主题，原内容和讨论继续保留。':'从感兴趣的主题开始，也可以直接阅读最新发表的内容。');
+  const feedTitle=section==='reports'?'内容处理记录':query?`“${query}”的搜索结果`:section==='owned'?'我的帖子':topicTitle;
+  const feedDescription=section==='reports'?'查看与你有关的举报、申诉和处理记录。':query?`搜索范围：${section==='owned'?'我的帖子':'银河讨论'}${topic?' · '+topicTitle:''}`:section==='owned'?(topic?`${topicTitle}中的本人帖子。继续阅读、回复或编辑。`:'继续阅读、回复或编辑自己发表的内容。'):topic?topicDescription:'从一个话题开始，也让想法继续。';
   const feedPath=forumBrowsePath({section,topic,query});
   const returnPath=browseReturn==='/app/community'?feedPath:browseReturn;
   const returnedScope=new URL(returnPath,location.origin);
@@ -402,6 +404,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const pendingActive = pending.find(item => item.state === 'awaiting-receipt');
   const recoveryNeedsReview=['authorization-expired','original-binding-changed','original-binding-unavailable','authorization-review-required'].includes(pendingReason);
   const displayedPublicationUntil = form?.operationId ? pending.find(item => item.operationId === form.operationId)?.publishedUntil ?? null : publicationUntil;
+  const editorTitle=form?(form.kind==='create-post'?'写帖子':form.kind==='publish-version'?'编辑帖子':labels[form.kind]):'写帖子';
   const needConnection = <div className="message"><p>{subjectId ? '这台浏览器已有你的身份。连接后可以发表；本机稿仍属于原身份。' : '阅读无需登录。准备参与时，先建立或接回自己的银河身份。'}</p><Button onClick={() => go('/app/settings/identity')}>{subjectId ? '连接已有身份' : '建立或接回身份'}</Button></div>;
   async function loadMore() {
     if(!client||!next)return;
@@ -442,10 +445,9 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   </article>;
 
   return <section className={'forum-workspace'+(isFeed&&section!=='reports'?' forum-discovery':'')} aria-busy={busy}>
-    {isFeed&&<><div className="forum-heading"><div><h1 className="small">社区</h1><p>从一个话题开始，也让想法继续。</p></div></div><nav className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论','active',section!=='reports','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</nav></>}
+    {isFeed&&<><div className="forum-heading"><div><h1 id={fieldId+'-heading'} className="small" style={{overflowWrap:'anywhere'}}>{feedTitle}</h1><p>{feedDescription}</p></div></div><nav className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论','active',section!=='reports','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</nav></>}
     {!isFeed&&link(returnPath,<>返回{returnLabel}</>,'back-link')}
-    {compose&&!form&&<div className="forum-heading"><h1 className="small">写帖子</h1></div>}
-    {reportId&&<h1 className="small">举报与处理</h1>}
+    {!isFeed&&(compose||reportId||replyId||!isAvailable(detail))&&<div className="forum-heading"><h1 className="small">{compose?editorTitle:reportId?'处理记录详情':replyId?'回复详情':manage?'帖子管理':'帖子详情'}</h1></div>}
     {error && <div className="message error" role="alert">{error}<AccountVerificationPrompt required={verificationRequired} navigate={go} /><Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重新读取当前内容</Button></div>}
     {notice && <output className="message">{notice}</output>}
     {form&&!editorOpen&&!draftLoading&&<aside className="forum-draft-return" aria-label="未提交的草稿"><div><strong>{form.kind==='publish-version'?'这篇帖子的修改尚未发表':form.kind==='create-reply'?'你有尚未发出的回复':'你有尚未提交的草稿'}</strong><p>{form.title||labels[form.kind]} · 仅保存在此浏览器</p></div><Button variant="outline" disabled={busy} onClick={resumeDraft}>继续编辑</Button></aside>}
@@ -454,11 +456,10 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {subjectId && !draftLoading && !draftLoaded && <Button variant="outline" disabled={busy} onClick={() => run(()=>readDraft())}>重新读取本机稿</Button>}
     {(!isFeed||section==='reports')&&reading && !detail && !replyDetail && !reportDetail && !items.length && !reportItems.length && <output className="empty-state">正在读取当前允许的内容…</output>}
     {isFeed&&section!=='reports'&&<div className="forum-discovery-layout">
-      <section className="forum-results" aria-labelledby={fieldId+'-scope'}>
-        <header className={'forum-scope-heading'+(!topic&&section==='all'?' forum-scope-all':'')}><h2 id={fieldId+'-scope'}>{section==='owned'?'我的帖子':topicTitle}</h2>{(topic||section==='owned')&&<p>{section==='owned'?(topic?`当前主题：${topicTitle}。继续阅读或编辑自己发表的内容。`:'找到自己发表的内容，继续阅读、回复或编辑。'):topicDescription}</p>}</header>
+      <section className="forum-results" aria-labelledby={fieldId+'-heading'}>
         <div className="forum-feed-toolbar"><span className="forum-order-label">{feedOrder==='published'?'最新发表':feedOrder==='id'?'服务默认顺序':'银河讨论'}</span>{section==='owned'?link(forumBrowsePath({topic,query}),'浏览所有讨论'):link(forumBrowsePath({section:'owned',topic,query}),'我的帖子')}</div>
         <search><form className="forum-search" onSubmit={event=>{event.preventDefault();go(forumBrowsePath({section,topic,query:queryInput}),'results');}}><label htmlFor={fieldId+'-search'}><span className="forum-search-label">搜索帖子</span><Input id={fieldId+'-search'} type="search" aria-label="搜索帖子" maxLength={160} value={queryInput} onChange={event=>setQueryInput(event.target.value)} placeholder={topic?'在当前主题中搜索标题或正文':'搜索帖子标题或正文'}/></label><Button type="submit" variant="outline"><Search size={16} aria-hidden/>搜索</Button></form></search>
-        {query&&<div className="forum-search-context"><p>搜索“{query}”{topic&&<> · {topicTitle}</>}</p>{link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results')}</div>}
+        {query&&<div className="forum-search-context">{link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results')}</div>}
         <div className="forum-feed" aria-busy={reading}>
           {items.map(value=>card(value,section==='owned'))}
           {reading&&!items.length&&<output className="empty-state">正在读取帖子…</output>}
@@ -491,7 +492,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       <footer className="forum-reading-return">{link(returnPath,<>继续浏览{returnLabel==='社区'?'社区帖子':returnLabel}</>)}</footer>
     </>}
 
-    {reportId && reportDetail && <section className="forum-report"><h2>当前处理记录</h2><p>{reportDetail.state === 'pending' ? '已登记，尚待处理。' : '以下是当前允许查看的处理事实。'}</p><p>登记不等于已经受理，没有响应时限承诺。</p>
+    {reportId && reportDetail && <section className="forum-report"><h2>处理经过</h2><p>{reportDetail.state === 'pending' ? '已登记，尚待处理。' : '以下是当前允许查看的处理事实。'}</p><p>登记不等于已经受理，没有响应时限承诺。</p>
       {reportDetail.target && link(targetPath(reportDetail.target) ?? '/app/community', '返回准确目标')}
       {(reportDetail.events ?? []).map((event) => <article className="forum-reply" key={event.governanceEventId ?? event.operationId}><h3>{event.kind === 'report' ? event.authorId === subjectId ? '我的举报' : '获准查看的举报' : ({ supplement: '补充', withdraw: '撤回', appeal: '申诉', resolve: '处理决定' } as Record<string,string>)[event.kind] ?? '记录'}</h3>{(event.payload?.summary || event.payload?.reason) && <p className="forum-prose">{event.payload.summary ?? event.payload.reason}</p>}{event.payload?.resolution && <p>{({ dismissed: '不成立', accepted: '成立', 'needs-review': '需要进一步核对' } as Record<string,string>)[event.payload.resolution]}</p>}{event.payload?.effect?.until && <p>本次停止读取最迟至 {date(event.payload.effect.until)}，后续仍以当前许可和处理状态为准。</p>}{event.availability && event.availability !== 'available' && <p>这段私有文字当前不可读取。</p>}</article>)}
       <div className="button-row">{reportDetail.canSupplement && <Button disabled={busy || !!form} onClick={() => run(() => begin('supplement', { reportId, expectedReportVersion: reportDetail.version }))}>补充我的举报</Button>}{reportDetail.canWithdrawReport && <Button variant="outline" disabled={busy || !!form} onClick={() => run(() => begin('withdraw-report', { reportId, expectedReportVersion: reportDetail.version }))}>撤回我的举报</Button>}{reportDetail.canAppeal && <Button disabled={busy || !!form} onClick={() => run(() => begin('appeal', { reportId, expectedReportVersion: reportDetail.version }))}>提交申诉</Button>}{reportDetail.canModerate && <Button disabled={busy || !!form} onClick={() => run(() => begin('resolve', { reportId, expectedReportVersion: reportDetail.version }))}>记录处理决定</Button>}</div>
@@ -499,7 +500,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     </section>}
 
     {subjectId && draftLoading && <output>正在读取这处本机稿…</output>}
-    {subjectId && !draftLoading && form && editorOpen && <section ref={editor} className="forum-editor" aria-label="社区本机稿"><h2>{form.kind === 'create-reply' ? '写回复' : form.kind === 'publish-version' ? '编辑帖子' : labels[form.kind]}</h2>
+    {subjectId && !draftLoading && form && editorOpen && <section ref={editor} className="forum-editor" aria-label="社区本机稿">{!compose&&<h2>{editorTitle}</h2>}
 
       {publicWrite(form.kind)&&<div className="forum-draft-context"><p>这是你的私人草稿。只有点击“公开发表”才会把这段内容公开。</p>{form.kind==='publish-version'&&<p>从{form.target.versionNumber?'第 '+form.target.versionNumber+' 版':'已发表的内容'}继续修改；已公开的正文与回复保持原样。</p>}{form.kind==='create-reply'&&form.target.versionNumber&&<p>回复第 {form.target.versionNumber} 版的内容。</p>}</div>}
       {form.operationId && <p className="message">这份稿已关联原提交。先查询原结果或停止本机重试，再准备新的内容。</p>}
