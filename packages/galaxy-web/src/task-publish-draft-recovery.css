@@ -3,8 +3,8 @@
 .galaxy-site .request-draft-recovery p{font-size:14px;line-height:1.8;margin:8px 0;overflow-wrap:anywhere}
 .galaxy-site .request-draft-recovery .button-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .galaxy-site .request-draft-recovery .button-row button{min-height:42px}
-.galaxy-site .request-draft-recovery>details{margin-top:15px;font-size:13px}
-.galaxy-site .request-draft-recovery summary{cursor:pointer;min-height:36px;display:list-item;align-content:center}
+.galaxy-site .request-draft-recovery>:is(.reading-detail-entry,.reading-section){margin-top:15px;font-size:13px}
+.galaxy-site .request-draft-recovery .reading-detail-link{cursor:pointer;min-height:36px;display:block;align-content:center}
 .galaxy-site .request-draft-comparison{margin:20px 0}
 .galaxy-site .request-draft-comparison>section{padding:0 0 18px;margin:18px 0;border-bottom:1px solid var(--g-line)}
 .galaxy-site .request-draft-comparison h3{font-size:15px;line-height:1.6;margin:0 0 12px}
@@ -18,7 +18,7 @@
 .galaxy-site .request-draft-comparison li{font-size:13px;line-height:1.8;margin:0 0 12px}
 .galaxy-site .request-draft-comparison a{display:inline-block;margin-left:6px;min-height:32px;color:var(--g-accent)}
 .galaxy-site .request-draft-copies{border-top:1px solid var(--g-line);margin:0 0 24px;padding-top:10px;font-size:14px}
-.galaxy-site .request-draft-copies>summary{cursor:pointer;padding:8px 0;min-height:40px;color:var(--g-muted)}
+.galaxy-site .request-draft-copies>.reading-detail-link{cursor:pointer;padding:8px 0;min-height:40px;color:var(--g-muted)}
 .galaxy-site .request-draft-copies>div{padding:14px 0}
 .galaxy-site .request-draft-copies label{font-size:13px;display:grid;gap:8px;max-width:100%}
 .galaxy-site .request-draft-copies select{font:inherit;width:100%;min-width:0;max-width:100%;padding:9px 12px;border:1px solid var(--g-line);border-radius:6px;background:var(--g-surface,#fff);color:var(--g-ink)}

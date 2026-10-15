@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -193,13 +194,13 @@ function ContextSession({ task, runtime, subjectId, connected, initialGrantId=nu
           <div className="button-row">{m.participantId===subjectId&&item.state==='pending'&&<><Button disabled={busy||activePending.length>0} onClick={()=>run(valid=>prepareEvent(item,'accept',valid,true))}>接收并阅读</Button><button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'decline',valid,true))}>婉拒</button></>}
           {(m.ownerId===subjectId||item.state==='accepted')&&['pending','accepted'].includes(item.state)&&<Button variant="outline" disabled={busy} onClick={()=>run(valid=>openMaterial(m.grantId,valid))}>打开材料</Button>}
           {m.ownerId===subjectId&&!['revoked','source-erased'].includes(item.state)&&<button className="text-link" disabled={busy} onClick={()=>run(valid=>prepareEvent(item,'revoke',valid))}>撤回</button>}</div>
-          <details className="technical-details"><summary>交接范围与准确引用</summary><p>参与范围第 {m.scopeVersion} 版；提供者 {m.ownerId}；接收者 {m.participantId}。</p><p>材料 {m.grantId}；摘要 {m.materialsHash}</p></details>
+          <ReadingDetails className="technical-details"><ReadingSummary>交接范围与准确引用</ReadingSummary><p>参与范围第 {m.scopeVersion} 版；提供者 {m.ownerId}；接收者 {m.participantId}。</p><p>材料 {m.grantId}；摘要 {m.materialsHash}</p></ReadingDetails>
         </article>;
       })}</div>
       {nextAfter&&<Button variant="outline" disabled={busy} onClick={()=>run(()=>load(nextAfter))}>更多材料</Button>}
     </>}
     {creating&&<section className="material-editor" ref={editor} style={{scrollMarginTop:'6rem'}}>
-      <button className="back-link" onClick={()=>setCreating(false)}>← 回到材料列表</button>
+      <button className="back-link" onClick={()=>setCreating(false)}> 回到材料列表</button>
       {draftStatus&&<p className="record-meta"><output>{draftStatus}</output></p>}
       <form className="workspace-form" onSubmit={event=>{event.preventDefault();void run(valid=>prepare(valid,()=>Date.now(),true));}}>
         <h4 tabIndex={-1}>把这次需要的资料交给对方</h4>
@@ -217,11 +218,11 @@ function ContextSession({ task, runtime, subjectId, connected, initialGrantId=nu
     {waiting.length>0&&<section className="operation-status" aria-label="材料发送状态">{waiting.map(op=><article key={op.operationId}>
       <p>{op.state==='stopped-local'?'这次发送已在本机停止。':operationErrors[op.operationId]??'上次材料操作已保留，可以继续核对。'}</p>
       {op.state!=='stopped-local'&&<Button variant="outline" disabled={busy} onClick={()=>run(valid=>reviewOperation(op,valid))}>继续这次材料操作</Button>}
-      <details><summary>查看本次发送记录</summary><p>操作 {op.operationId} · 接收者 {name(op.recipientId)}</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.reconcile(op.operationId);if(valid())await load();})}>核对结果</button>{op.state!=='stopped-local'&&<><p>停止本机发送不会撤回可能已经送达的材料。</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.abandon(op.operationId,{confirmed:true});if(valid())await load();})}>停止本机发送</button></>}</details>
+      <ReadingDetails><ReadingSummary>查看本次发送记录</ReadingSummary><p>操作 {op.operationId} · 接收者 {name(op.recipientId)}</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.reconcile(op.operationId);if(valid())await load();})}>核对结果</button>{op.state!=='stopped-local'&&<><p>停止本机发送不会撤回可能已经送达的材料。</p><button className="text-link" disabled={busy} onClick={()=>run(async valid=>{await client.abandon(op.operationId,{confirmed:true});if(valid())await load();})}>停止本机发送</button></>}</ReadingDetails>
     </article>)}</section>}
     <dialog ref={confirmation} className="workspace-dialog material-dialog" onCancel={event=>{if(busy)event.preventDefault();else{setPreview(null);setRenewal(null);}}}>
       {(preview||renewal)&&<><header className="dialog-heading"><span>{renewal?'重新确认材料范围':preview?.kind==='grants'?'预览资料交接':preview?.kind==='accept'?'接收这份材料':preview?.kind==='decline'?'婉拒这份材料':'撤回这份材料'}</span><button className="icon-button" disabled={busy} aria-label="关闭材料预览" onClick={()=>{setPreview(null);setRenewal(null);}}>×</button></header>
-        {renewal?<><h3>{{grant:'发送原材料',accept:'接收原材料',decline:'婉拒原材料',revoke:'撤回原材料'}[('kind' in renewal.payload?renewal.payload.kind:'grant')]}</h3><p>本次操作的另一方：{name(renewal.recipientId)}</p><p>{'materials' in renewal.payload?'原材料可阅读至':'本次操作授权至'} {readableTime(renewal.expiresAt)}。</p>{('materials' in renewal.payload?renewal.payload.materials:[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>)}<details className="technical-details"><summary>原操作的准确引用</summary><p>操作 {renewal.operationId} · 材料 {renewal.grantId} · 参与范围第 {renewal.payload.scopeVersion} 版</p><p>摘要 {renewal.payloadHash}</p></details></>:preview?.drafts.map((draft,index)=><article key={index}>
+        {renewal?<><h3>{{grant:'发送原材料',accept:'接收原材料',decline:'婉拒原材料',revoke:'撤回原材料'}[('kind' in renewal.payload?renewal.payload.kind:'grant')]}</h3><p>本次操作的另一方：{name(renewal.recipientId)}</p><p>{'materials' in renewal.payload?'原材料可阅读至':'本次操作授权至'} {readableTime(renewal.expiresAt)}。</p>{('materials' in renewal.payload?renewal.payload.materials:[]).map(m=><article key={m.id}><h3>{m.label}</h3><p className="reading-prose">{m.content}</p></article>)}<ReadingDetails className="technical-details"><ReadingSummary>原操作的准确引用</ReadingSummary><p>操作 {renewal.operationId} · 材料 {renewal.grantId} · 参与范围第 {renewal.payload.scopeVersion} 版</p><p>摘要 {renewal.payloadHash}</p></ReadingDetails></>:preview?.drafts.map((draft,index)=><article key={index}>
           {draft.payload?<><h3>给 {name(draft.payload.participantId)}</h3><p className="record-meta">{draft.recipient.agreedScope} · 可阅读至 {readableTime(draft.payload.expiresAt)}</p>{draft.payload.materials.map(m=><section key={m.id}><h4>{m.label}</h4><p className="reading-prose">{m.content}</p></section>)}</>:<><p>提供者：{name(draft.metadata.ownerId)} · 接收者：{name(draft.metadata.participantId)}</p><p>可阅读至 {readableTime(draft.metadata.expiresAt)}</p><ul>{(draft.materials??[]).map(m=><li key={m.id}>{m.label}</li>)}</ul></>}
         </article>)}
         <p className="permission-line">{preview?.kind==='revoke'?'撤回后，这份材料不再通过本次授权读取。':preview?.kind==='decline'?'婉拒只影响这次材料接收。':'仅提供者与所选接收者可见，接收者确认后才能打开正文。'}</p>

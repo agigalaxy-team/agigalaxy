@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useEffect,useEffectEvent,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import type {AccountRuntime} from './account-workspace-types';
@@ -67,7 +68,7 @@ function IdentityOperationSession({runtime,busy,run,onContinue,onReview,displaye
    {failed===row.operationId&&<Button variant="outline" disabled={busy||applying} onClick={()=>void continueOriginal(row.operationId)}>再试一次</Button>}
   </div>)}
   {(error||readError)&&<output className="message error">{error||readError}</output>}
-  {visible.length>0&&<details className="identity-continuity-details"><summary>{active.length?'接续详情':'以前的接续'}</summary>{visible.map(row=><div key={row.operationId}><p>{operationNames[row.kind]??'身份接续'} · {stateNames[receipts[row.operationId]?.state??row.state]??'正在确认结果'}</p><code>{row.operationId}</code></div>)}</details>}
+  {visible.length>0&&<ReadingDetails className="identity-continuity-details"><ReadingSummary>{active.length?'接续详情':'以前的接续'}</ReadingSummary>{visible.map(row=><div key={row.operationId}><p>{operationNames[row.kind]??'身份接续'} · {stateNames[receipts[row.operationId]?.state??row.state]??'正在确认结果'}</p><code>{row.operationId}</code></div>)}</ReadingDetails>}
  </section>;
 }
 

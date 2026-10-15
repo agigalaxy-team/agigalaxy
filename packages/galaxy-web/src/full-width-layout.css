@@ -6,10 +6,9 @@
   min-width:0;
 }
 
-.galaxy-site.galaxy-workspace .site-header-inner,
-.galaxy-site.galaxy-workspace:has(.community-page) .site-header-inner,
-.galaxy-site.galaxy-workspace .site-content,
-.galaxy-site.galaxy-workspace .site-app-footer {
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-header-inner,
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-content,
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-app-footer {
   width:100%;
   max-width:none;
   min-width:0;

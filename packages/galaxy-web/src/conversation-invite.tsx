@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useCallback,useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import type {createWebRuntime} from './runtime.mjs';
 import {createConversationDirectory} from './conversation-directory';
@@ -57,8 +58,8 @@ export function ConversationInvite({runtime,subjectId,room,decisions,disabled,ex
  }
  return <div className="conversation-invite">
   {notice&&<output className="invite-feedback">{notice}</output>}
-  <details open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-   <summary><UserRoundPlus size={16}/>邀请成员</summary>
+  <ReadingDetails className="conversation-invite" open={open} onOpenChange={value=>{if(value)setOpen(true);else if(opened===true)setOpen(false);}}>
+   <ReadingSummary><UserRoundPlus size={16}/>邀请成员</ReadingSummary>
    {open&&<form className="conversation-invite-form" onSubmit={event=>void invite(event)}>
     <label htmlFor={fieldId+"-query"}>查找联系人<Input id={fieldId+"-query"} value={form.query} disabled={!draft.ready||sending} onChange={event=>draft.change({query:event.target.value})} placeholder="按姓名查找"/></label>
     <div className="invite-person-list" role="radiogroup" aria-label="选择要邀请的人">{shown.map(id=><label className={'invite-person'+(form.person===id?' selected':'')} key={id}><input type="radio" name={'invite-'+room.roomId} value={id} checked={form.person===id} disabled={sending||!draft.ready} onChange={()=>choose(id)}/><MemberAvatar subjectId={id}/><span><strong>{name(id)}</strong><small>{people[id]}</small></span></label>)}</div>
@@ -66,12 +67,12 @@ export function ConversationInvite({runtime,subjectId,room,decisions,disabled,ex
     {loaded&&!shown.length&&!loading&&<p className="muted">{form.query?'当前列表中没有匹配的姓名。':'还没有其他可邀请的联系人。'}</p>}
     {readError&&<output>{readError}<button type="button" className="text-link" disabled={loading} onClick={()=>void directory.loadInitial()}>重新读取</button></output>}
     <div className="invite-more">{cursors.contacts&&<button type="button" className="text-link" disabled={loading} onClick={()=>void load('contacts',cursors.contacts!)}>更多联系人</button>}{cursors.rooms&&<button type="button" className="text-link" disabled={loading} onClick={()=>void load('rooms',cursors.rooms!)}>更早对话中的人</button>}</div>
-    <details className="invite-known-person"><summary>使用对方给我的银河 ID</summary><label htmlFor={fieldId+"-manual"}>对方的银河 ID<Input id={fieldId+"-manual"} value={eligible.includes(form.person)?'':form.person} maxLength={32} disabled={sending||!draft.ready} onChange={event=>choose(event.target.value.trim())} placeholder="粘贴完整银河 ID"/></label></details>
+    <ReadingDetails className="invite-known-person" mode="inline"><ReadingSummary>使用对方给我的银河 ID</ReadingSummary><label htmlFor={fieldId+"-manual"}>对方的银河 ID<Input id={fieldId+"-manual"} value={eligible.includes(form.person)?'':form.person} maxLength={32} disabled={sending||!draft.ready} onChange={event=>choose(event.target.value.trim())} placeholder="粘贴完整银河 ID"/></label></ReadingDetails>
     {form.person&&<p className="invite-selection">{validPerson?<>邀请 <strong>{name(form.person)}</strong> 加入</>:memberIds.has(form.person)?'对方已经在这段对话中。':waitingIds.has(form.person)?'邀请已发出，可以在成员请求中查看。':form.person===subjectId?'你已经在这段对话中。':'请输入完整的银河 ID。'}</p>}
     <p className="invite-impact">对方接受后，可以阅读这段对话中仍保留的消息。</p>
     {(error||(!draft.ready&&draft.status))&&<p className="message error" role="alert">{error?(externalError||error):draft.status}</p>}
     <div className="button-row"><Button type="submit" disabled={disabled||sending||!draft.ready||!validPerson}>{sending?'正在邀请…':'邀请加入'}</Button><Button type="button" variant="ghost" disabled={sending} onClick={()=>setOpen(false)}>稍后再邀请</Button></div>
    </form>}
-  </details>
+  </ReadingDetails>
  </div>;
 }

@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -135,7 +136,7 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
     {directory.legacy.map(item => <div className="message" key={`${item.source}:${item.operationId}`} aria-label="旧入口保留的原操作">
       <h3>旧入口的原操作：{names[item.kind as Kind] ?? '任务协作记录'}</h3>
       <p>本机保存的状态：{states[item.state] ?? '待核对'}。最近结果以上方明确查询的回执为准。这里只列出定位，不恢复旧正文，也不会自动发送。</p>
-      <details><summary>查看旧操作定位</summary><p style={{ overflowWrap: 'anywhere' }}>操作：{item.eventId}<br/>内容摘要：{item.payloadHash}</p></details>
+      <ReadingDetails><ReadingSummary>查看旧操作定位</ReadingSummary><p style={{ overflowWrap: 'anywhere' }}>操作：{item.eventId}<br/>内容摘要：{item.payloadHash}</p></ReadingDetails>
       <div className="button-row"><Button variant="outline" disabled={busy} onClick={() => reconcile(item.operationId)}>只核对旧入口原回执</Button>
         {item.source === 'legacy-task-event' && <Button variant="ghost" disabled={busy} onClick={() => run(async (_current, valid) => {
           setPreview(null); setStopping(null); setLegacyStop(null);
@@ -160,7 +161,7 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
     </div>}
     {pending && !preview && <div className="message" aria-label="本机保留的原请求操作">
       <h3>待核对：{names[pending.kind]}</h3><p>{states[pending.state] ?? '原操作待核对'}。不会在进入页面时自动提交。</p>
-      <details><summary>原操作定位</summary><p style={{ overflowWrap: 'anywhere' }}>操作：{pending.operationId}<br/>内容摘要：{pending.payloadHash}<br/>所依据的任务版本：{pending.expectedTaskVersion}</p></details>
+      <ReadingDetails><ReadingSummary>原操作定位</ReadingSummary><p style={{ overflowWrap: 'anywhere' }}>操作：{pending.operationId}<br/>内容摘要：{pending.payloadHash}<br/>所依据的任务版本：{pending.expectedTaskVersion}</p></ReadingDetails>
       <div className="button-row">
         <Button variant="outline" disabled={busy} onClick={() => reconcile(pending.operationId)}>只核对原操作回执</Button>
         {['prepared', 'absent'].includes(pending.state) && <Button variant="outline" disabled={busy || !writable} onClick={() => {
@@ -189,10 +190,10 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
       <p>{JSON.parse(preview.payloadJson).event.reason}</p>
       <p>依据原任务版本 {preview.expectedTaskVersion}，有效至 {stamp(preview.expiresAt)}。本次单独授权提交该操作，私有范围，不增加其他查看者。</p>
       <p>既有历史保留；资料权限不变；不授予完整任务访问；不执行结算。</p>
-      <details><summary>查看准确操作和授权范围</summary>
+      <ReadingDetails><ReadingSummary>查看准确操作和授权范围</ReadingSummary>
         <p style={{ overflowWrap: 'anywhere' }}>任务：{taskId}<br/>操作：{preview.operationId}<br/>内容摘要：{preview.payloadHash}<br/>接收服务：{preview.authorization.recipient}<br/>来源记录：{preview.source.eventId}，版本 {preview.source.version}</p>
         <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{preview.payloadJson}</pre>
-      </details>
+      </ReadingDetails>
       <div className="button-row"><Button disabled={busy || !writable} onClick={() => run(async (current, valid) => {
         const reviewed = preview; setPreview(null); await requireWritable(valid);
         const value = await current.confirm(reviewed, { confirmed: true }); if (valid()) setOutcome(value);
@@ -203,8 +204,8 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
       <p>{names[item.kind]} · 已停止本机重试 · {states[item.receiptState ?? 'unknown'] ?? '结果未知'}。保留历史定位，不会重新发送。</p>
       <Button variant="outline" disabled={busy} onClick={() => reconcile(item.operationId)}>核对这项已停止操作的原回执</Button>
     </div>)}
-    {directory.receipts.length > 0 && <details><summary>查看已确认的操作记录（{directory.receipts.length}）</summary>
+    {directory.receipts.length > 0 && <ReadingDetails><ReadingSummary>查看已确认的操作记录（{directory.receipts.length}）</ReadingSummary>
       {directory.receipts.map(item => <p key={item.operationId} style={{ overflowWrap: 'anywhere' }}>{names[item.kind]} · 记录版本 {item.version} · {item.operationId}。仅说明该原操作已被接受。</p>)}
-    </details>}
+    </ReadingDetails>}
   </section>;
 }

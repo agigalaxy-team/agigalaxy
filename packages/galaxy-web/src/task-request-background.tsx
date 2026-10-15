@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {getFactClient} from './fact-client.mjs';
 import {MemberLink,useMemberNames} from './conversation-ui';
@@ -57,7 +58,7 @@ function BackgroundSession({task,runtime,subjectId,navigate}:Omit<Props,'runtime
     {attempt.summary?<><h3>记录到的观察</h3><p className="request-reading-prose">{attempt.summary}</p></>:<p className="muted">这条记录尚未附上实际观察。</p>}
     {attempt.reportedOutcome&&<p>{reportedOutcome[attempt.reportedOutcome]??'保留当时的结果判断'}</p>}
     {attempt.failureReason&&<p className="request-reading-prose">{attempt.failureReason}</p>}
-    <details><summary>这次使用的输入与版本</summary>{attempt.inputScopeSummary&&<p className="request-reading-prose">{attempt.inputScopeSummary}</p>}<p>选定记录第 {reference.version} 版</p></details>
+    <ReadingDetails><ReadingSummary>这次使用的输入与版本</ReadingSummary>{attempt.inputScopeSummary&&<p className="request-reading-prose">{attempt.inputScopeSummary}</p>}<p>选定记录第 {reference.version} 版</p></ReadingDetails>
    </article>:<p>一条选定的当时记录目前不可读取。原引用保留，可以先就求助说明继续交流。</p>}</li>)}</ol>}
  </section>;
 }

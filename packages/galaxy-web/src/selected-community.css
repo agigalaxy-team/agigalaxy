@@ -1,0 +1,33 @@
+.galaxy-site.galaxy-workspace .community-layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:0; align-items:start; }
+.galaxy-site.galaxy-workspace .community-navigation { position:sticky; top:80px; height:calc(100dvh - 100px); max-height:calc(100dvh - 100px); overflow-y:auto; padding:20px 18px 28px 0; border-right:1px solid var(--g-line); background:#fff; }
+.galaxy-site .community-rail-title { margin:0 12px 20px; font-size:21px; font-weight:650; }
+.galaxy-site.galaxy-workspace .community-navigation>.community-domain-links { display:block; flex:none; overflow:visible; border:0; padding:0; }
+.galaxy-site .community-nav-label { margin:22px 12px 8px; font-size:11px; letter-spacing:.1em; color:var(--g-muted); }
+.galaxy-site .community-domain { margin-bottom:9px; }
+.galaxy-site .community-domain-heading>a { min-height:38px; padding:8px 12px; font-size:13px; gap:10px; }
+.galaxy-site .community-child-links { display:flex; flex-wrap:wrap; padding:0 5px 4px 34px; gap:1px 5px; }
+.galaxy-site .community-child-links a { min-height:27px; font-size:12px; padding:4px 6px; border-radius:5px; }
+.galaxy-site .community-all-topics { font-size:14px; }
+.galaxy-site.galaxy-workspace .community-layout-content { min-width:0; padding:28px 0 48px 32px; }
+.galaxy-site .community-mobile-topics { display:none; }
+.galaxy-site .forum-image-credit.reading-section { padding:8px 0 0; border:0; }
+.galaxy-site .forum-image-credit .reading-section-title { font-size:10px; color:var(--g-muted); margin:0 0 4px; font-weight:400; }
+.galaxy-site .forum-image-credit .reading-section-body { font-size:10px; color:var(--g-muted); line-height:1.5; }
+.galaxy-site .forum-image-credit.reading-detail-entry { margin:8px 0 0; padding:0; }
+.galaxy-site .forum-image-credit>.reading-detail-link { font-size:11px; color:var(--g-muted); text-decoration:none; padding:2px 0; }
+.galaxy-site .forum-image-credit>.reading-detail-link:hover { color:var(--g-accent); text-decoration:underline; }
+@media(max-width:1100px) {
+ .galaxy-site.galaxy-workspace .community-layout { grid-template-columns:190px minmax(0,1fr); }
+ .galaxy-site.galaxy-workspace .community-navigation { padding-right:12px; }
+ .galaxy-site.galaxy-workspace .community-layout-content { padding-left:24px; }
+}
+@media(max-width:800px) {
+ .galaxy-site.galaxy-workspace .community-layout { display:block; }
+ .galaxy-site.galaxy-workspace .community-navigation { display:none; }
+ .galaxy-site.galaxy-workspace .community-layout-content { padding:16px 0 32px; }
+ .galaxy-site .community-mobile-topics { display:block; margin:0 0 22px; border-bottom:1px solid var(--g-line); padding-bottom:10px; }
+ .galaxy-site .community-mobile-topic-row,.galaxy-site .community-mobile-child-row { display:flex; gap:7px; overflow-x:auto; scrollbar-width:thin; padding:3px 0 8px; }
+ .galaxy-site .community-mobile-topics a { flex:none; padding:7px 10px; color:var(--g-muted); text-decoration:none; font-size:12px; border-radius:6px; }
+ .galaxy-site .community-mobile-topics a[aria-current] { background:var(--g-soft); color:var(--g-accent); font-weight:600; }
+ .galaxy-site .community-mobile-child-row a { padding:4px 10px; font-size:11px; }
+}

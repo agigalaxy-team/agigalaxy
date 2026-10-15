@@ -1,5 +1,6 @@
+import { ReadingDetails, ReadingSummary, ReadingSurface } from './reading-details';
 import React,{useEffect,useState} from 'react';
-import {ArrowRight,ArrowUpRight,Search} from 'lucide-react';
+import {Search} from 'lucide-react';
 import {availableForumContent,type ForumCardView,type ForumPostView} from './community-forum-view-types';
 import {forumVersionPath} from './community-forum-origin.mjs';
 import {forumTopics} from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
@@ -21,8 +22,8 @@ export function CommunityHighlights({runtime,navigate}:Props){
  const available=items.filter(item=>availableForumContent(item,now));
  const names=useMemberNames(runtime,undefined,false,available.flatMap(item=>item.authorId?[item.authorId]:[]));
  const link=(path:string,children:React.ReactNode)=><a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(path);}}}>{children}</a>;
- return <section className="browse-section browse-section-community" aria-labelledby="browse-community"><header><div><h2 id="browse-community">社区里正在聊</h2><p>作品、想法与日常，都可以从一段交流开始。</p></div>{link('/app/community',<>查看全部<ArrowRight size={15}/></>)}</header>
-  {state==='loading'?<output className="browse-loading">正在读取公开讨论…</output>:state==='error'?<div className="browse-empty"><p>暂时没有读到公开讨论。</p><button onClick={()=>{setState('loading');setAttempt(value=>value+1);}}>重新读取</button></div>:available.length?<div className="browse-highlights">{available.map(item=><article className="browse-highlight browse-discussion" key={item.locator.postId}><div className="browse-discussion-byline"><MemberLink subjectId={item.authorId} name={memberName(item.authorId,undefined,names[item.authorId??'']??undefined)} navigate={navigate} avatar/><span>{forumTopics.find(topic=>topic.id===item.topic)?.label??'未分类'}</span></div><h3>{link(forumVersionPath(item.locator.postId,item.locator.versionId??item.currentVersionId)??'/app/community',<>{item.payload!.title}<ArrowUpRight size={15}/></>)}</h3><p className="browse-highlight-summary">{item.payload!.body.replace(/\s+/g,' ').trim()}</p></article>)}</div>:<EmptyContent kind="post" title="第一段交流，从这里开始" description="当前还没有公开讨论。先看看主题，或分享自己正在做的事。" action={link('/app/community',<>浏览社区主题<ArrowRight size={14}/></>)}/>}
+ return <section className="browse-section browse-section-community" aria-labelledby="browse-community"><header><div><h2 id="browse-community">社区里正在聊</h2><p>作品、想法与日常，都可以从一段交流开始。</p></div>{link('/app/community',<>查看全部</>)}</header>
+  {state==='loading'?<output className="browse-loading">正在读取公开讨论…</output>:state==='error'?<div className="browse-empty"><p>暂时没有读到公开讨论。</p><button onClick={()=>{setState('loading');setAttempt(value=>value+1);}}>重新读取</button></div>:available.length?<div className="browse-highlights">{available.map(item=><article className="browse-highlight browse-discussion" key={item.locator.postId}><div className="browse-discussion-byline"><MemberLink subjectId={item.authorId} name={memberName(item.authorId,undefined,names[item.authorId??'']??undefined)} navigate={navigate} avatar/><span>{forumTopics.find(topic=>topic.id===item.topic)?.label??'未分类'}</span></div><h3>{link(forumVersionPath(item.locator.postId,item.locator.versionId??item.currentVersionId)??'/app/community',<>{item.payload!.title}</>)}</h3><p className="browse-highlight-summary">{item.payload!.body.replace(/\s+/g,' ').trim()}</p></article>)}</div>:<EmptyContent kind="post" title="第一段交流，从这里开始" description="当前还没有公开讨论。先看看主题，或分享自己正在做的事。" action={link('/app/community',<>浏览社区主题</>)}/>}
  </section>;
 }
 
@@ -41,7 +42,7 @@ function ReadingLink({target,navigate,children,...props}:{target:string;navigate
 
 function ExternalCoverCredit({id}:{id:string}){
  const credit=externalCommunityCoverCredits[id];if(!credit)return null;
- return <details className="forum-image-credit"><summary>{id==='alice'?'配图：Tenniel · Gutenberg #114':'配图：NASA / ESA / CSA / STScI'}</summary><p>{credit.credit}</p><p><a href={credit.sourceUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">图片出处</a><span> · </span><a href={credit.licenseUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{credit.license}</a></p></details>;
+ return <ReadingDetails className="forum-image-credit"><ReadingSummary>{id==='alice'?'配图：Tenniel · Gutenberg':'配图：NASA / ESA / CSA / STScI'}</ReadingSummary><p>{credit.credit}</p><p><a href={credit.sourceUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">图片出处</a><span> · </span><a href={credit.licenseUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{credit.license}</a></p></ReadingDetails>;
 }
 
 export function filterExternalReadings(topic:string,query:string,format:CommunityFormat='all'){
@@ -68,8 +69,9 @@ function CommunityReadingSidebarView({preferenceKey,navigate,posts=[],source='ga
  };
  const visiblePosts=posts.filter(item=>availableForumContent(item,now)).slice(0,3);
  return <aside className="forum-community-aside" aria-label="频道与内容选读">
-  <section className="forum-followed-channels"><header><h2>关注的频道</h2><button type="button" aria-expanded={editing} onClick={()=>setEditing(value=>!value)}>{editing?'收起':'管理'}</button></header><p className="forum-aside-note">仅保存在此浏览器</p>
-   {editing?<fieldset className="forum-channel-choices"><legend>选择关注的频道</legend>{forumTopics.map(topic=><label key={topic.id}><input type="checkbox" checked={followed.includes(topic.id)} onChange={()=>toggle(topic.id)}/><span>{topic.label}</span></label>)}</fieldset>:followed.length?<nav aria-label="已关注频道">{followed.map(id=>{const topic=forumTopics.find(item=>item.id===id)!;return <ReadingLink key={id} target={communityBrowsePath({topic:id,source})} navigate={navigate}><strong>{topic.label}</strong><span>{topic.description}</span></ReadingLink>;})}</nav>:<div className="forum-followed-empty"><p>还没有关注的频道。</p><button type="button" onClick={()=>setEditing(true)}>选择感兴趣的频道</button></div>}
+  <section className="forum-followed-channels"><header><h2>关注的频道</h2><button type="button" aria-haspopup="dialog" onClick={()=>setEditing(true)}>管理</button></header><p className="forum-aside-note">仅保存在此浏览器</p>
+   {followed.length?<nav aria-label="已关注频道">{followed.map(id=>{const topic=forumTopics.find(item=>item.id===id)!;return <ReadingLink key={id} target={communityBrowsePath({topic:id,source})} navigate={navigate}><strong>{topic.label}</strong><span>{topic.description}</span></ReadingLink>;})}</nav>:<div className="forum-followed-empty"><p>还没有关注的频道。</p><button type="button" onClick={()=>setEditing(true)}>选择感兴趣的频道</button></div>}
+   <ReadingSurface open={editing} title="关注的频道" onClose={()=>setEditing(false)}><fieldset className="forum-channel-choices"><legend>选择关注的频道</legend>{forumTopics.map(topic=><label key={topic.id}><input type="checkbox" checked={followed.includes(topic.id)} onChange={()=>toggle(topic.id)}/><span>{topic.label}</span></label>)}</fieldset><p className="forum-aside-note">选择即时保存在此浏览器。</p></ReadingSurface>
    {storageNote&&<output className="forum-aside-note">{storageNote}</output>}
   </section>
   {visiblePosts.length>0&&<section className="forum-aside-readings"><h2>近期讨论</h2>{visiblePosts.map(post=><ReadingLink key={post.locator.postId} target={forumVersionPath(post.locator.postId,('versionId'in post.locator?post.locator.versionId:null)??post.currentVersionId)??'/app/community'} navigate={navigate}><ContentCover image={contentCoverFromLinks(post.payload?.links??[],post.payload?.title??'')} compact/><span><strong>{post.payload?.title}</strong><small>{forumTopics.find(topic=>topic.id===post.topic)?.label??'未分类'} · 银河讨论</small></span></ReadingLink>)}</section>}

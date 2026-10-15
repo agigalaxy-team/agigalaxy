@@ -1,5 +1,5 @@
 import React, {useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Bookmark, BookmarkCheck, ArrowUpRight} from 'lucide-react';
+import {Bookmark, BookmarkCheck} from 'lucide-react';
 import type {z} from 'zod/v4';
 import {createReadingBookmarksClient} from './reading-bookmarks-client.mjs';
 import {readingBookmarkReferenceSchema, readingBookmarkStateSchema, readingBookmarksPageSchema,
@@ -143,7 +143,7 @@ function ReadingBookmarksSession({runtime,connected,subjectId,onNeedIdentity,nav
         const source=item.source, available=source.state==='available';
         const path=readingBookmarkPath(item.reference);
         return <li key={readingBookmarkKey(item.reference)} id={'directory-bookmarks-'+item.id}><div className="reading-bookmark-content"><p className="reading-bookmark-kind">{titles[item.reference.kind]} · {item.savedAt?new Date(item.savedAt).toLocaleDateString('zh-CN'):''}</p>
-          {available&&source.state==='available'?<><h2><a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();open(item,path);}}}>{source.title}<ArrowUpRight size={16}/></a></h2><p className="reading-bookmark-summary">{source.summary}</p></>:<><h2>收藏的{titles[item.reference.kind]}</h2><p>{source.state==='temporarily-unavailable'?'暂时无法核对来源。':source.state==='unavailable'&&source.reason==='source-withdrawn'?'作者已撤回这份内容。':source.state==='unavailable'&&source.reason==='source-expired'?'本次可读期限已结束。':'这份来源当前不可读取。'}引用仍保留。</p></>}
+          {available&&source.state==='available'?<><h2><a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();open(item,path);}}}>{source.title}</a></h2><p className="reading-bookmark-summary">{source.summary}</p></>:<><h2>收藏的{titles[item.reference.kind]}</h2><p>{source.state==='temporarily-unavailable'?'暂时无法核对来源。':source.state==='unavailable'&&source.reason==='source-withdrawn'?'作者已撤回这份内容。':source.state==='unavailable'&&source.reason==='source-expired'?'本次可读期限已结束。':'这份来源当前不可读取。'}引用仍保留。</p></>}
         </div><SaveForLaterButton runtime={runtime} connected={connected} subjectId={subjectId} reference={item.reference} onNeedIdentity={onNeedIdentity} onChanged={onChanged}/></li>;
       })}</ol>{next&&<button className="load-more" type="button" disabled={busy} onClick={()=>{setBusy(true);void read(true);}}>{busy?'正在读取…':'更早的收藏'}</button>}
     </>}

@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useCallback,useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
@@ -28,7 +29,7 @@ type Props={runtime:OperationRuntime;task:FeedbackTask;participant:FeedbackParti
 function FeedbackReading({previous,participant}:{previous:FeedbackRecord|null|undefined;participant:FeedbackParticipant}){return previous?<div className="feedback-reading">
   <p className="feedback-summary">描述{clarity[previous.descriptionClarity]??'当前不可读'} · 工作范围{previous.scopeMatched?'相符':'有差异'}</p>
   <p className="reading-prose">{previous.note}</p>
-  <details className="feedback-source"><summary>反馈来源</summary><dl><dt>作者</dt><dd>{participant.subjectId}</dd><dt>本次参与</dt><dd>{participant.participationId}</dd><dt>反馈记录</dt><dd>{previous.eventId}</dd>{previous.supersedes&&<><dt>修订自</dt><dd>{previous.supersedes}</dd></>}{previous.reason&&<><dt>修订原因</dt><dd>{previous.reason}</dd></>}</dl><p>修订追加新记录，原反馈保留。</p></details>
+  <ReadingDetails className="feedback-source"><ReadingSummary>反馈来源</ReadingSummary><dl><dt>作者</dt><dd>{participant.subjectId}</dd><dt>本次参与</dt><dd>{participant.participationId}</dd><dt>反馈记录</dt><dd>{previous.eventId}</dd>{previous.supersedes&&<><dt>修订自</dt><dd>{previous.supersedes}</dd></>}{previous.reason&&<><dt>修订原因</dt><dd>{previous.reason}</dd></>}</dl><p>修订追加新记录，原反馈保留。</p></ReadingDetails>
 </div>:null;}
 
 export function RequesterFeedback(props:Props){

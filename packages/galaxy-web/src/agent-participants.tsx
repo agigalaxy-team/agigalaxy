@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useEffect,useMemo,useSyncExternalStore} from 'react';
 import {Bot} from 'lucide-react';
 import {createChatAgentClient} from './chat-agent-client.mjs';
@@ -51,7 +52,7 @@ function AgentParticipantsView({runtime,roomId,lease}:{runtime:Runtime;roomId:st
  const names=useMemberNames(runtime,owner,!!owner,items.map(item=>item.subjectId));
  const render=(item:Participant)=><li key={item.grantId}><Bot size={20} aria-hidden="true"/><div><strong>{memberName(item.subjectId,owner,names[item.subjectId]??undefined)}的 AI</strong><p>{item.state==='active'?modes[item.mode]??'有限参与':states[item.state]??'当前不可使用'}{item.primaryResponder&&item.state==='active'?' · 主要回复者':''}</p>
   {item.subjectId===owner&&item.state==='active'&&<div className="agent-participation-actions"><button className="text-link" onClick={()=>view.request('edit',item)}>调整参与方式</button><button className="text-link" onClick={()=>view.request('revoke',item)}>撤销</button></div>}
-  <details><summary>参与范围</summary><dl><dt>允许的行为</dt><dd>{modes[item.mode]??'有限参与'}</dd><dt>{item.state==='active'?'有效至':'原有效期至'}</dt><dd>{new Date(item.expiresAt*1000).toLocaleString('zh-CN')}</dd></dl>{item.subjectId===owner&&<button className="text-link" onClick={()=>view.request('inspect',item)}>查看这项授权的记录</button>}</details></div></li>;
+  <ReadingDetails mode="inline"><ReadingSummary>参与范围</ReadingSummary><dl><dt>允许的行为</dt><dd>{modes[item.mode]??'有限参与'}</dd><dt>{item.state==='active'?'有效至':'原有效期至'}</dt><dd>{new Date(item.expiresAt*1000).toLocaleString('zh-CN')}</dd></dl>{item.subjectId===owner&&<button className="text-link" onClick={()=>view.request('inspect',item)}>查看这项授权的记录</button>}</ReadingDetails></div></li>;
  const active=items.filter(item=>item.state==='active'),previous=items.filter(item=>item.state!=='active');
  return <section className="agent-participants" aria-label="对话中的 AI">
   <h4>当前参与</h4>
@@ -59,7 +60,7 @@ function AgentParticipantsView({runtime,roomId,lease}:{runtime:Runtime;roomId:st
   {error&&<output className="message error">{error} <button className="text-link" disabled={busy} onClick={()=>void view.load()}>再试一次</button></output>}
   {loaded&&!error&&!active.length&&<p className="muted">{next?'已加载的记录中，暂未看到当前可参与的 AI。':'目前没有已授权参与的 AI。'}</p>}
   <ul>{active.map(render)}</ul>
-  {!!previous.length&&<details className="agent-participants-history"><summary>以前的参与范围</summary><ul>{previous.map(render)}</ul></details>}
+  {!!previous.length&&<ReadingDetails className="agent-participants-history"><ReadingSummary>以前的参与范围</ReadingSummary><ul>{previous.map(render)}</ul></ReadingDetails>}
   {next&&<button className="text-link" disabled={busy} onClick={()=>view.more()}>更多参与记录</button>}
  </section>;
 }

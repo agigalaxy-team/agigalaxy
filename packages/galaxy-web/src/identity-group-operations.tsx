@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {useMemberNames} from './conversation-ui';
@@ -35,7 +36,7 @@ export function IdentityGroupOperations({runtime,client,lease,subjectId,onReceip
    <Button type="button" variant="ghost" disabled={busy} onClick={()=>onOpen(row.operationId)}>查看原邀请</Button>
    <Button type="button" variant="ghost" disabled={busy} onClick={()=>void run(async()=>{const receipt=await client.reconcile(row.proofId);check();if(receipt.state==='acknowledged')await onReceipt(receipt);else setNotice(receipt.operationClosed?'原邀请已经结束；本次发送尚未确认收到，输入仍保留。':'尚未确认收到这次发送，原操作仍保留。');})}>查询处理结果</Button>
    {row.state!=='stopped-local'&&<Button type="button" variant="ghost" disabled={busy} onClick={()=>void run(async()=>{const receipt=await client.stopLocalRetry(row.proofId,{confirmed:true});check();if(receipt.ownApprovalAcknowledged)await onReceipt({...receipt,state:'acknowledged'});else setNotice('本机已停止发送。已经收到的邀请仍按原状态处理。');})}>停止本机发送</Button>}
-  </div><details className="ig-technical"><summary>原操作详情</summary><HistoryFields value={row.locator}/></details></article>;})}
+  </div><ReadingDetails className="ig-technical"><ReadingSummary>原操作详情</ReadingSummary><HistoryFields value={row.locator}/></ReadingDetails></article>;})}
   {review&&<section className="ig-original-review"><header><h4>继续这份原内容</h4><p>连接或设备控制发生变化。这次会用当前设备处理同一份内容，原操作编号、范围和截止时间保持不变。</p></header><IdentityGroupIntent payload={review.preview.payload} sources={sources} subjectId={subjectId} names={names}/><p>本次选择：{review.preview.decision==='approve'?'同意':review.preview.decision==='decline'?'拒绝':'取消'}。</p><div className="button-row"><Button type="button" disabled={busy} onClick={()=>void run(async()=>{const prior=review;const receipt=await client.execute(prior.preview,{confirmed:true,onJournal:locator=>rebindDraft(prior.row.locator,locator)});check();setReview(null);setSources([]);if(receipt.state==='acknowledged')await onReceipt(receipt);else setNotice('原操作已经结束，本次发送没有确认收到。');})}>以当前设备继续{review.preview.decision==='approve'?'同意':review.preview.decision==='decline'?'拒绝':'取消'}</Button><Button type="button" variant="ghost" disabled={busy} onClick={()=>{setReview(null);setSources([]);}}>暂不继续</Button></div></section>}
   {error&&<p role="alert" className="message error">{error}</p>}{notice&&<output>{notice}</output>}
  </section>;

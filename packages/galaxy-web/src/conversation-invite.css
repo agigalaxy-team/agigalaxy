@@ -14,3 +14,8 @@
 .galaxy-site .member-decision .button-row{flex-wrap:wrap;margin-top:10px}
 .galaxy-site .member-decision .button-row:empty{display:none}
 .galaxy-site .conversation-invite output{display:block;margin:12px 0}
+.galaxy-site .conversation-invite .reading-detail-link{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--g-accent)}
+.galaxy-site .conversation-invite-form{display:grid;gap:16px;margin-top:15px}
+.galaxy-site .conversation-invite-form .reading-section{padding:0;border:0;margin:0}
+.galaxy-site .conversation-invite-form .reading-section-title{font-size:13px;margin:0 0 10px}
+.galaxy-site .conversation-invite-form .reading-section-body>label{display:grid;gap:8px}

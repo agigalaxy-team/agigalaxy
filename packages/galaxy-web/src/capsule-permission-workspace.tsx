@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -61,7 +62,7 @@ function CapsulePermissionEditor({runtime,client,subjectId,busy,run,propose,draf
    {(['granted','owned'] as const).map(view=><section key={view}><h3>{view==='granted'?'我收到的许可':'我给出的许可'}</h3>{loaded&&!catalog[view].length&&<p className="source-reading-note">{view==='granted'?'当前没有明确授予你的来源许可。':'你还没有授予来源许可。'}</p>}<div className="method-permission-list">{catalog[view].map(value=><article className="method-permission-card" key={value.permissionId}>
     <header><span className="method-source-person"><MemberAvatar subjectId={value.authorId}/>{memberName(value.authorId,subjectId,people.names[value.authorId]??undefined)}</span><span>{stateLabel(value)}</span></header>
     <h4>{value.payload?.license??'来源许可'}</h4><p className="reading-prose">{value.payload?.scope}</p><p>获许可人：{(value.payload?.grantees??[]).map((id:string)=>memberName(id,subjectId,people.names[id]??undefined)).join('、')}</p><p>署名要求：{value.payload?.attribution}</p><p className="source-reading-note">{value.payload?.allowPublic?'允许在此许可范围内公开':'限许可范围内使用，不允许公开'}{value.payload?.expiresAt?' · 截至 '+readableTime(value.payload.expiresAt):' · 仍受原授权有效期限制'}</p>
-    <details className="source-reference-details"><summary>准确来源与许可依据</summary><p>{value.payload?.basis==='documented-covering-license'?'依据覆盖许可文件：'+value.payload?.licenseReference:'原作者许可本人创作的选定内容'}</p>{value.payload.sources.map(ref=><p key={capsuleRefKey(ref)}>{sourceKind(ref.kind)} · 第 {ref.version} 版 <code>{ref.id}</code></p>)}</details>
+    <ReadingDetails className="source-reference-details"><ReadingSummary>准确来源与许可依据</ReadingSummary><p>{value.payload?.basis==='documented-covering-license'?'依据覆盖许可文件：'+value.payload?.licenseReference:'原作者许可本人创作的选定内容'}</p>{value.payload.sources.map(ref=><p key={capsuleRefKey(ref)}>{sourceKind(ref.kind)} · 第 {ref.version} 版 <code>{ref.id}</code></p>)}</ReadingDetails>
     {view==='owned'&&!value.revoked&&!value.expired&&<Button type="button" variant="outline" disabled={busy} onClick={()=>selectRevoke(value.permissionId)}>撤销这项许可</Button>}
    </article>)}</div></section>)}
   </section>

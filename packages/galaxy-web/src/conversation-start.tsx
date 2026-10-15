@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -27,7 +28,7 @@ export function ConversationStart({runtime,subjectId,busy,onStart,onClose}:{runt
   {loading&&<output>正在读取联系人…</output>}{loaded&&!loading&&!shown.length&&<p className="muted">{value.query?'已读取的联系人中没有这个姓名。':'还没有其他联系人。可以使用对方给你的银河 ID 发出邀请。'}</p>}
   {error&&<p className="message error">{error}<button className="text-link" type="button" disabled={loading} onClick={()=>void directory.loadInitial()}>重新读取</button></p>}
   <div className="invite-more">{cursors.contacts&&<button type="button" className="text-link" disabled={loading} onClick={()=>void directory.load('contacts',cursors.contacts!)}>更多联系人</button>}{cursors.rooms&&<button type="button" className="text-link" disabled={loading} onClick={()=>void directory.load('rooms',cursors.rooms!)}>更早对话中的人</button>}</div>
-  <details className="invite-known-person" open={!!value.person&&!peopleIds.includes(value.person)}><summary>使用对方给我的银河 ID</summary><label htmlFor={fieldId+'-manual'}>对方的银河 ID<Input id={fieldId+'-manual'} maxLength={32} disabled={busy} value={peopleIds.includes(value.person)?'':value.person} onChange={event=>change({person:event.target.value.trim()})} placeholder="粘贴对方的完整银河 ID"/></label></details>
+  <ReadingDetails className="invite-known-person" mode="inline"><ReadingSummary>使用对方给我的银河 ID</ReadingSummary><label htmlFor={fieldId+'-manual'}>对方的银河 ID<Input id={fieldId+'-manual'} maxLength={32} disabled={busy} value={peopleIds.includes(value.person)?'':value.person} onChange={event=>change({person:event.target.value.trim()})} placeholder="粘贴对方的完整银河 ID"/></label></ReadingDetails>
   {value.person&&<p className="invite-selection">{valid?<>邀请 <strong>{name(value.person)}</strong> 聊天</>:value.person===subjectId?'请选择想要交流的另一位成员。':'请输入对方完整的银河 ID。'}</p>}
   <label htmlFor={fieldId+'-title'}>话题名称 <span className="muted">可选</span><Input id={fieldId+'-title'} maxLength={120} disabled={busy} value={value.title} onChange={event=>change({title:event.target.value})} placeholder="也可以直接开始聊天"/></label>
   <p className="invite-impact">对方接受邀请后加入对话，可以阅读仍保留的消息。</p>

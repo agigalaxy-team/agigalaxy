@@ -4,7 +4,7 @@ import {Textarea} from '@/components/ui/textarea';
 import {TaskTerms} from './task-budget-fields';
 import {applicationFromDraft,budgetText,qualificationState,taskWriteError} from './task-bounty-client.mjs';
 import {TaskAgentIdentityPrompt} from './task-agent-identity-prompt';
-import {ArrowRight,Check,MessageCircle} from 'lucide-react';
+import {Check,MessageCircle} from 'lucide-react';
 import type {TaskPageTask} from './task-page-view';
 import type {WorkTask,WorkRequest,WorkApplication} from './work-task-types';
 import type {TaskEntryRuntime,ApplicationDraft} from './task-entry-types';
@@ -34,7 +34,7 @@ export function TaskApplication(props:Props){
 function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refresh,onNeedIdentity}:Omit<Props,'task'>&{task:WorkTask}){
  const key=`task-application-draft:${task.taskId}`,owner=subjectId??'visitor';
  const guard=useMemo(()=>runtime?.createTaskDraftClient()??null,[runtime]);
- const [draft,setDraft]=useState(blankApplication),[loaded,setLoaded]=useState(false),[guestDraft,setGuestDraft]=useState<ApplicationDraft|null>(null),[scopeOpen,setScopeOpen]=useState(false),[pending,setPending]=useState<unknown>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[saveState,setSaveState]=useState(''),[agentReady,setAgentReady]=useState(false);
+ const [draft,setDraft]=useState(blankApplication),[loaded,setLoaded]=useState(false),[guestDraft,setGuestDraft]=useState<ApplicationDraft|null>(null),[pending,setPending]=useState<unknown>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[saveState,setSaveState]=useState(''),[agentReady,setAgentReady]=useState(false);
  const epoch=useRef(0),working=useRef(false),saves=useRef<Promise<unknown>>(Promise.resolve()),draftRef=useRef(draft),guestSource=useRef<ApplicationDraft|null>(null),inputRevision=useRef(0),fieldId=useId();
  const [readAt,setReadAt]=useState(()=>Date.now()/1000);
  const current=(token=epoch.current)=>{if(token!==epoch.current||!guard||!runtime)return false;try{guard.check();return guard.ownerKey===owner;}catch{return false;}};
@@ -42,7 +42,7 @@ function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refre
   if(!runtime)return;const token=epoch.current;
   return Promise.all([runtime.getLocal(key,owner),subjectId?runtime.getLocal(key,'visitor'):null,subjectId?runtime.getLocal(`task-event:${task.taskId}`,owner):null]).then(([saved,guest,operation])=>{
    if(!current(token))return;const useGuest=!meaningfulApplication(saved)&&meaningfulApplication(guest),selected=readApplicationDraft(useGuest?guest:saved);
-   setDraft(selected);draftRef.current=selected;setScopeOpen(!!selected.scope);guestSource.current=useGuest?readApplicationDraft(guest):null;
+   setDraft(selected);draftRef.current=selected;guestSource.current=useGuest?readApplicationDraft(guest):null;
    if(meaningfulApplication(saved)&&meaningfulApplication(guest)&&!sameApplication(saved,guest))setGuestDraft(readApplicationDraft(guest));
    setPending(operation);setLoaded(true);setSaveState('输入会保存在此浏览器。');
   }).catch((reason:unknown)=>{if(current(token))setError(taskWriteError(reason));});
@@ -68,7 +68,7 @@ function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refre
   saves.current=saves.current.catch(()=>{}).then(async()=>{if(!current(token))throw Error('原参与草稿的身份或连接已变化。');await runtime.putLocal(key,next,draftOwner);if(!current(token))throw Error('原参与草稿的身份或连接已变化。');});
   void saves.current.then(()=>{if(current(token)&&draftRef.current===next)setSaveState('已保存到此浏览器。');}).catch((reason:unknown)=>{if(current(token)){setSaveState('尚未保存，文字仍在这里。');setError(taskWriteError(reason));}});
  }
- async function continueGuest(valid:()=>boolean){await saves.current;if(!valid()||!guestDraft)return;const next=readApplicationDraft(guestDraft);guestSource.current=guestDraft;inputRevision.current++;setGuestDraft(null);draftRef.current=next;setDraft(next);setScopeOpen(!!next.scope);setSaveState('已接着使用登录前的草稿，身份原稿仍保留。');}
+ async function continueGuest(valid:()=>boolean){await saves.current;if(!valid()||!guestDraft)return;const next=readApplicationDraft(guestDraft);guestSource.current=guestDraft;inputRevision.current++;setGuestDraft(null);draftRef.current=next;setDraft(next);setSaveState('已接着使用登录前的草稿，身份原稿仍保留。');}
  async function submit(valid:()=>boolean){
   if(!runtime)throw Error('请先接续当前身份。');await saves.current;if(!valid())return;
   const submittedDraft={...draftRef.current},revision=inputRevision.current,draftOwner=guestSource.current?'visitor':owner;
@@ -83,19 +83,18 @@ function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refre
  {error&&<div className="message error" role="alert">{error}</div>}{notice&&<output className="message">{notice}</output>}
  {!open&&<p className="message">这份求助已停止接受新的参与意向，仍可继续讨论。</p>}
  {!!pending&&<output className="application-note">上次提交的内容已保留，正在确认结果。</output>}
- {sent&&<div className="application-sent"><Check size={22}/><div><h3>你的帮助意向已送达</h3><p>{sent.proposal}</p>{sent.scope&&<p>{sent.scope}</p>}<Button variant="outline" onClick={()=>navigate(`/app/tasks/${task.taskId}?section=collaboration`)}>查看回应<ArrowRight size={15}/></Button></div></div>}
+ {sent&&<div className="application-sent"><Check size={22}/><div><h3>你的帮助意向已送达</h3><p>{sent.proposal}</p>{sent.scope&&<p>{sent.scope}</p>}<Button variant="outline" onClick={()=>navigate(`/app/tasks/${task.taskId}?section=collaboration`)}>查看回应</Button></div></div>}
  {guestDraft&&<div className="application-draft-choice"><h3>登录前还有一份不同的草稿</h3><p>当前显示这个身份已有的草稿。两份内容都已保留。</p><blockquote>{guestDraft.proposal}<br/>{guestDraft.scope}</blockquote><Button variant="outline" disabled={busy} onClick={()=>void run(continueGuest)}>接着写登录前的草稿</Button><Button variant="ghost" onClick={()=>setGuestDraft(null)}>继续当前草稿</Button></div>}
  {loaded&&!sent&&<form className="workspace-form application-compose" onSubmit={event=>{event.preventDefault();if(writable&&agentReady)void run(submit);}}>
   <fieldset disabled={busy||!!pending}>
    <label htmlFor={fieldId+'-proposal'}>你能提供怎样的帮助？<Textarea id={fieldId+'-proposal'} aria-label="你能提供怎样的帮助？" required maxLength={1500} value={draft.proposal} onChange={event=>change('proposal',event.target.value)} placeholder="可以是一个建议、一次复核，或一起完成某一部分。"/></label>
-   <button className="text-action" type="button" aria-expanded={scopeOpen} aria-controls={fieldId+'-scope-row'} onClick={()=>setScopeOpen(value=>!value)}>{scopeOpen?'收起补充说明':'补充方便的时间或其他说明'}</button>
-   {scopeOpen&&<label id={fieldId+'-scope-row'} htmlFor={fieldId+'-scope'}>补充说明 <small>可选</small><Textarea id={fieldId+'-scope'} aria-label="补充说明" maxLength={1500} value={draft.scope} onChange={event=>change('scope',event.target.value)} placeholder="有需要对方提前了解的事情时，再写在这里。"/></label>}
+   <label id={fieldId+'-scope-row'} htmlFor={fieldId+'-scope'}>补充说明 <small>可选</small><Textarea id={fieldId+'-scope'} aria-label="补充说明" maxLength={1500} value={draft.scope} onChange={event=>change('scope',event.target.value)} placeholder="方便的时间，或需要对方提前了解的事情。"/></label>
   </fieldset>
   {connected&&<TaskAgentIdentityPrompt {...{runtime,subjectId,connected,navigate}} onReady={setAgentReady}/>}
   <footer className="request-form-footer"><span aria-live="polite">{saveState}</span>
-   {!connected?<Button type="button" disabled={busy||!open||!!pending} onClick={()=>void run(async valid=>{await saves.current;if(valid()){if(onNeedIdentity)onNeedIdentity();else navigate('/app/settings/identity');}})}>登录并继续<ArrowRight size={15}/></Button>:agentReady&&<Button type="submit" disabled={busy||!open||!!pending}>{busy?'正在发送…':'发送帮助意向'}<ArrowRight size={15}/></Button>}
+   {!connected?<Button type="button" disabled={busy||!open||!!pending} onClick={()=>void run(async valid=>{await saves.current;if(valid()){if(onNeedIdentity)onNeedIdentity();else navigate('/app/settings/identity');}})}>登录并继续</Button>:agentReady&&<Button type="submit" disabled={busy||!open||!!pending}>{busy?'正在发送…':'发送帮助意向'}</Button>}
   </footer>
  </form>}
- <div className="application-discussion"><MessageCircle size={18}/><p>也可以直接在这件事下面交流。</p><Button variant="ghost" disabled={busy} onClick={()=>void run(async valid=>{await saves.current;if(valid())navigate(`/app/tasks/${task.taskId}?section=comments`);})}>参与讨论<ArrowRight size={15}/></Button></div>
+ <div className="application-discussion"><MessageCircle size={18}/><p>也可以直接在这件事下面交流。</p><Button variant="ghost" disabled={busy} onClick={()=>void run(async valid=>{await saves.current;if(valid())navigate(`/app/tasks/${task.taskId}?section=comments`);})}>参与讨论</Button></div>
  </section>;
 }

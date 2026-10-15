@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React from 'react';
 import {TaskCurrentSourceItem} from './task-material-view';
 import {Button} from '@/components/ui/button';
@@ -52,7 +53,7 @@ function Item({value,kind,children}:{value:HistoryFactItem;kind:string;children?
  return <article className="history-fact-item"><Author id={v.actorId??v.reportedBy??value.actorId??value.reportedBy}/><h4>{title}</h4><div className="fact-byline">{at&&<time>{at}</time>}{v.role&&<span> · {historyRoleLabel(v.role)}</span>}{v.types&&v.types.length>0&&<span> · {v.types.map(historyRoleLabel).join('、')}</span>}{value.supersededInVisibleHistory&&<span> · 已有后续修订</span>}</div>
   {lines.map((line,index)=><p key={index}>{line}</p>)}
   {reported&&<p className="fact-note">{v.reportedOutcome?'记录者报告：':'本项结论：'}{label(reported)}</p>}
-  {hasContext&&<details><summary>{kind==='尝试'?'使用条件与环境':'范围与具体条件'}</summary><Context value={v}/></details>}
+  {hasContext&&<ReadingDetails><ReadingSummary>{kind==='尝试'?'使用条件与环境':'范围与具体条件'}</ReadingSummary><Context value={v}/></ReadingDetails>}
   {children}
  </article>;
 }
@@ -68,7 +69,7 @@ function Participation({items,navigate}:{items:HistoryParticipation[];navigate?:
 function FactVersions<T extends HistoryFactItem>({items,kind,extra}:{items:T[];kind:string;extra?:(item:T)=>React.ReactNode}){
  return <>{groupHistoryVersions(items).map(({latest,previous},index)=><div className="history-fact-series" key={latest.id??index}>
   <Item value={latest} kind={kind}>{extra?.(latest)}</Item>
-  {previous.length>0&&<details className="history-revisions"><summary>此前 {previous.length} 次记录</summary><ol>{previous.map((item,i)=><li key={item.version??i}><Item value={item} kind={kind}>{extra?.(item)}</Item></li>)}</ol></details>}
+  {previous.length>0&&<ReadingDetails className="history-revisions"><ReadingSummary>此前 {previous.length} 次记录</ReadingSummary><ol>{previous.map((item,i)=><li key={item.version??i}><Item value={item} kind={kind}>{extra?.(item)}</Item></li>)}</ol></ReadingDetails>}
  </div>)}</>;
 }
 function StructuredDownload({record}:{record:HistoryFactsRecord}){
@@ -93,7 +94,7 @@ function HistoryFactsBody({record,navigate,runtime,connected=false,subjectId}:Hi
   <nav className="history-fact-tabs" aria-label="经历详情">{[['process','过程与参与'],['results','结果与核查'],['sources','来源与记录']].map(([id,title])=><button type="button" key={id} aria-pressed={tab===id} onClick={()=>selectTab(id)}>{title}</button>)}</nav>
   {tab==='process'&&<div>
    {!!attempts.length&&<section className="history-fact-section"><h3>尝试过程</h3><div className="history-timeline"><FactVersions items={attempts} kind="尝试"/></div></section>}
-   {!!interventions.length&&<section className="history-fact-section"><h3>各方做了什么</h3><div className="history-timeline"><FactVersions items={interventions} kind="参与" extra={value=><details><summary>相关方的意见</summary><InterventionOpinions intervention={{...value,confirmation:value.confirmation??''}} subjectId={subjectId} names={people}/></details>}/></div></section>}
+   {!!interventions.length&&<section className="history-fact-section"><h3>各方做了什么</h3><div className="history-timeline"><FactVersions items={interventions} kind="参与" extra={value=><ReadingDetails><ReadingSummary>相关方的意见</ReadingSummary><InterventionOpinions intervention={{...value,confirmation:value.confirmation??''}} subjectId={subjectId} names={people}/></ReadingDetails>}/></div></section>}
    {!!participation.length&&<section className="history-fact-section"><h3>参与和交付</h3><Participation items={participation} navigate={navigate}/></section>}
    {!hasProcess&&<p className="history-empty">这份资料还没有可查看的过程记录。</p>}
   </div>}

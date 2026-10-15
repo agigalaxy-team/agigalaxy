@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Paperclip} from 'lucide-react';
@@ -139,7 +140,7 @@ function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChang
     <div className="button-row">{item.state==='available'&&<button type="button" className="text-link" disabled={busy} onClick={()=>run(()=>saveAttachment(client,item,true))}>下载原文件</button>}{!['erased','revoked','expired'].includes(item.state)&&<button type="button" className="text-link" disabled={busy} onClick={()=>setConfirmRevoke(item)}>撤销文件</button>}</div>
    </article>;})}</div>
    {after&&<Button type="button" variant="outline" disabled={busy} onClick={()=>run(()=>reload(after!),false)}>更多附件</Button>}
-   {limits&&<details className="technical-details"><summary>文件保留与容量</summary><p>每条消息最多 {limits.maxFilesPerMessage} 个文件，你的临时文件总容量为 {size(limits.maxSubjectBytes)}。文件在保留期限内可以撤销；独立保存为工作材料需要另行申请。</p></details>}
+   {limits&&<ReadingDetails className="technical-details"><ReadingSummary>文件保留与容量</ReadingSummary><p>每条消息最多 {limits.maxFilesPerMessage} 个文件，你的临时文件总容量为 {size(limits.maxSubjectBytes)}。文件在保留期限内可以撤销；独立保存为工作材料需要另行申请。</p></ReadingDetails>}
   </dialog>
   <dialog ref={revokeDialog} className="galaxy-dialog" onCancel={event=>{if(busy)event.preventDefault();else setConfirmRevoke(null);}}>
    {confirmRevoke&&<><h3>{confirmRevoke.pending?'取消这次上传':'撤销文件'}</h3><p>{confirmRevoke.name??'这个文件'}</p><p>确认后停止文件下载，已有消息文字保留。</p><div className="button-row"><Button type="button" disabled={busy} onClick={()=>run(async valid=>{await(confirmRevoke.pending?client.abandon(roomId):client.revoke(roomId,confirmRevoke.attachmentId));if(!valid())return;changeSelection(currentSelection.current.selected.filter(value=>value.id!==confirmRevoke.attachmentId));setConfirmRevoke(null);})}>{busy?'正在处理…':'确认撤销'}</Button><Button type="button" variant="ghost" disabled={busy} onClick={()=>setConfirmRevoke(null)}>返回</Button></div></>}

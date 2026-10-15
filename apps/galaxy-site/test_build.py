@@ -8,7 +8,8 @@ from unittest.mock import patch
 
 from build import copy_example_images, windows_filesystem_path
 from guide_pages import render_markdown
-from product_pages import render_homepage
+import chrome
+from product_pages import render_homepage, render_product_pages
 
 
 class ArchivePathTests(unittest.TestCase):
@@ -50,45 +51,111 @@ class HomepageParser(HTMLParser):
     def __init__(self, html):
         super().__init__()
         self.elements = []
+        self.text = []
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         self.elements.append((tag, dict(attrs)))
 
+    def handle_data(self, text):
+        self.text.append(text)
+
 
 class HomepageTests(unittest.TestCase):
-    def test_content_and_real_destinations_are_available_without_javascript(self):
+    def test_selected_long_home_has_content_and_real_entries_without_javascript(self):
         html = render_homepage()
         parsed = HomepageParser(html)
         links = {attrs['href'] for tag, attrs in parsed.elements if tag == 'a'}
-        self.assertTrue({'/app/', '/downloads/', '/app/community', '/app/find', '/docs/', '/network/'} <= links)
-        self.assertIn('开放的身份</span><span>与能力网络', html)
-        self.assertIn('交互示例 · 资料、身份与回答均为预设内容', html)
+        self.assertTrue({'/app/', '/downloads/'} <= links)
+        for title in ('开放的身份与能力网络', '星河研究', '出处始终清楚',
+                      '同一身份，积累继续发挥作用', '从你熟悉的地方接入', '开始探索银河'):
+            self.assertIn(title, ''.join(parsed.text))
+        self.assertIn('资料、身份与回答均为预设内容', html)
+        self.assertIn('非正式协议条款', html)
+        self.assertNotIn('3.1', html)
+        self.assertNotIn('2024', html)
+        self.assertIn('本机接入', html)
         data = next(attrs['data-home-example'] for _, attrs in parsed.elements if 'data-home-example' in attrs)
         example = json.loads(data)
-        self.assertIn(example['questions']['overview']['answer'], html)
-        self.assertEqual(example['questions']['overview']['sources'], ['protocol', 'contribution'])
+        self.assertTrue(example['preset'])
+        self.assertEqual(example['entries']['native']['href'], '/downloads/')
         self.assertNotIn('<script', html)
+        self.assertFalse(any(tag == 'img' for tag, _ in parsed.elements))
         self.assertFalse(any(name.startswith('on') or name == 'style'
                              for _, attrs in parsed.elements for name in attrs))
 
-    def test_keyboard_tabs_and_local_disclosures_have_unique_targets(self):
+    def test_tabs_and_source_references_have_unique_valid_local_targets(self):
         elements = HomepageParser(render_homepage()).elements
         ids = [attrs['id'] for _, attrs in elements if 'id' in attrs]
         self.assertEqual(len(ids), len(set(ids)))
         by_id = {attrs['id']: attrs for _, attrs in elements if 'id' in attrs}
         tabs = [attrs for _, attrs in elements if attrs.get('role') == 'tab']
-        self.assertEqual(len(tabs), 4)
+        self.assertTrue(tabs)
         for tab in tabs:
             panel = by_id[tab['aria-controls']]
             selected = tab['aria-selected'] == 'true'
             self.assertEqual(panel['aria-labelledby'], tab['id'])
             self.assertEqual('hidden' not in panel, selected)
-            self.assertEqual(tab.get('tabindex', '0'), '0' if selected else '-1')
+            self.assertEqual(tab['tabindex'], '0' if selected else '-1')
         for _, attrs in elements:
-            if 'aria-controls' in attrs:
-                self.assertIn(attrs['aria-controls'], by_id)
-        self.assertEqual(len([attrs for _, attrs in elements if 'data-gh-open' in attrs]), 3)
+            for target in ('aria-controls', 'data-gh-reference', 'data-gh-locate'):
+                if target in attrs:
+                    self.assertIn(attrs[target], by_id)
+        self.assertFalse(any(tag in ('details', 'summary') or 'aria-expanded' in attrs
+                             for tag, attrs in elements))
+
+    def test_official_brand_geometry_is_reused(self):
+        markup = chrome.brand_mark()
+        elements = HomepageParser(markup).elements
+        ellipses = [attrs for tag, attrs in elements if tag == 'ellipse']
+        circles = [attrs for tag, attrs in elements if tag == 'circle']
+        self.assertEqual([(item['rx'], item['ry'], item['transform']) for item in ellipses],
+                         [('13', '6', 'rotate(-36 16 16)'), ('6', '13', 'rotate(-36 16 16)')])
+        self.assertEqual(circles[-1]['fill'], '#d8a9be')
+        self.assertEqual((circles[-1]['cx'], circles[-1]['cy']), ('26', '7'))
+
+
+class PublicNavigationTests(unittest.TestCase):
+    def test_all_current_pages_keep_entries_without_direction_icons_or_disclosures(self):
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            metadata = {
+                'backendRelease': '0.0.1', 'publicApiObservedAt': 'test fixture',
+                'nativeClientDownload': {
+                    'downloadBase': '/downloads/native-client/0.0.1/',
+                    'package': {'version': '0.0.1', 'filename': 'fixture.zip',
+                                'bytes': 128, 'sha256': 'a' * 64}
+                }
+            }
+            (output / 'release.json').write_text(json.dumps(metadata), encoding='utf-8')
+            with patch.object(chrome, 'OUT', output), patch.object(chrome, 'PREVIEW', True):
+                render_product_pages({'page': chrome.page, 'write': chrome.write,
+                                      'OUT': output, 'PREVIEW': True})
+            for page in output.rglob('*.html'):
+                html = page.read_text(encoding='utf-8')
+                elements = HomepageParser(html).elements
+                with self.subTest(page=page.relative_to(output)):
+                    self.assertFalse(any(tag in ('details', 'summary') for tag, _ in elements))
+                    self.assertFalse(any('aria-expanded' in attrs for _, attrs in elements))
+                    self.assertNotRegex(html, '[←→↔↑↓↗↘‹›»«]')
+                    links = {attrs.get('href') for tag, attrs in elements if tag == 'a'}
+                    self.assertTrue({'/app/', '/app/community', '/app/account', '/app/work',
+                                     '/app/rooms', '/app/publish', '/app/search'} <= links)
+            download = (output / 'downloads/index.html').read_text(encoding='utf-8')
+            verification = (output / 'downloads/verification/index.html').read_text(encoding='utf-8')
+            self.assertIn('href="/downloads/verification/"', download)
+            self.assertIn('SHA-256', verification)
+            self.assertIn('a' * 64, verification)
+            self.assertIn('/downloads/native-client/0.0.1/release.jws', verification)
+            self.assertIn('/docs/v0.3/installation.md', verification)
+
+    def test_guide_prose_uses_words_while_technical_code_keeps_original_bytes(self):
+        _, html, _ = render_markdown(
+            '# 安装\n\n设置 → MCP → 本地配置。\n\n' + chr(96) + 'input → output' + chr(96) + '\n',
+            '/docs/native-client/test/hosts.md', {}
+        )
+        self.assertIn('设置、MCP、本地配置。', html)
+        self.assertIn('<code>input → output</code>', html)
 
 
 class ExampleImageTests(unittest.TestCase):

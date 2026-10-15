@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React from 'react';
 import {decodeJwt} from 'jose';
 import type * as z from 'zod/v4';
@@ -29,6 +30,6 @@ export function CiProofView({value,technical=true}:{value:unknown;technical?:boo
     <CiSourceView source={data.source}/>
     <dl className="material-facts"><div><dt>采集时间</dt><dd>{ciTime(data.observedAt)}</dd></div><div><dt>证明有效至</dt><dd>{ciTime(data.expiresAt)}</dd></div><div><dt>签发服务</dt><dd>{data.issuer}</dd></div>{data.sourceControl?.repositoryOwner&&<div><dt>仓库所属账号</dt><dd>{data.sourceControl.repositoryOwner.login}</dd></div>}</dl>
     <p className="permission-line">这份证明仅说明这次 CI 运行的观察结果。运行由仓库控制；提交人的仓库控制权、独立执行、整个任务的结果和个人能力均未经这份证明认证。</p>
-    {technical&&<details className="technical-details"><summary>证明原文与来源记录</summary><pre>{JSON.stringify(data,null,2)}</pre>{signed&&<><p>签发方原签名</p><pre>{signed}</pre></>}</details>}
+    {technical&&<ReadingDetails className="technical-details"><ReadingSummary>证明原文与来源记录</ReadingSummary><pre>{JSON.stringify(data,null,2)}</pre>{signed&&<><p>签发方原签名</p><pre>{signed}</pre></>}</ReadingDetails>}
   </div>;
 }

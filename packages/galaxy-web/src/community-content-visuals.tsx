@@ -1,6 +1,6 @@
 /* eslint-disable nextjs/no-img-element -- This independently deployed Vite client has no Next image server. Covers use explicit dimensions and lazy loading. */
 import React, {useState} from 'react';
-import {ArrowUpRight,BookOpen,Compass,Lightbulb,MessagesSquare,Shapes} from 'lucide-react';
+import {BookOpen, Compass, Lightbulb, MessagesSquare, Shapes} from 'lucide-react';
 import './community-content-visuals.css';
 
 const topicIcons:Record<string,typeof MessagesSquare>={questions:Lightbulb,showcase:Shapes,methods:BookOpen,discussion:MessagesSquare};
@@ -42,7 +42,7 @@ export function ContentPreview({kind,title,excerpt,image,variant='tile'}:Preview
  const safeImage=image&&image.src.startsWith('/images/')&&!image.src.startsWith('//')&&!image.src.includes('..')?image:null;
  const firstPhrase=title.split(/[，。！？：:—｜|]/)[0];
  return <div className={'content-preview content-preview-'+kind+' content-preview-'+variant}>
-  {safeImage?<img src={safeImage.src} alt={safeImage.alt} loading={variant==='hero'?'eager':'lazy'}/>:<div className="content-preview-type" aria-hidden="true"><span>{kind==='method'?'方法笔记':kind==='project'?'作品 · 项目':'正在讨论'}</span><strong>{firstPhrase.length>24?firstPhrase.slice(0,24)+'…':firstPhrase}</strong>{excerpt&&<p>{excerpt.slice(0,82)}</p>}<span className="content-preview-rule"/><ArrowUpRight size={24}/></div>}
+  {safeImage?<img src={safeImage.src} alt={safeImage.alt} loading={variant==='hero'?'eager':'lazy'}/>:<div className="content-preview-type" aria-hidden="true"><span>{kind==='method'?'方法笔记':kind==='project'?'作品 · 项目':'正在讨论'}</span><strong>{firstPhrase.length>24?firstPhrase.slice(0,24)+'…':firstPhrase}</strong>{excerpt&&<p>{excerpt.slice(0,82)}</p>}<span className="content-preview-rule"/></div>}
  </div>;
 }
 
@@ -52,5 +52,5 @@ export function EmptyContent({kind,title,description,action}:{kind:'post'|'proje
 
 export function ContentLinkPreview({url}:{url:string}){
  let parsed:URL;try{parsed=new URL(url);if(!['https:','http:'].includes(parsed.protocol)||parsed.username||parsed.password)return null;}catch{return null;}
- return <a className="content-link-preview" href={parsed.href} target="_blank" rel="noreferrer noopener"><span className="content-link-domain">{parsed.hostname.replace(/^www\./,'')}</span><span>{decodeURIComponent(parsed.pathname).replace(/\/$/,'')||'打开相关内容'}</span><ArrowUpRight size={17}/></a>;
+ return <a className="content-link-preview" href={parsed.href} target="_blank" rel="noreferrer noopener"><span className="content-link-domain">{parsed.hostname.replace(/^www\./,'')}</span><span>{decodeURIComponent(parsed.pathname).replace(/\/$/,'')||'打开相关内容'}</span></a>;
 }

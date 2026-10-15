@@ -103,3 +103,5 @@ html:has(.galaxy-site), .galaxy-site .site-app-header,
 @media(prefers-reduced-motion:reduce) {
   .galaxy-site .loading-label svg {animation:none}
 }
+.galaxy-site { font-family:Inter,"Noto Sans SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+.galaxy-site select { appearance:none; background-image:none; }

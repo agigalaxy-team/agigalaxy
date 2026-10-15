@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {ArrowRight} from 'lucide-react';
+import {} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {createHomeContinuityClient} from './home-continuity-client.mjs';
 import {notificationTarget} from './notification-target.mjs';
@@ -24,7 +24,7 @@ function HomeContinuitySession({runtime,connected,navigate}:Props){
  useEffect(()=>()=>client?.close(),[client]);
  const result=useCurrentTaskMaterialTree(runtime,readResult);
  const go=(path:string)=>{try{client?.check();navigate(path);}catch{setResult(null);setError('身份已变化，请重新打开我的工作。');}};
- const link=(path:string,text:string)=><a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();go(path);}}}>{text}<ArrowRight size={14}/></a>;
+ const link=(path:string,text:string)=><a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();go(path);}}}>{text}</a>;
  return <div className="work-continuity" aria-busy={busy}>
   {busy&&!result&&<output>正在读取你的工作…</output>}
   {error&&<p role="alert">{error}<Button variant="ghost" onClick={()=>{setBusy(true);setRefresh(n=>n+1);}}>重试</Button></p>}
@@ -33,7 +33,7 @@ function HomeContinuitySession({runtime,connected,navigate}:Props){
    return <section key={kind} className="continuity-section"><header><h2>{own?'我发起的求助':'我参与的工作'}</h2>{link(target,'查看全部')}</header>
     {part?.error?<p className="continuity-empty">这部分工作暂时没有读到。{link(target,'打开列表重试')}</p>:!part?.page?.items.length?<div className="continuity-empty"><p>{own?'还没有发起求助。可以从想推进的一件事开始。':'还没有参与记录。看看有没有你感兴趣的事。'}</p>{link(own?'/app/publish':'/app/participate',own?'发起求助':'浏览正在找帮助的人')}</div>:<ul className="continuity-list">{part.page.items.map(item=>{
      const path='/app/tasks/'+item.taskId+(own?'':'?section=collaboration');
-     return <li key={item.taskId}><a href={path} onClick={event=>{event.preventDefault();go(path);}}><div><h3>{taskViewTitle(item,own?'发起的求助':'参与的工作')}</h3>{item.request?.summary&&<p>{item.request.summary}</p>}<TaskMaterialNotice task={item}/>{item.state&&taskStates[item.state]&&<span className="work-item-state">{taskStates[item.state]}</span>}</div><ArrowRight size={17}/></a></li>;
+     return <li key={item.taskId}><a href={path} onClick={event=>{event.preventDefault();go(path);}}><div><h3>{taskViewTitle(item,own?'发起的求助':'参与的工作')}</h3>{item.request?.summary&&<p>{item.request.summary}</p>}<TaskMaterialNotice task={item}/>{item.state&&taskStates[item.state]&&<span className="work-item-state">{taskStates[item.state]}</span>}</div></a></li>;
     })}</ul>}
    </section>;
   })}</div>

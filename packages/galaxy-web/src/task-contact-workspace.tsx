@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import {TaskCurrentSourceItem} from './task-material-view';
 import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -319,7 +320,7 @@ function TaskContactSession({
           {(task.contacts?.responses.applications??[]).some(item=>item.subjectId===candidate.subjectId)&&<p className="record-meta">已经申请参与这次求助，可以在参与申请中查看。</p>}
           <div className="contact-source-list">{candidate.sources.map(source=><TaskCurrentSourceItem key={source.item.type+source.item.id} runtime={runtime} item={source.item}>{item=><section>
             <h4>{item.title}</h4><p className="reading-prose">{item.summary}</p>
-            <details className="technical-details"><summary>查看原始记录与版本</summary><p>来源中的角色：{candidate.roles.map((role:string)=>(roleLabels[role]??role)).join('、')}</p><p>{source.item.ref.id} · 第 {source.item.ref.version} 版</p><pre className="code-block">{JSON.stringify(item.record,null,2)}</pre></details>
+            <ReadingDetails className="technical-details"><ReadingSummary>查看原始记录与版本</ReadingSummary><p>来源中的角色：{candidate.roles.map((role:string)=>(roleLabels[role]??role)).join('、')}</p><p>{source.item.ref.id} · 第 {source.item.ref.version} 版</p><pre className="code-block">{JSON.stringify(item.record,null,2)}</pre></ReadingDetails>
           </section>}</TaskCurrentSourceItem>)}</div>
           {selected.includes(candidate.subjectId)&&<div className="workspace-form contact-note-editor">
             <label htmlFor={fieldId+'-help-'+candidate.subjectId}>想请对方帮什么<Textarea id={fieldId+'-help-'+candidate.subjectId} maxLength={1500} value={candidate.help} onChange={event=>update(candidate.subjectId,'help',event.target.value)}/></label>
@@ -334,7 +335,7 @@ function TaskContactSession({
         <div className="contact-candidate-list">{saved.map(item=><article className="contact-candidate" key={item.subjectId}>
           <label className="contact-choice"><input type="checkbox" checked={savedSelected.includes(item.subjectId)} onChange={()=>setSavedSelected(toggled(savedSelected,item.subjectId))}/><MemberAvatar subjectId={item.subjectId}/><strong>{name(item.subjectId)}</strong></label>
           <h4>希望获得的帮助</h4><p className="reading-prose">{item.help}</p><h4>选择理由</h4><p className="reading-prose">{item.basis}</p><h4>仍需确认</h4><p className="reading-prose">{item.conditions}</p>
-          <details className="technical-details"><summary>保存时的准确引用</summary><ul>{item.sourceRefs.map((ref:string)=><li key={ref}><code>{ref}</code></li>)}</ul></details>
+          <ReadingDetails className="technical-details"><ReadingSummary>保存时的准确引用</ReadingSummary><ul>{item.sourceRefs.map((ref:string)=><li key={ref}><code>{ref}</code></li>)}</ul></ReadingDetails>
         </article>)}</div>
         {!!savedSelected.length&&<Button disabled={busy} onClick={()=>run(()=>prepare(saved.filter(item=>savedSelected.includes(item.subjectId))))}>预览邀请（{savedSelected.length}）</Button>}
       </>}
@@ -349,9 +350,9 @@ function TaskContactSession({
         <div className="reading-list">{rooms.map(room=><article className="reading-list-item task-room-row" key={room.roomId}><button className="reading-title-link" onClick={()=>navigate('/app/rooms/'+room.roomId)}>{room.title}</button><p className="record-meta">{room.members.length} 位成员 · {room.members.map(member=>name(member.subjectId)).join('、')}</p></article>)}</div>
         {!rooms.length&&<p className="empty-state">{roomsLoaded?'这里还没有你可以进入的任务讨论。':'正在读取任务讨论…'}</p>}
         <div className="button-row">{next&&<Button variant="outline" disabled={busy} onClick={()=>run(lease=>loadRooms(lease,next))}>更多讨论</Button>}<button className="text-link" onClick={()=>navigate('/app/rooms')}>查看全部消息</button></div>
-        <details className="technical-details"><summary>当前读取范围</summary><p>已核对本人 {scan} 个成员讨论。{next?'还有下一页。':roomsLoaded?'当前列表已读完。':'正在核对访问范围。'}</p><button className="text-link" disabled={busy} onClick={()=>run(lease=>loadRooms(lease))}>重新读取</button></details>
+        <ReadingDetails className="technical-details"><ReadingSummary>当前读取范围</ReadingSummary><p>已核对本人 {scan} 个成员讨论。{next?'还有下一页。':roomsLoaded?'当前列表已读完。':'正在核对访问范围。'}</p><button className="text-link" disabled={busy} onClick={()=>run(lease=>loadRooms(lease))}>重新读取</button></ReadingDetails>
       </section>:<section className="workspace-form room-arrangement-editor">
-        <button className="back-link" onClick={()=>setRoomCreating(false)}>← 回到任务讨论</button><h3>与谁开始讨论？</h3>
+        <button className="back-link" onClick={()=>setRoomCreating(false)}> 回到任务讨论</button><h3>与谁开始讨论？</h3>
         <fieldset><legend>选择参与者</legend>{interested.map(id=><label className="contact-choice" key={id}><input type="checkbox" checked={roomChoices.includes(id)} onChange={()=>setRoomChoices(toggled(roomChoices,id))}/><MemberAvatar subjectId={id}/><strong>{name(id)}</strong></label>)}</fieldset>
         <label>沟通方式<select value={mode} onChange={event=>setMode(event.target.value)}><option value="">选择沟通方式</option><option value="separate">分别交流</option><option value="together">一起讨论</option></select></label>
         <p>{mode==='together'?'新讨论只包含以后在这里发送的内容。受邀者自行决定是否加入，后续邀请还需要当前成员共同同意。':mode==='separate'?'你与每位受邀者各自建立讨论，互相看不到其他讨论的内容。':'可以各自交流，也可以一起讨论。'}</p>

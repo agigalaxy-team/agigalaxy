@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useId,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -30,7 +31,7 @@ export function IdentityGroupSource({source,display,compact=false}:{source:Ident
    {!compact&&record.limitations&&<p>适用限制：{Array.isArray(record.limitations)?record.limitations.join('；'):record.limitations}</p>}
   </>:<p>保留原选择，当前不展示来源正文。身份分组不会扩大这份记录的访问权。</p>}
   {source.displaySubjectId&&source.displaySubjectId!==ref.originalSubjectId&&<p>共同展示在 {display(source.displaySubjectId)} 下；原作者与签名保留。</p>}
-  <details className="ig-technical"><summary>准确记录</summary><HistoryFields value={{...ref,...(record?{record}:{}),accessGranted:false}}/></details>
+  <ReadingDetails className="ig-technical"><ReadingSummary>准确记录</ReadingSummary><HistoryFields value={{...ref,...(record?{record}:{}),accessGranted:false}}/></ReadingDetails>
  </div>;
 }
 export function IdentityGroupIntent({payload,sources=[],subjectId,names}:{payload:GroupIntent;sources?:IdentityGroupSourceView[];subjectId:string;names:Record<string,string|null>}){
@@ -40,7 +41,7 @@ export function IdentityGroupIntent({payload,sources=[],subjectId,names}:{payloa
   <p><strong>谁能看到分组：</strong>{payload.visibility==='Public'?'所有人':'分组中的身份'+(payload.viewers?.length?'和 '+payload.viewers.map(display).join('、'):'')}。</p>
   {!!payload.sourceRefs?.length&&<section className="ig-chosen-sources"><h3>这次选择的原记录</h3>{payload.sourceRefs.map(ref=>{const source=sources.find(item=>groupRefKey(item.ref)===groupRefKey(ref)),correction=payload.attributionCorrections?.find(item=>groupRefKey(item.source)===groupRefKey(ref));return <article key={groupRefKey(ref)}><IdentityGroupSource source={source??{ref,record:null}} display={display}/>{correction&&<p className="reading-prose">展示在 {display(correction.displaySubjectId)} 下，原因：{correction.reason}。原作者仍是 {display(ref.originalSubjectId)}。</p>}</article>;})}</section>}
   <p className="permission-line">只有这些身份全部同意，才共同展示。能力、额度、资料访问权和原作者均不合并。</p>
- </>}<p className="muted">{payload.kind==='revoke'?'撤销记录签署于 '+groupTime(payload.issuedAt):'本次邀请有效至 '+groupTime(payload.expiresAt)}</p><details className="ig-technical"><summary>分组与原操作详情</summary><HistoryFields value={payload}/></details></div>;
+ </>}<p className="muted">{payload.kind==='revoke'?'撤销记录签署于 '+groupTime(payload.issuedAt):'本次邀请有效至 '+groupTime(payload.expiresAt)}</p><ReadingDetails className="ig-technical"><ReadingSummary>分组与原操作详情</ReadingSummary><HistoryFields value={payload}/></ReadingDetails></div>;
 }
 type PeoplePickerProps={runtime:IdentityGroupRuntime;client:IdentityGroupClient;lease:IdentityGroupLease;subjectId:string;value:string[];onChange:(value:string[])=>void;label:string;query:string;onQuery:(value:string)=>void;manual:string;onManual:(value:string)=>void;disabled?:boolean;max?:number;includeSelf?:boolean;lockSelf?:boolean};
 export function IdentityGroupPeoplePicker({runtime,client,lease,subjectId,value,onChange,label,query,onQuery,manual,onManual,disabled=false,max=8,includeSelf=false,lockSelf=false}:PeoplePickerProps){
@@ -55,6 +56,6 @@ export function IdentityGroupPeoplePicker({runtime,client,lease,subjectId,value,
  return <fieldset className="ig-people-picker"><legend>{label}</legend><label htmlFor={field}>按姓名查找</label><Input id={field} type="search" value={query} disabled={disabled} onChange={e=>onQuery(e.target.value)} placeholder="联系人姓名"/>
   <div className="ig-person-options">{shown.map(id=><label key={id}><input type="checkbox" checked={value.includes(id)} disabled={disabled||(lockSelf&&id===subjectId)||(!value.includes(id)&&value.length>=max)} onChange={e=>choose(id,e.target.checked)}/><MemberAvatar subjectId={id} own={id===subjectId}/><span>{memberName(id,subjectId,names[id]??undefined)}{value.includes(id)&&!people.includes(id)&&id!==subjectId&&<small>已选择的身份</small>}</span></label>)}</div>
   {!ready&&<output>正在读取联系人…</output>}{ready&&!shown.length&&!error&&<p className="muted">{query?'当前已读联系人中没有这个姓名。':'还没有可选择的联系人。可以使用自己另一个身份的准确编号。'}</p>}{error&&<output>{error}<button type="button" className="text-link" onClick={()=>void load()}>重新读取</button></output>}{more&&<Button type="button" variant="ghost" disabled={disabled} onClick={()=>{pagesRef.current++;void load();}}>更多联系人</Button>}
-  <details><summary>使用已知的银河身份编号</summary><label htmlFor={field+'-manual'}>完整身份编号</label><Input id={field+'-manual'} value={manual} disabled={disabled} onChange={e=>{onManual(e.target.value);setManualError('');}}/><Button type="button" variant="outline" disabled={disabled||!manual.trim()} onClick={addManual}>加入选择</Button>{manualError&&<p role="alert">{manualError}</p>}</details>
+  <ReadingDetails mode="inline"><ReadingSummary>使用已知的银河身份编号</ReadingSummary><label htmlFor={field+'-manual'}>完整身份编号</label><Input id={field+'-manual'} value={manual} disabled={disabled} onChange={e=>{onManual(e.target.value);setManualError('');}}/><Button type="button" variant="outline" disabled={disabled||!manual.trim()} onClick={addManual}>加入选择</Button>{manualError&&<p role="alert">{manualError}</p>}</ReadingDetails>
  </fieldset>;
 }

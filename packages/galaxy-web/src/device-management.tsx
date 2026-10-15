@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {Laptop, Monitor} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -76,8 +77,8 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
  }
  function prepare(deviceId:string){void run(async valid=>{setPreview(null);const value=await management!.prepareRevoke({deviceId});if(valid())setPreview(value);});}
  if(!subjectId)return null;
- return <details className="room-settings device-management" id="identity-device-management">
-  <summary>我的设备</summary>
+ return <ReadingDetails mode="inline" className="room-settings device-management" id="identity-device-management">
+  <ReadingSummary>我的设备</ReadingSummary>
   <style>{'.device-list{list-style:none;padding:0;margin:18px 0}.device-row{display:flex;gap:14px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--border,#e2e8f0)}.device-row>svg{color:#66768d;flex:none;margin-top:3px}.device-row>div{flex:1;min-width:0}.device-row h3{font-size:1rem;margin:0 0 6px}.device-row p{margin:6px 0}.device-management .service-details{font-size:.84rem;margin:12px 0}.device-management code{overflow-wrap:anywhere}.device-confirm{padding:20px;background:var(--muted,#f3f6f9);border-radius:12px;margin:20px 0}.device-confirm h3{margin:0 0 12px}.device-management .device-muted{color:var(--muted-foreground,#64748b);font-size:.88rem}'} </style>
   <h2>管理可以使用这个身份的设备</h2>
   {!management?<p>设备管理暂时不可用，请稍后重新打开。</p>:<>
@@ -89,18 +90,18 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
     <ul className="device-list">{current.devices.map(device=><li className="device-row" key={device.deviceId}>
      {device.currentDevice?<Laptop size={22} aria-hidden="true"/>:<Monitor size={22} aria-hidden="true"/>}<div>
       <h3>{deviceName(device)}</h3><p className="device-muted">{states[device.state]??'状态暂不可用'}{device.currentDevice&&' · 你正在使用'}</p>
-      <details className="service-details"><summary>设备详情</summary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></details>
+      <ReadingDetails className="service-details"><ReadingSummary>设备详情</ReadingSummary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></ReadingDetails>
       {device.canRevoke&&<Button type="button" variant="outline" disabled={busy||!!pending.active} onClick={()=>prepare(device.deviceId)}>撤销此设备</Button>}
       {device.currentDevice&&device.state==='active'&&current.canManage&&!device.canRevoke&&<p className="device-muted">这是最后一个管理设备。先设置恢复码或连接另一台管理设备，再撤销本机。</p>}
      </div>
     </li>)}</ul>{!current.devices.length&&<p>没有可显示的设备。</p>}
-    <details className="service-details"><summary>服务与恢复设置</summary><p className="break-all">{current.endpoint}</p><p>{current.recoveryConfigured?'已设置恢复码，请自行妥善保存。':'尚未设置恢复码。'}</p></details>
+    <ReadingDetails className="service-details"><ReadingSummary>服务与恢复设置</ReadingSummary><p className="break-all">{current.endpoint}</p><p>{current.recoveryConfigured?'已设置恢复码，请自行妥善保存。':'尚未设置恢复码。'}</p></ReadingDetails>
    </>}
    {preview&&<section className="device-confirm" aria-label="撤销设备" tabIndex={-1} ref={reviewElement}>
     <h3>撤销{deviceName(preview.target)}？</h3>
     <p>撤销后，它将无法继续在当前服务使用这个身份。{preview.target.currentDevice?'当前设备也会断开连接。':''}</p>
     <p className="device-muted">银河身份、历史和资料保留。</p>
-    <details className="service-details"><summary>确认的设备与范围</summary><dl><dt>设备</dt><dd><code>{preview.target.deviceId}</code></dd><dt>服务</dt><dd className="break-all">{preview.endpoint}</dd><dt>权限</dt><dd>{preview.target.scopes.join('、')}</dd><dt>确认有效至</dt><dd>{new Date(preview.expiresAt*1000).toLocaleString()}</dd><dt>原操作</dt><dd><code>{preview.operationId}</code></dd></dl></details>
+    <ReadingDetails mode="inline" className="service-details"><ReadingSummary>确认的设备与范围</ReadingSummary><dl><dt>设备</dt><dd><code>{preview.target.deviceId}</code></dd><dt>服务</dt><dd className="break-all">{preview.endpoint}</dd><dt>权限</dt><dd>{preview.target.scopes.join('、')}</dd><dt>确认有效至</dt><dd>{new Date(preview.expiresAt*1000).toLocaleString()}</dd><dt>原操作</dt><dd><code>{preview.operationId}</code></dd></dl></ReadingDetails>
     <div className="button-row"><Button disabled={busy||!current?.canManage} onClick={()=>void run(async valid=>{const exact=preview;setPreview(null);const r=await management.confirm(exact,{confirmed:true});if(valid()){setNotice(receiptText(r));if(r.state==='committed')lastApplied.current.add(r.operationId);await onChanged.current?.();}})}>确认撤销</Button><Button variant="ghost" disabled={busy} onClick={()=>void run(async valid=>{const id=preview.operationId;setPreview(null);await management.stopRetry(id,{confirmed:true});if(valid())setNotice('已停止继续发送。');})}>暂不撤销</Button></div>
    </section>}
    {pending.active&&!preview&&<section className="device-confirm" aria-label="上次的设备操作">
@@ -109,7 +110,7 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
     {!pending.active.localRetryStopped&&current?.canManage&&(activeReceipt?.registered===false||['prepared','requested','preparing'].includes(pending.active.state))&&<Button disabled={busy} onClick={()=>prepare(pending.active!.deviceId)}>继续上次的选择</Button>}
     {!pending.active.localRetryStopped&&<Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{const r=await management.stopRetry(pending.active!.operationId,{confirmed:true});setNotice(receiptText(r));})}>停止继续发送</Button>}
    </section>}
-   {pending.history.length>0&&<details className="service-details"><summary>以前的设备操作</summary><ul className="device-list">{pending.history.map(row=><li key={row.operationId}><p>设备 {row.deviceId.slice(-6)} · {states[row.state]??'结果待确认'}</p><button className="text-link" disabled={busy} onClick={()=>void run(async valid=>{const r=await management.reconcile(row.operationId);if(valid())setHistoryReceipt(r);})}>查看详情</button>{historyReceipt?.operationId===row.operationId&&<p>{receiptText(historyReceipt)}</p>}</li>)}</ul></details>}
+   {pending.history.length>0&&<ReadingDetails className="service-details"><ReadingSummary>以前的设备操作</ReadingSummary><ul className="device-list">{pending.history.map(row=><li key={row.operationId}><p>设备 {row.deviceId.slice(-6)} · {states[row.state]??'结果待确认'}</p><button className="text-link" disabled={busy} onClick={()=>void run(async valid=>{const r=await management.reconcile(row.operationId);if(valid())setHistoryReceipt(r);})}>查看详情</button>{historyReceipt?.operationId===row.operationId&&<p>{receiptText(historyReceipt)}</p>}</li>)}</ul></ReadingDetails>}
   </>}
- </details>;
+ </ReadingDetails>;
 }

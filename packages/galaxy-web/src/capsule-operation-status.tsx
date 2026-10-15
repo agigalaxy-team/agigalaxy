@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {HistoryFields} from './history-facts';
@@ -60,11 +61,11 @@ function CapsuleCurrentOperations({runtime,subjectId,client,paused,onComplete,le
  if(!active&&!stopped.length&&!review&&!error)return null;
  return <aside className="operation-status" aria-label="上次的方法提交">
   {active&&<><p>{explanation(reason)}</p><div className="button-row"><Button type="button" variant="outline" disabled={busy||paused} onClick={()=>void run(valid=>open(active.operationId,valid))}>查看上次提交</Button><Button type="button" variant="ghost" disabled={busy||paused} onClick={()=>void run(async valid=>{const receipt=await client.stopLocalRetry(active.operationId,{confirmed:true});if(receipt.state==='acknowledged')await finish(receipt,valid);if(valid())setReview(null);})}>停止本机继续发送</Button></div></>}
-  {!!stopped.length&&<details className="source-reference-details"><summary>已停止发送的原记录</summary><p>这里继续查询原操作回执，不会重新发送已移除的内容。</p>{stopped.map(item=><p key={item.operationId}>{item.type==='permission'?'来源许可':item.type==='use'?'方法使用':'方法内容'} <code>{item.operationId}</code></p>)}</details>}
+  {!!stopped.length&&<ReadingDetails className="source-reference-details"><ReadingSummary>已停止发送的原记录</ReadingSummary><p>这里继续查询原操作回执，不会重新发送已移除的内容。</p>{stopped.map(item=><p key={item.operationId}>{item.type==='permission'?'来源许可':item.type==='use'?'方法使用':'方法内容'} <code>{item.operationId}</code></p>)}</ReadingDetails>}
   {error&&<p role="alert">{error}</p>}
   <dialog ref={dialog} className="workspace-dialog method-preview-dialog" onCancel={event=>{event.preventDefault();if(!busy)setReview(null);}}>{review&&original&&<>
    <header className="dialog-heading"><h2>继续上次这份内容</h2><button type="button" className="icon-button" aria-label="关闭原提交" disabled={busy} onClick={()=>setReview(null)}>×</button></header>
-   {original.type==='use'?<><p>{original.visibility==='Public'?'公开':original.viewers.length?'本人和 '+original.viewers.map((id:string)=>memberName(id,subjectId,names[id]??undefined)).join('、'):'仅本人'}可读</p><p className="reading-prose">{original.payload.note}</p><details className="source-reference-details"><summary>原应用与准确来源</summary><HistoryFields value={original.payload}/></details></>:<CapsuleAuthorPreview preview={original} subjectId={subjectId} names={names} display={{}}/>}
+   {original.type==='use'?<><p>{original.visibility==='Public'?'公开':original.viewers.length?'本人和 '+original.viewers.map((id:string)=>memberName(id,subjectId,names[id]??undefined)).join('、'):'仅本人'}可读</p><p className="reading-prose">{original.payload.note}</p><ReadingDetails className="source-reference-details"><ReadingSummary>原应用与准确来源</ReadingSummary><HistoryFields value={original.payload}/></ReadingDetails></>:<CapsuleAuthorPreview preview={original} subjectId={subjectId} names={names} display={{}}/>}
    <section className="method-preview-scope"><p>原授权期限：{original.expiresAt?readableTime(original.expiresAt):'未能核对'}</p>{review.authorization.state==='reauthorization-required'&&<p>本次明确授权至：{readableTime(review.authorization.expiresAt)}</p>}<p>继续原来的内容、阅读者和操作编号。</p></section>
    {error&&<p role="alert" className="message error">{error}</p>}
    <div className="button-row"><Button disabled={busy||paused} onClick={()=>void run(confirm)}>{review.authorization.state==='reauthorization-required'?'确认以上范围并继续':'继续同一笔提交'}</Button><Button variant="outline" disabled={busy} onClick={()=>setReview(null)}>暂不继续</Button></div>

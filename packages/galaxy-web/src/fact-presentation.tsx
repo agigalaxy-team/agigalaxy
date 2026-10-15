@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React from 'react';
 import {memberName} from './conversation-ui';
 import type {InterventionOpinionsView,ResolutionDecision} from './work-fact-presentation-types';
@@ -41,13 +42,13 @@ export function ResolutionStatus({ resolution, resolutions = [] }: { resolution:
     {reason && <p>{reason}</p>}
     {!!resolution.remainingGoals?.length && <p>尚待完成：{resolution.remainingGoals.join('；')}</p>}
     {(needsReconfirmation || resolution.priorResolutionId) && <p className="muted">历史决定仍按当时范围和来源保留，不能作为当前结论。</p>}
-    {!!resolutions.length && <details>
-      <summary>之前的结论</summary>
+    {!!resolutions.length && <ReadingDetails>
+      <ReadingSummary>之前的结论</ReadingSummary>
       {resolutions.map((decision, index) => <article key={decision.id ?? index}>
         <p><strong>{resolutionNames[decision.status] ?? '状态未提供'}</strong>{decision.scopeVersion ? ` · 范围版本 ${decision.scopeVersion}` : ''}</p>
         {decision.summary && <p>{decision.summary}</p>}
-        {!!decision.resultRefs?.length && <details className="source-locator"><summary>当时采用的来源</summary><p style={{ overflowWrap: 'anywhere' }}>{decision.resultRefs.map(ref => `${ref.id} / 版本 ${ref.version}`).join('；')}</p></details>}
+        {!!decision.resultRefs?.length && <ReadingDetails className="source-locator"><ReadingSummary>当时采用的来源</ReadingSummary><p style={{ overflowWrap: 'anywhere' }}>{decision.resultRefs.map(ref => `${ref.id} / 版本 ${ref.version}`).join('；')}</p></ReadingDetails>}
       </article>)}
-    </details>}
+    </ReadingDetails>}
   </div>;
 }

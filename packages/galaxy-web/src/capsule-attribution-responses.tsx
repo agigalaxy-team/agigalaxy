@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { MemberAvatar, memberName } from './conversation-ui';
@@ -70,11 +71,11 @@ export function CapsuleAttributionResponses({ attributions = [], navigate, subje
               {responses.length > 0 && <ul className="source-response-list">{responses.map(response => <li key={response.eventId}>
                 <span><strong>{person(response.actorId)}</strong><small>{relationshipText[response.relationship]}</small></span><span>{responseText[response.state]}</span>
               </li>)}</ul>}
-              {navigate && state.taskId && uuid.test(state.taskId) && <Button type="button" variant="link" onClick={() => navigate(`/app/tasks/${state.taskId}?section=collaboration#original-help`)}>查看原工作与回应 →</Button>}
+              {navigate && state.taskId && uuid.test(state.taskId) && <Button type="button" variant="link" onClick={() => navigate(`/app/tasks/${state.taskId}?section=collaboration#original-help`)}>查看原工作与回应 </Button>}
             </>}
-            <details className="source-reference-details"><summary>准确来源与回应记录</summary><dl><dt>来源作者</dt><dd>{attribution.subjectId}</dd><dt>来源</dt><dd>{attribution.source.kind} · {attribution.source.id} · 第 {attribution.source.version} 版</dd></dl>
+            <ReadingDetails className="source-reference-details"><ReadingSummary>准确来源与回应记录</ReadingSummary><dl><dt>来源作者</dt><dd>{attribution.subjectId}</dd><dt>来源</dt><dd>{attribution.source.kind} · {attribution.source.id} · 第 {attribution.source.version} 版</dd></dl>
               {readable && <><p>仅展示当前获准读取的各回应者最新记录；未读到的意见不会推断或补回。</p>{responses.map(response => <dl key={response.eventId}><dt>{person(response.actorId)}的回应</dt><dd>{response.eventId}</dd><dt>回应者</dt><dd>{response.actorId}</dd><dt>对应协助</dt><dd>{response.interventionRef.id} · 第 {response.interventionRef.version} 版</dd></dl>)}</>}
-            </details>
+            </ReadingDetails>
           </article>
         );
       })}

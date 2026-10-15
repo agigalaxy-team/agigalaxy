@@ -170,7 +170,7 @@ def main():
     site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview}
     guide_pages = render_versioned_guides(site, metadata)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
-    pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/network/', '/docs/', '/privacy/', '/status/']
+    pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/docs/', '/privacy/', '/status/']
     pages.extend(guide_pages.values())
     chrome.write('robots.txt', 'User-agent: *\nDisallow: /\n' if preview else
                  'User-agent: *\nAllow: /\nSitemap: https://agigalaxy.org/sitemap.xml\n')
