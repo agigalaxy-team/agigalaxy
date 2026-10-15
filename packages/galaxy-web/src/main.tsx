@@ -59,6 +59,7 @@ import '@/app/globals.css';
 import './workspace.css';
 import './porcelain-theme.css';
 import './identity-recovery.css';
+import './full-width-layout.css';
 import { SiteShell, StartPage, PageLoading } from './site-shell';
 const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));
 const PersonProfile = lazy(() => import('./person-profile').then(module => ({default: module.PersonProfile})));
