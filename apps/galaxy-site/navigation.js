@@ -19,7 +19,6 @@
         && current?.path === location.pathname && current.exactText === (code.textContent || '')) current.focused = false;
     });
     button.addEventListener('click', async () => {
-      button.disabled = true;
       const copyState = {path: location.pathname, exactText: code.textContent || '', status: '', focused: document.activeElement === button};
       globalThis.__GALAXY_GUIDE_COPY__ = copyState;
       window.dispatchEvent(new Event('galaxy:guide-copy'));
@@ -44,7 +43,7 @@
           selection.removeAllRanges(); selection.addRange(range);
           feedback('已选中，请复制');
         } else feedback('请选中文字复制');
-      } finally { button.disabled = false; }
+      }
     });
   });
   const progress = document.querySelector(".navigation-progress");
