@@ -3,7 +3,7 @@ import {createLocalWorkHistory,workListInputSchema,workGetInputSchema,workPendin
 import {createLocalConversationArchive,archiveSettingsInputSchema,archiveListInputSchema,archiveExportInputSchema,archiveDeleteInputSchema,archiveCleanupInputSchema} from '../../../galaxy-core/src/conversation-archive/index.mjs';
 import {getLocalUploadPrivacy,setLocalUploadPrivacy,initializeLocalWorkerGalaxyId,projectWorkHistoryForUpload,projectConversationForUpload} from '../../../galaxy-core/src/local-store.mjs';
 import {localPaths,readJson} from '../../../galaxy-core/src/storage/files.mjs';
-import {archiveSyncChoiceSchema,archiveCloudTargetSchema,archiveCloudItemSchema,archiveCloudExportSchema,archiveSyncFlushSchema} from './archive-sync.mjs';
+import {archiveSyncChoiceSchema,archiveCloudTargetSchema,archiveCloudListSchema,archiveCloudItemSchema,archiveCloudExportSchema,archiveSyncFlushSchema} from './archive-sync.mjs';
 import {workSyncChoiceSchema,workSyncFlushSchema,workCloudListSchema,workCloudItemSchema} from './work-sync.mjs';
 
 export const nativeUploadPrivacyInputSchema = z.strictObject({galaxyId:z.string().min(1).max(512).optional(),
@@ -43,6 +43,9 @@ export function createNativeLocalWorkServices(runtime) {
   }
   return Object.freeze({work,archive,cloud:runtime.archiveSync,workCloud:runtime.workSync,
     resumeSync:()=>runtime.resumePrivateSync?.(),
+    // The app-only preparation action invokes this only through the existing
+    // native initialization choice. It is not called by a history read.
+    prepareLocal:input=>runtime.initialize({initializationPath:'personal-galaxy',subjectType:input.subjectType},{confirmed:true}),
     async availableAccounts(){const connection=await runtime.store.readConnection?.(runtime.api.endpoint);
       if(!connection?.permission?.enabled||!runtime.archiveSync)return {accounts:[],connected:false,accountSettingsUrl};
       try{return {...await runtime.archiveSync.accounts(),connected:true,accountSettingsUrl};}catch{return {accounts:[],connected:true,unavailable:true,accountSettingsUrl};}},
@@ -121,7 +124,7 @@ export function registerNativeLocalWorkTools(register,runtime) {
     register('galaxy_archive_sync_accounts',z.strictObject({}),'Read actual currently associated account targets through the selected identity connection. Uses no cookie and never chooses the earliest account.',()=>local.cloud.accounts());
     register('galaxy_archive_sync_choice',archiveSyncChoiceSchema,'Choose a private account and selected original sessions; preserve unchanged ranges, and restore an owner-deleted source only when explicitly selected for restoration.',async input=>{const result=await local.cloud.choose(input);runtime.resumePrivateSync?.();return result;},{write:true,needsChoice:true});
     register('galaxy_archive_sync_flush',archiveSyncFlushSchema,'Continue already selected private archive snapshots. Reconciles original IDs/chunks after unknown delivery; no new scope, cookie or per-chunk choice.',input=>local.cloud.flush(input),{write:true});
-    register('galaxy_archive_cloud_list',archiveCloudTargetSchema,'Read owned private cloud archives at the explicitly selected account.',input=>local.cloud.listCloud(input));
+    register('galaxy_archive_cloud_list',archiveCloudListSchema,'Read owned private cloud archives at the explicitly selected account. Continue with nextAfter unchanged; no new disclosure choice is needed for another page.',input=>local.cloud.listCloud(input));
     register('galaxy_archive_cloud_export',archiveCloudExportSchema,'Read one owned cloud archive chunk. Local upload level does not restrict the owner reading their existing private copy.',input=>local.cloud.exportCloud(input));
     register('galaxy_archive_cloud_delete',archiveCloudItemSchema,'Delete the exact owned private cloud snapshot. Its source scope cannot silently reappear; other sources and local originals remain separate.',input=>local.cloud.deleteCloud(input),{write:true,needsChoice:true});
     register('galaxy_archive_cloud_cleanup',archiveCloudTargetSchema,'Apply the selected account’s existing private-archive retention rule. Does not create or enlarge a sync selection.',input=>local.cloud.cleanupCloud(input),{write:true});

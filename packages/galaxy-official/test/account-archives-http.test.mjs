@@ -173,3 +173,27 @@ test('private archive pagination covers all owner and origin records without lea
   assert.equal((await native(f,f.owner,accountId,'list',{limit:101})).body.error,'invalid_account_data');
  }finally{await f.close();}
 });
+
+test('private archive cursors survive anchor deletion and cleanup without acquiring another account or origin',{timeout:60000},async()=>{
+ const f=await communityForumFixture({officialAccountPortal:true});try{
+  const owner=await browserAccount(f,'archive-stable-page'),other=await browserAccount(f,'archive-stable-other');await f.login(f.owner,'archive-stable-page');await f.login(f.responder,'archive-stable-page');
+  const accountId=owner.session.account.id,ids=[];
+  for(let index=0;index<4;index++){f.clock.now++;ids.push((await readyArchive(f,f.owner,accountId)).input.id);}
+  const first=assertOk(await owner.list({limit:1})),nativeFirst=assertOk(await native(f,f.owner,accountId,'list',{limit:1}));
+  assert.equal(first.archives[0].id,ids[3]);assert.ok(first.nextAfter.startsWith('ac1.'));assert.ok(first.nextAfter.length<=512);
+  assert.equal((await other.list({after:first.nextAfter,limit:1})).body.error,'invalid_archive_cursor');
+  assert.equal((await native(f,f.owner,accountId,'list',{after:first.nextAfter,limit:1})).body.error,'invalid_archive_cursor','a website-wide position is not an original-ID position');
+  assert.equal((await native(f,f.responder,accountId,'list',{after:nativeFirst.nextAfter,limit:1})).body.error,'invalid_archive_cursor');
+  assertOk(await owner.post('delete',{id:ids[3]}));
+  const second=assertOk(await owner.list({after:first.nextAfter,limit:1}));assert.equal(second.archives[0].id,ids[2]);
+  assert.equal(assertOk(await native(f,f.owner,accountId,'list',{after:nativeFirst.nextAfter,limit:1})).archives[0].id,ids[2]);
+  await f.db.query('UPDATE private_conversation_archives_v1 SET expires_at=$2 WHERE id=$1',[ids[2],new Date((f.clock.now+1)*1000).toISOString()]);f.clock.now+=2;
+  const third=assertOk(await owner.list({after:second.nextAfter,limit:1}));assert.equal(third.archives[0].id,ids[1]);
+  const last=assertOk(await owner.list({after:third.nextAfter,limit:1}));assert.deepEqual(last.archives.map(row=>row.id),[ids[0]]);assert.equal(last.nextAfter,null);
+  assert.deepEqual(assertOk(await owner.list({after:ids[1],limit:1})).archives.map(row=>row.id),[ids[0]],'existing UUID positions remain supported');
+  const link=assertOk(await f.request('/v1/identity/query',{input:{}})).items.find(item=>item.state==='linked');assert.ok(link);
+  assertOk(await f.request('/v1/identity/revoke',{input:{id:link.id}}));
+  assert.equal((await native(f,f.owner,accountId,'list',{after:nativeFirst.nextAfter,limit:1})).body.error,'account_target_unavailable');
+  assert.equal(assertOk(await owner.list({after:second.nextAfter,limit:1})).archives[0].id,ids[1]);
+ }finally{await f.close();}
+});

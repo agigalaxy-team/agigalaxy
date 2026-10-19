@@ -7,6 +7,17 @@ const subjectId='GUID15'+'0'.repeat(26);
 const signedIn=()=>({state:'signed-in',account:{displayName:'隔离账户',email:null,emailVerified:false},linkedIds:[{subjectId,linkedAt:'2026-10-15T00:00:00.000Z'}],nextAfter:null,expiresAt:now()+3600,csrfToken:'isolated-csrf-value',galaxyAuthorization:false});
 const response=value=>new Response(JSON.stringify(value),{status:200,headers:{'Content-Type':'application/json'}});
 
+test('public account posts continue the exact opaque cursor without sending a session or identity',async()=>{
+ const id='8cc1659c-4d6f-46bb-8313-73bb6e461120',cursor='fp1.cHVibGlzaGVkX3Bvc2l0aW9u',requests=[];
+ const client=createOfficialAccountClient({endpoint,website,now,fetch:async(url,options)=>{requests.push({url,options});return response({items:[],nextAfter:null,checkedAt:now()});}});
+ await client.publicPosts(id,{after:cursor,limit:20});
+ const request=requests[0],url=new URL(request.url);
+ assert.equal(url.pathname,'/v1/account/public/'+id+'/posts');assert.equal(url.searchParams.get('after'),cursor);
+ assert.equal(request.options.credentials,'omit');assert.equal(request.options.headers.Authorization,undefined);assert.equal(request.options.headers['X-Galaxy-Account-ID'],undefined);
+ for(const page of [{limit:0},{limit:51},{after:''},{after:'fp1.'+'A'.repeat(509)},{after:id}])await assert.rejects(client.publicPosts(id,page),{code:'official_account_request_invalid'});
+ assert.equal(requests.length,1);
+});
+
 test('official session reads and pagination use only the deployed authority and credentialed transport',async()=>{
  const requests=[],client=createOfficialAccountClient({endpoint,website,now,fetch:async(url,options)=>{requests.push({url,options});return response(signedIn());}});
  const current=await client.session(),page=await client.session({after:subjectId});

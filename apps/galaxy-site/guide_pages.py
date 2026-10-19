@@ -127,7 +127,7 @@ def render_versioned_guides(site, metadata):
         siblings = ''.join('<a href="' + escape(source_pages[path], quote=True) + '"' + (' aria-current="page"' if current == kind else '') + '>' + LABELS[current] + '</a>' for current, path in guides.items())
         body = ('<div class="guide-breadcrumb"><a href="/downloads/">客户端下载</a><span aria-hidden="true"> / </span><span>本机接入 ' + escape(version) + '</span></div>' +
                 '<nav class="guide-tabs" aria-label="客户端说明">' + siblings + '</nav>' +
-                '<header class="guide-heading"><p class="release-label">开发候选 · ' + escape(version) + '</p><h1>' + escape(title) + '</h1></header>' +
+                '<header class="guide-heading"><p class="release-label">开发版 · ' + escape(version) + '</p><h1>' + escape(title) + '</h1></header>' +
                 '<div class="guide-layout"><aside class="guide-contents"><nav aria-label="本页目录"><strong>本页内容</strong>' + sections + '</nav>' +
                 '<a class="guide-original" href="' + escape(source, quote=True) + '">供 Agent 读取的 Markdown 原文</a></aside>' +
                 '<article class="guide-body" aria-label="' + escape(LABELS[kind], quote=True) + '">' + content + '</article></div>')

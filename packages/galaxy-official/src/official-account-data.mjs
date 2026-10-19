@@ -3,6 +3,7 @@ import {z} from 'zod';
 import {transaction} from './database.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {expirePrivateConversationsWithin} from './operations/private-conversation-retention.mjs';
+import {archiveAfterSchema,archiveCursorFor,archiveCursorAfter} from './shared/account-archive-cursor.mjs';
 
 const types=z.enum(['person','organization','agent']);
 const retention=z.number().int().min(1).max(36500).nullable();
@@ -58,11 +59,12 @@ export class OfficialAccountData {
       publicQuery:{scope:row.query_scope,showLinkedIds:row.query_linked_ids===true,showExternalCredentials:row.query_external_credentials===true},
       ...(row.query_scope==='profile-and-public-posts'&&publicPosts?{posts:await publicPosts(accountId)}:{})};}
   async cleanup(actor){const id=this.archiveOwner(actor);return this.run(async db=>({deleted:await expirePrivateConversationsWithin(db,this.now(),{accountId:id,originSubjectId:this.archiveOrigin(actor)})}));}
-  async listArchives(actor,input={}){const id=this.archiveOwner(actor),data=parse(z.strictObject({after:z.uuid().optional(),limit:z.number().int().min(1).max(100).default(50)}),input),origin=this.archiveOrigin(actor);await this.cleanup(actor);
-    let cursor=null;if(data.after){cursor=(await this.db.query('SELECT created_at,id FROM private_conversation_archives_v1 WHERE id=$1 AND account_id=$2 AND ($3::text IS NULL OR origin_subject_id=$3)',[data.after,id,origin])).rows[0];if(!cursor)throw new ServiceError('invalid_archive_cursor');}
+  async listArchives(actor,input={}){const id=this.archiveOwner(actor),data=parse(z.strictObject({after:archiveAfterSchema.optional(),limit:z.number().int().min(1).max(100).default(50)}),input),origin=this.archiveOrigin(actor);await this.cleanup(actor);
+    const context={accountId:id,originSubjectId:origin};let cursor=archiveCursorFor(data.after,context);
+    if(cursor?.legacy){cursor=(await this.db.query('SELECT created_at,id FROM private_conversation_archives_v1 WHERE id=$1 AND account_id=$2 AND ($3::text IS NULL OR origin_subject_id=$3)',[cursor.id,id,origin])).rows[0];if(!cursor)throw new ServiceError('invalid_archive_cursor');}
     const rows=(await this.db.query(`SELECT * FROM private_conversation_archives_v1 WHERE account_id=$1 AND (expires_at IS NULL OR expires_at>$2) AND ($3::text IS NULL OR origin_subject_id=$3)
       AND ($4::timestamptz IS NULL OR created_at<$4 OR (created_at=$4 AND id>$5::uuid)) ORDER BY created_at DESC,id LIMIT $6`,[id,iso(this.now()*1000),origin,cursor?.created_at??null,cursor?.id??null,data.limit+1])).rows;
-    return {archives:rows.slice(0,data.limit).map(archiveView),nextAfter:rows.length>data.limit?rows[data.limit-1].id:null};}
+    return {archives:rows.slice(0,data.limit).map(archiveView),nextAfter:rows.length>data.limit?archiveCursorAfter(rows[data.limit-1],context):null};}
   async archiveStatus(actor,input){const id=this.archiveOwner(actor),data=parse(z.strictObject({id:z.uuid()}),input);await this.cleanup(actor);
     const row=(await this.db.query('SELECT * FROM private_conversation_archives_v1 WHERE id=$1 AND account_id=$2 AND ($3::text IS NULL OR origin_subject_id=$3)',[data.id,id,this.archiveOrigin(actor)])).rows[0];
     if(row){if(row.expires_at&&Date.parse(row.expires_at)<=this.now()*1000)return {id:data.id,state:'expired',cleanupPending:true,storedSequences:[]};const chunks=(await this.db.query('SELECT sequence FROM private_conversation_chunks_v1 WHERE archive_id=$1 ORDER BY sequence',[data.id])).rows;return {id:data.id,state:row.state,archive:archiveView(row),storedSequences:chunks.map(v=>v.sequence)};}

@@ -37,6 +37,10 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
   const publicAccountQuery=request.method==='GET'&&/^\/v1\/account\/public\/(?:[0-9a-f-]{36}\/(?:ids|credentials)|by-id\/GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26})$/.test(url.pathname)
     &&url.search.length<=160&&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1);
+  const publicAccountPostsQuery=request.method==='GET'&&/^\/v1\/account\/public\/[0-9a-f-]{36}\/posts$/.test(url.pathname)
+    &&url.search.length<=600&&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1)
+    &&(!url.searchParams.has('after')||url.searchParams.get('after').length<=512&&/^fp1\.[A-Za-z0-9_-]+$/.test(url.searchParams.get('after')))
+    &&(!url.searchParams.has('limit')||/^(?:[1-9]|[1-4][0-9]|50)$/.test(url.searchParams.get('limit')));
   // This exact owner-only receipt route validates its two keys itself. Other
   // paths and methods retain the existing query prohibition.
   const recruitmentReceipt = request.method === 'GET'
@@ -48,7 +52,7 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
     && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(url.searchParams.get(keys[0]));
   const allowedQuery = consentList ? keys.every(key => key === 'after') && url.searchParams.getAll('after').length === 1
     : oidcCallback && url.search.length <= 8192 && keys.every(key => ['code','state','iss','error','error_description','error_uri','session_state'].includes(key))
-      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || publicAccountQuery || identityReturn;
+      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || publicAccountQuery || publicAccountPostsQuery || identityReturn;
   if (url.origin !== endpoint || url.username || url.password || url.hash || (url.search && !allowedQuery))
     throw new ServiceError('invalid_request');
   return url;

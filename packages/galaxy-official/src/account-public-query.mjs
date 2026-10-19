@@ -10,7 +10,7 @@ const publicFlags=row=>({scope:row.query_scope,showLinkedIds:row.query_linked_id
 // These anonymous projections use the online account's explicit display choices.
 // An association exposes no local work, other ID's private data or account control.
 export class AccountPublicQuery {
-  constructor({data,accounts,externalCredentials=null}){Object.assign(this,{data,accounts,externalCredentials});}
+  constructor({data,accounts,externalCredentials=null,forum=null}){Object.assign(this,{data,accounts,externalCredentials,forum});}
   providers(){return JSON.stringify([...(this.accounts?.providers??[])].map(value=>JSON.parse(value)));}
   async enabled(accountId,flag){
     parse(z.uuid(),accountId);
@@ -49,5 +49,11 @@ export class AccountPublicQuery {
     const page=parse(pageSchema(z.uuid()),input);await this.enabled(accountId,'query_external_credentials');
     if(!this.externalCredentials?.publicForAccount)throw new ServiceError('external_credentials_unavailable',503);
     return this.externalCredentials.publicForAccount(accountId,page);
+  }
+  async posts(accountId,input={}){
+    const page=parse(pageSchema(z.string().max(512).regex(/^fp1\.[A-Za-z0-9_-]+$/)),input),profile=await this.data.publicProfile(accountId);
+    if(profile.publicQuery.scope!=='profile-and-public-posts')throw new ServiceError('not_found',404);
+    if(!this.forum)throw new ServiceError('forum_unavailable',503);
+    return this.forum.publicForAccount(accountId,page);
   }
 }

@@ -24,6 +24,7 @@ import {createOpenCodeWorkRecorder} from './work-recorder.mjs';
 import {createLocalConversationArchive} from '../../../packages/galaxy-core/src/conversation-archive/index.mjs';
 import {redactLocalWorkData} from '../../../packages/galaxy-core/src/local-data-redaction.mjs';
 import {prepareOpenCodeLocalWork,isOpenCodePreparationDeferred,deferOpenCodePreparation} from './local-preparation.mjs';
+import {setWorkArchiveSelection} from './work-archive-choice.mjs';
 
 const MODULE_LABELS: Record<string, string> = {
   'galaxy-id': '银河 ID 与本地身份卡',
@@ -1192,7 +1193,7 @@ return {
         const options: MenuOption[] = [], routes: Routes = {};
         page.items.forEach((work: LocalWorkListItem, index: number) => {
           const number = String(index + 1);
-          options.push({number, title: work.title, description: work.summary || (chinese ? '已保留工作记录，等待自己的AI整理。' : 'Work recorded; awaiting your AI summary.')});
+          options.push({number, title: work.title, description: work.summary?.slice(0,160) || (chinese ? '工作记录已保存' : 'Work recorded')});
           routes[number] = () => void showLocalWorkDetails(work.workId, () => void showLocalWorkHistory(onReturn, after));
         });
         if (page.nextAfter) {options.push({number:'n',title:chinese?'下一组工作':'Next group'});routes.n=()=>void showLocalWorkHistory(onReturn,page.nextAfter);}
@@ -1215,7 +1216,7 @@ return {
         const routes:Routes={s:()=>showReading(work.title,(work.summary||(chinese?'已记录当前可观察材料，尚未形成AI摘要。':'Observed material has been recorded; no AI summary yet.'))
           +'\n\n'+(chinese?'整理状态：':'Summary state: ')+(chinese?processingLabels[work.processing?.state||'pending']:work.processing?.state||'pending')
           +'\n'+(chinese?'工作结果：':'Reported outcome: ')+(chinese?outcomeLabels[work.outcome]:work.outcome)
-          +(work.processing?.state==='failed'?'\n\n'+(chinese?'记录已保留，模型恢复后会继续整理。':'Records are retained. Summarization resumes when the model is available.') : ''),back),
+          +(work.processing?.state==='failed'?'\n\n'+(chinese?'工作记录仍可阅读。有新材料或切换模型后会自动继续整理。':'Work records remain readable. New material or a model change resumes summarization automatically.') : ''),back),
           r:()=>{closeGalaxy();if(work.host==='opencode')api.route?.navigate?.('session',{sessionID:work.sessionId});}};
         if(detail.environments.length){
           options.push({number:'e',title:chinese?'主要环境记录':'Observed environment'});
@@ -1229,13 +1230,17 @@ return {
           const archive=recorder.archive,settings=await archive.settings(),listed=settings.settings.sessions.some((item:{host:string;sessionId:string})=>item.host===work.host&&item.sessionId===work.sessionId),selected=settings.settings.enabled&&listed;
           options.push({number:'a',title:selected?(chinese?'停止为这段工作另存完整消息':'Stop saving full messages'):(chinese?'为这段工作保存完整消息':'Save full messages for this work'),description:chinese?'本人私有保存，回读所选会话可取得的消息；排除凭据，不读取附件正文，不因此上传。':'Private copies of available selected messages; credentials excluded, attachment bodies unread, no upload.'});
           routes.a=async()=>{
-            const sessions=selected?settings.settings.sessions.filter((item:{host:string;sessionId:string})=>item.host!==work.host||item.sessionId!==work.sessionId):listed?settings.settings.sessions:[...settings.settings.sessions,{host:work.host,sessionId:work.sessionId}];
-            await archive.configure({galaxyId:work.galaxyId,enabled:sessions.length>0,sessions,autoCleanAfterDays:settings.settings.autoCleanAfterDays});
-            if(!selected){
-              const result=await recorder.backfillArchive({galaxyId:work.galaxyId,host:work.host,sessionId:work.sessionId});
-              if(result.state!=='copied')return showInfo(chinese?'已保留保存选择':'Selection saved',chinese?'当前未能回读历史消息。已保留记录不受影响；之后可取得的新消息仍按所选范围保存。':'Earlier messages could not be read now. Retained observations remain available; future messages follow this selection.',back);
-            }
-            await recorder.refresh();back();
+            showInfo(chinese?'正在保存':'Saving',chinese?'正在更新这段工作的保存设置。':'Updating saving settings for this work.',back);
+            const operationPage=pageGeneration,stillReading=()=>!closed&&operationPage===pageGeneration;
+            try{
+              await setWorkArchiveSelection(archive,{galaxyId:work.galaxyId,host:work.host,sessionId:work.sessionId,enabled:!selected});
+              if(!selected){
+                const result=await recorder.backfillArchive({galaxyId:work.galaxyId,host:work.host,sessionId:work.sessionId});
+                if(!stillReading())return;
+                if(result.state!=='copied')return showInfo(chinese?'较早的消息暂不可读':'Earlier messages are unavailable',chinese?'已有工作记录仍可阅读。':'Existing work records remain readable.',back);
+              }
+              await recorder.refresh();if(stillReading())back();
+            }catch{if(stillReading())showInfo(chinese?'保存设置暂未完成':'Unable to update saving settings',chinese?'已有记录仍可阅读，请稍后重试。':'Existing records remain readable. Please try again later.',back);}
           };
         }
         const labels:Record<string,string>=chinese?{'user-statement':'用户陈述','model-report':'模型报告','host-event':'宿主事件','tool-report':'工具回报','external-material':'材料引用'}:{};
@@ -1244,29 +1249,40 @@ return {
           const eventLabels:Record<string,string>=chinese?{user:'我的话',assistant:'AI回复',idle:'回合结束',busy:'处理中',completed:'工具完成',running:'工具运行中',error:'工具未完成',message:'消息',tool:'工具',session:'会话',artifact:'材料',gap:'来源变化'}:{};
           const detailName=String(observation.details.tool||observation.details.status||observation.details.role||observation.kind);
           options.push({number,title:observation.details.tool?detailName:(eventLabels[detailName]||detailName),description:observation.content?.excerpt?.slice(0,100)||observation.occurredAt||observation.observedAt});
-          routes[number]=()=>{
-            const sourceBack=()=>back();
-            showSelect({title:chinese?'过程与来源':'Process and source',options:[
-              {number:'1',title:chinese?'阅读已保留内容':'Read retained material'},
-              ...(source.messageId&&work.host==='opencode'?[{number:'2',title:chinese?'回查宿主中的消息原文':'Read the original host message'}]:[])],routes:{
-              1:()=>showReading(chinese?'已保留记录':'Retained observation',(observation.content?.excerpt||(chinese?'此项只记录来源与状态，没有保存正文。':'Only source and status were retained.'))
-                +'\n\n'+(chinese?'来源：':'Source: ')+(labels[source.kind]||source.kind)+'\n'+(chinese?'时间：':'Observed at: ')+observation.observedAt
-                +(observation.exclusions?.length?'\n'+(chinese?'含已排除材料，仅保留排除位置和类别。':'Excluded material is recorded by location and category only.') : ''),sourceBack),
-              2:async()=>{
+          routes[number]=()=>showReading(observation.details.tool?detailName:(eventLabels[detailName]||detailName),(observation.content?.excerpt||(chinese?'此项记录来源与状态，未保存正文。':'This entry contains source and status, without body text.'))
+            +'\n\n'+(chinese?'来源：':'Source: ')+(labels[source.kind]||source.kind)+'\n'+(chinese?'时间：':'Observed at: ')+observation.observedAt
+            +(observation.exclusions?.length?'\n'+(chinese?'凭据等内容已排除。':'Credentials and other excluded material are omitted.') : ''),back);
+        });
+        const originals=api.client?.session?.message?detail.observations.filter((item:LocalWorkObservation)=>item.source.messageId&&work.host==='opencode').filter((item:LocalWorkObservation,index:number,items:LocalWorkObservation[])=>items.findIndex(other=>other.source.messageId===item.source.messageId)===index):[];
+        if(originals.length){
+          const originalList=()=>{
+            const originalRoutes:Routes={},originalOptions:MenuOption[]=[];
+            originals.forEach((observation:LocalWorkObservation,index:number)=>{
+              const number=String(index+1),source=observation.source;
+              const role=observation.details.role, name=role==='user'?(chinese?'我的话':'My message'):role==='assistant'?(chinese?'AI回复':'AI reply'):(chinese?'消息':'Message');
+              const related=detail.observations.find((item:LocalWorkObservation)=>item.source.messageId===source.messageId&&item.content?.excerpt);
+              originalOptions.push({number,title:name,description:related?.content?.excerpt?.slice(0,100)||observation.occurredAt||observation.observedAt});
+              originalRoutes[number]=async()=>{
+                showInfo(chinese?'正在读取消息':'Reading message',chinese?'正在读取这条消息的正文。':'Reading this message from the host.',originalList);
+                const readingPage=pageGeneration,stillReading=()=>!closed&&readingPage===pageGeneration;
                 try {
                   if(!source.messageId)throw Error('host_original_unavailable');
                   const response = api.client?.session?.message ? await api.client.session.message({sessionID:work.sessionId,messageID:source.messageId}) as {data?:{parts?:{type:string;text?:string;state?:{output?:string;error?:string}}[]};error?:unknown} : null;
+                  if(!stillReading())return;
                   const original=response?.data?.parts;
                   if(response?.error||!original)throw Error('host_original_unavailable');
                   const text=original.map(part=>part.type==='text'?part.text:part.type==='tool'?part.state?.output||part.state?.error:'').filter(Boolean).join('\n\n');
                   if(!text)throw Error('host_original_unavailable');
                   const protectedText=redactLocalWorkData(text);
                   showReading(chinese?'宿主当前可读的消息正文':'Currently readable host message',protectedText.value
-                    +(protectedText.exclusions.length?'\n\n'+(chinese?'凭据已排除；此处为宿主当前可取得的正文，不保证宿主长期保留。':'Credentials excluded. This is currently available host text; long-term host retention is not guaranteed.') : ''),sourceBack);
-                } catch {showInfo(chinese?'原文暂不可取得':'Original unavailable',chinese?'宿主已不再提供这条消息，或当前接口不支持回查。已保留片段仍可阅读；片段不等于永久保存的全文。':'The host no longer provides this message, or cannot read it here. Retained excerpts remain available and are not a permanent full copy.',sourceBack);}
-              }},onBack:sourceBack});
+                    +(protectedText.exclusions.length?'\n\n'+(chinese?'凭据已排除。':'Credentials excluded.') : ''),originalList);
+                } catch {if(stillReading())showInfo(chinese?'原文暂不可取得':'Original unavailable',chinese?'这条消息暂时无法从宿主读取，已保存的工作记录仍可阅读。':'This message could not be read from the host. Saved work records remain readable.',originalList);}
+              };
+            });
+            showSelect({title:chinese?'回查这一页的消息原文':'Read original messages on this page',options:originalOptions,routes:originalRoutes,onBack:back});
           };
-        });
+          options.push({number:'o',title:chinese?'回查消息原文':'Read original messages'});routes.o=originalList;
+        }
         if(detail.nextAfter!==null){options.push({number:'n',title:chinese?'后续过程记录':'More observations'});routes.n=()=>void showLocalWorkDetails(workId,onReturn,detail.nextAfter);}
         showSelect({title:work.title,options,routes,onBack:onReturn});
       }catch{showInfo('Galaxy',chinese?'这段本地工作暂不可读，已有资料保留。':'This local work is temporarily unavailable.',onReturn);}

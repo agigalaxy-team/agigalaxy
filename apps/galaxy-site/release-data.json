@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.27",
-  "releaseId": "0.1.27",
+  "version": "0.1.28",
+  "releaseId": "0.1.28",
   "component": "site",
-  "backendRelease": "0.1.17",
+  "backendRelease": "0.1.18",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -38,22 +38,22 @@
   "completeBusinessAcceptance": false,
   "publicApiObservedAt": "2026-10-12T14:08:04.536263+00:00",
   "nativeClientDownload": {
-    "revision": "0.1.14",
+    "revision": "0.1.15",
     "channel": "development-candidate",
-    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.14/",
+    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.15/",
     "keysUrl": "https://agigalaxy.org/releases/keys.json",
     "kid": "galaxy-release-20260911",
     "jwkThumbprint": "mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4",
-    "signatureExpiresAt": "2026-11-18T10:53:22.000Z",
+    "signatureExpiresAt": "2026-11-18T21:13:20.000Z",
     "actualHostAcceptance": false,
     "humanAcceptance": false,
     "stableRelease": false,
     "package": {
       "name": "@galaxy/native-client",
-      "version": "0.1.14",
-      "filename": "galaxy-native-client-0.1.14.tgz",
-      "sha256": "65cca5e7ca4768e94b9b76ada01f5b845d5140687700be55cecfd8b942fb6a22",
-      "bytes": 758692,
+      "version": "0.1.15",
+      "filename": "galaxy-native-client-0.1.15.tgz",
+      "sha256": "a359d6deaffd7646f82cb851499ad4b54def69cc8ca957638e8fa3a16d2ff43c",
+      "bytes": 761358,
       "exports": [
         "./runtime",
         "./server",
@@ -68,18 +68,31 @@
         "canonicalize": "4.0.0",
         "@modelcontextprotocol/ext-apps": "2.0.0"
       },
-      "lockSha256": "7a34f1b83192dabf3cbb24abace6d1084b82f33a98f9066a62db1a343f21affe",
-      "sourceHashesSha256": "6954bf0e219b89db1108cca79b0652c079048bbb4c6798177bbd70498e13d521"
+      "lockSha256": "38ef1f38b2cc68f558923168e6ea1892cd33d33e9c6f5e82964d64a0ef2ed176",
+      "sourceHashesSha256": "cced061ddf51dc9af5ab3f6d0044e5e5b8295effa6a19061b6c04c25b7bbeaf9"
     },
     "verifier": {
       "filename": "verify-native-client-download.mjs",
       "sha256": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a",
       "bytes": 771046
     },
+    "installBundle": {
+      "filename": "galaxy-native-client-0.1.15-install.zip",
+      "format": "zip",
+      "bytes": 884487,
+      "sha256": "8b04910fcba8e6406cc0f537fd14661de95d9ae7533b1d141d8da0f6edade735",
+      "contains": [
+        "galaxy-native-client-0.1.15.tgz",
+        "package-metadata.json",
+        "release.jws",
+        "protocol-report.json",
+        "verify-native-client-download.mjs"
+      ]
+    },
     "guides": {
-      "installation": "/docs/native-client/0.1.14/installation.md",
-      "hosts": "/docs/native-client/0.1.14/hosts.md",
-      "runtime": "/docs/native-client/0.1.14/runtime.md"
+      "installation": "/docs/native-client/0.1.15/installation.md",
+      "hosts": "/docs/native-client/0.1.15/hosts.md",
+      "runtime": "/docs/native-client/0.1.15/runtime.md"
     }
   },
   "historicalAccountObservation": {

@@ -22,6 +22,7 @@ export function registerLocalWorkPanelTools(server,{resourceUri,local,reviewActi
   const collect=async(method,galaxyId)=>{const items=[];let after;do{const page=await method({galaxyId,limit:100,...(after?{after}:{})});items.push(...page.items);after=page.nextAfter;}while(after);return items;};
   async function snapshot(input={}) {
     const privacy=await local.privacyGet(),galaxyId=privacy.galaxyId;
+    if(privacy.recoveryRequired)throw new Error('local_identity_recovery_required');
     if(input.galaxyId&&input.galaxyId!==galaxyId)throw new Error('local_identity_changed');
     if(!galaxyId)return {view:input.view??'history',galaxyId:null,notInitialized:true};
     const view=input.view??'history';
@@ -37,14 +38,16 @@ export function registerLocalWorkPanelTools(server,{resourceUri,local,reviewActi
       const archives=await local.archive.list({galaxyId,limit:30,...(input.after?{after:input.after}:{})});
       const titled=async item=>{const work=await local.work.get({galaxyId,host:item.host,sessionId:item.sessionId,limit:1}),title=work?.work.title;return {...item,...(title&&!['Recorded work','Unprocessed work'].includes(title)?{title}:{})};};
       archives.items=await Promise.all(archives.items.map(titled));
-      const selectedArchive=input.archiveSessionId?await local.archive.exportSession({galaxyId,archiveSessionId:input.archiveSessionId,afterSequence:input.afterSequence??0,limit:20}):null;
+      let selectedArchive=null,missingSelection;
+      if(input.archiveSessionId)try{selectedArchive=await local.archive.exportSession({galaxyId,archiveSessionId:input.archiveSessionId,afterSequence:input.afterSequence??0,limit:20});}
+      catch(error){if((error.code??error.message)!=='local_archive_session_unavailable')throw error;missingSelection='archive';}
       const selected=selectedArchive?await titled(selectedArchive.session):null;
-      return {view,galaxyId,archives,selectedArchive,archiveTitle:selected?.title};
+      return {view,galaxyId,archives,selectedArchive,archiveTitle:selected?.title,...(missingSelection?{missingSelection}:{})};
     }
     const selectedWork=input.workId?await local.work.get({galaxyId,workId:input.workId,afterSequence:input.afterSequence??0,limit:100}):null;
     const original=selectedWork?await local.archive.findSession({galaxyId,host:selectedWork.work.host,sessionId:selectedWork.work.sessionId}):null;
     return {view,galaxyId,work:await local.work.list({galaxyId,limit:30,...(input.after?{after:input.after}:{})}),selectedWork,
-      ...(original?.messageCount?{relatedArchiveSessionId:original.archiveSessionId}:{})};
+      ...(original?.messageCount?{relatedArchiveSessionId:original.archiveSessionId}:{}),...(input.workId&&!selectedWork?{missingSelection:'work'}:{})};
   }
   const add=(name,schema,description,run,{write=false,appOnly=false}={})=>registerAppTool(server,name,{inputSchema:schema,description,
     annotations:{readOnlyHint:!write},_meta:{ui:{resourceUri,...(appOnly?{visibility:['app']}: {})}}},async(input,context)=>{
@@ -60,6 +63,15 @@ export function registerLocalWorkPanelTools(server,{resourceUri,local,reviewActi
     if(result?.isError)return result;
     return component(await snapshot({view,galaxyId:input.galaxyId}));
   }
+  add('galaxy_local_panel_prepare',z.strictObject({view:z.enum(['history','privacy','archive']).default('history'),subjectType:z.enum(['person','organization']).default('person')}),
+    'Prepare this device only after the panel user chooses Start. Reuse the normal Native initialization review; existing local identity is read without creating or changing its type.',async(input,context)=>{
+      // The original preparation may have finished while its reply was lost.
+      // Reconcile actual local identity before offering another creation choice.
+      const privacy=await local.privacyGet();if(privacy.recoveryRequired)throw new Error('local_identity_recovery_required');
+      if(privacy.galaxyId)return component(await snapshot({view:input.view}));
+      const initialization={initializationPath:'personal-galaxy',subjectType:input.subjectType};
+      return reviewed('galaxy_native_initialize',initialization,context,()=>local.prepareLocal(initialization),input.view);
+    },{write:true,appOnly:true});
   add('galaxy_local_panel_upload_save',nativeUploadPrivacyInputSchema,'Save this panel user’s exact new upload selection through the real Native choice surface.',(input,context)=>reviewed('galaxy_local_upload_privacy_set',input,context,()=>local.privacySet(input),'privacy'),{write:true,appOnly:true});
   add('galaxy_local_panel_settings_save',nativeLocalSettingsInputSchema,'Save one selected conversation scope for local retention, allowed upload and the chosen private account.',(input,context)=>reviewed('galaxy_local_settings_save',input,context,()=>local.saveSettings(input),'privacy'),{write:true,appOnly:true});
   add('galaxy_local_panel_archive_save',archiveSettingsInputSchema,'Save exact selected private host/session capture scopes and cleanup age. No upload.',(input,context)=>reviewed('galaxy_local_archive_configure',input,context,()=>local.archive.configure(input),'privacy'),{write:true,appOnly:true});

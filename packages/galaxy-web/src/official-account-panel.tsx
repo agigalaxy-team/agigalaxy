@@ -20,7 +20,7 @@ export function OfficialAccountLoginNotice({search=location.search}:{search?:str
 export function useOfficialAccountSession(endpoint?:string):Model{
  const [phase,setPhase]=useState<Model['phase']>('loading'),[session,setSession]=useState<OfficialSession|null>(null),[client,setClient]=useState<Client|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
- const lifecycle=useRef({generation:0,request:0,active:false,client:null as Client|null,endpoint:null as string|null,session:null as OfficialSession|null,busy:false});
+  const lifecycle=useRef({generation:0,request:0,active:false,requestedEndpoint:endpoint,client:null as Client|null,endpoint:null as string|null,session:null as OfficialSession|null,busy:false});
  const read=useCallback(async(after?:string)=>{
   const current=lifecycle.current;if(!current.active||!current.client||current.busy)return;
   if(!isOnline()){current.request++;current.session=null;setSession(null);setPhase('offline');return;}
@@ -41,7 +41,7 @@ export function useOfficialAccountSession(endpoint?:string):Model{
  },[]);
  const refresh=useCallback(()=>read(),[read]);
  useEffect(()=>{
-  const current=lifecycle.current,generation=++current.generation;current.active=true;current.request++;current.busy=false;current.session=null;current.client=null;current.endpoint=null;
+   const current=lifecycle.current,generation=++current.generation;current.active=true;current.requestedEndpoint=endpoint;current.request++;current.busy=false;current.session=null;current.client=null;current.endpoint=null;
   queueMicrotask(()=>{if(!current.active||generation!==current.generation)return;setClient(null);setSession(null);setBusy(false);setError('');setPhase(isOnline()?'loading':'offline');});
   void (async()=>{await Promise.resolve();try{const deployedEndpoint=endpoint??(await loadWebConfiguration()).endpoint;if(!current.active||generation!==current.generation)return;
    const next=createOfficialAccountClient({endpoint:deployedEndpoint});current.client=next;current.endpoint=deployedEndpoint;setClient(next);await read();
@@ -62,7 +62,8 @@ export function useOfficialAccountSession(endpoint?:string):Model{
   finally{if(current.active&&current.generation===generation){current.busy=false;setBusy(false);}}
  },[]);
  const more=useCallback(()=>read(lifecycle.current.session?.nextAfter??undefined),[read]);
- return{phase,session,client,busy,error,refresh,more,logout};
+  const sameEndpoint=lifecycle.current.requestedEndpoint===endpoint;
+  return{phase:sameEndpoint?phase:isOnline()?'loading':'offline',session:sameEndpoint?session:null,client:sameEndpoint?client:null,busy:sameEndpoint&&busy,error:sameEndpoint?error:'',refresh,more,logout};
 }
 
 export function OfficialAccountStatus({model,navigate,returnTo='/app/account',resumeTo,showIds=false,compact=false}:{model:Model;navigate:(path:string)=>void;returnTo?:string;resumeTo?:string;showIds?:boolean;compact?:boolean}){

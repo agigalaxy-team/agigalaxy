@@ -1,8 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {profilePath,profileSubject,profileNavigationState,profileReturn,profileReturnLabel,profileExperiencePath,profileReturnNavigationState} from '../src/profile-navigation.mjs';
+import {profilePath,profileSubject,profileNavigationState,profileReturn,profileReturnLabel,profileExperiencePath,profileReturnNavigationState,publicAccountReturn} from '../src/profile-navigation.mjs';
 
 const alice='GUID'+'A'.repeat(28),bob='GUID'+'B'.repeat(28),post='/app/community/posts/ee346750-e0b2-43ba-abef-999fd11c8aca?version=2#reply-3';
+const account='/app/accounts/8cc1659c-4d6f-46bb-8313-73bb6e461120';
+test('account and ID profile detours retain the original search or discussion instead of forcing community home',()=>{
+ const search='/app/find?q='+alice;
+ const opened=profileNavigationState(search,account),id=profileNavigationState(account,profilePath(alice),opened);
+ const returned=profileNavigationState(profilePath(alice),account,id);
+ assert.equal(profileReturn(id),search);assert.equal(publicAccountReturn(returned),search);
+ assert.equal(publicAccountReturn(profileNavigationState(post,account)),post);
+ assert.equal(profileReturnLabel(profilePath(alice)),'返回 ID 资料');
+ assert.equal(profileReturnLabel(account),'返回账户资料');
+});
+test('public account return accepts local reading context and does not follow external or settings targets',()=>{
+ assert.equal(publicAccountReturn({from:post}),post);
+ assert.equal(publicAccountReturn({browseReturn:profilePath(alice)}),profilePath(alice));
+ for(const invalid of ['//other.test/app/find','https://other.test/app/find','/app/settings/privacy'])assert.equal(publicAccountReturn({from:invalid,browseReturn:invalid,profileReturn:invalid}),'/app/community');
+});
 test('reading a person and their experience retains the original content and exact position locator',()=>{
  const overview=profilePath(alice),experience=profileExperiencePath(alice,'task:aa346750-e0b2-43ba-abef-999fd11c8aca');
  const initial=profileNavigationState(post,overview),deeper=profileNavigationState(overview,experience,initial);

@@ -10,6 +10,6 @@
 <#nested "socialProviders">
 <#if displayInfo><div id="kc-info" class="${properties.kcSignUpClass!}"><div id="kc-info-wrapper"><#nested "info"></div></div></#if>
 </div></div>
-<div class="auth-submit-status" id="auth-submit-status" role="status" hidden><img src="${url.resourcesPath}/img/galaxy-mark.svg" alt=""><span id="auth-submit-message" data-offline="${msg("galaxyOffline")}" data-pending="${msg("galaxyPending")}">${msg("galaxyPending")}</span></div>
+<div class="auth-submit-status" id="auth-submit-status" role="status" hidden><img src="${url.resourcesPath}/img/galaxy-mark.svg" alt=""><span id="auth-submit-message" data-offline="${msg("galaxyOffline")}" data-pending="${msg("galaxyPending")}" data-delayed="${msg("galaxyDelayed")}" data-reconnected="${msg("galaxyReconnected")}">${msg("galaxyPending")}</span></div>
 <p class="auth-form-footer">${msg("galaxyFooterNote")}</p>
 <@loginFooter.content/>

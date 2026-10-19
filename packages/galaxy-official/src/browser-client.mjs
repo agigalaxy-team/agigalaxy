@@ -7,7 +7,7 @@ export const browserScopes = Object.freeze(['binding', 'consent', 'case-teaser',
 const recruitmentReceiptPath = /^\/v2\/recruitment\/[0-9a-f-]{36}\/receipt\?operationId=[0-9a-f-]{36}&payloadHash=[a-f0-9]{64}$/;
 const forumQuotaPath = /^\/v2\/community\/quotas\?(?:postId|replyId|sectionId)=[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const publicAccountUuid='[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}',publicAccountSubject='GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}';
-const publicAccountPagePath=new RegExp('^/v1/account/public/(?:'+publicAccountUuid+'/(ids|credentials)|by-id/'+publicAccountSubject+')$');
+const publicAccountPagePath=new RegExp('^/v1/account/public/(?:'+publicAccountUuid+'/(ids|credentials|posts)|by-id/'+publicAccountSubject+')$');
 function allowedPublicAccountPage(path){
  const [pathname,query,...extra]=path.split('?'),match=publicAccountPagePath.exec(pathname);
  if(!match||!query||extra.length)return false;
@@ -15,7 +15,10 @@ function allowedPublicAccountPage(path){
  for(const [key,value]of parameters){
   if(seen.has(key)||!['after','limit'].includes(key))return false;seen.add(key);
   if(key==='limit'&&!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value))return false;
-  if(key==='after'&&!new RegExp('^(?:'+(match[1]==='ids'?publicAccountSubject:publicAccountUuid)+')$').test(value))return false;
+  if(key==='after'){
+   const pattern=match[1]==='posts'?/^fp1\.[A-Za-z0-9_-]+$/:new RegExp('^(?:'+(match[1]==='ids'?publicAccountSubject:publicAccountUuid)+')$');
+   if(value.length>512||!pattern.test(value))return false;
+  }
  }
  return seen.size>0;
 }

@@ -1,6 +1,6 @@
 {
   "origin": "https://agigalaxy.org",
-  "siteRelease": "0.1.27",
+  "siteRelease": "0.1.28",
   "files": {
     "changelog.md": "27194058c661c2e3e9912c8717e0ea2a5e860c7bfb71af6bd60d316f5139e8ea",
     "docs/0.1.0/compatibility.md": "218807a4095d433cf1c02caf5bb80ce00a7956639179bd05dc4afb99046d4314",
@@ -293,6 +293,16 @@
     "downloads/native-client/0.1.14/source-hashes.json": "6954bf0e219b89db1108cca79b0652c079048bbb4c6798177bbd70498e13d521",
     "downloads/native-client/0.1.14/package-files.json": "7fa0a6c24f31610e5590403a0ef63eff41bba5558d3b3630e24260d2bb4838f3",
     "downloads/native-client/0.1.14/package-metadata.json": "8d9cda022d6cf76e33adf71de6c7963d5ab8fa3e9f278eb887cc7c3464ed48df",
-    "downloads/native-client/0.1.14/verify-native-client-download.mjs": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a"
+    "downloads/native-client/0.1.14/verify-native-client-download.mjs": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a",
+    "downloads/native-client/0.1.15/galaxy-native-client-0.1.15.tgz": "a359d6deaffd7646f82cb851499ad4b54def69cc8ca957638e8fa3a16d2ff43c",
+    "downloads/native-client/0.1.15/release.jws": "02bf5de3ab8e17e69c079e08aa481f6ce72e4f475859e78dab373af64c851acd",
+    "downloads/native-client/0.1.15/release.json": "bd01d079779b7490fdb399920efe174549ba778d67ed5a0e77bdc3bb698fcaf6",
+    "downloads/native-client/0.1.15/protocol-report.json": "c04889fc8096b3eeeb34d2612f63c8a42e1fdcee5f980c5b0ab9caa33c8d76d0",
+    "downloads/native-client/0.1.15/package-lock.json": "38ef1f38b2cc68f558923168e6ea1892cd33d33e9c6f5e82964d64a0ef2ed176",
+    "downloads/native-client/0.1.15/source-hashes.json": "cced061ddf51dc9af5ab3f6d0044e5e5b8295effa6a19061b6c04c25b7bbeaf9",
+    "downloads/native-client/0.1.15/package-files.json": "e12228c59d4a5d6822f99a9170d57ed21026c94e04acd0b3675beaa020ff636e",
+    "downloads/native-client/0.1.15/package-metadata.json": "0e4681c0cf2852a8747e0079b1cdf85dfaeff34783e4cdf8f5cc7588d10a14d3",
+    "downloads/native-client/0.1.15/verify-native-client-download.mjs": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a",
+    "downloads/native-client/0.1.15/galaxy-native-client-0.1.15-install.zip": "8b04910fcba8e6406cc0f537fd14661de95d9ae7533b1d141d8da0f6edade735"
   }
 }

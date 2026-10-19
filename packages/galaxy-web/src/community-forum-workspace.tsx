@@ -106,10 +106,15 @@ async function firstForumRead(client:ForumClient,route:{reportId?:string;replyId
 }
 export function CommunityForumWorkspace(props:Props){
   const official=useOfficialAccountSession(props.runtime?.api.endpoint),currentOfficial=useRef(official);currentOfficial.current=official;
+  const draftOwner=useRef<{endpoint:string|undefined;session:typeof official.session}>({endpoint:props.runtime?.api.endpoint,session:null});
+  if(draftOwner.current.endpoint!==props.runtime?.api.endpoint||official.phase==='signed-out'||official.phase==='loading')draftOwner.current={endpoint:props.runtime?.api.endpoint,session:null};
+  if(official.phase==='signed-in')draftOwner.current={endpoint:props.runtime?.api.endpoint,session:official.session};
   const parameters=new URLSearchParams(props.routeSearch),identityMode=parameters.get('acting')==='identity'&&!!props.subjectId;
-  const subjectId=identityMode?props.subjectId:undefined,session=official.session,accountId=!identityMode?session?.account.id:null,csrfToken=session?.csrfToken,expiresAt=session?.expiresAt;
+  // A temporary connection failure keeps only the local draft's owner. Every
+  // network action below still requires the current live account session.
+  const subjectId=identityMode?props.subjectId:undefined,session=official.session??(['offline','unavailable'].includes(official.phase)?draftOwner.current.session:null),accountId=!identityMode?session?.account.id:null,csrfToken=session?.csrfToken,expiresAt=session?.expiresAt;
   const account=useMemo(()=>{if(!accountId||!csrfToken||!expiresAt||!official.client)return null;const client=official.client,original={state:'signed-in',account:{id:accountId},csrfToken,expiresAt};
-    const assertCurrent=()=>{const value=currentOfficial.current;if(value.phase!=='signed-in'||value.session?.account.id!==accountId||value.session.csrfToken!==csrfToken||expiresAt*1000<=Date.now())throw Object.assign(Error('official_account_changed'),{code:'official_account_changed'});};
+    const assertCurrent=()=>{const value=currentOfficial.current;if(['offline','unavailable'].includes(value.phase))throw Object.assign(Error('official_account_unavailable'),{code:'official_account_unavailable'});if(value.phase!=='signed-in'||value.session?.account.id!==accountId||value.session.csrfToken!==csrfToken||expiresAt*1000<=Date.now())throw Object.assign(Error('official_account_changed'),{code:'official_account_changed'});};
     return{id:accountId,assertCurrent,call:(path:string,input:unknown,options:{method?:string}={})=>{assertCurrent();return client.call(path,input,{...options,session:original});}};
   },[accountId,csrfToken,expiresAt,official.client]);
   const authority=useChoiceViewLease(props.runtime,subjectId),key=JSON.stringify([authority.key,identityMode,accountId,csrfToken,official.phase==='loading',identityMode?forumScopeKey(props.runtime,subjectId):props.runtime?.api.endpoint,props.postId,props.versionId,props.replyId,props.reportId,props.memberSectionId,props.section,props.compose,props.manage,identityMode&&props.connected,props.routeSearch]);

@@ -9,7 +9,8 @@ import './settings-visual.css';
 import './selected-account.css';
 import {ReadingDetails,ReadingSummary} from './reading-details';
 import type {AccountRuntime,ProfileOverview,HonorBadge,HonorDetail,HonorResponse} from './account-workspace-types';
-import {OfficialAccountStatus,useOfficialAccountSession} from './official-account-panel';
+import {OfficialAccountStatus,useOfficialAccountSession,type OfficialSession} from './official-account-panel';
+import {AccountWorkHistory,type AccountWorkCall} from './account-work-history';
 import {availableForumContent,type ForumCardView} from './community-forum-view-types';
 
 
@@ -89,9 +90,17 @@ function AccountRecentPosts({model,navigate}:{model:ReturnType<typeof useOfficia
  {posts.length>0&&<NavLink to="/app/community?section=owned" navigate={navigate} className="text-link">全部帖子</NavLink>}</section>;
 }
 export function WorkOverview({runtime,subjectId,connected,navigate}:Pick<AccountProps,'runtime'|'subjectId'|'connected'|'navigate'>){
+  const official=useOfficialAccountSession(runtime?.api.endpoint),local=useRef<{endpoint:string|undefined;session:OfficialSession|null}>({endpoint:runtime?.api.endpoint,session:null});
+  if(local.current.endpoint!==runtime?.api.endpoint||official.phase==='signed-out'||official.phase==='loading')local.current={endpoint:runtime?.api.endpoint,session:null};
+  if(official.phase==='signed-in')local.current={endpoint:runtime?.api.endpoint,session:official.session};
+  const session=official.session??(['offline','unavailable'].includes(official.phase)?local.current.session:null);
+  const readCloud:AccountWorkCall=async(path,input,method='POST')=>{
+    if(official.phase!=='signed-in'||!official.client||!official.session||official.session.account.id!==session?.account.id)throw Object.assign(Error('official_account_session_expired'),{code:'official_account_session_expired'});
+    return official.client.call(path,input,{method,session:official.session});
+  };
  return <section className="personal-work"><header className="profile-heading"><h1 className="small">工作概览</h1><NavLink to="/app/publish" navigate={navigate} className="primary-action">发起求助</NavLink></header>
   <nav className="work-filter-links" aria-label="查看我的工作">{[['/app/participate?view=requested','我发布的'],['/app/participate?view=participating','我参与的'],['/app/rooms','对话']].map(([to,title])=><NavLink key={to} to={to} navigate={navigate}>{title}</NavLink>)}</nav>
-  {!connected?<div className="personal-empty"><BriefcaseBusiness size={32}/><h2>从上次的事情继续</h2><p>使用自己的身份，查看参与的工作和回应。</p><NavLink to="/app/settings/identity" navigate={navigate} className="primary-action">继续使用</NavLink></div>:<HomeContinuityWorkspace runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate}/>}
+  {!connected&&!session&&<OfficialAccountStatus model={official} navigate={navigate} returnTo="/app/work" compact/>}{session?.account.id&&<AccountWorkHistory key={runtime?.api.endpoint+':'+session.account.id+':'+session.csrfToken} accountId={session.account.id} call={readCloud} available={official.phase==='signed-in'}/>} {connected&&<HomeContinuityWorkspace runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate}/> }
   <section className="work-library"><h2>继续整理与使用</h2><nav>{[['/app/projects?section=projects','我的项目','持续推进的目标与参与机会'],['/app/projects?section=contacts','邀请与联系人','查看发出和收到的联系'],['/app/capsules?mode=author','我的方法','整理、修订与分享经验'],['/app/history','经历与贡献','回看实际过程和结果'],['/app/information','资料与关注','继续查找和跟进相关信息'],['/app/configurations','工作环境','复用已经记录的配置'],['/app/qualification-permissions','材料使用许可','管理具体材料和使用范围']].map(([to,title,description])=><NavLink key={to} to={to} navigate={navigate}><span><strong>{title}</strong><small>{description}</small></span></NavLink>)}</nav></section>
  </section>;
 }

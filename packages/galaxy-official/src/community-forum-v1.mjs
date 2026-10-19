@@ -274,16 +274,20 @@ export class CommunityForumV1 {
   for(const row of rows){scanned=row.id;const view=await this.headWithin(db,row.id,{actor});if(view.availability==='available')items.push(view);if(items.length===q.limit)break;}
   return {items,nextAfter:items.length===q.limit||rows.length===200?scanned:null,scanTruncated:rows.length===200&&items.length<q.limit,order:page.order,checkedAt:this.clock()};
  });}
- publicForAccount(accountId,{limit=20}={}){
-  if(!z.uuid().safeParse(accountId).success||!Number.isInteger(limit)||limit<1||limit>50)throw new ServiceError('invalid_forum_request');
+  publicForAccount(accountId,input={}){
+   if(!z.uuid().safeParse(accountId).success)throw new ServiceError('invalid_forum_request');
+   const q=validate(z.strictObject({limit:z.number().int().min(1).max(50).default(20),after:z.string().min(1).max(512).optional()}),input),
+    page=forumPageFor({...q,query:'',order:'published'},'public-account:'+accountId);
   return transaction(this.access.db,async db=>{
-   const rows=(await db.query("SELECT id FROM forum_posts_v1 WHERE account_id=$1 AND state='published' ORDER BY created_at DESC,id DESC LIMIT 201",[accountId])).rows,items=[];let scanned=0;
+    const rows=(await db.query(`SELECT id,created_at FROM forum_posts_v1 WHERE account_id=$1 AND state='published'
+     AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT 201`,[accountId,page.afterAt,page.afterId])).rows,items=[];let scanned=null,processed=0;
    for(const row of rows.slice(0,200)){
-    scanned++;const view=await this.headWithin(db,row.id);
+     scanned=row;processed++;const view=await this.headWithin(db,row.id);
     if(view.availability==='available')items.push(view);
-    if(items.length===limit)break;
+     if(items.length===q.limit)break;
    }
-   return {items,scanTruncated:scanned<rows.length,checkedAt:this.clock()};
+    const more=processed<rows.length;
+    return {items,nextAfter:more&&scanned?forumPageAfter(page,scanned):null,scanTruncated:more&&processed===200&&items.length<q.limit,order:'published',checkedAt:this.clock()};
   });
  }
  replies(input,actor=null){const q=validate(forumRepliesQuerySchema,input);return this.runRead(actor,async db=>{

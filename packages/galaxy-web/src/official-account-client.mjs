@@ -39,6 +39,8 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
  return Object.freeze({
   async session({after}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');return readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):'')));},
   async publicAccount(id){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true});},
+   /** @param {string} id @param {{after?:string,limit?:number}} [page] */
+   async publicPosts(id,{after,limit=20}={}){if(!accountId(id)||after!==undefined&&(typeof after!=='string'||after.length>512||!/^fp1\.[A-Za-z0-9_-]+$/.test(after))||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/posts?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
   /** @param {string} id @param {{after?:string,limit?:number}} [page] */
   async publicLinkedIds(id,{after,limit=20}={}){if(!accountId(id)||after!==undefined&&!guid(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/ids?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
   /** @param {string} id @param {{after?:string,limit?:number}} [page] */

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import { once } from 'node:events';
 import { createApi } from '../src/http.mjs';
-import { clientAddressReader, fixedWindowLimiter } from '../src/adapters/http/policy.mjs';
+import { clientAddressReader, fixedWindowLimiter, requestUrl } from '../src/adapters/http/policy.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';
 
 async function fixture(options, run) {
@@ -22,6 +22,16 @@ async function fixture(options, run) {
   });
   try { await run(send); } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
+
+test('public account post paging accepts its bounded cursor without broadening other routes or methods', () => {
+  const endpoint='https://galaxy.example',path='/v1/account/public/11111111-2222-4333-8444-555555555555/posts';
+  const read=(suffix,method='GET')=>requestUrl({url:path+suffix,method,headers:{}},endpoint);
+  assert.equal(read('?limit=50&after=fp1.abc_-123').pathname,path);
+  for(const query of ['?limit=0','?limit=51','?limit=01','?after=','?after=11111111-2222-4333-8444-555555555555',
+    '?limit=2&limit=3','?other=1','?after=fp1.'+'a'.repeat(509)])assert.throws(()=>read(query));
+  assert.throws(()=>read('?limit=2','POST'));
+  assert.throws(()=>requestUrl({url:path.replace('/posts','/ids')+'?after=fp1.'+'a'.repeat(180),method:'GET',headers:{}},endpoint));
+});
 
 test('known forum objects carry one exact quota locator through browser and real HTTP without opening other queries', async () => {
   const id = '11111111-2222-4333-8444-555555555555', calls = [];

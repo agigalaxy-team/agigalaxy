@@ -100,6 +100,7 @@ export function forumError(reason) {
     official_account_session_expired: '请登录银河账户后继续，正在编辑的文字仍保存在此浏览器。',
     official_account_unavailable: '账户服务暂时不可用，草稿和原操作保留。',
     official_account_changed: '当前登录账户已经变化。原账户的草稿和原操作分别保留，请回到原账户继续。',
+    official_account_unavailable: '账户暂时无法连接，草稿保留。连接恢复后继续。',
     account_selection_required: '这个 ID 关联了多个账户，请先选择本次操作的目标账户。',
     forum_audience_required: '请选择这次内容的阅读范围，草稿仍保留。',
     forum_participation_denied: '当前账户不符合这篇内容的参与条件，仍可按允许范围阅读。',

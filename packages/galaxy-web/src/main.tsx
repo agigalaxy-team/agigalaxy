@@ -358,7 +358,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     const targetPath=new URL(target,location.origin).pathname;
     const fromParameters=new URLSearchParams(location.search);
     const fromDirectory=(['/app/','/app/work','/app/find','/app/search','/app/match','/app/history','/app/participate','/app/capsules','/app/projects','/app/community','/app/bookmarks','/app/rooms','/app/notifications','/app/information'].includes(location.pathname)||!!profileSubject(location.pathname)&&!profileSubject(targetPath))&&!fromParameters.has('mode')&&!fromParameters.has('compose');
-    const toObject=/^\/app\/(tasks|capsules|projects|community|rooms|people)\/[^/]+/.test(targetPath);
+    const toObject=/^\/app\/(tasks|capsules|projects|community|rooms|people|accounts)\/[^/]+/.test(targetPath);
     const browseReturn=fromDirectory&&toObject?from:(enteringIdentity||toObject?history.state?.browseReturn:undefined);
     const readingState=options?.profileReturn?profileReturnNavigationState(history.state??{}):{...profileNavigationState(from,target,history.state??{}),...(browseReturn?{browseReturn}:{})};
     history.pushState({from,...readingState,...(identityReturn?{identityReturn}:{})}, '', target);
@@ -605,7 +605,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {path === '/app/account' && !['access','settings'].includes(projectParameters.get('section')??'') && <AccountOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
         {path === '/app/account' && projectParameters.get('section')==='access' && <AccountAccessWorkspace connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
         {path === '/app/account' && projectParameters.get('section')==='settings' && <OnlineAccountSettings endpoint={runtime?.api.endpoint} navigate={navigate} view={projectParameters.get('view')??'profile'}/>}
-        {publicAccountRoute && <PublicAccountWorkspace key={publicAccountRoute[1]} accountId={publicAccountRoute[1]} endpoint={runtime?.api.endpoint} navigate={navigate}/>}
+        {publicAccountRoute && <PublicAccountWorkspace key={publicAccountRoute[1]} accountId={publicAccountRoute[1]} endpoint={runtime?.api.endpoint} navigate={navigate} onReturn={target=>navigate(target,{profileReturn:true})}/>}
         {personSubject && <PersonProfile runtime={runtime} subjectId={status?.identity?.subjectId} targetSubjectId={personSubject} connected={connected} search={routeSearch} navigate={navigate} onReturn={target=>navigate(target,{profileReturn:true})}/>}
         {path === '/app/work' && <WorkOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/settings/identity' && !agentIdentityEntry && projectParameters.get('section')==='account' && <section><button className="back-link" onClick={()=>navigate(returnPath)}>回到原来的页面</button><AccountSettings key={[status?.endpoint,status?.identity?.subjectId,status?.identity?.deviceId,status?.connection?.bindingId,status?.connection?.generation].join(':')} runtime={runtime} connected={connected} hasIdentity={!!status?.identity} navigate={navigate} returnTo={returnPath}/></section>}

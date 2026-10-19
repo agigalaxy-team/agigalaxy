@@ -7,6 +7,9 @@ export function profilePath(subjectId) {
 export function profileSubject(pathname) {
   return /^\/app\/people\/(GUID[A-Z0-9]{28})$/.exec(pathname)?.[1] ?? null;
 }
+const accountProfile=pathname=>/^\/app\/accounts\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(pathname)?.[1]??null;
+const profileKey=pathname=>profileSubject(pathname)??(accountProfile(pathname)?'account:'+accountProfile(pathname):null);
+const knownProfile=value=>subjectPattern.test(value??'')||typeof value==='string'&&/^account:[0-9a-f-]{36}$/i.test(value);
 
 function localReadingPath(value) {
   if (typeof value !== 'string' || !value.startsWith('/app/') || value.startsWith('//')) return null;
@@ -26,9 +29,9 @@ const readingObject = pathname => /^\/app\/(projects|capsules|tasks|community|ro
 export function profileNavigationState(from, target, previous = {}) {
   const source = new URL(from, 'https://galaxy.invalid');
   const destination = new URL(target, 'https://galaxy.invalid');
-  const fromSubject=profileSubject(source.pathname),toSubject = profileSubject(destination.pathname);
-  const viaSettings=source.pathname.startsWith('/app/settings/')&&subjectPattern.test(previous.profileSubject??'');
-  const viaReading=readingObject(source.pathname)&&subjectPattern.test(previous.profileSubject??'');
+  const fromSubject=profileKey(source.pathname),toSubject = profileKey(destination.pathname);
+  const viaSettings=source.pathname.startsWith('/app/settings/')&&knownProfile(previous.profileSubject);
+  const viaReading=readingObject(source.pathname)&&knownProfile(previous.profileSubject);
   if(!toSubject){
     const origin=contentPath(previous.profileReturn);
     if(!(destination.pathname.startsWith('/app/settings/')||readingObject(destination.pathname)&&contentPath(target))||!fromSubject&&!viaSettings&&!viaReading)return {};
@@ -51,9 +54,14 @@ export function profileReturnNavigationState(previous = {}) {
 export function profileReturn(state) {
   return contentPath(state?.profileReturn) ?? '/app/';
 }
+export function publicAccountReturn(state) {
+  return contentPath(state?.profileReturn)??localReadingPath(state?.browseReturn)??contentPath(state?.from)??'/app/community';
+}
 
 export function profileReturnLabel(path) {
   const pathname = new URL(path, 'https://galaxy.invalid').pathname;
+  if(profileSubject(pathname))return '返回 ID 资料';
+  if(accountProfile(pathname))return '返回账户资料';
   if (pathname.startsWith('/app/community/')) return '返回原讨论';
   if (pathname.startsWith('/app/rooms/')) return '返回原对话';
   if (pathname.startsWith('/app/projects/')) return '返回原项目';

@@ -12,6 +12,7 @@ import {assertNoWorkCredentials} from '../../../galaxy-core/src/local-data-redac
 export const archiveSyncChoiceSchema=z.strictObject({choiceId:z.uuid(),enabled:z.boolean(),targetAccountId:z.uuid().optional(),archiveSessionIds:z.array(z.uuid()).max(500),restoreArchiveSessionIds:z.array(z.uuid()).max(500).default([])})
   .refine(x=>(!x.enabled||!!x.targetAccountId&&x.archiveSessionIds.length>0)&&x.restoreArchiveSessionIds.every(id=>x.archiveSessionIds.includes(id)));
 export const archiveCloudTargetSchema=z.strictObject({targetAccountId:z.uuid()});
+export const archiveCloudListSchema=archiveCloudTargetSchema.extend({after:z.string().min(1).max(512).optional(),limit:z.number().int().min(1).max(100).optional()});
 export const archiveCloudItemSchema=archiveCloudTargetSchema.extend({id:z.uuid()});
 export const archiveCloudExportSchema=archiveCloudItemSchema.extend({sequence:z.number().int().nonnegative().default(0)});
 export const archiveSyncFlushSchema=z.strictObject({archiveSessionId:z.uuid().optional()});
@@ -196,7 +197,7 @@ export function createNativeArchiveSync({dataDirectory,endpoint,getIdentity,call
     const items=[];for(const id of selected.choice.archiveSessionIds)items.push(...await processSource(id,{host,sessionId}));
     return {state:'processed',items};
   }
-  async function listCloud(input){const x=parse(archiveCloudTargetSchema,input);return call('/v2/account-archives/list',{}, {accountId:x.targetAccountId});}
+  async function listCloud(input){const {targetAccountId,...page}=parse(archiveCloudListSchema,input);return call('/v2/account-archives/list',page,{accountId:targetAccountId});}
   async function exportCloud(input){const x=parse(archiveCloudExportSchema,input);return call('/v2/account-archives/export',{id:x.id,sequence:x.sequence},{accountId:x.targetAccountId});}
   async function deleteCloud(input){const x=parse(archiveCloudItemSchema,input),result=await call('/v2/account-archives/delete',{id:x.id},{accountId:x.targetAccountId});
     await access(true,null,(db,owner)=>{const job=db.prepare('SELECT * FROM sync_jobs WHERE id=? AND owner_id=? AND endpoint=? AND target_id=?').get(x.id,owner,endpoint,x.targetAccountId);

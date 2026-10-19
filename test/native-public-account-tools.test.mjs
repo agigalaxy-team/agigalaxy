@@ -14,18 +14,20 @@ test('Native public account tools make exact anonymous GETs without local contex
  const cases=[['galaxy_account_public_profile',{accountId},'/v1/account/public/'+accountId],
   ['galaxy_account_public_ids',{accountId,after:afterSubject,limit:50},'/v1/account/public/'+accountId+'/ids?after='+afterSubject+'&limit=50'],
   ['galaxy_account_public_credentials',{accountId,after:afterAccount},'/v1/account/public/'+accountId+'/credentials?after='+afterAccount+'&limit=20'],
+  ['galaxy_account_public_posts',{accountId,after:'fp1.cHVibGlzaGVk',limit:50},'/v1/account/public/'+accountId+'/posts?after=fp1.cHVibGlzaGVk&limit=50'],
   ['galaxy_account_public_by_id',{subjectId,after:afterAccount,limit:1},'/v1/account/public/by-id/'+subjectId+'?after='+afterAccount+'&limit=1']];
  try{for(const [name,input,path]of cases){assert.equal(tools[name].write,false);assert.deepEqual(await tools[name].run(input),f.result);const sent=f.requests.at(-1);assert.equal(sent.url,endpoint+path);assert.equal(sent.options.method,'GET');assert.equal(sent.options.body,undefined);assert.equal(sent.options.credentials,'omit');assert.equal(sent.options.cache,'no-store');assert.equal(sent.options.referrerPolicy,'no-referrer');assert.equal(sent.options.headers.Authorization,undefined);assert.equal(sent.options.headers['X-Galaxy-Account-ID'],undefined);}
   assert.equal(f.client.snapshot(),null);assert.equal(f.signatures(),0);
   assert.throws(()=>tools.galaxy_account_public_ids.run({accountId,limit:51}));assert.throws(()=>tools.galaxy_account_public_ids.run({accountId,after:afterAccount}));
-  assert.throws(()=>tools.galaxy_account_public_by_id.run({subjectId,localContext:'private text'}));assert.equal(f.requests.length,4);
+  assert.throws(()=>tools.galaxy_account_public_posts.run({accountId,after:afterAccount}));assert.throws(()=>tools.galaxy_account_public_posts.run({accountId,after:'fp1.'+'A'.repeat(509)}));
+  assert.throws(()=>tools.galaxy_account_public_by_id.run({subjectId,localContext:'private text'}));assert.equal(f.requests.length,5);
  }finally{f.client.close();}
 });
 
-test('Public pagination permits only the three exact GET resources and typed bounded cursors',async()=>{
+test('Public pagination permits only the four exact GET resources and typed bounded cursors',async()=>{
  const f=fixture();try{
-  for(const path of ['/v1/account/public/'+accountId+'/ids?limit=20','/v1/account/public/'+accountId+'/credentials?limit=50','/v1/account/public/by-id/'+subjectId+'?after='+afterAccount])await f.client.call(path,undefined,{method:'GET',authenticated:false});
-  for(const path of ['/v1/account/public/'+accountId+'?limit=20','/v1/account/public/'+accountId+'/ids?limit=51','/v1/account/public/'+accountId+'/ids?limit=0','/v1/account/public/'+accountId+'/ids?limit=20&limit=30','/v1/account/public/'+accountId+'/ids?after='+afterAccount,'/v1/account/public/'+accountId+'/credentials?after='+afterSubject,'/v1/account/public/by-id/'+subjectId+'?localContext=private','/v1/account/public/by-id/not-an-id?limit=20','/v1/account/private/'+accountId+'/ids?limit=20'])await assert.rejects(f.client.call(path,undefined,{method:'GET',authenticated:false}),/Invalid API path/);
-  await assert.rejects(f.client.call('/v1/account/public/'+accountId+'/ids?limit=20',{}, {method:'POST',authenticated:false}),/Invalid API path/);assert.equal(f.requests.length,3);
+  for(const path of ['/v1/account/public/'+accountId+'/ids?limit=20','/v1/account/public/'+accountId+'/credentials?limit=50','/v1/account/public/by-id/'+subjectId+'?after='+afterAccount,'/v1/account/public/'+accountId+'/posts?after=fp1.cHVibGlzaGVk&limit=50'])await f.client.call(path,undefined,{method:'GET',authenticated:false});
+  for(const path of ['/v1/account/public/'+accountId+'?limit=20','/v1/account/public/'+accountId+'/ids?limit=51','/v1/account/public/'+accountId+'/ids?limit=0','/v1/account/public/'+accountId+'/ids?limit=20&limit=30','/v1/account/public/'+accountId+'/ids?after='+afterAccount,'/v1/account/public/'+accountId+'/credentials?after='+afterSubject,'/v1/account/public/'+accountId+'/posts?after='+afterAccount,'/v1/account/public/'+accountId+'/posts?limit=51','/v1/account/public/'+accountId+'/posts?localContext=private','/v1/account/public/by-id/'+subjectId+'?localContext=private','/v1/account/public/by-id/not-an-id?limit=20','/v1/account/private/'+accountId+'/ids?limit=20'])await assert.rejects(f.client.call(path,undefined,{method:'GET',authenticated:false}),/Invalid API path/);
+  await assert.rejects(f.client.call('/v1/account/public/'+accountId+'/ids?limit=20',{}, {method:'POST',authenticated:false}),/Invalid API path/);assert.equal(f.requests.length,4);
  }finally{f.client.close();}
 });

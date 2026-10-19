@@ -5,6 +5,8 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {communityForumFixture} from './community-forum-fixture.mjs';
 import {AccountPublicQuery} from '../src/account-public-query.mjs';
 import {createExternalCredentialsService} from '../src/external-credentials.mjs';
+import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
+import {createBrowserClient} from '../src/browser-client.mjs';
 
 async function accountBrowser(f,name){
  const cookies=new Map(),accept=response=>{for(const item of response.headers.getSetCookie()){const pair=item.split(';')[0];cookies.set(pair.split('=')[0],pair);}},cookie=()=>[...cookies.values()].join('; ');
@@ -97,5 +99,35 @@ test('public external credential metadata remains account-bound, current and wit
   await externalCredentials.withdraw(actor,owned.id);assert.equal((await query.credentials(account.id)).items.some(item=>item.id===owned.id),false);
   await account.settings({enabled:true,scope:'profile',showExternalCredentials:false});await assert.rejects(query.credentials(account.id),{code:'not_found'});
   await account.settings({enabled:false,scope:'profile',showExternalCredentials:true});await assert.rejects(query.credentials(account.id),{code:'not_found'});
+ }finally{await f.close();}
+});
+
+test('public account posts continue through current anonymous permissions and retain a position after the previous post is withdrawn',{timeout:60000},async()=>{
+ const f=await communityForumFixture({officialAccountPortal:true});try{
+  const author=await accountBrowser(f,'public-post-page'),other=await accountBrowser(f,'public-post-other'),base='/v1/account/public/'+author.id;
+  async function publish(title,audience){const payload=await bindForumIds('create-post','account:'+author.id,{...await f.post({title,...(audience?{audience}:{})}),accountId:author.id});
+   const result=await author.request('/v2/community/posts',{payloadJson:JSON.stringify(payload)});assert.equal(result.status,200,JSON.stringify(result.body));return payload;}
+  const posts=[];
+  for(let index=0;index<2;index++){f.clock.now++;posts.push(await publish('Public source '+index));}
+  f.clock.now++;const privatePost=await publish('Private source must not appear',{read:{kind:'selected-accounts',accountIds:[other.id]},participate:{kind:'accounts'}});
+  await author.settings({enabled:true,scope:'profile'});
+  assert.equal((await f.request(base+'/posts',{authorization:false})).status,404);
+  await author.settings({enabled:true,scope:'profile-and-public-posts'});
+  await other.settings({enabled:true,scope:'profile-and-public-posts'});
+  const browser=createBrowserClient({endpoint:f.owner.access.endpoint,trustedKeys:new Map([['anonymous-unused',{}]]),sign:async()=>{throw Error('No signature for anonymous reading');},
+   fetch:async(url,options)=>{const target=new URL(url);return fetch(f.origin+target.pathname+target.search,options);}});
+  const first=await browser.call(base+'/posts?limit=1',undefined,{method:'GET',authenticated:false});
+  assert.equal(first.items.length,1);assert.ok(first.nextAfter?.startsWith('fp1.'));assert.equal(first.order,'published');
+  const head=first.items[0].locator.postId,withdrawal=await bindForumIds('withdraw-post','account:'+author.id,{schemaVersion:1,operationId:randomUUID(),postId:head,expectedHeadVersion:1,accountId:author.id});
+  assert.equal((await author.request('/v2/community/posts/withdraw',{payloadJson:JSON.stringify(withdrawal)})).status,200);
+  const remaining=[];let cursor=first.nextAfter;
+  do{const page=await browser.call(base+'/posts?limit=1&after='+encodeURIComponent(cursor),undefined,{method:'GET',authenticated:false});remaining.push(...page.items);cursor=page.nextAfter;}while(cursor);
+  assert.deepEqual(new Set(remaining.map(item=>item.locator.postId)),new Set(posts.filter(item=>item.postId!==head).map(item=>item.postId)));
+  assert.equal(remaining.some(item=>item.locator.postId===privatePost.postId),false);
+  await assert.rejects(browser.call('/v1/account/public/'+other.id+'/posts?limit=1&after='+encodeURIComponent(first.nextAfter),undefined,{method:'GET',authenticated:false}),{code:'forum_cursor_mismatch'});
+  await assert.rejects(browser.call(base+'/posts?limit=51',undefined,{method:'GET',authenticated:false}),/Invalid API path/);
+  const profile=(await f.request(base,{authorization:false})).body;assert.ok(profile.posts.items.every(item=>item.availability==='available'));assert.ok(Object.hasOwn(profile.posts,'nextAfter'));
+  await author.settings({enabled:true,scope:'profile'});
+  assert.equal((await f.request(base+'/posts?after='+encodeURIComponent(first.nextAfter),{authorization:false})).status,404);
  }finally{await f.close();}
 });

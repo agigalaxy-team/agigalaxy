@@ -95,8 +95,10 @@ pre {background:#f8f9fb;color:#495362;padding:18px 21px;overflow:auto;border:1px
 .policy-list dt,.release-facts dt {font-size:14px;color:var(--ink)}
 .policy-list dd,.release-facts dd {font-size:14px;line-height:1.85;color:var(--muted);margin:0;min-width:0}
 .release-facts code {font-size:12px}
-.network-picture {display:grid;grid-template-columns:minmax(0,1fr) 50px minmax(0,1.25fr) 50px minmax(0,1fr);gap:15px;align-items:center;margin:0 0 42px}
-.network-picture>div {padding:29px 20px;background:#fff9fc;border:1px solid #f0e4eb;border-radius:7px;text-align:center}
+.network-picture {display:grid;grid-template-columns:minmax(0,1fr) 70px minmax(0,1.2fr);gap:15px;align-items:center;margin:0 0 42px}
+.network-origin,.network-services>section {padding:29px 20px;background:#fff9fc;border:1px solid #f0e4eb;border-radius:7px;text-align:center;min-width:0}
+.network-services {display:grid;gap:20px;min-width:0}
+.network-links {width:100%;height:320px}
 .network-picture strong {display:block;font-size:18px;margin:11px 0}
 .network-picture span,.network-picture small {font-size:13px;color:var(--muted)}
 .network-line {height:1px;position:relative;background:#e8bed1}
@@ -143,6 +145,13 @@ pre {background:#f8f9fb;color:#495362;padding:18px 21px;overflow:auto;border:1px
 .guide-body ul,.guide-body ol {padding-left:24px;margin:18px 0 24px}
 .guide-body li {padding:3px 0;color:#495260}
 .guide-body pre {width:100%;max-width:100%;font-size:14px;margin:22px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.guide-code-block {margin:22px 0;min-width:0}
+.guide-code-actions {display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-bottom:6px}
+.guide-code-copy {border:1px solid #e8dbe3;border-radius:5px;background:#fff;padding:6px 12px;min-height:36px;color:#805268;font-size:13px}
+.guide-code-copy:hover {background:#fff4f9}
+.guide-code-copy:disabled {cursor:wait;opacity:.65}
+.guide-code-status {font-size:12px;color:#667080}
+.guide-code-block pre {margin:0}
 .guide-body code {font-size:.9em}
 .guide-table {width:100%;max-width:100%;overflow:auto;margin:24px 0}
 table {width:100%;border-collapse:collapse;text-align:left;font-size:14px}
@@ -160,7 +169,7 @@ thead {background:#f8f8fa}
   .brand>.brand-mark {width:38px;height:38px}
   .reading-section {grid-template-columns:190px minmax(0,1fr);gap:28px}
   .guide-layout {grid-template-columns:180px minmax(0,1fr);gap:28px}
-  .network-picture {grid-template-columns:minmax(0,1fr) 30px minmax(0,1.25fr) 30px minmax(0,1fr);gap:10px}
+  .network-picture {grid-template-columns:minmax(0,1fr) 50px minmax(0,1.2fr);gap:10px}
   .network-picture strong {font-size:16px}
   .footer-grid nav {gap:10px 20px}
 }
@@ -186,7 +195,8 @@ thead {background:#f8f8fa}
   .download-focus>aside {border-left:0;border-top:1px solid #e8dbe3;padding:24px 0 0}
   .download-focus h2 {font-size:24px}
   .network-picture {grid-template-columns:minmax(0,1fr);gap:10px}
-  .network-picture>div {padding:20px}
+  .network-origin,.network-services>section {padding:20px}
+  .network-links {display:none}
   .network-line {width:1px;height:25px;justify-self:center}
   .network-picture strong {margin:7px 0}
   .guide-layout {display:block;padding-bottom:38px}

@@ -61,7 +61,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
  function change(patch:Partial<DiscoveryInput>){const value={...inputRef.current,...patch};inputRef.current=value;draft.change(patch);projectQueryMemory(runtime,connected,'discovery',value);if(memoryKey!=='discovery')projectQueryMemory(runtime,connected,memoryKey,value);}
  async function read<T>(path:string,value:unknown,token:number):Promise<T>{if(!current(token))throw Error('身份或连接已变化，请重新打开查找。');if(!runtime)throw Error('connection_required');const result:T=await runtime.api.call(path,value,{authenticated:connected});if(!current(token))throw Error('身份或连接已变化，请重新打开查找。');return result;}
  useEffect(()=>{const lifeRef=life,searchRef=searchSerial,detailRef=detailSerial;lifeRef.current++;return()=>{lifeRef.current++;searchRef.current++;detailRef.current++;};},[]);
- useEffect(()=>{if(detail||detailError)dialog.current?.showModal();else dialog.current?.close();},[detail,detailError]);
+  useEffect(()=>{if(detail||detailError||busy)dialog.current?.showModal();else dialog.current?.close();},[detail,detailError,busy]);
  function closeDetail(){detailSerial.current++;opened.current=null;setDetail(null);setDetailError('');setBusy(false);change({openedRef:null});}
  function hideSource(item:VisibleOpportunity){const locator=bodyFreeOpportunity(item);opened.current=locator;setItems(old=>old.map(row=>row.id===item.id?locator:row));setDetail({opportunity:locator,experience:{items:[]}});setDetailError('这份介绍或交流意愿已经变化，请重新查找。');}
  async function inspect(item:VisibleOpportunity,count=1,quiet=false){
@@ -96,7 +96,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
   }).catch(reason=>{if(current(token)&&serial===searchSerial.current){setError(errorMessage(reason));setItems([]);setNext(null);}});
  });
  useEffect(()=>{restoreSources();},[draft.ready]);
- useEffect(()=>{const refresh=()=>void reload(),timer=window.setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[]);
+  useEffect(()=>{const refresh=()=>void reload(),timer=window.setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);window.addEventListener('focus',refresh);window.addEventListener('online',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);window.removeEventListener('online',refresh);};},[]);
 
  const go=(path:string)=>{detailSerial.current++;navigate(path);};
  return <section className="discovery-page">
@@ -113,9 +113,10 @@ function DiscoveryView({runtime,connected,navigate}:Props){
   {searched&&!items.length&&!error&&<p className="empty-state">暂时没有找到相关的人或项目，试试更简短的方向词。</p>}{next&&<Button type="button" variant="outline" disabled={searching} onClick={()=>void search({after:next})}>更多结果</Button>}
   <footer className="discovery-other"><a href={discoveryTarget('/app/search',input.title)} onClick={event=>{event.preventDefault();go(discoveryTarget('/app/search',input.title));}}>查找方法与工具 </a><a href="/app/projects?section=projects" onClick={event=>{event.preventDefault();go('/app/projects?section=projects');}}>我的项目与联系 </a></footer>
   <dialog ref={dialog} className="galaxy-dialog discovery-reading" aria-labelledby="discovery-detail-title" onCancel={event=>{if(event.target===event.currentTarget){event.preventDefault();closeDetail();}}}>
-   <header className="dialog-heading"><span>了解与联系</span><button type="button" className="icon-button" aria-label="关闭项目介绍" onClick={closeDetail}><X size={20}/></button></header>
+    <header className="dialog-heading"><span id="discovery-detail-title">了解与联系</span><button type="button" className="icon-button" aria-label="关闭项目介绍" onClick={closeDetail}><X size={20}/></button></header>
+    {busy&&!detail&&!detailError&&<output>正在加载项目介绍…</output>}
    {detailError&&<output className="message">{detailError}<button type="button" className="text-link" disabled={busy} onClick={()=>opened.current&&void inspect(opened.current,historyPages.current)}>重试</button></output>}
-   {detail&&detail.experience&&!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={person(detail.opportunity)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2 id="discovery-detail-title">{detail.opportunity.project.title}</h2><p className="discovery-intro reading-prose">{detail.opportunity.project.summary}</p>{detail.opportunity.help.statement!==detail.opportunity.project.summary&&<p className="reading-prose">{detail.opportunity.help.statement}</p>}
+    {detail&&detail.experience&&!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={person(detail.opportunity)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2>{detail.opportunity.project.title}</h2><p className="discovery-intro reading-prose">{detail.opportunity.project.summary}</p>{detail.opportunity.help.statement!==detail.opportunity.project.summary&&<p className="reading-prose">{detail.opportunity.help.statement}</p>}
     <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><ReadingDetails key={item.key}><ReadingSummary>{item.title??'这项工作'}</ReadingSummary><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></ReadingDetails>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
    </>}
    {detail&&<OpportunityContactWorkspace runtime={runtime} connected={connected} subjectId={subjectId} query={displayQuery} opportunity={detail.opportunity} navigate={go} onSourceUnavailable={()=>hideSource(detail.opportunity)} onNeedIdentity={()=>go('/app/settings/identity')}/>}

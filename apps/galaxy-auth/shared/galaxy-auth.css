@@ -37,6 +37,7 @@
 }
 
 /* Authentication keeps the current action in focus. */
+.auth-submit-status:not([data-state="pending"]) img{display:none}
 .auth-workspace{display:flex;justify-content:center;align-items:center;padding:64px 28px;gap:0}
 .auth-form-area{width:100%;max-width:400px;min-width:0;border:0;padding:0;align-self:center}
 .auth-form-heading{margin-bottom:28px}.auth-form-heading .auth-eyebrow{display:none}.auth-form-context:empty,.auth-form-footer:empty{display:none}

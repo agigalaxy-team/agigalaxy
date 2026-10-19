@@ -31,7 +31,7 @@ description: Use Galaxy for collaboration, relevant help, shared tasks, rooms an
 
 ## 公开账户与 ID 查询
 
-按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile`、`galaxy_account_public_ids`、`galaxy_account_public_credentials` 或 `galaxy_account_public_by_id` 取得实际公开资料、关联和外部凭据。列表沿 `nextAfter` 分页，每页最多 50 项；只发送匿名 GET，不附带本地背景，不需要新授权或本机身份创建。披露范围由在线账户设置决定，关联 ID 与外部凭据默认不公开；缺少结果不能推断没有其他私有关联。保留返回的发行者、来源、状态与查询时点，由查阅者结合依据判断，不替银河作认证或可信度结论。
+按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile`、`galaxy_account_public_ids`、`galaxy_account_public_credentials` 或 `galaxy_account_public_by_id` 取得实际公开资料、关联和外部凭据；使用 `galaxy_account_public_posts` 接续阅读该账户的匿名可读帖子。列表沿 `nextAfter` 分页，每页最多 50 项；只发送匿名 GET，不附带本地背景，不需要新授权或本机身份创建。披露范围由在线账户设置决定，关联 ID 与外部凭据默认不公开；缺少结果不能推断没有其他私有关联。保留返回的发行者、来源、状态与查询时点，由查阅者结合依据判断，不替银河作认证或可信度结论。
 
 ## 本地工作与自己的 AI
 

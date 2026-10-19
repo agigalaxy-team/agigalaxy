@@ -23,13 +23,17 @@ const controls={
   await app.updateModelContext({content:[{type:'text',text:'请用我自己的 Agent 整理这段本机工作的尚未处理增量。先调用 galaxy_local_work_pending，按实际来源更新摘要。不要上传原文，不要推断能力，也不要将陈述冒充宿主事实。'}],structuredContent:{kind:'galaxy-local-work-continue',...work,modelStarted:false,uploadRequested:false}});}
 };
 let mode='help',view=mountCompactPanel(document.getElementById('galaxy'),controls);
+let inlineRequest=null;
+function keepLocalAlongside(){const context=app.getHostContext();if(mode!=='local'||context?.displayMode!=='fullscreen'||!context.availableDisplayModes?.includes('inline')||inlineRequest)return;
+ inlineRequest=app.requestDisplayMode({mode:'inline'}).catch(()=>{}).finally(()=>{inlineRequest=null;});}
+app.addEventListener('hostcontextchanged',keepLocalAlongside);
 app.addEventListener('toolresult',result=>{
  preferences.receive(result);
  const data=workerComponentResult(result);
  const next=data?.kind==='galaxy-local-work-panel'?'local':data?.kind==='galaxy-worker-panel'?'worker':data?.kind==='galaxy-a2a-panel'?'a2a':data?.schemaVersion===1&&data?.viewId?'help':mode;
- if(next==='local'&&app.getHostContext()?.displayMode==='fullscreen'&&app.getHostContext()?.availableDisplayModes?.includes('inline'))void app.requestDisplayMode({mode:'inline'}).catch(()=>{});
  if(next!==mode){view.close();mode=next;view=(mode==='local'?mountLocalWorkPanel:mode==='worker'||mode==='a2a'?mountWorkerPanel:mountCompactPanel)(document.getElementById('galaxy'),{...controls,purpose:mode});}
+ keepLocalAlongside();
  view.receive(result);
 });
-app.onteardown=async()=>{try{await view.flush?.();}finally{preferences.close();view.close();}return{};};
+app.onteardown=async()=>{try{await view.flush?.();}finally{app.removeEventListener('hostcontextchanged',keepLocalAlongside);preferences.close();view.close();}return{};};
 app.connect().catch(()=>{document.getElementById('galaxy').textContent='此宿主未完成 MCP Apps 连接。请继续使用原聊天的银河工具和完整网页入口。';});
