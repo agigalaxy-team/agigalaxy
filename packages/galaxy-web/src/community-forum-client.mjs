@@ -67,8 +67,8 @@ export function forumError(reason) {
     return '暂时无法连接社区，请检查网络后重试。';
   }
   return ({ forum_scope_changed: '身份或连接已改变，请重新打开并核对原稿。', receipt_status_authority_changed: '身份或连接已改变；原稿和原操作仍分别保留。',
-    connection_required: '请先连接当前身份。本机稿仍保留。', account_verification_required: '这次发表需要完成账号验证，本机稿已经保留。',
-    verified_account_required: '这次发表需要完成账号验证，本机稿已经保留。', invalid_forum_payload: '请检查必填内容、字数、链接和准确目标后，再确认发表。',
+    connection_required: '请先连接当前身份。本机稿仍保留。', account_verification_required: '这次发表需要完成银河账户关联，本机稿已经保留。',
+    verified_account_required: '这次发表需要完成银河账户关联，本机稿已经保留。', invalid_forum_payload: '请检查必填内容、字数、链接和准确目标后，再确认发表。',
     forum_payload_too_large: '这次内容超出可提交大小，请缩短文字或链接。', forum_quota_exceeded: '今天的此类发表额度已用完，本机稿可以保留。',
     forum_version_conflict: '这条记录已更新，请保留本机稿并重新核对当前版本。', forum_operation_conflict: '同一原操作出现不同内容，请保留原记录核对。',
     forum_head_conflict: '帖子已经有新的变化，请保留本机稿并重新核对当前版本。',

@@ -1,0 +1,19 @@
+{
+  "primary": [
+    {"href": "/", "label": "首页", "icon": "home"},
+    {"href": "/app/", "label": "发现", "icon": "discover"},
+    {"href": "/app/community", "label": "社区", "icon": "community"},
+    {"href": "/app/rooms", "label": "消息", "icon": "messages"},
+    {"href": "/app/work", "label": "我的工作", "icon": "work"},
+    {"href": "/app/account", "label": "账户", "icon": "account"}
+  ],
+  "publicPages": [
+    {"href": "/how-it-works/", "label": "怎样使用银河", "location": "关于银河"},
+    {"href": "/network/", "label": "开放网络", "location": "关于银河"},
+    {"href": "/docs/", "label": "使用说明", "location": "文档"},
+    {"href": "/downloads/", "label": "客户端下载", "location": "账户"},
+    {"href": "/start/", "label": "开始使用", "location": "账户"},
+    {"href": "/privacy/", "label": "隐私与数据", "location": "隐私与数据"},
+    {"href": "/status/", "label": "服务与版本", "location": "服务与版本"}
+  ]
+}

@@ -1,5 +1,6 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowLeft,ArrowRight,ArrowUpRight,Pencil} from 'lucide-react';
+import {Pencil} from 'lucide-react';
 import {createProfileClient} from './profile-client.mjs';
 import {createHistoryClient} from './history-client.mjs';
 import {HistoryWorkspace,type HistoryForm} from './history-workspace';
@@ -26,7 +27,7 @@ function ProfileText({value}:{value:string}){return <div className="person-prose
 function Intro({about}:{about:string}){
  const paragraphs=about.split(/\n\s*\n/),first=paragraphs[0],boundary=first.slice(0,260).search(/[。！？.!?]\s*[^。！？.!?]*$/);
  const summary=first.length<=260?first:boundary>=50?first.slice(0,boundary+1):first.slice(0,240)+'…';
- return summary===about?<ProfileText value={about}/>:<><p className="person-prose">{summary}</p><details className="person-full-intro"><summary>完整介绍</summary><ProfileText value={about}/></details></>;
+ return summary===about?<ProfileText value={about}/>:<><p className="person-prose">{summary}</p><ReadingDetails className="person-full-intro"><ReadingSummary>完整介绍</ReadingSummary><ProfileText value={about}/></ReadingDetails></>;
 }
 
 export function PersonProfile(props:Props){
@@ -64,8 +65,8 @@ function PersonSession({runtime,connected,subjectId,targetSubjectId,search,navig
  const editorPath=sectionPath(section,{edit:'1'});
  if(own&&parameters.get('edit')==='1')return <PersonProfileEditor runtime={runtime} subjectId={targetSubjectId} connected={connected} onClose={()=>navigate(sectionPath(section))} onNeedIdentity={()=>navigate('/app/settings/identity')} onSaved={()=>{setSaved(true);setProfile(null);setRecent(null);setLoading(true);setRefresh(value=>value+1);navigate(sectionPath('overview'));}}/>;
  return <article className="person-profile" aria-busy={loading}>
-  <Link to={back} navigate={onReturn??navigate} className="person-return"><ArrowLeft size={16}/>{profileReturnLabel(back)}</Link>
-  <header className="person-identity"><span className="person-portrait" aria-hidden="true"><MemberAvatar subjectId={targetSubjectId} own={own}/></span><div><p className="eyebrow">{own?'我的个人资料':'个人资料'}</p><h1>{profile?.displayName??memberName(targetSubjectId)}</h1></div>{own&&<div className="person-identity-actions"><Link to={editorPath} navigate={navigate} className="person-edit-link"><Pencil size={15}/>编辑资料</Link><Link to="/app/account" navigate={navigate} className="person-self-link">我的银河<ArrowUpRight size={14}/></Link></div>}</header>
+  <Link to={back} navigate={onReturn??navigate} className="person-return">{profileReturnLabel(back)}</Link>
+  <header className="person-identity"><span className="person-portrait" aria-hidden="true"><MemberAvatar subjectId={targetSubjectId} own={own}/></span><div><p className="eyebrow">{own?'我的个人资料':'个人资料'}</p><h1>{profile?.displayName??memberName(targetSubjectId)}</h1></div>{own&&<div className="person-identity-actions"><Link to={editorPath} navigate={navigate} className="person-edit-link"><Pencil size={15}/>编辑资料</Link><Link to="/app/account" navigate={navigate} className="person-self-link">我的银河</Link></div>}</header>
   {!own&&profile?.profileSource&&!declarationUnavailable&&<SaveForLaterButton runtime={runtime} connected={connected} subjectId={subjectId} reference={{kind:"person",subjectId:targetSubjectId}} onNeedIdentity={()=>navigate("/app/settings/identity")}/>}
   {profile?.profileSource&&!declarationUnavailable&&<AgentWorkContinuation runtime={runtime} subjectId={subjectId} object={{kind:'person',id:targetSubjectId}} title={profile.displayName??memberName(targetSubjectId)} purpose="根据当前允许阅读的介绍和具体经历，理解此人与原来事情相关的经验" returnTo={location.pathname+location.search+location.hash} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
   {saved&&<output className="person-updated">资料已更新。</output>}
@@ -74,9 +75,9 @@ function PersonSession({runtime,connected,subjectId,targetSubjectId,search,navig
   {declarationUnavailable&&!error&&<p className="person-read-error">介绍和项目需要重新核对当前可见范围。<button type="button" onClick={retry}>重新读取</button></p>}
   {section==='overview'&&<div className="person-overview"><div className="person-main">
    <section className="person-section"><header><h2>介绍</h2>{profile?.profileSource&&<span className="person-muted">本人填写</span>}</header>{profile?.about?<Intro about={profile.about}/>:!loading&&!error&&!declarationUnavailable&&<p className="person-muted">暂时没有可查看的介绍。</p>}</section>
-   <section className="person-section"><header><h2>近期经历</h2><Link to={experience} navigate={navigate}>完整经历<ArrowRight size={14}/></Link></header>
+   <section className="person-section"><header><h2>近期经历</h2><Link to={experience} navigate={navigate}>完整经历</Link></header>
     {historyError&&<p role="alert" className="person-read-error">{historyError}<button type="button" onClick={retry}>重试</button></p>}
-    {recent?.items.length?<ol className="person-experience-list">{recent.items.map(item=>{const times=item.activityTimes.map(time=>Date.parse(time)).filter(Number.isFinite),at=times.length?new Date(Math.max(...times)):null;return <li key={item.key}><Link to={profileExperiencePath(targetSubjectId,item.key)!} navigate={navigate}><h3>{item.title??'工作经历'}<ArrowRight size={15}/></h3>{item.summary&&<p>{item.summary}</p>}<div className="history-meta">{at&&<time dateTime={at.toISOString()}>{at.toLocaleDateString('zh-CN')}</time>}{item.subjectRoles.length>0&&<span>{item.subjectRoles.map(historyRoleLabel).join(' · ')}</span>}{item.synthetic&&<span>合成示例</span>}</div></Link></li>;})}</ol>:recent&&<p className="person-muted">暂时没有可查看的经历。</p>}
+    {recent?.items.length?<ol className="person-experience-list">{recent.items.map(item=>{const times=item.activityTimes.map(time=>Date.parse(time)).filter(Number.isFinite),at=times.length?new Date(Math.max(...times)):null;return <li key={item.key}><Link to={profileExperiencePath(targetSubjectId,item.key)!} navigate={navigate}><h3>{item.title??'工作经历'}</h3>{item.summary&&<p>{item.summary}</p>}<div className="history-meta">{at&&<time dateTime={at.toISOString()}>{at.toLocaleDateString('zh-CN')}</time>}{item.subjectRoles.length>0&&<span>{item.subjectRoles.map(historyRoleLabel).join(' · ')}</span>}{item.synthetic&&<span>合成示例</span>}</div></Link></li>;})}</ol>:recent&&<p className="person-muted">暂时没有可查看的经历。</p>}
    </section>
    <PersonProjects runtime={runtime} connected={connected} ownerId={targetSubjectId} legacy={declarationUnavailable?[]:profile?.projects??[]} refresh={refresh} check={client.check} navigate={navigate} allPath={sectionPath('projects')} preview/>
   </div><aside className="person-side">

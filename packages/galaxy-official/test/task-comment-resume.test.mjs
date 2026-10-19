@@ -7,7 +7,7 @@ import {createOidcLoginProvider} from '../src/oidc-login.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {sha256Hex} from '../src/shared/web-primitives.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import {createTaskCommentClient} from '../../galaxy-web/src/task-comment-client.mjs';
 
 async function fixture() {
@@ -25,7 +25,7 @@ async function fixture() {
     const origin = 'http://127.0.0.1:' + server.address().port;
     const store = {get: async key => structuredClone(local.get(key)), put: async (key, value) => local.set(key, structuredClone(value)),
       update: async (key, change) => {const value = change(structuredClone(local.get(key))); local.set(key, structuredClone(value)); return structuredClone(value);}};
-    runtime = await createWebRuntime({endpoint, trustedKeys: f.bindings.trustedKeys}, {store, now: () => clock.now,
+    runtime = await createExistingWebRuntime({endpoint, trustedKeys: f.bindings.trustedKeys}, {store, now: () => clock.now,
       fetch: async (url, options) => {
         const parsed = new URL(url), path = parsed.pathname;
         if (path === '/v1/consents') {
@@ -39,10 +39,10 @@ async function fixture() {
         if (drop?.path === path) {drop = null; assert.equal(result.status, 200); await result.arrayBuffer(); throw new Error('synthetic original ACK lost');}
         return result;
       }});
-    await runtime.createIdentity({confirmed: true}); await runtime.connect({confirmed: true});
+    await runtime.connect({confirmed: true});
     const started = await runtime.api.call('/v1/identity/begin', {providerId: 'fixture'}), callback = await issuer.authorize(started.authorizationUrl);
     const login = await fetch(origin + callback.pathname + callback.search); assert.equal(login.status, 200); await login.arrayBuffer();
-    await runtime.confirmAccountLink(started.loginId, {confirmed: true});
+    await confirmFixtureAccountLink(runtime, started.loginId);
     const subjectId = runtime.api.snapshot().subjectId, taskId = randomUUID(), task = {operationId: randomUUID(), taskId, caseId: null,
       intent: 'proactive-review', workContext: {goal: 'Read the exact original comment', currentSituation: 'Synthetic local recovery', attemptRefs: []},
       title: '[synthetic] Original comment recovery', summary: 'Private local integration scenario', visibility: 'Private',

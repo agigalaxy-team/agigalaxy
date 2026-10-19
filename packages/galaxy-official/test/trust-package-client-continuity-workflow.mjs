@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {publicationFixture} from './task-publication-continuity-fixture.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 
@@ -102,9 +102,9 @@ export async function verifyOrdinaryOwnerSwitch(){
   const fetcher=(url,options)=>{const u=new URL(url);return fetch(local+u.pathname+u.search,{...options,
    headers:{...options.headers,Origin:'https://galaxy.example.org'}});};
   const config={endpoint:x.runtime.api.endpoint,trustedKeys:x.f.bindings.trustedKeys};let onRead=null;
-  ownerRuntime=await createWebRuntime(config,{store:recoveryStore(x.values,(...args)=>onRead?.(...args)),fetch:fetcher,now:()=>x.f.now});
-  otherRuntime=await createWebRuntime(config,{store:recoveryStore(new Map()),fetch:fetcher,now:()=>x.f.now});
-  await otherRuntime.createIdentity({confirmed:true});await otherRuntime.connect({confirmed:true});
+  ownerRuntime=await createExistingWebRuntime(config,{store:recoveryStore(x.values,(...args)=>onRead?.(...args)),fetch:fetcher,now:()=>x.f.now});
+  otherRuntime=await createExistingWebRuntime(config,{store:recoveryStore(new Map()),fetch:fetcher,now:()=>x.f.now});
+  await otherRuntime.connect({confirmed:true});
   const recovery=await otherRuntime.prepareRecovery();await otherRuntime.saveRecovery({operationId:recovery.operationId,confirmed:true});
   const preview=await ownerRuntime.trustPackages.prepare(x.input());await ownerRuntime.trustPackages.exportPackage(preview,{confirmed:true});
   onRead=async key=>{if(!key.endsWith(':trust-package:last-export'))return;onRead=null;await ownerRuntime.recover(recovery.code,{confirmed:true});};

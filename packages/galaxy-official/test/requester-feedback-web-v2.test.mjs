@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createServices} from '../src/services.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {requesterFeedbackPreview,submitRequesterFeedback} from '../../galaxy-web/src/requester-feedback-client.mjs';
 import {retainTaskContactAgent,taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 import {memoryAtomicUpdate} from './memory-atomic-update.mjs';
@@ -23,8 +23,8 @@ test('browser requester feedback preserves private author scope, superseded hist
    if(drop&&path.startsWith('/v2/participations/')&&payload?.payloadJson&&JSON.parse(payload.payloadJson).kind==='requester-feedback'){
     drop=false;assert.equal(response.status,200);throw Error('Synthetic lost committed feedback acknowledgement');}
    return response;};
-  const config={endpoint:f.access.endpoint,trustedKeys};runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>f.now,website:taskContactWebsite});
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
+  const config={endpoint:f.access.endpoint,trustedKeys};runtime=await createExistingWebRuntime(config,{store,fetch:wire,now:()=>f.now,website:taskContactWebsite});
+  await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
   assert.equal((await runtime.agentContinuity.status()).state,'required');
   await retainTaskContactAgent(runtime,store,f.now);
   const taskId=randomUUID(),open={taskId,operationId:randomUUID(),caseId:null,intent:'collaboration',title:'Synthetic cooperation feedback',summary:'Selected private task',workContext:{goal:'Review collaboration',currentSituation:'No failure history required',attemptRefs:[]},visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:f.now+3600};
@@ -40,7 +40,7 @@ test('browser requester feedback preserves private author scope, superseded hist
   assert.throws(()=>requesterFeedbackPreview(task,participant,f.actor.subjectId,draft),/实际确认参与/);
   await assert.rejects(submitRequesterFeedback(runtime,preview),/lost committed/);
   const saved=await runtime.getLocal('task-event:'+taskId);assert.equal(JSON.parse(saved.payloadJson).note,draft.note);assert.equal(saved.preparedConsent.intent.visibility,'Private');
-  runtime.close();runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>f.now,website:taskContactWebsite});await runtime.connect({confirmed:true});
+  runtime.close();runtime=await createExistingWebRuntime(config,{store,fetch:wire,now:()=>f.now,website:taskContactWebsite});await runtime.connect({confirmed:true});
   assert.equal((await runtime.reconcileTaskEvent(taskId)).state,'acknowledged');
   assert.equal((await f.db.query('SELECT count(*)::int AS n FROM task_events WHERE id=$1',[saved.eventId])).rows[0].n,1);
   task=await read();participant=task.participations[0];assert.equal(participant.feedback.eventId,saved.eventId);

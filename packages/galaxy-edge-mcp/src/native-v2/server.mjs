@@ -20,6 +20,7 @@ import {registerNativeTrustTools} from '../../../../integrations/native-v2/trust
 import {registerNativeIdentityGroupTools} from '../../../../integrations/native-v2/identity-group-tools.mjs';
 import {registerNativeDeviceManagementTools} from '../../../../integrations/native-v2/device-management-tools.mjs';
 import {registerNativeIdentityWebConnectTools} from '../../../../integrations/native-v2/identity-web-connect-tools.mjs';
+import {registerNativeIdentityAccountTools} from '../../../../integrations/native-v2/identity-link-tools.mjs';
 import {registerNativeCompactApps,nativeCompactUiAdvertised} from '../../../../integrations/native-v2/compact-app/server.mjs';
 import {registerNativeWorkerTools} from '../../../../integrations/native-v2/worker-tools.mjs';
 import {registerNativeCapsuleWorkTools} from '../../../../integrations/native-v2/capsule-work-tools.mjs';
@@ -81,6 +82,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
  const identityGroups=registerNativeIdentityGroupTools(server,{runtime,review:reviewOperation});
  const deviceManagement=runtime.deviceManagement?registerNativeDeviceManagementTools(server,{runtime,review:reviewOperation}):null;
  const webIdentity=runtime.prepareWebIdentityContext?registerNativeIdentityWebConnectTools(server,{runtime}):null;
+ const identityAccounts=runtime.identityAccounts?registerNativeIdentityAccountTools(server,{runtime,review:reviewOperation}):null;
  const compact=compactArtifact?registerNativeCompactApps(server,{runtime,artifact:compactArtifact,reviewAction:async({name,input,preview,context,run})=>{
   return reviewOperation(name,{...input,preview},context,run);
  }}):null;
@@ -256,7 +258,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   // continuation enqueue that reply, then drain actual transport writes.
   await new Promise(resolve=>setImmediate(resolve));
   await Promise.allSettled(outbound);
-  const released=await Promise.allSettled([deviceDrain,webIdentityDrain,...[workers,a2aWork,a2a,trust,identityGroups,compact,choice].filter(Boolean).map(owner=>Promise.resolve().then(()=>owner.close?.()))]);
+  const released=await Promise.allSettled([deviceDrain,webIdentityDrain,...[workers,a2aWork,a2a,trust,identityGroups,identityAccounts,compact,choice].filter(Boolean).map(owner=>Promise.resolve().then(()=>owner.close?.()))]);
   watchRuntimes.clear();watches.clear();hostDrivers.clear();summaries.clear();
   const errors=[...drained,...lateDrained,...hostOnlyDrained,...released].filter(result=>result.status==='rejected').map(result=>result.reason);
   if(errors.length)throw new AggregateError(errors,'native_server_cleanup_failed');

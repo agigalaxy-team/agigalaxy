@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {getCiClient,ciSourceFromEvidence} from '../../galaxy-web/src/ci-client.mjs';
 import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
 import {inspectGithubRun} from '../src/github-evidence.mjs';
@@ -18,7 +18,7 @@ test('CI browser signed workflow keeps exact operations through lost Consent and
       const response=await fetch(origin+path,options);
       if(dropConsent&&path==='/v1/consents'){dropConsent=false;assert.equal(response.status,200);throw new Error('synthetic lost Consent reply');}
       if(path===dropPath){dropPath=null;assert.equal(response.status,200);throw new Error('synthetic lost write reply');}return response;};
-    runtime=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    runtime=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId,caseId=randomUUID();
     const write=async(path,payload,action,objectId)=>runtime.api.call(path,await runtime.api.authorizePayload(payload,{action,objectId,confirmed:true}));
     const root={schemaVersion:2,kind:'case-created',eventId:caseId,caseId,expectedVersion:0,actorId:subjectId,localRef:randomUUID(),title:'PRIVATE TITLE',summary:'PRIVATE SUMMARY',source:{kind:'local',reference:randomUUID()},synthetic:true};
@@ -35,7 +35,7 @@ test('CI browser signed workflow keeps exact operations through lost Consent and
     assert.equal(ciSourceFromEvidence({...ev,referenceStatus:'superseded'}),null);
     const request={id:randomUUID(),schemaVersion:2,kind:'observe',purpose:'observe-selected-ci-source-and-prepare-bounded-proof',caseId,evidenceRef:{id:evidence.id,version:1},resultRef:{id:result.eventId,version:1},source};
     let client=getCiClient(runtime,subjectId);dropConsent=true;await assert.rejects(client.submit('request',request,{confirmed:true}),/lost Consent/);
-    const signature=(await client.local()).pending.prepared.signedIntent;runtime.close();runtime=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});client=getCiClient(runtime,subjectId);
+    const signature=(await client.local()).pending.prepared.signedIntent;runtime.close();runtime=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});client=getCiClient(runtime,subjectId);
     dropPath='/v2/ci/requests';await assert.rejects(client.reconcile({retry:true,confirmed:true}),/lost write/);
     assert.equal((await client.local()).pending.prepared.signedIntent,signature);assert.equal((await client.reconcile()).state,'recorded');
     assert.equal((await client.local()).requests.length,1);

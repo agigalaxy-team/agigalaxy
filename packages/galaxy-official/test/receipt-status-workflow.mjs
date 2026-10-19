@@ -9,7 +9,7 @@ import { createReceiptStatusClient, createReceiptStatusDeviceSigner } from '../s
 import { choicePutIntent } from '../src/shared/choice-snapshot-schema-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import { createHelpSearchClient } from '../../galaxy-web/src/help-search-client.mjs';
 import { createChoiceSyncClient } from '../../galaxy-web/src/choice-sync-client.mjs';
 
@@ -47,9 +47,9 @@ export async function receiptStatusFixture({ database = null, migrateDatabase = 
       if (drop && path === '/v2/choice-snapshots/put') { drop = false; throw new Error('synthetic committed lost ACK'); }
       return response;
     };
-    runtime = await createWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, { now: () => current, fetch: transport,
+    runtime = await createExistingWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, { now: () => current, fetch: transport,
       store: { get: async key => data.get(key), put: async (key, value) => data.set(key, value),update:memoryAtomicUpdate(data) } });
-    await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
+    await runtime.connect({ confirmed: true });
     const identity = (await runtime.status()).identity;
     const material = data.get(`device:${identity.subjectId}:${identity.deviceId}`);
     const publicState = await runtime.publicControl(identity.subjectId);

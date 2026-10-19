@@ -1,0 +1,17 @@
+Galaxy authentication theme
+
+src/head.ftl is derived from the Keycloak 26.7.3 login template:
+https://github.com/keycloak/keycloak/blob/26.7.3/themes/src/main/resources/theme/base/login/template.ftl
+Copyright and license: Keycloak contributors, Apache License 2.0.
+The bundled license is licenses/KEYCLOAK-APACHE-2.0.txt.
+
+Modified for Galaxy on 2026-10-15: custom shared page shell, message-based title,
+original Galaxy favicon, plain language links, and removal of the locale dropdown.
+The original session-checking and authentication-support scripts are retained.
+
+The generated login template combines this head with Galaxy layout and form
+presentation. Unmodified form templates and their resources are inherited from
+the installed Keycloak parent theme and are not vendored by this package.
+
+Galaxy's original orbit mark is copied from the current Galaxy source asset.
+This notice does not grant rights to third-party trademarks.

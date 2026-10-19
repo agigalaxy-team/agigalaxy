@@ -4,7 +4,7 @@ import {generateKeyPairSync,randomUUID} from 'node:crypto';
 import {createServices} from '../src/services.mjs';
 import {createApi} from '../src/http.mjs';
 import {serviceFixture} from './service-fixture.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createGalaxyGenesis} from '../../galaxy-core/src/galaxy-guid.mjs';
 import {createRetirementController} from '../src/retirement.mjs';
@@ -37,19 +37,19 @@ test('existing browser control reconnects for bounded takeout and incident withd
       if(dropDeletion&&path==='/v1/deletion-requests/submit'){dropDeletion=false;assert.equal(response.status,200);throw new Error('lost deletion acknowledgement');}
       return response;
     };
-    const disk=store();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    const disk=store();runtime=await createExistingWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
+    await runtime.connect({confirmed:true});
     await retainTaskContactAgent(runtime,disk,at);
     const subjectId=(await runtime.status()).identity.subjectId;
     await assert.rejects(runtime.publishTask({title:'退役取回夹具',summary:'本人私有任务',intent:'collaboration',
       workContext:{goal:'验证退出',currentSituation:'没有失败尝试',attemptRefs:[]},visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:base+86400},{confirmed:true}),/lost committed/);
     const saved=await runtime.getLocal('task-publication'),taskId=saved.payload.taskId,consentId=saved.preparedConsent.intent.id;
-    other=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>at,website:origin});await other.createIdentity({confirmed:true});await other.connect({confirmed:true});
+    other=await createExistingWebRuntime(config,{store:store(),fetch:wire,now:()=>at,website:origin});await other.connect({confirmed:true});
     const strangerKeys=generateKeyPairSync('ed25519'),stranger=createGalaxyGenesis({publicKeyPem:strangerKeys.publicKey.export({type:'spki',format:'pem'}),originCode:'5'});
     const enrollment={subjectId:stranger.id,genesisProof:stranger.genesisProof,installationId:randomUUID(),scopes:['binding']};
 
     at=policy.stopWritesAt;
-    runtime.close();runtime=await createWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
+    runtime.close();runtime=await createExistingWebRuntime(config,{store:disk,fetch:wire,now:()=>at,website:origin});
     await runtime.connect({confirmed:true});assert.equal((await runtime.status()).connection.subjectId,subjectId);
     const consent=await runtime.api.reconcileAuthorization(saved.preparedConsent);assert.equal(consent.state,'acknowledged');
     const restored=await runtime.reconcilePublication();assert.equal(restored.taskId,taskId);assert.equal(restored.state,'acknowledged');

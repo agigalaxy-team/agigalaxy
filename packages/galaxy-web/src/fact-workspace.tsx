@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { CiWorkspace } from './ci-workspace';
 import {ConfigurationPicker} from './configuration-picker';
 import {InterventionOpinions, ResolutionStatus} from './fact-presentation';
 import {MemberAvatar,MemberLink,memberName,useMemberNames} from './conversation-ui';
-import {Plus,ArrowRight,ArrowLeft,X} from 'lucide-react';
+import {Plus, X} from 'lucide-react';
 import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operations';
 import {errorField,readOperationReceipt} from './task-operation-state';
 import {readWorkCompose,requireWorkCompose,readWorkRecordLocators,recordText,isWorkRecordView,isWorkEvidence,readQueuedParticipation,workFormBlank as blank} from './work-fact-types';
@@ -133,7 +134,7 @@ function ReceiptRecoverySession({runtime,subjectId,taskId,lease}:RecoveryProps&{
  return <section className="message" aria-label="上次提交"><h2>上次提交</h2>
   {loading&&<p><output>正在确认…</output></p>}{error&&<p className="message error" role="alert">{error}</p>}
   {receipt&&<p><output>{receiptMessages[receipt.state??'']??receiptMessages['result-unknown']}</output></p>}
-  {locator&&<details><summary>查看原操作编号与载荷摘要</summary><p>原操作：<code style={{overflowWrap:'anywhere'}}>{locator.operationId}</code></p><p>原载荷摘要：<code style={{overflowWrap:'anywhere'}}>{locator.payloadHash}</code></p></details>}
+  {locator&&<ReadingDetails><ReadingSummary>查看原操作编号与载荷摘要</ReadingSummary><p>原操作：<code style={{overflowWrap:'anywhere'}}>{locator.operationId}</code></p><p>原载荷摘要：<code style={{overflowWrap:'anywhere'}}>{locator.payloadHash}</code></p></ReadingDetails>}
   {error&&<Button type="button" variant="outline" disabled={loading||busy} onClick={()=>void query()}>再试一次</Button>}
  </section>;
 }
@@ -778,7 +779,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
     if(item.actorId!==subjectId||item.participationId!==(participant?.participationId??null))return null;
     const latest=results.find(result=>result.id===item.id),delivered=participant?.deliveries?.some(delivery=>delivery.resultRef?.id===item.id&&delivery.resultRef.version===item.version),canShare=participant&&eligibleResults.some(result=>refsKey(result)===refsKey(item));
     if(latest?.version!==item.version)return null;
-    return <footer className="result-actions">{canShare&&!delivered?<><Button disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>void run(()=>sendResult(item))}>交给发起者<ArrowRight size={14}/></Button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('deliver',undefined,{resultChoice:refsKey(item)})}>补充说明或资料后再分享</button><p className="permission-line">将这份结果和已附来源分享给发起者。</p></>:delivered?<p className="muted">这份结果已分享给发起者。</p>:null}<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',item)}>更正结果</button></footer>;
+    return <footer className="result-actions">{canShare&&!delivered?<><Button disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>void run(()=>sendResult(item))}>交给发起者</Button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('deliver',undefined,{resultChoice:refsKey(item)})}>补充说明或资料后再分享</button><p className="permission-line">将这份结果和已附来源分享给发起者。</p></>:delivered?<p className="muted">这份结果已分享给发起者。</p>:null}<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',item)}>更正结果</button></footer>;
   }
   const field = (
     title: string,
@@ -833,7 +834,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
   if (!connected || task.schemaVersion !== 2) return null;
   return (
     <section className={'work-facts'+(resultDetail?' is-result-detail':'')}>
-      <header className="work-facts-heading">{resultDetail?<><button className="text-action" onClick={()=>navigate(taskResultReturn(task.taskId,resultSelection.deliveryId))}><ArrowLeft size={15}/>{resultSelection.deliveryId?'返回原交付':'返回结果列表'}</button><h1 className="small">工作结果</h1></>:<h2>工作记录</h2>}</header>
+      <header className="work-facts-heading">{resultDetail?<><button className="text-action" onClick={()=>navigate(taskResultReturn(task.taskId,resultSelection.deliveryId))}>{resultSelection.deliveryId?'返回原交付':'返回结果列表'}</button><h1 className="small">工作结果</h1></>:<h2>工作记录</h2>}</header>
       {!action&&composeDrafts.map(saved=><WorkComposeCard key={saved.revision??saved.value.kind} saved={saved} busy={busy} pending={!!pending} sourceUnavailable={!!task.caseId&&!facts} composeError={composeError} onResume={resumeCompose} onDiscard={discardSavedCompose}/>)}
       {composeError&&!action&&<p role="alert" className="message error">{composeError}</p>}
       {error && (
@@ -857,7 +858,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
         <h3>继续发送这份原内容</h3>
         <p className="permission-line">仅本人{retryPreview.value.viewers.length?'和 '+retryPreview.value.viewers.map(person).join('、'):''}可读。</p>
         {retryPreview.value.items.map(item=><OriginalContent key={item.objectId} item={item}/>)}
-        <details className="source-locator"><summary>服务与原操作信息</summary><dl><dt>服务</dt><dd>{retryPreview.value.endpoint}</dd><dt>原操作</dt><dd>{retryPreview.value.operationId}</dd><dt>内容校验值</dt><dd>{retryPreview.value.payloadHash}</dd></dl></details>
+        <ReadingDetails className="source-locator"><ReadingSummary>服务与原操作信息</ReadingSummary><dl><dt>服务</dt><dd>{retryPreview.value.endpoint}</dd><dt>原操作</dt><dd>{retryPreview.value.operationId}</dd><dt>内容校验值</dt><dd>{retryPreview.value.payloadHash}</dd></dl></ReadingDetails>
         <div className="button-row">
           <Button disabled={busy} onClick={() => run(confirmOriginalRetry)}>按此范围继续发送</Button>
           <Button variant="outline" disabled={busy} onClick={() => { setRetryPreview(null); }}>暂不发送</Button>
@@ -907,15 +908,15 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
           <header><MemberAvatar subjectId={item.actorId}/><div><MemberLink subjectId={item.actorId} ownId={subjectId} name={memberNames[item.actorId]??undefined} navigate={navigate}/><span>{attemptStates[item.status]??'尝试'}</span></div></header>
           <p className="reading-prose work-entry-body">{item.strategy}</p>
           {item.summary?<div className="work-observation"><small>记录到的实际观察</small><p className="reading-prose">{item.summary}</p></div>:<p className="muted">这条尝试尚未记录实际观察。</p>}
-          <details className="work-context"><summary>输入与工作环境</summary>{item.inputScopeSummary&&<p className="reading-prose">{item.inputScopeSummary}</p>}{typeof item.environment==='object'&&<p>{item.environment.name==='unknown'?'环境未提供':item.environment.name}{item.environment.version&&item.environment.version!=='unknown'?' · '+item.environment.version:''}</p>}{item.configurationCondition&&<p>{item.configurationCondition.record?item.configurationCondition.record.title+' · 第 '+item.configurationCondition.version+' 版':item.configurationCondition.sourceStatus==='not-recorded'?'当时未记录配置，具体条件仍未知。':item.configurationCondition.sourceStatus==='revoked'?'当时的配置已撤回，详情当前不可读。':'配置详情当前不可读。'}</p>}{!!item.permissionScope?.length&&<p>操作范围：{item.permissionScope.join('；')}</p>}</details>
-          <footer>{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose(item.status==='running'?'attempt-end':'attempt-correct',item)}>{item.status==='running'?'写下尝试结果':'更正记录'}</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果<ArrowRight size={14}/></button></>}<details className="work-record-file"><summary>记录信息</summary><p>第 {item.version} 版</p><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></details></footer>
+          <ReadingDetails className="work-context"><ReadingSummary>输入与工作环境</ReadingSummary>{item.inputScopeSummary&&<p className="reading-prose">{item.inputScopeSummary}</p>}{typeof item.environment==='object'&&<p>{item.environment.name==='unknown'?'环境未提供':item.environment.name}{item.environment.version&&item.environment.version!=='unknown'?' · '+item.environment.version:''}</p>}{item.configurationCondition&&<p>{item.configurationCondition.record?item.configurationCondition.record.title+' · 第 '+item.configurationCondition.version+' 版':item.configurationCondition.sourceStatus==='not-recorded'?'当时未记录配置，具体条件仍未知。':item.configurationCondition.sourceStatus==='revoked'?'当时的配置已撤回，详情当前不可读。':'配置详情当前不可读。'}</p>}{!!item.permissionScope?.length&&<p>操作范围：{item.permissionScope.join('；')}</p>}</ReadingDetails>
+          <footer>{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose(item.status==='running'?'attempt-end':'attempt-correct',item)}>{item.status==='running'?'写下尝试结果':'更正记录'}</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果</button></>}<ReadingDetails className="work-record-file"><ReadingSummary>记录信息</ReadingSummary><p>第 {item.version} 版</p><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></ReadingDetails></footer>
         </article>)}
         {interventions.map(item=><article className="work-entry" key={refsKey(item)}>
           <header><MemberAvatar subjectId={item.actorId}/><div><MemberLink subjectId={item.actorId} ownId={subjectId} name={memberNames[item.actorId]??undefined} navigate={navigate}/><span>{item.types.map((x:string)=>names[x]??x).join('、')} · 本人记录</span></div></header>
           <p className="reading-prose work-entry-body">{item.description}</p>
           {item.observedEffect&&<div className="work-observation"><small>观察到的作用</small><p className="reading-prose">{item.observedEffect}</p></div>}
           {((item.responses?.length??0)>0||item.responseCoverage?.complete===false)&&<InterventionOpinions intervention={item} subjectId={subjectId} names={memberNames}/>}
-          <footer>{(requester||own.length>0)&&item.actorId!==subjectId&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention-response',item)}>回应</button>}{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention',item)}>更正记录</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果<ArrowRight size={14}/></button></>}<details className="work-record-file"><summary>记录信息</summary><p>第 {item.version} 版</p>{item.actorId===subjectId&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention-response',item)}>补充本人意见</button>}<button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></details></footer>
+          <footer>{(requester||own.length>0)&&item.actorId!==subjectId&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention-response',item)}>回应</button>}{item.actorId===subjectId&&item.participationId===(participant?.participationId??null)&&<><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention',item)}>更正记录</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('result-recorded',undefined,{sourceChoice:refsKey(item)})}>补充结果</button></>}<ReadingDetails className="work-record-file"><ReadingSummary>记录信息</ReadingSummary><p>第 {item.version} 版</p>{item.actorId===subjectId&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('intervention-response',item)}>补充本人意见</button>}<button className="text-action" onClick={()=>downloadRecord(item)}>保存记录文件</button></ReadingDetails></footer>
         </article>)}
         {!attempts.length&&!interventions.length&&<p className="empty-state">还没有可读的工作内容。</p>}
       </div>}
@@ -925,15 +926,15 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
           <header><MemberAvatar subjectId={item.actorId}/><div><strong title={item.actorId}>{person(item.actorId)}</strong><span>{outcomes[item.reportedOutcome]??'结果'} · 本人记录</span></div></header>
           <p className="reading-prose work-entry-body">{item.summary}</p>
           {item.limitations&&<div className="work-observation"><small>适用范围与未完成的部分</small><p className="reading-prose">{item.limitations}</p></div>}
-          <details className="work-context"><summary>这份结果来自哪项工作</summary><p className="reading-prose">{origin?.description??origin?.strategy??'该版本的来源正文当前不可读。'}</p><small>来源第 {item.origin.version} 版 · 结果第 {item.version} 版</small><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录与来源编号</button></details>
-          <button className="text-action" onClick={()=>navigate(taskResultPath(task.taskId,item))}>打开完整结果<ArrowRight size={14}/></button>{resultActions(item)}
+          <ReadingDetails className="work-context"><ReadingSummary>这份结果来自哪项工作</ReadingSummary><p className="reading-prose">{origin?.description??origin?.strategy??'该版本的来源正文当前不可读。'}</p><small>来源第 {item.origin.version} 版 · 结果第 {item.version} 版</small><button className="text-action" onClick={()=>downloadRecord(item)}>保存记录与来源编号</button></ReadingDetails>
+          <button className="text-action" onClick={()=>navigate(taskResultPath(task.taskId,item))}>打开完整结果</button>{resultActions(item)}
         </article>;})}
         {!results.length&&<p className="empty-state">还没有可读的结果。{!ownOrigins.length&&'先在“做过的事”写下实际工作，再补充由此得到的结果。'}</p>}
         {(facts.resolution?.status&&facts.resolution.status!=='unrecorded'||requester)&&<section className="work-resolution"><h3>问题解决了吗</h3><ResolutionStatus resolution={facts.resolution} resolutions={facts.resolutions}/>{requester&&<button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>{setParticipationId('');choose('resolution-recorded');}}>说明解决情况</button>}</section>}
       </div>}
       {workView==='evidence'&&task.caseId && (
-        <details className="room-settings">
-          <summary>读取获知的证据或检查记录</summary>
+        <ReadingDetails mode="inline" className="room-settings">
+          <ReadingSummary>读取获知的证据或检查记录</ReadingSummary>
           <form
             className="search-row"
             onSubmit={(e) => {
@@ -973,14 +974,14 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
               打开记录
             </Button>
           </form>
-        </details>
+        </ReadingDetails>
       )}
       {workView==='evidence'&&sourceError&&<p className="message"><output>{sourceError}</output> <button className="text-action" disabled={busy} onClick={()=>void run(()=>load())}>再试一次</button></p>}
       {workView==='evidence'&&<div className="work-reading-list">{records.map(item=><article className="work-entry" key={item.type+item.id}>
         <header><MemberAvatar subjectId={item.record?.reportedBy}/><div><strong>{person(item.record?.reportedBy)}</strong><span>{item.type==='evidence'?'来源':'检查或反馈'}{item.referenceStatus!=='current'?' · '+(observationNames[item.referenceStatus]??'状态待核对'):''}</span></div></header>
         <p className="reading-prose work-entry-body">{item.record?.summary??'这份记录的正文当前不可读。'}</p>
         {item.record&&<><p className="work-record-meta">{methods[item.record.method??'']??(item.type==='evidence'?item.record.source?.originSystem:'')} {observationNames[item.record.observation??item.record.reportedSourceState??'']??''}</p>{item.record.scope&&<p className="reading-prose">{item.record.scope}</p>}
-          <details className="work-context"><summary>{item.type==='evidence'?'来源详情':'检查条件'}</summary>{item.record.source&&<dl><dt>来源</dt><dd>{item.record.source.originSystem}</dd><dt>发布者</dt><dd>{item.record.source.issuer}</dd><dt>内容版本</dt><dd>{item.record.source.contentVersion}</dd>{item.record.source.uri&&<><dt>原链接</dt><dd>{item.record.source.uri}</dd></>}</dl>}{item.record.conditions&&<><p className="reading-prose">{item.record.conditions.environment}</p><p className="reading-prose">{item.record.conditions.commandOrMethod}</p></>}<button className="text-action" onClick={()=>downloadRecord(item)}>保存完整记录</button></details>
+          <ReadingDetails className="work-context"><ReadingSummary>{item.type==='evidence'?'来源详情':'检查条件'}</ReadingSummary>{item.record.source&&<dl><dt>来源</dt><dd>{item.record.source.originSystem}</dd><dt>发布者</dt><dd>{item.record.source.issuer}</dd><dt>内容版本</dt><dd>{item.record.source.contentVersion}</dd>{item.record.source.uri&&<><dt>原链接</dt><dd>{item.record.source.uri}</dd></>}</dl>}{item.record.conditions&&<><p className="reading-prose">{item.record.conditions.environment}</p><p className="reading-prose">{item.record.conditions.commandOrMethod}</p></>}<button className="text-action" onClick={()=>downloadRecord(item)}>保存完整记录</button></ReadingDetails>
           {isWorkRecordView(item)&&item.record.reportedBy===subjectId&&item.currentState==='active'&&<footer><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose(item.type,item)}>更正记录</button><button className="text-action" disabled={busy||!!pending||hasSavedDraft||!composeReady} onClick={()=>choose('revoke',item)}>撤回</button></footer>}
         </>}
       </article>)}</div>}
@@ -1501,7 +1502,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
               这份交付记录仅交给请求者。所引工作与证据分别沿用各作者原先授权，不扩大其他参与者权限。
             </p>
           ) : (
-            <details className="work-scope-choice"><summary>{viewers.length?person(subjectId)+"和 "+viewers.map(person).join("、")+"可读":"仅自己可读"} · 调整</summary><fieldset>
+            <ReadingDetails mode="inline" className="work-scope-choice"><ReadingSummary>{viewers.length?person(subjectId)+"和 "+viewers.map(person).join("、")+"可读":"仅自己可读"} · 调整</ReadingSummary><fieldset>
               <legend>谁可以阅读这条记录？</legend>
               {[
                 ...new Set([
@@ -1529,7 +1530,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
                       : ''}
                   </label>
                 ))}
-            </fieldset></details>
+            </fieldset></ReadingDetails>
           )}
           </fieldset>
           <div className="button-row">

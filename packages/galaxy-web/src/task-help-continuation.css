@@ -93,10 +93,10 @@
 .galaxy-site .request-source-error p{margin:0 0 7px}
 .galaxy-site .request-origin-missing{padding:10px 0;color:#91717b}
 .galaxy-site .request-origin-missing p{font-size:12px;line-height:1.75;margin:0}
-.galaxy-site .request-origin-missing details{font-size:11px;margin-top:7px}
+.galaxy-site .request-origin-missing :is(.reading-detail-entry,.reading-section){font-size:11px;margin-top:7px}
 .galaxy-site .request-origin-missing code{overflow-wrap:anywhere}
 .galaxy-site .request-help-reference{margin:12px 0 0;font-size:12px;color:#94849e}
-.galaxy-site .request-help-reference>summary{cursor:pointer;padding:5px 0;min-height:28px}
+.galaxy-site .request-help-reference>.reading-detail-link{cursor:pointer;padding:5px 0;min-height:28px}
 .galaxy-site .request-help-reference dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;margin:10px 0 0}
 .galaxy-site .request-help-reference dt{color:#9a8ba4}
 .galaxy-site .request-help-reference dd{margin:0;min-width:0;font-size:11px;line-height:1.8}
@@ -110,7 +110,7 @@
 .galaxy-site .request-compose-page .request-help-search>label{flex:1;min-width:0;display:grid;gap:7px;margin:0;font-size:12px}
 .galaxy-site .request-help-search>button{height:43px;min-width:68px}
 .galaxy-site .request-help-directions{margin:12px 0 18px;font-size:12px;color:#97879f}
-.galaxy-site .request-help-directions>summary{padding:5px 0;cursor:pointer;min-height:28px}
+.galaxy-site .request-help-directions>.reading-detail-link{padding:5px 0;cursor:pointer;min-height:28px}
 .galaxy-site .request-compose-page .request-help-directions>label{margin:12px 0 0;display:grid;gap:7px;font-size:12px}
 .galaxy-site .request-help-results{min-width:0;margin-top:16px}
 .galaxy-site .request-help-people{border-top:1px solid var(--g-line);margin-top:14px}
@@ -129,7 +129,7 @@
 .galaxy-site .request-help-source h5{font-size:12px;font-weight:500;margin:14px 0 4px}
 .galaxy-site .request-help-locator{font-size:11px;line-height:1.8;margin:10px 0 0;overflow-wrap:anywhere}
 .galaxy-site .request-help-other-sources{margin:12px 0 0 62px;font-size:12px;color:#9983a7}
-.galaxy-site .request-help-other-sources>summary{cursor:pointer;min-height:28px;padding:5px 0}
+.galaxy-site .request-help-other-sources>.reading-detail-link{cursor:pointer;min-height:28px;padding:5px 0}
 .galaxy-site .request-help-other-sources .request-help-source{margin-left:0;padding-top:10px;border-top:1px solid #eee8f2}
 .galaxy-site .request-help-person>.request-help-note{margin:12px 0 0 62px}
 .galaxy-site .request-help-unavailable{padding:15px 0;font-size:12px;line-height:1.8;color:#958194}
@@ -143,7 +143,7 @@
 .galaxy-site .request-selected-attempts article>header>span{font-size:12px;color:#82708d}
 .galaxy-site .request-selected-attempts h3{font-size:14px;margin:20px 0 7px}
 .galaxy-site .request-selected-attempts p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9}
-.galaxy-site .request-selected-attempts details{margin-top:14px}
+.galaxy-site .request-selected-attempts :is(.reading-detail-entry,.reading-section){margin-top:14px}
 @media(max-width:600px){
  .galaxy-site .request-work-origin{padding-top:16px}
  .galaxy-site .request-work-origin>header{gap:10px;margin-bottom:12px}
@@ -158,7 +158,7 @@
  .galaxy-site .request-help-search>button{min-width:62px}
  .galaxy-site .request-help-source,.galaxy-site .request-help-other-sources,.galaxy-site .request-help-person>.request-help-note{margin-left:28px}
  .galaxy-site .request-help-source h4{font-size:13px}
- .galaxy-site .request-help-reference>summary,.galaxy-site .request-help-other-sources>summary,.galaxy-site .request-help-directions>summary{min-height:34px;padding:7px 0}
+ .galaxy-site .request-help-reference>.reading-detail-link,.galaxy-site .request-help-other-sources>.reading-detail-link,.galaxy-site .request-help-directions>.reading-detail-link{min-height:34px;padding:7px 0}
  .galaxy-site .request-source-error button,.galaxy-site .request-help-unavailable button{min-height:40px}
  .galaxy-site .request-origin-return{display:block}
  .galaxy-site .request-origin-return>span{display:block;font-size:11px;margin-top:3px}

@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
 
 test('a current Task discovers an unreferenced same-Case source without a local catalog and rereads its real permission',{timeout:60000},async()=>{
@@ -14,10 +14,10 @@ test('a current Task discovers an unreferenced same-Case source without a local 
   update:async(key,change)=>{const value=change(structuredClone(data.get(key)));data.set(key,structuredClone(value));return structuredClone(value);}};
  try{
   await new Promise(done=>api.listen(0,'127.0.0.1',done));const origin='http://127.0.0.1:'+api.address().port;
-  runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,fetch:async(url,options)=>{
+  runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,fetch:async(url,options)=>{
    const target=new URL(url);if(['/v1/consents','/v2/cases/events','/v2/verification-records/submit','/v2/tasks'].includes(target.pathname))writes.push(target.pathname);
    return fetch(origin+target.pathname+target.search,options);}});
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
+  await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
   const task={operationId:randomUUID(),taskId:randomUUID(),caseId:null,intent:'collaboration',title:'[synthetic] Unreferenced source discovery',summary:'Private isolated read scenario',
    workContext:{goal:'Read existing sources across devices',currentSituation:'No local source index',attemptRefs:[]},visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:f.now+3600};
   const write=async(path,payload,action,objectId)=>{const envelope=await runtime.api.authorizePayload(payload,{action,objectId,visibility:'Private',confirmed:true});await runtime.api.call(path,envelope);return envelope;};

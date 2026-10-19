@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import { createRecoveryMaterial } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
@@ -50,24 +50,27 @@ export async function privacyConsumerFixture() {
     const response = await fetch(local + path, options); await wireHooks.after?.(path, response); return response;
   };
   const makeRuntime = async journal => {
-    const runtime = await createWebRuntime(config, { store: journal.store, fetch: wire, now: () => at }); clients.push(runtime); return runtime;
+    const runtime = await createExistingWebRuntime(config, { store: journal.store, fetch: wire, now: () => at }); clients.push(runtime); return runtime;
   };
+  const close = async () => { clients.forEach(client => client.close()); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close(); };
+  try {
   const journal = memoryStore(), runtime = await makeRuntime(journal);
-  await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
+  await runtime.connect({ confirmed: true });
   const originalOwner = (await runtime.status()).identity, original = runtime.api.snapshot(), id = randomUUID(), marker = 'SYNTHETIC_PRIVATE_EXPORT_' + id;
   const root = { id, kind: 'case', localRef: randomUUID(), title: 'Synthetic privacy continuity', summary: marker,
     source: { kind: 'local', reference: randomUUID() }, participants: [{ subjectId: original.subjectId, role: 'requester' }] };
   await runtime.api.call('/v1/cases', await runtime.api.authorizePayload(root, { action: 'case.teaser.publish', objectId: id, confirmed: true }));
   const prefix = `galaxy-web:${config.endpoint}:`, localKey = (name, subjectId = original.subjectId) => prefix + subjectId + ':' + name;
   return { f, services, runtime, journal, requests, wireHooks, originalOwner, original, marker, localKey, now: () => at, setTime: time => { at = time; },
-    async makeOther() { const saved = memoryStore(), other = await makeRuntime(saved); await other.createIdentity({ confirmed: true }); await other.connect({ confirmed: true }); return { runtime: other, journal: saved }; },
+    async makeOther() { const saved = memoryStore(), other = await makeRuntime(saved); await other.connect({ confirmed: true }); return { runtime: other, journal: saved }; },
     async createExport(datasets = ['case-events']) {
       const ticket = await runtime.privacy.createExport({ datasets }, { confirmed: true });
       if (datasets.includes('case-events')) assert.ok(JSON.stringify(await runtime.privacy.exportPage({ id: ticket.id, dataset: 'case-events' })).includes(marker));
       return ticket;
     },
-    async close() { clients.forEach(client => client.close()); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close(); },
+    close,
   };
+  } catch (error) { await close(); throw error; }
 }
 
 const intent = { action: 'request', scope: 'all-owned-service-data', reason: 'privacy', takeout: 'not-needed' };

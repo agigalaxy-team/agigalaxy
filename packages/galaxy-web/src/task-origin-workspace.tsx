@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useEffect,useId,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
@@ -64,8 +65,8 @@ function TaskOriginPickerSession({runtime,connected,locator,selection,busy,sourc
     })}
     {!attempts.length&&<p className="request-help-note">这里还没有可选的尝试，可以只关联原工作。</p>}
    </fieldset>}
-   {missing.map(ref=><div className="request-origin-missing" key={refKey(ref)}><p>此前选定的一条尝试目前不可读，原选择仍保留。</p><button type="button" className="text-action" disabled={busy} onClick={()=>remove(ref)}>不再引用这条尝试</button><details><summary>原选定记录</summary><code>{ref.id}</code><span> · 版本 {ref.version}</span></details></div>)}
-   <details className="request-help-reference"><summary>准确来源引用</summary><dl><dt>原工作</dt><dd><code>{selection.taskId}</code>{view&&<> · 当前修订 {view.task.version}</>}</dd>{selection.caseId&&<><dt>工作记录</dt><dd><code>{selection.caseId}</code></dd></>}{selection.attemptRefs.length>0&&<><dt>选定尝试</dt><dd>{selection.attemptRefs.map(ref=><p key={refKey(ref)}><code>{ref.id}</code> · 版本 {ref.version}</p>)}</dd></>}</dl></details>
+   {missing.map(ref=><div className="request-origin-missing" key={refKey(ref)}><p>此前选定的一条尝试目前不可读，原选择仍保留。</p><button type="button" className="text-action" disabled={busy} onClick={()=>remove(ref)}>不再引用这条尝试</button><ReadingDetails><ReadingSummary>原选定记录</ReadingSummary><code>{ref.id}</code><span> · 版本 {ref.version}</span></ReadingDetails></div>)}
+   <ReadingDetails className="request-help-reference"><ReadingSummary>准确来源引用</ReadingSummary><dl><dt>原工作</dt><dd><code>{selection.taskId}</code>{view&&<> · 当前修订 {view.task.version}</>}</dd>{selection.caseId&&<><dt>工作记录</dt><dd><code>{selection.caseId}</code></dd></>}{selection.attemptRefs.length>0&&<><dt>选定尝试</dt><dd>{selection.attemptRefs.map(ref=><p key={refKey(ref)}><code>{ref.id}</code> · 版本 {ref.version}</p>)}</dd></>}</dl></ReadingDetails>
   </>}
  </section>;
 }

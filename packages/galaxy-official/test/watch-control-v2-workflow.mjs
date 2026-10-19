@@ -5,7 +5,7 @@ import {digest} from '../src/shared/digest.mjs';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createBrowserClient,browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch.mjs';
 import {createNativeWatchHandoff} from '../../galaxy-edge-mcp/src/native-v2/watch-handoff.mjs';
 import {transaction} from '../src/database.mjs';
@@ -42,8 +42,8 @@ export async function verifyWatchControlV2({database=null,adminDatabase=database
     controllerSignature:await f.signForTest(challenge.challenge,'galaxy-identity-control-v2+jws'),newDeviceProof:await d.sign(challenge.challenge,'galaxy-identity-control-v2+jws')});
    const client=createBrowserClient({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys,sign:d.sign,now:()=>f.now,fetch:fetcher});
    await client.connect({subjectId:f.genesis.id,genesisProof:f.genesis.genesisProof,control:{deviceId:d.deviceId,keyId:digest(d.publicKeyPem),epoch:1},installationId:randomUUID(),scopes:browserScopes},{confirmed:true});clients.push(client);}
-  const[a,b,c]=clients;outsider=await createWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:memoryStore(),fetch:fetcher,now:()=>f.now});
-  await outsider.createIdentity({confirmed:true});await outsider.connect({confirmed:true});const peer=(await outsider.status()).identity.subjectId;
+  const[a,b,c]=clients;outsider=await createExistingWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:memoryStore(),fetch:fetcher,now:()=>f.now});
+  await outsider.connect({confirmed:true});const peer=(await outsider.status()).identity.subjectId;
   const room=await a.call('/v2/chat/rooms/create',{roomId:randomUUID(),operationId:randomUUID(),title:'Synthetic transferred watch'});
   const invite=await a.call(`/v2/chat/rooms/${room.roomId}/propose`,{decisionId:randomUUID(),expectedRevision:room.revision,action:'invite',targetSubjectId:peer});
   await outsider.api.call(`/v2/chat/rooms/${room.roomId}/accept`,{decisionId:invite.decisionId,accept:true});

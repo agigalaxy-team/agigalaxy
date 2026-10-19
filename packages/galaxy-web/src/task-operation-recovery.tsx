@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useCallback,useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {X} from 'lucide-react';
@@ -11,7 +12,7 @@ type Props={runtime:OperationRuntime;connected:boolean;taskId?:string|null;manag
 
 function SubmittedContent({value,material,clock}:{value:OperationAuthorizationPreview;material:PublicationMaterialRead|null;clock:number}){
  const body=submittedContent(value.payload,material?.materialBodies,material?.materialStates,clock);
- return <div className="submitted-content"><h3>{actions[body.kind]??'继续上次提交'}</h3>{body.texts.map((text,index)=><p className="reading-prose" key={index}>{text}</p>)}<dl><dt>可见范围</dt><dd>{value.visibility==='Public'?'公开':value.viewers.length?value.viewers.map(id=>memberName(id)).join('、'):'仅自己'}</dd><dt>本次授权至</dt><dd>{readableTime(value.expiresAt)}</dd>{body.enrollmentExpiresAt!==null&&<><dt>征集截止</dt><dd>{readableTime(body.enrollmentExpiresAt)}</dd></>}{body.expiresAt!==null&&<><dt>原内容有效至</dt><dd>{readableTime(body.expiresAt)}</dd></>}</dl><details className="technical-details"><summary>原提交的准确内容与引用</summary><pre className="code-block">{JSON.stringify(value.payload,null,2)}</pre></details></div>;
+ return <div className="submitted-content"><h3>{actions[body.kind]??'继续上次提交'}</h3>{body.texts.map((text,index)=><p className="reading-prose" key={index}>{text}</p>)}<dl><dt>可见范围</dt><dd>{value.visibility==='Public'?'公开':value.viewers.length?value.viewers.map(id=>memberName(id)).join('、'):'仅自己'}</dd><dt>本次授权至</dt><dd>{readableTime(value.expiresAt)}</dd>{body.enrollmentExpiresAt!==null&&<><dt>征集截止</dt><dd>{readableTime(body.enrollmentExpiresAt)}</dd></>}{body.expiresAt!==null&&<><dt>原内容有效至</dt><dd>{readableTime(body.expiresAt)}</dd></>}</dl><ReadingDetails className="technical-details"><ReadingSummary>原提交的准确内容与引用</ReadingSummary><pre className="code-block">{JSON.stringify(value.payload,null,2)}</pre></ReadingDetails></div>;
 }
 export function TaskOperationRecovery(props:Props){
  const {runtime,connected,taskId=null,managedFeedback=false}=props;

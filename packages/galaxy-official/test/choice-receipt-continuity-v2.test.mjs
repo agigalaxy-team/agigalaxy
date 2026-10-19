@@ -7,7 +7,7 @@ import {browserScopes} from '../src/browser-client.mjs';
 import {choiceReceiptResultSchema,choicePutIntent} from '../src/shared/choice-snapshot-schema-v2.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import canonicalize from 'canonicalize';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
 import {createRetirementController} from '../src/retirement.mjs';
@@ -27,7 +27,7 @@ async function fixture({retiring=false}={}){
    localRef:randomUUID(),title:'Receipt choice source',summary:'Synthetic selected public source',synthetic:true,source:{kind:'local',reference:randomUUID()}};
   const grant=await f.authorize(payload,'case.teaser.publish',{objectId:id,visibility:'Public',purpose:'public-profile'});await f.cases.submitV2(f.actor,grant);
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-  runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
+  runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
    store:{get:async k=>{const v=structuredClone(data.get(k));if(onGet)await onGet(k,v);return v;},
     put:async(k,v)=>{data.set(k,structuredClone(v));if(onPut)await onPut(k,v);},
     update:memoryAtomicUpdate(data,async(k,v)=>{if(onPut)await onPut(k,v);})},
@@ -39,7 +39,7 @@ async function fixture({retiring=false}={}){
     if(path==='/v2/choice-snapshots/receipt'){
      if(onReceipt)await onReceipt();if(receiptTransform)return new Response(JSON.stringify(receiptTransform(await response.json())),{status:response.status,headers:{'content-type':'application/json'}});
     }return response;}});
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
+  await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
   search=createHelpSearchClient(runtime,{authenticated:true,subjectId});cloud=createChoiceSyncClient(runtime,{subjectId});
   const page=await search.query({type:'history',query:{query:'Receipt choice source'}}),candidate=search.candidateKey(page.items[0]),snapshotId=randomUUID();
   await search.saveChoice({id:snapshotId,expectedVersion:0,localTaskRef:'Original private work',visibleRationale:'Original owner-only selected rationale',

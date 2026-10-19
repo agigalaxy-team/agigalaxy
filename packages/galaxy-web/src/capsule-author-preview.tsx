@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React from 'react';
 import {memberName,readableTime} from './conversation-ui';
 import {SourceReading,sourceKind} from './capsule-authoring-shared';
@@ -27,6 +28,6 @@ export function CapsuleAuthorPreview({preview,display={},subjectId,names}:Previe
   </>:type==='permission'&&payload.kind==='revoke'?<>
    <h3>撤销这项来源许可</h3><p className="reading-prose">{display.title??'所选原许可'}</p><p className="reading-prose">{payload.reason}</p><p>依赖这项许可的内容会重新核对当前可读性；已经发生的工作仍保留。</p>
   </>:null}
-  <details className="source-reference-details"><summary>准确版本与记录详情</summary><dl><dt>本次记录</dt><dd>{payload.id}</dd>{'sourceResolution' in payload&&<><dt>来源结果</dt><dd>{payload.sourceResolution.resultId} · 第 {payload.sourceResolution.resultVersion} 版</dd></>}{('sourceRefs' in payload?payload.sourceRefs:'sources' in payload?payload.sources:[]).map(ref=><React.Fragment key={ref.kind+':'+ref.id+':'+ref.version}><dt>{sourceKind(ref.kind)}</dt><dd>{ref.id} · 第 {ref.version} 版</dd></React.Fragment>)}</dl></details>
+  <ReadingDetails className="source-reference-details"><ReadingSummary>准确版本与记录详情</ReadingSummary><dl><dt>本次记录</dt><dd>{payload.id}</dd>{'sourceResolution' in payload&&<><dt>来源结果</dt><dd>{payload.sourceResolution.resultId} · 第 {payload.sourceResolution.resultVersion} 版</dd></>}{('sourceRefs' in payload?payload.sourceRefs:'sources' in payload?payload.sources:[]).map(ref=><React.Fragment key={ref.kind+':'+ref.id+':'+ref.version}><dt>{sourceKind(ref.kind)}</dt><dd>{ref.id} · 第 {ref.version} 版</dd></React.Fragment>)}</dl></ReadingDetails>
  </div>;
 }

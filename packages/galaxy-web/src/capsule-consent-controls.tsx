@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {memberName,useMemberNames,readableTime} from './conversation-ui';
@@ -54,7 +55,7 @@ function CapsuleConsentPanel({runtime,subjectId,targets,busy,run,onChanged,lease
  }
  const pending=records.filter(record=>!['revoked','expired'].includes(record.state)),past=records.filter(record=>['revoked','expired'].includes(record.state));
  if(!options.length&&!records.length)return null;
- return <details className="room-settings method-consent-controls"><summary>管理我已分享的内容</summary>
+ return <ReadingDetails mode="inline" className="room-settings method-consent-controls"><ReadingSummary>管理我已分享的内容</ReadingSummary>
   <p className="source-reading-note">停止选定版本或使用记录的当前展示。来源许可可在“来源许可”中单独管理。</p>
   {message&&<p className="message"><output>{message}</output></p>}{error&&<p role="alert" className="message error">{error}</p>}
   <fieldset disabled={busy}>
@@ -62,10 +63,10 @@ function CapsuleConsentPanel({runtime,subjectId,targets,busy,run,onChanged,lease
    {preview&&<section className="method-form-section"><h3>{previewLabel}</h3><p>{preview.visibility==='Public'?'当前面向公众展示':preview.viewers.length?'当前向本人及 '+preview.viewers.map(id=>memberName(id,subjectId,names[id]??undefined)).join('、')+' 展示':'当前仅本人可读'}</p><p className="source-reading-note">{stateText(preview.state)}{preview.expiresAt?' · 原期限 '+readableTime(preview.expiresAt):''}</p>
     {preview.state==='active'&&<><p>确认后停止这项展示授权。已发生的工作保留，外部已保存的副本不会因此被收回。</p><Button type="button" onClick={()=>run(operate)}>确认停止这项分享</Button></>}
     <Button type="button" variant="ghost" onClick={()=>setPreview(null)}>{preview.state==='active'?'继续保留分享':'关闭'}</Button>
-    <details className="source-reference-details"><summary>原授权记录</summary><p>{preview.target.operationId}</p><p>{preview.target.consentId}</p></details>
+    <ReadingDetails className="source-reference-details"><ReadingSummary>原授权记录</ReadingSummary><p>{preview.target.operationId}</p><p>{preview.target.consentId}</p></ReadingDetails>
    </section>}
    {!!pending.length&&<section className="method-consent-list" aria-label="上次的停止操作">{pending.map(record=>{const result=results[record.target.consentId]??record;return <article className="method-consent-card" key={record.target.consentId}><h3>{titleFor(record.target)}</h3><p>{stateText(result.state)}</p>{result.reason&&<p>{reasonText(result.reason)}</p>}<Button type="button" variant="outline" onClick={()=>run(()=>prepare(record.target))}>查看原内容的分享范围</Button></article>;})}</section>}
-   {!!past.length&&<details className="source-reference-details"><summary>已完成的展示变更</summary>{past.map(record=><p key={record.target.consentId}>{titleFor(record.target)} · {stateText(record.state)}</p>)}</details>}
+   {!!past.length&&<ReadingDetails className="source-reference-details"><ReadingSummary>已完成的展示变更</ReadingSummary>{past.map(record=><p key={record.target.consentId}>{titleFor(record.target)} · {stateText(record.state)}</p>)}</ReadingDetails>}
   </fieldset>
- </details>;
+ </ReadingDetails>;
 }

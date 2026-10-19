@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createAttachmentsClient} from '../../galaxy-web/src/chat-attachments-client.mjs';
 import {createChatClient} from '../../galaxy-web/src/chat-client.mjs';
@@ -18,8 +18,8 @@ test('browser binary transfer recovers exact upload receipt and checks digest/cu
   const fetcher=async(url,options)=>{const path=new URL(url).pathname,response=await fetch(base+path,{...options,headers:{...options.headers,Origin:'https://galaxy.example.org'}});
    if(path.endsWith('/upload')){sends++;if(drop){drop=false;assert.equal(response.status,200);throw new Error('synthetic lost upload response');}}
    if(tamper&&path.endsWith('/content'))return new Response('changed',{status:200,headers:response.headers});return response;};
-  const state=store();runtime=await createWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:state,fetch:fetcher,now:()=>f.now});
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+  const state=store();runtime=await createExistingWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:state,fetch:fetcher,now:()=>f.now});
+  await runtime.connect({confirmed:true});
   const room=await runtime.chat.create({title:'File browser workflow'},{confirmed:true}),files=createAttachmentsClient(runtime),file=new File(['actual browser upload body'],'sample.txt',{type:'text/plain'});
   await assert.rejects(files.send(room.roomId,file,{confirmed:true}),/lost upload/);const original=await files.pending(room.roomId);assert.ok(original.input.sha256);assert.equal(original.bytes,undefined);
   await assert.rejects(files.retry(room.roomId,new File(['wrong'],'sample.txt',{type:'text/plain'}),{confirmed:true}),/不一致/);

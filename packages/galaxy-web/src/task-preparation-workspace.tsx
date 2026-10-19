@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useState} from 'react';
 import {Button} from '@/components/ui/button';
@@ -21,7 +22,7 @@ function CandidateSource({source,subjectId}:{source:PreparationSource;subjectId:
   <p className="request-help-source-kind">{source.item.type==='opportunity'?'本人表达的交流意愿':'已有工作'}{synthetic?' · 合成示例':''}</p>
   <h4>{source.item.title}</h4>
   <p className="request-help-excerpt">{text}</p>
-  <details className="request-help-reference"><summary>阅读这份来源</summary>{text&&<p className="request-help-full">{text}</p>}{source.item.summary&&source.item.summary!==text&&<><h5>这项工作的背景</h5><p className="request-help-full">{source.item.summary}</p></>}<p className="request-help-locator">来源 <code>{source.item.ref.id}</code> · 版本 <code>{source.item.ref.version}</code></p></details>
+  <ReadingDetails className="request-help-reference"><ReadingSummary>阅读这份来源</ReadingSummary>{text&&<p className="request-help-full">{text}</p>}{source.item.summary&&source.item.summary!==text&&<><h5>这项工作的背景</h5><p className="request-help-full">{source.item.summary}</p></>}<p className="request-help-locator">来源 <code>{source.item.ref.id}</code> · 版本 <code>{source.item.ref.version}</code></p></ReadingDetails>
  </section>;
 }
 export function TaskPreparationWorkspace(props:PreparationProps){
@@ -44,7 +45,7 @@ function PreparationResults({runtime,subjectId,connected,value:readValue,selecte
   <div className="request-help-people">{rows.map(candidate=><article className="request-help-person" key={candidate.subjectId}>
    <label className="request-help-person-choice"><input type="checkbox" checked={selected.includes(candidate.subjectId)} disabled={disabled||(!selected.includes(candidate.subjectId)&&selected.length>=32)} onChange={()=>choose(candidate.subjectId)}/><MemberAvatar subjectId={candidate.subjectId}/><span><strong>{memberName(candidate.subjectId,subjectId,names[candidate.subjectId]??candidate.displayName)}</strong><small>{selected.includes(candidate.subjectId)?'已记下，发布后再看':'记下这个人'}</small></span></label>
    {candidate.sources[0]&&<CandidateSource source={candidate.sources[0]} subjectId={candidate.subjectId}/>}
-   {candidate.sources.length>1&&<details className="request-help-other-sources"><summary>还有 {candidate.sources.length-1} 份来源</summary>{candidate.sources.slice(1).map(source=><CandidateSource key={source.item.type+':'+source.item.ref.id+':'+source.item.ref.version} source={source} subjectId={candidate.subjectId}/>)}</details>}
+   {candidate.sources.length>1&&<ReadingDetails className="request-help-other-sources"><ReadingSummary>还有 {candidate.sources.length-1} 份来源</ReadingSummary>{candidate.sources.slice(1).map(source=><CandidateSource key={source.item.type+':'+source.item.ref.id+':'+source.item.ref.version} source={source} subjectId={candidate.subjectId}/>)}</ReadingDetails>}
    {candidate.willingness&&<p className="request-help-note">对方表达过交流意愿，是否参加这次工作仍需本人回应。</p>}
   </article>)}</div>
   {rows.length<candidates.length&&<Button type="button" variant="ghost" disabled={disabled} onClick={()=>setShown(value=>value+8)}>查看更多相关的人</Button>}

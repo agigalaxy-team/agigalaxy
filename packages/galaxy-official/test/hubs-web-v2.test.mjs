@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createHubsWebClient} from '../../galaxy-web/src/hubs-client.mjs';
 import {builderDeclaration} from './builders-workflow.mjs';
 import {sampleCharter} from './hubs-workflow.mjs';
@@ -12,11 +12,11 @@ test('Hub browser actual local signatures recover lost Charter and peering ACKs 
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000});
   let runtime,drop='',posts=0;
   try{await new Promise(ok=>api.listen(0,'127.0.0.1',ok));const origin=`http://127.0.0.1:${api.address().port}`,data=new Map();
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
+    runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
       store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:async(k,change)=>{const next=change(structuredClone(data.get(k)??null));data.set(k,structuredClone(next));return structuredClone(next);}},fetch:async(url,input)=>{
         const path=new URL(url).pathname;if(path==='/v2/hubs/events'||path==='/v2/hubs/peering/events')posts++;
         const res=await fetch(origin+path,input);if(drop===path){drop='';assert.equal(res.status,200);throw Error('synthetic lost Hub ACK');}return res;}});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
+    await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
     let client=createHubsWebClient(runtime,{subjectId});const hubId=randomUUID(),decl={id:randomUUID(),builderId:hubId,kind:'declare',expectedRevision:0,
       declaration:{...builderDeclaration('hub',subjectId),endpoint:f.access.endpoint}};
     const signed=await runtime.api.authorizePayload(JSON.stringify(decl),{action:'builder.publish',objectId:decl.id,visibility:'Public',confirmed:true});await runtime.api.call('/v1/builders/events',signed);

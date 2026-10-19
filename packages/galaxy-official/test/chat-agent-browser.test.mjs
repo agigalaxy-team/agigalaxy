@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createChatAgentClient} from '../../galaxy-web/src/chat-agent-client.mjs';
 
 const store=()=>{const values=new Map();return {get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value)),
@@ -23,8 +23,8 @@ test('HTTP room Agent grants recover lost receipts, isolate members and keep chi
    return response;
   };
   const config={endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys};
-  a=await createWebRuntime(config,{store:store(),fetch:fetcher,now:()=>f.now});b=await createWebRuntime(config,{store:store(),fetch:fetcher,now:()=>f.now});
-  for(const runtime of [a,b]){await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});}
+  a=await createExistingWebRuntime(config,{store:store(),fetch:fetcher,now:()=>f.now});b=await createExistingWebRuntime(config,{store:store(),fetch:fetcher,now:()=>f.now});
+  for(const runtime of [a,b]){await runtime.connect({confirmed:true});}
   const room=await a.chat.create({title:'普通交流，无任务'},{confirmed:true});assert.equal(room.taskRefs.length,0);
   const invited=await a.chat.propose(room.roomId,{expectedRevision:room.revision,action:'invite',targetSubjectId:(await b.status()).identity.subjectId},{confirmed:true});
   await b.api.call(`/v2/chat/rooms/${room.roomId}/accept`,{decisionId:invited.decisionId,accept:true});

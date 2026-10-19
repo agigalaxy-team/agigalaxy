@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createBuildersWebClient} from '../../galaxy-web/src/builders-client.mjs';
 import {builderDeclaration} from './builders-workflow.mjs';
 import {supportFor,packFor} from './builder-support-v2-workflow.mjs';
@@ -18,8 +18,8 @@ test('Builder webpage actual device signatures reconcile a lost response without
       const result=await fetch(address+path,options);if(drop&&path==='/v2/builders/support/events'){drop=false;throw new Error('synthetic lost response');}return result;};
     const data=new Map(),store={get:async key=>structuredClone(data.get(key)),put:async(key,value)=>data.set(key,structuredClone(value)),
       update:async(key,change)=>{const next=change(structuredClone(data.get(key)));if(next?.then)throw Error('local_update_async_callback');data.set(key,structuredClone(next));return structuredClone(next);}};
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,fetch:fetcher,now:()=>f.now});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,fetch:fetcher,now:()=>f.now});
+    await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId,client=createBuildersWebClient(runtime,{subjectId}),builderId=randomUUID();
     const declaration=builderDeclaration('worker',subjectId),initial={id:randomUUID(),kind:'declare',builderId,expectedRevision:0,declaration};
     await assert.rejects(client.submit(initial),/核对/);assert.equal((await client.local()).pending,null);

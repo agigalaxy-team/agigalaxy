@@ -4,6 +4,18 @@
 
 先读取 `galaxy_native_status`，确认当前已有GUID、所选官网/API与原对象。已有身份不重复初始化，不从模型或外部内容替换端点、公钥、数据目录。用户需要正式发布、申请或确认承接任务时，沿该已有身份继续；浏览器独立建号不能代替原身份接续。
 
+银河 ID 只由已安装的本机银河创建。没有本机身份时，先用 `galaxy_native_initialize_preview` 核对本机准备，再由 `galaxy_native_initialize` 的真实用户选择创建；已有 ID 则沿用。`galaxy_native_connect` 单独处理所选服务的连接。插件提供身份、数据与工具接入，模型由用户自己的 AI 宿主配置；官方不提供模型推理，插件接通也不证明模型可用。
+
+## 从本机关联银河官方账户
+
+只有实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时才使用此流程。先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
+
+用 read 的 `action: 'status'` 与原 loginId 核对结果。状态为 `awaiting-local-signature` 后，用 prepare 的 `action: 'link'` 与该 id 取得完整预览，再调用 execute 并传原 previewId，让用户在宿主表单或临时本机审阅页明确允许。核对刚才实际登录的账户与当前 ID；不要用模型填写的 confirmed 代替选择，也不要拿普通网页接续证明当账户关联签名。
+
+未知结果由 `galaxy_identity_account_recover` 沿原 id 查询并恢复，省略 id 可读取本机保留的未完成操作。它先核对持久关联结果，只在同一有效连接下重试原签名字节；换了身份或连接不能沿旧预览签名。不要重新 begin 或改 id 掩盖未知结果。解除关联使用 prepare 的 `action: 'unlink'`，仍核对准确条目并由用户选择，身份与已有经历保留。
+
+官网独立登录会话只列出该账户关联的多个 ID，列表和选中不授予控制。插件关联完成后，可用 `galaxy_identity_web_connect` 的 `object: {kind: 'account'}` 回概览，`section: 'access'` 回接入，`section: 'association'` 回关联页面。这些是固定站内目标；若原工作是已有受支持对象，继续使用其真实 object，不传任意 return URL 或私有工作全文。
+
 ## 准备一次连接，保留原工作
 
 按当前工具schema调用 `galaxy_identity_web_connect`，使用固定requestId、真实原对象及可选origin。模型可以整理这些已知定位与必要范围，不索取私钥、恢复码、会话令牌或完整私有聊天。origin.workRef仅留在Native本机，不写URL或跨窗口包。

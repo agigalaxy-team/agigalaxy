@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {getContributionClient} from '../../galaxy-web/src/contribution-client.mjs';
 
 test('actual browser identity and signed contribution operations recover lost Consent, publication and revoke replies without changing selected fields',async()=>{
@@ -17,7 +17,7 @@ test('actual browser identity and signed contribution operations recover lost Co
     const fetcher=async(url,options)=>{const path=new URL(url).pathname,response=await fetch(origin+path,options);
       if(loseConsent&&path==='/v1/consents'){loseConsent=false;assert.equal(response.status,200);throw new Error('synthetic lost Consent reply');}
       if(loseWrite&&path==='/v2/contributions/publish'){loseWrite=false;assert.equal(response.status,200);throw new Error('synthetic lost contribution reply');}return response;};
-    runtime=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    runtime=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId,id=randomUUID(),root={kind:'case-created',schemaVersion:2,eventId:id,caseId:id,expectedVersion:0,
       actorId:subjectId,localRef:randomUUID(),title:'PRIVATE CASE TITLE',summary:'PRIVATE CASE BACKGROUND',source:{kind:'local',reference:randomUUID()},synthetic:true};
     await runtime.api.call('/v2/cases/events',await runtime.api.authorizePayload(root,{action:'case.teaser.publish',objectId:id,confirmed:true}));
@@ -28,7 +28,7 @@ test('actual browser identity and signed contribution operations recover lost Co
       redactionConfirmed:true,publicationScope:'selected-fields-and-bounded-purpose-conclusions; original-text-permissions-unchanged'};
     let client=getContributionClient(runtime,subjectId);loseConsent=true;await assert.rejects(client.submit(payload,{confirmed:true}),/lost Consent/);
     const pending=(await client.local()).pending;assert.ok(pending.prepared?.signedIntent);assert.equal(pending.submission,null);
-    runtime.close();runtime=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});client=getContributionClient(runtime,subjectId);
+    runtime.close();runtime=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});await runtime.connect({confirmed:true});client=getContributionClient(runtime,subjectId);
     loseWrite=true;await assert.rejects(client.reconcile({retry:true,confirmed:true}),/lost contribution/);
     assert.equal((await client.local()).pending.prepared.signedIntent,pending.prepared.signedIntent);
     assert.equal((await client.reconcile()).state,'published');assert.equal((await client.local()).pending,null);

@@ -1,0 +1,53 @@
+import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {initialPublicReadingPage,isPublicReadingRoute,loadPublicReadingPage} from './public-reading-contract.mjs';
+import './public-reading.css';
+
+export {isPublicReadingRoute} from './public-reading-contract.mjs';
+type Node=string|{tag:string;attrs:Record<string,string>;children:Node[]};
+type Page={path:string;title:string;description:string;location:string;sidebar:Node[];body:Node[];footer:Node[]};
+type Props={path:string;search?:string;hash?:string;navigate:(target:string)=>void};
+const propertyNames:Record<string,string>={class:'className',tabindex:'tabIndex',viewbox:'viewBox','stroke-width':'strokeWidth','stroke-linecap':'strokeLinecap','stroke-linejoin':'strokeLinejoin'};
+function content(nodes:Node[]):React.ReactNode{return nodes.map((node,index)=>{
+  if(typeof node==='string')return node;
+  const props:Record<string,unknown>={key:index};
+  for(const [name,value] of Object.entries(node.attrs))props[propertyNames[name]??name]=name==='download'&&value===''?true:value;
+  return React.createElement(node.tag,props,...(node.children.length?[content(node.children)]:[]));
+});}
+
+/** Public content is rendered from a checked tree, never executable HTML. */
+export function PublicReadingWorkspace({path,search='',hash='',navigate}:Props){
+  const [state,setState]=useState<{path:string;page:Page|null;error:string}>(()=>({path,page:initialPublicReadingPage(path),error:''}));
+  const [attempt,setAttempt]=useState(0),container=useRef<HTMLDivElement>(null);
+  const current=state.path===path?state.page:null;
+  useEffect(()=>{
+    const controller=new AbortController();let active=true;
+    void loadPublicReadingPage(path,{signal:controller.signal}).then(page=>{if(active)setState({path,page,error:''});},()=>{if(active)setState({path,page:null,error:'这份说明暂时无法读取，可以重试或返回原来的页面。'});});
+    return()=>{active=false;controller.abort();};
+  },[path,attempt]);
+  useLayoutEffect(()=>{
+    if(!current)return;
+    document.title=current.title;
+    const description=document.querySelector('meta[name="description"]');if(description)description.setAttribute('content',current.description);
+    let anchor:string;try{anchor=decodeURIComponent(hash.slice(1));}catch{anchor='';}
+    const timer=requestAnimationFrame(()=>{
+      if(typeof history.state?.scrollY==='number')window.scrollTo(0,history.state.scrollY);
+      else if(anchor){const target=document.getElementById(anchor);if(target&&container.current?.contains(target))target.scrollIntoView({block:'start'});}
+    });
+    return()=>cancelAnimationFrame(timer);
+  },[current,path,search,hash]);
+  const follow=(event:React.MouseEvent<HTMLDivElement>)=>{
+    if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+    const anchor=event.target instanceof Element?event.target.closest('a[href]'):null;
+    if(!(anchor instanceof HTMLAnchorElement)||anchor.hasAttribute('download')||anchor.target&&anchor.target!=='_self')return;
+    const target=new URL(anchor.href,location.href);
+    if(target.origin!==location.origin||!(target.pathname==='/app'||target.pathname.startsWith('/app/')||isPublicReadingRoute(target.pathname)))return;
+    event.preventDefault();navigate(target.pathname+target.search+target.hash);
+  };
+  if(!current)return <section className="public-reading-unavailable"><h1>{state.path===path&&state.error?'暂时无法打开这份说明':'正在打开说明'}</h1>{state.path===path&&state.error?<><p>{state.error}</p><button type="button" onClick={()=>setAttempt(value=>value+1)}>重新读取</button></>:<output>正在读取本页内容…</output>}</section>;
+  // Native links keep their keyboard behavior; this container only delegates their navigation clicks.
+  // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+  return <div className="public-reading-page" ref={container} onClick={follow} data-public-page={current.path}>
+    <div className="public-page-layout">{content(current.sidebar)}<div className="public-page-content">{content(current.body)}</div></div>
+    {content(current.footer)}
+  </div>;
+}

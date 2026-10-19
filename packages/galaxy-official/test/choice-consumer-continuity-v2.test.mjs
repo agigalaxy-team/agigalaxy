@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
 
@@ -18,13 +18,13 @@ async function fixture() {
       localRef:randomUUID(),title:'Choice continuity',summary:'Synthetic public source',synthetic:true,source:{kind:'local',reference:randomUUID()}};
     const grant=await f.authorize(root,'case.teaser.publish',{objectId:id,visibility:'Public',purpose:'public-profile'});await f.cases.submitV2(f.actor,grant);
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
+    runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,
       store:{get:async key=>{const value=structuredClone(data.get(key));if(onGet)await onGet(key,value);return value;},
         put:async(key,value)=>{data.set(key,structuredClone(value));if(onPut)await onPut(key,value);},
         update:memoryAtomicUpdate(data,async(key,value)=>{if(onPut)await onPut(key,value);})},
       fetch:async(url,options)=>{const path=new URL(url).pathname;if(path==='/v2/choice-snapshots/put')writes.push(JSON.parse(options.body));const response=await fetch(origin+path,options);
         if(path==='/v2/choice-snapshots/put'&&dropAfterPut){dropAfterPut=false;throw new Error('synthetic lost ACK after actual put');}return response;}});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId,search=createHelpSearchClient(runtime,{authenticated:true,subjectId});
     const page=await search.query({type:'history',query:{query:'Choice continuity'}}),candidate=search.candidateKey(page.items[0]);
     const choice={id:randomUUID(),expectedVersion:0,localTaskRef:'Local current work',visibleRationale:'Private reasoning visible only to this user',

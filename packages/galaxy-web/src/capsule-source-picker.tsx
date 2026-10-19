@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {capsuleRefKey} from './capsule-workspace-client.mjs';
@@ -30,8 +31,8 @@ function CapsuleMessageChoices({runtime,subjectId,busy,selected,onChange,onlyOwn
  useEffect(()=>{const request=roomRead;return()=>{request.current++;};},[]);
  useEffect(()=>{if(!open||roomsLoaded||readingRooms||roomError)return;const timer=window.setTimeout(()=>void readRooms(),0);return()=>window.clearTimeout(timer);},[open,roomsLoaded,readingRooms,roomError,readRooms]);
  const chosen=selected.filter(item=>item.ref.kind==='selected-message');
- return <details className="capsule-message-picker" onToggle={event=>setOpen(event.currentTarget.open)}>
-  <summary>{onlyOwn?'选择我的交流内容':'加入对话片段'}{chosen.length>0?' · 已选 '+chosen.length+' 条':''}</summary>
+ return <ReadingDetails mode="inline" className="capsule-message-picker" onOpenChange={isOpen=>setOpen(isOpen)}>
+  <ReadingSummary>{onlyOwn?'选择我的交流内容':'加入对话片段'}{chosen.length>0?' · 已选 '+chosen.length+' 条':''}</ReadingSummary>
   <p className="source-reading-note">{onlyOwn?'选择你写下的原话，保留准确消息版本。':'选择要引用的原话。他人的文字仍需原作者许可。'}</p>
   {roomError&&<p className="message error" role="alert">{roomError}<Button type="button" variant="ghost" disabled={busy||readingRooms} onClick={()=>void readRooms()}>重新读取对话</Button></p>}
   {readingRooms&&!roomsLoaded&&<p><output>正在读取你的对话…</output></p>}
@@ -39,8 +40,8 @@ function CapsuleMessageChoices({runtime,subjectId,busy,selected,onChange,onlyOwn
   {rooms.length>0&&<label className="message-room-choice" htmlFor={roomSelectId}>选择对话<select id={roomSelectId} value={roomId} disabled={busy} onChange={event=>setRoomId(event.target.value)}><option value="">选择一段对话</option>{rooms.map(room=><option key={room.roomId} value={room.roomId}>{room.title}</option>)}</select></label>}
   {roomNext&&<Button type="button" variant="ghost" disabled={busy||readingRooms} onClick={()=>void readRooms(roomNext)}>更多对话</Button>}
   {open&&roomId&&<CapsuleRoomMessages key={roomId} {...{runtime,subjectId,busy,selected,onChange,onlyOwn,lease,roomId}} roomTitle={rooms.find(room=>room.roomId===roomId)?.title??'所选对话'}/>}
-  {chosen.length>0&&<details className="source-reference-details"><summary>查看已选片段</summary><p>已选内容会在保存前按当前权限核对。无法读取的文字不在这里保留副本。</p>{chosen.map(item=><div className="selected-source-reference" key={capsuleRefKey(item.ref)}><span>{item.label}<small>第 {item.ref.version} 版 · {item.ref.id}</small></span><Button type="button" variant="ghost" disabled={busy} onClick={()=>onChange(selected.filter(other=>capsuleRefKey(other.ref)!==capsuleRefKey(item.ref)))}>移除</Button></div>)}</details>}
- </details>;
+  {chosen.length>0&&<ReadingDetails className="source-reference-details"><ReadingSummary>查看已选片段</ReadingSummary><p>已选内容会在保存前按当前权限核对。无法读取的文字不在这里保留副本。</p>{chosen.map(item=><div className="selected-source-reference" key={capsuleRefKey(item.ref)}><span>{item.label}<small>第 {item.ref.version} 版 · {item.ref.id}</small></span><Button type="button" variant="ghost" disabled={busy} onClick={()=>onChange(selected.filter(other=>capsuleRefKey(other.ref)!==capsuleRefKey(item.ref)))}>移除</Button></div>)}</ReadingDetails>}
+ </ReadingDetails>;
 }
 function CapsuleRoomMessages({runtime,subjectId,busy,selected,onChange,onlyOwn,lease,roomId,roomTitle}:LeasedProps&{roomId:string;roomTitle:string}){
  const [messages,setMessages]=useState<Message[]>([]),[next,setNext]=useState<string|null>(null),[loaded,setLoaded]=useState(false),[readingMessages,setReadingMessages]=useState(false),[messageError,setMessageError]=useState('');

@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
 test('Two real web runtimes retain draft base, reconcile lost sync response and restore a separate authorized choice branch',async()=>{
@@ -15,10 +15,10 @@ test('Two real web runtimes retain draft base, reconcile lost sync response and 
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
   const config={endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},wire=async(url,options)=>{const path=new URL(url).pathname;if(path==='/v2/choice-snapshots/put')writes.push(JSON.parse(options.body));const response=await fetch(origin+path,options);if(drop&&path==='/v2/choice-snapshots/put'){drop=false;throw new Error('synthetic lost response after server write');}return response;};
   const store=data=>({get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)});const aData=new Map();
-  a=await createWebRuntime(config,{store:store(aData),fetch:wire,now:()=>f.now});await a.createIdentity({confirmed:true});await a.connect({confirmed:true});
+  a=await createExistingWebRuntime(config,{store:store(aData),fetch:wire,now:()=>f.now});await a.connect({confirmed:true});
   // Synthetic same authorized identity in two independent runtime caches; this
   // exercises version conflicts, not a claim of physical device-enrolment QA.
-  b=await createWebRuntime(config,{store:store(structuredClone(aData)),fetch:wire,now:()=>f.now});await b.connect({confirmed:true});
+  b=await createExistingWebRuntime(config,{store:store(structuredClone(aData)),fetch:wire,now:()=>f.now});await b.connect({confirmed:true});
   const subjectId=(await a.status()).identity.subjectId;ha=createHelpSearchClient(a,{authenticated:true,subjectId});hb=createHelpSearchClient(b,{authenticated:true,subjectId});ca=createChoiceSyncClient(a,{subjectId});cb=createChoiceSyncClient(b,{subjectId});
   const query={type:'history',query:{query:'Shared choice'}},ra=await ha.query(query),rb=await hb.query(query),choiceId=randomUUID();
   const make=(r,reason)=>({id:choiceId,expectedVersion:0,localTaskRef:'Local task',visibleRationale:reason,rationaleAuthor:'user',candidateKeys:[ha.candidateKey(r.items[0])],selectedKeys:[ha.candidateKey(r.items[0])],resultRefs:[]});

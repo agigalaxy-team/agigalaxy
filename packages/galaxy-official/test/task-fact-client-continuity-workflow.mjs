@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 
@@ -31,7 +31,7 @@ export async function factContinuityFixture(){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:2000}),data=new Map(),calls=[],runtimes=[];
  let runtime,origin,onGet,onPut,fault=null,offline=false;
  const start=async store=>{
-  const r=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,store,fetch:async(url,options)=>{
+  const r=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,store,fetch:async(url,options)=>{
    const parsed=new URL(url),path=parsed.pathname;calls.push({path,method:options.method??'GET'});
    if(offline&&path.endsWith('/receipt'))throw new Error('Fictional readonly receipt offline');
    const selected=fault?.path===path;if(selected&&fault.mode==='before'){fault=null;throw new Error('Fictional failure before dispatch');}
@@ -43,7 +43,7 @@ export async function factContinuityFixture(){
  try{
   await new Promise(r=>api.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+api.address().port;
   runtime=await start(memoryStore(data,{get:(...args)=>onGet?.(...args),put:(...args)=>onPut?.(...args)}));
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+  await runtime.connect({confirmed:true});
   const subjectId=runtime.api.snapshot().subjectId,client=getFactClient(runtime,subjectId);
   const seedTask=async(link=true)=>{
    const task={operationId:randomUUID(),taskId:randomUUID(),caseId:null,intent:'proactive-review',title:'FICTIONAL fact client continuity',
@@ -64,7 +64,7 @@ export async function factContinuityFixture(){
   const archiveKey=taskId=>'task-fact-receipts:'+subjectId+':'+taskId;
   const bodyWrites=()=>calls.filter(c=>c.path==='/v2/verification-records/submit'||c.path==='/v2/cases/events'||/\/v2\/tasks\/[^/]+\/case$/.test(c.path));
   const switchOwner=async()=>{
-   const other=await start(memoryStore(new Map()));await other.createIdentity({confirmed:true});await other.connect({confirmed:true});
+   const other=await start(memoryStore(new Map()));await other.connect({confirmed:true});
    const material=await other.prepareRecovery();await other.saveRecovery({operationId:material.operationId,confirmed:true});
    const recovered=await runtime.recover(material.code,{confirmed:true});await runtime.confirmRecoveredCode({operationId:recovered.operationId,confirmed:true});await runtime.connect({confirmed:true});
   };

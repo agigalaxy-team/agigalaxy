@@ -8,7 +8,7 @@ import {browserScopes} from '../src/browser-client.mjs';
 import {QualificationService} from '../src/qualification.mjs';
 import {QualificationV2Service} from '../src/qualification-v2.mjs';
 import {ExperienceReviewService} from '../src/experience-review.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import {taskDraft,publicationFromDraft,applicationFromDraft,evidenceFromSelection,policyKey,localDateTime} from '../../galaxy-web/src/task-bounty-client.mjs';
 import {retainTaskContactAgent,taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 
@@ -37,15 +37,17 @@ export async function verifyBountyWebV2(database=null,options={}){
   };
   const store=()=>{const data=new Map();return{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),
    update:async(k,change)=>{const next=change(structuredClone(data.get(k)));if(next?.then)throw Error('local_update_async_callback');const committed=structuredClone(next);data.set(k,committed);return structuredClone(committed);}};};
-  const aStore=store(),bStore=store(),config={endpoint,trustedKeys:f.bindings.trustedKeys};a=await createWebRuntime(config,{store:aStore,fetch:wire,now:()=>now,website:taskContactWebsite});b=await createWebRuntime(config,{store:bStore,fetch:wire,now:()=>now,website:taskContactWebsite});
-  for(const rt of [a,b]){await rt.createIdentity({confirmed:true});await rt.connect({confirmed:true});}
+  const aStore=store(),bStore=store(),config={endpoint,trustedKeys:f.bindings.trustedKeys};a=await createExistingWebRuntime(config,{store:aStore,fetch:wire,now:()=>now,website:taskContactWebsite});b=await createExistingWebRuntime(config,{store:bStore,fetch:wire,now:()=>now,website:taskContactWebsite});
+  for(const rt of [a,b]){await rt.connect({confirmed:true});}
   await retainTaskContactAgent(a,aStore,now);await retainTaskContactAgent(b,bStore,now);
   const aid=(await a.status()).identity.subjectId,bid=(await b.status()).identity.subjectId;
   const call=(rt,path,input)=>rt.api.call(path,input,{authenticated:true});
   const read=(rt,id)=>rt.api.call('/v2/tasks/'+id,null,{method:'GET',authenticated:true});
   const signed=async(rt,payload,action,objectId,viewers=[])=>rt.api.submitAuthorization(await rt.api.prepareAuthorization(JSON.stringify(payload),{action,objectId,visibility:'Private',viewers,confirmed:true}),{confirmed:true});
   const login=await call(a,'/v1/identity/begin',{providerId:'fixture'}),callback=await issuer.authorize(login.authorizationUrl);
-  assert.equal((await fetch(origin+callback.pathname+callback.search)).status,200);await a.confirmAccountLink(login.loginId,{confirmed:true});assert.equal((await call(a,'/v2/account/quotas',{})).accountVerified,true);
+  assert.equal((await fetch(origin+callback.pathname+callback.search)).status,200);
+  await assert.rejects(a.confirmAccountLink(login.loginId,{confirmed:true}),{code:'local_galaxy_required'});
+  await confirmFixtureAccountLink(a, login.loginId);assert.equal((await call(a,'/v2/account/quotas',{})).accountVerified,true);
   const catalog=await call(a,'/v1/qualification/policies',{});assert.equal(catalog.policies.length,1);
   const old={title:'保留旧草稿',summary:'主动诊断帮助',goal:'找到边界',situation:'没有失败尝试',visibility:'Public',intent:'diagnosis',unknownLocalNote:'旧本机材料'};
   const draft=taskDraft(old,now);assert.equal(draft.unknownLocalNote,old.unknownLocalNote);await a.putLocal('task-draft',draft);

@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowRight,Compass,Search} from 'lucide-react';
+import {Compass,Search} from 'lucide-react';
 import {ContentCard,type BrowsePage,type TaskBrowseItem} from './public-browse-workspace';
 import type {createWebRuntime} from './runtime.mjs';
 
@@ -48,14 +48,14 @@ function TaskDirectoryRead({runtime,subjectId,connected,navigate,needIdentity,vi
   if(!document.hidden)void request();const timer=setInterval(read,20000);document.addEventListener('visibilitychange',read);
   return()=>{lifecycle.current++;working.current=false;clearInterval(timer);document.removeEventListener('visibilitychange',read);};
  },[request,canRead]);
- return <section className="directory-page" aria-busy={busy}><header className="directory-heading"><div><h1 className="small">任务</h1><p className="lead">看看大家正在做什么。</p></div><a href="/app/publish" onClick={e=>{e.preventDefault();navigate('/app/publish');}}>发起求助 <ArrowRight size={15}/></a></header>
+ return <section className="directory-page" aria-busy={busy}><header className="directory-heading"><div><h1 className="small">任务</h1><p className="lead">看看大家正在做什么。</p></div><a href="/app/publish" onClick={e=>{e.preventDefault();navigate('/app/publish');}}>发起求助 </a></header>
  <nav className="directory-tabs" aria-label="任务范围">{(Object.keys(views) as View[]).map(value=><a key={value} href={value==='open'?'/app/participate':'/app/participate?view='+value} aria-current={view===value?'page':undefined} onClick={e=>{e.preventDefault();update(value,'');}}>{views[value]}</a>)}</nav>
- {!connected&&view!=='open'?<div className="directory-empty"><Compass size={30}/><h2>继续自己的工作</h2><p>连接身份，查看你的任务与参与记录。</p><button className="primary-action" onClick={needIdentity}>连接身份 <ArrowRight size={15}/></button></div>:<>
+ {!connected&&view!=='open'?<div className="directory-empty"><Compass size={30}/><h2>继续自己的工作</h2><p>连接身份，查看你的任务与参与记录。</p><button className="primary-action" onClick={needIdentity}>连接身份 </button></div>:<>
  <div className="directory-toolbar"><form onSubmit={e=>{e.preventDefault();const q=draft.trim();remember(q,q);if(query===q)refresh();else update(view,q);}}><Search size={18}/><input aria-label="搜索当前范围任务" value={draft} maxLength={200} onChange={e=>{setDraft(e.target.value);remember(e.target.value);}} placeholder="搜索任务" /><button disabled={!canRead||busy}>搜索</button></form></div>
  {error&&<div className="message error" role="alert">{error}<button disabled={busy} onClick={()=>refresh()}>再试一次</button></div>}
  {(!runtime||busy&&!loaded)&&<p><output>正在读取任务…</output></p>}
  <div className="content-grid">{items.map(item=><ContentCard key={item.taskId} kind="tasks" item={item} navigate={navigate} runtime={runtime}/>)}</div>
- {loaded&&!busy&&!error&&!items.length&&<div className="directory-empty"><Compass size={30}/><h2>{query?'没有找到相关任务':view==='open'?'还没有开放的任务':view==='requested'?'你还没有发布任务':'还没有参与记录'}</h2><p>{query?'换个关键词试试。':view==='participating'?'看看有没有你感兴趣的任务。':'可以从你想完成的一件事开始。'}</p>{query?<button onClick={()=>{remember('','');update(view,'');}}>清除搜索</button>:<a href={view==='participating'?'/app/participate':'/app/publish'} onClick={e=>{e.preventDefault();if(view==='participating')update('open','');else navigate('/app/publish');}}>{view==='participating'?'浏览开放任务':'发起求助'} <ArrowRight size={15}/></a>}</div>}
+ {loaded&&!busy&&!error&&!items.length&&<div className="directory-empty"><Compass size={30}/><h2>{query?'没有找到相关任务':view==='open'?'还没有开放的任务':view==='requested'?'你还没有发布任务':'还没有参与记录'}</h2><p>{query?'换个关键词试试。':view==='participating'?'看看有没有你感兴趣的任务。':'可以从你想完成的一件事开始。'}</p>{query?<button onClick={()=>{remember('','');update(view,'');}}>清除搜索</button>:<a href={view==='participating'?'/app/participate':'/app/publish'} onClick={e=>{e.preventDefault();if(view==='participating')update('open','');else navigate('/app/publish');}}>{view==='participating'?'浏览开放任务':'发起求助'} </a>}</div>}
  {next&&<button className="load-more" disabled={busy} onClick={()=>{pages.current++;setBusy(true);void request();}}>{busy?'正在读取…':'更多任务'}</button>}</>}
  </section>;
 }

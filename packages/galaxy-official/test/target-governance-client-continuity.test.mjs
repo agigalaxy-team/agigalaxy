@@ -6,7 +6,7 @@ import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
 import { createOidcLoginProvider } from '../src/oidc-login.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import { createTargetGovernanceClientV2 } from '../src/target-governance-client-v2.mjs';
 
 // Diagnostic only: actual synthetic OIDC/PKCE/JWS verified Account, WebRuntime,
@@ -24,7 +24,7 @@ async function fixture() {
     server = createApi({ ...f, browserOrigins: ['https://galaxy.example.org'], rateLimit: 1000 });
     await new Promise(done => server.listen(0, '127.0.0.1', done));
     const local = 'http://127.0.0.1:' + server.address().port;
-    runtime = await createWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, {
+    runtime = await createExistingWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, {
       now: () => now,
       store: { get: async key => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
        update:async(key,change)=>{const value=change(structuredClone(values.get(key)));values.set(key,structuredClone(value));return structuredClone(value);} },
@@ -39,12 +39,12 @@ async function fixture() {
         return response;
       },
     });
-    await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
+    await runtime.connect({ confirmed: true });
     issuer.setAccount('synthetic-M24-consumer-owner');
     const start = await runtime.api.call('/v1/identity/begin', { providerId: 'fixture' });
     const callback = await issuer.authorize(start.authorizationUrl);
     const response = await fetch(local + callback.pathname + callback.search);
-    assert.equal(response.status, 200); await response.arrayBuffer(); await runtime.confirmAccountLink(start.loginId, { confirmed: true });
+    assert.equal(response.status, 200); await response.arrayBuffer(); await confirmFixtureAccountLink(runtime, start.loginId);
     assert.equal((await runtime.api.call('/v2/account/quotas', {})).accountVerified, true);
     // The Task is an independently signed HTTP source fixture. This test
     // exercises governance continuity, not the Web task/Agent creation journey.

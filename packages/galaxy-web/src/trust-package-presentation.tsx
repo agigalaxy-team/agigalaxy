@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React,{useCallback,useEffect,useId,useRef,useState} from 'react';
 import {Input} from '@/components/ui/input';
 import {Button} from '@/components/ui/button';
@@ -43,6 +44,6 @@ export function TrustPeopleChooser(props:PeopleProps){
   {loading&&<p><output>正在读取联系人…</output></p>}{!loading&&!shown.length&&<p className="muted">{query?'当前已读列表没有匹配姓名。':'还没有可选联系人，也可以只给自己使用。'}</p>}
   <div className="button-row"><Button type="button" variant="ghost" disabled={busy||!subjectId} onClick={()=>{if(subjectId){if(props.single)props.onChange(subjectId);else props.onChange([subjectId]);}}}>{props.single?'用于我自己的资料包':'仅给我自己'}</Button>{next.contacts&&<Button type="button" variant="ghost" disabled={loading||busy} onClick={()=>more('contacts',next.contacts!)}>更多联系人</Button>}{next.rooms&&<Button type="button" variant="ghost" disabled={loading||busy} onClick={()=>more('rooms',next.rooms!)}>更早对话中的人</Button>}</div>
   {error&&<p><output>{error}</output></p>}
-  <details><summary>使用对方提供的银河 ID</summary><label htmlFor={identityId}>准确身份<Input id={identityId} value={props.single?props.value:chosen.join(' ')} disabled={busy} onChange={event=>{if(props.single)props.onChange(event.target.value.trim());else props.onChange([...new Set(event.target.value.split(/[\s,，、]+/).filter(Boolean))]);}} placeholder="粘贴对方给出的完整身份"/></label></details>
+  <ReadingDetails mode="inline"><ReadingSummary>使用对方提供的银河 ID</ReadingSummary><label htmlFor={identityId}>准确身份<Input id={identityId} value={props.single?props.value:chosen.join(' ')} disabled={busy} onChange={event=>{if(props.single)props.onChange(event.target.value.trim());else props.onChange([...new Set(event.target.value.split(/[\s,，、]+/).filter(Boolean))]);}} placeholder="粘贴对方给出的完整身份"/></label></ReadingDetails>
  </section>;
 }

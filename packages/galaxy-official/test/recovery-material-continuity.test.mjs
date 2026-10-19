@@ -7,6 +7,7 @@ import { createServices } from '../src/services.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { seedExistingWebIdentity } from './existing-web-identity-fixture.mjs';
 import { createRecoveryMaterial, importRecoveryMaterial } from '../../galaxy-core/src/domain/identity-material.mjs';
 
 // Synthetic materials remain in memory. The consumer and signed HTTP service
@@ -69,11 +70,13 @@ async function setup() {
     };
     stores.push(result); return result;
   }
-  async function runtime(materials = data) {
-    const rt = await createWebRuntime(config, { store: store(materials), fetch: fetchLocal, now: () => f.now });
+  async function runtime(materials = data, { initialize = false } = {}) {
+    const options = { store: store(materials), fetch: fetchLocal, now: () => f.now };
+    if (initialize) await seedExistingWebIdentity(config, options);
+    const rt = await createWebRuntime(config, options);
     runtimes.push(rt); return rt;
   }
-  const a = await runtime(); await a.createIdentity({ confirmed: true });
+  const a = await runtime(data, { initialize: true });
   return { ...f, a, data, hooks, stores, wire, runtime, sentCommits, advance:seconds=>{f.now+=seconds;}, recoverySlot: `galaxy-web:${f.access.endpoint}:recovery`,
     commits: () => wire.filter(v => v.path === '/v2/identity/control/commit').length,
     async close() { for (const rt of runtimes) rt.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await f.db.close(); },

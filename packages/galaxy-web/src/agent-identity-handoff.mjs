@@ -17,7 +17,8 @@ const owner=value=>value?.identity?`${value.identity.subjectId}:${value.identity
 export function agentIdentityReturnPath(value,origin){
  if(typeof value!=='string'||value.length>2048||!value.startsWith('/')||value.startsWith('//')||value.includes('\\')||Array.from(value).some(character=>character.charCodeAt(0)<32||character.charCodeAt(0)===127))return null;
  try{const target=new URL(value,origin);
-  if(target.origin!==origin||!(target.pathname==='/app'||target.pathname.startsWith('/app/'))||/^\/app\/settings\/identity(?:\/|$)/.test(target.pathname))return null;
+  if(target.origin!==origin||!(target.pathname==='/app'||target.pathname.startsWith('/app/'))
+   ||/^\/app\/settings\/identity(?:\/|$)/.test(target.pathname)&&target.pathname+target.search+target.hash!=='/app/settings/identity?section=account')return null;
   return target.pathname+target.search+target.hash;
  }catch{return null;}
 }

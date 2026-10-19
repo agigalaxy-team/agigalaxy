@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import {handoffExistingWebIdentity} from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 test('Browser help composition and local choice versions use actual API, survive source failure and never imply application or cloud sync',async()=>{
@@ -41,7 +42,7 @@ test('Browser help composition and local choice versions use actual API, survive
     assert.equal(refreshed.choices[0].versions[0].visibleRationale,choice.visibleRationale);
     assert.ok(requests.every(path=>path.startsWith('/v2/search/')),'only read queries, no cloud save or business write');
     assert.equal((await client.removeChoice(choice.id)).choices.length,0);
-    await runtime.createIdentity({confirmed:true});await assert.rejects(client.local(),/identity_changed/);
+    await handoffExistingWebIdentity(runtime,{now:()=>f.now});await assert.rejects(client.local(),/identity_changed/);
     taskFailure=false;
   }finally{client?.close();runtime?.close();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });

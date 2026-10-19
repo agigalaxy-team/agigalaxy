@@ -1,4 +1,5 @@
-import React,{useState} from 'react';
+import {ReadingDetails,ReadingSummary} from './reading-details';
+import React from 'react';
 import type {BuilderDeclaration,BuilderSupport,WorkerPack,BuilderReport,BuilderMaintenance,BuilderPreview} from './builder-authoring-state';
 import {memberName} from './conversation-ui';
 
@@ -14,9 +15,13 @@ const Ref=({href,children}:{href:string;children:React.ReactNode})=><a href={hre
 export const builderTestNames:Record<string,string>={format:'格式检查','source-flow':'源码流程','independent-interop':'独立互通','host-experience':'宿主使用'};
 export const builderMaintenanceNames:Record<string,string>={delist:'下架',relist:'恢复上架',correction:'纠正说明','security-issue':'安全问题','resolve-security':'安全问题已处理'};
 
-export function BuilderNotices({items}:{items:(BuilderMaintenance&{revision:number;eventId?:string})[]}){const [all,setAll]=useState(false);if(!items?.length)return null;const shown=(all?items:items.slice(-2)).slice().reverse();return <section className="professional-section"><h2>维护与变化</h2><ol className="plain-record-list">{shown.map(item=><li key={item.eventId??item.id}><h3>{builderMaintenanceNames[item.action]??item.action}</h3><p className="reading-prose">{item.summary}</p><p className="record-meta">第 {item.revision} 次登记更新</p></li>)}</ol>{items.length>2&&<button className="text-link" onClick={()=>setAll(v=>!v)}>{all?'收起较早公告':'阅读此前的维护公告'}</button>}</section>;}
+export function BuilderNotices({items}:{items:(BuilderMaintenance&{revision:number;eventId?:string})[]}){
+ if(!items?.length)return null;
+ const list=(notices:typeof items)=><ol className="plain-record-list">{notices.slice().reverse().map(item=><li key={item.eventId??item.id}><h3>{builderMaintenanceNames[item.action]??item.action}</h3><p className="reading-prose">{item.summary}</p><p className="record-meta">第 {item.revision} 次登记更新</p></li>)}</ol>;
+ return <section className="professional-section"><h2>维护与变化</h2>{list(items.slice(-2))}{items.length>2&&<ReadingDetails><ReadingSummary>此前的维护公告</ReadingSummary>{list(items.slice(0,-2))}</ReadingDetails>}</section>;
+}
 
-export function BuilderScopeReportView({value:e}:{value:BuilderReport}){return <div className="professional-record"><p><Ref href={e.suite.source}>{e.suite?.name} {e.suite?.version}</Ref></p><p>验证方式：{builderTestNames[e.run.testClass]??e.run.testClass}</p><p className="reading-prose">{e.run.environment}</p><p>运行：{e.run.id} · 执行器 {e.run.runnerVersion}</p>{e.run.peer&&<p>互通对象：{e.run.peer.name} {e.run.peer.version}</p>}<p>观察于 {new Date(e.observedAt*1000).toLocaleString('zh-CN')}，适用至 {new Date(e.expiresAt*1000).toLocaleString('zh-CN')}。</p><ul className="plain-record-list">{e.checks?.map((c)=><li key={c.action}><strong>{builderActionName(c.action)}</strong> · {reportStatusNames[c.status]}<p className="reading-prose">{c.detail}</p></li>)}</ul><p className="reading-prose">报告限制：{e.limitations}</p><details className="technical-details"><summary>用于复核的准确版本</summary><dl><dt>测试套件 SHA-256</dt><dd>{e.suite.sha256}</dd><dt>受测源码 SHA-256</dt><dd>{e.run.sourceHash}</dd><dt>报告 SHA-256</dt><dd>{e.run.reportHash}</dd></dl></details></div>;}
+export function BuilderScopeReportView({value:e}:{value:BuilderReport}){return <div className="professional-record"><p><Ref href={e.suite.source}>{e.suite?.name} {e.suite?.version}</Ref></p><p>验证方式：{builderTestNames[e.run.testClass]??e.run.testClass}</p><p className="reading-prose">{e.run.environment}</p><p>运行：{e.run.id} · 执行器 {e.run.runnerVersion}</p>{e.run.peer&&<p>互通对象：{e.run.peer.name} {e.run.peer.version}</p>}<p>观察于 {new Date(e.observedAt*1000).toLocaleString('zh-CN')}，适用至 {new Date(e.expiresAt*1000).toLocaleString('zh-CN')}。</p><ul className="plain-record-list">{e.checks?.map((c)=><li key={c.action}><strong>{builderActionName(c.action)}</strong> · {reportStatusNames[c.status]}<p className="reading-prose">{c.detail}</p></li>)}</ul><p className="reading-prose">报告限制：{e.limitations}</p><ReadingDetails className="technical-details"><ReadingSummary>用于复核的准确版本</ReadingSummary><dl><dt>测试套件 SHA-256</dt><dd>{e.suite.sha256}</dd><dt>受测源码 SHA-256</dt><dd>{e.run.sourceHash}</dd><dt>报告 SHA-256</dt><dd>{e.run.reportHash}</dd></dl></ReadingDetails></div>;}
 
 export function BuilderDeclarationView({value:d}:{value?:BuilderDeclaration|null}){
   if(!d)return null;

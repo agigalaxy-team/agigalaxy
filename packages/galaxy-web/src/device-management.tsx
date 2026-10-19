@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {KeyRound,Laptop,Monitor} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -90,19 +91,19 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
     <ul className="device-list">{current.devices.map(device=><li className={'device-row'+(device.currentDevice?' is-current-device':'')} key={device.deviceId}>
      <span className="device-glyph">{device.currentDevice?<Laptop size={27} aria-hidden="true"/>:<Monitor size={27} aria-hidden="true"/>}</span><div>
       <div className="device-row-heading"><h3>{deviceName(device)}</h3><span className={'setting-signal '+(device.state==='active'&&device.epoch===current.epoch?'is-current':'is-neutral')}>{states[device.state]??'状态暂不可用'}</span></div><p className="device-permission-overview">{permissionOverview(device.scopes)}{device.currentDevice&&(connected?' · 本次连接使用这台设备':' · 本机保存的设备')}</p>
-      <details className="service-details"><summary>设备与权限详情</summary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.map(identityPermissionLabel).join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></details>
+      <ReadingDetails className="service-details"><ReadingSummary>设备与权限详情</ReadingSummary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.map(identityPermissionLabel).join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></ReadingDetails>
       {device.canRevoke&&<Button type="button" variant="outline" disabled={busy||!!pending.active} onClick={()=>prepare(device.deviceId)}>撤销此设备</Button>}
       {device.currentDevice&&device.state==='active'&&current.canManage&&!device.canRevoke&&<p className="device-muted">这是最后一个管理设备。先设置恢复码或连接另一台管理设备，再撤销本机。</p>}
      </div>
     </li>)}</ul>{!current.devices.length&&<p>没有可显示的设备。</p>}
     <div className="device-recovery-overview"><KeyRound size={24} aria-hidden="true"/><div><strong>恢复码</strong><p>{current.recoveryConfigured?'保管好已保存的恢复码，遗失设备时可用它接回。':'尚未设置，换设备时也可以由已有管理设备批准。'}</p></div><span className="setting-signal is-neutral">{current.recoveryConfigured?'已设置':'尚未设置'}</span></div>
-    <details className="service-details"><summary>当前服务与核对时间</summary><p className="break-all">{current.endpoint}</p><p>最近核对：{new Date(current.checkedAt).toLocaleString('zh-CN')}</p></details>
+    <ReadingDetails className="service-details"><ReadingSummary>当前服务与核对时间</ReadingSummary><p className="break-all">{current.endpoint}</p><p>最近核对：{new Date(current.checkedAt).toLocaleString('zh-CN')}</p></ReadingDetails>
    </>}
    {preview&&<section className="device-confirm" aria-label="撤销设备" tabIndex={-1} ref={reviewElement}>
     <h3>撤销{deviceName(preview.target)}？</h3>
     <p>撤销后，它将无法继续在当前服务使用这个身份。{preview.target.currentDevice?'当前设备也会断开连接。':''}</p>
     <p className="device-muted">银河身份、历史和资料保留。</p>
-    <details className="service-details"><summary>确认的设备与范围</summary><dl><dt>设备</dt><dd><code>{preview.target.deviceId}</code></dd><dt>服务</dt><dd className="break-all">{preview.endpoint}</dd><dt>权限</dt><dd>{preview.target.scopes.join('、')}</dd><dt>确认有效至</dt><dd>{new Date(preview.expiresAt*1000).toLocaleString()}</dd><dt>原操作</dt><dd><code>{preview.operationId}</code></dd></dl></details>
+    <ReadingDetails mode="inline" className="service-details"><ReadingSummary>确认的设备与范围</ReadingSummary><dl><dt>设备</dt><dd><code>{preview.target.deviceId}</code></dd><dt>服务</dt><dd className="break-all">{preview.endpoint}</dd><dt>权限</dt><dd>{preview.target.scopes.join('、')}</dd><dt>确认有效至</dt><dd>{new Date(preview.expiresAt*1000).toLocaleString()}</dd><dt>原操作</dt><dd><code>{preview.operationId}</code></dd></dl></ReadingDetails>
     <div className="button-row"><Button disabled={busy||!current?.canManage} onClick={()=>void run(async valid=>{const exact=preview;setPreview(null);const r=await management.confirm(exact,{confirmed:true});if(valid()){setNotice(receiptText(r));if(r.state==='committed')lastApplied.current.add(r.operationId);await onChanged.current?.();}})}>确认撤销</Button><Button variant="ghost" disabled={busy} onClick={()=>void run(async valid=>{const id=preview.operationId;setPreview(null);await management.stopRetry(id,{confirmed:true});if(valid())setNotice('已停止继续发送。');})}>暂不撤销</Button></div>
    </section>}
    {pending.active&&!preview&&<section className="device-confirm" aria-label="上次的设备操作">
@@ -111,7 +112,7 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
     {!pending.active.localRetryStopped&&current?.canManage&&(activeReceipt?.registered===false||['prepared','requested','preparing'].includes(pending.active.state))&&<Button disabled={busy} onClick={()=>prepare(pending.active!.deviceId)}>继续上次的选择</Button>}
     {!pending.active.localRetryStopped&&<Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{const r=await management.stopRetry(pending.active!.operationId,{confirmed:true});setNotice(receiptText(r));})}>停止继续发送</Button>}
    </section>}
-   {pending.history.length>0&&<details className="service-details"><summary>以前的设备操作</summary><ul className="device-list">{pending.history.map(row=><li key={row.operationId}><p>设备 {row.deviceId.slice(-6)} · {states[row.state]??'结果待确认'}</p><button className="text-link" disabled={busy} onClick={()=>void run(async valid=>{const r=await management.reconcile(row.operationId);if(valid())setHistoryReceipt(r);})}>查看详情</button>{historyReceipt?.operationId===row.operationId&&<p>{receiptText(historyReceipt)}</p>}</li>)}</ul></details>}
+   {pending.history.length>0&&<ReadingDetails className="service-details"><ReadingSummary>以前的设备操作</ReadingSummary><ul className="device-list">{pending.history.map(row=><li key={row.operationId}><p>设备 {row.deviceId.slice(-6)} · {states[row.state]??'结果待确认'}</p><button className="text-link" disabled={busy} onClick={()=>void run(async valid=>{const r=await management.reconcile(row.operationId);if(valid())setHistoryReceipt(r);})}>查看详情</button>{historyReceipt?.operationId===row.operationId&&<p>{receiptText(historyReceipt)}</p>}</li>)}</ul></ReadingDetails>}
   </>}
  </section>;
 }

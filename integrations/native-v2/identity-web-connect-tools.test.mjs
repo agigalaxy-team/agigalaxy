@@ -73,7 +73,8 @@ async function fixture(){
  async function prepare(options={}){
   const input={requestId:randomUUID(),object:{kind:'task',id:task.taskId},origin,scopes:[...webIdentityDefaultScopes],...options};
   const info=await attached.call(connectName,input);assert.equal(info.subjectId,subjectId);
-  const targetPath=input.continueWith?.kind==='method-search'?'/app/search?'+new URLSearchParams({q:input.continueWith.query,sourceTask:task.taskId,returnTo:'/app/tasks/'+task.taskId+'?section=collaboration'}).toString()
+  const targetPath=input.object.kind==='account'?(input.object.section==='association'?'/app/settings/identity?section=account':'/app/account'+(input.object.section==='access'?'?section=access':''))
+   :input.continueWith?.kind==='method-search'?'/app/search?'+new URLSearchParams({q:input.continueWith.query,sourceTask:task.taskId,returnTo:'/app/tasks/'+task.taskId+'?section=collaboration'}).toString()
    :input.continueWith?'/app/capsules/'+input.continueWith.id+'/versions/'+input.continueWith.versionId+'?'
    +new URLSearchParams({sourceTask:task.taskId,returnTo:'/app/tasks/'+task.taskId+'?section=collaboration'}).toString():'/app/tasks/'+task.taskId;
   assert.equal(info.targetPath,targetPath);assert.equal(info.publicPacketsOnly,true);
@@ -289,9 +290,10 @@ test('revoking the original Native stops its pending proof/approval; delegated w
 
 test('identity bridge target routes require known local app paths and exact UUID components',()=>{
  for(const path of ['/app/tasks/'+randomUUID(),'/app/rooms/'+randomUUID(),'/app/projects/'+randomUUID(),
-  '/app/capsules/'+randomUUID()+'/versions/'+randomUUID(),'/app/publish','/app/settings/privacy'])assert.equal(isWebIdentityTargetPath(path),true,path);
+  '/app/capsules/'+randomUUID()+'/versions/'+randomUUID(),'/app/publish','/app/settings/privacy','/app/account','/app/account?section=access','/app/settings/identity?section=account'])assert.equal(isWebIdentityTargetPath(path),true,path);
  for(const path of ['//selected.example/app/publish','https://selected.example/app/publish','/app/settings/identity','/app/tasks/'+'-'.repeat(36),
-  '/app/tasks/'+randomUUID()+'?returnTo=https://evil.example','/app/%70ublish','/app/../publish','/app/publish#work','/app/publish\\evil'])assert.equal(isWebIdentityTargetPath(path),false,path);
+  '/app/tasks/'+randomUUID()+'?returnTo=https://evil.example','/app/%70ublish','/app/../publish','/app/publish#work','/app/publish\\evil',
+  '/app/account?section=access&extra=true','/app/settings/identity?section=account#other','/app/settings/identity?section=account&returnTo=%2Fapp%2Faccount'])assert.equal(isWebIdentityTargetPath(path),false,path);
  const taskId=randomUUID(),capsuleId=randomUUID(),versionId=randomUUID(),base='/app/capsules/'+capsuleId+'/versions/'+versionId;
  const query=new URLSearchParams({sourceTask:taskId,returnTo:'/app/tasks/'+taskId+'?section=collaboration'}).toString(),path=base+'?'+query;
  assert.equal(isWebIdentityTargetPath(path),true,path);
@@ -310,6 +312,17 @@ test('identity bridge target routes require known local app paths and exact UUID
   '/app/tasks/'+taskId+'?'+query,base+'?'+query+'?extra=true'])assert.equal(isWebIdentityTargetPath(bad),false,bad);
 });
 
+test('account handoff signs only the chosen fixed account destination and retains its native original work',{timeout:60000},async()=>{
+ const x=await fixture();try{
+  for(const section of[undefined,'access','association']){
+   const object={kind:'account',...(section?{section}:{})},bridge=await x.prepare({object}),nonce=randomUUID();
+   const ready=await bridge.message('ready',{nonce,existingDevice:null});await x.verifyProof(ready.context,nonce,null,bridge.info.targetPath);
+   const navigation=await x.original.store.get('navigation:'+bridge.info.navigationId);assert.deepEqual(navigation.object,object);assert.deepEqual(navigation.origin,x.origin);
+   assert.ok(!JSON.stringify(ready.context).includes(x.origin.workRef));await bridge.choose('decline');
+  }
+ }finally{await x.cleanup();}
+});
+
 test('method search signs the actual query and exact original Task return without creating a Capsule or transferring the private work reference',{timeout:60000},async()=>{
  const x=await fixture();
  try{
@@ -319,8 +332,8 @@ test('method search signs the actual query and exact original Task return withou
   assert.equal(bridge.info.targetPath,expected);
   const html=await(await fetch(bridge.info.url)).text();
   assert.match(html,/围绕“原页面说明 阅读方法”查找方法，随后返回原求助/);
-  assert.ok(html.includes('<details><summary>准确身份与原目标</summary>'));
-  assert.equal(html.slice(0,html.indexOf('<details>')).includes(x.subjectId),false);
+  assert.ok(html.includes('<section aria-label="准确身份与原目标"><h2>准确身份与原目标</h2>'));
+  assert.equal(html.includes('<details>'),false);
   const navigation=await x.original.store.get('navigation:'+bridge.info.navigationId);
   assert.deepEqual(navigation.object,{kind:'task',id:x.task.taskId});assert.deepEqual(navigation.origin,x.origin);
   const nonce=randomUUID(),ready=await bridge.message('ready',{nonce,existingDevice:null});

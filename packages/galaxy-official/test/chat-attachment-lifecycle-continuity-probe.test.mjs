@@ -8,7 +8,7 @@ import { attachmentContractFixture } from './chat-attachments-workflow.mjs';
 import { createApi } from '../src/http.mjs';
 import { ChatAttachmentsService } from '../src/chat-attachments.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import { createAttachmentsClient } from '../../galaxy-web/src/chat-attachments-client.mjs';
 
 // B diagnostic only: real signed Binding/WebRuntime/HTTP/PGlite. The local
@@ -37,8 +37,8 @@ test('diagnostic: same GUID reconnect while original attachment journal is read 
       return value;
     }, put: async (key, value) => { records.set(key, structuredClone(value)); await putHook?.(key, value); },
     update: memoryAtomicUpdate(records,async(key,value)=>{await putHook?.(key,value);}) };
-    runtime = await createWebRuntime({ endpoint: f.bindings.endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: fetcher, now: () => f.now });
-    await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
+    runtime = await createExistingWebRuntime({ endpoint: f.bindings.endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: fetcher, now: () => f.now });
+    await runtime.connect({ confirmed: true });
     const room = await runtime.chat.create({ title: 'Attachment old intent lease diagnostic' }, { confirmed: true });
     const files = createAttachmentsClient(runtime), original = runtime.api.snapshot();
     let replacement;

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { seedExistingWebIdentity } from './existing-web-identity-fixture.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
@@ -30,6 +31,7 @@ test('lost Consent before receipt requires explicit reauthorization after reconn
       if (dropTask && path === '/v2/tasks') { dropTask = false; assert.equal(response.status, 200); throw new Error('task committed but receipt lost'); }
       return response;
     };
+    await seedExistingWebIdentity(config, { store, fetch: fetcher, now: () => f.now });
     runtime = await createWebRuntime(config, { store, fetch: fetcher, now: () => f.now, website:websiteOrigin });
     await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
     await retainTaskContactAgent(runtime,store,f.now);
@@ -56,7 +58,7 @@ test('lost Consent before receipt requires explicit reauthorization after reconn
     assert.equal((await runtime.api.call(`/v2/tasks/${receipt.taskId}`, null, { method: 'GET' })).version, 1);
   } finally { runtime?.close(); await new Promise(resolve => api.close(resolve)); await f.db.close(); }
 });
-test('browser workspace creates real device identity, reconnects, publishes without a failure Case and restores lost task receipt', async () => {
+test('browser workspace requires local identity creation, then resumes an existing device, publishes without a failure Case and restores lost task receipt', async () => {
   const websiteOrigin = 'https://galaxy.example.org';
   const f = await serviceFixture(browserScopes, null, { now: Math.floor(Date.now() / 1000) }), api = createApi({ ...f, browserOrigins: [websiteOrigin], rateLimit: 1000 });
   let runtime, recovered, participant; const transmissions = []; let dropTask = false, dropEvent = false, dropDeclaration = false;
@@ -75,7 +77,10 @@ test('browser workspace creates real device identity, reconnects, publishes with
     assert.equal(allowed.status, 204); assert.equal(allowed.headers.get('access-control-allow-credentials'), null);
     const denied = await fetch(local + '/v2/tasks', { headers: { Origin: 'https://galaxy.example.org.evil.example' } });
     assert.equal(denied.status, 403); assert.equal(denied.headers.get('access-control-allow-origin'), null);
-    await assert.rejects(runtime.createIdentity(), /确认/);
+    await assert.rejects(runtime.createIdentity(), { code: 'local_galaxy_required' });
+    await assert.rejects(runtime.createIdentity({ confirmed: true }), { code: 'local_galaxy_required' });
+    runtime.close(); await seedExistingWebIdentity(config, { store, fetch: fetcher, now: () => f.now });
+    runtime = await createWebRuntime(config, { store, fetch: fetcher, now: () => f.now, website:websiteOrigin });
     const created = await runtime.createIdentity({ confirmed: true });
     assert.ok(created.identity.subjectId.startsWith('GUID')); assert.equal(created.connection, null);
     await runtime.connect({ confirmed: true }); assert.equal((await runtime.status()).connection.subjectId, created.identity.subjectId);
@@ -88,7 +93,8 @@ test('browser workspace creates real device identity, reconnects, publishes with
     const receipt = await runtime.reconcilePublication(); assert.equal(receipt.state, 'acknowledged');
     const task = await runtime.api.call(`/v2/tasks/${receipt.taskId}`, null, { method: 'GET' }); assert.equal(task.caseId, null);
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM cases WHERE subject_id=$1', [created.identity.subjectId])).rows[0].n, 0);
-    const participantStore=localStore();participant = await createWebRuntime(config, { store: participantStore, fetch: fetcher, now: () => f.now, website:websiteOrigin });
+    const participantStore=localStore();await seedExistingWebIdentity(config, { store: participantStore, fetch: fetcher, now: () => f.now });
+    participant = await createWebRuntime(config, { store: participantStore, fetch: fetcher, now: () => f.now, website:websiteOrigin });
     await participant.createIdentity({ confirmed: true }); await participant.connect({ confirmed: true });
     await retainTaskContactAgent(participant,participantStore,f.now);
     const providerId = (await participant.status()).identity.subjectId;

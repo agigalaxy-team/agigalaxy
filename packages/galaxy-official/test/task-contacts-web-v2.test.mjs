@@ -6,7 +6,7 @@ import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
 import { createOidcLoginProvider } from '../src/oidc-login.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import {
   taskDraft,
   publicationFromDraft,
@@ -87,7 +87,7 @@ test(
         config = { endpoint, trustedKeys: f.bindings.trustedKeys };
       const stores = new WeakMap();
     const make = async (store) => {
-        const rt = await createWebRuntime(config, {
+        const rt = await createExistingWebRuntime(config, {
           store,
           fetch: wire,
           now: () => now,
@@ -101,7 +101,6 @@ test(
       const b = await make(storage()),
         c = await make(storage());
       for (const [index, rt] of [a, b, c].entries()) {
-        await rt.createIdentity({ confirmed: true });
         await rt.connect({ confirmed: true });
         await retainTaskContactAgent(rt, stores.get(rt), now);
         issuer.setAccount(`synthetic-task-contact-${index}`);
@@ -113,7 +112,7 @@ test(
           (await fetch(origin + callback.pathname + callback.search)).status,
           200,
         );
-        await rt.confirmAccountLink(login.loginId, { confirmed: true });
+        await confirmFixtureAccountLink(rt, login.loginId);
       }
       const aid = a.api.snapshot().subjectId,
         bid = b.api.snapshot().subjectId,

@@ -8,7 +8,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createNativeRuntime} from '../../galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {verifyTrustPackage} from '../src/trust-package.mjs';
 import {createTrustPackageDeviceAdapter} from '../src/trust-package-device-adapter.mjs';
 
@@ -42,8 +42,8 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   native.close();native=await createNativeRuntime({...config,dataDirectory:directory,website:'https://galaxy.example',fetch:fetcher,now:()=>f.now});
   await exportOffline(native,id,1);
   const records=new Map(),store={get:async key=>records.get(key),put:async(key,value)=>records.set(key,value),update:memoryAtomicUpdate(records)};
-  web=await createWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});
-  await web.createIdentity({confirmed:true});await web.connect({confirmed:true});const browserId=(await web.status()).identity.subjectId;
+  web=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});
+  await web.connect({confirmed:true});const browserId=(await web.status()).identity.subjectId;
   await web.disconnect();await exportOffline(web,browserId,1);
   const before=requests;await web.trustPackages.refreshIdentity();assert.ok(requests>before,'refresh is an explicit network operation');
   await exportOffline(web,browserId,1);

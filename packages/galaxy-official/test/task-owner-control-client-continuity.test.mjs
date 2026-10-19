@@ -7,7 +7,7 @@ import {join,resolve,dirname,basename} from 'node:path';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createTaskOwnerReadClient} from '../../galaxy-web/src/task-owner-read-client.mjs';
 import {createTaskOwnerControlClient} from '../../galaxy-web/src/task-owner-control-client.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
@@ -29,7 +29,7 @@ async function fixture({legacyFault=null,legacyKind='cancel',legacySpaced=false}
   async declareSaved(subjectId,id){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),saveDeclared:true});},
   async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),receipt});}};
  let origin;
- const start=async()=>{const r=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+ const start=async()=>{const r=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
   fetch:async(url,options)=>{const path=new URL(url).pathname;if(offline&&path==='/v2/tasks/receipt')throw new Error('synthetic receipt offline');
    if(legacyArmed&&path.endsWith('/events')&&legacyFault==='absent'){legacyArmed=false;throw new Error('synthetic legacy dispatch unavailable');}
    if(path==='/v1/consents'||path.endsWith('/owner-control'))writes.push(path);const response=await fetch(origin+path,options);
@@ -38,7 +38,7 @@ async function fixture({legacyFault=null,legacyKind='cancel',legacySpaced=false}
   runtimes.push(r);return r;};
  try{
   await new Promise(r=>api.listen(0,'127.0.0.1',r));origin=`http://127.0.0.1:${api.address().port}`;runtime=await start();
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});const recovery=await runtime.prepareRecovery();await runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
+  await runtime.connect({confirmed:true});const recovery=await runtime.prepareRecovery();await runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
   const task={operationId:randomUUID(),taskId:randomUUID(),caseId:null,intent:'proactive-review',title:'Synthetic original private work',
    summary:'Do not transform the partial projection into a complete Task',workContext:{goal:'Keep original facts',currentSituation:'Same-ID device recovery',attemptRefs:[]},
    visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:f.now+10000};
@@ -59,9 +59,9 @@ async function fixture({legacyFault=null,legacyKind='cancel',legacySpaced=false}
     let v=await getOther(key);if(!v){v={...await createRecoveryMaterial(subjectId),operationId};await putOther(key,v);}return v;},
     async declareSaved(subjectId,id){const key=`pending-recovery:${subjectId}:${id}`;await putOther(key,{...await getOther(key),saveDeclared:true});},
     async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await putOther(key,{...await getOther(key),receipt});}};
-   const other=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:otherStore,now:()=>f.now,
+   const other=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:otherStore,now:()=>f.now,
     fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});runtimes.push(other);
-   await other.createIdentity({confirmed:true});await other.connect({confirmed:true});const material=await other.prepareRecovery();await other.saveRecovery({operationId:material.operationId,confirmed:true});
+   await other.connect({confirmed:true});const material=await other.prepareRecovery();await other.saveRecovery({operationId:material.operationId,confirmed:true});
    const recoveredOther=await runtime.recover(material.code,{confirmed:true});await runtime.confirmRecoveredCode({operationId:recoveredOther.operationId,confirmed:true});await runtime.connect({confirmed:true});
   };
   return{f,task,original,legacyRecord,writes,subjectId:runtime.api.snapshot().subjectId,get runtime(){return runtime;},store,directory,

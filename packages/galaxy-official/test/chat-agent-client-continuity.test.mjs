@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import { createChatAgentClient } from '../../galaxy-web/src/chat-agent-client.mjs';
 
 async function fixture() {
@@ -20,7 +20,7 @@ async function fixture() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const local = 'http://127.0.0.1:' + server.address().port;
   async function open() {
-    const runtime = await createWebRuntime({ endpoint: f.bindings.endpoint, trustedKeys: f.bindings.trustedKeys }, {
+    const runtime = await createExistingWebRuntime({ endpoint: f.bindings.endpoint, trustedKeys: f.bindings.trustedKeys }, {
       store, now: () => f.now, fetch: async (url, options) => {
         const path = new URL(url).pathname;
         if (path.endsWith('/agent-grant')) counts.grant++;
@@ -40,7 +40,6 @@ async function fixture() {
   }
   try {
     const runtime = await open();
-    await runtime.createIdentity({ confirmed: true });
     await runtime.connect({ confirmed: true });
     const room = await runtime.chat.create({ title: 'Synthetic room Agent lease continuity' }, { confirmed: true });
     return { f, runtime, room, values, counts, open,

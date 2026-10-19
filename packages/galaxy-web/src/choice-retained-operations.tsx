@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
 import {createChoiceSyncClient} from './choice-sync-client.mjs';
@@ -55,14 +56,14 @@ function RetainedOperations({client,lease,titles={},onResolved}:RetainedProps){
  useEffect(()=>{const viewEpoch=epoch;viewEpoch.current++;void refreshRef.current();const observe=()=>{if(!document.hidden)void refreshRef.current();};const timer=window.setInterval(observe,20000);document.addEventListener('visibilitychange',observe);return()=>{viewEpoch.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',observe);};},[client,lease]);
  useEffect(()=>{if(open)void refreshRef.current();},[open,limit]);
  if(!rows.length&&!error)return null;
- return <details className="choice-retained" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>查看以前的保存结果</summary>
+ return <ReadingDetails className="choice-retained" open={open} onOpenChange={isOpen=>setOpen(isOpen)}><ReadingSummary>查看以前的保存结果</ReadingSummary>
   {busy&&<p className="muted">正在读取…</p>}{error&&<p role="alert">{error}<button className="text-link" disabled={busy} onClick={()=>void refreshRef.current()}>重试</button></p>}
   {rows.slice(0,limit).map(row=>{const result=receipts[row.versionId],receipt=result?.state==='acknowledged'?result.receipt:null;return <article className="choice-retained-row" key={row.versionId}>
    <header><strong>{titles[row.snapshotId]??'参考记录 '+row.snapshotId.slice(-4)}</strong><span>{stateLabel[result?.state??row.originalState]??'暂未确认'}</span></header>
    {receipt?<p>{storedLabel[receipt.storedState]??'原保存已收到'} · {new Date(receipt.acceptedAt).toLocaleString('zh-CN')}</p>:result?.state==='absent'?<p>暂未查到这次保存的记录，可能未收到或记录已经清理。</p>:result?.state==='conflict'?<p>记录信息不一致，原内容没有重新发送。</p>:null}
-   <details><summary>记录详情</summary><dl><dt>参考记录</dt><dd>{row.snapshotId}</dd><dt>原版本</dt><dd>{row.versionId}</dd><dt>校验值</dt><dd>{row.requestHash}</dd>{receipt&&<><dt>副本期限</dt><dd>{new Date(receipt.contentExpiresAt).toLocaleString('zh-CN')}</dd></>}</dl></details>
+   <ReadingDetails><ReadingSummary>记录详情</ReadingSummary><dl><dt>参考记录</dt><dd>{row.snapshotId}</dd><dt>原版本</dt><dd>{row.versionId}</dd><dt>校验值</dt><dd>{row.requestHash}</dd>{receipt&&<><dt>副本期限</dt><dd>{new Date(receipt.contentExpiresAt).toLocaleString('zh-CN')}</dd></>}</dl></ReadingDetails>
   </article>;})}
   {rows.length>limit&&<Button variant="ghost" disabled={busy} onClick={()=>setLimit(v=>v+6)}>更早的保存</Button>}
   <p className="muted">这里仅记录是否收到过保存，不代表原内容现在仍可读取。</p>
- </details>;
+ </ReadingDetails>;
 }

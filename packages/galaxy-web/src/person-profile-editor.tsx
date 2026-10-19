@@ -1,5 +1,6 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useEffectEvent,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
-import {ArrowLeft,ChevronDown,Plus,Trash2} from 'lucide-react';
+import {Plus, Trash2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
@@ -56,16 +57,15 @@ function PeoplePicker({runtime,client,subjectId,value,onChange,disabled}:{runtim
 }
 
 function ProjectEditor({value,onChange,onRemove,index}:{value:ProjectInput;onChange:(value:ProjectInput)=>void;onRemove:()=>void;index:number}){
- const [expanded,setExpanded]=useState(!value.title),[technical,setTechnical]=useState(!!value.technologies||!!value.functions||value.discoverable),fieldId=useId();
+ const fieldId=useId();
  const change=(patch:Partial<ProjectInput>)=>onChange({...value,...patch});
- return <article className="person-project-editor"><header><button type="button" className="person-project-toggle" aria-expanded={expanded} onClick={()=>setExpanded(old=>!old)}><span>{value.title||'新项目介绍'}<small>{value.kind==='module'?'可复用模块':'项目'}{!expanded&&value.summary?' · '+value.summary.slice(0,75):''}</small></span><ChevronDown size={18}/></button><button type="button" className="person-project-remove" aria-label={'移除'+(value.title||'项目介绍 '+(index+1))} onClick={onRemove}><Trash2 size={16}/><span>移除</span></button></header>
-  <div hidden={!expanded} className="person-project-fields" onInvalidCapture={event=>{if(!expanded){event.preventDefault();const field=event.target as HTMLInputElement|HTMLTextAreaElement;setExpanded(true);requestAnimationFrame(()=>{field.focus();field.reportValidity();});}}}>
+ return <article className="person-project-editor"><header><h3>{value.title||'新项目介绍'}<small>{value.kind==='module'?'可复用模块':'项目'}</small></h3><button type="button" className="person-project-remove" aria-label={'移除'+(value.title||'项目介绍 '+(index+1))} onClick={onRemove}><Trash2 size={16}/><span>移除</span></button></header>
+  <div className="person-project-fields">
    <div className="person-project-title"><label htmlFor={fieldId+'-title'}>名称<Input id={fieldId+'-title'} aria-label={'项目 '+(index+1)+' 名称'} required value={value.title} maxLength={120} onChange={event=>change({title:event.target.value})}/></label><label>类型<select aria-label={'项目 '+(index+1)+' 类型'} value={value.kind} onChange={event=>change({kind:event.target.value==='module'?'module':'project'})}><option value="project">作品或项目</option><option value="module">可复用模块</option></select></label></div>
    <label htmlFor={fieldId+'-summary'}>介绍<Textarea id={fieldId+'-summary'} aria-label={'项目 '+(index+1)+' 介绍'} required rows={4} value={value.summary} maxLength={2000} onChange={event=>change({summary:event.target.value})} placeholder="介绍作品的内容、当前进展，以及你在其中做的事。"/></label>
    <label htmlFor={fieldId+'-url'}>项目链接<span className="person-field-optional">可选</span><Input id={fieldId+'-url'} aria-label={'项目 '+(index+1)+' 链接'} type="url" value={value.sourceUrl??''} maxLength={2048} onChange={event=>change({sourceUrl:event.target.value})} placeholder="https://…"/></label>
-   <label className="person-checkbox"><input type="checkbox" checked={value.discoverable} onChange={event=>{change({discoverable:event.target.checked});if(event.target.checked)setTechnical(true);}}/><span>允许按内容方向发现这份作品<small>遵循下方资料范围，并沿用你的发现设置。</small></span></label>
-   {!technical&&<button type="button" className="text-link" onClick={()=>setTechnical(true)}>补充内容方向与工具</button>}
-   {technical&&<><label htmlFor={fieldId+'-functions'}>内容与涉及方向{!value.discoverable&&<span className="person-field-optional">可选</span>}<Input id={fieldId+'-functions'} aria-label={'项目 '+(index+1)+' 内容与涉及方向'} required={value.discoverable} value={value.functions} onChange={event=>change({functions:event.target.value})} placeholder="用逗号分隔，例如：整理资料，协作编辑"/></label><label htmlFor={fieldId+'-technologies'}>使用的工具与技术<span className="person-field-optional">可选</span><Input id={fieldId+'-technologies'} aria-label={'项目 '+(index+1)+' 使用的工具与技术'} value={value.technologies} onChange={event=>change({technologies:event.target.value})} placeholder="用逗号分隔"/></label></>}
+   <label className="person-checkbox"><input type="checkbox" checked={value.discoverable} onChange={event=>{change({discoverable:event.target.checked});}}/><span>允许按内容方向发现这份作品<small>遵循下方资料范围，并沿用你的发现设置。</small></span></label>
+   <><label htmlFor={fieldId+'-functions'}>内容与涉及方向{!value.discoverable&&<span className="person-field-optional">可选</span>}<Input id={fieldId+'-functions'} aria-label={'项目 '+(index+1)+' 内容与涉及方向'} required={value.discoverable} value={value.functions} onChange={event=>change({functions:event.target.value})} placeholder="用逗号分隔，例如：整理资料，协作编辑"/></label><label htmlFor={fieldId+'-technologies'}>使用的工具与技术<span className="person-field-optional">可选</span><Input id={fieldId+'-technologies'} aria-label={'项目 '+(index+1)+' 使用的工具与技术'} value={value.technologies} onChange={event=>change({technologies:event.target.value})} placeholder="用逗号分隔"/></label></>
   </div>
  </article>;
 }
@@ -97,7 +97,7 @@ export function PersonProfileEditor(props:Props){
  useEffect(()=>()=>client?.close(),[client]);
  const initial=owner?draftFromOwner(owner):savedDraft;
  const available=localReady&&!!initial&&(!!savedDraft||owner?.readable||owner?.revision===0||startFresh);
- return <article className="person-profile person-edit"><button type="button" className="person-return" onClick={onClose}><ArrowLeft size={16}/>返回个人资料</button><header className="person-edit-heading"><h1>编辑个人资料</h1><p>让别人认识你，以及你关注和参与的事情。</p></header>
+ return <article className="person-profile person-edit"><button type="button" className="person-return" onClick={onClose}>返回个人资料</button><header className="person-edit-heading"><h1>编辑个人资料</h1><p>让别人认识你，以及你关注和参与的事情。</p></header>
   {!connected?<div className="person-edit-recovery"><p>使用本人的身份后，可以继续编辑这份资料。</p><Button onClick={onNeedIdentity}>继续使用我的身份</Button></div>:<>
    {loading&&!available&&<output>正在读取本人资料和本机草稿…</output>}
    {error&&<p className="person-read-error" role="alert">{error}<button type="button" onClick={()=>{setLoading(true);setRetry(value=>value+1);}}>重新读取</button></p>}
@@ -183,7 +183,7 @@ function ProfileEditorForm({runtime,subjectId,client,draftKey,initial,serverOwne
    {!conflict.readable&&conflict.revision>0?<p>最新资料目前不可读取，暂时不能合并。本页修改仍保留。</p>:latest&&<div className="person-profile-differences">{differences.map(group=><section key={group}><h3>{groupTitles[group]}</h3><div><div><h4>最新资料</h4><DifferenceValue value={latest} group={group} subjectId={subjectId} names={names}/></div><div><h4>本页内容</h4><DifferenceValue value={values} group={group} subjectId={subjectId} names={names}/></div></div></section>)}</div>}
    <div className="button-row"><Button disabled={busy||!conflict.readable&&conflict.revision>0} onClick={()=>void resolveConflict('mine')}>继续本页修改</Button><Button variant="outline" disabled={busy||!conflict.readable&&conflict.revision>0} onClick={()=>void resolveConflict('latest')}>采用最新资料</Button><Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{const value=await client.ownerRead();if(current())setConflict(value);})}>重新读取</Button></div>
   </section>}
-  {pending&&!conflict&&<section className="person-edit-recovery" aria-label="继续刚才的保存"><h2>{sharingExpired?'本次分享时间已结束':authorizationReview?'继续保存原来的内容':'正在核对刚才的保存'}</h2><p>{sharingExpired?'原内容仍在，可以修改实际分享范围后再保存。':'本次提交会继续使用原来的内容与分享范围，核对期间不会另存一份。'}</p>{pendingValues&&<details><summary>本次保存的内容</summary>{groups.map(group=><section key={group}><h3>{groupTitles[group]}</h3><DifferenceValue value={pendingValues} group={group} subjectId={subjectId} names={names}/></section>)}</details>}<div className="button-row"><Button disabled={busy} onClick={()=>sharingExpired?void stopForEditing():authorizationReview?void run(async()=>finish(await client.reauthorize(authorizationReview,{confirmed:true}))):void resume(true)}>{busy?'正在核对…':sharingExpired?'返回修改分享范围':authorizationReview?'继续保存原内容':'重新核对并继续'}</Button><Button variant="ghost" onClick={onClose}>先返回资料</Button></div></section>}
+  {pending&&!conflict&&<section className="person-edit-recovery" aria-label="继续刚才的保存"><h2>{sharingExpired?'本次分享时间已结束':authorizationReview?'继续保存原来的内容':'正在核对刚才的保存'}</h2><p>{sharingExpired?'原内容仍在，可以修改实际分享范围后再保存。':'本次提交会继续使用原来的内容与分享范围，核对期间不会另存一份。'}</p>{pendingValues&&<ReadingDetails><ReadingSummary>本次保存的内容</ReadingSummary>{groups.map(group=><section key={group}><h3>{groupTitles[group]}</h3><DifferenceValue value={pendingValues} group={group} subjectId={subjectId} names={names}/></section>)}</ReadingDetails>}<div className="button-row"><Button disabled={busy} onClick={()=>sharingExpired?void stopForEditing():authorizationReview?void run(async()=>finish(await client.reauthorize(authorizationReview,{confirmed:true}))):void resume(true)}>{busy?'正在核对…':sharingExpired?'返回修改分享范围':authorizationReview?'继续保存原内容':'重新核对并继续'}</Button><Button variant="ghost" onClick={onClose}>先返回资料</Button></div></section>}
   {error&&<p role="alert" className="person-read-error">{error}{!pendingReady&&<button type="button" disabled={busy} onClick={()=>void resume(true)}>重试</button>}</p>}
   {!valid&&<p role="alert">原稿内容暂时无法读取，未覆盖现有资料。</p>}
   {serverOwner&&!serverOwner.readable&&serverOwner.revision>0&&!conflict&&<p className="person-muted">原资料当前不可读取。下方保留的是本机内容；保存后将按本次选择展示。</p>}

@@ -7,6 +7,7 @@ import {createServices} from '../../galaxy-official/src/services.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createWebRuntime} from '../src/runtime.mjs';
+import {seedExistingWebIdentity} from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import {createIdentityControlClient} from '../../galaxy-core/src/domain/identity-control-client.mjs';
 import {createIdentityDeviceHandoff} from '../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import {createBrowserGenesis} from '../../galaxy-core/src/domain/guid-browser-adapter.mjs';
@@ -40,13 +41,14 @@ async function fixture(t,{trustSeconds=200000}={}){
   return response;
  };
  const config={endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys};
- async function web(store=memoryStore()){
+  async function web(store=memoryStore(),{initialize=false}={}){
   const journal={...store,get:async key=>{
    if(drop.signatureBefore&&key.startsWith('device:')&&[...store.records.values()].some(row=>row?.state==='prepared'&&typeof row.payloadJson==='string'&&!row.preparedConsent)){
     drop.signatureBefore=false;throw Error('controlled interruption before original signature');
    }return store.get(key);
   }};
-  const runtime=await createWebRuntime(config,{store:journal,fetch:fetcher,now:()=>clock,website});clients.push(runtime);return{runtime,store};
+   if(initialize)await seedExistingWebIdentity(config,{store:journal,fetch:fetcher,now:()=>clock});
+   const runtime=await createWebRuntime(config,{store:journal,fetch:fetcher,now:()=>clock,website});clients.push(runtime);return{runtime,store};
  }
  const transport=await web(),native=await createDeviceMaterial(),genesis=await createBrowserGenesis({publicKeyPem:native.publicKeyPem,originCode:'5'}),nativeStore=memoryStore();
  const nativeIdentity={subjectId:genesis.id,deviceId:native.deviceId,genesisProof:genesis.genesisProof,installationId:crypto.randomUUID()};await nativeStore.put(`device:${genesis.id}:${native.deviceId}`,native);
@@ -221,8 +223,8 @@ test('automatic Task continuation keeps expired original publication content wit
  assert.deepEqual(await browser.runtime.getLocal('task-publication'),original);
 });
 
-test('browser-only creation keeps ordinary identity and draft, but cannot publish/apply/confirm with a forged local flag',async t=>{
- const x=await fixture(t),browser=await x.web();await browser.runtime.createIdentity({confirmed:true});await browser.runtime.connect({confirmed:true});
+test('an existing browser identity keeps its draft, but cannot publish/apply/confirm with a forged local flag',async t=>{
+  const x=await fixture(t),browser=await x.web(memoryStore(),{initialize:true});await browser.runtime.connect({confirmed:true});
  await browser.runtime.putLocal('task-draft',{title:'Preserve my independent local draft',unknownLegacy:'retained'});
  const identity=(await browser.runtime.status()).identity,before=x.calls.filter(row=>row.path==='/v1/consents').length,taskId=crypto.randomUUID();
  await assert.rejects(browser.runtime.publishTask(draft(x.f),{confirmed:true}),error=>error.code==='agent_identity_required');
@@ -257,9 +259,9 @@ test('lost identity ACK reopens the same operation, then expired transfer proof 
 });
 
 test('a delayed browser handoff cannot overwrite the identity selected by another runtime sharing its local store',async t=>{
- const x=await fixture(t),shared=memoryStore(),stale=await x.web(shared),other=await x.web(shared),request=await x.offer(stale);
+  const x=await fixture(t),shared=memoryStore(),stale=await x.web(shared),request=await x.offer(stale);
  await stale.runtime.putLocal('task-draft',{title:'Original unsent browser draft'});
- await other.runtime.createIdentity({confirmed:true});
+  const other=await x.web(shared,{initialize:true});
  const selected=(await other.runtime.status()).identity,activeKey=`galaxy-web:${x.config.endpoint}:active`,before=await shared.get(activeKey);
  assert.notEqual(selected.subjectId,x.genesis.id);
  await assert.rejects(stale.runtime.deviceHandoff.acceptApproval(request.approval,{confirmed:true}),error=>error.code==='device_handoff_owner_changed');

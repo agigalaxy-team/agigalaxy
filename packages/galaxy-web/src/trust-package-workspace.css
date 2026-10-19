@@ -21,6 +21,14 @@
 .trust-purpose .package-pending{margin:1.8rem 0}.trust-purpose .package-pending article{display:block}.trust-purpose .package-pending article>button{margin:.4rem .6rem 0 0}
 .trust-purpose .package-original-text,.trust-purpose .package-material-body p,.trust-purpose .package-reading p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
 .trust-purpose select,.trust-purpose textarea,.trust-purpose input:not([type=radio]):not([type=checkbox]){max-width:100%;min-width:0}
-.trust-purpose details>summary{cursor:pointer;color:#395746;line-height:1.6;padding:.4rem 0}.trust-purpose .package-audience{min-width:0}
+.trust-purpose :is(.reading-detail-entry,.reading-section)>.reading-detail-link{cursor:pointer;color:#395746;line-height:1.6;padding:.4rem 0}.trust-purpose .package-audience{min-width:0}
 .trust-purpose .package-permission-status{padding:1rem;background:#f5f7f5;border-radius:10px;margin-top:1rem}
 @media(max-width:600px){.trust-purpose{padding:0 .15rem 2rem}.trust-purpose .history-fact-tabs{flex-wrap:wrap}.trust-purpose .package-selected article>div,.trust-purpose .package-license>div{flex-basis:100%}.trust-purpose .trust-permission-material,.trust-purpose .trust-selected-license,.trust-purpose .trust-original{padding:.9rem}.trust-purpose .button-row{gap:.55rem;flex-wrap:wrap}.trust-purpose .package-ready .button-row>button{flex:1 1 auto}}
+.package-material-dialog .package-source-picker{border:0;padding:0;max-width:none}
+.package-material-dialog .package-source-picker header>button{display:none}
+.package-material-dialog .package-source-picker>header{margin-bottom:20px}
+.package-material-dialog .package-source-picker label{display:grid;gap:8px;margin-block:16px}
+.package-material-dialog .package-source-picker select{width:100%;min-height:44px;border:1px solid #e5dfe4;border-radius:8px;padding:8px 12px;background:#fff}
+.package-material-dialog .package-source-picker article{padding-block:18px;border-bottom:1px solid #eee8ed}
+.package-material-dialog .package-picker-fields{border:0;padding:0;margin:0;min-width:0}
+.package-material-dialog .package-source-picker select{box-sizing:border-box;margin:0}

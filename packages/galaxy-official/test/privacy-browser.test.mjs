@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
@@ -29,8 +29,8 @@ test('browser privacy flow verifies selected export pages, partial/cancel outcom
       if(corrupt&&path==='/v1/data-exports/page'){corrupt=false;const value=await response.json();value.items.push({injected:'not a genuine row'});return new Response(JSON.stringify(value),{status:200,headers:response.headers});}
       return response;
     };
-    runtime=await createWebRuntime(config,{store:localStore,fetch:wire,now:()=>at});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    runtime=await createExistingWebRuntime(config,{store:localStore,fetch:wire,now:()=>at});
+    await runtime.connect({confirmed:true});
     const subjectId=(await runtime.status()).identity.subjectId;
     const spec=await runtime.privacy.specification();assert.equal(spec.subjectId,subjectId);assert.ok(spec.datasets.includes('task-comments-v2'));
     await assert.rejects(runtime.privacy.createExport({datasets:['identity']}),/确认/);
@@ -49,10 +49,10 @@ test('browser privacy flow verifies selected export pages, partial/cancel outcom
     await assert.rejects(runtime.privacy.submitDeletion(preview),/确认/);
     dropDeletion=true;await assert.rejects(runtime.privacy.submitDeletion(preview,{confirmed:true}),/acknowledgement lost/);
     const pending=await runtime.privacy.pendingDeletion();assert.equal(pending.intent.id,preview.intent.id);assert.ok(pending.signed);
-    runtime.close();runtime=await createWebRuntime(config,{store:localStore,fetch:wire,now:()=>at});await runtime.connect({confirmed:true});
+    runtime.close();runtime=await createExistingWebRuntime(config,{store:localStore,fetch:wire,now:()=>at});await runtime.connect({confirmed:true});
     const receipt=await runtime.privacy.reconcileDeletion();assert.equal(receipt.id,preview.intent.id);assert.equal(receipt.state,'requested');assert.equal(receipt.physicalDeletionPerformed,false);assert.equal(receipt.serviceWideDeletionComplete,false);
     assert.equal(await runtime.privacy.pendingDeletion(),null);assert.equal((await runtime.privacy.queryDeletion()).items.length,1);
-    other=await createWebRuntime(config,{store:store(),fetch:wire,now:()=>at});await other.createIdentity({confirmed:true});await other.connect({confirmed:true});
+    other=await createExistingWebRuntime(config,{store:store(),fetch:wire,now:()=>at});await other.connect({confirmed:true});
     await assert.rejects(other.privacy.readDeletion({id:receipt.id}),/not_found/);await assert.rejects(other.privacy.holderStatus(receipt.id),/deletion_status_unavailable/);
     const cancellation=await runtime.privacy.prepareDeletion({action:'cancel',requestId:receipt.id,expectedRevision:receipt.revision});
     dropDeletion=true;await assert.rejects(runtime.privacy.submitDeletion(cancellation,{confirmed:true}),/acknowledgement lost/);

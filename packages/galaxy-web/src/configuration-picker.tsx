@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import type {z} from 'zod/v4';
 import {Button} from '@/components/ui/button';
@@ -71,8 +72,8 @@ function ConfigurationChoiceList({runtime,subjectId,busy,selected,onChange,onlyO
   const item:CapsuleSourceItem={ref:{kind:'configuration',id:view.id,version:view.version},authorId:view.subjectId,label:view.record.title,view},rest=selected.filter(other=>key(other)!==key(item));
   onChange(chosen?[...(single?rest.filter(other=>other.ref.kind!=='configuration'):rest),item]:rest);
  }
- return <details className="configuration-source-picker" onToggle={event=>setOpen(event.currentTarget.open)}>
-  <summary>{single?'关联这次的运行配置（可选）':'关联用过的配置（可选）'}{selectedConfigurations.length?' · 已选 '+selectedConfigurations.length+' 项':''}</summary>
+ return <ReadingDetails mode="inline" className="configuration-source-picker" onOpenChange={isOpen=>setOpen(isOpen)}>
+  <ReadingSummary>{single?'关联这次的运行配置（可选）':'关联用过的配置（可选）'}{selectedConfigurations.length?' · 已选 '+selectedConfigurations.length+' 项':''}</ReadingSummary>
   <p className="source-reading-note">{single?'选择当时已经登记的配置版本，帮助读者理解条件。没有配置记录也可以继续。':'这里只引用选定配置记录。关联本身不证明已经安装或实际执行。'}</p>
   {reading&&!loaded&&<p><output>正在读取配置内容…</output></p>}
   {error&&<p role="alert" className="message error">{error}<Button type="button" variant="ghost" disabled={busy||reading} onClick={()=>void load()}>重新读取</Button></p>}
@@ -84,6 +85,6 @@ function ConfigurationChoiceList({runtime,subjectId,busy,selected,onChange,onlyO
   </article>;})}</div>
   {next&&<Button type="button" variant="ghost" disabled={busy||reading} onClick={()=>void load(true)}>更多配置</Button>}
   {versionNext&&<Button type="button" variant="ghost" disabled={busy||reading} onClick={()=>void loadVersions(objectId,versionNext)}>更早版本</Button>}
-  {selectedConfigurations.filter(item=>!available.some(view=>view.id===item.ref.id&&view.version===item.ref.version)).map(item=><div className="configuration-choice" key={key(item)}><p>已选运行条件 · 第 {item.ref.version} 版</p><p className="source-reading-note">这一版本现在无法读取，准确引用仍保留。</p><Button type="button" variant="ghost" disabled={busy} onClick={()=>onChange(selected.filter(other=>key(other)!==key(item)))}>移除这一条引用</Button><details className="source-reference-details"><summary>准确版本</summary><code>{item.ref.id}</code></details></div>)}
- </details>;
+  {selectedConfigurations.filter(item=>!available.some(view=>view.id===item.ref.id&&view.version===item.ref.version)).map(item=><div className="configuration-choice" key={key(item)}><p>已选运行条件 · 第 {item.ref.version} 版</p><p className="source-reading-note">这一版本现在无法读取，准确引用仍保留。</p><Button type="button" variant="ghost" disabled={busy} onClick={()=>onChange(selected.filter(other=>key(other)!==key(item)))}>移除这一条引用</Button><ReadingDetails className="source-reference-details"><ReadingSummary>准确版本</ReadingSummary><code>{item.ref.id}</code></ReadingDetails></div>)}
+ </ReadingDetails>;
 }

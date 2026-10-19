@@ -11,7 +11,7 @@ export function CapsuleSourceReading({reading,navigate}:{reading:CapsuleDetail['
   ?'/app/people/'+source.authorId+'?section=experience&record='+encodeURIComponent('case:'+source.ref.id):null;
  return <div className="method-source-context">
   <div className="method-source-background"><h3>{source.status==='available'&&source.title?source.title:'原工作'}</h3>
-   {source.status==='available'?<>{source.summary&&<p className="reading-prose">{source.summary}</p>}{path&&<a href={path} className="text-link" onClick={event=>{event.preventDefault();navigate(path);}}>查看当前可读的原工作 →</a>}</>:<p className="source-reading-note">当前无法读取这份原工作资料。</p>}
+    {source.status==='available'?<>{source.summary&&<p className="reading-prose">{source.summary}</p>}{path&&<a href={path} className="text-link" onClick={event=>{event.preventDefault();navigate(path);}}>查看当前可读的原工作</a>}</>:<p className="source-reading-note">当前无法读取这份原工作资料。</p>}
   </div>
   <div className="method-source-result"><h3>这一版方法依据的结果</h3>
    {result.status==='available'?<>

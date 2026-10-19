@@ -7,6 +7,7 @@ import {createServices} from '../../galaxy-official/src/services.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createWebRuntime} from '../src/runtime.mjs';
+import {seedExistingWebIdentity} from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import {createIdentityControlClient} from '../../galaxy-core/src/domain/identity-control-client.mjs';
 import {createDeviceMaterial,identityKeyId,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 
@@ -23,13 +24,14 @@ async function fixture(t){
  const fetcher=async(url,options)=>{const parsed=new URL(url);assert.equal(parsed.origin,endpoint);
   requests.push({path:parsed.pathname,...(parsed.pathname==='/v2/binding-challenges'?{scopes:JSON.parse(options.body).scopes}:{})});
   return fetch(origin+parsed.pathname,options);};
- const web=async()=>{const runtime=await createWebRuntime({endpoint,trustedKeys},{store,fetch:fetcher,now:()=>clock});clients.push(runtime);return runtime;};
+  await seedExistingWebIdentity({endpoint,trustedKeys},{store,fetch:fetcher,now:()=>clock});requests.length=0;
+  const web=async()=>{const runtime=await createWebRuntime({endpoint,trustedKeys},{store,fetch:fetcher,now:()=>clock});clients.push(runtime);return runtime;};
  t.after(async()=>{clients.forEach(client=>client.close());api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await db.close();});
  return{services,store,requests,web,now:()=>clock,advance:seconds=>{clock+=seconds;}};
 }
 test('approved browser connection resumes after reopen and expiry with exactly its scopes; explicit exit persists',async t=>{
  const f=await fixture(t),first=await f.web();assert.equal(await first.resumeConnection(),null);assert.equal(f.requests.length,0);
- await first.createIdentity({confirmed:true});const before=f.requests.length;assert.equal(await first.resumeConnection(),null);assert.equal(f.requests.length,before);
+ const before=f.requests.length;assert.equal(await first.resumeConnection(),null);assert.equal(f.requests.length,before);
  const initial=await first.connect({confirmed:true,scopes:['binding','assistance']}),owner=(await first.status()).identity;
  const preference=[...f.store.rows.entries()].find(([key])=>key.includes(':connection:'))[1];
  assert.deepEqual(preference.scopes,['binding','assistance']);assert.equal(preference.enabled,true);
@@ -47,7 +49,7 @@ test('approved browser connection resumes after reopen and expiry with exactly i
  reopened.close();const exited=await f.web();assert.equal(await exited.resumeConnection(),null);assert.equal(f.requests.length,count);
 });
 test('reopening refuses changed receipt identity, device, epoch, scope, expiry and an actually revoked binding without replacing it',async t=>{
- const f=await fixture(t),runtime=await f.web();await runtime.createIdentity({confirmed:true});const initial=await runtime.connect({confirmed:true,scopes:['binding','assistance']});
+ const f=await fixture(t),runtime=await f.web();const initial=await runtime.connect({confirmed:true,scopes:['binding','assistance']});
  const [key,preference]=[...f.store.rows.entries()].find(([key])=>key.includes(':connection:')),
   receipt=preference.binding,
   claims=JSON.parse(Buffer.from(receipt.receipt.split('.')[1],'base64url')).data;
@@ -74,7 +76,7 @@ test('reopening refuses changed receipt identity, device, epoch, scope, expiry a
  assert.equal(f.requests.filter(value=>value.path==='/v1/bindings').length,before);
 });
 test('automatic connection refuses a genuinely revoked device using fresh signed identity control',async t=>{
- const f=await fixture(t),runtime=await f.web();await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+ const f=await fixture(t),runtime=await f.web();await runtime.connect({confirmed:true});
  const {identity}=await runtime.status(),original=await f.store.get(`device:${identity.subjectId}:${identity.deviceId}`),second=await createDeviceMaterial();
  const makeClient=(controller,newDevice=controller)=>createIdentityControlClient({endpoint:runtime.api.endpoint,send:runtime.api.send,store:memoryStore(),now:f.now,
   signController:payload=>signIdentityPayload(payload,controller.privateKey),signNewDevice:payload=>signIdentityPayload(payload,newDevice.privateKey)});

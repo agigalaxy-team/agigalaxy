@@ -2,6 +2,7 @@
 .galaxy-site .member-avatar .member-initial{font-weight:650;font-size:17px;line-height:1;letter-spacing:0}
 .galaxy-site .member-profile-link{color:inherit;gap:9px}
 .galaxy-site .member-profile-link:hover{text-decoration:underline;text-underline-offset:4px}
-.galaxy-site .message-navigation{gap:24px;margin:0 0 22px;border-color:#dddeda}
-.galaxy-site .message-navigation a{font-size:14px;min-height:48px;color:#63747c;padding:10px 0}
-.galaxy-site .message-navigation a[aria-current]{color:var(--g-accent,#24648b);border-color:var(--g-accent,#24648b)}
+.galaxy-site .selected-messages-layout .conversation-day{display:flex;align-items:center;gap:14px;margin:8px 0 24px;color:var(--g-muted);font-size:12px;text-align:center}
+.galaxy-site .selected-messages-layout .conversation-day:before,.galaxy-site .selected-messages-layout .conversation-day:after{content:"";height:1px;background:var(--g-line);flex:1}
+.galaxy-site .selected-messages-layout .conversation-message.continued{margin-top:-12px}
+.galaxy-site .selected-messages-layout .conversation-message.continued>.member-avatar{visibility:hidden}

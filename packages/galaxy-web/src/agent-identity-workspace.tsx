@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useEffect,useMemo,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
 import {Check,KeyRound,Link2,Monitor} from 'lucide-react';
@@ -58,14 +59,14 @@ export function AgentIdentityWorkspace({runtime,entry,identity,connection,naviga
   {context&&<AgentConnectionSummary context={selection?{...context,scopes:selection.scopes}:context} deviceFingerprint={state.fingerprint} approved={!!selection}/>}
   {selection&&!stopped&&<section className="agent-device-selection" aria-labelledby="agent-device-selection-heading"><h3 id="agent-device-selection-heading">使用已获准的设备继续</h3>
    <p>本机 AI 已批准这次连接。继续后，这个浏览器会改用获准的新设备，接着打开刚才的页面；银河身份、原设备记录和已有草稿保留。</p>
-   <details className="agent-exact-connection"><summary>查看本次设备变化</summary><dl><dt>原浏览器设备</dt><dd><code>{selection.previousDeviceId}</code></dd><dt>获准的新设备</dt><dd><code>{selection.deviceId}</code></dd></dl></details>
+   <ReadingDetails className="agent-exact-connection"><ReadingSummary>查看本次设备变化</ReadingSummary><dl><dt>原浏览器设备</dt><dd><code>{selection.previousDeviceId}</code></dd><dt>获准的新设备</dt><dd><code>{selection.deviceId}</code></dd></dl></ReadingDetails>
    <Button disabled={busy||state.phase!=='choose-device'} onClick={()=>void view.selectLocalDevice()}>{state.phase==='selecting-device'?'正在接续…':'使用这个设备继续'}</Button>
   </section>}
   {stopped&&<p className="message error" role="alert">{messages[state.code??'']??readable({code:state.code})}</p>}
   {error&&<p className="message error" role="alert">{error}</p>}
   {draftVisible&&<article className="agent-draft-choice"><h3>继续连接前的求助草稿</h3><p>原稿继续留在本浏览器。继续这份草稿会把它保存到当前身份下，下一页仍可编辑，不会立即发布。</p>
    <AgentDraftSummary value={draft.preview.visitorDraft??{}} title="连接前填写的草稿"/>
-   {draft.preview.existingDraft&&<details className="agent-existing-draft" open><summary>当前身份还留有另一份草稿</summary><AgentDraftSummary value={draft.preview.existingDraft} title="当前身份的草稿"/><p>改用连接前的草稿会替换上面这份当前身份草稿，请选择需要继续的内容。</p></details>}
+   {draft.preview.existingDraft&&<ReadingDetails mode="inline" className="agent-existing-draft" open><ReadingSummary>当前身份还留有另一份草稿</ReadingSummary><AgentDraftSummary value={draft.preview.existingDraft} title="当前身份的草稿"/><p>改用连接前的草稿会替换上面这份当前身份草稿，请选择需要继续的内容。</p></ReadingDetails>}
    <div className="button-row"><Button disabled={busy} onClick={()=>void view.adopt()}>{draft.preview.existingDraft?'改用连接前的草稿':'继续这份草稿'}</Button><Button variant="outline" disabled={busy} onClick={view.keep}>{draft.preview.existingDraft?'继续当前身份的草稿':'先回原页面'}</Button></div>
   </article>}
   {!stopped&&state.phase!=='connected'&&<Button variant="outline" onClick={view.cancel}>停止本次自动接续</Button>}

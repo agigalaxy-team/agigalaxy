@@ -4,6 +4,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import {seedExistingWebIdentity} from './existing-web-identity-fixture.mjs';
 import {createIdentityDeviceHandoff} from '../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import {createRecoveryMaterial,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 
@@ -11,20 +12,22 @@ async function fixture(){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),server=createApi({...f,rateLimit:1000}),instances=[],commits=[],requests=[];
  f.identityControl.now=()=>f.now;let beforeCommit=false,statusOffline=false,onRead=null,onStatusResponse=null;
  await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin='http://127.0.0.1:'+server.address().port;
- async function runtime(rows=new Map()){const writes=[],store={get:async key=>{const value=structuredClone(rows.get(key));await onRead?.(key);return value;},
+  async function runtime(rows=new Map(),{initialize=false}={}){const writes=[],store={get:async key=>{const value=structuredClone(rows.get(key));await onRead?.(key);return value;},
   put:async(key,value)=>{writes.push(key);return rows.set(key,structuredClone(value));},update:async(key,change)=>{const value=change(structuredClone(rows.get(key)));writes.push(key);rows.set(key,structuredClone(value));return structuredClone(value);},
   prepareRecovery:async(subjectId,operationId)=>{const key=`pending-recovery:${subjectId}:${operationId}`,existing=await store.get(key);if(existing)return existing;
    const record={...await createRecoveryMaterial(subjectId),operationId,saveDeclared:false,status:'local-pending-registration'};await store.put(key,record);return record;}};
-  const runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.access.trustedKeys},{store,now:()=>f.now,fetch:async(url,options)=>{
+   const config={endpoint:f.access.endpoint,trustedKeys:f.access.trustedKeys},options={store,now:()=>f.now,fetch:async(url,options)=>{
    const path=new URL(url).pathname;if(path==='/v2/identity/control/status'&&statusOffline)throw Error('Synthetic original status unavailable');
    if(path==='/v2/identity/control/commit'&&beforeCommit){beforeCommit=false;throw Error('Synthetic saved commit not delivered');}
    if(options.body)assert.ok(!/PRIVATE KEY|galaxy-recovery-v1:/.test(options.body));
    const result=await fetch(origin+path,options);requests.push({path,status:result.status});
    if(path==='/v2/identity/control/commit')commits.push({body:options.body,status:result.status});
-   if(path==='/v2/identity/control/status')await onStatusResponse?.();return result;}});
+    if(path==='/v2/identity/control/status')await onStatusResponse?.();return result;}};
+   if(initialize)await seedExistingWebIdentity(config,options);
+   const runtime=await createWebRuntime(config,options);
   instances.push(runtime);return{runtime,rows,store,writes};
  }
- const old=await runtime();await old.runtime.createIdentity({confirmed:true});await old.runtime.connect({confirmed:true});
+  const old=await runtime(new Map(),{initialize:true});await old.runtime.connect({confirmed:true});
  const subjectId=(await old.runtime.status()).identity.subjectId;
  async function offer(joiner){const offer=await joiner.runtime.deviceHandoff.createOffer(subjectId,{confirmed:true}),approval=await old.runtime.deviceHandoff.approveOffer(offer,{confirmed:true});return{offer,approval};}
  return{f,old,subjectId,commits,requests,runtime,offer,setBeforeCommit:value=>beforeCommit=value,setStatusOffline:value=>statusOffline=value,setRead:fn=>onRead=fn,setStatusResponse:fn=>onStatusResponse=fn,
@@ -279,9 +282,9 @@ test('an asynchronous original device read cannot activate or send into a newly 
   const joiner=await x.runtime(),{offer,approval}=await x.offer(joiner);x.setBeforeCommit(true);
   await assert.rejects(joiner.runtime.deviceHandoff.acceptApproval(approval,{confirmed:true}));
   const original=await joiner.store.get('identity-operation:'+x.f.access.endpoint+':'+offer.operationId);
-  let changed=false;x.setRead(async key=>{if(!changed&&key==='identity-handoff:'+x.f.access.endpoint+':'+offer.operationId){changed=true;x.setRead(null);await joiner.runtime.createIdentity({confirmed:true});}});
+   let changed=false,selected;x.setRead(async key=>{if(!changed&&key==='identity-handoff:'+x.f.access.endpoint+':'+offer.operationId){changed=true;x.setRead(null);joiner.runtime.close();selected=await x.runtime(joiner.rows,{initialize:true});}});
   await assert.rejects(joiner.runtime.deviceHandoff.resumePending(offer.operationId),/身份|device_handoff_owner_changed/);
-  assert.equal(changed,true);assert.notEqual((await joiner.runtime.status()).identity.subjectId,x.subjectId);
+   assert.equal(changed,true);assert.notEqual((await selected.runtime.status()).identity.subjectId,x.subjectId);assert.equal((await joiner.runtime.status()).identity,null);
   assert.equal(x.commits.filter(value=>JSON.parse(value.body).operationId===offer.operationId).length,0);
   assert.deepEqual((await joiner.store.get('identity-operation:'+x.f.access.endpoint+':'+offer.operationId)).commit,original.commit);
  }finally{await x.close();}

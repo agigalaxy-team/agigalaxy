@@ -1,5 +1,5 @@
 import React,{useEffect,useEffectEvent,useId,useMemo,useRef,useState} from 'react';
-import {ArrowLeft,ArrowRight,BookOpen,Search} from 'lucide-react';
+import {BookOpen, Search} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {createHistoryClient,prepareHistoryQuery} from './history-client.mjs';
@@ -60,7 +60,7 @@ function HistorySession({runtime,connected,subjectId,targetSubjectId,navigate,fo
   }catch(error){setError(readable(error));}
  }
  if(!target)return <section className="history-empty"><BookOpen size={32}/><h2>经历与贡献</h2><p>从个人资料查看完整经历，或使用自己的身份查看本人记录。</p><Button onClick={()=>navigate('/app/settings/identity')}>查看我的经历</Button></section>;
- if(record)return <section aria-busy={busy}><header className="history-detail-header"><button className="history-back" type="button" onClick={back}><ArrowLeft size={17}/>返回经历</button><h2 ref={heading} tabIndex={-1}>{record.title??'工作经历'}</h2>{record.summary&&<p>{record.summary}</p>}</header><HistoryFacts key={record.key} runtime={runtime} record={record} navigate={navigate} connected={connected} subjectId={subjectId}/></section>;
+ if(record)return <section aria-busy={busy}><header className="history-detail-header"><button className="history-back" type="button" onClick={back}>返回经历</button><h2 ref={heading} tabIndex={-1}>{record.title??'工作经历'}</h2>{record.summary&&<p>{record.summary}</p>}</header><HistoryFacts key={record.key} runtime={runtime} record={record} navigate={navigate} connected={connected} subjectId={subjectId}/></section>;
  return <section aria-busy={busy} className="history-workspace"><header className="history-heading"><div><h2>{own?'我的经历':'工作经历'}</h2><p>做过的事、遇到的问题，以及实际结果。</p></div></header>
   <form className="history-search" onSubmit={event=>{event.preventDefault();search();}}>
    <label className="history-search-field" htmlFor={searchId}><span className="sr-only">搜索经历</span><Search size={17}/><Input id={searchId} maxLength={200} placeholder="搜索经历中的内容" value={form.query} onChange={event=>setForm(old=>({...old,query:event.target.value}))}/></label>
@@ -71,7 +71,7 @@ function HistorySession({runtime,connected,subjectId,targetSubjectId,navigate,fo
   {selected&&!record&&!busy&&!error&&<p className="message">这条经历目前不可查看。下方是当前允许阅读的经历。</p>}
   {error&&<div role="alert" className="message error">{error}<Button variant="ghost" onClick={()=>read()}>重试</Button></div>}
   {page&&!page.items.length&&<div className="history-empty"><BookOpen size={32}/><h3>暂时没有可查看的经历</h3><p>{form.query?'试试其他关键词，或查看全部时间。':'已有工作会在形成记录、且允许查看时出现在这里。'}</p>{own&&<Button variant="outline" onClick={()=>navigate('/app/participate')}>看看可以参与的事情</Button>}</div>}
-  <ol className="history-list">{page?.items.map(item=><li key={item.key}><button type="button" className="history-open" onClick={()=>openRecord(item.key)}><BookOpen size={20}/><div><h3>{item.title??'工作经历'}</h3>{item.summary&&<p>{item.summary}</p>}<div className="history-meta">{date(item)&&<time>{date(item)}</time>}{!!item.subjectRoles.length&&<span>{item.subjectRoles.map(historyRoleLabel).join(' · ')}</span>}{item.synthetic&&<span>合成示例</span>}</div></div><ArrowRight size={17}/></button></li>)}</ol>
+  <ol className="history-list">{page?.items.map(item=><li key={item.key}><button type="button" className="history-open" onClick={()=>openRecord(item.key)}><BookOpen size={20}/><div><h3>{item.title??'工作经历'}</h3>{item.summary&&<p>{item.summary}</p>}<div className="history-meta">{date(item)&&<time>{date(item)}</time>}{!!item.subjectRoles.length&&<span>{item.subjectRoles.map(historyRoleLabel).join(' · ')}</span>}{item.synthetic&&<span>合成示例</span>}</div></div></button></li>)}</ol>
   {page?.nextCursor&&<Button className="history-more" type="button" variant="outline" disabled={busy} onClick={()=>read(page.nextCursor)}>{busy?'正在读取…':'查看更多经历'}</Button>}
  </section>;
 }

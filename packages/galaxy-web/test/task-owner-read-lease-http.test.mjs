@@ -7,7 +7,7 @@ import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { createRecoveryMaterial } from '../../galaxy-core/src/domain/identity-material.mjs';
-import { createWebRuntime } from '../src/runtime.mjs';
+import { createExistingWebRuntime } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import { createTaskOwnerReadClient } from '../src/task-owner-read-client.mjs';
 import { publicationFromDraft, taskDraft } from '../src/task-bounty-client.mjs';
 
@@ -31,7 +31,7 @@ test('actual signed HTTP owner projection refuses stale metadata, signing, Conse
   };
   try {
     await new Promise(resolve => api.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${api.address().port}`;
-    runtime = await createWebRuntime({ endpoint, trustedKeys: fixture.bindings.trustedKeys }, { store, now: () => now,
+    runtime = await createExistingWebRuntime({ endpoint, trustedKeys: fixture.bindings.trustedKeys }, { store, now: () => now,
       fetch: async (url, input) => {
         const path = new URL(url).pathname; let action;
         if (path === '/v1/consents') action = JSON.parse(Buffer.from(JSON.parse(input.body).signedIntent.split('.')[1], 'base64url')).action;
@@ -41,7 +41,7 @@ test('actual signed HTTP owner projection refuses stale metadata, signing, Conse
         if (path.endsWith('/owner-read')) await pause('body');
         return response;
       } });
-    await runtime.createIdentity({ confirmed: true }); const recovery = await runtime.prepareRecovery(); await runtime.saveRecovery({ operationId: recovery.operationId, confirmed: true }); await runtime.connect({ confirmed: true });
+    const recovery = await runtime.prepareRecovery(); await runtime.saveRecovery({ operationId: recovery.operationId, confirmed: true }); await runtime.connect({ confirmed: true });
     // Fixture seeding uses the actual signed service, rather than claiming that
     // this test browser has completed the separate task Agent handoff UI.
     const publication={...publicationFromDraft(taskDraft({ title: 'Synthetic owner read lease', summary: 'Exact original private owner body',
@@ -81,7 +81,7 @@ test('actual signed HTTP owner projection refuses stale metadata, signing, Conse
     const originalConnection=runtime.api.snapshot(),originalScope=saved.payloadJson,originalExpiry=saved.expiresAt,
       bindingsBeforeReopen=Number((await fixture.db.query('SELECT count(*) AS n FROM bindings')).rows[0].n);
     runtime.close();
-    runtime=await createWebRuntime({endpoint,trustedKeys:fixture.bindings.trustedKeys},{store,now:()=>now,
+    runtime=await createExistingWebRuntime({endpoint,trustedKeys:fixture.bindings.trustedKeys},{store,now:()=>now,
       fetch:async(url,input)=>{
         const path=new URL(url).pathname,body=input.body?JSON.parse(input.body):null;
         const action=path==='/v1/consents'?JSON.parse(Buffer.from(body.signedIntent.split('.')[1],'base64url')).action:undefined;

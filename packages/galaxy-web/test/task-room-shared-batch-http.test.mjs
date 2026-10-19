@@ -6,7 +6,7 @@ import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fi
 import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
-import { createWebRuntime } from '../src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import { taskDraft, publicationFromDraft } from '../src/task-bounty-client.mjs';
 import { createTaskContactClient } from '../src/task-contact-client.mjs';
 
@@ -60,17 +60,17 @@ async function fixtureRun(run) {
     };
     const stores = new WeakMap();
     const ownerStore = memoryStore(), make = async (store = memoryStore()) => {
-      const rt = await createWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: wire, now: () => now, website: taskContactWebsite });
+      const rt = await createExistingWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: wire, now: () => now, website: taskContactWebsite });
       stores.set(rt, store);
       runtimes.push(rt); return rt;
     };
     const a = await make(ownerStore), b = await make(), c = await make();
-    for (const rt of [a, b, c]) { await rt.createIdentity({ confirmed: true }); await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now); }
+    for (const rt of [a, b, c]) { await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now); }
     for (const { rt, account } of [{ rt: a, account: 'owner' }, { rt: b, account: 'recipient-b' }, { rt: c, account: 'recipient-c' }]) {
       issuer.setAccount('synthetic-m11-room-' + account);
       const login = await rt.api.call('/v1/identity/begin', { providerId: 'fixture' }), callback = await issuer.authorize(login.authorizationUrl);
       assert.equal((await fetch(origin + callback.pathname + callback.search)).status, 200);
-      await rt.confirmAccountLink(login.loginId, { confirmed: true });
+      await confirmFixtureAccountLink(rt, login.loginId);
     }
     const { taskId } = await a.publishTask(publicationFromDraft(taskDraft({ title: 'M11 exact displayed Room plan',
       summary: 'Synthetic isolated fixture', goal: 'Confirm original recipients and mode', situation: 'Concurrent local runtimes',

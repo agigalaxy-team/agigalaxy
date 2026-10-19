@@ -5,6 +5,7 @@ import { createOidcLoginProvider } from '../src/oidc-login.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import { digest } from '../src/shared/digest.mjs';
 
 // Real WebRuntime, signed HTTP and synthetic verified OIDC account on PGlite.
@@ -84,7 +85,7 @@ export async function publicationFixture() {
     const callback = await issuer.authorize(started.authorizationUrl);
     const response = await fetch(local + callback.pathname + callback.search);
     assert.equal(response.status, 200); await response.arrayBuffer();
-    await runtime.confirmAccountLink(started.loginId, { confirmed: true });
+    await confirmFixtureAccountLink(runtime, started.loginId, { store: { get: async key => structuredClone(values.get(key)) } });
     assert.equal((await runtime.api.call('/v2/account/quotas', {})).accountVerified, true);
     const draft = { caseId: null, intent: 'proactive-review',
       workContext: { goal: 'Review synthetic continuity', currentSituation: 'No failed attempt', attemptRefs: [] },

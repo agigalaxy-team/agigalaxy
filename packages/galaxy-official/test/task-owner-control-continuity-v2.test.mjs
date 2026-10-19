@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createRecoveryMaterial,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {TaskOwnerControlServiceV2} from '../src/task-owner-control-v2.mjs';
 import {digest} from '../src/shared/digest.mjs';
@@ -29,10 +29,10 @@ async function fixture({retiring=false}={}){
   async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),receipt});}};
  try{
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-  runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,fetch:async(url,options)=>{
+  runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,fetch:async(url,options)=>{
    const path=new URL(url).pathname,response=await fetch(origin+path,options);
    if(dropAck&&path.endsWith('/owner-control')&&response.ok){dropAck=false;await response.text();throw new Error('synthetic_committed_ack_lost');}return response;}});
-  await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+  await runtime.connect({confirmed:true});
   const recovery=await runtime.prepareRecovery();await runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
   const sign=async(payloadJson,action,objectId,{expiresAt=f.now+7200,purpose,fields,...rest}={})=>{
    let prepared=await runtime.api.prepareAuthorization(payloadJson,{action,objectId,visibility:'Private',viewers:[],expiresAt,confirmed:true,...rest});
@@ -56,9 +56,9 @@ async function fixture({retiring=false}={}){
   const execute=(task,request)=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-control`,request);
   const receipt=(task,p)=>runtime.api.call('/v2/tasks/receipt',{taskId:task.taskId,eventId:p.operationId,payloadHash:p.payloadHash});
   const original=task=>f.db.query('SELECT id,subject_id,payload_text,payload_hash,consent_id,version FROM task_events WHERE task_id=$1 ORDER BY version',[task.taskId]).then(r=>r.rows);
-  const peer=async()=>{const data=new Map(),r=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
+  const peer=async()=>{const data=new Map(),r=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
    store:{get:async key=>structuredClone(data.get(key)),put:async(key,v)=>data.set(key,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
-   fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});peers.push(r);await r.createIdentity({confirmed:true});await r.connect({confirmed:true});return r;};
+   fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});peers.push(r);await r.connect({confirmed:true});return r;};
   const raw=async(path,body,credential)=>{const r=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',
    ...(credential?{authorization:`Bearer ${credential}`}:{})},body:JSON.stringify(body)});return{status:r.status,body:await r.json()};};
   const revokeDevice=async()=>{const owner=(await runtime.status()).identity,state=await runtime.publicControl(owner.subjectId),device=state.devices.find(d=>d.device_id===owner.deviceId);

@@ -6,7 +6,7 @@ import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fi
 import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
-import { createWebRuntime } from '../src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import { taskDraft, publicationFromDraft } from '../src/task-bounty-client.mjs';
 import { createTaskContactClient } from '../src/task-contact-client.mjs';
 
@@ -62,14 +62,14 @@ async function fixtureRun(run) {
     };
     const ownerStore = memoryStore(), config = { endpoint, trustedKeys: f.bindings.trustedKeys };
     const stores = new WeakMap();
-    const make = async store => { const rt = await createWebRuntime(config, { store, fetch: wire, now: () => now, website: taskContactWebsite }); stores.set(rt, store); runtimes.push(rt); return rt; };
+    const make = async store => { const rt = await createExistingWebRuntime(config, { store, fetch: wire, now: () => now, website: taskContactWebsite }); stores.set(rt, store); runtimes.push(rt); return rt; };
     const a = await make(ownerStore), b = await make(memoryStore()), c = await make(memoryStore());
-    for (const rt of [a, b, c]) { await rt.createIdentity({ confirmed: true }); await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now); }
+    for (const rt of [a, b, c]) { await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now); }
     issuer.setAccount('synthetic-m11-owner');
     const login = await a.api.call('/v1/identity/begin', { providerId: 'fixture' });
     const callback = await issuer.authorize(login.authorizationUrl);
     assert.equal((await fetch(origin + callback.pathname + callback.search)).status, 200);
-    await a.confirmAccountLink(login.loginId, { confirmed: true });
+    await confirmFixtureAccountLink(a, login.loginId);
     const a2 = await make(ownerStore); await a2.connect({ confirmed: true });
     assert.equal(a.api.snapshot().subjectId, a2.api.snapshot().subjectId);
     assert.notEqual(a.api.snapshot().bindingId, a2.api.snapshot().bindingId);

@@ -7,11 +7,13 @@ export const navigationSchema=z.strictObject({object:z.discriminatedUnion('kind'
  z.strictObject({kind:z.literal('capsule'),id:z.uuid(),versionId:z.uuid().optional()}),
  z.strictObject({kind:z.literal('post'),id:z.uuid(),versionId:z.uuid().optional()}),
  z.strictObject({kind:z.literal('community'),topic:forumReadTopicSchema.optional(),query:z.string().trim().min(1).max(160).optional()}),
+ z.strictObject({kind:z.literal('account'),section:z.enum(['access','association']).optional()}),
  z.strictObject({kind:z.enum(['bookmarks','match','publish','participate','messages','identity','privacy','search','capsules','summaries','notifications'])})]),
  origin:z.strictObject({host:z.string().min(1).max(80),workRef:z.string().min(1).max(500)}).optional()});
-const routes={task:'tasks',room:'rooms',messages:'rooms',project:'projects',capsule:'capsules',capsules:'capsules',post:'community/posts',community:'community',bookmarks:'bookmarks',match:'match',publish:'publish',participate:'participate',identity:'settings/identity',privacy:'settings/privacy',search:'search',summaries:'settings/summaries',notifications:'notifications'};
+const routes={task:'tasks',room:'rooms',messages:'rooms',project:'projects',capsule:'capsules',capsules:'capsules',post:'community/posts',community:'community',account:'account',bookmarks:'bookmarks',match:'match',publish:'publish',participate:'participate',identity:'settings/identity',privacy:'settings/privacy',search:'search',summaries:'settings/summaries',notifications:'notifications'};
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const pathFor=object=>{
+ if(object.kind==='account')return object.section==='association'?'/app/settings/identity?section=account':'/app/account'+(object.section==='access'?'?section=access':'');
  const path='/app/'+routes[object.kind]+(object.id?'/'+object.id:'')+(object.versionId?'/versions/'+object.versionId:'');
  if(object.kind!=='community')return path;
  const query=new URLSearchParams();if(object.topic)query.set('topic',object.topic);if(object.query)query.set('q',object.query);

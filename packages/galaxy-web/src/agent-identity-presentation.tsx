@@ -1,3 +1,4 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import React from 'react';
 import {BookOpen,MessageSquare,ShieldCheck,Wrench} from 'lucide-react';
 import {literalTaskText,hasMaterialText} from './task-material-client.mjs';
@@ -27,7 +28,7 @@ export function AgentConnectionSummary({context,deviceFingerprint,approved=false
   })}{context.scopes.filter((scope:string)=>!known.includes(scope)).map((scope:string)=><li key={scope}>{identityPermissionLabel(scope)}</li>)}</ul>
   {deviceFingerprint&&<div className="agent-device-check"><p>请与本机 AI 的连接页面对照这串设备核对码：</p><code>{fingerprint(deviceFingerprint)}</code></div>}
   <dl className="agent-connection-destination"><dt>连接的服务</dt><dd>{context.endpoint}</dd><dt>连接后</dt><dd>{agentReturnLabel(context.targetPath)}</dd><dt>申请有效至</dt><dd>{new Date(context.expiresAt*1000).toLocaleString('zh-CN')}</dd></dl>
-  <details className="agent-exact-connection"><summary>准确身份与连接信息</summary><dl><dt>银河 ID</dt><dd><code>{context.subjectId}</code></dd><dt>原页面</dt><dd><code>{context.targetPath}</code></dd><dt>协议中的范围</dt><dd><code>{context.scopes.join('、')}</code></dd></dl></details>
+  <ReadingDetails className="agent-exact-connection"><ReadingSummary>准确身份与连接信息</ReadingSummary><dl><dt>银河 ID</dt><dd><code>{context.subjectId}</code></dd><dt>原页面</dt><dd><code>{context.targetPath}</code></dd><dt>协议中的范围</dt><dd><code>{context.scopes.join('、')}</code></dd></dl></ReadingDetails>
  </section>;
 }
 

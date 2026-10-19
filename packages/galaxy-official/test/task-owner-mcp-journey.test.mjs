@@ -9,7 +9,7 @@ import {createApi} from '../src/http.mjs';
 import {createPersonalMcp} from '../src/personal-mcp.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 
 const names=['galaxy_task_v2_owner_read_prepare','galaxy_task_v2_owner_read',
@@ -36,10 +36,10 @@ async function fixture(){
     let v=await get(key);if(!v){v={...await createRecoveryMaterial(subjectId),operationId};await put(key,v);}return v;},
     async declareSaved(subjectId,id){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),saveDeclared:true});},
     async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),receipt});}};
-   const runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+   const runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
     fetch:(url,options)=>{const authorization=new Headers(options?.headers).get('authorization');if(authorization)credential=authorization.replace(/^Bearer /,'');
      return fetch(origin+new URL(url).pathname,options);}});runtimes.push(runtime);
-   await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+   await runtime.connect({confirmed:true});
    const recovery=await runtime.prepareRecovery();await runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
    return{runtime,get credential(){return credential;},subjectId:runtime.api.snapshot().subjectId,
     recover:async()=>{const prior=runtime.api.snapshot();const recoveredMaterial=await runtime.recover(recovery.code,{confirmed:true});

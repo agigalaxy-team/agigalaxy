@@ -69,7 +69,8 @@ export function describeNativeChoice(name,input) {
  if(name==='galaxy_contact_work_execute'&&typeof preview.payloadJson==='string'){try{contactPayload=JSON.parse(preview.payloadJson);}catch{/* Opaque bytes stay in diagnostics; no fields are guessed. */}}
  const payload=contactPayload??(/^galaxy_a2a_(?:work_)?execute$/.test(name)&&['result',undefined].includes(preview.action)?a2aParticipantContent(preview):preview.exact?.payload??preview.payload??preview);
  const a2aResultAuthorization=name==='galaxy_a2a_execute'&&preview.kind==='result'?preview.authorization:null;
- const title=name==='galaxy_a2a_execute'&&preview.kind==='result'?'保留这次结果'
+ const title=name==='galaxy_identity_account_execute'?(preview.action==='unlink'?'解除这条银河账户关联':'关联这个银河账户')
+  :name==='galaxy_a2a_execute'&&preview.kind==='result'?'保留这次结果'
   :name==='galaxy_help_execute_action'&&preview.kind==='task-event'&&payload.event?.kind==='apply'?'发送这份协助说明'
   :name==='galaxy_capsule_work_execute'?({publish:'保存这份方法',apply:'记录这次实际应用',reverify:'记录这次再次验证',reference:'在原工作引用这份方法'}[preview.action]??'继续这份方法')
   :name==='galaxy_a2a_work_execute'?({send:'发送本次所选内容',reply:'发送这次补充内容',cancel:'停止这次工作',result:'保留这次结果'}[preview.action]??'继续本次选择')
@@ -83,6 +84,7 @@ export function describeNativeChoice(name,input) {
  const sections=[];
  if(name==='galaxy_native_initialize')sections.push({label:'保存在这台设备',text:'稳定身份和设备密钥。连接服务与外发内容按需要另行选择。'});
  if(name==='galaxy_native_connect')sections.push({label:'这次连接',text:'使用当前设备接入所选银河服务；私人笔记和原工作全文不会由这次连接上传。'});
+ if(name==='galaxy_identity_account_execute')sections.push({label:'本机确认',text:preview.action==='unlink'?'解除这里显示的账户与当前银河 ID 的关联，保留身份和已有经历。':'将刚才实际登录的官方账户关联到当前银河 ID。请核对账户与身份；关联不会合并其他 ID 的经历，也不授予资料或 AI 行为的新权限。'});
  if(/device_management_confirm|identity_device_native_confirm/.test(name))sections.push({label:'这次变更',text:'撤销所选设备的身份控制与绑定，保留历史证明。'});
  if(/device_management_stop|identity_device_native_stop_retry/.test(name))sections.push({label:'这次变更',text:'停止本机等待并保留原操作证明；这不会确认远端已取消。'});
  if(/identity_group/.test(name))sections.push({label:'当前身份的选择',text:'这次选择仅代表当前身份，其他成员仍需各自选择。'});
@@ -132,6 +134,9 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
  else if(name==='galaxy_command'){lines.push('在原聊天说明想取得的帮助，沿用当前工作继续。可找帮助、发起求助、查看消息或回到原工作。');if(data.state==='recovery-required')lines.push('本机有尚未完成的恢复操作，请先保留当前资料并检查恢复状态。');}
  else if(name==='galaxy_native_status'){lines.push(nativeConnectionMessage(data));}
  else if(name==='galaxy_native_initialize'&&data.initialized){lines.push(data.existingIdentityPreserved?'已沿用已有身份完成这台设备的准备。':'这台设备的稳定身份已准备好。');lines.push('可以继续原工作；连接和外发范围按需要选择。');}
+ else if(name==='galaxy_identity_account_read'&&data.authorizationUrl){lines.push('打开官方账户登录，完成后回到当前 AI 宿主核对账户与银河 ID：',data.authorizationUrl,'登录完成后，仍需在本机明确允许这次关联。');}
+ else if(name.startsWith('galaxy_identity_account_')&&data.state==='linked'){lines.push('这个银河 ID 已关联到刚才核验的官方账户。可以回官网账户中心查看；其他 ID 与已有经历分别保留。');}
+ else if(name.startsWith('galaxy_identity_account_')&&data.state==='revoked'){lines.push('这条银河账户关联已解除。原银河 ID 与已有经历保留。');}
  else if(specific){lines.push(...specific);}
  else{
   if(data.url)lines.push(data.launched?'已请求打开当前内容。':'可以打开当前内容：',data.url);

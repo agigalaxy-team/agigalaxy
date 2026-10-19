@@ -1,0 +1,58 @@
+.galaxy-site.selected-shell .selected-account-layout{display:grid;grid-template-columns:208px minmax(0,1fr);width:100%;max-width:none;margin:0;gap:0;align-items:start;min-height:calc(100dvh - var(--selected-header-height,72px))}
+.galaxy-site.selected-shell .selected-account-sidebar{position:static;align-self:stretch;border-right:1px solid var(--g-line);padding:28px 16px;background:#fff;overflow:visible;min-width:0}
+.galaxy-site .selected-account-sidebar h2{font-size:19px;line-height:1.5;margin:0 12px 22px;color:var(--g-ink)}
+.galaxy-site .selected-account-sidebar nav{display:grid;gap:5px}
+.galaxy-site .selected-account-sidebar nav a{display:flex;align-items:center;gap:11px;color:var(--g-ink);padding:12px;border-radius:9px;text-decoration:none;font-size:14px;line-height:1.5;min-height:44px}
+.galaxy-site .selected-account-sidebar nav a[aria-current=page]{background:var(--g-pink);color:var(--g-accent);font-weight:600}
+.galaxy-site .selected-account-sidebar nav a:hover{background:var(--g-soft)}
+.galaxy-site .selected-account-sidebar .selected-account-settings{border-top:1px solid var(--g-line);margin-top:24px;padding-top:18px}
+.galaxy-site.selected-shell .selected-account-layout>.settings-content{width:100%;max-width:none;min-width:0;margin:0;padding:28px var(--page-gutter,32px) 40px}
+.galaxy-site .selected-account{width:100%;max-width:none;margin:0}
+.galaxy-site .selected-account .profile-heading{margin-bottom:24px}
+.galaxy-site .selected-account .profile-heading h1{font-size:26px;line-height:1.4;letter-spacing:0}
+.galaxy-site .selected-account .profile-intro{display:flex;gap:25px;align-items:center;background:var(--g-soft);padding:28px 30px;border:0;border-radius:12px;margin-bottom:26px}
+.galaxy-site .selected-account .profile-avatar{width:88px;height:88px;flex:none;border-radius:50%;background:var(--g-pink);color:var(--g-ink);font-size:38px}
+.galaxy-site .selected-account .profile-intro h2{font-size:26px;margin:0 0 9px}
+.galaxy-site .selected-account .profile-intro p{font-size:14px;line-height:1.7;margin:0}
+.galaxy-site .selected-account .profile-intro-actions{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}
+.galaxy-site .selected-account .profile-intro-actions a{font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.galaxy-site .selected-account .profile-tags{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.galaxy-site .selected-account .profile-tags li{font-size:12px;background:#fff;border:1px solid var(--g-line);color:var(--g-muted);border-radius:6px;padding:3px 8px}
+.galaxy-site .selected-account .profile-honors{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 22px}
+.galaxy-site .account-honor-reading .reading-detail-link{display:flex;align-items:center;gap:8px;color:var(--g-accent)}
+.galaxy-site .account-overview-grid{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(250px,1fr);gap:26px;align-items:start}
+.galaxy-site .account-overview-grid>section{min-width:0}
+.galaxy-site .account-overview-grid>section>header{margin-bottom:16px}
+.galaxy-site .account-overview-grid h2{font-size:20px;line-height:1.5;margin:0 0 3px}
+.galaxy-site .account-overview-grid header>p{font-size:13px;color:var(--g-muted);line-height:1.6;margin:0}
+.galaxy-site .selected-account .work-continuity{margin:0}
+.galaxy-site .selected-account .work-overview-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.galaxy-site .selected-account .continuity-section{background:#fff;border:1px solid var(--g-line);border-radius:10px;padding:18px;margin:0}
+.galaxy-site .selected-account .continuity-section h2{font-size:15px;margin:0}
+.galaxy-site .selected-account .continuity-section header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+.galaxy-site .selected-account .continuity-section header>a{font-size:12px;white-space:nowrap}
+.galaxy-site .selected-account .continuity-list{margin:0;padding:0;list-style:none}
+.galaxy-site .selected-account .continuity-list li+li{border-top:1px solid var(--g-line);margin-top:12px;padding-top:12px}
+.galaxy-site .selected-account .continuity-list a{display:flex;align-items:center;color:var(--g-ink);text-decoration:none}
+.galaxy-site .selected-account .continuity-list h3{font-size:15px;margin:0 0 5px}
+.galaxy-site .selected-account .continuity-list p,.galaxy-site .selected-account .continuity-empty{font-size:13px;line-height:1.7;margin:0;color:var(--g-muted)}
+.galaxy-site .selected-account .continuity-empty a{display:block;margin-top:8px;font-size:13px;color:var(--g-accent)}
+.galaxy-site .selected-account .continuity-responses{margin-top:14px}
+.galaxy-site .selected-account .account-data-links{display:block;margin:0;padding:20px;border:1px solid var(--g-line);border-radius:10px;background:#fff}
+.galaxy-site .selected-account .account-data-links>header>h2{font-size:20px;line-height:1.5;font-weight:600;margin:0 0 3px;color:var(--g-ink)}
+.galaxy-site .selected-account .personal-empty{margin:0;padding:28px 24px;background:#fff;border:1px solid var(--g-line);border-radius:10px}
+.galaxy-site .selected-account .personal-empty>svg{color:var(--g-muted)}
+.galaxy-site .selected-account .account-data-links>a{display:flex;align-items:center;gap:13px;padding:16px 0;color:var(--g-ink);text-decoration:none;border-top:1px solid var(--g-line);font-size:14px}
+.galaxy-site .selected-account .account-data-links>a>svg{flex:none;color:var(--g-muted)}
+.galaxy-site .selected-account .account-data-links strong{display:block;font-weight:500}
+.galaxy-site .selected-account .account-data-links small{display:block;margin-top:4px;font-size:12px;line-height:1.6;color:var(--g-muted)}
+.galaxy-site .selected-account .account-content-entries{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:30px;border-top:1px solid var(--g-line)}
+.galaxy-site .selected-account .account-content-entries>a{display:flex;align-items:flex-start;gap:14px;border:0;border-radius:0;background:none;padding:24px 20px;min-height:150px;color:var(--g-ink);text-decoration:none}
+.galaxy-site .selected-account .account-content-entries>a+a{border-left:1px solid var(--g-line)}
+.galaxy-site .selected-account .account-content-entries h2{font-size:17px;margin:0 0 9px}
+.galaxy-site .selected-account .account-content-entries p{font-size:13px;line-height:1.65;color:var(--g-muted);margin:0}
+.galaxy-site .selected-account .account-content-open{display:block;font-size:12px;color:var(--g-accent);margin-top:16px}
+@media(min-width:1800px){.galaxy-site .selected-account .work-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1200px){.galaxy-site.selected-shell .selected-account-layout{grid-template-columns:184px minmax(0,1fr)}.galaxy-site .account-overview-grid{grid-template-columns:1fr}.galaxy-site .selected-account .account-data-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px}.galaxy-site .selected-account .account-data-links>header{grid-column:1/-1}.galaxy-site .selected-account .account-content-entries>a{padding:20px 13px}}
+@media(max-width:900px){.galaxy-site.selected-shell .selected-account-layout{grid-template-columns:1fr}.galaxy-site.selected-shell .selected-account-sidebar{position:static;height:auto;border-right:0;border-bottom:1px solid var(--g-line);padding:16px var(--page-gutter,24px);overflow:visible}.galaxy-site .selected-account-sidebar h2{margin:0 0 10px;font-size:16px}.galaxy-site .selected-account-sidebar nav{display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;max-width:100%;padding-bottom:3px}.galaxy-site .selected-account-sidebar nav a{flex:none;padding:9px 11px;min-height:40px;white-space:nowrap;font-size:13px}.galaxy-site .selected-account-sidebar .selected-account-settings{margin-top:10px;padding-top:9px}.galaxy-site .selected-account-sidebar .selected-account-settings a{font-size:12px}}
+@media(max-width:720px){.galaxy-site.selected-shell .selected-account-layout>.settings-content{padding:22px 16px 30px}.galaxy-site .selected-account .profile-heading h1{font-size:23px}.galaxy-site .selected-account .profile-intro{padding:22px 18px;gap:16px;align-items:flex-start}.galaxy-site .selected-account .profile-avatar{width:52px;height:52px;font-size:26px}.galaxy-site .selected-account .profile-intro h2{font-size:20px}.galaxy-site .selected-account .profile-intro p{font-size:13px}.galaxy-site .selected-account .account-data-links{display:block;padding:18px}.galaxy-site .selected-account .account-content-entries{grid-template-columns:1fr;margin-top:24px}.galaxy-site .selected-account .account-content-entries>a{min-height:0;padding:20px 0}.galaxy-site .selected-account .account-content-entries>a+a{border-left:0;border-top:1px solid var(--g-line)}.galaxy-site .selected-account .account-content-open{margin-top:8px}.galaxy-site .account-overview-grid{gap:22px}.galaxy-site .selected-account .continuity-section{padding:15px}}

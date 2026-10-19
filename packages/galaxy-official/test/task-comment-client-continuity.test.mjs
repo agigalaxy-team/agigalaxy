@@ -7,7 +7,7 @@ import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
 import { createOidcLoginProvider } from '../src/oidc-login.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import { createTaskCommentClient } from '../../galaxy-web/src/task-comment-client.mjs';
 
 // Actual WebRuntime, Galaxy signed Consent, verified synthetic OIDC account and
@@ -31,7 +31,7 @@ async function fixture() {
     server = createApi({ ...f, browserOrigins: ['https://galaxy.example.org'], rateLimit: 1000 });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const local = 'http://127.0.0.1:' + server.address().port;
-    runtime = await createWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, {
+    runtime = await createExistingWebRuntime({ endpoint, trustedKeys: f.bindings.trustedKeys }, {
       now: () => now,
       store: { get: async key => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
         update: async (key, change) => {const value = change(structuredClone(values.get(key))); values.set(key, structuredClone(value)); return structuredClone(value);} },
@@ -46,13 +46,13 @@ async function fixture() {
         return result;
       },
     });
-    await runtime.createIdentity({ confirmed: true }); await runtime.connect({ confirmed: true });
+    await runtime.connect({ confirmed: true });
     issuer.setAccount('synthetic-comment-lease-owner');
     const started = await runtime.api.call('/v1/identity/begin', { providerId: 'fixture' });
     const callback = await issuer.authorize(started.authorizationUrl);
     const response = await fetch(local + callback.pathname + callback.search);
     assert.equal(response.status, 200); await response.arrayBuffer();
-    await runtime.confirmAccountLink(started.loginId, { confirmed: true });
+    await confirmFixtureAccountLink(runtime, started.loginId);
     assert.equal((await runtime.api.call('/v2/account/quotas', {})).accountVerified, true);
     // Pre-existing signed Task fixture for comment leases. This test does not
     // exercise the website's separate Agent-continuity publication policy.

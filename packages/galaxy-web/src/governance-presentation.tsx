@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { FileText, MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -52,16 +53,16 @@ export function GovernancePeople({ids,subjectId,names}:{ids:string[];subjectId?:
 export function GovernanceSource({source,navigate}:{source:SourceView;navigate:(path:string)=>void}) {
   if(!source)return <p className="muted">原内容当前无法读取。</p>;
   const Icon=source.kind==='room'?MessageCircle:FileText;
-  return <div className="governance-source"><Icon size={22} aria-hidden="true"/><div><p className="eyebrow">{source.kind==='room'?'相关对话':source.kind==='task'?'相关求助':'相关工作'}</p><h2>{source.title}</h2>{source.summary&&<p className="reading-prose">{source.summary}</p>}{source.path&&<a href={source.path} className="text-link" onClick={e=>{e.preventDefault();if(source.path)navigate(source.path);}}>打开原内容 →</a>}</div></div>;
+  return <div className="governance-source"><Icon size={22} aria-hidden="true"/><div><p className="eyebrow">{source.kind==='room'?'相关对话':source.kind==='task'?'相关求助':'相关工作'}</p><h2>{source.title}</h2>{source.summary&&<p className="reading-prose">{source.summary}</p>}{source.path&&<a href={source.path} className="text-link" onClick={e=>{e.preventDefault();if(source.path)navigate(source.path);}}>打开原内容 </a>}</div></div>;
 }
 export function GovernanceEvents({events,subjectId,names}:{events:Statement[];subjectId?:string;names:Record<string,string|null>}) {
-  const [all,setAll]=useState(false),shown=all?events:events.slice(-2);
-  return <section className="governance-history" aria-label="处理说明">
-    <h2>处理说明</h2>{!events.length?<p className="muted">暂时没有向你开放的说明。</p>:<ol>{shown.map((event,index)=><li key={event.eventId??event.id??index}>
+  const list=(shown:Statement[])=><ol>{shown.map((event,index)=><li key={event.eventId??event.id??index}>
       <MemberAvatar subjectId={event.authorId??event.actorId}/><article><div className="governance-event-heading"><strong>{memberName(event.authorId??event.actorId,subjectId,names[event.authorId??event.actorId??'']??undefined)}</strong><span>{governanceLabels[event.kind]??'说明'}</span><time>{readableTime(event.at??event.createdAt)}</time></div>
       {event.summary&&event.summary!==event.scope&&<p className="reading-prose">{event.summary}</p>}{event.scope&&<p>复核范围：{event.scope}</p>}{event.conclusion&&<p><strong>{governanceLabels[event.conclusion]??event.conclusion}</strong></p>}{event.verdict&&<p><strong>{governanceLabels[event.verdict]??event.verdict}</strong></p>}{event.rule&&<p className="muted">依据：{event.rule}</p>}
-    </article></li>)}</ol>}
-    {events.length>2&&<button className="text-link" onClick={()=>setAll(v=>!v)}>{all?'收起较早说明':'查看此前的说明'}</button>}
+    </article></li>)}</ol>;
+  return <section className="governance-history" aria-label="处理说明">
+    <h2>处理说明</h2>{!events.length?<p className="muted">暂时没有向你开放的说明。</p>:list(events.slice(-2))}
+    {events.length>2&&<ReadingDetails><ReadingSummary>此前的处理说明</ReadingSummary><div className="governance-history">{list(events.slice(0,-2))}</div></ReadingDetails>}
   </section>;
 }
 export function GovernancePreview({value,names,subjectId,busy,error,onConfirm,onClose}:{value:StatementPreview;names:Record<string,string|null>;subjectId?:string;busy:boolean;error?:string;onConfirm:()=>void;onClose:()=>void}) {
@@ -82,7 +83,7 @@ export function GovernancePreview({value,names,subjectId,busy,error,onConfirm,on
     {payload.expiresAt&&kind==='invite-verifier'&&<p>邀请有效至 {fullTime(payload.expiresAt)}</p>}
     <section className="governance-recipients"><h3>{value.viewers?.length?'这份说明发送给':'这份说明仅本人可见'}</h3><GovernancePeople ids={value.viewers??[]} subjectId={subjectId} names={names}/>{!value.recovery&&value.expiresAt&&payload.kind!=='invite-verifier'&&<p className="muted">接收人可读至 {fullTime(value.expiresAt)}</p>}</section>
     {value.recovery&&<p className="muted">原内容和接收人保持不变。{value.expiresAt?'本次许可至 '+fullTime(value.expiresAt)+'。':''}</p>}
-    <details className="governance-technical"><summary>记录详情</summary><dl><dt>服务</dt><dd>{value.endpoint}</dd><dt>原记录</dt><dd>{payload.reportId??payload.id}</dd>{payload.expectedVersion&&<><dt>基于版本</dt><dd>{payload.expectedVersion}</dd></>}</dl><button className="text-link" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='galaxy-statement.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>保存完整记录文件</button></details>
+    <ReadingDetails className="governance-technical"><ReadingSummary>记录详情</ReadingSummary><dl><dt>服务</dt><dd>{value.endpoint}</dd><dt>原记录</dt><dd>{payload.reportId??payload.id}</dd>{payload.expectedVersion&&<><dt>基于版本</dt><dd>{payload.expectedVersion}</dd></>}</dl><button className="text-link" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='galaxy-statement.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>保存完整记录文件</button></ReadingDetails>
     <div className="button-row"><Button disabled={busy} onClick={onConfirm}>{busy?'请稍候…':value.recovery?'确认并继续':'确认发送'}</Button><Button variant="outline" disabled={busy} onClick={onClose}>返回修改</Button></div>
   </dialog>;
 }

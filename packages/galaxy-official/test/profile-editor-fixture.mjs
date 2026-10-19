@@ -4,6 +4,7 @@ import {createServices} from '../src/services.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import {seedExistingWebIdentity} from './existing-web-identity-fixture.mjs';
 import {createProfileEditorClient} from '../../galaxy-web/src/profile-editor-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
@@ -46,8 +47,9 @@ export async function profileEditorFixture(){
     const material=await createRecoveryMaterial(subjectId);
     values.set(`pending-recovery:${subjectId}:${operationId}`,{...material,operationId,saveDeclared:false});return material;
    }};
-  let runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>time});
-  if(initialize){await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});}
+   if(initialize)await seedExistingWebIdentity(config,{store,fetch:wire,now:()=>time});
+   let runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>time});
+  if(initialize){await runtime.connect({confirmed:true});}
   const subjectId=runtime.api.snapshot()?.subjectId;
   const result={get runtime(){return runtime;},get subjectId(){return subjectId??runtime.api.snapshot()?.subjectId;},editor:()=>createProfileEditorClient(runtime,{now:()=>time}),
    async reload({connectNew=false}={}){runtime.close();runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>time});

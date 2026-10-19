@@ -5,6 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import {handoffExistingWebIdentity} from './existing-web-identity-fixture.mjs';
 import {createHistoryClient,prepareHistoryQuery} from '../../galaxy-web/src/history-client.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 
@@ -52,7 +53,7 @@ test('history browser queries real visible facts and more than 64 loaded search 
     await assert.rejects(history.query({...request,after:page.nextCursor}),e=>e.code==='history_sources_changed_retry');
     const refreshed=await history.query({...request,query:'History-browser synthetic 0'});assert.equal(refreshed.items[0].results.length,0);
     assert.ok(calls.every(p=>p==='/v2/history/query'||p==='/v2/search/query'),'browser uses read routes only; comparison remains local');
-    await runtime.createIdentity({confirmed:true});await assert.rejects(history.query(request),/history_identity_changed/);
+    await handoffExistingWebIdentity(runtime,{now:()=>f.now});await assert.rejects(history.query(request),/history_identity_changed/);
   }finally{history?.close();search?.close();runtime?.close();await new Promise(resolve=>api.close(resolve));await f.db.close();}
 });
 import {memoryAtomicUpdate} from './memory-atomic-update.mjs';

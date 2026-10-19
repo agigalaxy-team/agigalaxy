@@ -1,8 +1,9 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import {useCurrentTaskMaterialTree} from './task-material-view';
 import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {ArrowLeft,ArrowRight,Search,SlidersHorizontal,UsersRound,X} from 'lucide-react';
+import {Search, UsersRound, X} from 'lucide-react';
 import {FactDetails} from './fact-details';
 import {OpportunityContactWorkspace} from './opportunity-contact-workspace';
 import {projectQueryMemory,projectViewScope,opportunityUnavailable} from './project-view-client.mjs';
@@ -50,7 +51,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
  const [items,setItems]=useState<VisibleOpportunity[]>([]),[next,setNext]=useState<string|null>(null),[readDetail,setDetail]=useState<OpportunityDetail|UnavailableOpportunityDetail|null>(null);
  const [displayQuery,setDisplayQuery]=useState<DiscoveryQuery|null>(null);
  const [busy,setBusy]=useState(false),[searching,setSearching]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState('');
- const [filterChoice,setFilterChoice]=useState<boolean|null>(null),[searched,setSearched]=useState(false);
+ const [searched,setSearched]=useState(false);
  const query=useRef<DiscoveryQuery|null>(null),opened=useRef<VisibleOpportunity|null>(null),pages=useRef(1),historyPages=useRef(1),booted=useRef(false);
  const life=useRef(0),searchSerial=useRef(0),detailSerial=useRef(0),background=useRef(false),dialog=useRef<HTMLDialogElement>(null);
  const detail=useCurrentTaskMaterialTree(runtime,readDetail);
@@ -96,27 +97,26 @@ function DiscoveryView({runtime,connected,navigate}:Props){
  });
  useEffect(()=>{restoreSources();},[draft.ready]);
  useEffect(()=>{const refresh=()=>void reload(),timer=window.setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[]);
- const filters=filterChoice??!!(input.functions||input.technologies);
- const filterCount=(input.functions?1:0)+(input.technologies?1:0),go=(path:string)=>{detailSerial.current++;navigate(path);};
+
+ const go=(path:string)=>{detailSerial.current++;navigate(path);};
  return <section className="discovery-page">
   <DiscoveryTabs path="/app/match" query={input.title} navigate={go}/>
-  <header className="discovery-heading">{originReturn&&<a className="back-link" href={originReturn} onClick={event=>{event.preventDefault();go(originReturn);}}><ArrowLeft size={14}/>回到原工作</a>}<h1>寻找同行</h1><p>从你关心的方向，找到可以交流的人和项目。</p></header>
+  <header className="discovery-heading">{originReturn&&<a className="back-link" href={originReturn} onClick={event=>{event.preventDefault();go(originReturn);}}>回到原工作</a>}<h1>寻找同行</h1><p>从你关心的方向，找到可以交流的人和项目。</p></header>
   <form className="discovery-search" onSubmit={event=>{event.preventDefault();void search();}}>
    <label htmlFor="discovery-topic">想找什么方向</label><div className="discovery-query-row"><Input id="discovery-topic" required maxLength={200} disabled={!draft.ready} value={input.title} onChange={event=>change({title:event.target.value})} placeholder="例如：阅读体验、网页协作"/><Button type="submit" disabled={!runtime||!draft.ready||searching}>{searching?'正在查找…':<><Search size={17}/>查找</>}</Button></div>
-   <button type="button" className="discovery-filter-toggle" aria-expanded={filters} onClick={()=>setFilterChoice(!filters)}><SlidersHorizontal size={15}/>交流方式与筛选{filterCount?' · '+filterCount+' 项限定':''}</button>
-   {filters&&<div className="discovery-filters"><fieldset><legend>希望怎样交流</legend>{purposes.map(([id,title])=><label key={id}><input type="checkbox" checked={input.selected.includes(id)} onChange={event=>change({selected:event.target.checked?[...input.selected,id]:input.selected.filter(value=>value!==id)})}/>{title}</label>)}</fieldset><label htmlFor="discovery-functions">限定方向（可选）<Input id="discovery-functions" value={input.functions} onChange={event=>change({functions:event.target.value})} placeholder="留空时按上面的方向查找"/></label><label htmlFor="discovery-technologies">技术或环境（可选）<Input id="discovery-technologies" value={input.technologies} onChange={event=>change({technologies:event.target.value})} placeholder="例如：React、PostgreSQL"/></label></div>}
+   <div className="discovery-filters"><fieldset><legend>希望怎样交流</legend>{purposes.map(([id,title])=><label key={id}><input type="checkbox" checked={input.selected.includes(id)} onChange={event=>change({selected:event.target.checked?[...input.selected,id]:input.selected.filter(value=>value!==id)})}/>{title}</label>)}</fieldset><label htmlFor="discovery-functions">限定方向（可选）<Input id="discovery-functions" value={input.functions} onChange={event=>change({functions:event.target.value})} placeholder="留空时按上面的方向查找"/></label><label htmlFor="discovery-technologies">技术或环境（可选）<Input id="discovery-technologies" value={input.technologies} onChange={event=>change({technologies:event.target.value})} placeholder="例如：React、PostgreSQL"/></label></div>
    {draft.status&&!['正在保存…','草稿已保存在本机。','已恢复本机草稿。'].includes(draft.status)&&<output>{draft.status}</output>}
   </form>
   {error&&<p className="message error" role="alert">{error}</p>}
   {!searched&&!searching&&!error&&<div className="discovery-start"><UsersRound size={28}/><h2>先说一个想交流的方向</h2><p>查看对方正在做的项目，再决定是否联系。交流方式和技术条件可以按需要补充。</p></div>}
-  <div className="discovery-results" aria-busy={searching}>{items.map(item=><article key={item.id} className="discovery-result">{item.sourceUnavailable?<p>这项介绍当前无法读取。</p>:<><div className="person-line"><MemberLink subjectId={item.subjectId} name={person(item)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2><button type="button" disabled={busy} onClick={()=>void inspect(item)}>{item.project.title}</button></h2><p className="reading-prose">{item.help.statement}</p><p className="discovery-directions">{item.help.functions.join(' · ')}</p><button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(item)}>了解与联系 <ArrowRight size={15}/></button></>}</article>)}</div>
+  <div className="discovery-results" aria-busy={searching}>{items.map(item=><article key={item.id} className="discovery-result">{item.sourceUnavailable?<p>这项介绍当前无法读取。</p>:<><div className="person-line"><MemberLink subjectId={item.subjectId} name={person(item)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2><button type="button" disabled={busy} onClick={()=>void inspect(item)}>{item.project.title}</button></h2><p className="reading-prose">{item.help.statement}</p><p className="discovery-directions">{item.help.functions.join(' · ')}</p><button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(item)}>了解与联系 </button></>}</article>)}</div>
   {searched&&!items.length&&!error&&<p className="empty-state">暂时没有找到相关的人或项目，试试更简短的方向词。</p>}{next&&<Button type="button" variant="outline" disabled={searching} onClick={()=>void search({after:next})}>更多结果</Button>}
-  <footer className="discovery-other"><a href={discoveryTarget('/app/search',input.title)} onClick={event=>{event.preventDefault();go(discoveryTarget('/app/search',input.title));}}>查找方法与工具 <ArrowRight size={14}/></a><a href="/app/projects?section=projects" onClick={event=>{event.preventDefault();go('/app/projects?section=projects');}}>我的项目与联系 <ArrowRight size={14}/></a></footer>
+  <footer className="discovery-other"><a href={discoveryTarget('/app/search',input.title)} onClick={event=>{event.preventDefault();go(discoveryTarget('/app/search',input.title));}}>查找方法与工具 </a><a href="/app/projects?section=projects" onClick={event=>{event.preventDefault();go('/app/projects?section=projects');}}>我的项目与联系 </a></footer>
   <dialog ref={dialog} className="galaxy-dialog discovery-reading" aria-labelledby="discovery-detail-title" onCancel={event=>{if(event.target===event.currentTarget){event.preventDefault();closeDetail();}}}>
    <header className="dialog-heading"><span>了解与联系</span><button type="button" className="icon-button" aria-label="关闭项目介绍" onClick={closeDetail}><X size={20}/></button></header>
    {detailError&&<output className="message">{detailError}<button type="button" className="text-link" disabled={busy} onClick={()=>opened.current&&void inspect(opened.current,historyPages.current)}>重试</button></output>}
    {detail&&detail.experience&&!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={person(detail.opportunity)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2 id="discovery-detail-title">{detail.opportunity.project.title}</h2><p className="discovery-intro reading-prose">{detail.opportunity.project.summary}</p>{detail.opportunity.help.statement!==detail.opportunity.project.summary&&<p className="reading-prose">{detail.opportunity.help.statement}</p>}
-    <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><details key={item.key}><summary>{item.title??'这项工作'}</summary><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></details>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
+    <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><ReadingDetails key={item.key}><ReadingSummary>{item.title??'这项工作'}</ReadingSummary><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></ReadingDetails>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
    </>}
    {detail&&<OpportunityContactWorkspace runtime={runtime} connected={connected} subjectId={subjectId} query={displayQuery} opportunity={detail.opportunity} navigate={go} onSourceUnavailable={()=>hideSource(detail.opportunity)} onNeedIdentity={()=>go('/app/settings/identity')}/>}
   </dialog>

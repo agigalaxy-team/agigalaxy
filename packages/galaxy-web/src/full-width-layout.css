@@ -1,0 +1,233 @@
+/* One fluid outer frame. Reading measures belong to content inside that frame. */
+.galaxy-site.galaxy-workspace {
+  --page-gutter:32px;
+  --page-section-gap:40px;
+  width:100%;
+  min-width:0;
+}
+
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-header-inner,
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-content,
+.galaxy-site.galaxy-workspace:not(.selected-shell) .site-app-footer {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  margin-inline:0;
+  padding-inline:var(--page-gutter);
+}
+
+.galaxy-site.galaxy-workspace .site-header-inner {
+  column-gap:clamp(18px,2.6vw,40px);
+}
+.galaxy-site.galaxy-workspace .site-primary-nav {min-width:0}
+.galaxy-site.galaxy-workspace .site-content {padding-top:40px}
+.galaxy-site.galaxy-workspace .site-app-footer {margin:0}
+.galaxy-site.galaxy-workspace .site-footer-main,
+.galaxy-site.galaxy-workspace .site-capability-groups,
+.galaxy-site.galaxy-workspace .site-footer-bottom {min-width:0}
+
+/* Lazy page styles cannot reintroduce their former centered page containers. */
+.galaxy-site.galaxy-workspace .site-content>section,
+.galaxy-site.galaxy-workspace .site-content>article,
+.galaxy-site.galaxy-workspace .site-content>.page-loading,
+.galaxy-site.galaxy-workspace .site-content :is(
+  .personal-page,.contribution-page,.person-profile,.person-edit,
+  .messages-page,.conversation-page,.explore-page,.discovery-page,
+  .content-search-page,.reading-bookmarks-page,.help-search-page,
+  .request-compose-page,.application-page,.task-owner-reading,.task-result-page,
+  .professional-page,.professional-detail,.configuration-workspace,
+  .material-workspace,.tool-workspace,.information-workspace,.hubs-workspace,
+  .governance-workspace,.identity-group-workspace,.agent-identity-workspace,
+  .method-author-workspace,.method-permission-workspace,.builder-authoring,
+  .trust-purpose,.purpose-package,.purpose-summary,.privacy-page,
+  .account-verification,.identity-recovery-flow,.project-reading-page,
+  .project-contact-page,.project-contact-preferences,.recognition-reading
+) {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  margin-inline:0;
+}
+
+.galaxy-site.galaxy-workspace .settings-layout {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  grid-template-columns:220px minmax(0,1fr);
+  gap:var(--page-section-gap);
+}
+.galaxy-site.galaxy-workspace .settings-content,
+.galaxy-site.galaxy-workspace .settings-content>section,
+.galaxy-site.galaxy-workspace .settings-content>.personal-page {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  margin-inline:0;
+}
+
+/* The channel rail is an inner column; its outside edge shares the page gutter. */
+.galaxy-site.galaxy-workspace .site-content.community-page {
+  padding-block:0;
+}
+.galaxy-site.galaxy-workspace .community-layout-content {
+  padding-inline:24px 0;
+}
+.galaxy-site.galaxy-workspace .forum-workspace {max-width:none;min-width:0}
+
+/* Lists and real groups can use width without stretching paragraph line lengths. */
+.galaxy-site.galaxy-workspace .personal-destinations {
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.galaxy-site.galaxy-workspace .personal-destinations>a {min-width:0}
+.galaxy-site.galaxy-workspace .personal-destinations>a>div {min-width:0}
+.galaxy-site.galaxy-workspace .profile-data-links {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:0 32px;
+}
+.galaxy-site.galaxy-workspace .profile-data-links>h2 {grid-column:1/-1}
+.galaxy-site.galaxy-workspace .profile-data-links>a {
+  min-width:0;
+  margin-right:0;
+}
+.galaxy-site.galaxy-workspace .personal-work .work-library>nav {
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.galaxy-site.galaxy-workspace .explore-content,
+.galaxy-site.galaxy-workspace .content-search-sections {
+  column-gap:var(--page-section-gap);
+}
+.galaxy-site.galaxy-workspace .person-overview {
+  grid-template-columns:minmax(0,1fr) minmax(260px,.32fr);
+  gap:var(--page-section-gap);
+}
+.galaxy-site.galaxy-workspace .person-main,
+.galaxy-site.galaxy-workspace .person-side {min-width:0}
+.galaxy-site.galaxy-workspace .person-prose,
+.galaxy-site.galaxy-workspace .person-projects article>p,
+.galaxy-site.galaxy-workspace .history-fact-body,
+.galaxy-site.galaxy-workspace .contribution-snippet>p,
+.galaxy-site.galaxy-workspace .summary-reading article>p,
+.galaxy-site.galaxy-workspace .package-reading article>p {
+  max-width:76ch;
+  overflow-wrap:anywhere;
+}
+
+/* Full conversation frame, readable messages and composer within it. */
+.galaxy-site.galaxy-workspace .conversation-page {margin:0}
+.galaxy-site.galaxy-workspace .conversation-message-content {
+  max-width:min(78ch,calc(100% - 58px));
+}
+.galaxy-site.galaxy-workspace .conversation-compose>textarea {
+  max-width:78ch;
+  width:100%;
+}
+.galaxy-site.galaxy-workspace .conversation-search-hit>p {max-width:78ch}
+.galaxy-site.galaxy-workspace .conversation-list>a,
+.galaxy-site.galaxy-workspace .conversation-invitations>article {min-width:0}
+.galaxy-site.galaxy-workspace .conversation-row-heading {min-width:0;flex-wrap:wrap}
+.galaxy-site.galaxy-workspace .conversation-list .conversation-last-message {max-width:76ch}
+.galaxy-site.galaxy-workspace .conversation-empty {
+  width:100%;
+  padding-block:48px;
+}
+
+@media(min-width:1201px) {
+  .galaxy-site.galaxy-workspace .conversation-list {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:40px;
+  }
+  .galaxy-site.galaxy-workspace .conversation-invitations {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:40px;
+  }
+  .galaxy-site.galaxy-workspace .conversation-invitations>h2 {grid-column:1/-1}
+  .galaxy-site.galaxy-workspace .settings-content .identity-choice-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:24px;
+  }
+  .galaxy-site.galaxy-workspace .identity-settings-page:not(.identity-recovery-flow) {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:32px;
+    align-items:start;
+  }
+  .galaxy-site.galaxy-workspace .identity-settings-page:not(.identity-recovery-flow)>:not(.identity-current-panel):not(.identity-recovery-setting) {
+    grid-column:1/-1;
+  }
+  .galaxy-site.galaxy-workspace .identity-current-panel,
+  .galaxy-site.galaxy-workspace .identity-recovery-setting {min-width:0}
+  .galaxy-site.galaxy-workspace .privacy-purpose-list {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    column-gap:40px;
+  }
+  .galaxy-site.galaxy-workspace .privacy-purpose-list>a {min-width:0}
+  .galaxy-site.galaxy-workspace .verification-providers,
+  .galaxy-site.galaxy-workspace .verification-linked {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:0 32px;
+  }
+  .galaxy-site.galaxy-workspace .verification-providers>h3,
+  .galaxy-site.galaxy-workspace .verification-linked>h3 {grid-column:1/-1}
+  .galaxy-site.galaxy-workspace .person-edit-form>fieldset {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:0 40px;
+    align-items:start;
+  }
+  .galaxy-site.galaxy-workspace .person-edit-form>fieldset>section {min-width:0}
+}
+
+@media(min-width:1920px) {
+  .galaxy-site.galaxy-workspace .conversation-list {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .galaxy-site.galaxy-workspace .personal-work .work-library>nav {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+
+@media(min-width:721px) and (max-width:1200px) {
+  .galaxy-site.galaxy-workspace {--page-gutter:24px;--page-section-gap:28px}
+  .galaxy-site.galaxy-workspace .settings-layout {
+    grid-template-columns:180px minmax(0,1fr);
+  }
+  .galaxy-site.galaxy-workspace .personal-destinations {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .galaxy-site.galaxy-workspace .personal-work .work-library>nav {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .galaxy-site.galaxy-workspace .profile-data-links {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .galaxy-site.galaxy-workspace .person-overview {
+    grid-template-columns:minmax(0,1fr) 260px;
+  }
+}
+
+@media(max-width:720px) {
+  .galaxy-site.galaxy-workspace {--page-gutter:16px;--page-section-gap:24px}
+  .galaxy-site.galaxy-workspace .site-header-inner,
+  .galaxy-site.galaxy-workspace:has(.community-page) .site-header-inner {gap:12px}
+  .galaxy-site.galaxy-workspace .site-content {padding-top:28px}
+  .galaxy-site.galaxy-workspace .site-content.community-page {padding-top:0}
+  .galaxy-site.galaxy-workspace .community-layout-content {padding-inline:0}
+  .galaxy-site.galaxy-workspace .settings-layout {display:block}
+  .galaxy-site.galaxy-workspace .settings-sidebar {min-width:0}
+  .galaxy-site.galaxy-workspace .personal-destinations,
+  .galaxy-site.galaxy-workspace .personal-work .work-library>nav,
+  .galaxy-site.galaxy-workspace .profile-data-links {grid-template-columns:1fr}
+  .galaxy-site.galaxy-workspace .personal-destinations>a {padding-inline:0}
+  .galaxy-site.galaxy-workspace .person-overview {display:block}
+  .galaxy-site.galaxy-workspace .person-side {margin-top:28px}
+  .galaxy-site.galaxy-workspace .conversation-page {margin:0}
+  .galaxy-site.galaxy-workspace .conversation-message-content {
+    max-width:calc(100% - 36px);
+  }
+  .galaxy-site.galaxy-workspace .site-footer-links {min-width:0;flex-wrap:wrap}
+}

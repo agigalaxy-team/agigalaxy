@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {getContributionClient} from '../../galaxy-web/src/contribution-client.mjs';
 import {nativeWork} from './qualification-v2-workflow.mjs';
 import {HonorService} from '../src/honor.mjs';
@@ -18,13 +18,13 @@ async function fixture(){
     put:async(key,value)=>{data.set(key,structuredClone(value));await onPut?.(key,value);},update:memoryAtomicUpdate(data,async(key,value)=>{await onPut?.(key,value);})};
   try{
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+    runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
       fetch:async(url,options)=>{const path=new URL(url).pathname;
         if(offlineStatus&&path==='/v2/contributions/status')throw new Error('synthetic offline status');
         if(path==='/v1/consents'||path==='/v2/contributions/publish')writes.push(path);
         const response=await fetch(origin+path,options);
         if(loseWrite&&path==='/v2/contributions/publish'){loseWrite=false;assert.equal(response.status,200);throw new Error('synthetic lost contribution reply');}return response;}});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    await runtime.connect({confirmed:true});
     const subjectId=runtime.api.snapshot().subjectId,id=randomUUID(),root={kind:'case-created',schemaVersion:2,eventId:id,caseId:id,expectedVersion:0,
       actorId:subjectId,localRef:randomUUID(),title:'PRIVATE SYNTHETIC CASE',summary:'Do not expose the original body',source:{kind:'local',reference:randomUUID()},synthetic:true};
     await runtime.api.call('/v2/cases/events',await runtime.api.authorizePayload(root,{action:'case.teaser.publish',objectId:id,confirmed:true}));

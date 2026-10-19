@@ -14,7 +14,7 @@
 .agent-identity-workspace dd{margin:0;overflow-wrap:anywhere}
 .agent-identity-workspace dt{color:var(--muted-foreground,#6f6b78)}
 .agent-exact-connection{font-size:.86rem;margin-top:1.15rem}
-.agent-exact-connection summary{cursor:pointer;padding:.3rem 0}
+.agent-exact-connection .reading-detail-link{padding:.3rem 0}
 .agent-draft-choice{padding:1.3rem 0;min-width:0}
 .agent-draft-choice>h3{margin:0 0 .65rem;font-size:1.2rem}
 .agent-draft-reading{padding:1rem 0;min-width:0}
@@ -23,7 +23,7 @@
 .agent-draft-reading h5{font-size:.95rem;margin:1.1rem 0 .3rem}
 .agent-draft-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:.5rem 0}
 .agent-existing-draft{border-top:1px solid var(--g-line,#e3e0e7);margin:.6rem 0 1.1rem}
-.agent-existing-draft summary{cursor:pointer;padding:.9rem 0;font-weight:600}
+.agent-existing-draft .reading-section-title{padding:.9rem 0;font-weight:600}
 .agent-identity-workspace .button-row{display:flex;gap:.65rem;flex-wrap:wrap}
 .agent-identity-workspace .button-row button{min-height:44px;max-width:100%;white-space:normal}
 .agent-connect-heading{display:flex;align-items:flex-start;gap:17px;margin:0 0 26px}.agent-connect-heading>div{min-width:0;flex:1}.agent-connect-heading h2{font-size:26px!important;line-height:1.4;margin:0 0 8px!important}.agent-connect-heading>div>p:last-child{font-size:14px;color:var(--g-muted,#63747c);max-width:62ch;margin:0}

@@ -1,9 +1,10 @@
+import { ReadingDetails, ReadingSummary } from './reading-details';
 import {TaskCurrentSourceItem,TaskDerivedTitle} from './task-material-view';
 import {independentMaterialLabel} from './task-material-client.mjs';
 import React, { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Bell, ArrowRight, X, Plus } from 'lucide-react';
+import {Search, Bell, X, Plus} from 'lucide-react';
 import { createInformationClientV2 } from './information-client-v2.mjs';
 import { memberName, useMemberNames } from './conversation-ui';
 import { PageLoading } from './site-shell';
@@ -155,8 +156,8 @@ function FactSummary({ item, full = false }: { item: InformationItem; full?: boo
           </section>
         ))}
       {full && (
-        <details className="information-source-details">
-          <summary>来源与版本</summary>
+        <ReadingDetails className="information-source-details">
+          <ReadingSummary>来源与版本</ReadingSummary>
           <dl>
             <dt>类型</dt>
             <dd>{sourceNames[item.type ?? item.recordKind ?? ''] ?? '工作资料'}</dd>
@@ -182,7 +183,7 @@ function FactSummary({ item, full = false }: { item: InformationItem; full?: boo
           <button className="text-action" onClick={() => download(item)}>
             保存完整来源文件
           </button>
-        </details>
+        </ReadingDetails>
       )}
     </div>
   );
@@ -1095,7 +1096,7 @@ function InformationSession({
             onClick={() => void run((valid) => showEvents(row, valid))}
           >
             查看资料与变化
-            <ArrowRight size={14} />
+
           </button>
           {['active', 'paused'].includes(row.state) && (
             <button
@@ -1118,8 +1119,8 @@ function InformationSession({
               {row.state === 'active' ? '暂停' : '恢复'}
             </button>
           )}
-          <details className="information-watch-options">
-            <summary>设置</summary>
+          <ReadingDetails className="information-watch-options">
+            <ReadingSummary>设置</ReadingSummary>
             {row.state !== 'ended' && (
               <>
                 <button
@@ -1155,7 +1156,7 @@ function InformationSession({
               (source) =>
                 source.state === 'temporarily-unavailable' || !source.complete,
             ) && <p>部分来源暂时不可用或尚未读完。</p>}
-          </details>
+          </ReadingDetails>
         </footer>
       </article>
     );
@@ -1210,7 +1211,7 @@ function InformationSession({
                 }
               >
                 查看内容
-                <ArrowRight size={14} />
+
               </button>
               {withFollow && (
                 <button
@@ -1334,11 +1335,11 @@ function InformationSession({
                   </label>
                 ))}
             </div>
-            <details
+            <ReadingDetails mode="inline"
               className="information-filters"
               open={types.includes('opportunity') ? true : undefined}
             >
-              <summary>更多筛选</summary>
+              <ReadingSummary>更多筛选</ReadingSummary>
               {types.includes('history') && (
                 <>
                   <label>
@@ -1383,7 +1384,7 @@ function InformationSession({
                   </label>
                 </>
               )}
-            </details>
+            </ReadingDetails>
           </form>
           {draftProblem('query')}
           {searchLoading && !page ? (
@@ -1404,10 +1405,10 @@ function InformationSession({
               从一个问题或关键词开始。也可以直接查找所选类型的当前资料。
             </p>
           )}
-          <details
+          <ReadingDetails mode="inline"
             className="information-honor"
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
+            onOpenChange={(isOpen)=> {
+              const open = isOpen;
               setHonorOpen(open);
               if (open && rules === null)
                 void run(async (valid) => {
@@ -1421,7 +1422,7 @@ function InformationSession({
                 });
             }}
           >
-            <summary>查看某个人的荣誉依据</summary>
+            <ReadingSummary>查看某个人的荣誉依据</ReadingSummary>
             {honorOpen && (
               <div>
                 <label>
@@ -1484,7 +1485,7 @@ function InformationSession({
                 </Button>
               </div>
             )}
-          </details>
+          </ReadingDetails>
         </>
       ) : (
         <>
@@ -1503,7 +1504,7 @@ function InformationSession({
                     className="text-action"
                     onClick={() => setEvents(null)}
                   >
-                    ← 返回我的关注
+                     返回我的关注
                   </button>
                   <header>
                     <h2>{events.watch.plan.purpose}</h2>
@@ -1514,8 +1515,8 @@ function InformationSession({
                   {events.current.items.map((scope) =>
                     resultScope(scope, false),
                   )}
-                  <details className="information-source-details">
-                    <summary>变化记录</summary>
+                  <ReadingDetails className="information-source-details">
+                    <ReadingSummary>变化记录</ReadingSummary>
                     {!events.events.length ? (
                       <p>还没有新的变化。</p>
                     ) : (
@@ -1537,7 +1538,7 @@ function InformationSession({
                         </article>
                       ))
                     )}
-                  </details>
+                  </ReadingDetails>
                 </article>
               ) : (
                 <>
@@ -1562,14 +1563,14 @@ function InformationSession({
                   {watches.some((row) =>
                     ['ended', 'expired'].includes(row.state),
                   ) && (
-                    <details className="information-previous-watches">
-                      <summary>以前的关注</summary>
+                    <ReadingDetails className="information-previous-watches">
+                      <ReadingSummary>以前的关注</ReadingSummary>
                       {watches
                         .filter((row) =>
                           ['ended', 'expired'].includes(row.state),
                         )
                         .map(watchCard)}
-                    </details>
+                    </ReadingDetails>
                   )}
                   {watchAfter && (
                     <Button
@@ -1678,7 +1679,7 @@ function InformationSession({
                           onClick={() => navigate(itemLink(item)!)}
                         >
                           阅读全文
-                          <ArrowRight size={15} />
+
                         </Button>
                       )}
                       <button

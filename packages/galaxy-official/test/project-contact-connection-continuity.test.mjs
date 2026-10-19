@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes,createBrowserClient} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {getProjectContactClient} from '../../galaxy-web/src/project-contact-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
@@ -39,7 +39,7 @@ async function fixture(){
   const server=createApi({...f,rateLimit:1000}),data=new Map(),writes=[],clients=[];let runtime,onGet,onPut,lose=false;
   try{
     await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
-    const makeRuntime=async store=>{const client=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
+    const makeRuntime=async store=>{const client=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
       now:()=>f.now,store,fetch:async(url,options)=>{const path=new URL(url).pathname;
         if(path==='/v1/consents'||path==='/v2/projects')writes.push(path);
         const response=await fetch(origin+path,options);
@@ -47,14 +47,14 @@ async function fixture(){
         return response;
       }});clients.push(client);return client;};
     runtime=await makeRuntime(memoryStore(data,{get:(...args)=>onGet?.(...args),put:(...args)=>onPut?.(...args)}));
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    await runtime.connect({confirmed:true});
     const subjectId=runtime.api.snapshot().subjectId;
     const input={kind:'create',projectId:randomUUID(),operationId:randomUUID(),expectedRevision:0,
       document:{kind:'project',title:'FICTIONAL private project',summary:'PRIVATE FICTIONAL M10 draft',
         functions:['table-extraction'],discoverable:false}};
     const rows=async()=>(await f.db.query('SELECT operation_id,consent_id,payload_text,payload_hash FROM project_events_v2 WHERE project_id=$1',[input.projectId])).rows;
     return{f,runtime,data,writes,subjectId,input,rows,
-      other:async()=>{const other=await makeRuntime(memoryStore(new Map()));await other.createIdentity({confirmed:true});await other.connect({confirmed:true});return other;},
+      other:async()=>{const other=await makeRuntime(memoryStore(new Map()));await other.connect({confirmed:true});return other;},
       get:fn=>{onGet=fn;},put:fn=>{onPut=fn;},lose:()=>{lose=true;},
       close:async()=>{clients.forEach(client=>client.close());server.closeAllConnections();await new Promise(r=>server.close(r));await f.db.close();}};
   }catch(error){clients.forEach(client=>client.close());if(server.listening){server.closeAllConnections();await new Promise(r=>server.close(r));}await f.db.close();throw error;}

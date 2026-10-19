@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createChatAgentClient} from '../../galaxy-web/src/chat-agent-client.mjs';
 import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch.mjs';
 import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
@@ -26,8 +26,8 @@ test('actual HTTP room scopes omit private device data and stopped watch retries
    const response=await fetch(local+path,{...options,headers:{...options.headers,Origin:'https://galaxy.example.org'}});
    if(loseRevoke&&path.endsWith('/agent-revoke')){loseRevoke=false;assert.equal(response.status,200);throw Error('lost exact revoke receipt');}return response;
   };
-  for(let i=0;i<3;i++){const runtime=await createWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:store(),fetch:fetcher,now:()=>f.now});
-   runtimes.push(runtime);await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});}
+  for(let i=0;i<3;i++){const runtime=await createExistingWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store:store(),fetch:fetcher,now:()=>f.now});
+   runtimes.push(runtime);await runtime.connect({confirmed:true});}
   const [a,b,c]=runtimes,owner=(await a.status()).identity.subjectId;
   const room=await a.chat.create({title:'Synthetic ordinary room; no task'},{confirmed:true});
   const invite=await a.chat.propose(room.roomId,{expectedRevision:room.revision,action:'invite',targetSubjectId:(await b.status()).identity.subjectId},{confirmed:true});

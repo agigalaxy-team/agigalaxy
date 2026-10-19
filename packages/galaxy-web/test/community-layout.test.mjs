@@ -26,11 +26,13 @@ test('community source and external format survive a keyword route without enter
  assert.equal(communitySelection('?format=work').format,'all');
 });
 
-test('the production layout preserves full function navigation and clearly labels child links as channel searches',()=>{
+test('the community channel directory keeps all categories direct and leaves global navigation to the shared shell',()=>{
  const html=renderToStaticMarkup(React.createElement(CommunityLayout,{path:'/app/community',search:'?topic=technology&q=硬件&source=external',navigate:()=>{}},React.createElement('p',null,'实际列表')));
- for(const label of ['发现','社区','消息','我的工作','账户中心','收藏','技术与工具','艺术与创作','阅读与学习','生活与兴趣','银河反馈','接入','设置'])assert.ok(html.includes(label),label);
+ for(const label of ['社区','全部频道','技术与工具','艺术与创作','阅读与学习','生活与兴趣','银河反馈','硬件'])assert.ok(html.includes(label),label);
+ assert.equal(html.includes('href="/app/rooms"'),false,'global messages navigation belongs to the persistent shell');
+ assert.equal(html.includes('<details'),false);assert.equal(html.includes('aria-expanded'),false);
  assert.ok(html.includes('在技术与工具中搜索“硬件”'));assert.ok(html.includes('source=external'));
- assert.ok(html.includes('实际列表'));assert.ok(html.includes('aria-labelledby='));
+ assert.ok(html.includes('实际列表'));assert.ok(html.includes('aria-label="社区频道"'));
  assert.equal(html.includes('GALAXY'),false,'the community rail must not create another brand header');
 });
 

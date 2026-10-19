@@ -8,7 +8,7 @@ import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fi
 import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
-import { createWebRuntime } from '../src/runtime.mjs';
+import { createExistingWebRuntime, confirmFixtureAccountLink } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
 import { createTaskContactClient } from '../src/task-contact-client.mjs';
 import { taskDraft, publicationFromDraft } from '../src/task-bounty-client.mjs';
 
@@ -32,15 +32,15 @@ test('same-subject reconnection cannot continue an old contact-send intent after
     };
     const storage = () => { const data = new Map(); return { get: async key => { const value = structuredClone(data.get(key)); if (key === delayKey && --delayReads === 0) { delayKey = null; hit(); await resumed; } return value; }, put: async (key, value) => data.set(key, structuredClone(value)), update: async (key, updater) => { const next = updater(structuredClone(data.get(key))); if (next && typeof next.then === 'function') throw Error('synchronous_update_required'); const stored = structuredClone(next); data.set(key, stored); return structuredClone(stored); } }; };
     const stores = new WeakMap();
-    const make = async store => { const rt = await createWebRuntime({ endpoint, trustedKeys: fixture.bindings.trustedKeys }, { store, fetch: wire, now: () => now, website: taskContactWebsite }); stores.set(rt, store); runtimes.push(rt); return rt; };
+    const make = async store => { const rt = await createExistingWebRuntime({ endpoint, trustedKeys: fixture.bindings.trustedKeys }, { store, fetch: wire, now: () => now, website: taskContactWebsite }); stores.set(rt, store); runtimes.push(rt); return rt; };
     const a = await make(storage()), b = await make(storage());
     for (const [index, rt] of [a, b].entries()) {
-      await rt.createIdentity({ confirmed: true }); await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now);
+      await rt.connect({ confirmed: true }); await retainTaskContactAgent(rt, stores.get(rt), now);
       issuer.setAccount(`synthetic-contact-lease-${index}`);
       const login = await rt.api.call('/v1/identity/begin', { providerId: 'fixture' });
       const callback = await issuer.authorize(login.authorizationUrl);
       assert.equal((await fetch(origin + callback.pathname + callback.search)).status, 200);
-      await rt.confirmAccountLink(login.loginId, { confirmed: true });
+      await confirmFixtureAccountLink(rt, login.loginId);
     }
     const aid = a.api.snapshot().subjectId, bid = b.api.snapshot().subjectId;
     const published = await a.publishTask(publicationFromDraft(taskDraft({ title: '同身份重连隔离验收', summary: '合成任务，验证旧联系意图不能跨新连接继续。', goal: '限制到原确认连接', situation: '本机读取被延迟', visibility: 'Public', intent: 'diagnosis' }, now), [], now), { confirmed: true });

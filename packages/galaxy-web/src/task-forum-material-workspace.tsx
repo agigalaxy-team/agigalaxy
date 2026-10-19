@@ -1,3 +1,4 @@
+import {ReadingDetails,ReadingSummary} from './reading-details';
 import React, { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,9 +69,9 @@ export function TaskForumMaterialWorkspace({ source, sourceState, draft, states,
       <Button type="button" variant="outline" disabled={busy} onClick={onRefresh}>重新核对这版材料</Button>
       <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>返回自己的草稿</Button></div> : <>
       <p className="muted">当前选择：第 {source.locator.versionNumber ?? '指定'} 版。原材料许可至 {date(source.publishedUntil??0)}。</p>
-      {present(draft.title) || present(draft.summary) ? <details><summary>查看已有原稿</summary>
+      {present(draft.title) || present(draft.summary) ? <ReadingDetails><ReadingSummary>查看已有原稿</ReadingSummary>
         <h3>{previousTitle || '原稿标题含当前不可用材料'}</h3><p className="forum-prose">{previousSummary || '尚无独立说明'}</p>
-        <p className="muted">追加保留原说明；明确替换时，原字段只作为本机恢复项保留。</p></details> : <p className="message">可以直接使用下面的标题和说明。</p>}
+        <p className="muted">追加保留原说明；明确替换时，原字段只作为本机恢复项保留。</p></ReadingDetails> : <p className="message">可以直接使用下面的标题和说明。</p>}
       <fieldset disabled={busy}>
         <legend>选择要带入的文字</legend>
         <label><input type="checkbox" checked={useTitle} onChange={event => edit(() => setUseTitle(event.target.checked))}/>使用这版标题{present(draft.title) ? '（替换原稿标题）' : ''}</label>
@@ -85,18 +86,18 @@ export function TaskForumMaterialWorkspace({ source, sourceState, draft, states,
             <small>可以直接使用或编辑。这一材料段与原有独立说明分开保存。</small></label>
         </>}
         {!bodyValid && <p role="alert">说明材料最多10000字，请缩小原文选区或编辑上面的材料。</p>}
-        <details><summary>从准确原文缩小选区</summary><p>在下列原文中选中文字，选区会直接更新对应的材料；不需要复制粘贴。</p>
+        <ReadingDetails mode="inline"><ReadingSummary>从准确原文缩小选区</ReadingSummary><p>在下列原文中选中文字，选区会直接更新对应的材料；不需要复制粘贴。</p>
           <label htmlFor={fieldId+'-source-title'}>原文标题<Textarea id={fieldId+'-source-title'} aria-label="原文标题" readOnly value={source.payload?.title??''} onSelect={event => range('title', event.currentTarget)}/></label>
           <label htmlFor={fieldId+'-source-body'}>原文正文<Textarea id={fieldId+'-source-body'} aria-label="原文正文" readOnly value={source.payload?.body??''} onSelect={event => range('body', event.currentTarget)}/></label>
-        </details>
+        </ReadingDetails>
       </fieldset>
       <fieldset disabled={busy}>
         <legend>这次材料的使用范围</legend>
         <label>谁可以看到<select value={visibility} onChange={event => edit(() => setVisibility(event.target.value))}>
           <option value="Public">公开求助</option><option value="Private">仅自己</option></select></label>
         <p>本次材料使用至 {date(expiresAt)}。到期或原材料撤回后，相应文字停止展示，独立说明继续保留。</p>
-        <details><summary>缩短材料使用期限</summary><label htmlFor={fieldId+'-expires'}>材料使用截止<Input id={fieldId+'-expires'} type="datetime-local" value={Number.isFinite(expiresAt)?localDateTime(expiresAt):''}
-          max={localDateTime(source.publishedUntil??0)} onChange={event => edit(() => setExpiresAt(Math.floor(Date.parse(event.target.value) / 1000)))}/></label></details>
+        <ReadingDetails mode="inline"><ReadingSummary>缩短材料使用期限</ReadingSummary><label htmlFor={fieldId+'-expires'}>材料使用截止<Input id={fieldId+'-expires'} type="datetime-local" value={Number.isFinite(expiresAt)?localDateTime(expiresAt):''}
+          max={localDateTime(source.publishedUntil??0)} onChange={event => edit(() => setExpiresAt(Math.floor(Date.parse(event.target.value) / 1000)))}/></label></ReadingDetails>
         {!untilValid && <p role="alert">使用期限须在当前时间之后，且不晚于原材料许可。</p>}
         <label><input type="checkbox" checked={declared} onChange={event => edit(() => setDeclared(event.target.checked))}/>
           选中的内容是我可用于这份任务的材料；我已排除无权再发布的第三方内容。</label>

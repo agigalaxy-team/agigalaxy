@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
+import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {createCapsuleWebClient} from '../../galaxy-web/src/capsule-workspace-client.mjs';
 import {createCapsuleVisibilityClient} from '../../galaxy-web/src/capsule-visibility-client.mjs';
@@ -21,7 +21,7 @@ export async function capsuleWebContinuityFixture(){
   async function person(name){
     const values=new Map(),store={get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value)),
       update:async(key,change)=>{const next=change(structuredClone(values.get(key)));if(next?.then)throw Error('fixture_sync_update_required');values.set(key,structuredClone(next));return structuredClone(next);}};
-    const runtime=await createWebRuntime({endpoint:f.owner.bindings.endpoint,trustedKeys:f.owner.bindings.trustedKeys},{store,now,fetch:async(url,input)=>{
+    const runtime=await createExistingWebRuntime({endpoint:f.owner.bindings.endpoint,trustedKeys:f.owner.bindings.trustedKeys},{store,now,fetch:async(url,input)=>{
       f.clock.now=now();const path=new URL(url).pathname;
       if(hooks.beforeRequest)await hooks.beforeRequest(path,input);
       const response=await fetch(f.origin+path,input);let locator={};
@@ -33,7 +33,7 @@ export async function capsuleWebContinuityFixture(){
       if(hooks.afterResponse)await hooks.afterResponse(path,response,input);
       return response;
     }});
-    await runtime.createIdentity({confirmed:true});await runtime.connect({confirmed:true});
+    await runtime.connect({confirmed:true});
     const identity=(await runtime.status()).identity,material=await store.get(`device:${identity.subjectId}:${identity.deviceId}`);
     f.issuer.setAccount('capsule-continuity-'+randomUUID());const login=await runtime.api.call('/v1/identity/begin',{providerId:'forum-fixture'}),callback=await f.issuer.authorize(login.authorizationUrl),response=await fetch(f.origin+callback.pathname+callback.search);
     if(!response.ok)throw Error('fixture_oidc_callback_failed');await response.arrayBuffer();const preview=await runtime.api.call('/v1/identity/status',{id:login.loginId});
