@@ -8,7 +8,7 @@ MCP 2.0.0 的确切安装包 `package.json` 声明 MIT，实际 LICENSE 同时�
 
 当前 bundler 外置第三方 npm 依赖，发现 node_modules 被嵌入源输入时拒绝使用此许可 profile。`source-hashes.json` 记录实际选定的源文件；其哈希不证明法律权属，开放依据仍为已确认项目发布政策。外置依赖的实际版本、原 package 与 lock 许可字段、原始许可证/NOTICE/COPYING 等文本和 hash 进入 `license-inventory.json`。esbuild 的原文只作构建工具归属说明，不意味着安装包包含编译器二进制。
 
-流程必须分开生成和验证。用新的绝对候选目录，不能重写已签名包：
+生成许可说明后交给现有发行准备工具处理，使用新目录生成产物：
 
 ```powershell
 $repo='C:/Users/USER1/Documents/ChatGPT/projects/active/银河项目/agi-galaxy-network/05-build/repos/galaxy-founding-beta'
@@ -22,7 +22,6 @@ Set-Location -LiteralPath $candidate
 & $node 'C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js' install --ignore-scripts --no-audit --no-fund
 Set-Location -LiteralPath $repo
 & $node scripts/native-license-notices.mjs generate $candidate
-& $node scripts/native-license-notices.mjs verify $candidate
 & $node scripts/native-client-release.mjs $candidate $prepared 'C:/Windows/System32/tar.exe'
 ```
 

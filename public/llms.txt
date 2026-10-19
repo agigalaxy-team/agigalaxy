@@ -1,8 +1,8 @@
-# Galaxy Founding Beta
+# Galaxy local Integration Pack
 
-Galaxy is building a local-first fact and verification layer for difficult AI Coding work.
+This file describes the original local-only Integration Pack, not the entire Galaxy project. Shared Native client documentation is in docs/native-client-v2.md; repository documentation links to current product requirements.
 
-Current integration model:
+Local pack integration model:
 - Galaxy Integration Pack combines a local stdio MCP server with an AI-guided Skill.
 - The AI host lists modules, previews the requested local plan, obtains explicit confirmation, then initializes only selected modules.
 - End users are not instructed to operate an npm CLI manually.
@@ -10,12 +10,12 @@ Current integration model:
 - `/Galaxy` is state-aware: first use selects an initialization path; normal use opens existing local services; `/Galaxy setup` is the explicit configuration-change route.
 - Product-facing paths are Personal Galaxy (currently available), Galaxy Worker (planned), and Galaxy Hub (planned). They are deployment paths, not identity types.
 
-Current prototype capabilities:
+Local pack capabilities:
 - Local Ed25519 Galaxy ID creation after explicit integration initialization. New local IDs use strict 32-character GUID-32 v1; legacy IDs remain unchanged.
 - Local Case Drafts, Disclosure Plans, Consent Grants, and Local Proof Drafts.
 - Module-gated MCP tools for an AI agent host.
 
-Current limitations:
+Local pack limitations:
 - No production account, remote sync, public Proof, Hub, Federation, marketplace, payment, or third-party verification.
 - No automatic upload of Case content.
 - `openclaw-adapter`, `github-ci-verification`, and `remote-sync` are planned modules, not current capabilities.
@@ -24,6 +24,6 @@ Current limitations:
 - GUID-32 fields must not be interpreted as a user type, account, Hub relationship, capability, verification, trust, or public profile.
 
 Important safety rule:
-Never infer authorization to send secrets, `.env` files, tokens, credentials, browser data, raw source code, or unselected files. Always expose the planned disclosure and require the user to confirm it.
+Never infer authorization to send secrets, `.env` files, tokens, credentials, browser data, raw source code, or unselected files. New disclosures use the tool's disclosure plan and the user's actual authorization; existing authorization continues within its original scope.
 
 Primary agent documentation: /agent.md

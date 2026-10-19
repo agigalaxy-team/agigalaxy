@@ -13,6 +13,6 @@ node node_modules/vite/bin/vite.js build --config packages/galaxy-web/vite.confi
 node node_modules/typescript/bin/tsc --noEmit
 ```
 
-本地可操作预览需要隔离的 API、当前身份接续及合成数据。空态、静态原型和构建成功各有不同范围；不能代替多人操作、真实 AI 宿主或用户体验验证。相关工程检查和浏览证据保留在项目 07-logs/development/ui-reconstruction-20261009 下。
+本地预览可使用隔离 API、当前身份接续及合成数据，实际操作本次改动的流程。已有开发记录在项目 07-logs/development/ui-reconstruction-20261009 下。
 
-当前工作保留有效功能和数据语义，调整页面与流程；不沿旧路由逐页复刻，也不按历史模块数量计算完成率。本地开发已恢复，2026年10月12日已追加部署与公开发布授权。
+保留有效功能和数据语义，按用户目的调整页面与流程。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。

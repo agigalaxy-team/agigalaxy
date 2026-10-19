@@ -1,10 +1,10 @@
 # Galaxy 跨宿主适配器：资料入口
 
-此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../../02-architecture/archive-ui-20261009/implementation/host--README.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
+相应版本的接口、配置及实现记录见[历史技术说明](../../../../../02-architecture/archive-ui-20261009/implementation/host--README.md)。
 
 本主题现行要求：[AI宿主、客户端与命令界面](../../../../../02-architecture/current/CLIENT_EXPERIENCE.md)；全产品交互遵循[体验规则](../../../../../02-architecture/current/EXPERIENCE_RULES.md)。按当前问题返回可读结果；完整背景按权限调用，界面按用途精炼。
 
-当前已按用户后续明确授权恢复本地设计、开发、预览与必要检查，部署和公开发布仍未获准。共享 Native 的当前工作面板按目的显示帮助、消息、Worker 输入和实际输出，使用同一业务含义与稳定网页深链，详见[Native 客户端](../../docs/native-client-v2.md)。
+共享 Native 的工作面板按目的显示帮助、消息、Worker 输入和实际输出，使用同一业务含义与稳定网页深链，详见[Native 客户端](../../docs/native-client-v2.md)。
 
 OpenCode stable 当前源码的 `/galaxy` 从“找帮助、发起求助、消息、我的与设置、回到原工作”直接进入。打开不会创建身份或连接；本机身份准备和连接分别使用实际原生选择，保留后端原五层与准确连接预览。完整连接请求只在有目的的来源与诊断里查看，不要求用户输入确认口令。
 

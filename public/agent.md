@@ -1,8 +1,8 @@
-# Galaxy Founding Beta — Agent Guide
+# Galaxy local Integration Pack — Agent Guide
 
 ## Product status
 
-Galaxy Founding Beta is a local-development prototype for difficult AI Coding Cases. It is not a deployed public network, verified identity service, Hub, marketplace, production Evidence registry, or a public plugin installation channel.
+This guide describes the original local-only Integration Pack and its tools. The shared Native client is documented in `docs/native-client-v2.md`; product requirements and current work are in the repository documentation. The local pack's available tools do not define the capabilities of the whole Galaxy project.
 
 ## Primary integration path
 
@@ -17,7 +17,7 @@ Use this sequence:
 5. Obtain explicit human confirmation in the conversation.
 6. Only then call `galaxy_integration_initialize` with its required confirmation value.
 
-Never tell an end user to run `npm install`, `npm run mcp`, or the internal Galaxy ID fallback. The installed Integration Pack and AI host own process startup. Do not guide remote deployment or public release: neither is authorized in Founding Beta.
+The installed Integration Pack and AI host own process startup; users enter through `/Galaxy` rather than internal npm or Galaxy ID commands.
 
 ## `/Galaxy` routing
 

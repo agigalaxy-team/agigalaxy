@@ -1,7 +1,12 @@
-# Development checks and round-two boundaries：资料入口
+# 开发检查
 
-此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../02-architecture/archive-ui-20261009/implementation/repo--development-checks.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
+按实际改动选择已有构建、类型检查或相关模块测试，操作受影响的功能，发现问题后直接修正。检查通过后继续完成工作，不默认重跑无关的全项目检查。
 
-本主题现行要求：[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md)。相关界面与操作遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)；实现细节与产品目标按各自范围核对。
+常用入口：
 
-接口和数据是否仍适用须结合实际代码与版本核对；原始事实、权限及历史检查不被这份导航改写。本页是历史实现导航；当前开发与交付按最新明确授权及对应版本的实际检查执行。
+- 模块测试：`node --test <相关测试文件>`。
+- 网页构建：`npm run build:web`。
+- 官网构建：`npm run build:site`。
+- 类型检查：`node node_modules/typescript/bin/tsc --noEmit`。
+
+当前开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)。旧检查记录见[历史技术说明](../../../../02-architecture/archive-ui-20261009/implementation/repo--development-checks.md)，保留其原版本含义。

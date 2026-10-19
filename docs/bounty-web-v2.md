@@ -1,7 +1,5 @@
 # 开放／赏金任务网页流程（M11）：资料入口
 
-此旧版本说明已从现行产品要求中退出，技术内容与当时证据完整保留在[历史实现参考](../../../../02-architecture/archive-ui-20261009/implementation/repo--bounty-web-v2.md)。不能从旧“当前行为”、菜单、发布或恢复命令继续开发。
+相应版本的接口、配置及实现记录见[历史技术说明](../../../../02-architecture/archive-ui-20261009/implementation/repo--bounty-web-v2.md)。
 
 本主题现行要求：[当前决定](../../../../02-architecture/current/DECISIONS.md)与[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)。后续实现按实际目的处理，不单独保留旧对象页面。
-
-接口和数据是否仍适用须结合实际代码与版本核对；原始事实、权限及历史检查不被这份导航改写。本页是历史实现导航；当前开发与交付按最新明确授权及对应版本的实际检查执行。

@@ -2,7 +2,7 @@
 
 银河连接人、Agent、工具与真实工作：查找资料和帮助、交流协作、使用结果，并在保留来源与权限的前提下积累可复用的经验。核心架构、用户自带模型、稳定身份和真实工作事实继续保留。
 
-全部银河工作执行[项目工作规则](../../../02-architecture/current/WORK_RULES.md)和[本仓约束](AGENTS.md)。完整目标、实际读取、来源与采用、跨部分依赖和证据边界长期适用；[执行范围](../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)与[当前状态](../../../02-architecture/current/chapters/11-current-state.md)分别说明最新授权及事实。下列交付记录保留原日期，不代表已重新核验。
+按[简明工作方式](../../../02-architecture/current/WORK_RULES.md)和[本仓说明](AGENTS.md)完成实际功能，需要的页面、交互和底层行为一起处理。当前事项见[任务安排](../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)与[项目状态](../../../02-architecture/current/chapters/11-current-state.md)；下列交付记录保留原日期。
 
 ## 10月12日交付记录
 

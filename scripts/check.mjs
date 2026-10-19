@@ -65,4 +65,4 @@ if (mode !== 'lint') {
 if (mode === 'all' || mode === 'lint') {
   run('lint', ['node_modules/oxlint/bin/oxlint', 'app', 'packages', 'scripts', 'lib/browser-demo.mjs']);
 }
-console.log('[galaxy-check] requested checks passed; live PostgreSQL and host acceptance are separate gates.');
+console.log('[galaxy-check] requested checks passed.');

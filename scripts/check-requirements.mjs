@@ -9,7 +9,7 @@ const project = process.env.GALAXY_PROJECT_ROOT
 const checker = resolve(project, '05-build/tools/galaxy_docs.py');
 const manifest = resolve(project, '02-architecture/current/manifest.json');
 if (!existsSync(checker) || !existsSync(manifest)) {
-  console.error('Current project documentation unavailable. Supply its matching GALAXY_PROJECT_ROOT; validation cannot be skipped.');
+  console.error('Project documentation unavailable. Set GALAXY_PROJECT_ROOT to its location.');
   process.exit(2);
 }
 /** @type {Array<[string, string[]]>} */
@@ -30,4 +30,4 @@ for (const args of [[checker, 'validate']]) {
     { cwd: project, windowsHide: true, shell: false, stdio: 'inherit' });
   if (result.error || result.status !== 0) process.exit(result.status ?? 1);
 }
-console.log('Current documentation assembly, links and decision mappings checked. Historical modules are source locators. Semantic understanding, product behavior, user acceptance and deployment require separate evidence.');
+console.log('Document entries and local links checked.');
