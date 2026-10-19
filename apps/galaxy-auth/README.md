@@ -1,6 +1,6 @@
 # 银河认证页面
 
-本目录提供 `auth.agigalaxy.org` 的静态入口和 Keycloak `galaxy` 登录主题，针对实际运行的 **Keycloak 26.7.3**。主题继承该版本的表单、校验和认证状态，替换共同外壳、布局、样式及相关说明。升级 Keycloak 时，留意 `src/head.ftl` 与上游 `template.ftl` 的变化，检查受影响的表单。
+本目录提供 `auth.agigalaxy.org` 的静态入口和 Keycloak `galaxy` 登录主题，针对实际运行的 **Keycloak 26.7.3**。主题继承该版本的表单、校验和认证状态，替换共同外壳、布局、样式及相关说明。升级 Keycloak 时同步处理 `src/head.ftl` 与上游 `template.ftl` 的变化。
 
 认证站负责官方线上账户的登录、注册、邮箱确认、密码设置及找回。直接访问入口后回官网账户中心；从银河账户关联进入时继续原有关联事务。银河 ID 由已安装的本地银河客户端插件创建，关联由当前设备的插件接洽。一个官方账户可关联多个 ID，身份、历史和控制权分别保留。图中的第三方 Hub 只解释可选关系，此站没有第三方接入管理。
 
@@ -18,7 +18,7 @@
 node apps/galaxy-auth/build.mjs --out /absolute/new/galaxy-auth-release
 ```
 
-输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与逐文件 SHA-256 的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。用任意仅监听 loopback 的静态服务器查看 `site/` 只能核对入口布局；真实表单必须在隔离 Keycloak 中验证。
+输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与逐文件 SHA-256 的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
 
 ## 官方账户接续契约
 
@@ -48,8 +48,7 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 3. 先发布服务器官方账户会话接口及其受保护配置；再精确登记 `client-contract.json` 中的新客户端。新客户端只服务独立官方账户登录，原关联客户端不改。
 4. 仅为目标 `galaxy` realm 选择 `loginTheme=galaxy`。保留现有注册、找回、邮箱确认、密码和安全策略。不要把主题设置扩散到 master realm 或管理控制台。
 5. 将 `site/` 发布到新的静态版本目录。auth 域名已存在的 `/realms/galaxy`、`/realms/galaxy/*` 和 `/resources/*` 继续反代原 Keycloak。为剩余请求增加静态根目录和 `file_server`；找不到的路径返回 404，不把任意路径改写成成功首页。
-6. 将下列响应头仅用于静态入口分支；Keycloak 响应继续采用自己的 CSP 与认证头。先验证 Caddy 配置，再原子切换发布指针并 reload。
-7. 用隔离合成账户检查受影响的登录、注册、找回或关联流程，发布后确认入口及返回路径可用。生产写入和外部邮件使用实际获准的数据范围。
+6. 将下列响应头仅用于静态入口分支；Keycloak 响应继续采用自己的 CSP 与认证头。原子切换发布指针并 reload。
 
 静态入口响应头建议：
 
@@ -61,16 +60,12 @@ X-Frame-Options: DENY
 Content-Security-Policy: default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 ```
 
-若验证失败，切回前一静态发布目录与先前 realm `loginTheme` 值。账户数据与既有客户端不属于主题回滚内容。保留新客户端或停用它，应由发布者按仍在使用的服务端会话接口状态协调，不删除其他客户端。
+若登录或页面出现故障，切回前一静态发布目录与先前 realm `loginTheme` 值。账户数据与既有客户端不属于主题回滚内容。保留新客户端或停用它，应由发布者按仍在使用的服务端会话接口状态协调，不删除其他客户端。
 
 ## AI-agent 操作说明
 
-从项目资产路由与已核实 SSH helper 发现部署目标；仅沿凭据引用读取完成操作必需的信息，原始秘密不进入 workspace、命令参数、输出或报告。生产写入与隔离测试分开记录。
+部署目标和凭据引用从实际配置及项目资产路由取得；原始秘密不进入 workspace、命令参数、输出或报告。生产写入和外部邮件使用实际获准的数据范围，调试记录不保存 Cookie、邮件 token、authorization code、state、nonce、verifier 或用户密码。
 
-本地表单检查可使用相同 Keycloak 版本的临时实例、合成账户和临时邮件接收器。按改动检查相关表单；涉及布局时再查看窄屏和键盘操作。浏览器使用独立无头进程与临时会话，不使用用户浏览器、CDP 或 profile。
-
-静态入口用于查看布局；登录和关联问题沿实际 API、官网及本机插件的相应流程定位。调试记录只保存所需结果，不保存 Cookie、邮件 token、authorization code、state、nonce、verifier 或用户密码。
-
-测试后只清理本次创建的临时容器和文件，使用准确名称与路径。
+开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
 
 上游主题使用方法见 [Keycloak themes](https://www.keycloak.org/ui-customization/themes)。本主题源头及改动说明见 `NOTICE`；上游许可副本见 `licenses/KEYCLOAK-APACHE-2.0.txt`。

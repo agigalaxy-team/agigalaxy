@@ -135,4 +135,4 @@ JSON中 input.fields 是精确顶层字段；input.schema 指向业务 schema �
 
 `node scripts/build-api-reference.mjs` 重建目录及错误字面量索引；`--check` 只检查文件是否匹配。来源扫描限于 Official src，不读取工作区凭据或项目归档。错误索引包含静态 ServiceError 声明；动态/库错误及每个端点的可达状态不由静态扫描推断。
 
-修改目录生成或路由描述时，可使用 `node --test packages/galaxy-official/test/api-reference.test.mjs` 检查路由、认证要求、代理可达性和生成目录。业务修改使用对应功能的已有测试或实际操作检查。
+开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，命令见[开发检查参考](development-checks.md)。

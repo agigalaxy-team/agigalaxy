@@ -10,10 +10,10 @@
 
 统一构建先完成 Web，再把该构建的 entry、CSS 地址和摘要交给官网。非首页的 `public-bootstrap.js` 预读当前内容树并启动同一个 App，失败时保留原 URL 的可阅读 HTML。独立官网构建只有显式提供 `--web-dist <已完成Web目录>` 才启用此增强，避免自动混入旧工件。独立输出可用 `npm run build -- --web-output <Web目录> --output <官网目录>`；这两个目录的文件作为同一批制品提供。
 
-`release-data.json` 记录最近导入的公开发行资料。`public-archive.json` 固定已公开历史文档与下载的地址和 SHA-256。首次构建从官方网站读取这些公开文件并核对摘要，后续使用被忽略的 `.cache`；可通过 `npm run build:site -- --offline` 验证离线构建。目录中的 `docs/index.html` 与 `downloads/index.html` 是本轮重构的现行入口；这两份旧入口原件按原始字节另存于 `/archives/public/<原路径>`，其余固定文档和下载保留原地址及字节。下载核验页提供旧入口原件链接。构建无需本机凭据、私人仪表盘或仓库外的运维报告。
+`release-data.json` 记录最近导入的公开发行资料。`public-archive.json` 固定已公开历史文档与下载的地址和 SHA-256。首次构建从官方网站读取这些公开文件并核对摘要，后续使用被忽略的 `.cache`；`--offline` 使用已有缓存构建。目录中的 `docs/index.html` 与 `downloads/index.html` 是本轮重构的现行入口；这两份旧入口原件按原始字节另存于 `/archives/public/<原路径>`，其余固定文档和下载保留原地址及字节。下载核验页提供旧入口原件链接。构建无需本机凭据、私人仪表盘或仓库外的运维报告。
 
 发布构建需要明确的组件版本，例如 `npm run build -- --site-release 0.1.20 --api-release 0.1.15`。这只生成制品，不会发布或证明对应 API 已上线。发布前应以实际服务版本更新 `release-data.json` 的观测记录，并用已校验的客户端发行资料更新当前下载与安装说明。保留已公开的历史下载地址。
 
-AI Agent 按当前服务版本和公开配置构建；接口或数据迁移有变化时处理相应兼容。网站构建和服务部署分别执行，发行数据使用实际版本与内容。发布后从真实 HTTPS 页面操作受影响的功能。
+网站构建和服务部署分别执行，发行数据使用实际服务版本、公开配置与内容。开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
 
 官网的响应策略须允许同源脚本、内容树读取与搜索表单。首页可以使用 `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`。非首页渐进启动后使用与 `/app/` 相同的准确 API 连接策略，并允许同源 `/assets/public-pages/` 与 `/assets/workspace-entry.json`；部署时根据所选公开配置核对实际 `connect-src`，不要为此扩大到任意来源。旧静态页的 `form-action 'none'` 会阻止搜索，缺少 `connect-src` 会使 App 增强留在静态回退；HTTP 200 与本地构建不能发现这类线上浏览器阻断。

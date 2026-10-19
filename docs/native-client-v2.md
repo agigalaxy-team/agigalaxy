@@ -61,13 +61,13 @@ OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整
 
 原对象目前不可读或服务暂时不可用时，返回结果保留原对象定位和原工作引用，明确标记 `current:false`、`data:null` 与来源错误，不重放缓存正文、不自动授权或重新提交业务。认证或会话本身失效仍按原错误处理。宿主可以据此回到原工作、说明当前缺口，并在条件恢复后再次查询同一对象；历史回执不授予当前正文访问权。HelpSession 刷新或返回遇到发布、参与接受结果未知时，先查询原 operationId 与原载荷摘要，确认后再读取当前任务，不通过另建任务或另一次接受猜测结果。
 
-个人摘要默认本地，不产生模型调用。私有同步和房间分享分别选择。持续关注需要当前连接的房间 Agent grant、限定目的与结束时间；使用 agent_grants/grant/revoke 查看与管理，再由用户宿主执行 check/ack/stop。绑定变化后停止旧关注，需重新选择当前连接授权；不会复制旧权限。并发检查使用本机锁和租约，待处理内容只保存定位信息，每次重新读取来源权限。当前实现不安装后台服务，不会在宿主退出后代替用户运行模型。检查没有新事件时模型调用为零；有事件只返回供用户模型处理的数据。Agent 处理游标与人类已读分开。宿主实际子会话启动、睡眠恢复、按钮或侧栏能力需分别验证。
+个人摘要默认本地，不产生模型调用。私有同步和房间分享分别选择。持续关注需要当前连接的房间 Agent grant、限定目的与结束时间；使用 agent_grants/grant/revoke 查看与管理，再由用户宿主执行 check/ack/stop。绑定变化后停止旧关注，需重新选择当前连接授权；不会复制旧权限。并发检查使用本机锁和租约，待处理内容只保存定位信息，每次重新读取来源权限。当前实现不安装后台服务，不会在宿主退出后代替用户运行模型。检查没有新事件时模型调用为零；有事件只返回供用户模型处理的数据。Agent 处理游标与人类已读分开。
 
 安装 Skill 时将 `skills/galaxy` 放到对应宿主认可的 Skill 路径。MCP 配置的 command 指向该机 Node 可执行文件，args 为独立候选中的 `galaxy.js`，env 只含 `GALAXY_NATIVE_CONFIG` 路径。不要同时启用同名旧 Galaxy MCP。切换版本保留原数据目录并关闭旧进程，不重跑初始化。
 
 本包附 `host-configs.mjs`：运行 `node host-configs.mjs <公开配置绝对路径> <尚不存在的输出目录绝对路径>` 生成八端配置与 Skill；只生成新目录，不修改用户配置。参见 HOSTS.md 和 host-capabilities.json。复制到另一台电脑需用该机路径重新生成，恢复身份使用批准流程而非把账号密钥塞入插件。
 
-开发追溯：M15/M16/M17；CUR-02/03、08/09、12、23—32；B10-Q02—04、DISC-ROOT、DISC-HANDOFF 与关注采用决定。操作与验证的实际范围记录在项目 `07-logs/development/native-client-v2.md`，本 README 不是上线证明。
+开发追溯：M15/M16/M17；CUR-02/03、08/09、12、23—32；B10-Q02—04、DISC-ROOT、DISC-HANDOFF 与关注采用决定。原运行记录位于项目 `07-logs/development/native-client-v2.md`。
 
 分发采用独立的 galaxy-native-client-release 签名种类。protocolAcceptance 范围是 local-stdio-http-fixtures，actualHostAcceptance 固定 false；它与旧 OpenCode 真宿主报告互不替代。标准 JWS/Ed25519 绑定发行包与报告的准确字节，公钥由调用者固定，签名最长 30 天。验签通过不表示已经安装、公开发布、运行或完成人工验收。
 
@@ -77,7 +77,7 @@ OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整
 
 peer 还可携带公开的 `authentication` 选择：默认 `{"mode":"none"}` 适用于无凭据对端；Bearer 对端使用 `{"mode":"bearer-environment","variable":"GALAXY_A2A_PEER_<所选名称>_TOKEN"}`。只给该 MCP 子进程注入所选变量；配置、插件、日志与聊天均不放原始值，不永久导出全局环境。启动与 peers 工具不读取变量，实际调用才读取该精确变量；缺失时报告对端授权不可用，不降级成匿名、不借用 Official token。若宿主不能注入所选变量，先使用已有浏览器衔接或处理该宿主配置，不改变协议信任。OAuth、任意请求头和自动凭据发现尚不支持。
 
-配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。具体生命周期与 Python 互通证据见源码仓 `packages/galaxy-a2a/docs/native-v2-python.md`；源码变化不会自动更新已经签名发布的包，新包须独立捕获、验证和发行。
+配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。具体生命周期与 Python 互通记录见源码仓 `packages/galaxy-a2a/docs/native-v2-python.md`；源码变化不会自动更新已经签名发布的包。
 
 ## 设备清单与明确撤销
 
@@ -148,4 +148,6 @@ macOS `UNUserNotificationCenter.add` 成功仅表示系统受理，仍返回未�
 
 接入后读取 `galaxy_native_status`，操作需要使用的功能。未选择连接时由本人选择，已有有效选择在原范围恢复。Worker 工具缺失时查看 `workerPacks` 与同名 `a2a.peers` 配置。设备预览失效时查询原记录，不能把重绑后的旧句柄当成授权。
 
-本机审阅页只接受准确的 loopback Host 与 Origin。实际浏览器表单使用同源 referrer 策略；Origin 为 `null` 或来自另一来源时仍拒绝，不能为绕开 403 放宽校验。退出时停止接收新调用、使设备预览失效、等待在途回执和本机保存完成，随后关闭协议；未知操作保留在原 journal。测试替身、参考子进程、真实浏览器、物理宿主及真人验收须分别说明，自动测试结果不填补真实验收缺口。
+本机审阅页只接受准确的 loopback Host 与 Origin。实际浏览器表单使用同源 referrer 策略；Origin 为 `null` 或来自另一来源时仍拒绝，不能为绕开 403 放宽校验。退出时停止接收新调用、使设备预览失效、等待在途回执和本机保存完成，随后关闭协议；未知操作保留在原 journal。
+
+开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](development-checks.md)。

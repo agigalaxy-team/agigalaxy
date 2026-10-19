@@ -83,7 +83,7 @@ in its original journal when a late return is withheld after reconnection.
 Closing this composition invalidates its previews; the process owner separately
 stops the child process.
 
-## AI-agent deployment and verification
+## AI-agent local operation
 
 Discover the existing repository, actual Node path, locked A2A package and exact
 source files before launching. Do not install a global runner or accept an
@@ -92,11 +92,7 @@ real external transport, TLS and peer credentials require the owner's explicit
 deployment and selection. The local reference's authenticated SDK context means
 only local-owner transport, not public identity verification.
 
-From the repository, run:
-
-```powershell
-& 'C:/Program Files/nodejs/node.exe' --test packages/galaxy-official/test/worker-pack-process-v2.test.mjs
-```
+Development methods are in [Project work rules](../../../../../02-architecture/current/WORK_RULES.md); tool commands are in [Development checks](../../docs/development-checks.md).
 
 The workflow uses actual independent child processes, the locked SDK, signed
 HTTP business requests, PGlite and a filesystem A2A journal. It verifies normal

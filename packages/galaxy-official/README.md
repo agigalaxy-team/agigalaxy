@@ -6,4 +6,4 @@
 
 实现、路由和数据规则以当前源码及匹配版本为事实，版本说明见[技术索引](../../docs/TECHNICAL_REFERENCE_INDEX.md)。EVIDENCE.md、PROOFS.md及IMPLEMENTATION_HISTORY_PRE_CURRENT_2026-09-13.md保留其原有时间与范围，不能据此宣称今天完整上线。
 
-AI Agent 部署时读取目标服务配置、依赖、数据库版本及受限角色，沿现有部署方式更新，并检查受影响的功能。秘密不进入文档和日志。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。
+部署使用目标服务配置、依赖、数据库版本及受限角色，秘密不进入文档和日志。开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。

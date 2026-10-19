@@ -6,13 +6,6 @@
 
 设计与实现依[全产品体验规则](../../../../../02-architecture/current/EXPERIENCE_RULES.md)和[用户流程](../../../../../02-architecture/current/chapters/03-user-flows.md)。内容、人、对话和结果是页面主体；系统处理更新、来源检查、去重和同一已授权操作的恢复。真实数据范围及新的对外动作仍由用户选择。暂停、撤销、到期或身份变化不会被后台接续绕过。
 
-从本仓库根目录执行现有网页构建和类型检查：
-
-```powershell
-node node_modules/vite/bin/vite.js build --config packages/galaxy-web/vite.config.mjs
-node node_modules/typescript/bin/tsc --noEmit
-```
-
-本地预览可使用隔离 API、当前身份接续及合成数据，实际操作本次改动的流程。已有开发记录在项目 07-logs/development/ui-reconstruction-20261009 下。
+开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，构建等命令见[开发检查参考](../../docs/development-checks.md)。本地预览可使用隔离 API、当前身份接续及合成数据。已有开发记录在项目 07-logs/development/ui-reconstruction-20261009 下。
 
 保留有效功能和数据语义，按用户目的调整页面与流程。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。
