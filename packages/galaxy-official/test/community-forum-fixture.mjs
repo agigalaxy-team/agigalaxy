@@ -10,10 +10,11 @@ import {forumWriteSpec} from '../src/shared/community-forum-v1-schema.mjs';
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {createServices} from '../src/services.mjs';
+import {createOfficialAccountPortal} from '../src/official-account.mjs';
 
-export async function communityForumFixture({policy,resourceBudgetPolicy,endpoint='https://official.example.org',scopes=['binding','consent','assistance','moderation','data-export','data-delete','history','case-teaser','context','notifications'],database=null,migrateDatabase=true}={}){
+export async function communityForumFixture({policy,resourceBudgetPolicy,officialAccountPortal=false,endpoint='https://official.example.org',scopes=['binding','consent','assistance','moderation','data-export','data-delete','history','case-teaser','context','notifications'],database=null,migrateDatabase=true}={}){
  const clock={now:Math.floor(Date.now()/1000)};
- const issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/forum-fixture'],{emailVerified:true});let owner,api;
+ const issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/forum-fixture',...(officialAccountPortal?[endpoint+'/v1/account/callback']:[])],{emailVerified:true});let owner,api;
  try{
   const provider=await createOidcLoginProvider({id:'forum-fixture',name:'Isolated real OIDC fixture',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/identity/callback/forum-fixture',allowLoopbackHttp:true,now:()=>clock.now});
   const options={now:clock.now,endpoint,identityProviders:[provider],resourceBudgetPolicy,syntheticCommunityQuota:false};
@@ -26,7 +27,9 @@ export async function communityForumFixture({policy,resourceBudgetPolicy,endpoin
   const forum=new CommunityForumV1(owner.access,owner.consents,{accounts:owner.communityAccounts,publicWrites:owner.publicWrites,policy});
   const governance=new CommunityForumGovernanceV1(owner.access,owner.consents,forum,{accounts:owner.communityAccounts,moderatorIds:[moderator.actor.subjectId]});
   owner.forum=forum;owner.forumGovernance=governance;owner.dataExport.viewServices.forum=forum;owner.dataExport.viewServices.forumGovernance=governance;
-  api=createApi({...owner,forum,forumGovernance:governance,rateLimit:10000,failureAudit:async()=> 'fixture-error-recorded'});
+  const website='https://galaxy.example.org',entry=officialAccountPortal?await createOidcLoginProvider({id:'official-account-entry',name:'Isolated account entry',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/account/callback',includeAccountProfile:true,allowLoopbackHttp:true,now:()=>clock.now}):null,
+   officialAccounts=entry?createOfficialAccountPortal({provider:entry,db:owner.db,endpoint,websiteOrigin:website,associationProviders:[provider],now:()=>clock.now}):null;
+  api=createApi({...owner,forum,forumGovernance:governance,officialAccounts,browserOrigins:entry?[website]:[],rateLimit:10000,failureAudit:async()=> 'fixture-error-recorded'});
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+api.address().port;
   async function request(path,{who=owner,input,method=input===undefined?'GET':'POST',authorization=true}={}){
    const response=await fetch(origin+path,{method,headers:{...(input===undefined?{}:{'content-type':'application/json'}),...(authorization?{authorization:'Bearer '+who.credential}:{})},...(input===undefined?{}:{body:JSON.stringify(input)})});
@@ -53,6 +56,6 @@ export async function communityForumFixture({policy,resourceBudgetPolicy,endpoin
   }
   async function post(overrides={},who=owner){const p={schemaVersion:1,operationId:randomUUID(),postId:randomUUID(),expectedHeadVersion:0,versionId:randomUUID(),title:'Independent ordinary discussion',body:'A useful question without a Task, model or history prerequisite.',links:[],publishedUntil:clock.now+2592000,...overrides};return prepare(who,p.expectedHeadVersion===0?'create-post':'publish-version',p);}
   async function reply(p,overrides={},who=responder){return prepare(who,'create-reply',{schemaVersion:1,operationId:randomUUID(),replyId:randomUUID(),postId:p.postId,postVersionId:p.versionId,expectedRevision:0,body:'An exact-version reply.',publishedUntil:clock.now+2592000,replyTo:null,...overrides});}
-  return {owner,responder,moderator,forum,governance,db:owner.db,issuer,clock,origin,request,ok,login,authorize,prepare,write,reconnect,post,reply,close:async()=>{api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await issuer.close();if(!database)await owner.db.close();}};
+  return {owner,responder,moderator,forum,governance,officialAccounts,website,db:owner.db,issuer,clock,origin,request,ok,login,authorize,prepare,write,reconnect,post,reply,close:async()=>{api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await issuer.close();if(!database)await owner.db.close();}};
  }catch(error){if(api){api.closeAllConnections();await new Promise(resolve=>api.close(resolve));}await issuer.close();if(owner&&!database)await owner.db.close();throw error;}
 }

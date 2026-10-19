@@ -32,6 +32,7 @@ import {presentNativeResult} from './presentation.mjs';
 import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './reading-bookmarks.mjs';
 import {readProfileDisplayNames} from '../../../galaxy-official/src/profile-display-names.mjs';
 import {registerWorkContinuationTools} from './work-continuation.mjs';
+import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './local-work-tools.mjs';
 
 export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifact,watchHost,watchHostDriverFactory,notificationOptions}={}){
  const configuredHost=createConfiguredWatchHost(watchHost,{createDriver:watchHostDriverFactory});
@@ -55,8 +56,8 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   return connect(transport);
  };
  async function reviewOperation(name,input,ctx,operation,choiceOptions){
-  const subjectId=(await runtime.status()).identity??'',snapshot=runtime.api.snapshot?.();
-  const authorizationContext={subjectId,endpoint:runtime.api.endpoint,bindingId:snapshot?.bindingId??null,generation:snapshot?.generation??null};
+   const subjectId=(await runtime.status()).identity??'';
+   const localSettingsChoice=['galaxy_local_settings_save','galaxy_work_sync_choice','galaxy_archive_sync_choice'].includes(name);
   currentSubject=subjectId;
   // A new room permission must identify the actual authorized room. This is
   // read-only context for the exact choice; the submitted grant stays unchanged.
@@ -71,9 +72,32 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
    const room=await runtime.api.call('/v2/chat/rooms/'+input.roomId+'/read',{});
    reviewedInput={...input,reviewRoom:{roomId:input.roomId,title:room.title}};
   }
-  return choice.run(server,name,{...reviewedInput,authorizationContext},ctx,async()=>{
+  if(name==='galaxy_local_upload_privacy_set'&&input.sessionIds?.length){
+   const sessions=await localWork.archive.list({galaxyId:subjectId,limit:100});
+   reviewedInput={...input,selectedArchiveSessions:sessions.items.filter(item=>input.sessionIds.includes(item.archiveSessionId)).map(item=>({
+    host:item.host,updatedAt:item.updatedAt,messageCount:item.messageCount}))};
+  }
+  if(name==='galaxy_local_settings_save'||name==='galaxy_work_sync_choice'||name==='galaxy_archive_sync_choice'){
+   const key='local-settings-review:'+runtime.api.endpoint+':'+subjectId+':'+input.choiceId;let saved=await runtime.store.get(key);
+   if(saved&&JSON.stringify(saved.input)!==JSON.stringify(input))throw new Error('local_settings_original_choice_changed');
+    if(!saved){const targets=await localWork.availableAccounts(),target=targets.accounts.find(account=>account.accountId===input.targetAccountId),names=[],workNames=[];
+     const title=value=>value&&!['Recorded work','Unprocessed work'].includes(value)?value:'尚未命名的工作';
+     for(const source of input.sessions??[]){const work=await localWork.work.get({host:source.host,sessionId:source.sessionId,limit:1});names.push(title(work?.work.title));}
+     for(const workId of input.workIds??[]){const work=await localWork.work.get({workId,limit:1});workNames.push(title(work?.work.title));}
+     saved={input,targetAccountName:target?.displayName??'所选银河账户',selectedConversationNames:names,selectedWorkNames:workNames};await runtime.store.put(key,saved);
+   }
+    reviewedInput={...input,targetAccountName:saved.targetAccountName,selectedConversationNames:saved.selectedConversationNames,...(saved.selectedWorkNames?{selectedWorkNames:saved.selectedWorkNames}:{})};
+  }
+   const snapshot=runtime.api.snapshot?.(),selectedConnection=localSettingsChoice?await runtime.store.readConnection(runtime.api.endpoint):null;
+   const authorizationContext={subjectId,endpoint:runtime.api.endpoint,...(localSettingsChoice
+    ?{connectionRevision:selectedConnection.revision,deviceId:selectedConnection.active?.deviceId??null}
+    :{bindingId:snapshot?.bindingId??null,generation:snapshot?.generation??null})};
+   return choice.run(server,name,{...reviewedInput,authorizationContext},ctx,async()=>{
    const identity=(await runtime.status()).identity??'',latest=runtime.api.snapshot?.();
-   if(identity!==subjectId||runtime.api.endpoint!==authorizationContext.endpoint||(latest?.bindingId??null)!==authorizationContext.bindingId||(latest?.generation??null)!==authorizationContext.generation)throw new Error('native_choice_binding_changed');
+    const currentConnection=localSettingsChoice?await runtime.store.readConnection(runtime.api.endpoint):null;
+    if(identity!==subjectId||runtime.api.endpoint!==authorizationContext.endpoint||(localSettingsChoice
+     ?currentConnection.revision!==authorizationContext.connectionRevision||(currentConnection.active?.deviceId??null)!==authorizationContext.deviceId
+     :(latest?.bindingId??null)!==authorizationContext.bindingId||(latest?.generation??null)!==authorizationContext.generation))throw new Error('native_choice_binding_changed');
    return operation();
   },choiceOptions);
  }
@@ -108,6 +132,9 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   },{scopeKey,singleUse:singleUseChoice});}return nativeResult(await run(input));}
   catch(error){const code=/^[a-z0-9_-]{1,100}$/.test(error.code??error.message)?error.code??error.message:'native_operation_failed';
    return{isError:true,...nativeResult({error:code,mayNeedReceiptReconciliation:write})};}});
+ const localWork=registerNativeLocalWorkTools(register,runtime);
+ compact?.registerLocalWork(localWork);
+ localWork.startMaintenance();
  register('galaxy_native_status',z.strictObject({}),'Read current local/native state and resume an already selected connection within its original saved scope and current device control. Does not create an identity, grant new scope or start a model.',()=>runtime.status({restoreSelected:true}));
  register('galaxy_profile_names',z.strictObject({subjectIds:z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(20)}),
   'Read only current permitted self-declared display names for already known subject references. Missing or withdrawn names stay null; no provider identity or old profile fallback.',async({subjectIds})=>{
@@ -119,9 +146,9 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
  if(runtime.receiptStatus)register('galaxy_native_receipt_status',receiptStatusOperationSchema,
   'Read only this current local device owner’s exact original Choice receipt, including after the ordinary session expires. Creates no binding or writable session, uploads no original body and never resends the operation.',
   input=>runtime.receiptStatus.query(input));
- register('galaxy_command',z.strictObject({command:z.enum(['open','help','language','status','connect','setup','case','privacy','worker','hub','website']).default('open'),language:z.enum(['zh-CN','en-US']).optional(),stage:z.number().int().min(1).max(5).optional()}),
-  'Preserved local five-stage /galaxy command contract. Opening an existing installation never initializes it again.',({command,...options})=>runtime.command(command,options));
- const init=z.strictObject({initializationPath:z.enum(['personal-galaxy','galaxy-worker','galaxy-hub']).optional(),profile:z.enum(['minimal','coding-case','agent-workspace']).optional(),modules:z.array(z.string().min(2).max(80)).max(8).optional()});
+ register('galaxy_command',z.strictObject({command:z.enum(['open','help','language','status','connect','setup','history','work','case','privacy','worker','hub','website']).default('open'),language:z.enum(['zh-CN','en-US']).optional(),stage:z.number().int().min(1).max(5).optional()}),
+  'Open the ordinary local menu, work history or upload settings. Existing installations are not initialized again.',async({command,...options})=>await localWork.command(command)??runtime.command(command,options));
+ const init=z.strictObject({initializationPath:z.enum(['personal-galaxy','galaxy-worker','galaxy-hub']).optional(),profile:z.enum(['minimal','coding-case','agent-workspace']).optional(),modules:z.array(z.string().min(2).max(80)).max(8).optional(),subjectType:z.enum(['person','organization']).optional(),uploadPrivacy:nativeUploadPrivacyInputSchema.omit({galaxyId:true}).optional()});
  register('galaxy_native_initialize_preview',init,'Preview local-only initialization choices; no key creation or network.',input=>previewGalaxyIntegration(input));
  register('galaxy_native_initialize',init,'Initialize the reviewed local module choices only. Creates no remote connection.',input=>runtime.initialize(input,{confirmed:true}),{write:true,needsChoice:true});
  register('galaxy_native_connect',z.strictObject({}),'Explicitly bind this device at the configured pinned authority. Local notes and full context are not uploaded. Restore the identity’s existing private-summary choice; an unset choice stays off and can be reviewed separately.',async()=>{
@@ -245,6 +272,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   // independent control journal survives; a late read cannot create a handle.
   const deviceDrain=deviceManagement?.close();
   const webIdentityDrain=webIdentity?.close();
+  const localWorkDrain=localWork.close();
   return localClosed??=Promise.resolve().then(async()=>{
   const drained=await Promise.allSettled([...watchRuntimes.values()].map(current=>current.dispose()).concat([hostNotifications.close()]));
   // Both sets contain native Promises. allSettled consumes them synchronously
@@ -258,7 +286,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   // continuation enqueue that reply, then drain actual transport writes.
   await new Promise(resolve=>setImmediate(resolve));
   await Promise.allSettled(outbound);
-  const released=await Promise.allSettled([deviceDrain,webIdentityDrain,...[workers,a2aWork,a2a,trust,identityGroups,identityAccounts,compact,choice].filter(Boolean).map(owner=>Promise.resolve().then(()=>owner.close?.()))]);
+  const released=await Promise.allSettled([deviceDrain,webIdentityDrain,localWorkDrain,...[workers,a2aWork,a2a,trust,identityGroups,identityAccounts,compact,choice].filter(Boolean).map(owner=>Promise.resolve().then(()=>owner.close?.()))]);
   watchRuntimes.clear();watches.clear();hostDrivers.clear();summaries.clear();
   const errors=[...drained,...lateDrained,...hostOnlyDrained,...released].filter(result=>result.status==='rejected').map(result=>result.reason);
   if(errors.length)throw new AggregateError(errors,'native_server_cleanup_failed');

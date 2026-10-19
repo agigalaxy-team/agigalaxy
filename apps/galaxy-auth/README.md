@@ -2,11 +2,11 @@
 
 本目录提供 `auth.agigalaxy.org` 的静态入口和 Keycloak `galaxy` 登录主题，针对实际运行的 **Keycloak 26.7.3**。主题继承该版本的表单、校验和认证状态，替换共同外壳、布局、样式及相关说明。升级 Keycloak 时同步处理 `src/head.ftl` 与上游 `template.ftl` 的变化。
 
-认证站负责官方线上账户的登录、注册、邮箱确认、密码设置及找回。直接访问入口后回官网账户中心；从银河账户关联进入时继续原有关联事务。银河 ID 由已安装的本地银河客户端插件创建，关联由当前设备的插件接洽。一个官方账户可关联多个 ID，身份、历史和控制权分别保留。图中的第三方 Hub 只解释可选关系，此站没有第三方接入管理。
+认证站负责官方线上账户的登录、注册、邮箱确认、密码设置及找回。直接访问入口后回官网账户中心；从银河账户关联进入时继续原有关联事务。银河 ID 由已安装的本地银河客户端插件创建，关联由当前设备的插件接洽。一个官方账户可关联多个 ID，身份、历史和控制权分别保留。认证表单不承载身份架构讲解；具体关联关系在官网相应操作中呈现。
 
 ## 源码与构建
 
-- `src/layout.html`：静态入口与真实 Keycloak 页面共用的顶栏、固定顶级侧栏、关系图与说明。
+- `src/layout.html`：静态入口与真实 Keycloak 页面共用的顶栏、固定顶级侧栏和单列认证表单。
 - `src/head.ftl`、`src/form.ftl`：主题宏。保留 Keycloak 会话检查、原生表单 action、隐藏字段、错误及可选认证入口。
 - `shared/`：样式、表单渐进增强与原始轨道品牌 SVG。品牌取自现行官网原始资产，不用生成近似图代替。
 - `theme/galaxy/login/`：主题继承、中文与英文文案。
@@ -18,7 +18,7 @@
 node apps/galaxy-auth/build.mjs --out /absolute/new/galaxy-auth-release
 ```
 
-输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与逐文件 SHA-256 的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
+输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与记录文件路径、大小的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
 
 ## 官方账户接续契约
 
@@ -45,7 +45,7 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 
 1. 确认目标 Keycloak 版本、realm 与现有路由。主题更新保留数据库、账户、凭据、注册策略及已有客户端。
 2. 构建到新的版本目录，将 `themes/galaxy` 作为只读主题目录交给相同版本的 Keycloak；保留前一主题目录与先前 `loginTheme` 值，不编辑镜像中的内置主题。
-3. 先发布服务器官方账户会话接口及其受保护配置；再精确登记 `client-contract.json` 中的新客户端。新客户端只服务独立官方账户登录，原关联客户端不改。
+3. 先发布服务器官方账户会话接口及其受保护配置；再精确登记 `client-contract.json` 中的新客户端。新客户端只服务独立官方账户登录，原关联客户端不改。新客户端的固定 `baseUrl` 为官网账户中心，供原生错误页面返回；不开放任意外部返回地址。
 4. 仅为目标 `galaxy` realm 选择 `loginTheme=galaxy`。保留现有注册、找回、邮箱确认、密码和安全策略。不要把主题设置扩散到 master realm 或管理控制台。
 5. 将 `site/` 发布到新的静态版本目录。auth 域名已存在的 `/realms/galaxy`、`/realms/galaxy/*` 和 `/resources/*` 继续反代原 Keycloak。为剩余请求增加静态根目录和 `file_server`；找不到的路径返回 404，不把任意路径改写成成功首页。
 6. 将下列响应头仅用于静态入口分支；Keycloak 响应继续采用自己的 CSP 与认证头。原子切换发布指针并 reload。

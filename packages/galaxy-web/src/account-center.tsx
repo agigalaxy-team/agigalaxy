@@ -9,7 +9,9 @@ import './settings-visual.css';
 import './selected-account.css';
 import {ReadingDetails,ReadingSummary} from './reading-details';
 import type {AccountRuntime,ProfileOverview,HonorBadge,HonorDetail,HonorResponse} from './account-workspace-types';
-import {OfficialAccountPanel} from './official-account-panel';
+import {OfficialAccountStatus,useOfficialAccountSession} from './official-account-panel';
+import {availableForumContent,type ForumCardView} from './community-forum-view-types';
+
 
 type Go=(path:string)=>void;
 type Props={path:string;search:string;subjectId?:string;navigate:Go;children:React.ReactNode};
@@ -17,9 +19,9 @@ const settings=[['/app/account?section=access','接入与 AI'],['/app/settings/i
 function NavLink({to,navigate,children,...rest}:{to:string;navigate:Go;children:React.ReactNode}&Omit<React.ComponentPropsWithoutRef<'a'>,'href'|'onClick'>){return <a href={to} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(to);}}} {...rest}>{children}</a>;}
 export function SettingsLayout({path,search,subjectId,navigate,children}:Props){
  const section=new URLSearchParams(search).get('section');
- const current=path==='/app/settings/identity'&&section==='account'?path+'?section=account':path==='/app/account'&&section==='access'?path+'?section=access':path;
+ const current=path==='/app/settings/identity'&&section==='account'?path+'?section=account':path==='/app/account'&&['access','settings'].includes(section??'')?path+'?section='+section:path;
  const profile=profilePath(subjectId);
- const personal=[['/app/account','概览',Home],[profile?profile+'?edit=1':'/app/settings/identity','个人资料',UserRound],['/app/work','我的工作',BriefcaseBusiness],['/app/community?section=owned','我的帖子',MessageSquare],['/app/bookmarks','我的收藏',Bookmark],['/app/history','经历与贡献',BookOpen]] as const;
+ const personal=[['/app/account','概览',Home],['/app/account?section=settings','在线账户资料',UserRound],...(profile?[[profile+'?edit=1','本机 ID 资料',UserRound] as const]:[]),['/app/work','我的工作',BriefcaseBusiness],['/app/community?section=owned','我的帖子',MessageSquare],['/app/bookmarks','我的收藏',Bookmark],['/app/history','经历与贡献',BookOpen]] as const;
  return <div className="settings-layout selected-account-layout"><aside className="settings-sidebar selected-account-sidebar"><h2>账户</h2><nav aria-label="账户栏目">{personal.map(([url,title,Icon])=><NavLink key={url+'-'+title} to={url} navigate={navigate} aria-current={url===current?'page':undefined}><Icon size={19}/>{title}</NavLink>)}</nav><nav className="selected-account-settings" aria-label="账户设置">{settings.map(([url,title])=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}>{title}</NavLink>)}</nav></aside><div className={'settings-content'+(path==='/app/account'?' selected-account-content':'')}>{children}</div></div>;
 }
 
@@ -31,6 +33,7 @@ export function AccountOverview(props:AccountProps){
  return <AccountSession key={`${props.subjectId??'guest'}:${props.connected}:${binding?.bindingId}:${binding?.generation}`} {...props}/>;
 }
 function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:AccountProps){
+ const official=useOfficialAccountSession(runtime?.api.endpoint);
  const client=useMemo(()=>runtime&&subjectId?createProfileClient(runtime,{subjectId,authenticated:connected}):null,[runtime,subjectId,connected]);
  const [profile,setProfile]=useState<AccountProfile|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(!!client),[refresh,setRefresh]=useState(0),declarationRead=useRef(0);
  const [honor,setHonor]=useState<HonorBadge|null>(null),[honorDetail,setHonorDetail]=useState<HonorDetail|null>(null),[honorError,setHonorError]=useState(''),[honorBusy,setHonorBusy]=useState(false);
@@ -52,25 +55,13 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
   }catch{if(selection.active&&token===selection.sequence){setHonorDetail(null);setHonorError('当前依据暂时不可读取，请重试。');}}
   finally{if(selection.active&&token===selection.sequence)setHonorBusy(false);}
  }
- const destinations=[
-  {to:'/app/community?section=owned',icon:MessageSquare,title:'我的帖子',description:'讨论、想法与分享'},
-  {to:'/app/bookmarks',icon:Bookmark,title:'我的收藏',description:'找回帖子、方法、项目与人物'},
-  {to:'/app/history',icon:BookOpen,title:'经历与贡献',description:'看完整过程和实际结果'},
- ];
  return <section className="profile-overview selected-account" aria-busy={busy}>
-  <header className="profile-heading"><h1 className="small">概览</h1><NavLink to="/app/settings/identity" navigate={navigate} className="profile-settings-link"><Settings size={18}/>设置</NavLink></header>
-  <OfficialAccountPanel endpoint={runtime?.api.endpoint} navigate={navigate}/>
-  {hasIdentity&&<div className="profile-intro"><span className="profile-avatar" aria-hidden="true">{profile?.displayName?Array.from(profile.displayName).slice(0,1):<UserRound size={34}/>}</span><div>
-   <h2>{profile?.displayName??(hasIdentity?'我的个人资料':'欢迎来到银河')}</h2>
-   {profile?.about?<p className="profile-about">{profile.about}</p>:<p>{hasIdentity?'在这里继续自己的交流与工作。':'浏览经验、参与讨论，遇到问题时找到帮助。'}</p>}
-   {!!profile?.tags?.length&&<ul className="profile-tags" aria-label="自我介绍中的方向">{profile.tags.slice(0,6).map((tag:string)=><li key={tag}>{tag}</li>)}</ul>}
-   {subjectId&&<div className="profile-intro-actions"><NavLink to={profilePath(subjectId)!} navigate={navigate} className="profile-self-view">查看个人资料</NavLink><NavLink to={profilePath(subjectId)!+'?edit=1'} navigate={navigate} className="person-edit-link"><Pencil size={14}/>编辑资料</NavLink></div>}
-   {!connected&&<NavLink to={hasIdentity?'/app/settings/identity':'/app/account?section=access'} navigate={navigate} className="primary-action">{hasIdentity?'继续使用我的身份':'选择使用方式'}</NavLink>}
-  </div></div>}
-  {hasIdentity&&<div className="account-connection-strip"><span><KeyRound size={16} aria-hidden="true"/>{connected?'网页已连接当前服务':'这台浏览器保留已有身份记录'}</span>{connected&&<span className="setting-signal is-current"><ShieldCheck size={14} aria-hidden="true"/>已连接</span>}<NavLink to="/app/settings/identity" navigate={navigate}>管理设备与网页连接</NavLink></div>}
-  {error&&<p role="alert" className="profile-inline-error">{error}<button type="button" onClick={()=>{setBusy(!!client);setRefresh(n=>n+1);}}>重试</button></p>}
-  {!!profile?.honors?.length&&<div className="profile-honors" aria-label="当前认可">{profile.honors.map(item=><ReadingDetails key={item.id} className="account-honor-reading" onOpenChange={open=>{if(open)void showHonor(item);else if(honorRequest.current.selected?.id===item.id){honorRequest.current.sequence++;honorRequest.current.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}}><ReadingSummary><Award size={20}/>{item.title}</ReadingSummary>{honor?.id===item.id&&<section className="honor-detail" aria-label={honor.title} aria-busy={honorBusy}>
-   <p>这枚标志表示符合“{honor.title}”的具体规则。它的含义以以下依据为限。</p>
+  <header className="profile-heading"><h1 className="small">我的账户</h1><NavLink to="/app/account?section=settings" navigate={navigate} className="profile-settings-link"><Settings size={18}/>设置</NavLink></header>
+  <OfficialAccountStatus model={official} navigate={navigate} compact/>
+  {official.phase==='signed-in'&&<AccountRecentPosts key={official.session?.account.id+':'+official.session?.csrfToken} model={official} navigate={navigate}/>}
+  {connected&&error&&<p role="alert" className="profile-inline-error">{error}<button type="button" onClick={()=>{setBusy(!!client);setRefresh(n=>n+1);}}>重试</button></p>}
+  {!!profile?.honors?.length&&<div className="profile-honors" aria-label="当前身份的荣誉">{profile.honors.map(item=><ReadingDetails key={item.id} className="account-honor-reading" onOpenChange={open=>{if(open)void showHonor(item);else if(honorRequest.current.selected?.id===item.id){honorRequest.current.sequence++;honorRequest.current.selected=null;setHonor(null);setHonorDetail(null);setHonorBusy(false);}}}><ReadingSummary><Award size={20}/>{item.title}</ReadingSummary>{honor?.id===item.id&&<section className="honor-detail" aria-label={honor.title} aria-busy={honorBusy}>
+   
    {honorBusy&&!honorDetail&&<output>正在读取依据…</output>}{honorError&&<p role="alert">{honorError}<button type="button" onClick={()=>showHonor(honor)}>重试</button></p>}
    {honorDetail&&<><dl className="profile-key-facts"><div><dt>颁发方</dt><dd>{honorDetail.card.issuer}</dd></div><div><dt>当前规则</dt><dd>{honorDetail.card.rule.title} · {honorDetail.card.rule.version}</dd></div></dl>
     <ul className="honor-evidence">{(honorDetail.items??[]).map((item,index)=><li key={item.id??item.assistanceId??index}><strong>{item.title??item.summary??item.case?.title??(item.eligible===false?'当前未计入的参考记录':item.accepted?'已被接受的参与记录':'支持这项认可的记录')}</strong>{item.participatedAt&&<time>{new Date(item.participatedAt*1000).toLocaleDateString()}</time>}{item.projections?.map((projection,i)=><p key={i}>{projection.projection?.title??projection.projection?.summary??'已获准的参与事实'}</p>)}{item.sourceEvents&&<p>{item.sourceEvents.map((event)=>({request:'发起工作',confirm:'确认参与',deliver:'提交结果',accept:'发起者接受结果',cancel:'取消参与',review:'补充评价'} as Record<string,string>)[event.kind]).filter(Boolean).join(' · ')}</p>}{item.summary&&item.title&&<p>{item.summary}</p>}</li>)}</ul>
@@ -79,9 +70,23 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
   </section>}</ReadingDetails>)}</div>}
   {profile?.honorsError&&<p className="muted">认可资料暂未读到。</p>}
 
-  <div className="account-overview-grid"><section className="account-continue"><header><h2>继续</h2><p>接着已有的工作与回应</p></header>{connected?<HomeContinuityWorkspace runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate}/>:<div className="personal-empty"><BriefcaseBusiness size={28}/><h3>{hasIdentity?'原身份记录保留':'用本机银河继续'}</h3><p>{hasIdentity?'连接后读取已有工作、回应与收藏；本机插件接洽另行核对。':'在本机银河插件中创建或接续 ID，再授权网页使用。'}</p><NavLink to={hasIdentity?'/app/settings/identity':'/app/account?section=access'} navigate={navigate} className="primary-action">{hasIdentity?'查看已有身份':'接洽本机银河'}</NavLink></div>}</section><section className="profile-data-links account-data-links"><header><h2>我的资料</h2><p>个人信息与使用设置</p></header><NavLink to={subjectId?profilePath(subjectId)!:'/app/settings/identity'} navigate={navigate}><UserRound size={21}/><span><strong>个人资料</strong><small>查看姓名、介绍与展示范围</small></span></NavLink><NavLink to="/app/account?section=access" navigate={navigate}><KeyRound size={21}/><span><strong>接入与 AI</strong><small>{connected?'网页连接保留；本机插件另行接洽':hasIdentity?'已有身份记录保留，接洽本机插件':'安装本机银河，接续自己的 AI 环境'}</small></span></NavLink><NavLink to="/app/settings/privacy" navigate={navigate}><ShieldCheck size={21}/><span><strong>数据与隐私</strong><small>管理可见范围与数据设置</small></span></NavLink><NavLink to="/app/settings/identity?section=account" navigate={navigate}><FileText size={21}/><span><strong>银河账户关联</strong><small>管理与官方线上服务账户的关系</small></span></NavLink></section></div>
-  <nav className="personal-destinations account-content-entries" aria-label="我的内容">{destinations.map(({to,icon:Icon,title,description})=><NavLink key={to} to={to} navigate={navigate}><Icon size={22}/><div><h2>{title}</h2><p>{description}</p><span className="account-content-open">查看内容</span></div></NavLink>)}</nav>
+  {connected&&<section className="account-continue"><header><h2>继续工作</h2></header><HomeContinuityWorkspace runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate}/></section>}
+  {official.phase==='signed-in'&&<nav className="account-content-shortcuts" aria-label="我的资料"><NavLink to="/app/bookmarks" navigate={navigate}><Bookmark size={19}/>我的收藏</NavLink><NavLink to="/app/account?section=settings&view=work" navigate={navigate}><BriefcaseBusiness size={19}/>工作资料</NavLink><NavLink to="/app/account?section=settings&view=archives" navigate={navigate}><FileText size={19}/>私有会话</NavLink></nav>}
+
  </section>;
+}
+function AccountRecentPosts({model,navigate}:{model:ReturnType<typeof useOfficialAccountSession>;navigate:Go}){
+ const [posts,setPosts]=useState<ForumCardView[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+ const accountId=model.session?.account.id,csrfToken=model.session?.csrfToken;
+ useEffect(()=>{let active=true;const session=model.session,client=model.client;if(!session?.account.id||!client)return;
+  setLoading(true);void client.call('/v2/community/posts/owned',{}, {session}).then(value=>{if(active){setPosts((value as {items:ForumCardView[]}).items??[]);setError('');}}).catch(()=>{if(active){setPosts([]);setError('帖子暂时无法加载。');}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+ },[model.client,accountId,csrfToken,revision]);
+ useEffect(()=>{const refresh=()=>{if(!document.hidden&&navigator.onLine!==false)setRevision(value=>value+1);};window.addEventListener('online',refresh);window.addEventListener('focus',refresh);return()=>{window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh);};},[]);
+ const expiry=Math.min(...posts.flatMap(value=>value.availability==='available'&&typeof value.publishedUntil==='number'?[value.publishedUntil]:[]));
+ useEffect(()=>{if(!Number.isFinite(expiry))return;const timer=setTimeout(()=>{setPosts(old=>old.map(value=>typeof value.publishedUntil==='number'&&value.publishedUntil*1000<=Date.now()?{...value,payload:undefined,availability:'expired'}:value));setRevision(value=>value+1);},Math.max(0,expiry*1000-Date.now()+1));return()=>clearTimeout(timer);},[expiry]);
+ return <section className="account-recent-posts" aria-busy={loading}><header><h2>我的帖子</h2><NavLink to="/app/community?compose=post" navigate={navigate} className="primary-action"><Pencil size={15}/>写帖子</NavLink></header>
+ {error?<p role="alert">{error}<button type="button" onClick={()=>setRevision(value=>value+1)}>重试</button></p>:loading&&!posts.length?<output>正在加载帖子…</output>:posts.length?<ul>{posts.slice(0,4).map(value=>{const readable=availableForumContent(value,Math.floor(Date.now()/1000));return <li key={value.locator.postId}><NavLink to={'/app/community/posts/'+value.locator.postId+'?manage=1'} navigate={navigate}><strong>{readable?value.payload.title:'state'in value&&value.state==='withdrawn'?'已撤回的帖子':'当前不可读取的帖子'}</strong>{readable&&<p>{value.payload.body.replace(/\s+/g,' ').slice(0,180)}</p>}</NavLink>{value.updatedAt&&<time>{new Date(value.updatedAt*1000).toLocaleDateString('zh-CN')}</time>}</li>;})}</ul>:<p>还没有帖子，写下第一段想分享的内容吧。</p>}
+ {posts.length>0&&<NavLink to="/app/community?section=owned" navigate={navigate} className="text-link">全部帖子</NavLink>}</section>;
 }
 export function WorkOverview({runtime,subjectId,connected,navigate}:Pick<AccountProps,'runtime'|'subjectId'|'connected'|'navigate'>){
  return <section className="personal-work"><header className="profile-heading"><h1 className="small">工作概览</h1><NavLink to="/app/publish" navigate={navigate} className="primary-action">发起求助</NavLink></header>

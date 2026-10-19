@@ -58,16 +58,11 @@ export function AccountSettings({runtime,connected,hasIdentity=false,navigate=(p
  const official=useOfficialAccountSession(runtime?.api.endpoint),[showPrevious,setShowPrevious]=useState(false);
  const [online,setOnline]=useState(()=>navigator.onLine!==false);
  useEffect(()=>{const changed=()=>setOnline(navigator.onLine!==false);window.addEventListener('online',changed);window.addEventListener('offline',changed);return()=>{window.removeEventListener('online',changed);window.removeEventListener('offline',changed);};},[]);
- return <section className="account-settings account-link-page"><header className="account-page-heading"><h1>银河账户关联</h1><p>一个官方账户关联多个银河 ID，每个 ID 保留自己的经历与控制依据。</p></header>
-  <div className="account-association-workspace"><section className="account-association-current" aria-labelledby="account-local-association">
-   <OfficialAccountStatus model={official} navigate={navigate} returnTo="/app/settings/identity?section=account" resumeTo={returnTo} showIds={false}/>
-   <span className="account-section-label"><Fingerprint size={17}/>当前设备的银河插件</span><h2 id="account-local-association">关联本机插件中的 ID</h2>
-   <p className="account-local-explanation">在已安装银河的 AI 环境中发起接洽，选择本地 ID 并审阅这次关联。</p>
-   <LocalGalaxyEntry purpose="association" introduction={false} returnTo={returnTo}/>
-   <dl className="association-current-summary association-web-history"><div><dt>网页身份记录</dt><dd>{hasIdentity?'保留已有接续记录':'尚未接续'}</dd></div><div><dt>网页连接</dt><dd>{!online?'暂时离线':connected?'已连接当前服务':'尚未连接'}</dd></div></dl>
-   {runtime&&<ReadingDetails className="verification-source" onOpenChange={setShowPrevious}><ReadingSummary>此网页之前的关联记录</ReadingSummary>{showPrevious&&<PreviousAccountRecords runtime={runtime} connected={connected}/>}</ReadingDetails>}
-  </section><aside className="account-association-explainer"><span className="account-section-label"><Cloud size={17}/>身份与服务的关系</span><h2>多个环境 ID，<br/>可以关联一个银河账户。</h2><p>银河 ID 在本地插件中创建。官方账户提供线上基础服务，关联不会合并这些 ID 的经历与配置。</p><IdentityRelationshipDiagram compact/><p className="association-hub-choice">图中为可选关系示意，不表示当前环境已连接。</p></aside></div>
-  {official.phase==='signed-in'&&official.session&&<section className="account-associated-ids"><OfficialAccountIds model={official}/></section>}
-  <p className="account-association-boundary"><ShieldCheck size={18}/>账户登录、ID 控制与资料使用分别授权；网页已有连接不表示本机插件持续在线。</p>
+ return <section className="account-settings account-link-page"><header className="account-page-heading"><h1>银河账户关联</h1></header>
+ <OfficialAccountStatus model={official} navigate={navigate} returnTo="/app/settings/identity?section=account" resumeTo={returnTo} showIds={false} compact/>
+ <div className="account-association-workspace"><section className="account-association-current" aria-labelledby="account-local-association"><h2 id="account-local-association">关联本机 ID</h2><p className="account-local-explanation">让本机银河关联所用账户，继续同步资料或在本机操作官网。</p><LocalGalaxyEntry purpose="association" introduction={false} hasIdentity={hasIdentity} returnTo={returnTo}/>
+ {official.phase==='signed-in'&&<OfficialAccountIds model={official}/>}
+ {runtime&&connected&&<ReadingDetails className="verification-source" onOpenChange={setShowPrevious}><ReadingSummary>之前的关联记录</ReadingSummary>{showPrevious&&<PreviousAccountRecords runtime={runtime} connected={connected}/>}</ReadingDetails>}
+ </section><aside className="account-association-explainer"><h2>ID 与账户</h2><p>本机 ID 积累经历，在线账户接收你选择同步的资料。多个 ID 与账户可以分别关联。</p><IdentityRelationshipDiagram compact/></aside></div>
  </section>;
 }

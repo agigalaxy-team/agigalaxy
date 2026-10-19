@@ -1,3 +1,5 @@
+import {listUploadPrivacyLevels,normalizeUploadPrivacy,selectUploadPrivacy} from './upload-privacy.mjs';
+
 const MODULES = [
   {
     id: 'galaxy-id',
@@ -84,7 +86,8 @@ const MODULES = [
 const MODULE_BY_ID = new Map(MODULES.map((module) => [module.id, module]));
 
 // An initialization path is a product-facing starting topology, not an
-// identity type. A Galaxy ID can later control a Worker or connect to a Hub.
+// identity type. Normal clients create person/organization IDs; Agent subjects
+// use an isolated Worker identity path instead of retyping an existing ID.
 // Worker and Hub remain visible as architecture paths but are intentionally
 // non-selectable until their runtimes and safety contracts exist.
 const INITIALIZATION_PATHS = [
@@ -95,10 +98,10 @@ const INITIALIZATION_PATHS = [
     availability: 'available',
     defaultSelected: true,
     moduleIds: ['galaxy-id', 'case-workspace', 'consent-controls', 'agent-mcp', 'agent-guidance'],
-    serviceCommands: ['open', 'status', 'setup', 'case', 'privacy'],
-    privacyDefault: 'local-only',
+    serviceCommands: ['open', 'status', 'setup', 'history', 'case', 'privacy'],
+    privacyDefault: 'history-overview',
     requiresContinuousRuntime: false,
-    description: 'Start a local personal Galaxy for AI work, Case capture, disclosure review, consent, and local history.',
+    description: 'Start a normal local client with a person or organization identity, ordinary work recording, own-Agent summaries and optional network access.',
     doesNotMean: 'A remote account, public profile, Worker, Hub membership, verified capability, or automatic sharing.',
   },
   {
@@ -188,15 +191,15 @@ function localizedCopy(language) {
       whyItMatters: 'Why it exists',
       shape: 'Choose your Galaxy form',
       shapePrompt: 'Choose the product form for your first Galaxy deployment.',
-      modules: 'L3 Foundation package (recommended)',
+      modules: 'Local work and connection tools',
       modulesPrompt: 'Local work capabilities and network connection preparation are selected by default.',
-      privacy: 'Connection and visibility',
-      privacyPrompt: 'Official is the default public entry; compatible Hubs are optional. No endpoint is connected.',
+      privacy: 'Allowed upload data types',
+      privacyPrompt: 'Level 2 is preselected. This local selection starts no upload and does not set online public visibility.',
       identity: 'Galaxy ID',
       identityPrompt: 'Choose how to create or bind your Galaxy ID.',
       confirmation: 'Confirm initialization',
       confirmationPrompt: 'Review local effects and explicitly confirm. Nothing before this step writes local state.',
-      keyboard: '← → switch  Enter confirm  Esc back',
+      keyboard: 'Enter confirm  Esc back',
       languageTitle: 'Choose language / 选择语言',
       languagePrompt: 'Choose the display language for this Galaxy setup. You can change it later.',
       languageFooter: 'Reply 1 or 2, or type 中文 / English.',
@@ -216,15 +219,15 @@ function localizedCopy(language) {
     whyItMatters: 'Galaxy 为什么存在',
     shape: '请选择银河形态',
     shapePrompt: '请选择你首次部署 Galaxy 的产品形态。',
-    modules: 'L3 银河基础网络能力包（推荐）',
+    modules: '本地工作与接入工具',
     modulesPrompt: '默认预选本地工作能力与网络接入准备。',
-    privacy: '接入与可见性',
-    privacyPrompt: 'Official 是默认公共入口，兼容 Hub 可选配置。当前未连接任何端点。',
+    privacy: '允许上传的数据类型',
+    privacyPrompt: '预选第 2 档。此本地选择不启动上传，也不设置在线账户对外公开范围。',
     identity: 'Galaxy ID',
     identityPrompt: '选择创建或绑定方式。',
     confirmation: '确认初始化',
     confirmationPrompt: '检查本地影响后明确确认；此前步骤不应写入本地状态。',
-    keyboard: '← → 切换　Enter 确认　Esc 返回',
+    keyboard: 'Enter 确认　Esc 返回',
     languageTitle: '选择语言 / Choose language',
     languagePrompt: '请选择本次 Galaxy 配置引导的显示语言；之后可随时更改。',
     languageFooter: '输入 1 或 2，或直接输入 中文 / English。',
@@ -390,14 +393,14 @@ function initializationInteractionGuide(stage, language) {
       ? ['Enter 1 or “Personal Galaxy” to continue. Worker and Hub are shown for orientation only and cannot be selected.', 'Type back to return to language selection.']
       : ['输入 1 或“个人银河”继续。Agent 7×24 与 Galaxy Hub 仅供了解，当前不能选择。', '输入“返回”回到语言选择。'],
     2: english
-      ? ['L3 is preselected. Type continue to review connection and visibility; nothing is saved yet.', 'Type back to revisit the Galaxy form.']
-      : ['已预选 L3。输入“继续”查看接入与可见性；此时不保存任何配置。', '输入“返回”回到银河形态。'],
+      ? ['L3 is preselected. Type continue to choose allowed upload data types; nothing is saved yet.', 'Type back to revisit the Galaxy form.']
+      : ['已预选 L3。输入“继续”选择允许上传的数据类型；此时不保存任何配置。', '输入“返回”回到银河形态。'],
     3: english
-      ? ['Enter 1 or “Local only” to continue. The other privacy levels are planned and cannot be selected.', 'Type back to revisit the L3 package.']
-      : ['输入 1 或“仅本地”继续。其余隐私级别仍在规划中，不能选择。', '输入“返回”回到 L3 能力包。'],
+      ? ['Choose a level from 1 to 4; level 2 is preselected. Full conversations remain excluded unless separately enabled for selected sessions.', 'Type back to revisit the L3 package.']
+      : ['选择第 1 至 4 档；预选第 2 档。完整会话仍默认排除，需要另行开启并选定会话。', '输入“返回”回到 L3 能力包。'],
     4: english
-      ? ['Enter 1 or “Create a new Galaxy ID” to continue. Existing-ID binding is planned and cannot be selected.', 'Type back to revisit privacy.']
-      : ['输入 1 或“创建新的 Galaxy ID”继续。绑定已有 ID 仍在规划中，不能选择。', '输入“返回”回到隐私选择。'],
+      ? ['Create a local ID with Person preselected, or choose Organization. Agent subjects use the separate Worker setup.', 'Type back to revisit privacy.']
+      : ['创建本地 ID，默认个人，也可额外选择组织。Agent 主体通过独立 Worker 入口创建。', '输入“返回”回到隐私选择。'],
     5: english
       ? ['Type “Confirm initialization” to create the local Personal Galaxy. Type back to change an earlier choice, or cancel to exit without writing.', 'Nothing is written until this exact confirmation is received.']
       : ['输入“确认初始化”才会创建本地 Personal Galaxy。输入“返回”修改之前的选择，或输入“取消”直接退出。', '在收到这句明确确认前，不会写入任何本地状态。'],
@@ -405,7 +408,7 @@ function initializationInteractionGuide(stage, language) {
   const routes = {
     1: { select: ['1', english ? 'Personal Galaxy' : '个人银河'], nextStage: 2, backStage: 'language-selection' },
     2: { select: [english ? 'continue' : '继续'], nextStage: 3, backStage: 1 },
-    3: { select: ['1', english ? 'Local only' : '仅本地'], nextStage: 4, backStage: 2 },
+    3: { select: ['1', '2', '3', '4'], defaultSelection: 'history-overview', nextStage: 4, backStage: 2 },
     4: { select: ['1', english ? 'Create a new Galaxy ID' : '创建新的 Galaxy ID'], nextStage: 5, backStage: 3 },
     5: { confirm: [english ? 'Confirm initialization' : '确认初始化'], backStage: 4 },
   };
@@ -503,7 +506,7 @@ function cloneContractOption(option) {
 // This contract is the portable product contract. It is data only: it neither
 // draws a terminal nor changes local state. The adapter must call preview and
 // initialization tools separately, and only after the final confirmation.
-export function getGalaxyInitializationContract({ stage = 1, hostCapabilities, language } = {}) {
+export function getGalaxyInitializationContract({ stage = 1, hostCapabilities, language, subjectType = 'person', uploadPrivacy } = {}) {
   const totalStages = 5;
   if (!language) {
     return {
@@ -521,6 +524,7 @@ export function getGalaxyInitializationContract({ stage = 1, hostCapabilities, l
   const copy = localizedCopy(resolvedLanguage);
   const normalizedStage = Number.isInteger(stage) && stage >= 1 && stage <= totalStages ? stage : 1;
   const interaction = resolveGalaxyInteractionMode(hostCapabilities);
+  const privacy = normalizeUploadPrivacy(uploadPrivacy);
   const stages = [
     initializationStage(
       1,
@@ -561,45 +565,19 @@ export function getGalaxyInitializationContract({ stage = 1, hostCapabilities, l
         selection: 'summary',
         capabilityProfile: 'l3-foundation',
         defaultSelected: true,
-        note: resolvedLanguage === 'en-US' ? 'L3 is preselected: local capabilities plus Official discovery and compatible Hub preparation. Network endpoints are not connected; Proof / History services remain planned.' : '已预选 L3：本地能力加 Official 发现与兼容 Hub 接入准备。远程端点未连接；Proof / History 服务仍待实现。',
+        note: resolvedLanguage === 'en-US' ? 'Local recording and own-Agent organization work without a network model. Service discovery and compatible Hub access are prepared; no endpoint is connected by initialization.' : '本地记录与自己的 Agent 整理可离线使用；准备官方服务发现与兼容 Hub 接入。初始化不会连接端点。',
       },
     ),
     initializationStage(
       3,
-      'connection-visibility',
+      'upload-privacy',
       copy.privacy,
       copy.privacyPrompt,
-      [
-        {
-          id: 'local-only',
-          title: resolvedLanguage === 'en-US' ? 'Local only (available now)' : '仅本地（当前可用）',
-          description: resolvedLanguage === 'en-US' ? 'Writes only local configuration and device-held key material; no remote account, Case upload, Proof publication, or sync.' : '只写入本机配置和设备持有的密钥材料；不创建远程账户、不上传 Case、不发布 Proof、不启用同步。',
-          selected: true,
-          selectable: true,
-          availability: 'available',
-        },
-        {
-          id: 'controlled-share',
-          title: resolvedLanguage === 'en-US' ? 'Controlled disclosure (planned)' : '受控披露（规划中）',
-          description: resolvedLanguage === 'en-US' ? 'Awaiting revocable Context Grant, detailed terms, and remote-service authorization.' : '等待可撤销 Context Grant、细化条款和远程服务授权。',
-          selected: false,
-          selectable: false,
-          availability: 'planned',
-          disabledReason: resolvedLanguage === 'en-US' ? 'Multi-level privacy semantics are not implemented.' : '多级隐私语义尚未实现。',
-        },
-        {
-          id: 'network-contribution',
-          title: resolvedLanguage === 'en-US' ? 'Network contribution (planned)' : '网络贡献（规划中）',
-          description: resolvedLanguage === 'en-US' ? 'Awaiting Evidence, visibility, revocation, and release gates.' : '等待 Evidence、可见性、撤销和发布 Gate。',
-          selected: false,
-          selectable: false,
-          availability: 'planned',
-          disabledReason: resolvedLanguage === 'en-US' ? 'Remote-network and Evidence semantics are not implemented.' : '远程网络与 Evidence 语义尚未实现。',
-        },
-      ],
-      { selection: 'single', note: resolvedLanguage === 'en-US'
-        ? 'Public metadata: future reads send no Galaxy ID, Case or Context. Binding: requires a real endpoint, visible Scope, confirmation and signed challenge. Proof / Case Teaser / History / Context: separate recipient, purpose, visible fields, expiry and revocation. No network action occurs now.'
-        : '公开元数据：未来读取不发送 Galaxy ID、Case 或 Context。Binding：需要真实端点、可见 Scope、确认与签名 challenge。Proof／Case Teaser／History／Context：分别约束接收方、用途、字段、时限与撤销。当前不执行网络动作。' },
+      listUploadPrivacyLevels().map(level => ({id: level.id, title: resolvedLanguage === 'en-US' ? level.titleEn : level.title,
+        description: level.description, selected: privacy.level === level.id, selectable: true, availability: 'available', dataTypes: level.dataTypes})),
+      { selection: 'single', uploadPrivacy: privacy, fullConversationSelectionRequired: true, note: resolvedLanguage === 'en-US'
+        ? 'This controls upload data types only. A real selected service and permitted scope are also required. Public visibility is separately managed by the online account. Full conversations are excluded by default, including at level 4.'
+        : '这里只限制允许上传的数据类型；实际发送还需已选择的服务与有效范围。在线账户另管公开查询。第 4 档也默认排除完整会话。' },
     ),
     initializationStage(
       4,
@@ -625,7 +603,10 @@ export function getGalaxyInitializationContract({ stage = 1, hostCapabilities, l
           disabledReason: resolvedLanguage === 'en-US' ? 'Existing-ID binding is not implemented.' : '已有 ID 绑定尚未实现。',
         },
       ],
-      { selection: 'single' },
+      { selection: 'single', subjectType, subjectTypes: [
+        {id: 'person', title: resolvedLanguage === 'en-US' ? 'Person' : '个人', selected: subjectType === 'person'},
+        {id: 'organization', title: resolvedLanguage === 'en-US' ? 'Organization' : '组织', selected: subjectType === 'organization'},
+      ], typeImmutable: true, workerIdentityTool: 'galaxy_local_worker_identity_create' },
     ),
     initializationStage(
       5,
@@ -784,15 +765,18 @@ export function resolveModuleSelection({ modules, profile } = {}) {
   };
 }
 
-export function resolveGalaxyInitialization({ initializationPath, modules, profile, allowPlanned = false } = {}) {
+export function resolveGalaxyInitialization({ initializationPath, modules, profile, allowPlanned = false, subjectType, uploadPrivacy } = {}) {
+  if (subjectType !== undefined && !['person', 'organization'].includes(subjectType)) throw Object.assign(new Error('local_identity_subject_type_invalid'), {code: 'local_identity_subject_type_invalid'});
+  const localSelection = {subjectType: subjectType ?? 'person', uploadPrivacy: uploadPrivacy === undefined ? normalizeUploadPrivacy() : selectUploadPrivacy(undefined, uploadPrivacy)};
   if (!initializationPath && modules === undefined && profile === undefined) {
-    return resolveGalaxyInitialization({ initializationPath: 'personal-galaxy' });
+    return resolveGalaxyInitialization({ initializationPath: 'personal-galaxy', subjectType, uploadPrivacy });
   }
   if (!initializationPath) {
     return {
       ...resolveModuleSelection({ modules, profile }),
       initializationPath: null,
       operation: 'module-change',
+      ...localSelection,
     };
   }
   if (profile || (Array.isArray(modules) && modules.length > 0)) {
@@ -828,5 +812,6 @@ export function resolveGalaxyInitialization({ initializationPath, modules, profi
     initializationPath: cloneInitializationPath(path),
     operation: 'first-run-or-path-change',
     canInitialize: true,
+    ...localSelection,
   };
 }

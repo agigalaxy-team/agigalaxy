@@ -21,7 +21,7 @@ export function workspaceLocation(path) {
     || pathname.startsWith(page.href));
   if (publicPage) return publicPage.location;
   if (pathname === '/404') return '页面';
-  if (pathname === '/app/account' || /^\/app\/settings(?:\/|$)/.test(pathname)) return '账户';
+   if (pathname === '/app/account' || pathname.startsWith('/app/accounts/') || /^\/app\/settings(?:\/|$)/.test(pathname)) return '账户';
   if (/^\/app\/community(?:\/|$)/.test(pathname)) return '社区';
   if (/^\/app\/rooms(?:\/|$)/.test(pathname) || pathname === '/app/notifications') return '消息';
   if (pathname.startsWith('/app/people/')) return '个人主页';

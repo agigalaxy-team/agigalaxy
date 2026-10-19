@@ -1,7 +1,6 @@
 import {readFile,writeFile,mkdir,readdir,copyFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createHash} from 'node:crypto';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const args=process.argv.slice(2),outputAt=args.indexOf('--out');
@@ -34,10 +33,10 @@ const escape=value=>value.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':
 const htmlTokens=text=>text.replace(/\{\{([a-zA-Z0-9]+)\}\}/g,(_,key)=>{if(!Object.hasOwn(messages,key))throw new Error('Missing message: '+key);return escape(messages[key]);});
 for(const [target,content] of [['site/index.html','src/landing.html']]){
  const landingBody=htmlTokens(layout.replace('@@form@@',await read(content))).replaceAll('@@asset@@','/assets').replace('@@languages@@','');
- await write(target,'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="referrer" content="no-referrer"><title>银河在线账户 · 银河</title><meta name="description" content="了解银河身份与官方线上账户的关系，登录、注册或继续银河账户关联。"><link rel="icon" href="/assets/img/galaxy-mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/css/galaxy-auth.css"></head><body class="auth-standalone">'+landingBody+'</body></html>\n');
+ await write(target,'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="referrer" content="no-referrer"><title>银河在线账户 · 银河</title><meta name="description" content="登录或注册银河在线账户，继续原来的事情。"><link rel="icon" href="/assets/img/galaxy-mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/css/galaxy-auth.css"></head><body class="auth-standalone">'+landingBody+'</body></html>\n');
 }
 const files=[];
-async function inventory(dir=''){for(const name of (await readdir(path.join(output,dir))).sort()){const rel=path.join(dir,name),meta=await stat(path.join(output,rel));if(meta.isDirectory())await inventory(rel);else{const bytes=await readFile(path.join(output,rel));files.push({path:rel.split(path.sep).join('/'),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});}}}
+async function inventory(dir=''){for(const name of (await readdir(path.join(output,dir))).sort()){const rel=path.join(dir,name),meta=await stat(path.join(output,rel));if(meta.isDirectory())await inventory(rel);else files.push({path:rel.split(path.sep).join('/'),bytes:meta.size});}}
 await inventory();
 await write('manifest.json',JSON.stringify({schemaVersion:1,name:'galaxy-auth',version:'0.1.0',keycloakVersion:'26.7.3',theme:'galaxy',files},null,2)+'\n');
 console.log(JSON.stringify({output,theme:'galaxy',keycloakVersion:'26.7.3',fileCount:files.length}));

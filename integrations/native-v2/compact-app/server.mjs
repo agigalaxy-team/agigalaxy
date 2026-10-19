@@ -4,6 +4,7 @@ import {registerAppResource,registerAppTool,RESOURCE_MIME_TYPE,getUiCapability} 
 import {createCompactController,panelInputSchema,panelIdSchema,panelOpenSchema,panelReturnSchema,panelDraftSchema,panelReplyDraftSchema,panelMessageSchema,panelSelectSchema,panelFinishSchema,panelPrepareSchema,panelExecuteSchema,panelOperationSchema} from './controller.mjs';
 import {panelResult} from './result.mjs';
 import {createHostViewState,hostViewStateSchema} from './host-view-state.mjs';
+import {registerLocalWorkPanelTools} from './local-work-server.mjs';
 export function nativeCompactUiAdvertised(server){return !!getUiCapability(server.server.getClientCapabilities?.())?.mimeTypes?.includes(RESOURCE_MIME_TYPE);}
 export async function loadCompactArtifact(){const url=new URL('dist/',import.meta.url),manifest=JSON.parse(await readFile(new URL('manifest.json',url),'utf8')),html=await readFile(new URL('panel.html',url),'utf8');
  if(createHash('sha256').update(html).digest('hex')!==manifest.sha256)throw new Error('panel_artifact_changed');return{manifest,html};}
@@ -33,5 +34,6 @@ export function registerNativeCompactApps(server,{runtime,artifact,reviewAction}
   try{const data=await preferences.run(input);return{content:[],structuredContent:data};}
   catch(e){const value=e.code??e.message,error=/^[a-z0-9_-]{1,100}$/.test(value??'')?value:'host_view_unavailable';return{isError:true,content:[],structuredContent:{error,businessMutation:false}};}
  });
- return{close:()=>{controller.close();preferences.close();},resourceUri:uri};
+ return{close:()=>{controller.close();preferences.close();},resourceUri:uri,
+  registerLocalWork:local=>registerLocalWorkPanelTools(server,{resourceUri:uri,local,reviewAction})};
 }

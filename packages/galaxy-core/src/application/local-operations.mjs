@@ -3,12 +3,18 @@ import {publishInitialization, resumeInitialization} from '../storage/initializa
 import {withLocalWrite,withLocalRead} from '../storage/write-lock.mjs';
 import {generateKeyPairSync} from 'node:crypto';
 import {mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
 import {createGalaxyGenesis} from '../galaxy-guid.mjs';
 import {listIntegrationModules,resolveGalaxyInitialization} from '../integration-modules.mjs';
 import {localPaths,resolveDataDir,readJson,fileExists,migrateLegacyLocalFiles,writeJson} from '../storage/files.mjs';
 import {STORE_VERSION,FORBIDDEN_DISCLOSURE_ITEMS,PERMITTED_DISCLOSURE_ITEMS,now,makeId,fingerprint,emptyState,normalizeState,addAuditEvent,assertText,requiredRecord,permittedIncludeList} from '../domain/local-model.mjs';
+import {listUploadPrivacyLevels,normalizeUploadPrivacy,selectUploadPrivacy,allowedUploadDataTypes} from '../upload-privacy.mjs';
 
-async function initializeUnlocked(dataDirectory) {
+const localError = code => Object.assign(new Error(code), {code});
+
+async function initializeUnlocked(dataDirectory, {subjectType, clientKind = 'normal'} = {}) {
+  if (clientKind === 'worker' ? subjectType !== 'agent' : subjectType !== undefined && !['person', 'organization'].includes(subjectType))
+    throw localError('local_identity_subject_type_invalid');
   const dataDir = resolveDataDir(dataDirectory);
   const paths = localPaths(dataDir);
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
@@ -17,6 +23,10 @@ async function initializeUnlocked(dataDirectory) {
   await resumeInitialization(paths);
 
   let identity = await readJson(paths.identity);
+  if (identity && subjectType !== undefined && identity.subjectType !== subjectType)
+    throw localError(identity.subjectType ? 'local_identity_type_immutable' : 'local_identity_legacy_type_unconfirmed');
+  if (identity && identity.clientKind && identity.clientKind !== clientKind)
+    throw localError('local_identity_client_kind_mismatch');
   if (!identity) {
     // A previous initializer may have stopped between writes. Never silently
     // replace its key material or attach old facts to a newly generated identity.
@@ -37,6 +47,8 @@ async function initializeUnlocked(dataDirectory) {
       idFormat: 'guid-32-v1',
       birthOrigin: 'local',
       birthOriginCode: '0',
+      subjectType: subjectType ?? 'person',
+      clientKind,
       publicKeyFingerprint,
       keyAlgorithm: 'Ed25519',
       createdAt,
@@ -66,8 +78,18 @@ async function initializeUnlocked(dataDirectory) {
   return { dataDir, identity, state };
 }
 
-export async function initializeLocalGalaxyId(dataDirectory) {
-  return withLocalWrite(dataDirectory, initializeUnlocked);
+export async function initializeLocalGalaxyId(dataDirectory, input = {}) {
+  if (input.subjectType !== undefined && !['person', 'organization'].includes(input.subjectType)) throw localError('local_identity_subject_type_invalid');
+  return withLocalWrite(dataDirectory, directory => initializeUnlocked(directory, {subjectType: input.subjectType}));
+}
+
+/** A Worker gets an isolated local identity directory. This does not start an
+ * Agent, change the normal client's ID, or create a cloud account. */
+export async function initializeLocalWorkerGalaxyId(dataDirectory, {workerId} = {}) {
+  if (typeof workerId !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(workerId)) throw localError('local_worker_id_invalid');
+  const workerDirectory = join(resolveDataDir(dataDirectory), 'workers', workerId);
+  const snapshot = await withLocalWrite(workerDirectory, directory => initializeUnlocked(directory, {subjectType: 'agent', clientKind: 'worker'}));
+  return {...snapshot, workerId, runtimeStarted: false, localOnly: true};
 }
 
 export async function getLocalSnapshot(dataDirectory) {
@@ -104,6 +126,7 @@ export async function getGalaxyIntegrationStatus(dataDirectory) {
     recoveryRequired,
     galaxyId: identity,
     integration,
+    uploadPrivacy: normalizeUploadPrivacy(state.uploadPrivacy),
     catalog: listIntegrationModules(),
     recordCounts: {
       cases: normalizedState.cases.length,
@@ -131,6 +154,7 @@ export async function initializeGalaxyIntegration(dataDirectory, input = {}) {
       modules: [...currentModuleIds, ...requestedPlan.modules.map((module) => module.id)],
     });
     const occurredAt = now();
+    if (input.uploadPrivacy !== undefined) state.uploadPrivacy = selectUploadPrivacy(state.uploadPrivacy, input.uploadPrivacy, occurredAt);
     const explicitModuleIds = new Set(requestedPlan.requestedModuleIds);
     const currentById = new Map(currentModules.map((module) => [module.id, module]));
     const modules = mergedPlan.modules.map((module) => {
@@ -177,8 +201,8 @@ export async function initializeGalaxyIntegration(dataDirectory, input = {}) {
       localOnly: true,
     });
 
-    return { integration: state.integration, addedModuleIds, plan: mergedPlan, change };
-  });
+    return { integration: state.integration, uploadPrivacy: normalizeUploadPrivacy(state.uploadPrivacy), addedModuleIds, plan: mergedPlan, change };
+  }, {subjectType: input.subjectType});
 
   return {
     dataDir: update.dataDir,
@@ -203,12 +227,53 @@ export async function assertGalaxyModulesEnabled(dataDirectory, moduleIds) {
   return status;
 }
 
-export async function updateState(dataDirectory, mutator) {
+export async function updateState(dataDirectory, mutator, identityOptions) {
   return withLocalWrite(dataDirectory, async directory => {
-    const snapshot = await initializeUnlocked(directory);
+    const snapshot = await initializeUnlocked(directory, identityOptions);
     const result = await mutator(snapshot.state, snapshot.identity);
     await writeJson(localPaths(snapshot.dataDir).state, snapshot.state);
     return { ...snapshot, result };
+  });
+}
+
+async function privacyContext(directory, getIdentity) {
+  const paths = localPaths(directory);
+  const identity = await readJson(paths.identity, null) ?? await readJson(paths.legacyIdentity, null);
+  const selected = getIdentity ? await getIdentity(directory) : identity;
+  const owner = typeof selected === 'string' ? selected : selected?.id ?? selected?.subjectId ?? null;
+  const state = normalizeState(await readJson(paths.state, null) ?? await readJson(paths.legacyState, null) ?? emptyState());
+  const separatePath=join(directory,'galaxy-upload-privacy.json');
+  const separate=await readJson(separatePath,{version:1,identities:{}});
+  if(separate?.version!==1||!separate.identities||typeof separate.identities!=='object'||Array.isArray(separate.identities))throw localError('local_upload_privacy_file_invalid');
+  const settings = normalizeUploadPrivacy(owner && owner !== identity?.id ? separate.identities[owner]??state.uploadPrivacyByIdentity?.[owner] : state.uploadPrivacy);
+  return {paths, identity, owner, state, settings,separatePath,separate};
+}
+
+export async function getLocalUploadPrivacy(dataDirectory, {getIdentity} = {}) {
+  return withLocalRead(dataDirectory, async directory => {
+    const paths = localPaths(directory);
+    const recoveryRequired = await fileExists(paths.initializationJournal) || await fileExists(paths.resetJournal);
+    const context = await privacyContext(directory, getIdentity);
+    return {galaxyId: context.owner, initialized: Boolean(context.owner), recoveryRequired,
+      settings: context.settings, levels: listUploadPrivacyLevels(), allowedDataTypes: allowedUploadDataTypes(context.settings),
+      uploadStarted: false, changesOnlineVisibility: false, localOnly: true};
+  });
+}
+
+export async function setLocalUploadPrivacy(dataDirectory, input = {}, {getIdentity} = {}) {
+  return withLocalWrite(dataDirectory, async directory => {
+    const paths = localPaths(directory);
+    if (await fileExists(paths.initializationJournal) || await fileExists(paths.resetJournal)) throw localError('local_recovery_required');
+    const {identity,owner,state,settings: old,separatePath,separate} = await privacyContext(directory, getIdentity);
+    if (!owner) throw localError('local_identity_required');
+    if (input.galaxyId !== undefined && input.galaxyId !== owner) throw localError('local_identity_mismatch');
+    const settings = selectUploadPrivacy(old, input, now());
+    if (owner === identity?.id) {
+      state.uploadPrivacy = settings;
+      addAuditEvent(state, 'upload_privacy.changed', owner, {level: settings.level, includeFullConversations: settings.includeFullConversations, selectedSessionCount: settings.sessionIds.length});
+      await writeJson(paths.state, state);
+    } else await writeJson(separatePath,{version:1,identities:{...separate.identities,[owner]:settings}});
+    return {galaxyId: owner, settings, levels: listUploadPrivacyLevels(), allowedDataTypes: allowedUploadDataTypes(settings), uploadStarted: false, changesOnlineVisibility: false, localOnly: true};
   });
 }
 

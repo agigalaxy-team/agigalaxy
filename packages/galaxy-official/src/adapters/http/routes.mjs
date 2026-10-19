@@ -1,3 +1,4 @@
+import {dispatchExternalCredentials} from './external-credentials-http.mjs';
 import {dispatchCommunityForum} from './community-forum-http.mjs';
 import {dispatchReadingBookmarks} from './reading-bookmarks-http.mjs';
 import {dispatchHubs} from './hub-http.mjs';
@@ -5,8 +6,10 @@ import {dispatchInformation} from './information-http.mjs';
 import {dispatchTargetGovernance} from './target-governance-http.mjs';
 import {dispatchIdentityGroups} from './identity-group-http.mjs';
 import {dispatchWatchControls} from './watch-control-http.mjs';
-import {serveIdentityCallback} from './identity-callback-page.mjs';
+import {serveIdentityCallback,dispatchIdentityReturn} from './identity-callback-page.mjs';
 import {dispatchOfficialAccount} from './official-account-http.mjs';
+import {dispatchAccountWork} from './account-work-http.mjs';
+import {dispatchAccountArchives} from './account-archives-http.mjs';
 import { ServiceError } from '../../shared/service-error.mjs';
 import { body, authenticate } from './request.mjs';
 import {taskMaterialBody} from './task-material-http.mjs';
@@ -18,11 +21,15 @@ import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../
 import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
 import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ officialAccounts,readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ officialAccounts,externalCredentials,accountWork,communityAccounts,readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
-    if(await dispatchOfficialAccount({officialAccounts,request,response,url,send,recordFailure}))return;
-    if(await dispatchCommunityForum({forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
+    if(dispatchIdentityReturn({request,response,url}))return;
+    if(await dispatchAccountWork({accountWork,officialAccounts,access,request,requestId,url,send}))return;
+    if(await dispatchExternalCredentials({externalCredentials,officialAccounts,request,response,url,send}))return;
+    if(await dispatchOfficialAccount({officialAccounts,forum,request,response,url,send,recordFailure}))return;
+    if(await dispatchAccountArchives({access,communityAccounts,request,url,send}))return;
+    if(await dispatchCommunityForum({officialAccounts,forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchReadingBookmarks({readingBookmarks,access,request,requestId,url,send,consumeSearchPage}))return;
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/challenges')
       return send(201,await receiptStatus.challenge(await body(request,null)));

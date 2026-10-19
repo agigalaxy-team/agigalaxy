@@ -6,7 +6,7 @@ import {createIdentityControlClient} from '../../../galaxy-core/src/domain/ident
 import {createIdentityDeviceHandoff} from '../../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import {createIdentityDeviceManagement} from '../../../galaxy-core/src/domain/identity-device-management.mjs';
 import {signIdentityPayload,identityKeyId} from '../../../galaxy-core/src/domain/identity-material.mjs';
-import {getLocalSnapshot,initializeGalaxyIntegration,getGalaxyCommandSurface} from '../../../galaxy-core/src/local-store.mjs';
+import {getLocalSnapshot,initializeGalaxyIntegration,getGalaxyCommandSurface,getLocalUploadPrivacy,assertNativeUploadAllowed} from '../../../galaxy-core/src/local-store.mjs';
 import {resolveGalaxyInitialization} from '../../../galaxy-core/src/integration-modules.mjs';
 import {localPaths,readJson} from '../../../galaxy-core/src/storage/files.mjs';
 import {createHelpRuntimeV2} from '../../../galaxy-official/src/help-runtime-v2.mjs';
@@ -21,12 +21,27 @@ import {createReceiptStatusClient,createReceiptStatusDeviceSigner} from '../../.
 import {createIdentityGroupClientV2} from '../../../galaxy-official/src/identity-group-client-v2.mjs';
 import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/identity-group-device-signer-v2.mjs';
 import {createNativeIdentityAccountClient} from './identity-account-client.mjs';
+import {createNativeArchiveSync} from './archive-sync.mjs';
+import {createNativeWorkSync} from './work-sync.mjs';
 
 // Same pinned current-control browser protocol, with a native local signer.
 // No token, PEM or recovery seed is exposed through the returned public methods.
-export async function createNativeRuntime({dataDirectory,endpoint,website,trustedKeys,fetch,now=()=>Math.floor(Date.now()/1000),openBrowser}){
+export async function createNativeRuntime({dataDirectory,endpoint,website,trustedKeys,fetch,now=()=>Math.floor(Date.now()/1000),openBrowser,autoResumePrivateSync=true}){
  const store=createNativeStore(dataDirectory),activeKey='native-active:'+endpoint;
- let selection=await store.readConnection(endpoint),active=selection.active,connecting=null,closed=false;
+ const localIdentityWithin=async directory=>{const selected=await store.readWithin(directory,activeKey);
+  return selected?{id:selected.subjectId,genesisProof:selected.genesisProof}:await readJson(localPaths(directory).identity,null)??await readJson(localPaths(directory).legacyIdentity,null);};
+  let selection=await store.readConnection(endpoint),active=selection.active,connecting=null,closed=false;
+  let resumeTimer=null,resumeRunning=null,resumeDelay=1000;
+  function resumePrivateSync(delay=0){
+   if(!autoResumePrivateSync||closed||resumeRunning)return;if(resumeTimer){if(delay)return;clearTimeout(resumeTimer);}
+   resumeTimer=setTimeout(()=>{resumeTimer=null;
+    let reschedule=false;resumeRunning=(async()=>{const connection=await store.readConnection(endpoint);if(!connection.permission?.enabled)return null;
+     const [work,archive]=await Promise.all([workSync.settings(),archiveSync.settings()]);if(!work.choice.enabled&&!archive.choice.enabled)return null;
+     const results=[];if(work.choice.enabled)results.push(await workSync.flush());if(archive.choice.enabled)results.push(await archiveSync.flush());
+     return results.some(result=>result.items?.some(item=>['unknown','not-synced','prepared'].includes(item.state)));
+    })().catch(()=>true).then(retry=>{reschedule=retry!==null;resumeDelay=retry?Math.min(resumeDelay*2,300000):60000;}).finally(()=>{resumeRunning=null;if(!closed&&reschedule)resumePrivateSync(resumeDelay);});
+   },delay);resumeTimer.unref?.();
+  }
  const authorityChanged=()=>{throw Object.assign(new Error('native_connection_selection_changed'),{code:'native_connection_selection_changed'});};
  async function syncSelection(){
   const current=await store.readConnection(endpoint);
@@ -162,15 +177,24 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
     if(selected.revision!==lease.revision||JSON.stringify(selected.active)!==JSON.stringify(lease.owner))authorityChanged();
     return{active:selected.active,permission:{enabled:true,subjectId:active.subjectId,deviceId:active.deviceId,scopes,selectedAt:now()}};
    });selection=saved;}
-   return result;
+    resumePrivateSync();return result;
   })().catch(error=>{api.disconnect();throw error;});try{return await connecting;}finally{connecting=null;}}
  async function ensure(){await syncSelection();
   const permission=selection.permission;if(!permission?.enabled||permission.subjectId!==active?.subjectId||permission.deviceId!==active?.deviceId)throw new Error('native_connection_choice_required');
   if(api.snapshot())return;await connect({confirmed:true,restore:true});}
- async function call(path,input,options){if(options?.authenticated!==false)await ensure();const lease=await sharedLease();
+ async function checkUpload(path,input,options) {
+  if (input === undefined || options?.method === 'GET') return;
+  const privacy = await getLocalUploadPrivacy(dataDirectory,{getIdentity:localIdentityWithin});
+  if(privacy.recoveryRequired)throw new Error('local_recovery_required');
+  assertNativeUploadAllowed(privacy.settings,path,input,options?.localUpload);
+ }
+ async function call(path,input,options){await checkUpload(path,input,options);if(options?.authenticated!==false)await ensure();const lease=await sharedLease();
   try{const result=await api.call(path,input,options);await lease.assertCurrent();return result;}
   catch(error){await lease.assertCurrent();throw error;}}
  async function authorize(input,{confirmed=false}={}){
+  // Selected raw Context must be permitted before the separate authorization
+  // request sends its exact material-bearing payload to the service.
+  if(input.action==='context.grant')await checkUpload('/v2/context/grants',input);
   const key='native-authorization:'+endpoint+':'+input.requestId;let saved=await store.get(key);
   if(saved&&JSON.stringify(saved.input)!==JSON.stringify(input))throw new Error('native_authorization_request_changed');
   if(!saved&&!confirmed)throw new Error('native_authorization_choice_required');await ensure();const lease=await sharedLease();
@@ -202,6 +226,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   }
   const local=await getLocalSnapshot(dataDirectory),modules=active?await store.get('native-modules:'+endpoint+':'+active.subjectId):null;
   return{version:2,endpoint,website,identity:active?.subjectId??local.identity?.id??null,
+  subjectType:active&&active.subjectId!==local.identity?.id?null:local.identity?.subjectType??null,clientKind:active&&active.subjectId!==local.identity?.id?null:local.identity?.clientKind??null,
   connected:!!api.snapshot(),connection:api.snapshot(),...(connectionError?{connectionError}:{}),connectionChoice:{revision:selection.revision,enabled:selection.permission?.enabled===true,subjectId:active?.subjectId??null,deviceId:active?.deviceId??null},localInitialized:active&&local.identity?.id!==active.subjectId?!!modules:!!local.state?.integration,modelService:'user-host',backgroundModel:'not-started',embeddedUi:'unverified',activeEntries:['match','publish','participate'],
   helpPaths:['continue-current-ai','capsule-or-history','open-assistance','bounty-or-expert']};}
  async function command(name,options){const local=await getLocalSnapshot(dataDirectory);
@@ -276,12 +301,15 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   }
   return{context,assertCurrent:lease.assertCurrent,assertControl,readControl,signContext,...(openBrowser?{openBrowser}:{})};
  }
- return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,identityAccounts,get identityGroups(){return identityGroups();},
+ const archiveSync=createNativeArchiveSync({dataDirectory,endpoint,getIdentity:localIdentityWithin,call});
+ const workSync=createNativeWorkSync({dataDirectory,endpoint,getIdentity:localIdentityWithin,call});
+  resumePrivateSync();
+  return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,localIdentityWithin,archiveSync,workSync,resumePrivateSync,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,identityAccounts,get identityGroups(){return identityGroups();},
   authorizationExists:async input=>{const r=await store.get('native-authorization:'+endpoint+':'+input.requestId);return !!r&&JSON.stringify(r.input)===JSON.stringify(input);},
   device:{pending:handoff.pending,offer:handoff.createOffer,approve:handoff.approveOffer,accept:handoff.acceptApproval,reconcile:handoff.reconcile,cancel:handoff.cancel,
    previewOffer:handoff.previewOffer,previewApproval:handoff.previewApproval},
   disconnect:async()=>{const lease=await sharedLease();const saved=await store.updateConnection(endpoint,current=>{
    if(current.revision!==lease.revision)authorityChanged();return{active:current.active,permission:{enabled:false}};
-  });selection=saved;api.disconnect();return{connected:false,remoteBindingRevoked:false};},
-  close:()=>{closed=true;api.close();},now});
+   });selection=saved;clearTimeout(resumeTimer);resumeTimer=null;api.disconnect();return{connected:false,remoteBindingRevoked:false};},
+   close:()=>{closed=true;clearTimeout(resumeTimer);resumeTimer=null;api.close();return Promise.all([resumeRunning,archiveSync.close(),workSync.close()]);},now});
 }

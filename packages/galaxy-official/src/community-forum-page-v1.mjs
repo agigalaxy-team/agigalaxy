@@ -19,12 +19,13 @@ export function forumPageFor(input, ownerId = null) {
   const uuidAfter = input.after !== undefined && z.uuid().safeParse(input.after).success;
   const order = input.order ?? (uuidAfter ? 'id' : 'published');
   if (order === 'id') {
-    if (input.topic !== undefined || input.query !== '' || input.after !== undefined && !uuidAfter)
+    if (input.topic !== undefined || input.sectionId !== undefined || input.query !== '' || input.after !== undefined && !uuidAfter)
       throw new ServiceError('forum_cursor_mismatch');
     return {order, afterId: input.after ?? null, afterAt: null, filtersHash: null};
   }
   if (uuidAfter) throw new ServiceError('forum_cursor_mismatch');
-  const filtersHash = digest(JSON.stringify([ownerId, input.topic ?? null, input.query.toLocaleLowerCase('en-US'), order]));
+  const parts=[ownerId,input.topic??null,input.query.toLocaleLowerCase('en-US'),order];if(input.sectionId!==undefined)parts.push(input.sectionId);
+  const filtersHash = digest(JSON.stringify(parts));
   if (input.after === undefined) return {order, afterId: null, afterAt: null, filtersHash};
   try {
     if (!/^fp1\.[A-Za-z0-9_-]+$/.test(input.after)) throw Error();

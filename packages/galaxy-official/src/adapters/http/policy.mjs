@@ -33,16 +33,20 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   try { url = new URL(request.url, endpoint); } catch { throw new ServiceError('invalid_request'); }
   const consentList = request.method === 'GET' && url.pathname === '/v1/consents';
   const oidcCallback = request.method === 'GET' && (/^\/v1\/identity\/callback\/[a-z0-9][a-z0-9._-]{0,63}$/.test(url.pathname) || url.pathname === '/v1/account/callback');
-  const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session'].includes(url.pathname) && url.search.length <= 8192;
+  const identityReturn=request.method==='GET'&&/^\/v1\/identity\/return\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=8192;
+  const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
   // This exact owner-only receipt route validates its two keys itself. Other
   // paths and methods retain the existing query prohibition.
   const recruitmentReceipt = request.method === 'GET'
     && /^\/v2\/recruitment\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/receipt$/.test(url.pathname)
     && url.search.length <= 512;
   const keys = [...url.searchParams.keys()];
+  const forumQuota = request.method === 'GET' && url.pathname === '/v2/community/quotas'
+    && url.search.length <= 96 && keys.length === 1 && ['postId','replyId','sectionId'].includes(keys[0])
+    && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(url.searchParams.get(keys[0]));
   const allowedQuery = consentList ? keys.every(key => key === 'after') && url.searchParams.getAll('after').length === 1
     : oidcCallback && url.search.length <= 8192 && keys.every(key => ['code','state','iss','error','error_description','error_uri','session_state'].includes(key))
-      && new Set(keys).size === keys.length || recruitmentReceipt || accountQuery;
+      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || identityReturn;
   if (url.origin !== endpoint || url.username || url.password || url.hash || (url.search && !allowedQuery))
     throw new ServiceError('invalid_request');
   return url;

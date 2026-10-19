@@ -1,5 +1,6 @@
 import {getGalaxyInitializationContract,getGalaxyInitializationPresentation,listGalaxyInitializationPaths} from '../integration-modules.mjs';
-import {getGalaxyIntegrationStatus} from '../application/local-operations.mjs';
+import {getGalaxyIntegrationStatus,getLocalUploadPrivacy} from '../application/local-operations.mjs';
+import {createLocalWorkHistory} from '../work-history/index.mjs';
 
 export const GALAXY_COMMANDS = Object.freeze({
   open: { route: 'galaxy-service-home', title: 'Open Galaxy' },
@@ -8,8 +9,10 @@ export const GALAXY_COMMANDS = Object.freeze({
   status: { route: 'galaxy-status', title: 'Galaxy status' },
   connect: { route: 'galaxy-connection', title: 'Connect to Galaxy' },
   setup: { route: 'galaxy-configuration-change', title: 'Change Galaxy setup' },
+  history: { route: 'galaxy-work-history', title: 'Local work history' },
+  work: { route: 'galaxy-work-history', title: 'Local work history' },
   case: { route: 'galaxy-case-workspace', title: 'Galaxy Case workspace', requires: ['case-workspace'] },
-  privacy: { route: 'galaxy-privacy-controls', title: 'Galaxy privacy controls', requires: ['consent-controls'] },
+  privacy: { route: 'galaxy-privacy-controls', title: 'Galaxy upload settings' },
   worker: { route: 'galaxy-worker-service', title: 'Galaxy Worker', futurePath: 'galaxy-worker' },
   hub: { route: 'galaxy-hub-service', title: 'Galaxy Hub', futurePath: 'galaxy-hub' },
   website: { route: 'galaxy-website-entry', title: 'Open the Galaxy website' },
@@ -20,6 +23,8 @@ export const GALAXY_COMMAND_HELP = Object.freeze([
   { command: '/Galaxy status', action: 'status', title: '查看本机状态 / Check local status' },
   { command: '/Galaxy connect', action: 'connect', title: '接入银河 / Connect to Galaxy' },
   { command: '/Galaxy setup', action: 'setup', title: '调整初始化配置 / Review setup changes' },
+  { command: '/Galaxy history', action: 'history', title: '阅读本地工作履历 / Read local work history' },
+  { command: '/Galaxy worker', action: 'worker', title: '独立 Worker 身份入口 / Separate Worker identity' },
   { command: '/Galaxy case', action: 'case', title: '进入本地 Case / Open local Cases' },
   { command: '/Galaxy privacy', action: 'privacy', title: '查看隐私控制 / Open privacy controls' },
   { command: '/Galaxy language', action: 'language', title: '切换显示语言 / Choose display language' },
@@ -32,13 +37,15 @@ export function getGalaxyConsoleCopy(language) {
       title: 'Galaxy Console',
       welcome: 'Welcome back to Galaxy',
       summary: 'Your local Galaxy is ready for real work that needs a clearer path forward.',
-      purpose: 'Use this space to capture a difficult Case, review disclosure choices, and build a useful local history before any future sharing is considered.',
-      boundary: 'This Founding Beta workspace is local only: no remote account, sync, public Proof, Worker, or Hub is active.',
+      purpose: 'Read ordinary local work and environment facts, and use your own Agent to organize the unprocessed observations. A Case is available when you need a separate help request.',
+      boundary: 'Reading local work starts no network connection or model. Upload selections and online public visibility are separate.',
       available: 'Available now',
       next: 'Suggested next steps',
       future: 'Coming later',
       interactionTitle: 'How to use this console',
       status: 'Check local status',
+      history: 'Read local work history',
+      historyDescription: 'Read real observations and their sources; let your own Agent organize pending increments.',
       case: 'Start or continue a Case',
       privacy: 'Review privacy controls',
       setup: 'Review setup changes',
@@ -49,18 +56,18 @@ export function getGalaxyConsoleCopy(language) {
       workerDescription: 'A policy-controlled 7×24 Agent runtime; not implemented in Founding Beta.',
       hubDescription: 'An organization or community Galaxy with its own policy and evidence boundary; not implemented in Founding Beta.',
       caseDescription: 'Record the difficult point in local work without publishing it.',
-      privacyDescription: 'Review local disclosure and consent controls before sharing anything.',
+      privacyDescription: 'Read or adjust the four upload levels. Full conversations remain excluded unless separately selected.',
       setupDescription: 'Preview changes before enabling any additional local capability.',
       languageDescription: 'This affects only the current host conversation.',
       websiteDescription: 'Opens a configured official HTTPS site only on explicit request.',
       guidance: [
-        'Start with a local Case when existing AI or tools cannot move real work forward.',
+        'Use history for ordinary work; local recording and your own Agent’s summaries do not require a formal Case.',
         'Review privacy controls before any future disclosure decision.',
         'Use setup only for an explicit, previewed configuration change.',
       ],
       interactionRules: [
         'Type /Galaxy status to inspect your local Galaxy without changing anything.',
-        'Type /Galaxy case to start or continue local work; type /Galaxy privacy before any future disclosure decision.',
+        'Type /Galaxy history to read local work; /Galaxy privacy shows the saved upload selection.',
         'Type /Galaxy setup only when you intend to review a configuration change. Type /Galaxy help at any time for the full command list.',
       ],
     };
@@ -69,13 +76,15 @@ export function getGalaxyConsoleCopy(language) {
     title: 'Galaxy 控制台',
     welcome: '欢迎回到银河',
     summary: '你的本地 Galaxy 已准备好承接需要更清晰路径的真实工作。',
-    purpose: '在这里记录真正卡住的 Case、检查披露选择，并在考虑任何未来共享之前形成可用的本地历史。',
-    boundary: '当前 Founding Beta 工作区仅在本机运行：没有远程账户、同步、公开 Proof、Worker 或 Hub。',
+    purpose: '阅读普通工作的本地记录与环境事实，由你自己的 Agent 整理尚未处理的增量；需要求助时再使用独立的 Case。',
+    boundary: '阅读本地履历不会启动联网或模型。上传类型与在线账户的公开查询分别设置。',
     available: '当前可用',
     next: '建议下一步',
     future: '后续能力',
     interactionTitle: '如何使用控制台',
     status: '查看本机状态',
+    history: '阅读本地工作履历',
+    historyDescription: '查看真实观察及来源，由自己的 Agent 整理尚未处理的增量。',
     case: '开始或继续一个 Case',
     privacy: '检查隐私控制',
     setup: '检查设置变更',
@@ -86,18 +95,18 @@ export function getGalaxyConsoleCopy(language) {
     workerDescription: '在受控政策下运行的 7×24 Agent Runtime；Founding Beta 尚未实现。',
     hubDescription: '具有自身政策和证据边界的组织或社区银河；Founding Beta 尚未实现。',
     caseDescription: '记录本地工作真正卡住的位置，不会发布内容。',
-    privacyDescription: '在任何未来披露决定前检查本地披露与授权控制。',
+    privacyDescription: '查看和调整四档上传类型；完整会话默认排除，需要另行选择。',
     setupDescription: '任何新增本地能力都必须先预览，再明确确认。',
     languageDescription: '只影响当前宿主对话的显示。',
     websiteDescription: '仅在明确请求时打开已配置的 HTTPS 官网。',
     guidance: [
-      '当现有 AI 或工具无法推进真实工作时，从一个本地 Case 开始。',
+      '普通工作使用本地履历，不需要先创建正式 Case；摘要由自己的 Agent 整理。',
       '在任何未来披露决定前，先检查隐私控制。',
       '只有需要显式变更本地能力时，才进入设置。',
     ],
     interactionRules: [
       '输入 /Galaxy status 查看本机 Galaxy，不会改变任何内容。',
-      '输入 /Galaxy case 开始或继续本地工作；任何未来披露决定前输入 /Galaxy privacy。',
+      '输入 /Galaxy history 阅读本地工作；输入 /Galaxy privacy 查看已保存的上传选择。',
       '只有准备检查设置变更时才输入 /Galaxy setup；随时输入 /Galaxy help 查看完整命令。',
     ],
   };
@@ -123,6 +132,8 @@ export function getGalaxyConsoleContract(status, interaction = {}) {
     localStatus: {
       initializationPath: path,
       galaxyId: status.galaxyId?.id ?? null,
+      subjectType: status.galaxyId?.subjectType ?? null,
+      uploadPrivacy: status.uploadPrivacy,
       localOnly: true,
     },
     interactionGuide: {
@@ -130,6 +141,7 @@ export function getGalaxyConsoleContract(status, interaction = {}) {
       rules: copy.interactionRules,
       routes: [
         { input: '/Galaxy status', command: 'status', effect: 'show-local-status' },
+        { input: '/Galaxy history', command: 'history', effect: 'read-local-work-history' },
         { input: '/Galaxy case', command: 'case', effect: 'open-local-case-workspace' },
         { input: '/Galaxy privacy', command: 'privacy', effect: 'open-local-privacy-controls' },
         { input: '/Galaxy setup', command: 'setup', effect: 'preview-configuration-change' },
@@ -146,8 +158,11 @@ export function getGalaxyConsoleContract(status, interaction = {}) {
         actions: [
           { id: 'status', command: 'status', title: copy.status, selectable: true },
           { id: 'connect', command: 'connect', title: interaction.language === 'en-US' ? 'Connect to Galaxy' : '接入银河', selectable: true },
+          { id: 'history', command: 'history', title: copy.history, description: copy.historyDescription, selectable: true },
           { id: 'case', command: 'case', title: copy.case, description: copy.caseDescription, selectable: enabledModuleIds.has('case-workspace') },
-          { id: 'privacy', command: 'privacy', title: copy.privacy, description: copy.privacyDescription, selectable: enabledModuleIds.has('consent-controls') },
+          { id: 'privacy', command: 'privacy', title: copy.privacy, description: copy.privacyDescription, selectable: true },
+          { id: 'worker-identity', command: 'worker', title: interaction.language === 'en-US' ? 'Separate Worker identity' : '独立 Worker 身份',
+            description: interaction.language === 'en-US' ? 'Create an isolated Agent identity; does not start a Worker runtime.' : '通过独立路径创建 Agent 主体，不改变普通客户端身份，也不启动 Worker 运行时。', selectable: true },
         ],
       },
       {
@@ -164,7 +179,6 @@ export function getGalaxyConsoleContract(status, interaction = {}) {
         id: 'future',
         title: copy.future,
         actions: [
-          { id: 'worker', command: 'worker', title: copy.worker, description: copy.workerDescription, selectable: false, availability: 'planned' },
           { id: 'hub', command: 'hub', title: copy.hub, description: copy.hubDescription, selectable: false, availability: 'planned' },
         ],
       },
@@ -236,6 +250,23 @@ export async function getGalaxyCommandSurface(dataDirectory, command = 'open', i
       localOnly: true,
     };
   }
+
+  // These are local reads and remain useful for an existing identity whose
+  // optional integration modules have not been enabled.
+  if (normalizedCommand === 'privacy') return {
+    command: normalizedCommand, route: commandDefinition.route, state: 'ready', title: commandDefinition.title,
+    privacy: await getLocalUploadPrivacy(dataDirectory), nextTools: ['galaxy_local_upload_privacy_get', 'galaxy_local_upload_privacy_set'], localOnly: true,
+  };
+  if (normalizedCommand === 'worker') return {
+    command:normalizedCommand,route:'galaxy-worker-identity',state:'identity-setup-available',title:'Separate Worker identity',
+    message:'Agent subjects use an isolated Worker directory. Creating that local identity preserves the normal client ID/history and starts no Worker, model, connection or upload.',
+    runtimeStarted:false,nextTools:['galaxy_local_worker_identity_create'],localOnly:true,
+  };
+  if ((normalizedCommand === 'history' || normalizedCommand === 'work') && status.galaxyId) return {
+    command: normalizedCommand, route: commandDefinition.route, state: 'ready', title: commandDefinition.title,
+    history: await createLocalWorkHistory({dataDirectory}).list(),
+    nextTools: ['galaxy_local_work_list', 'galaxy_local_work_get', 'galaxy_local_work_pending', 'galaxy_local_work_summary', 'galaxy_local_work_note'], localOnly: true,
+  };
 
   if (!status.initialized) {
     if (normalizedCommand === 'status') {

@@ -82,7 +82,36 @@ export function describeNativeChoice(name,input) {
  const recipients=a2aResultAuthorization?.viewers??preview.recipientNames??preview.recipients??preview.viewers??preview.recipientIds??payload.viewers??input.viewers;
  const scope=input?.mode??preview.mode;
  const sections=[];
- if(name==='galaxy_native_initialize')sections.push({label:'保存在这台设备',text:'稳定身份和设备密钥。连接服务与外发内容按需要另行选择。'});
+  if(name==='galaxy_local_settings_save'){
+   sections.push({label:'允许上传',text:({'local-only':'仅本地','history-overview':'履历概况','work-content':'工作内容','conversation-archive':'会话归档'}[preview.level]??'原设置')},
+    {label:'原会话',text:preview.conversationMode==='off'?'不另存后续原会话':(preview.sessions?.length??0)+'份会话'+(preview.conversationMode==='cloud'?'保存在本机与所选账户':'保存在本机')});
+   if(preview.conversationMode==='cloud')sections.push({label:'保存到账户',text:input.targetAccountName??'所选银河账户'});
+   for(const title of input.selectedConversationNames??[])sections.push({label:'会话',text:title});
+   if(preview.restoreArchiveSessionIds?.length)sections.push({label:'恢复保存',text:'重新保存本次明确选中的已删除云副本'});
+  }
+ if(name==='galaxy_native_initialize')sections.push({label:'保存在这台设备',text:'新 ID 默认个人，可额外选择组织；已有 ID 不改变类型。兼容客户端记录实际工作与主要环境事实，由用户自己的 AI 整理。连接服务与外发内容按需要另行选择。'},
+  {label:'本次主体类型',text:preview.subjectType==='organization'?'组织':preview.subjectType==='person'?'个人':'已有 ID 沿用原类型；新建默认个人'});
+ if(name==='galaxy_local_upload_privacy_set') {
+  sections.push({label:'允许上传的类型',text:({'local-only':'第 1 档 · 仅本地','history-overview':'第 2 档 · 履历概览','work-content':'第 3 档 · 选定工作内容','conversation-archive':'第 4 档 · 完整会话可选'}[preview.level]??'所选档位')},
+   {label:'完整会话',text:preview.includeFullConversations?'仅另外选定的 '+(preview.sessionIds?.length??0)+' 份原会话允许上传':'排除完整会话'},
+   {label:'本次影响',text:'仅保存本机允许上传的数据类型与范围，不启动上传，不改变在线账户公开查询，也不限制本人本地读取或宿主自有模型。'});
+  for(const session of input.selectedArchiveSessions??[])sections.push({label:'所选原会话',text:session.host+' · '+session.messageCount+' 条已采集消息 · '+session.updatedAt});
+ }
+ if(name==='galaxy_local_archive_configure')sections.push({label:'私有原文保存',text:preview.enabled?'只采集明确所选 '+(preview.sessions?.length??0)+' 个宿主会话的后续原消息':'停止采集后续完整原文'},
+  {label:'自动清理',text:preview.autoCleanAfterDays?'清理早于 '+preview.autoCleanAfterDays+' 天的本机归档原文':'不自动清理本机原文'},
+  {label:'本次影响',text:'不抓取附件，不上传或公开；宿主原件、普通工作履历和云副本分别处理。'});
+ if(name==='galaxy_local_worker_identity_create')sections.push({label:'独立 Worker 身份',text:'在独立 Worker 目录创建 Agent 主体，保留普通客户端的 ID 与履历；不启动 Worker、模型或联网。'});
+ if(name==='galaxy_work_sync_choice'||name==='galaxy_archive_sync_choice'){sections.push(
+   {label:'目标在线账户',text:input.targetAccountName??'所选银河账户'},
+  {label:'所选范围',text:name==='galaxy_work_sync_choice'?(preview.workIds?.length??0)+' 段工作'+(preview.includeFutureWork?'，并纳入此后新开始的本机工作':''):(preview.archiveSessionIds?.length??0)+' 份明确选定的原会话'},
+  {label:'既有资料',text:name==='galaxy_archive_sync_choice'?'仅本次明确选择且上传隐私允许的已保留原文':preview.includeExisting?'明确纳入所选工作的已有资料':'新范围只纳入本次选择后的材料'},
+  {label:'保存方式',text:preview.enabled?'按所选范围自动保存为私有资料。':'停止后续同步，保留已有资料。'});
+  for(const title of input.selectedWorkNames??[])sections.push({label:'工作',text:title});
+  if(preview.restoreWorkIds?.length||preview.restoreArchiveSessionIds?.length)sections.push({label:'恢复保存',text:'重新保存本次明确选中的已删除云副本'});
+ }
+ if(name==='galaxy_work_cloud_delete'||name==='galaxy_archive_cloud_delete')sections.push({label:'目标在线账户',text:preview.targetAccountId},
+  {label:'删除范围',text:'删除这份本人私有云资料，并停止相同来源范围静默恢复；本机原件和其他来源分别处理。'});
+ if(name==='galaxy_local_archive_delete'||name==='galaxy_local_work_delete')sections.push({label:'删除范围',text:name==='galaxy_local_archive_delete'?'只删除所选本人本机原文，并停止该会话后续采集；不删除宿主原件、普通工作事实或云副本。':'只删除所选本人本机工作事实和摘要；不删除宿主原件、独立原会话归档或云副本。'});
  if(name==='galaxy_native_connect')sections.push({label:'这次连接',text:'使用当前设备接入所选银河服务；私人笔记和原工作全文不会由这次连接上传。'});
  if(name==='galaxy_identity_account_execute')sections.push({label:'本机确认',text:preview.action==='unlink'?'解除这里显示的账户与当前银河 ID 的关联，保留身份和已有经历。':'将刚才实际登录的官方账户关联到当前银河 ID。请核对账户与身份；关联不会合并其他 ID 的经历，也不授予资料或 AI 行为的新权限。'});
  if(/device_management_confirm|identity_device_native_confirm/.test(name))sections.push({label:'这次变更',text:'撤销所选设备的身份控制与绑定，保留历史证明。'});
@@ -97,7 +126,7 @@ export function describeNativeChoice(name,input) {
  if(visibility)sections.push({label:'可见范围',text:nativeAudienceLabel(visibility,recipients)});
  if(recipients?.length)sections.push({label:'接收方',text:recipients.every(v=>typeof v==='string'&&!v.startsWith('GUID'))?recipients.join('、'):`本次选择的 ${recipients.length} 位成员`});
  if(scope)sections.push({label:'AI 可以做什么',text:({read:'读取这段对话',draft:'读取并准备草稿',respond:'在这段对话中回复'}[scope]??scope)});
- if(input?.enabled!==undefined)sections.push({label:'私人同步',text:input.enabled?'开启本次所选笔记的私人同步':'停止后续私人同步'});
+ if(input?.enabled!==undefined&&!name.startsWith('galaxy_local_')&&!/^galaxy_(work|archive)_sync_choice$/.test(name))sections.push({label:'私人同步',text:input.enabled?'开启本次所选笔记的私人同步':'停止后续私人同步'});
  const expires=name==='galaxy_contact_work_execute'?preview.consentExpiresAt:a2aResultAuthorization?.expiresAt??input?.expiresAt??preview.expiresAt??preview.authorizationExpiresAt;
  if(expires){const date=new Date(typeof expires==='number'&&expires<1e12?expires*1000:expires);if(Number.isFinite(date.getTime()))sections.push({label:name==='galaxy_contact_work_execute'?'本次内容授权有效至':'有效至',text:date.toLocaleString('zh-CN')});}
  const identityRefs=[],refs=new Set();
@@ -107,7 +136,8 @@ export function describeNativeChoice(name,input) {
    else if(key==='payloadJson'&&typeof item==='string'){try{walk(JSON.parse(item));}catch{/* Exact opaque bytes are in the diagnostic. */}}
    else if(typeof item==='object')walk(item);
   }};walk(input);}
- return {title,rows,sections,identityRefs,recipientRefs:(name==='galaxy_contact_work_execute'?preview.viewers:preview.recipientIds??recipients)?.filter(v=>typeof v==='string'&&v.startsWith('GUID'))??[],
+  const localTitle={galaxy_local_settings_save:'保存这些选择',galaxy_local_upload_privacy_set:'保存上传类型与范围',galaxy_local_archive_configure:'保存本机私有原文范围',galaxy_local_worker_identity_create:'创建独立 Worker 身份',galaxy_local_archive_delete:'删除所选本机原文',galaxy_local_work_delete:'删除所选本机履历',galaxy_work_sync_choice:'保存履历到账户',galaxy_archive_sync_choice:'保存原会话到账户',galaxy_work_cloud_delete:'删除本人云端履历',galaxy_archive_cloud_delete:'删除本人云端原会话'}[name];
+ return {title:localTitle??title,rows,sections,identityRefs,recipientRefs:(name==='galaxy_contact_work_execute'?preview.viewers:preview.recipientIds??recipients)?.filter(v=>typeof v==='string'&&v.startsWith('GUID'))??[],
   note:'只允许这里显示的内容与范围。关闭或取消不会批准。'};
 }
 
@@ -120,7 +150,7 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
  if(data===undefined||data===null)return result;
  // Apps already supply their carefully scoped human presentation and private
  // component metadata. Do not turn it back into a second generic summary.
- if(data.kind==='galaxy-worker-panel'||data.kind==='galaxy-a2a-panel'||data.kind==='galaxy-help-panel'||data.schemaVersion===1&&data.viewId)return result;
+  if(data.kind==='galaxy-local-work-panel'||data.kind==='galaxy-worker-panel'||data.kind==='galaxy-a2a-panel'||data.kind==='galaxy-help-panel'||data.schemaVersion===1&&data.viewId)return result;
  if(data.kind==='galaxy-work-continuation'||name==='galaxy_work_continue')return result;
  const lines=[],specific=result.isError||data.error?null:communityResultLines(name,data)??bookmarkResultLines(name,data);
  if(result.isError||data.error){const code=data.error??'';
@@ -131,7 +161,10 @@ export function presentNativeResult(name,result,{readOnly=false}={}){
    '当前内容暂不可用。可以继续原工作，稍后重试取得当前内容。');
   if(data.reconcileOriginal||data.mayNeedReceiptReconciliation)lines.push('请先查询原操作的结果，再决定是否重试。');}
  else if(data.state==='user-choice-needs-browser'){lines.push(nativeChoiceText(data.operation??name,data.preview??{}),'打开本机审阅页完成选择：',data.url);}
- else if(name==='galaxy_command'){lines.push('在原聊天说明想取得的帮助，沿用当前工作继续。可找帮助、发起求助、查看消息或回到原工作。');if(data.state==='recovery-required')lines.push('本机有尚未完成的恢复操作，请先保留当前资料并检查恢复状态。');}
+  else if(name==='galaxy_command'&&data.history){for(const work of data.history.items??[])lines.push(work.title+(work.summary?'\n'+work.summary:''));if(!lines.length)lines.push('开始工作后，履历会出现在这里。');}
+  else if(name==='galaxy_local_work_get'&&data.work){lines.push(data.work.title,data.work.summary||'还没有整理这段工作。');for(const observation of data.observations??[])if(observation.content?.excerpt)lines.push(observation.content.excerpt);}
+  else if(name==='galaxy_local_settings_save'||name==='galaxy_local_upload_privacy_set'){lines.push('已保存。');}
+  else if(name==='galaxy_command'){lines.push('可以继续原工作，或查看社区、帮助与消息。');if(data.state==='recovery-required')lines.push('本机准备暂未完成，原资料已保留。');}
  else if(name==='galaxy_native_status'){lines.push(nativeConnectionMessage(data));}
  else if(name==='galaxy_native_initialize'&&data.initialized){lines.push(data.existingIdentityPreserved?'已沿用已有身份完成这台设备的准备。':'这台设备的稳定身份已准备好。');lines.push('可以继续原工作；连接和外发范围按需要选择。');}
  else if(name==='galaxy_identity_account_read'&&data.authorizationUrl){lines.push('打开官方账户登录，完成后回到当前 AI 宿主核对账户与银河 ID：',data.authorizationUrl,'登录完成后，仍需在本机明确允许这次关联。');}

@@ -3,6 +3,15 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='galaxy_api') THEN CREATE ROLE galaxy_api NOLOGIN; END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON account_external_credentials_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE,DELETE ON account_work_scopes_v1,account_work_v1,account_work_operations_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON official_account_profiles_v1,official_account_type_history_v1 TO galaxy_api;
+GRANT UPDATE(subject_type,display_name,revision,query_enabled,query_scope,archive_retention_days,updated_at) ON official_account_profiles_v1 TO galaxy_api;
+GRANT SELECT,INSERT,DELETE ON private_conversation_archives_v1,private_conversation_chunks_v1 TO galaxy_api;
+GRANT UPDATE(state,byte_length,chunk_count,updated_at,expires_at) ON private_conversation_archives_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON private_conversation_deletions_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON forum_sections_v2,forum_section_events_v2,forum_notification_reads_v2 TO galaxy_api;
+GRANT UPDATE(version,title,theme,description,audience,state,category,updated_at) ON forum_sections_v2 TO galaxy_api;
 GRANT SELECT,INSERT ON reading_bookmarks_v1,reading_bookmark_operations_v1 TO galaxy_api;
 GRANT UPDATE(saved,revision,saved_at,updated_at) ON reading_bookmarks_v1 TO galaxy_api;
 GRANT SELECT,INSERT ON task_materials_v1 TO galaxy_api;

@@ -1,4 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
+import {defaultUploadPrivacy, normalizeUploadPrivacy} from '../upload-privacy.mjs';
 
 export const STORE_VERSION = 2;
 
@@ -33,6 +34,7 @@ export function emptyState() {
   return {
     version: STORE_VERSION,
     integration: null,
+    uploadPrivacy: defaultUploadPrivacy(),
     cases: [],
     disclosurePlans: [],
     consentGrants: [],
@@ -50,6 +52,7 @@ export function normalizeState(state) {
     integration: state.integration && Array.isArray(state.integration.modules)
       ? state.integration
       : null,
+    uploadPrivacy: normalizeUploadPrivacy(state.uploadPrivacy),
     cases: Array.isArray(state.cases) ? state.cases : [],
     disclosurePlans: Array.isArray(state.disclosurePlans) ? state.disclosurePlans : [],
     consentGrants: Array.isArray(state.consentGrants) ? state.consentGrants : [],

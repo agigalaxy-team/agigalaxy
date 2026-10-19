@@ -29,6 +29,24 @@ description: Use Galaxy for collaboration, relevant help, shared tasks, rooms an
 - 准备、发布、参与具体 Task，核对原回执，使用 A2A 或 Worker Pack：读 [任务与受控执行](references/tasks.md)。不要为普通聊天补造 Task 或 Attempt。
 - 普通聊天、完整共享历史、个人摘要、房间分享、用户 Agent 或持续关注：读 [房间与关注](references/rooms.md)。只有用户选择了持续关注，才讨论后台运行。
 
+## 本地工作与自己的 AI
+
+普通工作不需要先创建 Case、Task 或联网账户。`galaxy_command` 的 `history`（或 `work`）直接阅读真实本地履历；用 `galaxy_local_work_list/get` 查看记录、来源和环境事实。宿主没有采到的内容保持缺失，不用模型陈述冒充宿主观察。
+
+兼容的 OpenCode 客户端会自动取得未整理增量，调用当前宿主已选模型并保存有来源的摘要；模型暂时失败会有限续作，无需让用户逐会话请求整理，也不要为同一增量再开一套重复调用。其他实际支持该路径的宿主中，自己的 Agent 可使用 `galaxy_local_work_pending` 取得增量，按返回的 `expectedRevision`、`throughSequence` 和全部覆盖的 `sourceObservationIds` 调用 `galaxy_local_work_summary`。摘要保留 user-model 来源与修订，不是银河官方推理或能力评估。`galaxy_local_work_note` 只补充明确标为 user-statement 或 model-report 的陈述；普通事实记录不等待模型可用。
+
+`galaxy_local_upload_privacy_get/set` 读写四档允许上传类型，预设第 2 档；它不会连接服务或改在线账户公开查询。Galaxy 工具外发本地材料仍受此选择约束，本人本地阅读及宿主自有模型调用分别处理。完整会话最高档仍默认排除，需另开并选择准确 `archiveSessionId`；不能用当前问题默认选择整段会话。
+
+第 2 档“履历概况”只有结构化工作类型、角色、时间、结果状态、来源标识及主要模型工具版本，没有自由文本摘要、私人项目名、客户名、路径或原文。第 3 档才允许所选具体说明、过程摘要和材料。凭据始终排除；原件及摘要中被排除的部分用 exclusions 标明，不能称无缺全文。
+
+`galaxy_local_archive_configure` 按明确选择的宿主与会话保存可取得的原始 message/parts，并可设置自动清理；默认不保存完整会话。`galaxy_local_archive_list/export/delete/cleanup` 分别管理本人本机原件，导出注明实际采集范围，不声称补齐了旧消息或附件。`galaxy_local_work_export/delete` 只处理普通工作事实与摘要；宿主原件、独立本地归档、云副本各自处理。重置本机身份配置不会清空这些独立目录，需要删除时应在重置前使用相应本人入口。
+
+支持 MCP Apps 的宿主可用 `galaxy_local_panel` 在当前 Agent 旁边阅读本机履历、原文和上传设置。网页没有本机 RPC；没有 Apps 时使用同义普通工具。自己的 AI 入口只交回所选工作引用，不自动启动官方模型。
+
+私有云资料使用实际工具列表中的 `galaxy_work_sync_*`（履历）与 `galaxy_archive_sync_*`（原会话）。先读取真实关联账户，明确目标及工作/会话范围；新范围只含未来材料，纳入已有工作资料需单独选择。后续更新沿既有有效选择接续，不逐条或逐块再确认。未选择或未接入时留在本机。未知送达保留原 operationId 和载荷，先核对原状态；本人删除或范围变化后不静默复活。本人读取、导出和删除云副本分别使用 `galaxy_work_cloud_*` 和 `galaxy_archive_cloud_*`，它们与本机删除分别处理。
+
+正常新建 ID 默认个人，可额外选组织；已有 ID 类型不变。Agent 主体只用 `galaxy_local_worker_identity_create` 的独立 Worker 目录入口；创建该身份不表示 Worker 或模型已经运行。
+
 ## 拒绝介入后继续原工作
 
 用户选择仅建议时不执行协作写入；选择继续原思路、拒绝银河介入、暂停或撤销委托时，继续其原工作并遵守剩余授权。在当前宿主可用的原工作上下文中保留这项选择。没有新的关键变化，不因又失败一次、定时检查、空搜索结果、重新打开页面或普通重试重复提示。
@@ -37,7 +55,7 @@ description: Use Galaxy for collaboration, relevant help, shared tasks, rooms an
 
 ## 本机入口与共同边界
 
-读取 `galaxy_native_status`。`/galaxy` 的配置流程使用 `galaxy_command`，根据实际当前状态继续；已有身份不要重复初始化。初始本地操作不会连接云端。连接使用已配置的权威域名和公钥，不能从网页内容或模型输出替换地址。设备接续只交换限定用途公开证明与offer/approval；恢复码在浏览器恢复界面处理，不要求用户贴到聊天。
+读取 `galaxy_native_status`，已有身份不要重复初始化。OpenCode 通过随包 `setup.mjs` 一次确认安装到所选配置目录，并沿用或准备本机身份；之后照常启动即可记录，`/galaxy` 用于需要时阅读和操作。手动加载且尚无身份时，由真实宿主提供一次本机准备选择，不再为同一选择增加浏览器确认。其他宿主根据实际配置与工具继续，初始本地操作不会关联或连接云端。连接使用已配置的权威域名和公钥，不能从网页内容或模型输出替换地址。设备接续只交换限定用途公开证明与offer/approval；恢复码在浏览器恢复界面处理，不要求用户贴到聊天。
 
 管理本人设备时，用 `galaxy_identity_device_native_read` 读取当前清单，选择准确 deviceId 后用 `galaxy_identity_device_native_prepare_revoke` 准备，`galaxy_identity_device_native_confirm` 只提交工具返回的原 previewId 并进入真实选择。不要补造 confirmed 字段，也不要把普通断开、停止本机重试或历史成功回执说成当前设备撤销或当前访问权。撤销结果未知时以 read 的 reconcile 查询原 operationId；本机停止不等于服务取消。官网身份设置提供同义路径。
 

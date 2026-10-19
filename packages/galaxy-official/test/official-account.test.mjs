@@ -44,13 +44,20 @@ test('official login is cookie-bound, lists independently signed IDs, and cannot
   assert.equal(first.status,303); assert.ok(first.headers.getSetCookie()[0].includes('HttpOnly; Secure; SameSite=Lax'));
   const returned = await issuer.authorize(first.headers.get('location'));
   const alien = await request(returned.pathname+returned.search);
-  assert.equal(alien.status,303); assert.match(alien.headers.get('location'),/accountLogin=failed/);
+  assert.equal(alien.status,303); assert.match(alien.headers.get('location'),/accountLogin=stale/);
   assert.equal((await session()).value.state,'signed-out','foreign browser cannot acquire victim login');
   const correct = await request(returned.pathname+returned.search,{headers:{Cookie:cookie()}}); accept(correct);
   assert.equal(correct.headers.get('location'),website+'/app/community?channel=help');
   const empty = await session();
   assert.equal(empty.value.state,'signed-in'); assert.deepEqual(empty.value.linkedIds,[]);
   assert.equal(empty.value.account.email,'synthetic@example.invalid'); assert.equal(empty.value.account.emailVerified,true);
+  assert.match(empty.value.account.id,/^[0-9a-f-]{36}$/);
+  const accountHeaders={Cookie:cookie(),Origin:website,'X-Galaxy-Account-ID':empty.value.account.id,'X-Galaxy-Account-CSRF':empty.value.csrfToken};
+  assert.deepEqual(await officialAccounts.actionActor({method:'POST',headers:Object.fromEntries(Object.entries(accountHeaders).map(([key,value])=>[key.toLowerCase(),value]))}),
+    {kind:'official-account',accountId:empty.value.account.id,endpoint});
+  assert.equal((await request('/v1/account/settings',{headers:accountHeaders})).status,200);
+  assert.equal((await request('/v1/account/settings',{headers:{...accountHeaders,'X-Galaxy-Account-ID':other.actor.bindingId}})).status,409,'another tab/account cannot redirect an old action');
+  assert.equal((await request('/v1/account/settings',{method:'POST',headers:{...accountHeaders,'Content-Type':'application/json','X-Galaxy-Account-CSRF':'x'.repeat(43)},body:'{}'})).status,403);
   assert.equal(empty.response.headers.get('access-control-allow-credentials'),'true');
   assert.equal(empty.response.headers.get('cache-control'),'no-store');
   for(const forbidden of ['access_token','id_token','externalSubject','issuer','publicKey','bindingId']) assert.ok(!JSON.stringify(empty.value).includes(forbidden));
@@ -62,6 +69,7 @@ test('official login is cookie-bound, lists independently signed IDs, and cannot
     await identity.confirm(owner.actor,{id:preview.loginId,signed:await owner.signForTest(status.payloadJson,'galaxy-identity-link+jws')});
   }
   const full = await session();
+  assert.equal(full.value.account.id,empty.value.account.id,'later ID associations retain the independent account');
   assert.deepEqual(new Set(full.value.linkedIds.map(value=>value.subjectId)),new Set([f.actor.subjectId,other.actor.subjectId]));
   assert.equal(full.value.galaxyAuthorization,false);
   assert.equal((await request('/v1/identity/providers',{method:'POST',headers:{Cookie:cookie(),'Content-Type':'application/json'},body:'{}'})).status,401,'account cookie cannot replace subject authorization');
@@ -76,8 +84,17 @@ test('official login is cookie-bound, lists independently signed IDs, and cannot
   assert.equal(otherPreflight.status,403,'cookie CSRF exception does not broaden Galaxy operation CORS');
   const logout = await postLogout(website,full.value.csrfToken); assert.equal(logout.status,200);accept(logout);
   assert.equal((await session()).value.state,'signed-out');
+  const oldLogin=await start('?returnTo='+encodeURIComponent('/app/community?compose=post'));
+  const oldReturned=await issuer.authorize(oldLogin.headers.get('location'));
+  const newerLogin=await start('?returnTo='+encodeURIComponent('/app/work'));
+  const stale=await request(oldReturned.pathname+oldReturned.search,{headers:{Cookie:cookie()}});
+  assert.equal(stale.status,303);assert.match(stale.headers.get('location'),/accountLogin=stale/);
+  assert.equal(stale.headers.getSetCookie().length,0,'an old callback cannot clear the new browser login');
+  const newerResult=await finish(newerLogin);assert.equal(newerResult.headers.get('location'),website+'/app/work');
+  assert.equal((await session()).value.account.id,empty.value.account.id,'the newer login remains completable after an old tab returns');
   issuer.setAccount('another-official-account');
   await finish(await start());
+  assert.notEqual((await session()).value.account.id,empty.value.account.id);
   assert.deepEqual((await session()).value.linkedIds,[],'another account cannot enumerate the first account IDs');
   clock += 3601;
   assert.equal((await session()).value.state,'signed-out','expired official session cannot read associations');

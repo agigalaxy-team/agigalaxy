@@ -1,6 +1,6 @@
 {
   "origin": "https://agigalaxy.org",
-  "siteRelease": "0.1.19",
+  "siteRelease": "0.1.25",
   "files": {
     "changelog.md": "27194058c661c2e3e9912c8717e0ea2a5e860c7bfb71af6bd60d316f5139e8ea",
     "docs/0.1.0/compatibility.md": "218807a4095d433cf1c02caf5bb80ce00a7956639179bd05dc4afb99046d4314",
@@ -275,6 +275,15 @@
     "downloads/native-client/0.1.12/package-files.json": "2ea69538159f6604c51773588196d4245ec5baeb988dbe0ad3bf0c1ce990c8a7",
     "downloads/native-client/0.1.12/package-metadata.json": "218c3855486aba62b459d1ebb2960c1b3cdd0c5609d505acbecbf08607bb6b81",
     "downloads/native-client/0.1.12/verify-native-client-download.mjs": "63ca45d2136d34998dcab26c3d951fc697175937581db47190066ee13c1b6084",
-    "downloads/native-client/0.1.12/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc"
+    "downloads/native-client/0.1.12/verifier-build.json": "f55caa4bfdd49a8049691c84ec3052475e48401cff379167666d3ff82f7edcdc",
+    "downloads/native-client/0.1.13/galaxy-native-client-0.1.13.tgz": "050de812a3d959ea26e3a5685ab58a453e0532042d3b7b8d7baf0441ad8500ca",
+    "downloads/native-client/0.1.13/release.jws": "c755894e3c8ca0657c58001615337d6a159eb1c85544d46b98e6bb2bf4981582",
+    "downloads/native-client/0.1.13/release.json": "345a67eeaf3f821323ee7fb990ba97b62a11cec0d4ecff402e314d54f52c0279",
+    "downloads/native-client/0.1.13/protocol-report.json": "76043776813fa331ca61b2c6eb9eb210b67fe88b40d86bb7535556bdb11c731d",
+    "downloads/native-client/0.1.13/package-lock.json": "37a35af61c9dc4e3214a57e9f5ed361a1cdc9ccc378b03f1a41d7e19399a1508",
+    "downloads/native-client/0.1.13/source-hashes.json": "baa6c2d3044d9654893af52b87d27b240dc34a78b308b9a007cd7a205c584836",
+    "downloads/native-client/0.1.13/package-files.json": "d831366dba9033076229fff5c5717313cbbfc3bfeee7cab6c33f3e19668df016",
+    "downloads/native-client/0.1.13/package-metadata.json": "7f7c463efcb7550a7a89f1f0f7b1895dc295769ff005505f9a5125f11f2bdc48",
+    "downloads/native-client/0.1.13/verify-native-client-download.mjs": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a"
   }
 }

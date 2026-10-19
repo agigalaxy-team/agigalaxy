@@ -5,7 +5,7 @@ import {recordContentErasure} from './lifecycle-product-v2.mjs';
 const day=86400;
 async function eraseEvent(db,table,row,{at,retainedUntil,reason,requestId=null}){
  if(!row.payload_text)return false;
- await recordContentErasure(db,{table,key:row.id,subjectId:row.subject_id,originalHash:row.payload_hash,requestId,at,retainedUntil,reason});
+ await recordContentErasure(db,{table,key:row.id,subjectId:row.subject_id,accountId:row.subject_id?null:row.account_id,originalHash:row.payload_hash,requestId,at,retainedUntil,reason});
  await db.query(`UPDATE ${table} SET payload_text='',erased_at=COALESCE(erased_at,$2) WHERE id=$1`,[row.id,forumStamp(at)]);return true;
 }
 export async function prepareForumDeletionWithin(db,info){
@@ -23,8 +23,10 @@ export async function prepareForumDeletionWithin(db,info){
 // locators only, never the erased author's Account, public key or source text.
 export async function minimizeForumDeletionWithin(db,info){
  await prepareForumDeletionWithin(db,info);
- const exclusiveAccounts="SELECT l.account_id FROM community_account_links l WHERE l.subject_id=$1 AND NOT EXISTS(SELECT 1 FROM community_account_links other WHERE other.account_id=l.account_id AND other.subject_id<>$1)";
- for(const table of ['forum_permissions_v1','forum_governance_events_v1'])await db.query(`UPDATE ${table} SET account_id=NULL WHERE account_id IN (${exclusiveAccounts})`,[info.subjectId]);
+ // An online account survives deletion of its last associated local ID. Only
+ // that ID's own statements are minimized; Cookie-authored records stay owned.
+ await db.query('UPDATE forum_sections_v2 SET creator_subject_id=NULL WHERE creator_subject_id=$1',[info.subjectId]);
+ await db.query('UPDATE forum_section_events_v2 SET subject_id=NULL,consent_id=NULL WHERE subject_id=$1',[info.subjectId]);
  for(const table of ['forum_posts_v1','forum_versions_v1','forum_replies_v1','forum_events_v1','forum_governance_events_v1','forum_write_receipts_v1'])
   await db.query(`UPDATE ${table} SET subject_id=NULL,account_id=NULL${['forum_events_v1','forum_governance_events_v1','forum_write_receipts_v1'].includes(table)?',consent_id=NULL':''} WHERE subject_id=$1`,[info.subjectId]);
  await db.query("UPDATE forum_permissions_v1 SET subject_id=NULL,account_id=NULL,consent_id=NULL,origin_binding_id=NULL,source_device_id=NULL,source_key_id=NULL,signer_public_key='',fields='[]',viewers='[]' WHERE subject_id=$1",[info.subjectId]);
@@ -42,16 +44,17 @@ export async function cleanupForumWithin(db,at,{policy=defaultForumPolicy,endpoi
   if(endpoints.length>1)throw new Error('Forum retention endpoint required');permissions.access.endpoint=endpoints[0]?.endpoint??'';
  }
  for(const table of ['forum_events_v1','forum_governance_events_v1']){
-  const rows=(await db.query(`SELECT e.id,e.subject_id,e.payload_text,e.payload_hash,p.id permission_id FROM ${table} e
+  const rows=(await db.query(`SELECT e.id,e.subject_id,e.account_id,e.payload_text,e.payload_hash,p.id permission_id FROM ${table} e
    LEFT JOIN forum_permissions_v1 p ON p.event_id=e.id LEFT JOIN consents c ON c.id=p.consent_id LEFT JOIN bindings b ON b.id=p.origin_binding_id
    LEFT JOIN subject_control_events ce ON ce.id=b.revocation_control_event_id
-   WHERE e.payload_text<>'' AND (p.id IS NULL OR p.subject_id IS NULL OR p.erased_at IS NOT NULL OR p.published_until<=$1
-    OR c.expires_at<=$1 OR p.revoked_at IS NOT NULL OR c.revoked_at IS NOT NULL OR b.id IS NULL
-    OR b.revoked_at IS NOT NULL AND (b.revocation_kind IS DISTINCT FROM 'recovery' OR ce.kind IS DISTINCT FROM 'recover' OR ce.subject_id IS DISTINCT FROM p.subject_id))
+   WHERE e.payload_text<>'' AND (p.id IS NULL OR p.erased_at IS NOT NULL OR p.published_until<=$1 OR p.revoked_at IS NOT NULL
+    OR (p.authorization_kind='official-account' AND p.account_id IS NULL)
+    OR (p.authorization_kind='id-consent' AND (p.subject_id IS NULL OR c.expires_at<=$1 OR c.revoked_at IS NOT NULL OR b.id IS NULL
+     OR b.revoked_at IS NOT NULL AND (b.revocation_kind IS DISTINCT FROM 'recovery' OR ce.kind IS DISTINCT FROM 'recover' OR ce.subject_id IS DISTINCT FROM p.subject_id))))
    ORDER BY e.created_at,e.id LIMIT 100 FOR UPDATE OF e`,[forumStamp(at)])).rows;
   for(const row of rows){
    // Worker reads provenance without control/Consent row-lock mutation rights.
-   const state=await permissions.statusWithin(db,row.permission_id,{viewerId:row.subject_id,lock:false});
+   const state=await permissions.statusWithin(db,row.permission_id,{viewerId:row.subject_id,lock:false,checkAudience:false});
    // A cancellable pending deletion only hides reads. It does not erase data.
    if(state.allowed||state.reasons.every(reason=>reason==='deletion-pending'))continue;
    if(await eraseEvent(db,table,row,{at,retainedUntil:at+parsed.auditDays*day,reason:'temporary-content-expired'}))removed[table==='forum_events_v1'?'forumBodies':'forumGovernanceBodies']++;

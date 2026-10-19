@@ -1,6 +1,9 @@
 import { loadGovernanceForRuntime } from './operations/governance-review.mjs';
 import { loadIdentityProviders } from './identity-config.mjs';
 import {loadOfficialAccountPortal} from './official-account.mjs';
+import {loadExternalCredentialsConfiguration} from './external-credentials-config.mjs';
+import {createExternalCredentialsService} from './external-credentials.mjs';
+import {createExternalCredentialsMaintenance} from './external-credentials-maintenance.mjs';
 import { loadPersonalMcp } from './personal-mcp-config.mjs';
 import { createRuntimeLogger,consoleRuntimeLogger,runtimeLogConfiguration } from './operations/runtime-log.mjs';
 import { loadMetricsConfiguration,createOperationalMetrics,startMetricsListener,closeMetricsListener } from './operations/metrics.mjs';
@@ -48,6 +51,7 @@ let metricsServer;
 let chatTransport;
 let chatMaintenance;
 let attachmentConfiguration;
+let externalCredentialsMaintenance;
 let runtimeLog=consoleRuntimeLogger('api',{destination:process.stderr});
 let startupPhase = 'environment';
 const shutdown = createShutdownDeadline();
@@ -128,9 +132,13 @@ try {
   startupPhase = 'identity-providers';
   const identityConfiguration = await loadIdentityProviders(process.env.GALAXY_IDENTITY_CONFIG_FILE, { endpoint });
   const officialAccounts = await loadOfficialAccountPortal(process.env.GALAXY_ACCOUNT_CONFIG_FILE, {endpoint, db, browserOrigins:browserPolicy.origins, identityProviders:identityConfiguration.providers});
+  startupPhase = 'external-credentials';
+  const externalCredentialsConfiguration=await loadExternalCredentialsConfiguration(process.env.GALAXY_EXTERNAL_CREDENTIALS_CONFIG_FILE);
+  const externalCredentials=createExternalCredentialsService({db,endpoint,configuration:externalCredentialsConfiguration});
+  externalCredentialsMaintenance=createExternalCredentialsMaintenance(externalCredentials,{logger:runtimeLog.write});
   startupPhase = 'attachment-config';
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
-  const services = createServices({ ...governance, officialAccounts,communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
+  const services = createServices({ ...governance, officialAccounts,externalCredentials,communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
     operator: process.env.GALAXY_OPERATOR, region: process.env.GALAXY_REGION });
   startupPhase = 'personal-mcp';
   const personalMcp=await loadPersonalMcp(process.env.GALAXY_PERSONAL_MCP_CONFIG_FILE,{services,identityProviders:identityConfiguration.providers});
@@ -160,6 +168,7 @@ try {
   runtimeLog.write({ event: 'listening', port });
   chatMaintenance=createChatMaintenance({chat:services.chat,summaries:services.summaries,sharedSummaries:services.sharedSummaries,choices:services.choices,transport:chatTransport,logger:runtimeLog.write});
   chatMaintenance.start();
+  if(externalCredentialsConfiguration.issuers.length)externalCredentialsMaintenance.start();
   let stopping = false;
   const stop = () => {
     if (stopping) return;
@@ -168,7 +177,7 @@ try {
     shutdown.start();
     const timeout = setTimeout(() => { server.closeAllConnections(); }, 10000);
     timeout.unref();
-    server.close(() => { clearTimeout(timeout); void closeMetricsListener(metricsServer).then(()=>chatTransport?.stop()).then(()=>chatMaintenance?.drain()).then(()=>failureSpool.close()).finally(() => db.end()).finally(()=>runtimeLog.close())
+    server.close(() => { clearTimeout(timeout); void closeMetricsListener(metricsServer).then(()=>chatTransport?.stop()).then(()=>chatMaintenance?.drain()).then(()=>externalCredentialsMaintenance?.close()).then(()=>failureSpool.close()).finally(() => db.end()).finally(()=>runtimeLog.close())
       .catch(() => { process.exitCode = 1; }).finally(() => shutdown.finish()); });
   };
   process.on('SIGTERM', stop);
@@ -177,6 +186,6 @@ try {
   runtimeLog.error({ event: 'startup_failed', phase: startupPhase });
   process.exitCode = 1;
   shutdown.start();
-  try { chatMaintenance?.quiesce(); await closeMetricsListener(metricsServer); if (chatTransport) await chatTransport.stop(); await chatMaintenance?.drain(); if (failureSpool) await failureSpool.close(); if (db) await db.end(); } catch { /* Keep sanitized startup failure. */ }
+  try { chatMaintenance?.quiesce(); await closeMetricsListener(metricsServer); if (chatTransport) await chatTransport.stop(); await chatMaintenance?.drain(); await externalCredentialsMaintenance?.close(); if (failureSpool) await failureSpool.close(); if (db) await db.end(); } catch { /* Keep sanitized startup failure. */ }
   finally { try{await runtimeLog.close();}catch{process.exitCode=1;}shutdown.finish(); }
 }

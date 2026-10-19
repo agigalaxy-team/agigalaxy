@@ -10,6 +10,7 @@ import {
   createLocalProofDraft,
   getGalaxyCommandSurface,
   getGalaxyIntegrationStatus,
+  getLocalSnapshot,
   initializeGalaxyIntegration,
   issueConsentGrant,
   listGalaxyIntegrationModules,
@@ -19,6 +20,10 @@ import {
 } from '../../galaxy-core/src/local-store.mjs';
 import { isGalaxyGuid, parseGalaxyGuid } from '../../galaxy-core/src/galaxy-guid.mjs';
 import { registerConnectionTools } from './connection-tools.mjs';
+import {resolveDataDir,localPaths,readJson} from '../../galaxy-core/src/storage/files.mjs';
+import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './native-v2/local-work-tools.mjs';
+import {createNativeChoice,nativeResult} from './native-v2/choice.mjs';
+import {createNativeStore} from './native-v2/store.mjs';
 
 const dataDir = process.env.GALAXY_DATA_DIR;
 const INITIALIZATION_CONFIRMATION = 'I_CONFIRM_LOCAL_GALAXY_INITIALIZATION';
@@ -73,12 +78,16 @@ function textResult(payload) {
 }
 
 function createServer() {
+  const directory=resolveDataDir(dataDir),localStore=createNativeStore(directory);
+  let localSubject='';
+  const localChoice=createNativeChoice({identity:()=>localSubject,website:getConfiguredOfficialWebsite()??'local',store:localStore});
   const server = new McpServer(
     {
       name: 'galaxy-integration-mcp',
       version: '0.4.0',
     },
     {
+      requestState:{verify:localChoice.verify},
       instructions: [
         'Galaxy Integration Pack is local-only in Founding Beta.',
         'Treat /Galaxy as a state-aware entry: initialize only on first use or after the user explicitly requests a configuration change.',
@@ -109,6 +118,8 @@ function createServer() {
         initializationPath: z.enum(['personal-galaxy', 'galaxy-worker', 'galaxy-hub']).optional(),
         profile: z.enum(['minimal', 'coding-case', 'agent-workspace']).optional(),
         modules: z.array(z.string().trim().min(2).max(80)).max(8).optional(),
+        subjectType: z.enum(['person','organization']).optional(),
+        uploadPrivacy: nativeUploadPrivacyInputSchema.omit({galaxyId:true}).optional(),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -124,13 +135,17 @@ function createServer() {
         initializationPath: z.enum(['personal-galaxy', 'galaxy-worker', 'galaxy-hub']).optional(),
         profile: z.enum(['minimal', 'coding-case', 'agent-workspace']).optional(),
         modules: z.array(z.string().trim().min(2).max(80)).max(8).optional(),
+        subjectType: z.enum(['person','organization']).optional(),
+        uploadPrivacy: nativeUploadPrivacyInputSchema.omit({galaxyId:true}).optional(),
         confirmation: z.literal(INITIALIZATION_CONFIRMATION),
       }),
     },
-    async ({ initializationPath, profile, modules }) => textResult(await initializeGalaxyIntegration(dataDir, {
+    async ({ initializationPath, profile, modules, subjectType, uploadPrivacy }) => textResult(await initializeGalaxyIntegration(dataDir, {
       initializationPath,
       profile,
       modules,
+      subjectType,
+      uploadPrivacy,
       source: 'mcp',
     })),
   );
@@ -151,7 +166,7 @@ function createServer() {
       title: 'Route /Galaxy to initialization or an active service',
       description: 'A read-only command surface for Agent adapters. It returns first-run initialization guidance only when Galaxy is not initialized; otherwise it routes normal /Galaxy service requests without rerunning setup.',
       inputSchema: z.object({
-        command: z.enum(['open', 'help', 'language', 'status', 'connect', 'setup', 'case', 'privacy', 'worker', 'hub', 'website']).default('open'),
+        command: z.enum(['open', 'help', 'language', 'status', 'connect', 'setup', 'history', 'work', 'case', 'privacy', 'worker', 'hub', 'website']).default('open'),
         language: z.enum(['zh-CN', 'en-US']).optional(),
         stage: z.number().int().min(1).max(5).optional(),
       }),
@@ -311,6 +326,27 @@ function createServer() {
     },
   );
 
+  const registerLocal=(name,inputSchema,description,run,{write=false,needsChoice=false}={})=>server.registerTool(name,{inputSchema,description,annotations:{readOnlyHint:!write}},async(input,context)=>{
+    try {
+      localSubject=(await getLocalSnapshot(directory)).identity?.id??'';
+      if(needsChoice) {
+        const reviewedOwner=localSubject;
+        return await localChoice.run(server,name,input,context,async()=>{
+          if((await getLocalSnapshot(directory)).identity?.id!==reviewedOwner)throw new Error('local_identity_changed');
+          return run(input);
+        });
+      }
+      return nativeResult(await run(input));
+    } catch(error) {return {isError:true,...nativeResult({error:/^[a-z0-9_]{1,100}$/.test(error.code??error.message)?error.code??error.message:'local_operation_failed'})};}
+  });
+  const localWork=registerNativeLocalWorkTools(registerLocal,{store:localStore,localIdentityWithin:async directory=>{
+    const paths=localPaths(directory);return await readJson(paths.identity,null)??await readJson(paths.legacyIdentity,null);
+  }});
+  localWork.startMaintenance();
+  const close=server.close.bind(server);
+  server.close=async()=>{await localWork.close();await localChoice.close();await close();};
+  const onclose=server.server.onclose;
+  server.server.onclose=()=>{void localWork.close();void localChoice.close();onclose?.();};
   registerConnectionTools(server, dataDir);
   return server;
 }

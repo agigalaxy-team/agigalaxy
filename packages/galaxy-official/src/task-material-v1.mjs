@@ -34,7 +34,7 @@ export class TaskMaterialServiceV1 {
   if(await this.forum.hiddenWithin(db,{kind:'post-version',postId:source.postId,versionId:source.versionId}))
    return {available:false,permanent:false,reasons:['source-governance-hidden'],row};
   const payload=JSON.parse(row.payload_text);
-  return {available:true,permanent:false,row,payload,availableUntil:Math.min(forumSeconds(row.published_until),permission.row.intent.expiresAt)};
+  return {available:true,permanent:false,row,payload,availableUntil:Math.min(forumSeconds(row.published_until),permission.row.intent?.expiresAt??forumSeconds(permission.row.published_until))};
  }
  selection(state,selection){
   if(!sourceFields.includes(selection.field)||typeof state.payload[selection.field]!=='string')throw new ServiceError('task_material_source_mismatch',409);

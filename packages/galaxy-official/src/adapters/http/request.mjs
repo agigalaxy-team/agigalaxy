@@ -10,14 +10,14 @@ export const authenticatedRequestActor = request => authenticatedRequests.get(re
 import { ServiceError } from '../../shared/service-error.mjs';
 import { failureActor } from '../../shared/http-failure-context.mjs';
 
-export async function body(request, keys) {
+export async function body(request, keys, {maxBytes=32768}={}) {
   if (request.headers['content-type'] !== 'application/json' || request.headers['content-encoding'])
     throw new ServiceError('unsupported_media_type', 415);
   const chunks = []; let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
     if (measuredBodyBytes.has(request)) measuredBodyBytes.set(request, size);
-    if (size > 32768) throw new ServiceError('request_too_large', 413);
+    if (size > maxBytes) throw new ServiceError('request_too_large', 413);
     chunks.push(chunk);
   }
   let input;

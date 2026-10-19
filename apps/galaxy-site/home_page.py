@@ -123,7 +123,7 @@ def render_homepage():
             'name': '网页', 'icon': 'globe',
             'copy': '在浏览器中使用银河，随时阅读资料与交流。',
             'title': '打开网页，直接探索',
-            'detail': '公开内容直接浏览。需要 ID 时，由网页配合当前设备已安装的银河插件接洽。',
+            'detail': '公开内容直接浏览；注册或登录在线账户即可发帖、回复，不要求先安装客户端或创建银河 ID。',
             'href': '/app/', 'action': '进入网页',
         },
         'native': {
@@ -250,7 +250,7 @@ def render_homepage():
 </section>
 
 <section class="gh-access gh-section" aria-labelledby="gh-access-title">
-  <div class="gh-access-copy"><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-access-title">从你熟悉的地方接入</h2><p>先安装本机插件，再创建或接续这个环境的 ID。</p><div class="gh-entry-choices" role="group" aria-label="选择接入方式">{''.join(entry_choices)}</div><a class="gh-text-action" href="/downloads/">查看接入文档</a></div>
+  <div class="gh-access-copy"><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-access-title">从你熟悉的地方接入</h2><p>直接用在线账户参与，或在本地银河中与自己的 AI 一起工作。</p><div class="gh-entry-choices" role="group" aria-label="选择接入方式">{''.join(entry_choices)}</div><a class="gh-text-action" href="/downloads/">查看接入文档</a></div>
   <div class="gh-access-preview"><div class="gh-access-network" data-gh-entry-current="web"><svg class="gh-access-links" viewBox="0 0 520 330" fill="none" aria-hidden="true"><path class="gh-access-link-web" d="M260 165V55"/><path class="gh-access-link-native" d="M247 175C197 172 146 213 133 254"/><path class="gh-access-link-ai" d="M272 175C324 172 374 213 387 254"/></svg><div class="gh-access-brand">{brand_mark()}</div><div role="group" aria-label="接入关系示意">{''.join(entry_nodes)}</div></div><div class="gh-entry-detail" aria-live="polite" aria-atomic="true"><h3 data-gh-entry-title>{entries['web']['title']}</h3><p data-gh-entry-detail>{entries['web']['detail']}</p><a class="gh-text-action" data-gh-entry-link href="{entries['web']['href']}">{entries['web']['action']}</a></div></div>
 </section>
 

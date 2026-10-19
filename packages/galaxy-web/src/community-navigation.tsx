@@ -51,6 +51,8 @@ function CommunityNavigation({path, search, navigate}: {path: string; search: st
   return <nav className="community-domain-links forum-topic-links" aria-label="社区频道">
     <h2 className="community-rail-title">社区</h2>
     <CommunityLink className="community-all-topics" target={topicPath('')} navigate={navigate} aria-current={feed && !selected.topic && !params.has('section') ? 'page' : undefined}><Grid2X2 size={19} aria-hidden/>全部频道</CommunityLink>
+    <CommunityLink className="community-all-topics" target="/app/community?section=sections" navigate={navigate} aria-current={path.includes('/community/sections/')||params.get('section')==='sections'?'page':undefined}>成员版块</CommunityLink>
+    <CommunityLink className="community-all-topics" target="/app/community?section=notifications" navigate={navigate} aria-current={params.get('section')==='notifications'?'page':undefined}>回复提醒</CommunityLink>
     <p className="community-nav-label">领域分区</p>
     {communityDomains.map(domain => {
       const current = selected.topic === domain.id;
@@ -71,7 +73,7 @@ export function CommunityLayout({path, search = '', navigate, children}: {path: 
     <aside className="community-navigation"><CommunityNavigation path={path} search={search} navigate={navigate}/></aside>
     <div className="community-layout-content">
       <nav className="community-mobile-topics" aria-label="社区频道">
-        <div className="community-mobile-topic-row"><CommunityLink target={topicPath('')} navigate={navigate} aria-current={!selected.topic?'page':undefined}>全部</CommunityLink>{communityDomains.map(domain=><CommunityLink key={domain.id} target={topicPath(domain.id)} navigate={navigate} aria-current={selected.topic===domain.id?'page':undefined}>{domain.label}</CommunityLink>)}<CommunityLink target={topicPath('unclassified')} navigate={navigate} aria-current={selected.topic==='unclassified'?'page':undefined}>未分类</CommunityLink></div>
+        <div className="community-mobile-topic-row"><CommunityLink target={topicPath('')} navigate={navigate} aria-current={!selected.topic&&!new URLSearchParams(search).has('section')?'page':undefined}>全部</CommunityLink><CommunityLink target="/app/community?section=sections" navigate={navigate} aria-current={path.includes('/community/sections/')||new URLSearchParams(search).get('section')==='sections'?'page':undefined}>成员版块</CommunityLink><CommunityLink target="/app/community?section=notifications" navigate={navigate} aria-current={new URLSearchParams(search).get('section')==='notifications'?'page':undefined}>回复提醒</CommunityLink>{communityDomains.map(domain=><CommunityLink key={domain.id} target={topicPath(domain.id)} navigate={navigate} aria-current={selected.topic===domain.id?'page':undefined}>{domain.label}</CommunityLink>)}<CommunityLink target={topicPath('unclassified')} navigate={navigate} aria-current={selected.topic==='unclassified'?'page':undefined}>未分类</CommunityLink></div>
         {!!currentDomain?.children.length&&<div className="community-mobile-child-row">{currentDomain.children.map(child=><CommunityLink key={child} target={topicPath(currentDomain.id,child)} navigate={navigate} aria-current={selected.query===child?'page':undefined}>{child}</CommunityLink>)}</div>}
       </nav>
       {children}

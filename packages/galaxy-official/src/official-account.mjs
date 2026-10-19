@@ -1,8 +1,9 @@
-import {randomBytes, createHash, timingSafeEqual} from 'node:crypto';
+import {randomBytes, randomUUID, createHash, timingSafeEqual} from 'node:crypto';
 import {lstat, readFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import {createOidcLoginProvider} from './oidc-login.mjs';
 import {ServiceError} from './shared/service-error.mjs';
+import {OfficialAccountData} from './official-account-data.mjs';
 
 const opaque = () => randomBytes(32).toString('base64url');
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -27,8 +28,8 @@ function sameSecret(a, b) {
 }
 
 // Official account login is independent of Galaxy identity/device authority.
-// OIDC tokens never leave the server. This bounded, process-local session grants
-// only the account's association list, never any subject's private materials.
+// OIDC tokens never leave the server. Account actions use their own current
+// account session; a login never grants control of an associated Galaxy ID.
 export function createOfficialAccountPortal({provider, db, endpoint, websiteOrigin, associationProviders = [],
   now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false}) {
   origin(endpoint, allowLoopbackHttp); origin(websiteOrigin, allowLoopbackHttp);
@@ -37,6 +38,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
   const clients = associationProviders.map(value => value.describe()).filter(value => value.issuer === description.issuer).map(value => value.clientId);
   if (!clients.length) throw Error('Official account association provider required.');
   const pending = new Map(), sessions = new Map();
+  const data = new OfficialAccountData({db,endpoint,now});
   const secure = new URL(endpoint).protocol === 'https:';
   // __Host cookies are mandatory in production. Literal-loopback HTTP fixtures
   // use separate names because browsers correctly reject insecure __Host cookies.
@@ -63,6 +65,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
   }
   const signedOut = () => ({state:'signed-out', galaxyAuthorization:false});
   return Object.freeze({
+    data,
     configurationHash:hash(JSON.stringify({endpoint,websiteOrigin,issuer:description.issuer,clientId:description.clientId,associationClients:[...clients].sort((a,b)=>a<b?-1:a>b?1:0)})),
     async login(request, response, url) {
       if ([...url.searchParams.keys()].some(key => !['mode','returnTo'].includes(key)) || ['mode','returnTo'].some(key => url.searchParams.getAll(key).length > 1)) throw new ServiceError('invalid_account_login');
@@ -91,7 +94,14 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
     async callback(request, response, url) {
       purge(); const value = cookieValue(request, loginCookie), key = value ? hash(value) : null;
       const record = key ? pending.get(key) : null;
-      if (key) pending.delete(key);
+      // An old tab must not consume the newer login held by this browser.
+      // Only a callback for this exact preview may clear/cancel its transaction.
+      const expectedState=record?new URL(record.preview.authorizationUrl).searchParams.get('state'):null;
+      if(!record||url.searchParams.getAll('state').length!==1||url.searchParams.get('state')!==expectedState){
+        response.setHeader('Referrer-Policy','no-referrer');response.setHeader('Cache-Control','no-store');
+        response.statusCode=303;response.setHeader('Location',websiteOrigin+'/app/account?accountLogin=stale');response.end();return;
+      }
+      pending.delete(key);
       const cookies = [cookie(loginCookie, '', 0)];
       let target = record?.returnTo ?? websiteOrigin + '/app/account';
       try {
@@ -99,14 +109,22 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
         const account = await provider.complete(record.preview, url.href);
         if (account.issuer !== description.issuer || account.clientId !== description.clientId || account.expiresAt <= now() || typeof account.externalSubject !== 'string') throw Error();
         if (sessions.size >= 10000) throw Error();
+        const newId = randomUUID();
+        const accountRow = (await db.query(`INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at)
+          VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(endpoint,issuer,external_subject)
+          DO UPDATE SET verified_at=EXCLUDED.verified_at,verification_method=EXCLUDED.verification_method RETURNING id`,
+        [newId, endpoint, account.issuer, account.externalSubject,
+          account.accountVerification?.verified === true ? 'email' : 'external-account', new Date(now()*1000).toISOString()])).rows[0];
+        if (!accountRow?.id) throw unavailable();
+        await data.ensureWithin(db,accountRow.id,{subjectType:accountRow.id===newId?'person':null,displayName:account.accountProfile?.displayName??null});
         const prior = cookieValue(request, sessionCookie); if (prior) sessions.delete(hash(prior));
         const token = opaque();
-        sessions.set(hash(token), {issuer:account.issuer, externalSubject:account.externalSubject,
-          account:{displayName:account.accountProfile?.displayName ?? null, email:account.accountProfile?.email ?? null, emailVerified:account.accountVerification?.verified === true},
+        sessions.set(hash(token), {accountId:accountRow.id, issuer:account.issuer, externalSubject:account.externalSubject,
+          account:{id:accountRow.id, displayName:account.accountProfile?.displayName ?? null, email:account.accountProfile?.email ?? null, emailVerified:account.accountVerification?.verified === true},
           csrfToken:opaque(), expiresAt:now() + 3600});
         cookies.push(cookie(sessionCookie, token, 3600));
       } catch {
-        const failure = new URL(target); failure.searchParams.set('accountLogin', 'failed'); target = failure.href;
+        const failure = new URL(target); failure.searchParams.set('accountLogin',url.searchParams.get('error')==='access_denied'?'cancelled':'failed'); target = failure.href;
       } finally {if (record) provider.cancel(record.preview);}
       response.setHeader('Set-Cookie', cookies); response.setHeader('Referrer-Policy','no-referrer');
       response.statusCode = 303; response.setHeader('Location', target); response.end();
@@ -124,6 +142,22 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
       const linkedIds = rows.slice(0,100).map(row => ({subjectId:row.subject_id, linkedAt:new Date(row.linked_at).toISOString()}));
       return {state:'signed-in', account:session.account, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
         expiresAt:session.expiresAt, csrfToken:session.csrfToken, galaxyAuthorization:false};
+    },
+    async actionActor(request, {write = request.method !== 'GET'} = {}) {
+      if(request.headers.authorization!==undefined)throw new ServiceError('access_denied',401);
+      const session = readSession(request);
+      if (!session) throw new ServiceError('official_account_login_required',401);
+      const sameOriginRead=!write&&request.method==='GET'&&request.headers.origin===undefined
+        &&endpoint===websiteOrigin&&request.headers['sec-fetch-site']==='same-origin'
+        &&request.headers.host===new URL(endpoint).host;
+      if (request.headers.origin !== websiteOrigin&&!sameOriginRead) throw new ServiceError('account_csrf_invalid',403);
+      // Bind drafts and in-flight requests to the account the user actually saw.
+      // Another tab changing the ambient cookie must not redirect an old action.
+      if (request.headers['x-galaxy-account-id'] !== session.accountId)
+        throw new ServiceError('official_account_changed',409);
+      if (write && !sameSecret(request.headers['x-galaxy-account-csrf'],session.csrfToken))
+        throw new ServiceError('account_csrf_invalid',403);
+      return {kind:'official-account',accountId:session.accountId,endpoint};
     },
     logout(request, response) {
       const session = readSession(request);

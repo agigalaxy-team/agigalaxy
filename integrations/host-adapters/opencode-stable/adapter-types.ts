@@ -8,18 +8,30 @@ export type Prompt = { title: string; placeholder: string; value?: string; onCon
 export type HostWorkResult = { title: string; content: string; sourceUrl?: string };
 export type HostWorkContext = { query?: string; origin?: { host: string; workRef: string }; caseId?: string; taskId?: string;
   a2a?: { peerId: string; attemptId: string; attemptVersion: number; text: string } };
+export type HostWorkEvent = {type: string; id?: string; properties: Record<string, unknown>};
+export type HostObservedMessage = {id:string;role:string;sessionID?:string;time?:{created:number;completed?:number};
+  providerID?:string;modelID?:string;model?:{providerID:string;modelID:string};agent?:string;error?:{name:string};finish?:string};
 type Command = { name: string; title: string; run: Action; desc?: string; category?: string; namespace?: string; slashName?: string; slashAliases?: string[] };
 export interface StableHostApi {
+  app?: {readonly version: string};
+  event?: {on(type: string, handler: (event: HostWorkEvent) => void): Action};
   renderer?: { readonly width: number; readonly height: number };
   lifecycle?: { readonly signal: AbortSignal; onDispose(handler: Action): Action };
   // Public OpenCode TUI SDK. Appending keeps the host's unsent input and does
   // not submit it or select/start a model.
-  client?: { tui: { appendPrompt(input: { text: string }): Promise<{ data?: boolean; error?: unknown }> } };
-  route?: { readonly current: { name: string; params?: { sessionID?: string } } };
-  state?: { session: { messages(sessionId: string): readonly { id: string; role: string }[] };
+  client?: { tui: { appendPrompt(input: { text: string }): Promise<{ data?: boolean; error?: unknown }> };
+    session?: {create(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
+      prompt(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
+      messages?(input: {sessionID: string}, options?: {signal?: AbortSignal}): Promise<unknown>;
+      message?(input: {sessionID: string; messageID: string}): Promise<unknown>;
+      abort?(input: {sessionID: string}): Promise<unknown>; update?(input: Record<string, unknown>): Promise<unknown>} };
+  route?: { readonly current: { name: string; params?: { sessionID?: string } }; navigate?(name: string, params?: Record<string, unknown>): void };
+  state?: {config?: {model?: string}; mcp?: () => readonly {name: string; status: string}[];
+    session: { get?(sessionId:string):{id:string;title:string;directory?:string;workspaceID?:string;time?:{updated:number}}|undefined;messages(sessionId: string): readonly HostObservedMessage[];status?(sessionId:string):{type:string}|undefined };
     part(messageId: string): readonly { type: string; text?: string }[] };
   keymap: { registerLayer(layer: { mode?: string; commands: Command[]; bindings?: { key: string; cmd: string; desc: string }[] }): Action };
   ui: {
+    toast?(input: {variant: string; title: string; message: string}): void;
     dialog: { setSize(size: 'medium' | 'xlarge'): void; clear(): void; replace(factory: Action, dispose?: Action): void };
     DialogAlert(input: { title: string; message: string; onConfirm: Action }): unknown;
     DialogPrompt(input: { title: string; placeholder: string; value?: string; onConfirm: (value: string) => unknown; onCancel: Action }): unknown;
@@ -58,7 +70,7 @@ export type InitializationView = {
     options: { title: string; description?: string; disabledReason?: string; selectable?: boolean }[] };
 };
 export type AdapterCore = Omit<typeof import('../../../packages/galaxy-core/src/integration-modules.mjs'), 'getGalaxyInitializationContract'> & {
-  getGalaxyInitializationContract(input: { language: string; stage: number; hostCapabilities?: Record<string, boolean> }): InitializationView;
+  getGalaxyInitializationContract(input: { language: string; stage: number; subjectType?: 'person'|'organization'; uploadPrivacy?: Record<string, unknown>; hostCapabilities?: Record<string, boolean> }): InitializationView;
 };
 export type PublicationDraft = { localCaseId: string; title: string; status: string };
 export type HistoryItem = {

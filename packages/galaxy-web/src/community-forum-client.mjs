@@ -3,12 +3,15 @@ import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 import { forumWriteSpec } from '../../galaxy-official/src/shared/community-forum-v1-schema.mjs';
 import { bindForumIds } from '../../galaxy-official/src/shared/community-forum-ids-v1.mjs';
 import { forumTopicSchema,forumReadTopicSchema } from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
+import { forumAudienceSchema } from '../../galaxy-official/src/shared/community-forum-access-v2.mjs';
 
 const draftSchema = z.strictObject({
   id: z.uuid(), revision: z.number().int().positive(),
-  kind: z.enum(['create-post', 'publish-version', 'create-reply', 'withdraw-post', 'withdraw-version', 'withdraw-reply', 'create-report', 'supplement', 'withdraw-report', 'appeal', 'resolve']),
+  kind: z.enum(['create-post', 'publish-version', 'create-reply', 'withdraw-post', 'withdraw-version', 'withdraw-reply', 'create-report', 'supplement', 'withdraw-report', 'appeal', 'resolve', 'create-section', 'update-section']),
   title: z.string().default(''), body: z.string().default(''), linksText: z.string().default(''),
   topic: forumReadTopicSchema.optional(),
+  sectionId: z.uuid().nullable().optional(), audience: forumAudienceSchema.optional(),
+  theme: z.string().default(''), description: z.string().default(''), sectionState: z.enum(['active','archived']).default('active'),
   category: z.enum(['spam', 'harassment', 'privacy', 'misleading', 'other']).default('other'),
   target: z.record(z.string(), z.union([z.string(), z.number(), z.null()])).default({}),
   replyTo: z.strictObject({ replyId: z.uuid(), contentRevision: z.literal(1) }).nullable().default(null),
@@ -36,15 +39,19 @@ export function newForumDraft(kind = 'create-post', target = {}, values = {}) {
 
 export function forumDraftPayload(value, { maxPermissionSeconds, maxGovernanceHideSeconds }, now = Math.floor(Date.now() / 1000)) {
   const draft = draftSchema.parse(value), target = draft.target;
-  const base = { schemaVersion: 1, operationId: crypto.randomUUID() };
+  const base = { schemaVersion: 1, operationId: crypto.randomUUID(), ...(typeof target.accountId==='string'?{accountId:z.uuid().parse(target.accountId)}:{}) };
   const content = () => ({ versionId: crypto.randomUUID(), title: draft.title.trim(), body: draft.body.trim(),
     links: draft.linksText.split(/\r?\n/).map(line => line.trim()).filter(Boolean), publishedUntil: now + maxPermissionSeconds,
-    ...(forumTopicSchema.safeParse(draft.topic).success?{topic:draft.topic}:{}) });
+    ...(forumTopicSchema.safeParse(draft.topic).success?{topic:draft.topic}:{}),
+    ...(draft.sectionId!==undefined?{sectionId:draft.sectionId}:{}),...(draft.audience?{audience:draft.audience}:{}) });
   switch (draft.kind) {
     case 'create-post': return { ...base, postId: crypto.randomUUID(), expectedHeadVersion: 0, ...content() };
     case 'publish-version': return { ...base, postId: target.postId, expectedHeadVersion: target.expectedHeadVersion, ...content() };
     case 'create-reply': return { ...base, replyId: crypto.randomUUID(), postId: target.postId, postVersionId: target.versionId,
-      expectedRevision: 0, body: draft.body.trim(), publishedUntil: now + maxPermissionSeconds, replyTo: draft.replyTo };
+      expectedRevision: 0, body: draft.body.trim(), publishedUntil: now + maxPermissionSeconds, replyTo: draft.replyTo,
+      ...(draft.audience?{audience:draft.audience}:{}) };
+    case 'create-section': case 'update-section': return {...base,sectionId:target.sectionId??crypto.randomUUID(),expectedVersion:target.expectedVersion??0,
+      title:draft.title.trim(),theme:draft.theme.trim(),description:draft.description.trim(),audience:draft.audience,state:draft.sectionState};
     case 'withdraw-post': return { ...base, postId: target.postId, expectedHeadVersion: target.expectedHeadVersion };
     case 'withdraw-version': return { ...base, postId: target.postId, versionId: target.versionId, expectedHeadVersion: target.expectedHeadVersion };
     case 'withdraw-reply': return { ...base, replyId: target.replyId, expectedRevision: 1 };
@@ -90,23 +97,38 @@ export function forumError(reason) {
     not_found: '没有读到这项内容，或当前身份没有查看权限。', request_timeout: '等待超时，原结果可能尚未返回，请查询原操作。',
     forum_original_status_unavailable: '草稿所指的原操作暂不能核对。原记录仍保留，请先查询原结果，或明确停止本机重试。',
     forum_cursor_mismatch: '浏览条件已改变，请从当前主题重新读取列表。',
+    official_account_session_expired: '请登录银河账户后继续，正在编辑的文字仍保存在此浏览器。',
+    official_account_unavailable: '账户服务暂时不可用，草稿和原操作保留。',
+    official_account_changed: '当前登录账户已经变化。原账户的草稿和原操作分别保留，请回到原账户继续。',
+    account_selection_required: '这个 ID 关联了多个账户，请先选择本次操作的目标账户。',
+    forum_audience_required: '请选择这次内容的阅读范围，草稿仍保留。',
+    forum_participation_denied: '当前账户不符合这篇内容的参与条件，仍可按允许范围阅读。',
+    forum_section_not_found: '没有读到这个版块，或当前账户不在它的阅读范围内。',
+    forum_section_archived: '这个版块已归档，已有内容按各自许可保留，不再接收新帖子。',
+    forum_section_version_conflict: '版块已被更新，当前修改仍在草稿中，请先读取新内容。',
+    forum_section_maintenance_denied: '当前账户不是这个版块的维护者。',
   })[reason?.code ?? reason?.message] ?? (reason?.issues ? '请检查文字、链接和目标是否完整。' : reason?.message ?? '本次操作没有完成，请稍后重试。');
 }
 
 // Draft heads and the original-operation journal share one IDB transaction.
 // A second tab can retire an operation without allowing an old queued save,
 // signing completion, or HTTP completion to resurrect its retry body.
-/** @param {any} runtime @param {{subjectId?: string|null, context?: string, now?:()=>number}} [options] */
-export function createCommunityForumClient(runtime, { subjectId = null, context = 'community', now=()=>Math.floor(Date.now()/1000) } = {}) {
+/** @param {any} runtime @param {{subjectId?: string|null, context?: string, browserDrafts?:boolean, account?:{id:string,assertCurrent:()=>void,call:(path:string,input:unknown,options?:{method?:string})=>Promise<any>}|null, targetAccountId?:string|null, now?:()=>number}} [options] */
+export function createCommunityForumClient(runtime, { subjectId = null, context = 'community', browserDrafts = false, account = null, targetAccountId = null, now=()=>Math.floor(Date.now()/1000) } = {}) {
   const api = runtime.api, endpoint = api.endpoint, original = api.snapshot();
-  const lease = subjectId ? runtime.receiptStatus.captureLease() : null;
-  const key = `community-forum:${endpoint}:${subjectId}`;
+  const lease = subjectId && !account ? runtime.receiptStatus.captureLease() : null;
+  const ownerId=account?`account:${account.id}`:subjectId??'visitor';
+  const key = `community-forum:${endpoint}:${account?ownerId:subjectId??(browserDrafts?'visitor':null)}`;
+  const storageOwner=account||browserDrafts&&!subjectId?ownerId:subjectId;
+  const accountActor=account?`account:${account.id}`:null;
   const previews = new WeakMap(), observed = new Set();
   let closed = false, loaded = false, head = null, lastSave = null, operationTail = Promise.resolve();
   if (!queues.has(api)) queues.set(api, new Map());
   const localQueues = queues.get(api);
   function check() {
     if (closed || api.endpoint !== endpoint) fail('forum_scope_changed', '页面或服务已改变，请重新打开社区。');
+    if(account)return;
+    if(browserDrafts&&!subjectId)return;
     lease?.assertCurrent();
     const current = api.snapshot();
     if (!!original !== !!current || original && ['subjectId', 'bindingId', 'generation'].some(field => original[field] !== current?.[field]))
@@ -115,10 +137,12 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   }
   function localCheck() {
     check();
-    if (!subjectId || !lease) fail('forum_identity_required', '先建立或接回自己的银河身份，文字才能归入本机稿。');
+    if (!account && !browserDrafts && (!subjectId || !lease)) fail('forum_identity_required', '先建立或接回自己的银河身份，文字才能归入本机稿。');
   }
   function writeCheck(scope = null) {
     localCheck();
+    if(account){account.assertCurrent();return;}
+    if(!subjectId)fail('official_account_session_expired','请登录银河账户后继续，草稿仍保存在此浏览器。');
     const current = api.snapshot();
     if (!current) fail('connection_required', '请先连接当前身份。本机稿仍保留。');
     if (!current.scopes.some(value => value === '*' || (scope ? value === scope : ['assistance', 'moderation'].includes(value))))
@@ -129,19 +153,22 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
     try { const value = await action(); check(); return value; } catch (error) { check(); throw error; }
   }
   const publicCall = (path, input, method = 'POST') => wait(() => api.call(path, input, { method, authenticated: false }));
-  const privateCall = async (path, input, method = 'POST') => { writeCheck(); return wait(() => api.call(path, input, { method, authenticated: true })); };
+  const privateCall = async (path, input, method = 'POST', accountId = targetAccountId) => { writeCheck(); return wait(() => account?account.call(path,input,{method}):api.call(path, input, { method, authenticated: true, ...(accountId?{accountId}:{}) })); };
+  const readerCall = (path,input,method='POST',accountId=targetAccountId) => account ? wait(()=>account.call(path,input,{method}))
+    : subjectId&&api.snapshot() ? wait(()=>api.call(path,input,{method,authenticated:true,...(accountId?{accountId}:{})})) : publicCall(path,input,method);
   function rowValue(value) {
-    const row = value ?? { version: 1, endpoint, subjectId, drafts: {}, active: null, completed: [] };
+    const row = value ?? { version: 1, endpoint, subjectId, ...(account||browserDrafts&&!subjectId?{ownerId}:{}), drafts: {}, active: null, completed: [] };
     if (row.version !== 1 || row.endpoint !== endpoint || row.subjectId !== subjectId || !row.drafts || !Array.isArray(row.completed))
       fail('forum_local_owner_mismatch', '本机社区记录与当前身份或服务不一致。');
+    if((account||browserDrafts&&!subjectId)&&row.ownerId!==ownerId)fail('forum_local_owner_mismatch','当前账户与这份本机稿不一致。');
     return row;
   }
   function update(mutator) {
     localCheck();
     if (typeof runtime.updateLocal !== 'function') fail('local_atomic_update_unavailable', '当前本机存储不能安全保存，请保留文字后重新打开。');
-    return wait(() => runtime.updateLocal(key, value => { localCheck(); return mutator(rowValue(value)); }, subjectId));
+    return wait(() => runtime.updateLocal(key, value => { localCheck(); return mutator(rowValue(value)); }, storageOwner));
   }
-  const read = async () => { localCheck(); return rowValue(await wait(() => runtime.getLocal(key, subjectId))); };
+  const read = async () => { localCheck(); return rowValue(await wait(() => runtime.getLocal(key, storageOwner))); };
   function serialDraft(action) {
     localCheck();
     const invoke = () => { localCheck(); return action(); };
@@ -224,6 +251,27 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
         return cleared;
       });
     },
+    importVisitor(reference) {
+      const expected=draftRefSchema.parse(reference);
+      return serialDraft(async()=>{
+        if(!account)fail('official_account_session_expired','登录后才能接回这份草稿。');
+        const visitorKey=`community-forum:${endpoint}:visitor`;
+        const source=await wait(()=>runtime.getLocal(visitorKey,'visitor'));
+        const raw=source?.version===1&&source.endpoint===endpoint&&source.ownerId==='visitor'&&source.subjectId===null?source.drafts?.[context]:null;
+        if(!raw||!same(token(raw),expected)||raw.operationId)return {status:'missing',draft:null};
+        const value=draftSchema.parse(raw);let occupied=false;
+        const row=await update(current=>{const prior=current.drafts[context];
+          if(prior&&!same(token(prior),expected)){occupied=true;return current;}
+          current.drafts[context]=clone(value);return current;});
+        if(occupied)return {status:'occupied',draft:clone(value)};
+        await wait(()=>runtime.updateLocal(visitorKey,current=>{
+          if(current?.ownerId==='visitor'&&same(token(current.drafts?.[context]),expected)&&!current.drafts[context].operationId)delete current.drafts[context];
+          return current;
+        },'visitor'));
+        head=token(row.drafts[context]);loaded=true;observed.add(`${value.id}:${value.revision}`);
+        return {status:'imported',draft:clone(row.drafts[context])};
+      });
+    },
   });
 
   function minimal(operation, state, receipt = null) {
@@ -248,7 +296,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
     return receipt;
   }
   async function receipt(operation) {
-    const result = await privateCall('/v2/community/receipt', { operationId: operation.operationId, payloadHash: operation.payloadHash });
+    const result = await privateCall('/v2/community/receipt', { operationId: operation.operationId, payloadHash: operation.payloadHash }, 'POST', operation.payload?.accountId??targetAccountId);
     if (!['absent', 'acknowledged'].includes(result.status) || result.operationId !== operation.operationId || result.payloadHash !== operation.payloadHash)
       fail('forum_receipt_mismatch', '原操作回执未通过核对，请保留原记录。');
     return result;
@@ -272,6 +320,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
       || await wait(() => sha256Hex(operation.payloadJson)) !== operation.payloadHash
       || ['action','objectId','path','visibility'].some(field => spec[field] !== operation[field]))
       fail('forum_operation_conflict', '保存的内容与原发布操作不一致，请保留原稿。');
+    if(account){if(operation.accountId!==account.id)fail('official_account_changed','原提交属于另一个账户。');return false;}
     if (!operation.prepared) return false;
     const intent = operation.prepared.intent;
     const expiresAt = needsPublication(operation.kind) ? operation.payload.publishedUntil : operation.authorizationExpiresAt;
@@ -288,6 +337,15 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   async function send(operation, { reauthorize = false } = {}) {
     try {
       writeCheck(operation.kind === 'resolve' ? 'moderation' : 'assistance'); await activeOperation(operation.operationId);
+      if(account){
+        await originalAuthorization(operation);
+        if(needsPublication(operation.kind)&&operation.payload.publishedUntil<=now())fail('forum_publication_expired','原内容的公开期限已过，草稿仍保留。');
+        operation.businessAttempted=true;await saveActive(operation);
+        await privateCall(operation.path,{payloadJson:operation.payloadJson});
+        const result=await receipt(operation);
+        if(result.status!=='acknowledged')fail('forum_receipt_unknown','正在确认发表结果，请保留原稿。');
+        return complete(operation,result);
+      }
       if (reauthorize) {
         if(operation.prepared)operation.authorizationHistory=[...(operation.authorizationHistory??[]),
           {prepared:operation.prepared,reason:operation.prepared.intent.bindingId===api.snapshot()?.bindingId?'same-binding-signature-renewal':'explicit-current-binding-authorization'}];
@@ -313,7 +371,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
       await activeOperation(operation.operationId);
       // The server creates and consumes the signed Consent in the same forum
       // transaction. A rejected business write cannot leave an unspent grant.
-      await privateCall(operation.path, { signedIntent: operation.prepared.signedIntent, payloadJson: operation.payloadJson });
+      await privateCall(operation.path, { signedIntent: operation.prepared.signedIntent, payloadJson: operation.payloadJson }, 'POST', operation.payload.accountId??targetAccountId);
       const result = await receipt(operation);
       if (result.status !== 'acknowledged') fail('forum_receipt_unknown', '写入结果尚未确认，请查询原操作。');
       return await complete(operation, result);
@@ -325,32 +383,40 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   return Object.freeze({
     check, draft, close() { closed = true; },
     topics: () => publicCall('/v2/community/topics', null, 'GET'),
-    posts: input => publicCall('/v2/community/posts/query', input ?? {}),
-    post: postId => publicCall(`/v2/community/posts/${z.uuid().parse(postId)}`, null, 'GET'),
-    version: (postId, versionId) => publicCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions/${z.uuid().parse(versionId)}`, null, 'GET'),
-    versions: (postId, input = {}) => publicCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions`, input),
-    replies: input => publicCall('/v2/community/replies/query', input),
-    reply: replyId => publicCall(`/v2/community/replies/${z.uuid().parse(replyId)}`, null, 'GET'),
+    posts: input => readerCall('/v2/community/posts/query', input ?? {}),
+    post: postId => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}`, null, 'GET'),
+    version: (postId, versionId) => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions/${z.uuid().parse(versionId)}`, null, 'GET'),
+    versions: (postId, input = {}) => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions`, input),
+    replies: input => readerCall('/v2/community/replies/query', input),
+    reply: replyId => readerCall(`/v2/community/replies/${z.uuid().parse(replyId)}`, null, 'GET'),
+    accessOptions: () => readerCall('/v2/community/access-options',null,'GET'),
+    accounts: (input={}) => readerCall('/v2/community/accounts/query',input),
+    sections: (input={}) => readerCall('/v2/community/sections/query',input),
+    section: sectionId => readerCall(`/v2/community/sections/${z.uuid().parse(sectionId)}`,null,'GET',null),
+    notifications: (input={}) => privateCall('/v2/community/notifications/query',input),
+    readNotification: replyId => privateCall('/v2/community/notifications/read',{replyId:z.uuid().parse(replyId)}),
     owned: (input = {}) => privateCall('/v2/community/posts/owned', input),
-    ownPost: postId => privateCall(`/v2/community/posts/${z.uuid().parse(postId)}/owned`, null, 'GET'),
-    ownReply: replyId => privateCall(`/v2/community/replies/${z.uuid().parse(replyId)}/owned`, null, 'GET'),
-    quotas: () => privateCall('/v2/community/quotas', null, 'GET'),
+    ownPost: postId => privateCall(`/v2/community/posts/${z.uuid().parse(postId)}/owned`, null, 'GET',null),
+    ownReply: replyId => privateCall(`/v2/community/replies/${z.uuid().parse(replyId)}/owned`, null, 'GET',null),
+    quotas: (input={}) => {const query=new URLSearchParams();for(const name of ['postId','replyId','sectionId'])if(input[name])query.set(name,z.uuid().parse(input[name]));return privateCall('/v2/community/quotas'+(query.size?'?'+query:''),null,'GET',query.size?null:targetAccountId);},
     permission: permissionId => privateCall(`/v2/community/permissions/${z.uuid().parse(permissionId)}`, null, 'GET'),
     reportConfig: (input = {}) => privateCall('/v2/community/reports/config', input),
     reports: (input = {}) => privateCall('/v2/community/reports/query', input),
-    report: reportId => privateCall(`/v2/community/reports/${z.uuid().parse(reportId)}`, null, 'GET'),
+    report: reportId => privateCall(`/v2/community/reports/${z.uuid().parse(reportId)}`, null, 'GET',null),
     /** @param {string} kind @param {unknown} input @param {{viewers?: string[], draftRef?: {id: string, revision: number}|null, authorizationExpiresAt?: number}} [options] */
     async prepare(kind, input, { viewers = [], draftRef = null, authorizationExpiresAt = now() + 3600 } = {}) {
       writeCheck(kind === 'resolve' ? 'moderation' : 'assistance');
       // Bind only a new preparation. Retained operations never enter this path.
       // Check the lease around each real digest, including both create-post IDs.
       const scopedCrypto = { subtle: { digest: (algorithm, bytes) => wait(() => globalThis.crypto.subtle.digest(algorithm, bytes)) } };
-      const payload = await wait(() => bindForumIds(kind, subjectId, input, scopedCrypto));
+      const knownAccount=!!input&&typeof input==='object'&&'accountId'in input&&typeof input.accountId==='string'?input.accountId:null;
+      const targeted=!account&&!knownAccount&&targetAccountId?Object.assign({},input,{accountId:targetAccountId}):input;
+      const payload = await wait(() => bindForumIds(kind, accountActor??subjectId, targeted, scopedCrypto));
       const spec = forumWriteSpec(kind, payload);
       const payloadJson = JSON.stringify(payload), payloadHash = await wait(() => sha256Hex(payloadJson));
       const operation = { kind, operationId: payload.operationId, payload, payloadJson, payloadHash,
         action: spec.action, objectId: spec.objectId, path: spec.path, visibility: spec.visibility,
-        viewers: [...new Set(viewers)], authorizationExpiresAt, context, draftRef: draftRef ? draftRefSchema.parse(draftRef) : null };
+        viewers: [...new Set(viewers)], authorizationExpiresAt, context, ...(account?{accountId:account.id}:{}), draftRef: draftRef ? draftRefSchema.parse(draftRef) : null };
       const preview = clone({ kind, payload, visibility: spec.visibility, viewers: operation.viewers, payloadHash });
       previews.set(preview, operation); return preview;
     },
@@ -388,6 +454,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
         // The approved selection owns a fixed binding, body, audience and
         // deadline. Only signature age in that same binding can renew itself.
         const reauthorize = await originalAuthorization(operation);
+        if(account)return send(clone(operation));
         const bindingId=operation.prepared?.intent?.bindingId??operation.authorizationBindingId;
         if(!bindingId||bindingId!==api.snapshot()?.bindingId)
           throw Object.assign(new Error('原许可未成立，请核对原内容后明确使用当前连接继续。'),{
@@ -400,7 +467,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
       return clone({ operationId: operation.operationId, kind: operation.kind, payload: operation.payload,payloadHash:operation.payloadHash,
         expiresAt:needsPublication(operation.kind)?operation.payload.publishedUntil:operation.authorizationExpiresAt??operation.prepared?.intent?.expiresAt??null,
         visibility: operation.visibility, viewers: operation.viewers, originalBindingId: operation.prepared?.intent.bindingId ?? operation.authorizationBindingId ?? null,
-        requiresReauthorization: !operation.prepared
+        requiresReauthorization: account?false:!operation.prepared
           ? !operation.authorizationBindingId||operation.authorizationBindingId!==api.snapshot()?.bindingId
           : operation.prepared.intent.bindingId !== api.snapshot()?.bindingId||operation.prepared.intent.issuedAt < now() - 300 });
     },

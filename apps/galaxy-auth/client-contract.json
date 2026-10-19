@@ -1,6 +1,7 @@
 {
   "clientId": "galaxy-account-entry",
   "name": "银河在线账户入口",
+  "baseUrl": "https://agigalaxy.org/app/account",
   "protocol": "openid-connect",
   "enabled": true,
   "publicClient": true,

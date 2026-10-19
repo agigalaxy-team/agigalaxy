@@ -20,6 +20,10 @@ import { showExactChoice } from './exact-choice.mjs';
 import {readableDialogSelect} from './dialog-reading.mjs';
 import {sourceReadingText} from './source-reading.mjs';
 import {hostReadingPages} from './host-reading-pages.mjs';
+import {createOpenCodeWorkRecorder} from './work-recorder.mjs';
+import {createLocalConversationArchive} from '../../../packages/galaxy-core/src/conversation-archive/index.mjs';
+import {redactLocalWorkData} from '../../../packages/galaxy-core/src/local-data-redaction.mjs';
+import {prepareOpenCodeLocalWork,isOpenCodePreparationDeferred,deferOpenCodePreparation} from './local-preparation.mjs';
 
 const MODULE_LABELS: Record<string, string> = {
   'galaxy-id': '银河 ID 与本地身份卡',
@@ -27,6 +31,24 @@ const MODULE_LABELS: Record<string, string> = {
   'consent-controls': '隐私、披露与授权记录',
   'agent-mcp': 'Agent / MCP 接入',
   'agent-guidance': 'AI 引导与初始化支持',
+};
+const UPLOAD_LEVELS = [
+  {id:'local-only',zh:'仅本地',en:'Local only'},
+  {id:'history-overview',zh:'履历概况',en:'History overview'},
+  {id:'work-content',zh:'工作内容',en:'Work content'},
+  {id:'conversation-archive',zh:'会话归档',en:'Conversation archive'},
+] as const;
+
+type LocalWorkListItem = {workId: string; title: string; summary: string};
+type LocalWorkEnvironment = {version: number; observedAt: string; facts: Record<string, unknown>};
+type LocalWorkObservation = {
+  kind: string;
+  source: {kind: string; messageId?: string};
+  details: Record<string, unknown>;
+  content?: {excerpt: string} | null;
+  occurredAt?: string | null;
+  observedAt: string;
+  exclusions?: {path: string; kind: string}[];
 };
 
 function divider() {
@@ -63,19 +85,22 @@ function compactModules(modules: (string | ModuleEntry)[], language: string) {
   return lines.join('\n');
 }
 
-export function createGalaxyAdapter(connectionController: ConnectionController | null = null, { readCaseSubmission = null, discovery = null, dataDirectory: configuredDirectory, nativeTools = null, readWorkContext = null }: { readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null; discovery?: DiscoverySource | null; dataDirectory?: string; nativeTools?: {call(name:string,args:Record<string,unknown>):Promise<unknown>;openLink?:(url:string)=>Promise<unknown>} | null; readWorkContext?: (()=>Promise<HostWorkContext | null>) | null } = {}) {
+export function createGalaxyAdapter(connectionController: ConnectionController | null = null, { readCaseSubmission = null, discovery = null, dataDirectory: configuredDirectory, nativeTools = null, readWorkContext = null, recordWork = true, readLocalIdentity = undefined, onWorkSessionComplete = undefined,connectionUnavailable=false }: { readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null; discovery?: DiscoverySource | null; dataDirectory?: string; nativeTools?: {call(name:string,args:Record<string,unknown>):Promise<unknown>;openLink?:(url:string)=>Promise<unknown>} | null; readWorkContext?: (()=>Promise<HostWorkContext | null>) | null; recordWork?: boolean; readLocalIdentity?: (directory:string)=>Promise<{id:string}|null>; onWorkSessionComplete?: (input:{host:string;sessionId:string})=>Promise<unknown>;connectionUnavailable?:boolean } = {}) {
 let closed = false, attached = false;
 let disposeHost: Action | null = null;
 let disposeLifecycle: Action | null = null;
+let workRecorder: ReturnType<typeof createOpenCodeWorkRecorder> | null = null;
+let closing: Promise<void> | null = null;
 function close() {
-  if (closed) return;
+  if (closed) return closing ?? Promise.resolve();
   closed = true;
   try { disposeHost?.(); }
   finally {
     disposeHost = null;
     try { connectionController?.disconnect(); }
-    finally { discovery?.close(); disposeLifecycle?.(); disposeLifecycle = null; }
+    finally { discovery?.close(); disposeLifecycle?.(); disposeLifecycle = null; closing = workRecorder?.close() ?? Promise.resolve(); }
   }
+  return closing;
 }
 function requiredController(): ConnectionController {
   if (!connectionController) throw new Error('Galaxy connection runtime unavailable.');
@@ -108,14 +133,19 @@ return {
     ]) as [AdapterCore, typeof import('../../../packages/galaxy-core/src/local-store.mjs'), typeof import('../../../packages/galaxy-core/src/connection-profile.mjs')];
     if (closed) return;
     const dataDirectory = configuredDirectory ?? process.env.GALAXY_DATA_DIR;
+    if (recordWork) workRecorder = createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity: readLocalIdentity, onSessionComplete:onWorkSessionComplete,
+      archive: createLocalConversationArchive({dataDirectory, getIdentity: readLocalIdentity})});
     let discoveryAbort: AbortController | null = null;
     let disposeMenuKeys: Action | null = null;
     let activeLanguage = 'zh-CN';
+    let initializationSubjectType: 'person'|'organization' = 'person';
+    let initializationUploadLevel: typeof UPLOAD_LEVELS[number]['id'] = 'history-overview';
     let connectionGeneration = 0;
     let pageGeneration = 0;
     let visiblePage: number | null = null;
     let pendingConnection: object | null = null;
     let purposeMenu: ReturnType<typeof createPurposeMenu> | null = null;
+    let firstPreparationVisible=false;
 
     function clearMenuKeys() {
       if (disposeMenuKeys) disposeMenuKeys();
@@ -123,6 +153,7 @@ return {
     }
 
     function closeGalaxy() {
+      if(firstPreparationVisible){firstPreparationVisible=false;void deferOpenCodePreparation(dataDirectory).catch(()=>{});}
       connectionGeneration++;
       pageGeneration++;
       discoveryAbort?.abort();
@@ -344,8 +375,8 @@ return {
       showInfo(
         chinese ? 'Galaxy / 隐私条款' : 'Galaxy / Privacy terms',
         chinese
-          ? '本页只读，不修改配置，也不联网。\n仅本地：配置、ID和设备密钥。\n无远程账户、上传、公开Proof或同步。\n匿名发现不发送ID/Case/Context。\n绑定另需端点、Scope、确认、签名。\n受控披露（未启用）：Context Grant\n需可预览、限期、可撤销及远程授权。\n网络贡献（未启用）：需Evidence、\n可见性、撤销、发布门槛；无信誉结论。\n每项授权限定接收方/用途/字段/时限。\n按 Enter 返回隐私选择；Esc 退出。'
-          : 'Read-only page; no writes or network access.\nLocal only: configuration, ID and device-held keys.\nNo remote account, uploads, public Proof or sync.\nAnonymous discovery sends no ID/Case/Context.\nBinding needs endpoint, Scope, confirmation, signature.\nControlled sharing (off): previewable, expiring,\nrevocable Context Grant and remote authorization.\nNetwork contribution (off): Evidence, visibility,\nrevocation and release gates; no reputation claim.\nGrants bound recipient, purpose, fields and expiry.\nEnter returns to privacy; Esc exits.',
+          ? '普通工作会自动积累本地履历，供本人回查与自己的AI整理。程序保存来源、状态及有限片段；不会因此另存全部会话。\n\n仅本地：工作数据不纳入上传。\n履历概况：允许所选履历及主要环境概况。\n工作内容：进一步允许选定工作说明、过程和材料。\n会话归档：完整会话仍需另行明确选入，默认不包含。\n\n默认履历概况。未接入服务时不主动关联或上传；上传不等于公开，公开查询另在在线账户设置。'
+          : 'Ordinary work is recorded locally for your review and your own AI summaries. Sources, state and bounded excerpts are retained; full conversations are not copied by default.\n\nLocal only excludes work data from upload. History overview permits selected history and main environment facts. Work content additionally permits selected process and material. Conversation archive still requires an explicit selection; complete conversations are excluded by default.\n\nHistory overview is preset. There is no connection or upload before connecting a service. Upload and public visibility are separate.',
         () => showInitializationStage(language, 3),
       );
     }
@@ -355,6 +386,8 @@ return {
       const contract = core.getGalaxyInitializationContract({
         language,
         stage: stageNumber,
+        subjectType: initializationSubjectType,
+        uploadPrivacy: {level:initializationUploadLevel},
         hostCapabilities: { nativeSingleSelect: true, nativeConfirm: true },
       });
       const stage = contract.currentStage;
@@ -362,12 +395,11 @@ return {
       const previous = stageNumber === 1 ? showLanguage : () => showInitializationStage(language, stageNumber - 1);
 
       if (stageNumber === 5) {
-        const preview = store.previewGalaxyIntegration({ initializationPath: 'personal-galaxy' });
         const confirmation = chinese ? '确认初始化' : 'Confirm initialization';
         showPrompt({
           title: chinese
-            ? `${contract.header.title} · 阶段 5 / 5\n个人银河 · 仅本地 · 新 Galaxy ID\nL3 推荐：${compactModules(preview.modules, language)}\n保存L3快照/空连接意图；未连接\n无远程账户/上传/Proof发布/同步\n不启动Worker/Hub；请输入“确认初始化”\n“返回”改身份；“取消”退出且不写入。`
-            : `${contract.header.title} · Step 5 / 5\nPersonal Galaxy · local only · new Galaxy ID\nL3 recommended: ${compactModules(preview.modules, language)}\nSave L3 snapshot/empty intentions; not connected.\nNo remote account, uploads, Proof, sync, Worker/Hub.\nType “Confirm initialization” to create locally.\n“back” changes identity; “cancel” exits without writes.`,
+             ? `${contract.header.title} · 阶段 5 / 5\n${initializationSubjectType==='person'?'个人':'组织'}身份 · 本机新 Galaxy ID\n上传档位：${UPLOAD_LEVELS.find(level=>level.id===initializationUploadLevel)?.zh}\n普通工作自动积累本地履历，供本人回查和自己的AI整理；只保留实际取得的事实、来源和有限片段。\n未接入服务，不主动关联或上传。身份类型创建后不可更改。\n请输入“确认初始化”；“返回”修改选择，“取消”退出。`
+             : `${contract.header.title} · Step 5 / 5\n${initializationSubjectType} identity · new local Galaxy ID\nUpload level: ${initializationUploadLevel}\nOrdinary work is recorded locally for your review and your AI summaries. Only actual observations, sources and bounded excerpts are retained.\nNo connection or upload before service connection. Identity type is permanent.\nType “Confirm initialization”; “back” changes choices and “cancel” exits.`,
           placeholder: confirmation,
           onConfirm: async (value) => {
             const input = value.trim();
@@ -376,7 +408,10 @@ return {
                 const initialized = await store.initializeGalaxyIntegration(dataDirectory, {
                   initializationPath: 'personal-galaxy',
                   source: 'opencode-native-tui',
+                   subjectType: initializationSubjectType,
+                   uploadPrivacy: {level:initializationUploadLevel},
                 });
+                 await workRecorder?.refresh();
                 await showConsole(initialized);
               } catch (error) {
                 showInfo(chinese ? '初始化未完成' : 'Initialization did not complete', String(error instanceof Error ? error.message : error), () => showInitializationStage(language, 5));
@@ -411,9 +446,7 @@ return {
           ? '本地准备，未连接；本地发现/Hub未启用'
           : 'Local preparation only; discovery/Hub not enabled.'}`;
       }
-      if (stageNumber === 3) stageTitle = `${stage.title}\n${chinese
-        ? 'Official默认/Hub可选；未连接，仅本地'
-        : 'Official default; Hub optional. Not connected.'}`;
+      if (stageNumber === 3) stageTitle = chinese?'上传隐私\n默认履历概况；未接入不主动关联上传。档位与服务、工作范围及公开查询分别设置。':'Upload privacy\nHistory overview is preset. No connection or upload before connecting a service.';
       const options: Menu['options'] = stageNumber === 2
         ? [{ number: '1', title: chinese ? '采用 L3（已预选）' : 'Use L3 (preselected)', description: chinese ? '继续查看接入与可见性；最终确认前不保存。' : 'Review connection and visibility; nothing is saved before final confirmation.' }]
         : stage.options.map((option, index) => ({
@@ -427,12 +460,20 @@ return {
       const selectable = options.find((option) => !option.disabled);
       if (selectable) routes[selectable.number] = () => showInitializationStage(language, stageNumber + 1);
       if (stageNumber === 3) {
+        options.splice(0,options.length,...UPLOAD_LEVELS.map((level,index)=>({number:String(index+1),title:(chinese?level.zh:level.en)+(level.id===initializationUploadLevel?(chinese?'（已选）':' (selected)'):''),disabled:false})));
+        UPLOAD_LEVELS.forEach((level,index)=>{routes[String(index+1)]=()=>{initializationUploadLevel=level.id;showInitializationStage(language,4);};});
         options.push({
-          number: '4',
+          number: 't',
           title: chinese ? '阅读隐私条款' : 'Read privacy terms',
-          description: chinese ? '查看三个层级的写入、披露与规划边界；返回后仍停在本页。' : 'Review writing, disclosure, and planned boundaries for all three levels; then return here.',
+          description: chinese ? '了解本地记录、四档上传与公开查询的不同用途。' : 'Read about local records, four upload levels and public visibility.',
         });
-        routes[4] = () => showPrivacyTerms(language);
+        routes.t = () => showPrivacyTerms(language);
+      }
+      if(stageNumber===4){
+        stageTitle=chinese?'本机身份类型\n个人是正常客户端默认；Agent主体由独立Worker客户端处理。创建后类型不可更改。':'Local identity type\nPersonal is the normal default. Agent identities use the separate Worker client. Type is permanent.';
+        options.splice(0,options.length,{number:'1',title:chinese?'个人（默认）':'Person (default)'},{number:'2',title:chinese?'组织':'Organization'});
+        routes[1]=()=>{initializationSubjectType='person';showInitializationStage(language,5);};
+        routes[2]=()=>{initializationSubjectType='organization';showInitializationStage(language,5);};
       }
       showSelect({
         title: `${contract.header.title} · ${chinese ? `阶段 ${stageNumber} / 5` : `Step ${stageNumber} / 5`}\n${stageTitle}`,
@@ -1100,13 +1141,15 @@ return {
     function showSettings(onReturn: Action): void {
       const chinese = activeLanguage === 'zh-CN';
       if(nativeTools){
-        const nativeEntry=(kind:'identity'|'methods'|'external'|'projects')=>()=>{
+        const nativeEntry=(kind:'identity'|'methods'|'external'|'projects'):Action=>async()=>{
+          if(kind==='identity'&&workRecorder){try{if(!await workRecorder.history.identity())return showQuickInitialize(nativeEntry(kind));}
+            catch{return showInfo('Galaxy',chinese?'本地身份暂不可读，请在保留资料的情况下恢复原目录。':'The local identity is unavailable. Keep the existing material and restore its location.',()=>showSettings(onReturn));}}
           const version=++connectionGeneration;purposeMenu?.close();
           purposeMenu=createPurposeMenu({nativeTools,controller:connectionController,select:showSelect,prompt:showPrompt,info:showInfo,language:activeLanguage,
             isCurrent:()=>!closed&&version===connectionGeneration,onBack:()=>showSettings(onReturn),onReturnWork:returnToWork,readWorkContext:currentWorkContext});purposeMenu[kind]();
         };
         return showSelect({title:chinese?'Galaxy / 我的与设置':'Galaxy / My settings',options:[
-          {number:'1',title:chinese?'身份与设备':'Identity and devices',description:chinese?'沿用当前 Native 的稳定身份。':'Use the current stable Native identity.'},
+          {number:'1',title:chinese?'身份与设备':'Identity and devices',description:chinese?'当前身份、设备与账户关联。':'Current identity, devices and account links.'},
           {number:'2',title:chinese?'方法':'Methods',description:chinese?'沿用实际工作整理、应用与验证方法。':'Prepare, apply and reverify methods from actual work.'},
           {number:'4',title:chinese?'交给已有服务处理':'Use an existing service',description:chinese?'选择现有工作与必要内容，接续已配置 A2A 服务。':'Select current work and necessary content for a configured A2A service.'},
           {number:'5',title:chinese?'同行与联系':'People and contacts',description:chinese?'从当前方向读项目、发起联系，接续对话。':'Read projects, contact people, and continue the conversation.'},
@@ -1138,16 +1181,119 @@ return {
       });
     }
 
-    async function showQuickInitialize(onReturn: Action) {
-      const status = await store.getGalaxyIntegrationStatus(dataDirectory);
-      if (status.initialized) return showConsole(status);
-      const chinese=activeLanguage==='zh-CN';
-      showSelect({title:chinese?'Galaxy / 在本机准备身份\n保存稳定身份和设备密钥，便于接续工作。连接和外发范围按需另行选择。':'Galaxy / Prepare this device\nSave a stable identity and device-held key. Connection and external sharing are selected when needed.',
-        options:[{number:'1',title:chinese?'创建本机身份':'Create local identity',description:chinese?'使用当前默认配置；保留已有文件。':'Use current defaults and retain existing files.'}],
-        routes:{1:async()=>{try{const initialized=await store.initializeGalaxyIntegration(dataDirectory,{initializationPath:'personal-galaxy',source:'opencode-native-tui'});await showConsole(initialized);}catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}}},onBack:onReturn});
+    async function showLocalWorkHistory(onReturn: Action, after?: string) {
+      const chinese = activeLanguage === 'zh-CN', recorder = workRecorder;
+      if (!recorder) return showInfo('Galaxy', chinese ? '当前入口未取得本机记录位置。请恢复所选配置后重开；已有资料保留。' : 'The local recording location is unavailable. Restore the selected configuration and reopen.', onReturn);
+      await recorder.refresh();
+      try {
+        const page = await recorder.history.list({after, limit: 6});
+        if (closed) return;
+        if (!page.galaxyId) return showQuickInitialize(()=>void showLocalWorkHistory(onReturn,after));
+        const options: MenuOption[] = [], routes: Routes = {};
+        page.items.forEach((work: LocalWorkListItem, index: number) => {
+          const number = String(index + 1);
+          options.push({number, title: work.title, description: work.summary || (chinese ? '已保留工作记录，等待自己的AI整理。' : 'Work recorded; awaiting your AI summary.')});
+          routes[number] = () => void showLocalWorkDetails(work.workId, () => void showLocalWorkHistory(onReturn, after));
+        });
+        if (page.nextAfter) {options.push({number:'n',title:chinese?'下一组工作':'Next group'});routes.n=()=>void showLocalWorkHistory(onReturn,page.nextAfter);}
+        showSelect({title:(chinese?'本地工作履历':'Local work history')+(page.items.length?'':chinese?'\n还没有本地工作记录。保持客户端启用并照常工作即可。':'\nNo local work recorded yet. Continue working with the client active.'), options, routes, onBack:onReturn});
+      } catch {showInfo('Galaxy', chinese ? '本地记录暂不可读，已有资料保留。' : 'Local history is temporarily unavailable; existing material is retained.', onReturn);}
     }
 
-    function purpose(kind: 'search' | 'messages' | 'publish' | 'community' | 'continueWeb', onBack: Action) {
+    async function showLocalWorkDetails(workId: string, onReturn: Action, afterSequence = 0) {
+      const chinese = activeLanguage === 'zh-CN', recorder = workRecorder;
+      if (!recorder) return onReturn();
+      try {
+        const detail = await recorder.history.get({workId,afterSequence,limit:6});
+        if (!detail || closed) return onReturn();
+        const back = () => void showLocalWorkDetails(workId,onReturn,afterSequence);
+        const work = detail.work;
+        const processingLabels:Record<string,string>={'pending':'等待整理','running':'自己的AI正在整理','failed':'整理未完成，原记录保留','model-unavailable':'等待宿主模型可用','idle':'当前材料已整理'};
+        const outcomeLabels:Record<string,string>={'unknown':'尚无明确整体结果','reported-success':'已报告完成（AI归纳）','reported-failure':'已报告未完成（AI归纳）','partial':'部分结果（AI归纳）','cancelled':'已取消（AI归纳）'};
+        const options:MenuOption[]=[{number:'s',title:chinese?'概况与整理':'Overview and summary'},
+          ...(work.host==='opencode'&&api.route?.navigate?[{number:'r',title:chinese?'回到这段工作':'Return to this work'}]:[])];
+        const routes:Routes={s:()=>showReading(work.title,(work.summary||(chinese?'已记录当前可观察材料，尚未形成AI摘要。':'Observed material has been recorded; no AI summary yet.'))
+          +'\n\n'+(chinese?'整理状态：':'Summary state: ')+(chinese?processingLabels[work.processing?.state||'pending']:work.processing?.state||'pending')
+          +'\n'+(chinese?'工作结果：':'Reported outcome: ')+(chinese?outcomeLabels[work.outcome]:work.outcome)
+          +(work.processing?.state==='failed'?'\n\n'+(chinese?'记录已保留，模型恢复后会继续整理。':'Records are retained. Summarization resumes when the model is available.') : ''),back),
+          r:()=>{closeGalaxy();if(work.host==='opencode')api.route?.navigate?.('session',{sessionID:work.sessionId});}};
+        if(detail.environments.length){
+          options.push({number:'e',title:chinese?'主要环境记录':'Observed environment'});
+          routes.e=()=>showReading(chinese?'主要环境记录':'Observed environment',detail.environments.map((item: LocalWorkEnvironment)=>{
+            const facts=item.facts,labels:Record<string,string>=chinese?{host:'宿主',hostVersion:'宿主版本',platform:'系统',architecture:'架构',runtime:'运行环境',runtimeVersion:'运行版本',configuredModel:'宿主配置模型',selectedModel:'会话选用模型',actualModel:'消息报告的实际模型'}:{};
+            return (chinese?'版本 ':'Version ')+item.version+' · '+item.observedAt+'\n'+Object.entries(facts).filter(([key])=>key!=='tools').map(([key,value])=>(labels[key]||key)+'：'+String(value)).join('\n')
+              +(Array.isArray(facts.tools)&&facts.tools.length?'\n'+(chinese?'工具接入：':'Connected tools: ')+facts.tools.join('、'):'');
+          }).join('\n\n'),back);
+        }
+        if(recorder.archive&&work.host==='opencode'){
+          const archive=recorder.archive,settings=await archive.settings(),listed=settings.settings.sessions.some((item:{host:string;sessionId:string})=>item.host===work.host&&item.sessionId===work.sessionId),selected=settings.settings.enabled&&listed;
+          options.push({number:'a',title:selected?(chinese?'停止为这段工作另存完整消息':'Stop saving full messages'):(chinese?'为这段工作保存完整消息':'Save full messages for this work'),description:chinese?'本人私有保存，回读所选会话可取得的消息；排除凭据，不读取附件正文，不因此上传。':'Private copies of available selected messages; credentials excluded, attachment bodies unread, no upload.'});
+          routes.a=async()=>{
+            const sessions=selected?settings.settings.sessions.filter((item:{host:string;sessionId:string})=>item.host!==work.host||item.sessionId!==work.sessionId):listed?settings.settings.sessions:[...settings.settings.sessions,{host:work.host,sessionId:work.sessionId}];
+            await archive.configure({galaxyId:work.galaxyId,enabled:sessions.length>0,sessions,autoCleanAfterDays:settings.settings.autoCleanAfterDays});
+            if(!selected){
+              const result=await recorder.backfillArchive({galaxyId:work.galaxyId,host:work.host,sessionId:work.sessionId});
+              if(result.state!=='copied')return showInfo(chinese?'已保留保存选择':'Selection saved',chinese?'当前未能回读历史消息。已保留记录不受影响；之后可取得的新消息仍按所选范围保存。':'Earlier messages could not be read now. Retained observations remain available; future messages follow this selection.',back);
+            }
+            await recorder.refresh();back();
+          };
+        }
+        const labels:Record<string,string>=chinese?{'user-statement':'用户陈述','model-report':'模型报告','host-event':'宿主事件','tool-report':'工具回报','external-material':'材料引用'}:{};
+        detail.observations.forEach((observation: LocalWorkObservation,index: number)=>{
+          const number=String(index+1), source=observation.source;
+          const eventLabels:Record<string,string>=chinese?{user:'我的话',assistant:'AI回复',idle:'回合结束',busy:'处理中',completed:'工具完成',running:'工具运行中',error:'工具未完成',message:'消息',tool:'工具',session:'会话',artifact:'材料',gap:'来源变化'}:{};
+          const detailName=String(observation.details.tool||observation.details.status||observation.details.role||observation.kind);
+          options.push({number,title:observation.details.tool?detailName:(eventLabels[detailName]||detailName),description:observation.content?.excerpt?.slice(0,100)||observation.occurredAt||observation.observedAt});
+          routes[number]=()=>{
+            const sourceBack=()=>back();
+            showSelect({title:chinese?'过程与来源':'Process and source',options:[
+              {number:'1',title:chinese?'阅读已保留内容':'Read retained material'},
+              ...(source.messageId&&work.host==='opencode'?[{number:'2',title:chinese?'回查宿主中的消息原文':'Read the original host message'}]:[])],routes:{
+              1:()=>showReading(chinese?'已保留记录':'Retained observation',(observation.content?.excerpt||(chinese?'此项只记录来源与状态，没有保存正文。':'Only source and status were retained.'))
+                +'\n\n'+(chinese?'来源：':'Source: ')+(labels[source.kind]||source.kind)+'\n'+(chinese?'时间：':'Observed at: ')+observation.observedAt
+                +(observation.exclusions?.length?'\n'+(chinese?'含已排除材料，仅保留排除位置和类别。':'Excluded material is recorded by location and category only.') : ''),sourceBack),
+              2:async()=>{
+                try {
+                  if(!source.messageId)throw Error('host_original_unavailable');
+                  const response = api.client?.session?.message ? await api.client.session.message({sessionID:work.sessionId,messageID:source.messageId}) as {data?:{parts?:{type:string;text?:string;state?:{output?:string;error?:string}}[]};error?:unknown} : null;
+                  const original=response?.data?.parts;
+                  if(response?.error||!original)throw Error('host_original_unavailable');
+                  const text=original.map(part=>part.type==='text'?part.text:part.type==='tool'?part.state?.output||part.state?.error:'').filter(Boolean).join('\n\n');
+                  if(!text)throw Error('host_original_unavailable');
+                  const protectedText=redactLocalWorkData(text);
+                  showReading(chinese?'宿主当前可读的消息正文':'Currently readable host message',protectedText.value
+                    +(protectedText.exclusions.length?'\n\n'+(chinese?'凭据已排除；此处为宿主当前可取得的正文，不保证宿主长期保留。':'Credentials excluded. This is currently available host text; long-term host retention is not guaranteed.') : ''),sourceBack);
+                } catch {showInfo(chinese?'原文暂不可取得':'Original unavailable',chinese?'宿主已不再提供这条消息，或当前接口不支持回查。已保留片段仍可阅读；片段不等于永久保存的全文。':'The host no longer provides this message, or cannot read it here. Retained excerpts remain available and are not a permanent full copy.',sourceBack);}
+              }},onBack:sourceBack});
+          };
+        });
+        if(detail.nextAfter!==null){options.push({number:'n',title:chinese?'后续过程记录':'More observations'});routes.n=()=>void showLocalWorkDetails(workId,onReturn,detail.nextAfter);}
+        showSelect({title:work.title,options,routes,onBack:onReturn});
+      }catch{showInfo('Galaxy',chinese?'这段本地工作暂不可读，已有资料保留。':'This local work is temporarily unavailable.',onReturn);}
+    }
+
+    async function showQuickInitialize(onReturn: Action,firstStart=false):Promise<unknown> {
+      const owner=await workRecorder?.history.identity();
+      const snapshot=await store.getLocalSnapshot(dataDirectory);
+      if(owner||snapshot.identity){firstPreparationVisible=false;await workRecorder?.refresh();return onReturn();}
+      const chinese=activeLanguage==='zh-CN';
+      if(snapshot.recoveryRequired)return showInfo(chinese?'本地资料需要恢复':'Local recovery needed',chinese?'上次本机准备尚未完成。请保留现有资料，恢复后再开始记录。':'The previous preparation was interrupted. Keep existing material and recover before recording.',onReturn);
+      const initialize=async(subjectType:'person'|'organization')=>{try{
+        // A real TUI start choice is sufficient for this local-only operation.
+        // No browser approval or account association repeats the same decision.
+        if(!await workRecorder?.history.identity())await prepareOpenCodeLocalWork(dataDirectory,{subjectType});
+        firstPreparationVisible=false;await workRecorder?.refresh();onReturn();
+      }catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}};
+      firstPreparationVisible=firstStart;
+      const later=async()=>{firstPreparationVisible=false;await deferOpenCodePreparation(dataDirectory).catch(()=>{});closeGalaxy();};
+      showSelect({title:chinese?'开始使用银河\n普通工作会自动记录到本机，供本人回看与自己的 AI 整理；保留事实、来源和有限片段，默认不另存全部会话。\n上传预设“履历概况”，接入在线服务前不关联、不上传。沿用已有身份；新身份默认为个人，类型创建后不可更改。':'Start using Galaxy\nOrdinary work is recorded on this device for your review and AI summaries. Facts, sources and bounded excerpts are retained; full conversations are not copied by default.\nUpload is preset to history overview, with no connection or upload before choosing a service. Existing identity is reused; new identities are personal by default and their type is permanent.',
+        options:[{number:'1',title:chinese?'同意并开始':'Agree and start'},{number:'2',title:chinese?'用于组织':'Use for an organization'},{number:'3',title:chinese?'以后再说':'Not now'}],
+        routes:{1:()=>initialize('person'),2:()=>initialize('organization'),3:later},onBack:firstStart?later:onReturn,onEscape:later});
+    }
+
+    async function purpose(kind: 'search' | 'messages' | 'publish' | 'community' | 'continueWeb', onBack: Action):Promise<unknown> {
+      if(nativeTools&&workRecorder&&['messages','publish','continueWeb'].includes(kind)){try{if(!await workRecorder.history.identity())return showQuickInitialize(()=>void purpose(kind,onBack));}
+        catch{return showInfo('Galaxy',activeLanguage==='zh-CN'?'本地身份暂不可读，请先恢复原资料位置。':'The local identity is unavailable. Restore its existing location first.',onBack);}}
       const version=++connectionGeneration;
       purposeMenu?.close();
       if(!nativeTools&&kind==='search'&&!connectionController?.querySearch){
@@ -1171,6 +1317,7 @@ return {
           { number: '3', title: chinese ? '消息' : 'Messages', description: chinese ? '查看对话，做必要回复。' : 'Read conversations and reply when needed.' },
           ...(nativeTools ? [{ number: '6', title: chinese ? '逛社区' : 'Browse community', description: chinese ? '按主题阅读讨论，保留原工作。' : 'Browse discussions by topic and retain your original work.' }] : []),
           ...(nativeTools ? [{ number: '7', title: chinese ? '接着网页里的事情' : 'Continue the selected web content', description: chinese ? '沿用网页选择的材料和当前目的。' : 'Use the selected web material and current purpose.' }] : []),
+          {number:'8',title:chinese?'本地工作履历':'Local work history',description:chinese?'查看自动记录的工作、过程、摘要与来源。':'Read recorded work, summaries and sources.'},
           { number: '4', title: chinese ? '我的与设置' : 'My settings', description: chinese ? '身份、连接、资料和显示偏好。' : 'Identity, connection, data and display preferences.' },
           { number: '5', title: chinese ? '回到原工作' : 'Return to original work', description: '' },
         ],
@@ -1182,6 +1329,7 @@ return {
           5: closeGalaxy,
           6: () => purpose('community',reopen),
           7: () => purpose('continueWeb',reopen),
+          8: () => void showLocalWorkHistory(reopen),
           0: closeGalaxy,
         },
         onBack: closeGalaxy,
@@ -1223,6 +1371,14 @@ return {
       }],
     });
     disposeHost = () => { closeGalaxy(); disposeRoot(); };
+    if(connectionUnavailable)api.ui.toast?.({variant:'warning',title:'银河 · 在线连接暂不可用',message:'本地记录可以继续使用。需要在线服务时，请在设置中恢复原连接。'});
+    // Installation normally prepared the identity already. An older/manual
+    // install with no identity gets one actual agreement here, not a menu hunt.
+    if(recordWork&&nativeTools&&workRecorder){
+      await workRecorder.ready;
+      try{if(!closed&&!await workRecorder.history.identity()&&!await isOpenCodePreparationDeferred(dataDirectory))await showQuickInitialize(closeGalaxy,true);}
+      catch{api.ui.toast?.({variant:'warning',title:'银河 · 本地资料暂不可读',message:'已有资料保留。可在设置中恢复原资料位置后继续。'});}
+    }
     } catch (error) { close(); throw error; }
   },
 };

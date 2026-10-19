@@ -4,6 +4,7 @@ import { request as httpRequest } from 'node:http';
 import { once } from 'node:events';
 import { createApi } from '../src/http.mjs';
 import { clientAddressReader, fixedWindowLimiter } from '../src/adapters/http/policy.mjs';
+import { createBrowserClient } from '../src/browser-client.mjs';
 
 async function fixture(options, run) {
   const server = createApi({ bindings: { endpoint: 'https://galaxy.example' }, ...options });
@@ -21,6 +22,32 @@ async function fixture(options, run) {
   });
   try { await run(send); } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
+
+test('known forum objects carry one exact quota locator through browser and real HTTP without opening other queries', async () => {
+  const id = '11111111-2222-4333-8444-555555555555', calls = [];
+  await fixture({ access: { authenticate: async () => ({ subjectId: 'fixture' }) },
+    forum: { budget: { status: async (_actor, input) => { calls.push(input); return input; } } } }, async send => {
+    for (const key of ['postId', 'replyId', 'sectionId']) {
+      const response = await send(`/v2/community/quotas?${key}=${id}`, { headers: { authorization: 'Bearer synthetic' } });
+      assert.equal(response.status, 200); assert.deepEqual(response.body, { [key]: id });
+    }
+    for (const query of [`postId=${id}&replyId=${id}`, `postId=${id}&postId=${id}`, 'postId=invalid', `other=${id}`])
+      assert.equal((await send('/v2/community/quotas?' + query)).status, 400);
+    assert.equal((await send('/v2/community/posts?postId=' + id)).status, 400);
+    assert.equal(calls.length, 3);
+  });
+  const sent = [], client = createBrowserClient({ endpoint: 'https://galaxy.example', trustedKeys: new Map([['fixture', {}]]), sign: async () => '',
+    fetch: async url => { sent.push(url); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); } });
+  try {
+    for (const key of ['postId', 'replyId', 'sectionId'])
+      await client.call(`/v2/community/quotas?${key}=${id}`, null, { method: 'GET', authenticated: false });
+    for (const path of [`/v2/community/quotas?postId=${id}&replyId=${id}`, '/v2/community/quotas?postId=invalid', `/v2/community/posts?postId=${id}`]) {
+      await assert.rejects(client.call(path, null, { method: 'GET', authenticated: false }), /Invalid API path/);
+      await assert.rejects(client.send('https://galaxy.example' + path, { method: 'GET' }), /Invalid browser API target/);
+    }
+    assert.equal(sent.length, 3);
+  } finally { client.close(); }
+});
 
 test('HTTP forwarded addresses require a trusted socket and stop at the first untrusted hop', async () => {
   const read = clientAddressReader(['127.0.0.1', '::1']);

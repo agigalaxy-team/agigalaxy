@@ -9,8 +9,8 @@ export async function readExportView(services, db, actor, selection, authorizati
   let view;
   try {
     switch (selection.kind) {
-      case 'forum-post-version':view=await services.forum.readVersionWithin(db,selection.id,selection.versionId);break;
-      case 'forum-reply':view=await services.forum.readReplyWithin(db,selection.id);break;
+      case 'forum-post-version':view=await services.forum.readVersionWithin(db,selection.id,selection.versionId,{actor});break;
+      case 'forum-reply':view=await services.forum.readReplyWithin(db,selection.id,{actor});break;
       case 'choice-snapshot':view=await services.choices.getWithin(db,actor,selection.id);break;
       case 'recruitment': view = await services.recruitment.readWithin(db, actor, selection.id); break;
       case 'project': view = await services.projects.readWithin(db, actor, selection.id); break;

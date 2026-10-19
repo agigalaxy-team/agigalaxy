@@ -4,11 +4,11 @@ import { lifecyclePolicyVersion } from '../infrastructure/lifecycle-registry-v2.
 import {prepareForumDeletionWithin,minimizeForumDeletionWithin} from './community-forum-retention-v1.mjs';
 
 const iso = seconds => new Date(seconds * 1000).toISOString();
-export async function recordContentErasure(db, { table, key, subjectId, originalHash = null, requestId = null,
+export async function recordContentErasure(db, { table, key, subjectId, accountId=null, originalHash = null, requestId = null,
   at, retainedUntil, reason = 'subject-deletion' }) {
-  await db.query(`INSERT INTO lifecycle_erasure_records(id,table_name,object_key,subject_id,reason,policy_version,original_payload_hash,request_id,erased_at,retained_until)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(table_name,object_key) DO NOTHING`,
-  [randomUUID(), table, key, subjectId, reason, lifecyclePolicyVersion, originalHash, requestId, iso(at), iso(retainedUntil)]);
+  await db.query(`INSERT INTO lifecycle_erasure_records(id,table_name,object_key,subject_id,reason,policy_version,original_payload_hash,request_id,erased_at,retained_until,account_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(table_name,object_key) DO NOTHING`,
+  [randomUUID(), table, key, subjectId??null, reason, lifecyclePolicyVersion, originalHash, requestId, iso(at), iso(retainedUntil),accountId]);
 }
 
 // Remove only system-maintained copies of selected authors/events. Independent

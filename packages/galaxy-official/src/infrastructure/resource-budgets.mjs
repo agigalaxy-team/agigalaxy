@@ -21,6 +21,11 @@ const bytesSql=budgetPayloadTables.map(table=>`SELECT coalesce(sum(octet_length(
 // fields; counting null-to-value JSON growth afterwards could cause a false
 // rollback after a remote message had already been accepted.
 const productBytesSql = [
+  "SELECT coalesce(sum(coalesce(octet_length(data::text),0)+octet_length(work_id)+1024),0)::bigint AS bytes FROM account_work_v1 WHERE origin_subject_id=$1",
+  "SELECT coalesce(sum(octet_length(work_id)+512),0)::bigint AS bytes FROM account_work_scopes_v1 WHERE origin_subject_id=$1",
+  "SELECT coalesce(sum(octet_length(receipt::text)+octet_length(work_id)+1024),0)::bigint AS bytes FROM account_work_operations_v1 WHERE origin_subject_id=$1",
+  "SELECT coalesce(sum(byte_length+octet_length(title)+octet_length(selection::text)+1024),0)::bigint AS bytes FROM private_conversation_archives_v1 WHERE origin_subject_id=$1",
+  "SELECT (count(*)*512)::bigint AS bytes FROM private_conversation_deletions_v1 WHERE origin_subject_id=$1",
   "SELECT coalesce(sum(octet_length(purpose)+1024),0)::bigint AS bytes FROM watch_controls_v2 WHERE subject_id=$1",
   "SELECT coalesce(sum(octet_length(result::text)+512),0)::bigint AS bytes FROM watch_control_operations_v2 WHERE subject_id=$1",
   "SELECT coalesce(sum(octet_length(member_ids::text)+1024),0)::bigint AS bytes FROM identity_groups_v2 WHERE subject_id=$1",

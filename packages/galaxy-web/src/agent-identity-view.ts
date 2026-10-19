@@ -1,6 +1,7 @@
 import {createAgentIdentityHandoff,readAgentIdentityEntry} from './agent-identity-handoff.mjs';
 import type {createWebRuntime} from './runtime.mjs';
 import type {AgentConnectionContext} from './agent-identity-presentation';
+import {rememberLocalGalaxyWindow} from './local-galaxy-window.mjs';
 
 export type AgentIdentityRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 export type AgentIdentityEntry=NonNullable<ReturnType<typeof readAgentIdentityEntry>>;
@@ -49,13 +50,19 @@ export function createAgentIdentityView(runtime:AgentIdentityRuntime|null,entry:
    onConnected:async(result?:ConnectedIdentity)=>{
     if(!valid()||!result)return;
     try{
-     const lease=runtime.receiptStatus.captureLease();checkCompleted(result,lease);completed={result,lease};
+     const lease=runtime.receiptStatus.captureLease();checkCompleted(result,lease);completed={result,lease};rememberLocalGalaxyWindow(entry);
      await callbacks.onChange();if(!valid())return;checkCompleted(result,lease);
      const original=new URL(result.targetPath,location.origin);
      const candidate=original.pathname==='/app/publish'?await runtime.visitorDrafts.preview():null;
      if(!valid())return;checkCompleted(result,lease);
      if(candidate){
       if(candidate.subjectId!==result.subjectId)throw Object.assign(new Error(),{code:'agent_handoff_browser_identity_changed'});
+      if(!candidate.existingDraft){
+       const adopted=await runtime.visitorDrafts.adopt(candidate,{confirmed:true});
+       if(!valid())return;checkCompleted(result,lease);
+       if(adopted.currentIdentityChanged)throw Object.assign(new Error(),{code:'agent_handoff_browser_identity_changed'});
+       callbacks.navigate(result.targetPath);return;
+      }
       publish({draft:{...result,preview:candidate,lease}});return;
      }
      callbacks.navigate(result.targetPath);

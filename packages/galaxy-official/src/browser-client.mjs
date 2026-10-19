@@ -5,6 +5,8 @@ import { assertConsentPolicy } from './domain/consent-policy.mjs';
 
 export const browserScopes = Object.freeze(['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'history', 'assistance', 'context', 'notifications', 'moderation', 'capsules', 'builders', 'audit', 'data-export', 'data-delete']);
 const recruitmentReceiptPath = /^\/v2\/recruitment\/[0-9a-f-]{36}\/receipt\?operationId=[0-9a-f-]{36}&payloadHash=[a-f0-9]{64}$/;
+const forumQuotaPath = /^\/v2\/community\/quotas\?(?:postId|replyId|sectionId)=[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const allowedReadQuery = (path, method) => method === 'GET' && (recruitmentReceiptPath.test(path) || forumQuotaPath.test(path));
 
 // The deploy-time public configuration supplies the authority and pins. Neither
 // a URL parameter nor a model response can select a credential destination.
@@ -21,24 +23,27 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
   if (origin.protocol !== 'https:' || origin.origin !== endpoint || origin.username || origin.password
     || !(trustedKeys instanceof Map) || !trustedKeys.size || typeof sign !== 'function') throw new Error('Invalid browser authority configuration.');
   let session = null, generation = 0, closed = false, connectionController, establishedBinding = null;
-  async function send(url, { bodyJson, method = 'POST', signal, credential } = {}) {
+  async function send(url, { bodyJson, method = 'POST', signal, credential, accountId } = {}) {
     const target = new URL(url);
     if (closed || target.origin !== endpoint || target.username || target.password || target.hash
-      || target.search && !(method === 'GET' && recruitmentReceiptPath.test(target.pathname + target.search)))
+      || target.search && !allowedReadQuery(target.pathname + target.search, method))
       throw new Error('Invalid browser API target.');
+    if (accountId !== undefined && (typeof accountId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(accountId)))
+      throw new Error('Invalid account target.');
     const deadline = AbortSignal.timeout(30000), operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     let response;
     try {
       response = await fetcher(target.href, { method, body: bodyJson, signal: operationSignal, redirect: 'error', credentials: 'omit', cache: 'no-store',
       referrerPolicy: 'no-referrer', headers: { Accept: 'application/json', ...(bodyJson === undefined ? {} : { 'Content-Type': 'application/json' }),
-        ...(credential ? { Authorization: `Bearer ${credential}` } : {}) } });
+        ...(credential ? { Authorization: `Bearer ${credential}`, ...(accountId ? {'X-Galaxy-Account-ID':accountId} : {}) } : {}) } });
     } catch (error) {
       if (error?.name === 'TimeoutError') throw Object.assign(new Error('request_timeout'), { code: 'request_timeout', cause: error });
       throw error;
     }
-    if (Number(response.headers.get('content-length')) > 1048576) throw new Error('API response too large.');
+    const maximumResponse = target.pathname === '/v2/account-archives/export' ? 2097152 : 1048576;
+    if (Number(response.headers.get('content-length')) > maximumResponse) throw new Error('API response too large.');
     const text = await response.text();
-    if (new TextEncoder().encode(text).length > 1048576) throw new Error('API response too large.');
+    if (new TextEncoder().encode(text).length > maximumResponse) throw new Error('API response too large.');
     let result; try { result = JSON.parse(text); } catch { throw new Error('API returned an invalid response.'); }
     if (!response.ok) {
       const code = typeof result?.error === 'string' && /^[a-z0-9_:-]{1,100}$/.test(result.error) ? result.error : 'request_failed';
@@ -68,12 +73,12 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
     if (!session || session.expiresAt <= now()) { session = null; return null; }
     const { credential: _credential, ...publicState } = session; return { ...publicState, generation, scopes: [...publicState.scopes] };
   }
-  async function call(path, input, { method = 'POST', authenticated = true, signal } = {}) {
-    if (!/^\/(v[12]\/|\.well-known\/)/.test(path) || path.includes('?') && !(method === 'GET' && recruitmentReceiptPath.test(path)) || path.includes('#')) throw new Error('Invalid API path.');
+  async function call(path, input, { method = 'POST', authenticated = true, signal, accountId } = {}) {
+    if (!/^\/(v[12]\/|\.well-known\/)/.test(path) || path.includes('?') && !allowedReadQuery(path, method) || path.includes('#')) throw new Error('Invalid API path.');
     const current = session, lease = generation;
     if (authenticated && !snapshot()) throw Object.assign(new Error('connection_required'), { code: 'connection_required' });
     const result = await send(endpoint + path, { bodyJson: method === 'GET' ? undefined : JSON.stringify(input), method, signal,
-      credential: authenticated ? current.credential : undefined });
+      credential: authenticated ? current.credential : undefined, accountId: authenticated ? accountId : undefined });
     if (lease !== generation || authenticated && (session !== current || !snapshot())) throw new Error('Authorization changed during request.');
     return result;
   }

@@ -8,6 +8,7 @@ import { WorkerPackUseServiceV2 } from './worker-pack-uses-v2.mjs';
 import { IdentityLinkService } from './identity-links.mjs';
 import {IdentityGroupServiceV2} from './identity-group-v2.mjs';
 import {createIdentityGroupSourceReader} from './identity-group-source-v2.mjs';
+import {AccountWorkService} from './account-work.mjs';
 import { CommunityAccountRegistry } from './community-accounts.mjs';
 import { PublicWriteService } from './public-writes.mjs';
 import { IdentityControlService } from './identity-control.mjs';
@@ -82,7 +83,7 @@ import {postHubPeeringJson} from './public-fetch.mjs';
 import { verifyEnvelope } from './signed-envelope.mjs';
 
 export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
-  now = () => Math.floor(Date.now() / 1000), operator, region, manifestProfile = {}, resourceBudgetPolicy, communityPolicy, forumPolicy, incident=null, identityProviders = [], officialAccounts = null, chatTransport = null, attachmentConfiguration=null, experienceReviewers = [],
+  now = () => Math.floor(Date.now() / 1000), operator, region, manifestProfile = {}, resourceBudgetPolicy, communityPolicy, forumPolicy, incident=null, identityProviders = [], officialAccounts = null, externalCredentials = null, chatTransport = null, attachmentConfiguration=null, experienceReviewers = [],
   allowedScopes = ['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'history', 'assistance', 'context', 'notifications', 'moderation', 'capsules', 'builders', 'audit', 'audit-review', 'data-export', 'data-delete'],
   capabilities = ['binding', 'sessions', 'docs-mcp'], auditReaderIds = [], auditReviewerIds = [], qualificationPolicies = [], moderatorIds = [], honorRules = [], builderAssessorIds = [], conformanceSuitePins = [], consentPolicy, repositories = {}, evidenceSource = githubEvidenceSource, retirement = createRetirementController(null, { endpoint, now }) }) {
   const signing = { endpoint, signingKey, kid, trustedKeys, now };
@@ -97,8 +98,10 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const access = new AccessService({ db, endpoint, now, trustedKeys, sign: sessionSigner.sign, resourceBudgetPolicy });
   const consents = new ConsentService(access, { additionalPolicy: consentPolicy });
   const communityAccounts = new CommunityAccountRegistry(access, identityProviders);
+  const accountWork=new AccountWorkService(access,{accounts:communityAccounts});
   const publicWrites = new PublicWriteService(access, communityAccounts, communityPolicy);
   const forum = new CommunityForumV1(access,consents,{accounts:communityAccounts,publicWrites,policy:forumPolicy});
+  forum.accessRules.externalCredentials=externalCredentials;
   const forumGovernance = new CommunityForumGovernanceV1(access,consents,forum,{accounts:communityAccounts,moderatorIds});
   const profiles=new ProfileService(access,consents);
   const evidence = new EvidenceService(access, consents, { source: evidenceSource, lockEvidenceWrite: repositories.lockEvidenceWrite });
@@ -134,6 +137,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const contributionSharing = new ContributionSharingV2Service(access, consents,{taskMaterials});
   const honor = new HonorService(access, assistance, proofs, honorRules);
   honor.v2 = new HonorV2Service(honor, { qualification: qualification.v2, sharing: contributionSharing, ciV2 });
+  forum.accessRules.honor=honor.v2;
   const requesterHistoryV2 = new RequesterHistoryV2Service(access, assistance, contributionSharing);
   const context = new ContextService(access, consents, assistance);
   const contextV2 = new ContextServiceV2(access, consents, assistance);
@@ -199,7 +203,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   inbox.informationWatches=informationWatches;
   const contacts = new ContactV2Service(access, { consents, discovery: discovery.v2, inbox, publicWrites,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor), createRoomWithin: createChatContactAdapter(chat) });
-  return { officialAccounts,readingBookmarks,taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
+  return { officialAccounts,externalCredentials,accountWork,readingBookmarks,taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
     identity: new IdentityLinkService(access, identityProviders, { accountRegistry: communityAccounts }), communityAccounts, publicWrites, verificationRecords, chat,
     receiptStatus,watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
     proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { forum,forumGovernance, choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),

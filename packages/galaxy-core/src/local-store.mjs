@@ -2,6 +2,9 @@
 export { DEFAULT_DATA_DIR } from './storage/files.mjs';
 export { resolveDataDir } from './storage/files.mjs';
 export { initializeLocalGalaxyId } from './application/local-operations.mjs';
+export { initializeLocalWorkerGalaxyId } from './application/local-operations.mjs';
+export { getLocalUploadPrivacy, setLocalUploadPrivacy } from './application/local-operations.mjs';
+export { DEFAULT_UPLOAD_PRIVACY_LEVEL, listUploadPrivacyLevels, normalizeUploadPrivacy, allowedUploadDataTypes, allowsUploadDataType, projectWorkHistoryForUpload, projectConversationForUpload, assertNativeUploadAllowed } from './upload-privacy.mjs';
 export { getLocalSnapshot } from './application/local-operations.mjs';
 export { initializeLocalNode } from './application/local-operations.mjs';
 export { previewGalaxyIntegration } from './application/local-operations.mjs';

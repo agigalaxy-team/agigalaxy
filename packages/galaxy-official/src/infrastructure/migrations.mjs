@@ -1,6 +1,12 @@
+import {externalCredentialsV1MigrationSql} from './external-credentials-v1-schema.mjs';
+import {accountWorkV1MigrationSql} from './account-work-v1-schema.mjs';
 import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
 import {communityForumTopicsV1MigrationSql} from './community-forum-topics-v1-schema.mjs';
 import {readingBookmarksV1MigrationSql} from './reading-bookmarks-v1-schema.mjs';
+import {forumAccountActorsV2MigrationSql} from './forum-account-actors-v2-schema.mjs';
+import {officialAccountDataV1MigrationSql} from './official-account-data-v1-schema.mjs';
+import {communityForumAccessV2MigrationSql} from './community-forum-access-v2-schema.mjs';
+import {communityForumAccountGovernanceV2MigrationSql} from './community-forum-account-governance-v2-schema.mjs';
 import {taskMaterialV1MigrationSql} from './task-material-v1-schema.mjs';
 import {chatDirectoryMigrationSql} from './chat-directory-schema-v2.mjs';
 import { searchIndexMigrationSql } from './search-index-schema-v1.mjs';
@@ -536,7 +542,13 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
   {version:79,sql:communityForumV1MigrationSql},{version:80,sql:taskMaterialV1MigrationSql},
   {version:81,sql:chatDirectoryMigrationSql},
   {version:82,sql:communityForumTopicsV1MigrationSql},
-  {version:83,sql:readingBookmarksV1MigrationSql});
+  {version:83,sql:readingBookmarksV1MigrationSql},
+  {version:84,sql:forumAccountActorsV2MigrationSql},
+  {version:85,sql:officialAccountDataV1MigrationSql},
+  {version:86,sql:communityForumAccessV2MigrationSql},
+  {version:87,sql:communityForumAccountGovernanceV2MigrationSql},
+  {version:88,sql:externalCredentialsV1MigrationSql},
+  {version:89,sql:accountWorkV1MigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

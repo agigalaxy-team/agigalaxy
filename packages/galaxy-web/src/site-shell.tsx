@@ -1,5 +1,5 @@
 import React,{lazy,Suspense,useEffect} from 'react';
-import {Bell,BriefcaseBusiness,Compass,Home,MessageCircle,MessagesSquare,Orbit,Plus,Search,UserRound} from 'lucide-react';
+import {Bell,BriefcaseBusiness,Compass,Home,MessageCircle,MessagesSquare,Plus,Search,UserRound} from 'lucide-react';
 import {CommunityLayout} from './community-navigation';
 import {PublicBrowseWorkspace} from './public-browse-workspace';
 import {ReadingDetails,ReadingSummary} from './reading-details';
@@ -47,10 +47,10 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
  const current=(target:string)=>target==='/app/'?!inWork&&(path==='/app'||path==='/app/'||/^\/app\/(participate|tasks|capsules|projects|find|search|match)(\/|$)/.test(path))
   :target==='/app/work'?inWork
   :target==='/app/rooms'?messages
-  :target==='/app/account'?settings||publicPage&&workspaceLocation(path)==='账户'
+   :target==='/app/account'?settings||path.startsWith('/app/accounts/')||publicPage&&workspaceLocation(path)==='账户'
   :path===target||path.startsWith(target+'/');
  const link=(target:string,label:string)=><a key={target} href={target} aria-current={current(target)?'page':undefined} onClick={event=>follow(event,target)}>{label}</a>;
- const accountLinks=connected?[['/app/account','账户概览'],['/app/account?section=access','接入与 AI'],['/app/bookmarks','我的收藏'],['/app/history','经历与贡献'],['/app/community?section=owned','我的帖子'],['/app/community?section=reports','内容处理记录'],['/app/settings/identity','身份与设备']]:[['/app/account','账户概览'],['/app/account?section=access','身份与接入'],['/app/bookmarks','我的收藏']];
+  const accountLinks=[['/app/account','账户概览'],['/app/account?section=settings','在线账户资料'],['/app/community?section=owned','我的帖子'],['/app/bookmarks','我的收藏'],['/app/account?section=access','接入与 AI'],...(subjectId?[['/app/history','经历与贡献'],['/app/community?section=reports','内容处理记录'],['/app/settings/identity','身份与设备']]:[])];
  const searchContents=(event:React.SubmitEvent<HTMLFormElement>)=>{
   event.preventDefault();const value=new FormData(event.currentTarget).get('q'),query=typeof value==='string'?value.trim():'';
   if(community){const params=new URLSearchParams(search);for(const key of ['compose','manage','section','before','cursor'])params.delete(key);if(query)params.set('q',query);else params.delete('q');const encoded=params.toString();go('/app/community'+(encoded?'?'+encoded:''));}
@@ -82,5 +82,5 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
   <main id="main-content" className={'workspace-main site-content'+(settings?' settings-page':'')+(community?' community-page':'')+(messages?' messages-shell-page':'')+(publicPage?' public-content':'')} tabIndex={-1}>{community?<CommunityLayout path={path} search={search} navigate={navigate}>{children}</CommunityLayout>:settings?<Suspense fallback={<PageLoading label="正在打开账户与设置…"/>}><SettingsLayout path={path} search={search} subjectId={subjectId} navigate={navigate}>{children}</SettingsLayout></Suspense>:children}</main>
  </div>;
 }
-export function PageLoading({label='正在读取当前资料…'}:{label?:string}){return <div className="page-loading"><output className="loading-label"><Orbit size={19}/><span>{label}</span></output><div className="skeleton skeleton-title"/><div className="skeleton skeleton-line"/><div className="skeleton skeleton-line short"/><div className="skeleton-pair"><div className="skeleton skeleton-card"/><div className="skeleton skeleton-card"/></div></div>;}
+export function PageLoading({label='正在读取当前资料…'}:{label?:string}){return <div className="page-loading"><output className="loading-label"><GalaxyMark/><span>{label}</span></output><div className="skeleton skeleton-title"/><div className="skeleton skeleton-line"/><div className="skeleton skeleton-line short"/><div className="skeleton-pair"><div className="skeleton skeleton-card"/><div className="skeleton skeleton-card"/></div></div>;}
 export function StartPage({runtime,navigate}:{runtime:Awaited<ReturnType<typeof createWebRuntime>>|null;navigate:(path:string)=>void}){return <PublicBrowseWorkspace runtime={runtime} navigate={navigate}/>;}

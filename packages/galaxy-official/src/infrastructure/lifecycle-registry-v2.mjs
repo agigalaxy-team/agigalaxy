@@ -1,15 +1,14 @@
 // New policy-to-storage mapping. Account counter windows are implementation
 // choices under CUR-35, not quotations of an exact user-selected table TTL.
 export const lifecyclePolicyVersion = 'galaxy-retention/v1-product-v2';
-const exclusiveAccount = account => `${account} IN (SELECT l.account_id FROM community_account_links l WHERE l.subject_id=$1)
-  AND NOT EXISTS(SELECT 1 FROM community_account_links other WHERE other.account_id=${account} AND other.subject_id<>$1)`;
 export const productV2DeletionTargets = {
   chat_human_message_reads:'t.subject_id=$1',
   reading_bookmarks_v1:'t.subject_id=$1',reading_bookmark_operations_v1:'t.subject_id=$1',
   task_materials_v1:'t.subject_id=$1',
   forum_posts_v1:'t.subject_id=$1',forum_versions_v1:'t.subject_id=$1',forum_replies_v1:'t.subject_id=$1',forum_events_v1:'t.subject_id=$1',
   forum_permissions_v1:'t.subject_id=$1',forum_reports_v1:'t.subject_id=$1',forum_governance_events_v1:'t.subject_id=$1',forum_write_receipts_v1:'t.subject_id=$1',
-  forum_daily_usage_v1:exclusiveAccount('t.account_id'),
+  forum_daily_usage_v1:'false',
+  forum_sections_v2:'false',forum_section_events_v2:'false',forum_notification_reads_v2:'false',
   watch_controls_v2:'t.subject_id=$1',watch_control_operations_v2:'t.subject_id=$1',
   identity_groups_v2:'t.subject_id=$1',identity_group_operations_v2:'t.subject_id=$1',identity_group_approvals_v2:'t.subject_id=$1',
   target_reports_v2:'t.subject_id=$1',target_governance_events_v2:'t.subject_id=$1',
@@ -41,8 +40,10 @@ export const productV2DeletionTargets = {
   subject_control_heads: 't.subject_id=$1', subject_control_events: 't.subject_id=$1',
   device_authorizations: 't.subject_id=$1', recovery_authorizations: 't.subject_id=$1', identity_control_operations: 't.subject_id=$1',
   case_task_links: 't.subject_id=$1',
-  community_accounts: exclusiveAccount('t.id'), community_account_links: 't.subject_id=$1',
-  community_interactions: exclusiveAccount('t.account_id'), community_daily_usage: exclusiveAccount('t.account_id'),
+  // Account ownership is independent of its ID links. ID deletion removes the
+  // association and its authored facts, not the account or account quota ledger.
+  community_accounts: 'false', community_account_links: 't.subject_id=$1',
+  community_interactions: 'false', community_daily_usage: 'false',
   community_write_receipts: 't.subject_id=$1',
   task_requests: 't.requester_id=$1', task_participations: 't.subject_id=$1', task_events: 't.subject_id=$1',
   verification_objects: 't.subject_id=$1',

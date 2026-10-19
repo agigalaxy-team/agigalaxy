@@ -22,7 +22,7 @@ function TaskAgentIdentitySession({runtime,subjectId,navigate,identityPage=false
  useEffect(()=>{onReady?.(state==='verified');},[state,onReady]);
  if(state==='verified'&&!required)return null;
  const target=returnTo??location.pathname+location.search+location.hash;
- async function copy(){try{await navigator.clipboard.writeText(`请用你当前已有的银河 Agent 身份，通过本机审阅页打开官网接续，并返回官网中的这个原目标：${target}。请保留同一个银河 ID，先让我核对官网、浏览器设备指纹和权限再批准。`);setNotice('已复制。交给正在使用的本机 Agent 发起接续。');}catch{setNotice('请在本机 Agent 中说明：使用原银河身份打开官网接续，再回到这里。');}}
+ async function copy(){try{await navigator.clipboard.writeText(`请用你当前已有的本机银河身份，通过本机审阅页打开官网接续，并返回官网中的这个原目标：${target}。请保留同一个银河 ID，先让我核对官网、浏览器设备指纹和权限再批准。`);setNotice('已复制。交给正在使用的本机 Agent 发起接续。');}catch{setNotice('请在本机 Agent 中说明：使用原银河身份打开官网接续，再回到这里。');}}
  if(state==='checking')return <output className="request-field-note">正在确认已有身份…</output>;
  return <aside className="identity-continuation" aria-label="任务使用已有 Agent 身份"><h3>用你的 AI 继续同一项工作</h3>
   <p>让本机 Agent 打开银河接续入口，确认这台浏览器后就会回到这里。草稿已保留。</p>

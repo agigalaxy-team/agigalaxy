@@ -9,6 +9,7 @@ import {notificationTarget} from './notification-target.mjs';
 import {Bell,BellOff,Check,FileText,MessageCircle,Settings2,X} from 'lucide-react';
 import {MessageNavigation,readableTime,useMemberNames,memberName} from './conversation-ui';
 import {NotificationSettings} from './notification-settings';
+import {AccountReplyNotifications} from './account-reply-notifications';
 import './selected-messages.css';
 import {applyNotificationChanges,saveNotificationSelection} from './notification-settings-model.mjs';
 type Runtime=Awaited<ReturnType<typeof import('./runtime.mjs').createWebRuntime>>;
@@ -96,7 +97,7 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
     if(receipt.presented)setItems(old=>old.map(value=>value.id===prompt.item.id?{...value,presented:true,interruptiveEligible:false}:value));
     else setPrompt(null);
    }
-  }).catch(()=>{if(!cancelled&&prompt.lease===active.current.epoch){setNotice('这条提醒已在本端显示，正在核对原显示回执；尚未标记为已读。');if(Date.parse(prompt.leaseUntil)>Date.now()+2000)timer=setTimeout(acknowledge,2000);}});
+  }).catch(()=>{if(!cancelled&&prompt.lease===active.current.epoch){setNotice('提醒已显示，正在同步。');if(Date.parse(prompt.leaseUntil)>Date.now()+2000)timer=setTimeout(acknowledge,2000);}});
   const onVisibility=()=>{if(document.hidden){presentedIds.current.delete(prompt.item.id);setPrompt(null);}else void acknowledge();};
   document.addEventListener('visibilitychange',onVisibility);
   if(!document.hidden)void acknowledge();
@@ -111,15 +112,16 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
  function openItem(item:Item){const destination=target(item);if(!destination)return;void markItemRead(item).catch(()=>{});navigate(destination);}
  async function toggleRoom(roomId:string){const lease=active.current.epoch,current=await client!.options({},undefined);if(lease!==active.current.epoch)return;const muted=current.settings.mutedRoomIds.includes(roomId),settings=applyNotificationChanges(current.settings,{mutedRooms:{[roomId]:!muted}});
   const saved=await saveNotificationSelection(client,{expectedRevision:current.revision,settings});if(lease!==active.current.epoch)return;setOptions(saved);setNotice(muted?'已恢复这段对话的通知。':'已静音这段对话的通知。');}
- if(!connected)return <section className="messages-page notifications-page"><h2 className="message-module-title">消息</h2><MessageNavigation active="notifications" navigate={navigate}/><h1 className="small message-page-title">通知</h1><p className="lead">连接自己的身份，查看邀请、消息和待回应事项。</p><div className="empty-state"><h2>当前尚未连接</h2><p>未连接时无法取得通知。此前未保存的通知选择留在本浏览器，重新连接原身份后可继续。</p><Button onClick={()=>navigate('/app/settings/identity')}>连接我的身份</Button></div></section>;
+ if(!connected)return <section className="messages-page notifications-page"><h2 className="message-module-title">消息</h2><MessageNavigation active="notifications" navigate={navigate}/><AccountReplyNotifications endpoint={runtime?.api.endpoint} navigate={navigate}/></section>;
  if(!permitted)return <section className="messages-page notifications-page"><h2 className="message-module-title">消息</h2><MessageNavigation active="notifications" navigate={navigate}/><h1 className="small message-page-title">通知</h1><div className="browse-note"><p>当前设备还不能查看和处理通知。可以在原设备的授权设置中添加通知权限，然后回到这里。</p><Button variant="outline" onClick={()=>navigate('/app/settings/identity')}>查看当前身份与设备</Button></div></section>;
  return <section className="messages-page notifications-page" aria-busy={busy}><div className="page-heading"><h2 className="message-module-title">消息</h2><button className="icon-button" aria-label="通知设置" onClick={()=>setSettingsOpen(true)}><Settings2 size={20}/></button></div><MessageNavigation active="notifications" navigate={navigate}/><h1 className="small message-page-title">通知</h1>
+  <AccountReplyNotifications endpoint={runtime?.api.endpoint} navigate={navigate} secondary/>
   {error&&<div className="message error" role="alert">{error}</div>}{notice&&<output className="message">{notice}</output>}
   {prompt&&<output className="notification-prompt" aria-live="polite"><Bell size={18}/><button onClick={()=>openItem(prompt.item)}>{prompt.item.title}</button><button className="icon-button" aria-label="关闭提醒" onClick={()=>setPrompt(null)}><X size={16}/></button></output>}
   <div className="notification-filter" aria-label="通知筛选"><button aria-pressed={unread} onClick={()=>changeFilter(true)}>未读</button><button aria-pressed={!unread} onClick={()=>changeFilter(false)}>全部</button></div>
   {loading&&!checked&&<PageLoading label="正在读取当前允许的通知…"/>}
    <div className="notification-list">{notificationRows(items).map(item=><article className={!item.read?'unread':''} key={item.rowKey}><span className="notification-type" aria-hidden="true">{item.object.type==='room'?<MessageCircle size={21}/>:<FileText size={21}/>}</span><div className="notification-content"><h2>{target(item)?<a href={target(item)!} onClick={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();openItem(item);}}>{item.title}</a>:item.title}</h2><p><span>{description(item)}</span><time dateTime={item.at}>{readableTime(item.at)}</time></p>{!target(item)&&<p>这项内容暂时无法从网页打开。</p>}</div><div className="notification-row-actions">{!item.read&&<button className="icon-button notification-read" aria-label={'标为已读：'+item.title} disabled={busy} onClick={()=>run(()=>markItemRead(item))}><Check size={18}/></button>}{item.object.type==='room'&&<button className="icon-button notification-read" aria-label={(options?.settings.mutedRoomIds.includes(item.object.id)?'恢复通知：':'静音通知：')+item.title} disabled={busy} onClick={()=>run(()=>toggleRoom(item.object.id))}><BellOff size={16}/></button>}</div></article>)}</div>
-  {!loading&&!items.length&&!error&&<div className="empty-state"><h2>{unread?'当前没有可见的未读事项':'当前没有可见的通知'}</h2><p>{unread?'可以查看已读事项，或直接继续自己的对话与工作。':'通知按当前权限和来源期限显示。没有通知时，也可以继续已有交流。'}</p><div className="button-row">{unread&&<Button variant="outline" onClick={()=>changeFilter(false)}>查看全部通知</Button>}<Button variant="outline" onClick={()=>navigate('/app/rooms')}>继续聊天</Button></div></div>}
+  {!loading&&!items.length&&!error&&<div className="empty-state"><h2>{unread?'当前没有可见的未读事项':'当前没有可见的通知'}</h2><p>{unread?'可以查看全部通知。':'可以继续已有对话。'}</p><div className="button-row">{unread&&<Button variant="outline" onClick={()=>changeFilter(false)}>查看全部通知</Button>}<Button variant="outline" onClick={()=>navigate('/app/rooms')}>继续聊天</Button></div></div>}
   {next&&<Button variant="outline" disabled={busy} onClick={async()=>{if(working.current)return;const lease=active.current.epoch;working.current=true;setBusy(true);try{await load(next);}catch(reason){if(lease===active.current.epoch)setError(readableError(reason,'通知下一页暂未读取成功，请稍后重试。'));}finally{if(active.current.open){working.current=false;setBusy(false);}}}}>更多通知</Button>}
   {runtime&&client&&subjectId&&<NotificationSettings runtime={runtime} subjectId={subjectId} client={client} open={settingsOpen} onResume={()=>setSettingsOpen(true)} onClose={()=>setSettingsOpen(false)} onSaved={(value,message)=>{setOptions(value);setNotice(message);void load().catch(()=>{});}}/>}
  </section>;

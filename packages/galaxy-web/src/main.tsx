@@ -13,6 +13,8 @@ const IdentityOperationQuery = lazy(() => import('./identity-operation-query').t
 const ChatWorkspace = lazy(() => import('./chat-workspace').then(module => ({default: module.ChatWorkspace})));
 const ContactOriginWorkspace = lazy(() => import('./contact-origin-workspace').then(module => ({default: module.ContactOriginWorkspace})));
 const AccountSettings = lazy(() => import('./account-settings').then(module => ({default: module.AccountSettings})));
+const OnlineAccountSettings = lazy(() => import('./online-account-settings').then(module => ({default: module.OnlineAccountSettings})));
+const PublicAccountWorkspace = lazy(() => import('./public-account-workspace').then(module => ({default: module.PublicAccountWorkspace})));
 const DiscoveryWorkspace = lazy(() => import('./discovery-workspace').then(module => ({default: module.DiscoveryWorkspace})));
 const ContentSearchWorkspace = lazy(() => import('./content-search-workspace').then(module => ({default: module.ContentSearchWorkspace})));
 const TaskCollaboration = lazy(() => import('./task-collaboration').then(module => ({default: module.TaskCollaboration})));
@@ -245,6 +247,13 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     addEventListener('hashchange',skipAnchorChanged);
     return()=>{removeEventListener('hashchange',skipAnchorChanged);if(chatShellNavigation.current===registration)chatShellNavigation.current=null;};
   },[runtime]);
+  const forumShellNavigation=useRef<{runtime:Runtime;route:string;isCurrent:()=>boolean;leaveAction:(action:()=>void)=>void}|null>(null);
+  const registerForumShellNavigation=useMemo(()=>(isCurrent:()=>boolean,leaveAction:(action:()=>void)=>void)=>{
+    const route=draftHistory.current?.editorRoute()??location.pathname+location.search+location.hash;
+    if(!runtime||!new URL(route,location.origin).pathname.startsWith('/app/community'))return()=>{};
+    const registration={runtime,route,isCurrent,leaveAction};forumShellNavigation.current=registration;draftHistory.current?.resume();
+    return()=>{if(forumShellNavigation.current===registration)forumShellNavigation.current=null;};
+  },[runtime]);
   function clearRecoveryCode() { cancelRecoveryDisplay(); displayedRecovery.current=null;setNewCode('');setNewCodeOwner('');setNewCodeOperationId('');setCodePanelOpen(false);setCodeVisible(false); }
   function showRecoveryCode(code:string,isRecovered:boolean,operationId:string,identity=status?.identity) {
     if(!runtime||!identity||typeof code!=='string'||!code||!operationId)return;
@@ -363,6 +372,10 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   };
   const selectHistoryLeave=useCallback((origin:string)=>{
     const selected=identityRuntime.current,chatRegistration=chatShellNavigation.current,view=shellStatus.current;
+    const forumRegistration=forumShellNavigation.current;
+    if(selected&&forumRegistration?.runtime===selected&&forumRegistration.route.split('#')[0]===origin.split('#')[0]&&forumRegistration.isCurrent()){
+      return{leave:forumRegistration.leaveAction,isCurrent:()=>identityRuntime.current===selected&&forumShellNavigation.current===forumRegistration&&forumRegistration.isCurrent()};
+    }
     if(selected&&chatRegistration?.runtime===selected&&chatRegistration.route===origin){
       if(!view?.connection||!view.identity)return null;
       try{chatRegistration.lease.assertCurrent();}catch{return null;}
@@ -518,16 +531,18 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const reviewRoute = /^\/app\/reviews(?:\/([0-9a-f-]{36}))?$/.exec(path);
   const governanceRoute = /^\/app\/governance(?:\/([0-9a-f-]{36}))?$/.exec(path);
   const forumPostRoute = /^\/app\/community\/posts\/([0-9a-f-]{36})(?:\/versions\/([0-9a-f-]{36}))?$/.exec(path);
+  const forumSectionRoute = /^\/app\/community\/sections\/([0-9a-f-]{36})$/.exec(path);
   const forumReplyRoute = /^\/app\/community\/replies\/([0-9a-f-]{36})$/.exec(path);
   const forumReportRoute = /^\/app\/community\/reports\/([0-9a-f-]{36})$/.exec(path);
-  const forumPage = path === '/app/community' || !!forumPostRoute || !!forumReplyRoute || !!forumReportRoute;
+  const publicAccountRoute = /^\/app\/accounts\/([0-9a-f-]{36})$/.exec(path);
+  const forumPage = path === '/app/community' || !!forumPostRoute || !!forumReplyRoute || !!forumReportRoute || !!forumSectionRoute;
   const projectParameters = new URLSearchParams(routeSearch);
   const readingTaskResult=taskSection==='collaboration'&&projectParameters.get('view')==='work'&&projectParameters.get('record')==='results'&&readTaskResult(routeSearch).selected;
   const governanceTargetType = projectParameters.get('targetType'), governanceTargetId = projectParameters.get('targetId');
   const governanceTarget = (governanceTargetType === 'task' || governanceTargetType === 'room') && /^[0-9a-f-]{36}$/.test(governanceTargetId ?? '')
     ? { type: governanceTargetType as 'task' | 'room', id: governanceTargetId! } : undefined;
   const knownPath = publicReadingPage || path === '/app' || path === '/app/' || path === '/app/find' || path === '/app/account' || path === '/app/work' || entries.some(entry => entry.path === path)
-    || /^\/app\/(?:tasks|rooms)\/[0-9a-f-]{36}$/.test(path) || !!capsuleRoute || !!projectRoute || !!personSubject || !!qualificationPermissionRoute || !!packUseRoute || !!informationRoute || !!governanceRoute || !!reviewRoute || forumPage;
+    || /^\/app\/(?:tasks|rooms)\/[0-9a-f-]{36}$/.test(path) || !!capsuleRoute || !!projectRoute || !!personSubject || !!qualificationPermissionRoute || !!packUseRoute || !!informationRoute || !!governanceRoute || !!reviewRoute || forumPage || !!publicAccountRoute;
   const hasDisplayedCode=!!newCode&&newCodeOwner===currentIdentityOwner;
   const savingRecoveryCode=hasDisplayedCode&&codePanelOpen;
   const enteringRecoveryCode=identityMethod==='recovery'&&!savingRecoveryCode&&!recoveryConnectReady;
@@ -539,9 +554,9 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {historySavePending&&<div className="message"><output>先保存当前输入，再继续离开。保存失败时，输入会留在本页。</output><Button variant="outline" onClick={()=>draftHistory.current?.resume()}>保存并继续</Button></div>}
         <Suspense fallback={<PageLoading label="正在打开页面…"/>}>
         {publicReadingPage&&<PublicReadingWorkspace path={path} search={routeSearch} hash={routeHash} navigate={navigateFromShell}/>}
-        {!knownPath && <section><h1 className="small">找不到这个页面</h1><p>链接没有对应的银河页面。可以到发现页选择内容，或让原聊天中的模型核对对象地址。</p><Button onClick={() => navigate('/app/')}>回到发现</Button></section>}
+        {!knownPath && <section><h1 className="small">找不到这个页面</h1><p>没有找到这个页面。可以返回发现，继续浏览。</p><Button onClick={() => navigate('/app/')}>回到发现</Button></section>}
         {(path === '/app/' || path === '/app') && <StartPage runtime={runtime} navigate={navigate}/>}
-        {forumPage && runtime && <CommunityForumWorkspace key={`forum:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} postId={forumPostRoute?.[1]} versionId={forumPostRoute?.[2]} replyId={forumReplyRoute?.[1]} reportId={forumReportRoute?.[1]} section={projectParameters.get('section') ?? 'all'} compose={projectParameters.get('compose') === 'post'} manage={projectParameters.get('manage') === '1'} routeSearch={routeSearch} browseReturn={browseReturnPath('/app/community')} browseReturnLabel={browseReturnLabel('/app/community')}/>}
+        {forumPage && runtime && <CommunityForumWorkspace key={`forum:${status?.endpoint}:${status?.identity?.subjectId ?? 'visitor'}:${status?.identity?.deviceId ?? ''}:${status?.connection?.bindingId ?? ''}:${status?.connection?.generation ?? ''}:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} postId={forumPostRoute?.[1]} versionId={forumPostRoute?.[2]} replyId={forumReplyRoute?.[1]} reportId={forumReportRoute?.[1]} memberSectionId={forumSectionRoute?.[1]} section={projectParameters.get('section') ?? 'all'} compose={projectParameters.get('compose') === 'post'} manage={projectParameters.get('manage') === '1'} routeSearch={routeSearch} browseReturn={browseReturnPath('/app/community')} browseReturnLabel={browseReturnLabel('/app/community')} registerShellNavigation={registerForumShellNavigation}/>}
         {!publicReadingPage&&!runtime&&!configError&&path!=='/app/'&&path!=='/app'&&<PageLoading label="正在读取连接与本机资料…"/>}
         {runtime&&<>
         {path==='/app/bookmarks'&&<ReadingBookmarksWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} onNeedIdentity={needIdentity} search={routeSearch}/>}
@@ -587,8 +602,10 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {governanceRoute && <TargetGovernanceWorkspace key={`${status?.identity?.subjectId ?? 'visitor'}:${status?.connection?.bindingId ?? ''}:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} reportId={governanceRoute[1]} target={governanceTarget}/>}
         {path === '/app/history' && <ContributionWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/settings/summaries' && <PersonalSummaryWorkspace runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
-        {path === '/app/account' && projectParameters.get('section')!=='access' && <AccountOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
+        {path === '/app/account' && !['access','settings'].includes(projectParameters.get('section')??'') && <AccountOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
         {path === '/app/account' && projectParameters.get('section')==='access' && <AccountAccessWorkspace connected={connected} hasIdentity={!!status?.identity} navigate={navigate}/>}
+        {path === '/app/account' && projectParameters.get('section')==='settings' && <OnlineAccountSettings endpoint={runtime?.api.endpoint} navigate={navigate} view={projectParameters.get('view')??'profile'}/>}
+        {publicAccountRoute && <PublicAccountWorkspace key={publicAccountRoute[1]} accountId={publicAccountRoute[1]} endpoint={runtime?.api.endpoint} navigate={navigate}/>}
         {personSubject && <PersonProfile runtime={runtime} subjectId={status?.identity?.subjectId} targetSubjectId={personSubject} connected={connected} search={routeSearch} navigate={navigate} onReturn={target=>navigate(target,{profileReturn:true})}/>}
         {path === '/app/work' && <WorkOverview runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate}/>}
         {path === '/app/settings/identity' && !agentIdentityEntry && projectParameters.get('section')==='account' && <section><button className="back-link" onClick={()=>navigate(returnPath)}>回到原来的页面</button><AccountSettings key={[status?.endpoint,status?.identity?.subjectId,status?.identity?.deviceId,status?.connection?.bindingId,status?.connection?.generation].join(':')} runtime={runtime} connected={connected} hasIdentity={!!status?.identity} navigate={navigate} returnTo={returnPath}/></section>}

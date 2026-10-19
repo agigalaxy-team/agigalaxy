@@ -16,5 +16,8 @@ export async function resetLocalFiles(paths, afterRemove = async () => {}) {
     await afterRemove(basename(path));
   }
   await rm(paths.resetJournal);
-  return { dataDir: paths.dataDir, removedFiles: [...files, paths.resetJournal].map(path => basename(path)), localOnly: true };
+  return { dataDir: paths.dataDir, removedFiles: [...files, paths.resetJournal].map(path => basename(path)),
+    retainedLocalAreas: ['work-history', 'conversation-archive', 'native-v2', 'workers', 'galaxy-upload-privacy.json'],
+    message: 'Reset removes the listed local identity/configuration files. Separate work history, private conversation archives, Native records and Worker directories remain in their original locations. Export or delete owned work/archives through their dedicated tools before resetting if needed.',
+    localOnly: true };
 }

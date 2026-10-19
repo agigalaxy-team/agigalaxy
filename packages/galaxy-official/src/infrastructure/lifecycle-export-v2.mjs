@@ -12,8 +12,8 @@ async function taskMaterialExport(item,_now,{db,actor,viewServices}){
 async function forumEventExport(item,_now,{db,actor,viewServices}){
  const forum=viewServices.forum;let allowed=false;
  if(forum&&item.payload_text){
-  if(item.kind==='create-post'||item.kind==='publish-version')allowed=(await forum.readVersionWithin(db,item.post_id,item.version_id)).availability==='available';
-  else if(item.kind==='create-reply')allowed=(await forum.readReplyWithin(db,item.reply_id)).availability==='available';
+  if(item.kind==='create-post'||item.kind==='publish-version')allowed=(await forum.readVersionWithin(db,item.post_id,item.version_id,{actor})).availability==='available';
+  else if(item.kind==='create-reply')allowed=(await forum.readReplyWithin(db,item.reply_id,{actor})).availability==='available';
   else allowed=(await forum.permissions.statusWithin(db,item.permission_id,{viewerId:actor.subjectId,payloadHash:item.payload_hash})).allowed;
  }
  return {...item,payload_text:allowed?item.payload_text:'',contentAvailable:allowed,authority:'current-forum-read-only; original hash is historical'};

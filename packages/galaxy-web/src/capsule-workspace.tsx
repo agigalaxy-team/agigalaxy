@@ -264,7 +264,7 @@ function CapsuleWorkspaceSession({runtime,subjectId,connected,navigate,capsuleId
     const scopes=[...new Set([...(runtime.api.snapshot()?.scopes??[]).filter((scope:string)=>browserScopes.includes(scope)),'binding','consent','case-teaser','history','assistance','context','capsules'])];
     const method=detail?.capsuleId&&detail.versionId?{kind:'capsule',id:detail.capsuleId,versionId:detail.versionId}:null;
     const request={object:helpOrigin?{kind:'task',id:helpOrigin.taskId}:method??{kind:'capsules'},...(helpOrigin&&method?{continueWith:method}:{}),scopes};
-    const text='请用当前已有的银河 Agent 身份调用 galaxy_identity_web_connect，并核对以下公开定位与所需权限：'+JSON.stringify(request)+'。保留同一个银河 ID；请让我在本机审阅页明确批准新的浏览器设备。原设备、本机草稿与原任务仍保留，授权后回到这份精确方法。';
+    const text='请用当前已有的本机银河身份调用 galaxy_identity_web_connect，并核对以下公开定位与所需权限：'+JSON.stringify(request)+'。保留同一个银河 ID；请让我在本机审阅页明确批准新的浏览器设备。原设备、本机草稿与原任务仍保留，授权后回到这份精确方法。';
     try{await navigator.clipboard.writeText(text);assertCurrent(token);setNotice('已复制原任务、所选方法版本与所需权限。交给正在使用的本机 Agent 发起接续，再在本机审阅页批准。');}
     catch{if(current(token))setNotice(text);}
   }

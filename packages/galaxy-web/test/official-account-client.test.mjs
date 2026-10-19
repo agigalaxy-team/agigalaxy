@@ -18,6 +18,7 @@ test('official session reads and pagination use only the deployed authority and 
 test('login preserves a same-site application target and rejects external or recursive-looking targets',()=>{
  const client=createOfficialAccountClient({endpoint,website,now});
  const url=new URL(client.loginUrl('register','/app/settings/identity?section=account'));
+ assert.equal(new URL(client.loginUrl('login','/app/community?compose=post&accountLogin=failed#draft')).searchParams.get('returnTo'),'/app/community?compose=post#draft','a retry does not carry an old failure into a successful return');
  assert.equal(url.origin,endpoint);assert.equal(url.searchParams.get('returnTo'),'/app/settings/identity?section=account');assert.equal(url.searchParams.get('mode'),'register');
  for(const target of ['//other.example/app','https://other.example/app','/app-elsewhere','/app/\\elsewhere','/app/\nnext'])assert.equal(new URL(client.loginUrl('login',target)).searchParams.get('returnTo'),'/app/account');
 });

@@ -94,7 +94,7 @@ def page(path, title, description, body):
     )
     footer_links = ''.join(link(url, label) for url, label in [
         ('/how-it-works/', '关于银河'), ('/network/', '开放网络'), ('/docs/', '文档'),
-        ('/privacy/', '隐私与数据'), ('/status/', '服务与版本')
+        ('/privacy/', '隐私与数据'), ('/status/', '版本信息')
     ])
     continue_links = ''.join(link(url, label) for url, label in [
         ('/app/search', '找帮助'), ('/app/publish', '发起求助'), ('/app/work', '我的工作'),

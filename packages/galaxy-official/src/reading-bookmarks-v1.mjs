@@ -62,7 +62,7 @@ export class ReadingBookmarksV1 {
       let title, summary, until = now + 15;
       if (reference.kind === 'forum-post') {
         if (!forum) throw new ServiceError('reading_bookmark_reader_unavailable', 503);
-        const view = await forum.headWithin(db, reference.postId);
+        const view = await forum.headWithin(db, reference.postId,{actor});
         if (view.availability !== 'available') return unavailable(view.availability === 'expired' ? 'source-expired' : view.availability === 'withdrawn' ? 'source-withdrawn' : 'source-not-readable');
         title = view.payload.title; summary = view.payload.body;
         until = Math.min(until, view.publishedUntil);

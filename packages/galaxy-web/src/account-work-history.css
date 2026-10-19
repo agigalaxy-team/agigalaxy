@@ -1,0 +1,22 @@
+.account-work-history {max-width:68rem;min-width:0;}
+.account-work-history>header p {max-width:50rem;color:#746971;}
+.account-work-list {padding:0;margin:1rem 0;list-style:none;}
+.account-work-list>li {padding:1rem 0;border-bottom:1px solid #eee7eb;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.account-work-list h3 {font-size:1.05rem;margin:.3rem 0;}
+.account-work-list p {margin:.35rem 0;}
+.account-work-tabs {display:flex;flex-wrap:wrap;gap:.4rem;border-bottom:1px solid #eee7eb;padding-bottom:.7rem;margin:1rem 0;}
+.account-work-tabs button {border:0;background:none;border-radius:.6rem;padding:.5rem .8rem;color:#6d6068;}
+.account-work-tabs button[aria-current] {background:#fff0f7;color:#7e365b;}
+.account-work-scope {font-size:.85rem;color:#786a74;}
+.account-work-facts {display:grid;gap:.8rem;}
+.account-work-facts>div {display:grid;grid-template-columns:8.5rem minmax(0,1fr);gap:1rem;}
+.account-work-facts dt {color:#7d6f78;}
+.account-work-facts dd {margin:0;overflow-wrap:anywhere;}
+.account-work-summary {margin:1.4rem 0;padding:1rem 0;border-top:1px solid #eee7eb;}
+.account-work-observations {padding-left:1.2rem;}
+.account-work-observations>li {padding:1rem 0;border-bottom:1px solid #eee7eb;}
+.account-work-observations header {display:flex;justify-content:space-between;flex-wrap:wrap;gap:.6rem;}
+.account-work-observations time,.account-work-environment>time {font-size:.83rem;color:#7d6f78;}
+.account-work-environment {padding:.8rem 0;border-bottom:1px solid #eee7eb;}
+.account-work-environment h4 {font-size:1rem;margin:.4rem 0;}
+@media(max-width:600px){.account-work-list>li{align-items:flex-start;flex-direction:column;}.account-work-facts>div{grid-template-columns:1fr;gap:.3rem;}.account-work-tabs button{padding:.5rem .6rem;}}
