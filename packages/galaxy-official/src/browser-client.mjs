@@ -6,7 +6,20 @@ import { assertConsentPolicy } from './domain/consent-policy.mjs';
 export const browserScopes = Object.freeze(['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'history', 'assistance', 'context', 'notifications', 'moderation', 'capsules', 'builders', 'audit', 'data-export', 'data-delete']);
 const recruitmentReceiptPath = /^\/v2\/recruitment\/[0-9a-f-]{36}\/receipt\?operationId=[0-9a-f-]{36}&payloadHash=[a-f0-9]{64}$/;
 const forumQuotaPath = /^\/v2\/community\/quotas\?(?:postId|replyId|sectionId)=[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const allowedReadQuery = (path, method) => method === 'GET' && (recruitmentReceiptPath.test(path) || forumQuotaPath.test(path));
+const publicAccountUuid='[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}',publicAccountSubject='GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}';
+const publicAccountPagePath=new RegExp('^/v1/account/public/(?:'+publicAccountUuid+'/(ids|credentials)|by-id/'+publicAccountSubject+')$');
+function allowedPublicAccountPage(path){
+ const [pathname,query,...extra]=path.split('?'),match=publicAccountPagePath.exec(pathname);
+ if(!match||!query||extra.length)return false;
+ const parameters=new URLSearchParams(query),seen=new Set();
+ for(const [key,value]of parameters){
+  if(seen.has(key)||!['after','limit'].includes(key))return false;seen.add(key);
+  if(key==='limit'&&!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value))return false;
+  if(key==='after'&&!new RegExp('^(?:'+(match[1]==='ids'?publicAccountSubject:publicAccountUuid)+')$').test(value))return false;
+ }
+ return seen.size>0;
+}
+const allowedReadQuery = (path, method) => method === 'GET' && (recruitmentReceiptPath.test(path) || forumQuotaPath.test(path) || allowedPublicAccountPage(path));
 
 // The deploy-time public configuration supplies the authority and pins. Neither
 // a URL parameter nor a model response can select a credential destination.

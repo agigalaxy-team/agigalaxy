@@ -29,5 +29,6 @@ export const externalCredentialsConfigurationSchema=z.strictObject({version:z.li
 
 export const externalCredentialImportSchema=z.strictObject({credential:z.string().min(16).max(174764).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/)});
 export const externalCredentialListSchema=z.strictObject({after:z.uuid().optional()});
+export const externalCredentialPublicListSchema=z.strictObject({after:z.uuid().optional(),limit:z.number().int().min(1).max(50).default(20)});
 export const externalCredentialIdSchema=z.uuid();
 export function parseExternalCredentialInput(schema,input){const parsed=schema.safeParse(input);if(!parsed.success)throw new ServiceError('invalid_external_credential_input');return parsed.data;}

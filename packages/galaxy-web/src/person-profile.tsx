@@ -9,6 +9,7 @@ import {PersonRecognitions,RecognitionOverview} from './person-recognitions';
 import {PersonProjects} from './person-projects';
 import {AgentWorkContinuation} from './agent-work-continuation';
 import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {PublicIdentityAccounts} from './public-account-relations';
 import {historyRoleLabel} from './history-facts';
 import {MemberAvatar,memberName} from './conversation-ui';
 import {profilePath,profileExperiencePath,profileReturn,profileReturnLabel} from './profile-navigation.mjs';
@@ -81,6 +82,7 @@ function PersonSession({runtime,connected,subjectId,targetSubjectId,search,navig
    </section>
    <PersonProjects runtime={runtime} connected={connected} ownerId={targetSubjectId} legacy={declarationUnavailable?[]:profile?.projects??[]} refresh={refresh} check={client.check} navigate={navigate} allPath={sectionPath('projects')} preview/>
   </div><aside className="person-side">
+   <PublicIdentityAccounts key={targetSubjectId} subjectId={targetSubjectId} endpoint={runtime.api.endpoint} navigate={navigate}/>
    {!!profile?.tags.length&&<section className="person-section"><h2>关注与参与方向</h2><ul className="person-directions">{profile.tags.map(tag=><li key={tag}>{tag}</li>)}</ul></section>}
    {profile&&<RecognitionOverview {...{profile,recognitionPath,navigate}}/>}
   </aside></div>}

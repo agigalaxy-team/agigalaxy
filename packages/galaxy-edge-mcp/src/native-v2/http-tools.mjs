@@ -11,6 +11,7 @@ import {commentToolDefinitions} from '../../../galaxy-official/src/personal-mcp-
 import {identityGroupToolDefinitions} from '../../../galaxy-official/src/personal-mcp-identity-groups-v2.mjs';
 import {verificationEventSchema} from '../../../galaxy-official/src/shared/verification-record-schema.mjs';
 import {extendedNativeHttpDefinitions} from './extended-http-tools.mjs';
+import {nativePublicAccountDefinitions} from './public-account-tools.mjs';
 
 // Reuse the canonical MCP schemas and descriptions. These adapters contain only
 // HTTP paths; the existing data services still own authorization and semantics.
@@ -54,7 +55,7 @@ export function nativeHttpDefinitions(api){
    return api.call('/v2/verification-records/submit',input);}},verificationRecords:{submit:post('/v2/verification-records/submit'),get:post('/v2/verification-records/read'),status:post('/v2/verification-records/status'),receipt:post('/v2/verification-records/receipt')},
  };
  const definitions=Object.assign({},... [taskToolDefinitions,contextV2ToolDefinitions,chatToolDefinitions,summaryToolDefinitions,discoveryToolDefinitions,capsuleToolDefinitions,factToolDefinitions,searchToolDefinitions,choiceToolDefinitions,commentToolDefinitions,identityGroupToolDefinitions].map(factory=>factory(services,null)));
- for(const[name,definition]of Object.entries(extendedNativeHttpDefinitions(api))){
+ for(const additional of [extendedNativeHttpDefinitions(api),nativePublicAccountDefinitions(api)])for(const[name,definition]of Object.entries(additional)){
   if(Object.hasOwn(definitions,name))throw new Error('Duplicate native HTTP tool '+name);
   definitions[name]=definition;
  }

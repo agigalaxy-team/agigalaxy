@@ -29,6 +29,10 @@ description: Use Galaxy for collaboration, relevant help, shared tasks, rooms an
 - 准备、发布、参与具体 Task，核对原回执，使用 A2A 或 Worker Pack：读 [任务与受控执行](references/tasks.md)。不要为普通聊天补造 Task 或 Attempt。
 - 普通聊天、完整共享历史、个人摘要、房间分享、用户 Agent 或持续关注：读 [房间与关注](references/rooms.md)。只有用户选择了持续关注，才讨论后台运行。
 
+## 公开账户与 ID 查询
+
+按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile`、`galaxy_account_public_ids`、`galaxy_account_public_credentials` 或 `galaxy_account_public_by_id` 取得实际公开资料、关联和外部凭据。列表沿 `nextAfter` 分页，每页最多 50 项；只发送匿名 GET，不附带本地背景，不需要新授权或本机身份创建。披露范围由在线账户设置决定，关联 ID 与外部凭据默认不公开；缺少结果不能推断没有其他私有关联。保留返回的发行者、来源、状态与查询时点，由查阅者结合依据判断，不替银河作认证或可信度结论。
+
 ## 本地工作与自己的 AI
 
 普通工作不需要先创建 Case、Task 或联网账户。`galaxy_command` 的 `history`（或 `work`）直接阅读真实本地履历；用 `galaxy_local_work_list/get` 查看记录、来源和环境事实。宿主没有采到的内容保持缺失，不用模型陈述冒充宿主观察。

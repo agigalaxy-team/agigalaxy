@@ -35,6 +35,8 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   const oidcCallback = request.method === 'GET' && (/^\/v1\/identity\/callback\/[a-z0-9][a-z0-9._-]{0,63}$/.test(url.pathname) || url.pathname === '/v1/account/callback');
   const identityReturn=request.method==='GET'&&/^\/v1\/identity\/return\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=8192;
   const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
+  const publicAccountQuery=request.method==='GET'&&/^\/v1\/account\/public\/(?:[0-9a-f-]{36}\/(?:ids|credentials)|by-id\/GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26})$/.test(url.pathname)
+    &&url.search.length<=160&&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1);
   // This exact owner-only receipt route validates its two keys itself. Other
   // paths and methods retain the existing query prohibition.
   const recruitmentReceipt = request.method === 'GET'
@@ -46,7 +48,7 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
     && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(url.searchParams.get(keys[0]));
   const allowedQuery = consentList ? keys.every(key => key === 'after') && url.searchParams.getAll('after').length === 1
     : oidcCallback && url.search.length <= 8192 && keys.every(key => ['code','state','iss','error','error_description','error_uri','session_state'].includes(key))
-      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || identityReturn;
+      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || publicAccountQuery || identityReturn;
   if (url.origin !== endpoint || url.username || url.password || url.hash || (url.search && !allowedQuery))
     throw new ServiceError('invalid_request');
   return url;

@@ -5,6 +5,7 @@ import {availableForumContent,type ForumPostView} from './community-forum-view-t
 import {forumVersionPath} from './community-forum-origin.mjs';
 import {forumTopics} from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 import {discoveryTarget} from './discovery-navigation';
+import {PublicIdentityAccounts,PublicAccountMatch} from './public-account-relations';
 import type {createWebRuntime} from './runtime.mjs';
 import './content-search-workspace.css';
 
@@ -56,6 +57,8 @@ export function ContentSearchWorkspace({runtime,navigate,search}:Props){
  const people=discoveryTarget('/app/match',query);
  return <section className="content-search-page"><a className="back-link" href="/app/" onClick={event=>follow(event,'/app/',navigate)}>返回发现</a><header><h1 className="small">查找银河内容</h1><p>从讨论、做法、项目和求助中找回你关心的内容。</p></header>
   <search><form className="explore-search" onSubmit={event=>{event.preventDefault();navigate('/app/find'+(draft.trim()?'?q='+encodeURIComponent(draft.trim()):''));}}><label className="sr-only" htmlFor="galaxy-content-query">查找银河内容</label><Search size={19} aria-hidden/><input id="galaxy-content-query" type="search" maxLength={160} required value={draft} onChange={event=>setDraft(event.target.value)} placeholder="搜索标题、内容或方向"/><button type="submit">查找</button></form></search>
+  {/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(query)&&<PublicIdentityAccounts key={query} subjectId={query} endpoint={runtime.api.endpoint} navigate={navigate} showProfileLink/>}
+  {/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(query)&&<PublicAccountMatch key={query} accountId={query} endpoint={runtime.api.endpoint} navigate={navigate}/>}
   {query?<><p className="content-search-current">正在查找“{query}” <a href="/app/find" onClick={event=>follow(event,'/app/find',navigate)}>清除查找</a></p><nav className="content-search-jump" aria-label="结果类型">{kinds.map(kind=><a key={kind} href={'#search-'+kind}>{directories[kind].label}</a>)}</nav><div className="content-search-sections">{kinds.map(kind=><SearchGroup key={kind+query} runtime={runtime} navigate={navigate} kind={kind} query={query}/>)}</div></>:<div className="content-search-start"><p>输入一个关键词，也可以直接浏览。</p><nav aria-label="浏览内容">{kinds.map(kind=><a key={kind} href={directories[kind].path} onClick={event=>follow(event,directories[kind].path,navigate)}>{directories[kind].label}</a>)}</nav></div>}
   <aside className="content-search-other"><p>想找可以交流的人，或适合当前问题的帮助？</p><a href={people} onClick={event=>follow(event,people,navigate)}>寻找同行与项目</a><a href={discoveryTarget('/app/search',query)} onClick={event=>follow(event,discoveryTarget('/app/search',query),navigate)}>按问题找方法与工具</a></aside>
  </section>;

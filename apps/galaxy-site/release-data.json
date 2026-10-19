@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.25",
-  "releaseId": "0.1.25",
+  "version": "0.1.26",
+  "releaseId": "0.1.26",
   "component": "site",
-  "backendRelease": "0.1.16",
+  "backendRelease": "0.1.17",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -38,22 +38,22 @@
   "completeBusinessAcceptance": false,
   "publicApiObservedAt": "2026-10-12T14:08:04.536263+00:00",
   "nativeClientDownload": {
-    "revision": "0.1.13",
+    "revision": "0.1.14",
     "channel": "development-candidate",
-    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.13/",
+    "downloadBase": "https://agigalaxy.org/downloads/native-client/0.1.14/",
     "keysUrl": "https://agigalaxy.org/releases/keys.json",
     "kid": "galaxy-release-20260911",
     "jwkThumbprint": "mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4",
-    "signatureExpiresAt": "2026-11-18T10:26:58.000Z",
+    "signatureExpiresAt": "2026-11-18T10:53:22.000Z",
     "actualHostAcceptance": false,
     "humanAcceptance": false,
     "stableRelease": false,
     "package": {
       "name": "@galaxy/native-client",
-      "version": "0.1.13",
-      "filename": "galaxy-native-client-0.1.13.tgz",
-      "sha256": "050de812a3d959ea26e3a5685ab58a453e0532042d3b7b8d7baf0441ad8500ca",
-      "bytes": 757646,
+      "version": "0.1.14",
+      "filename": "galaxy-native-client-0.1.14.tgz",
+      "sha256": "65cca5e7ca4768e94b9b76ada01f5b845d5140687700be55cecfd8b942fb6a22",
+      "bytes": 758692,
       "exports": [
         "./runtime",
         "./server",
@@ -68,8 +68,8 @@
         "canonicalize": "4.0.0",
         "@modelcontextprotocol/ext-apps": "2.0.0"
       },
-      "lockSha256": "37a35af61c9dc4e3214a57e9f5ed361a1cdc9ccc378b03f1a41d7e19399a1508",
-      "sourceHashesSha256": "baa6c2d3044d9654893af52b87d27b240dc34a78b308b9a007cd7a205c584836"
+      "lockSha256": "7a34f1b83192dabf3cbb24abace6d1084b82f33a98f9066a62db1a343f21affe",
+      "sourceHashesSha256": "6954bf0e219b89db1108cca79b0652c079048bbb4c6798177bbd70498e13d521"
     },
     "verifier": {
       "filename": "verify-native-client-download.mjs",
@@ -77,9 +77,9 @@
       "bytes": 771046
     },
     "guides": {
-      "installation": "/docs/native-client/0.1.13/installation.md",
-      "hosts": "/docs/native-client/0.1.13/hosts.md",
-      "runtime": "/docs/native-client/0.1.13/runtime.md"
+      "installation": "/docs/native-client/0.1.14/installation.md",
+      "hosts": "/docs/native-client/0.1.14/hosts.md",
+      "runtime": "/docs/native-client/0.1.14/runtime.md"
     }
   },
   "historicalAccountObservation": {

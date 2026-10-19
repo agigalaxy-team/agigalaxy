@@ -45,6 +45,12 @@ OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整
 
 `galaxy_open` 支持 `community`（可选 `topic`、`query`）、`post`（准确帖子，可选版本）和 `bookmarks`，原工作引用留在本机。返回时通过原 navigationId 重新读取当前对象。收藏与历史成功回执不会授予新权限；来源撤回或暂不可核查时保留定位并说明实际状态，不显示已失效正文。以上工具与当前网页的协议检查不表示所有真实宿主都已经独立验收。
 
+## 查阅公开账户与 ID
+
+自己的 Agent 可按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile` 读取公开账户资料，`galaxy_account_public_ids` 查询其公开关联 ID，`galaxy_account_public_credentials` 读取公开外部凭据，或用 `galaxy_account_public_by_id` 反向查询公开关联账户。列表沿返回的 `nextAfter` 继续，每页最多 50 项。这些工具只向已配置服务发送匿名 GET，不上传本地工作背景，不创建身份，也不要求新的授权选择。
+
+公开结果由在线账户的查询与披露开关决定；关联 ID 和外部凭据的披露默认关闭。不可读或未返回的关联不代表不存在其他私有关联。使用返回的发行者、来源、当前状态与查询时点说明依据，不补造隐藏资料，不把外部认证说成银河官方认证，也不替查阅者作可信度判断。
+
 ## 本地履历、上传范围与私有原会话
 
 正常客户端新建身份默认个人，可额外选择组织；已有身份及其类型沿用，不因为换宿主而重建或改型。需要 Agent 主体时使用 `galaxy_local_worker_identity_create` 的独立 Worker 目录入口。创建这个身份不会启动 Worker、接入服务或调用模型。

@@ -27,7 +27,7 @@ export function createRoutes({ officialAccounts,externalCredentials,accountWork,
     if(dispatchIdentityReturn({request,response,url}))return;
     if(await dispatchAccountWork({accountWork,officialAccounts,access,request,requestId,url,send}))return;
     if(await dispatchExternalCredentials({externalCredentials,officialAccounts,request,response,url,send}))return;
-    if(await dispatchOfficialAccount({officialAccounts,forum,request,response,url,send,recordFailure}))return;
+    if(await dispatchOfficialAccount({officialAccounts,externalCredentials,forum,request,response,url,send,recordFailure}))return;
     if(await dispatchAccountArchives({access,communityAccounts,request,url,send}))return;
     if(await dispatchCommunityForum({officialAccounts,forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchReadingBookmarks({readingBookmarks,access,request,requestId,url,send,consumeSearchPage}))return;
