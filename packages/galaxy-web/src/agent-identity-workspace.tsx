@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
+import {Check,KeyRound,Link2,Monitor} from 'lucide-react';
 import {agentIdentityErrorCode,createAgentIdentityView} from './agent-identity-view';
 import type {AgentIdentityEntry,AgentIdentityRuntime} from './agent-identity-view';
 import {AgentConnectionSummary,AgentDraftSummary} from './agent-identity-presentation';
@@ -46,9 +47,11 @@ export function AgentIdentityWorkspace({runtime,entry,identity,connection,naviga
  useEffect(()=>{view.verifyCurrent();},[view,identity?.subjectId,identity?.deviceId,connection?.bindingId,connection?.generation]);
  const stopped=['stopped','expired'].includes(state.phase),context=state.context,selection=state.localDeviceSelection;
  const draftVisible=draft&&(identity===undefined||identity?.subjectId===draft.subjectId&&identity?.deviceId===draft.deviceId);
+ const connectionSteps=[{title:'沿用原身份',icon:KeyRound,phases:['waiting','verifying-native']},{title:'允许这台浏览器',icon:Monitor,phases:['preparing','awaiting-approval','accepting','choose-device','selecting-device']},{title:'回到原来的事情',icon:Link2,phases:['connecting','connected']}];
+ const currentStep=connectionSteps.findIndex(step=>step.phases.includes(state.phase));
  return <section className="identity-device-workspace agent-identity-workspace" aria-labelledby="agent-identity-heading">
-  <h2 id="agent-identity-heading">在浏览器继续使用原身份</h2>
-  <p>把本机 AI 使用的银河身份接到当前浏览器。需要批准时，请在本机 AI 的连接页面完成；连接后会回到刚才的页面。</p>
+  <header className="agent-connect-heading"><span className="setting-symbol"><Link2 size={26} aria-hidden="true"/></span><div><p className="setting-eyebrow">从自己的 AI 接着做</p><h2 id="agent-identity-heading">在浏览器继续使用原身份</h2><p>需要批准时，在本机 AI 的连接页面完成；连接后回到刚才的内容。</p></div></header>
+  <ol className="agent-connect-progress" aria-label="这次连接的进度">{connectionSteps.map(({title,icon:Icon},index)=><li key={title} className={!stopped&&currentStep>index?'is-done':!stopped&&currentStep===index?'is-current':''}><span>{!stopped&&currentStep>index?<Check size={20} aria-hidden="true"/>:<Icon size={20} aria-hidden="true"/>}</span><strong>{title}</strong>{!stopped&&currentStep===index&&<small>{state.phase==='connected'?'已完成':'当前步骤'}</small>}</li>)}</ol>
   {!runtime&&<output className="message">正在准备当前官网的连接工具…</output>}
   {phaseText[state.phase]&&<output className="message">{phaseText[state.phase]}</output>}
   {state.additionalDeviceApproval&&state.phase==='awaiting-approval'&&<p className="browse-note">当前浏览器设备缺少本次所需的权限。请在本机 AI 的连接页面批准新设备；原身份与草稿会保留。</p>}

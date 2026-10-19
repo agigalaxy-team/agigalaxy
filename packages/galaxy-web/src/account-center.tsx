@@ -5,16 +5,17 @@ import {HomeContinuityWorkspace} from './home-continuity-workspace';
 import {profilePath} from './profile-navigation.mjs';
 import './profile-settings.css';
 import './person-profile.css';
+import './settings-visual.css';
 import type {AccountRuntime,ProfileOverview,HonorBadge,HonorDetail,HonorResponse} from './account-workspace-types';
 
 type Go=(path:string)=>void;
 type Props={path:string;search:string;navigate:Go;children:React.ReactNode};
-const settings=[['/app/settings/identity','身份与设备'],['/app/settings/identity?section=account','账号验证'],['/app/settings/privacy','数据与隐私'],['/app/settings/summaries','交流笔记'],['/app/settings/trust-package','分享的资料']];
+const settings=[{url:'/app/settings/identity',title:'身份与设备',icon:KeyRound},{url:'/app/settings/identity?section=account',title:'账号验证',icon:UserRound},{url:'/app/settings/privacy',title:'数据与隐私',icon:ShieldCheck},{url:'/app/settings/summaries',title:'交流笔记',icon:FileText},{url:'/app/settings/trust-package',title:'分享的资料',icon:BookOpen}];
 function NavLink({to,navigate,children,...rest}:{to:string;navigate:Go;children:React.ReactNode}&Omit<React.ComponentPropsWithoutRef<'a'>,'href'|'onClick'>){return <a href={to} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(to);}}} {...rest}>{children}</a>;}
 export function SettingsLayout({path,search,navigate,children}:Props){
  if(path==='/app/account')return <div className="personal-page">{children}</div>;
  const current=path==='/app/settings/identity'&&new URLSearchParams(search).get('section')==='account'?path+'?section=account':path;
- return <div className="settings-layout"><aside className="settings-sidebar"><NavLink to="/app/account" navigate={navigate} className="settings-title"><ChevronLeft size={16}/>我的银河</NavLink><nav aria-label="设置">{settings.map(([url,title])=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}>{title}</NavLink>)}</nav></aside><div className="settings-content">{children}</div></div>;
+ return <div className="settings-layout settings-visual-layout"><header className="settings-section-nav"><NavLink to="/app/account" navigate={navigate} className="settings-title"><ChevronLeft size={16}/>我的银河</NavLink><nav aria-label="设置">{settings.map(({url,title,icon:Icon})=><NavLink key={url} to={url} navigate={navigate} aria-current={url===current?'page':undefined}><Icon size={16} aria-hidden="true"/>{title}</NavLink>)}</nav></header><div className="settings-content">{children}</div></div>;
 }
 type AccountProps={runtime?:AccountRuntime|null;subjectId?:string;connected:boolean;hasIdentity:boolean;navigate:Go};
 type AccountProfile=ProfileOverview&{profileReadExpiresAt?:number};
@@ -51,7 +52,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
   {to:'/app/bookmarks',icon:Bookmark,title:'我的收藏',description:'找回帖子、方法、项目与人物'},
   {to:'/app/history',icon:BookOpen,title:'经历与贡献',description:'看完整过程和实际结果'},
  ];
- return <section className="profile-overview" aria-busy={busy}>
+ return <section className="profile-overview account-visual-page" aria-busy={busy}>
   <header className="profile-heading"><h1 className="small">我的银河</h1><NavLink to="/app/settings/identity" navigate={navigate} className="profile-settings-link"><Settings size={18}/>设置</NavLink></header>
   <div className="profile-intro"><span className="profile-avatar" aria-hidden="true">{profile?.displayName?Array.from(profile.displayName).slice(0,1):<UserRound size={34}/>}</span><div>
    <h2>{profile?.displayName??(hasIdentity?'我的个人资料':'欢迎来到银河')}</h2>
@@ -60,6 +61,7 @@ function AccountSession({runtime,subjectId,connected,hasIdentity,navigate}:Accou
    {subjectId&&<div className="profile-intro-actions"><NavLink to={profilePath(subjectId)!} navigate={navigate} className="profile-self-view">查看完整个人资料<ArrowRight size={15}/></NavLink><NavLink to={profilePath(subjectId)!+'?edit=1'} navigate={navigate} className="person-edit-link"><Pencil size={14}/>编辑资料</NavLink></div>}
    {!connected&&<NavLink to="/app/settings/identity" navigate={navigate} className="primary-action">{hasIdentity?'继续使用我的身份':'开始使用'}<ArrowRight size={15}/></NavLink>}
   </div></div>
+  <div className="account-connection-strip"><span><KeyRound size={16} aria-hidden="true"/>{connected?'正在使用当前银河身份':hasIdentity?'身份保存在这台设备':'可以先浏览，再接入自己的身份'}</span>{connected&&<span className="setting-signal is-current"><ShieldCheck size={14} aria-hidden="true"/>已连接</span>}<NavLink to="/app/settings/identity" navigate={navigate}>管理设备与连接<ArrowRight size={14} aria-hidden="true"/></NavLink></div>
   {error&&<p role="alert" className="profile-inline-error">{error}<button type="button" onClick={()=>{setBusy(!!client);setRefresh(n=>n+1);}}>重试</button></p>}
   {!!profile?.honors?.length&&<div className="profile-honors" aria-label="当前认可">{profile.honors.map((item)=><button type="button" key={item.id} className="honor-badge" onClick={()=>showHonor(item)} aria-expanded={honor?.id===item.id}><Award size={22}/><span>{item.title}</span></button>)}</div>}
   {profile?.honorsError&&<p className="muted">认可资料暂未读到。</p>}

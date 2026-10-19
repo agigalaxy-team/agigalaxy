@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpen, Code2, Grid2X2, Leaf, MessageCircle, Palette, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, MessageCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,9 @@ import {useChoiceViewLease,type ChoiceViewLease} from './choice-retained-operati
 import {chatErrorCode,type ChatRuntime} from './chat-workspace-types';
 import {forumBodyParagraphs,forumBrowseFocus,forumBrowsePath,forumBrowseSelection,forumLinkLabel,readForumBrowsePosition,saveForumBrowsePosition,readForumPages as readPages} from './community-forum-browse.mjs';
 import {forumTopics,forumReadTopicSchema} from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
+import {ContentCover,contentCoverFromLinks} from './community-content-visuals';
+import {CommunityExternalWorkspace,CommunityReadingSidebar} from './community-highlights';
+import {communityBrowsePath,communitySelection} from './community-navigation';
 import './community-forum-workspace.css';
 import {availableForumContent,forumPayload,forumPreviewProjection,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumPreviewPayload,type ForumPayload,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPostsQuery} from './community-forum-view-types';
 
@@ -48,20 +51,10 @@ function Links({ links = [], titled = false }: { links?: string[]; titled?:boole
   return titled?<section className="forum-related" aria-label="相关链接"><h2>相关链接</h2>{list}</section>:list;
 }
 
-type ForumTopicOption={id:string;label:string;description:string};
 type ForumFocusTarget='topic'|'results'|'tabs';
 function ForumLink({target,children,className,active=false,focusTarget,navigate}:{target:string;children:React.ReactNode;className?:string;active?:boolean;focusTarget?:ForumFocusTarget;navigate:(path:string,focus?:ForumFocusTarget)=>void}) {
   return <a className={className} href={target} aria-current={active?'page':undefined} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(target,focusTarget);}}}>{children}</a>;
 }
-const topicIcons:Record<string,React.ComponentType<{size?:number;'aria-hidden'?:boolean}>>={technology:Code2,arts:Palette,learning:BookOpen,life:Leaf,galaxy:Sparkles};
-function TopicNavigation({topics,selected,query,section,navigate}:{topics:readonly ForumTopicOption[];selected:string;query:string;section:string;navigate:(path:string,focus?:ForumFocusTarget)=>void}) {
-  const option=(id:string,label:string)=>{
-    const Icon=topicIcons[id]??Grid2X2,target=forumBrowsePath({section,topic:id,query});
-    return <a key={id} href={target} className={id==='unclassified'?'forum-uncategorized':undefined} aria-current={selected===id?'page':undefined} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(target,'topic');}}}><Icon size={16} aria-hidden/>{label}</a>;
-  };
-  return <nav className="forum-topic-navigation" aria-label="按主题浏览"><h2>浏览主题</h2><div className="forum-topic-links">{option('','全部主题')}{topics.map(topic=>option(topic.id,topic.label))}{option('unclassified','未分类')}</div></nav>;
-}
-
 function PostTime({createdAt,updatedAt}:{createdAt?:number;updatedAt?:number}) {
   const published=typeof createdAt==='number'&&Number.isFinite(createdAt)?new Date(createdAt*1000):null;
   const updated=typeof updatedAt==='number'&&Number.isFinite(updatedAt)&&updatedAt!==(createdAt??updatedAt)?new Date(updatedAt*1000):null;
@@ -99,6 +92,7 @@ async function firstForumRead(client:ForumClient,route:{reportId?:string;replyId
 }
 export function CommunityForumWorkspace(props:Props){
  const authority=useChoiceViewLease(props.runtime,props.subjectId),key=JSON.stringify([authority.key,forumScopeKey(props.runtime,props.subjectId),props.postId,props.versionId,props.replyId,props.reportId,props.section,props.compose,props.manage,props.connected,props.routeSearch]);
+ if(!props.postId&&!props.replyId&&!props.reportId&&!props.compose&&(!props.section||props.section==='all')&&communitySelection(props.routeSearch).source==='external')return <CommunityExternalWorkspace key={key} runtime={props.runtime} subjectId={props.subjectId} navigate={props.navigate} routeSearch={props.routeSearch}/>;
  return <CommunityForumView key={key} {...props} lease={authority.lease}/>;
 }
 function CommunityForumView({ runtime, subjectId, connected, navigate, postId, versionId, replyId, reportId, section: requestedSection = 'all', compose = false, manage = false, routeSearch = '', browseReturn = '/app/community', browseReturnLabel = '社区', lease }: Props&{lease:ChoiceViewLease|null}) {
@@ -181,7 +175,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     const focus=pendingBrowseFocus.current;if(!isFeed||!focus||reading)return;
     const frame=requestAnimationFrame(()=>{if(pendingBrowseFocus.current!==focus)return;
       const selector=error?'.forum-workspace .message.error button':focus==='topic'?'.forum-topic-links a[aria-current="page"]':focus==='tabs'?'.forum-tabs a[aria-current="page"]':'.forum-feed article h2 a, .forum-result-empty h3';
-      document.querySelector<HTMLElement>(selector)?.focus({preventScroll:true});pendingBrowseFocus.current=null;
+      const target=[...document.querySelectorAll<HTMLElement>(selector)].find(element=>element.getClientRects().length>0)??document.querySelector<HTMLElement>('.community-mobile-trigger');
+      target?.focus({preventScroll:true});pendingBrowseFocus.current=null;
       history.replaceState({...history.state,forumBrowseFocus:null},'',location.href);
     });return()=>cancelAnimationFrame(frame);
   },[isFeed,reading,error]);
@@ -428,11 +423,14 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   function card(value: ForumCardView, owned = false) {
     const locator = value.locator, available = isAvailable(value), path = owned ? `/app/community/posts/${locator.postId}?manage=1` : targetPath(locator) ?? `/app/community/posts/${locator.postId}`;
     const category=available?forumTopics.find(item=>item.id===value.topic):null;
-    return <article className="forum-card" id={'forum-post-'+locator.postId} key={locator.postId}>
-      <div className="forum-meta"><MemberLink subjectId={value.authorId} name={forumName(value.authorId)} ownId={subjectId} navigate={go} avatar/><PostTime createdAt={value.createdAt} updatedAt={available?value.versionCreatedAt:undefined}/>{available&&link(forumBrowsePath({topic:category?.id??'unclassified'}),category?.label??'未分类','forum-topic-label')}</div>
+    return <article className="forum-card forum-content-row" id={'forum-post-'+locator.postId} key={locator.postId}>
+      {available&&<ContentCover image={contentCoverFromLinks(value.payload.links??[],value.payload.title)} href={path} navigate={go}/>}
+      <div className="forum-card-copy">
       <h2>{link(path, available ? value.payload.title : 'state'in value&&value.state==='withdrawn'?'已撤回的帖子':'当前不可读取的帖子')}</h2>
       {available ? <p className="forum-excerpt">{value.payload.body.replace(/\s+/g,' ').trim()}</p> : <p>{states[value.availability??''] ?? '当前没有可展示的正文。'}</p>}
+      <div className="forum-meta"><MemberLink subjectId={value.authorId} name={forumName(value.authorId)} ownId={subjectId} navigate={go} avatar/><PostTime createdAt={value.createdAt} updatedAt={available?value.versionCreatedAt:undefined}/>{available&&link(forumBrowsePath({topic:category?.id??'unclassified'}),category?.label??'未分类','forum-topic-label')}</div>
       <div className="forum-card-footer">{link(path, <><MessageCircle size={14}/>阅读与讨论</>)}{available&&value.payload.links?.length>0&&<span>{value.payload.links.length} 个相关链接</span>}</div>
+      </div>
     </article>;
   }
   const displayReply = (value: ForumReplyView) => <article className="forum-reply" id={'reply-' + value.locator.replyId} key={value.locator.replyId}>
@@ -443,7 +441,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   </article>;
 
   return <section className={'forum-workspace'+(isFeed&&section!=='reports'?' forum-discovery':'')} aria-busy={busy}>
-    {isFeed&&<><div className="forum-heading"><div><h1 className="small">社区</h1><p>分享想法、作品和日常，找到感兴趣的讨论。</p></div><Button disabled={busy} onClick={()=>go(forumBrowsePath({section,topic,query,compose:true}))}><Plus size={16}/>写帖子</Button></div><nav className="forum-tabs" aria-label="社区内容">{[['all','全部帖子'],['owned','我的帖子']].map(([value,text])=>link(forumBrowsePath({section:value,topic,query}),text,section===value?'active':undefined,section===value,'tabs'))}{link('/app/bookmarks','我的收藏')}{section==='reports'&&<span className="active">举报与处理</span>}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}</nav></>}
+    {isFeed&&<><div className="forum-heading"><div><h1 className="small">社区</h1><p>从一个话题开始，也让想法继续。</p></div></div><nav className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论','active',section!=='reports','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</nav></>}
     {!isFeed&&link(returnPath,<><ArrowLeft size={15}/>返回{returnLabel}</>,'back-link')}
     {compose&&!form&&<div className="forum-heading"><h1 className="small">写帖子</h1></div>}
     {reportId&&<h1 className="small">举报与处理</h1>}
@@ -455,19 +453,19 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {subjectId && !draftLoading && !draftLoaded && <Button variant="outline" disabled={busy} onClick={() => run(()=>readDraft())}>重新读取本机稿</Button>}
     {(!isFeed||section==='reports')&&reading && !detail && !replyDetail && !reportDetail && !items.length && !reportItems.length && <output className="empty-state">正在读取当前允许的内容…</output>}
     {isFeed&&section!=='reports'&&<div className="forum-discovery-layout">
-      <TopicNavigation topics={forumTopics} selected={topic} query={query} section={section} navigate={go}/>
       <section className="forum-results" aria-labelledby={fieldId+'-scope'}>
-        <header className="forum-scope-heading"><h2 id={fieldId+'-scope'}>{section==='owned'?'我的帖子':topicTitle}</h2><p>{section==='owned'?(topic?`当前主题：${topicTitle}。继续阅读或编辑自己发表的内容。`:'找到自己发表的内容，继续阅读、回复或编辑。'):topicDescription}</p></header>
+        <header className={'forum-scope-heading'+(!topic&&section==='all'?' forum-scope-all':'')}><h2 id={fieldId+'-scope'}>{section==='owned'?'我的帖子':topicTitle}</h2>{(topic||section==='owned')&&<p>{section==='owned'?(topic?`当前主题：${topicTitle}。继续阅读或编辑自己发表的内容。`:'找到自己发表的内容，继续阅读、回复或编辑。'):topicDescription}</p>}</header>
+        <div className="forum-feed-toolbar"><span className="forum-order-label">{feedOrder==='published'?'最新发表':feedOrder==='id'?'服务默认顺序':'银河讨论'}</span>{section==='owned'?link(forumBrowsePath({topic,query}),'浏览所有讨论'):link(forumBrowsePath({section:'owned',topic,query}),'我的帖子')}</div>
         <search><form className="forum-search" onSubmit={event=>{event.preventDefault();go(forumBrowsePath({section,topic,query:queryInput}),'results');}}><label htmlFor={fieldId+'-search'}><span className="forum-search-label">搜索帖子</span><Input id={fieldId+'-search'} type="search" aria-label="搜索帖子" maxLength={160} value={queryInput} onChange={event=>setQueryInput(event.target.value)} placeholder={topic?'在当前主题中搜索标题或正文':'搜索帖子标题或正文'}/></label><Button type="submit" variant="outline"><Search size={16} aria-hidden/>搜索</Button></form></search>
         {query&&<div className="forum-search-context"><p>搜索“{query}”{topic&&<> · {topicTitle}</>}</p>{link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results')}</div>}
-        {feedOrder==='published'&&items.length>0&&<span className="forum-order-note">最新发表在前</span>}
         <div className="forum-feed" aria-busy={reading}>
           {items.map(value=>card(value,section==='owned'))}
           {reading&&!items.length&&<output className="empty-state">正在读取帖子…</output>}
-          {!reading&&!error&&!items.length&&(section==='all'||connected)&&<div className="forum-result-empty"><h3 tabIndex={-1}>{query?'没有找到相符的帖子':section==='owned'?'这里还没有你的帖子':topic?'这个主题还没有可读的帖子':'社区还没有可读的帖子'}</h3><p>{query?'可以换一个词，或清除搜索继续浏览。':section==='owned'?'发表后，可以在这里找到并继续自己的内容。':'可以浏览其他主题，也可以写下自己的第一段内容。'}</p><div className="button-row">{query?link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results'):topic?link(forumBrowsePath({section}),'浏览全部帖子','text-link',false,'topic'):null}{!query&&<Button variant="outline" onClick={()=>go(forumBrowsePath({section,topic,compose:true}))}>写一条帖子</Button>}</div></div>}
+          {!reading&&!error&&!items.length&&(section==='all'||connected)&&<div className="forum-result-empty"><h3 tabIndex={-1}>{query?'没有找到相符的帖子':section==='owned'?'这里还没有你的帖子':topic?'这个主题还没有可读的帖子':'社区还没有可读的帖子'}</h3><p>{query?'可以换一个词，或清除搜索继续浏览。':section==='owned'?'发表后，可以在这里找到并继续自己的内容。':'可以浏览其他主题，也可以写下自己的第一段内容。'}</p><div className="button-row">{query?link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results'):topic?link(forumBrowsePath({section}),'浏览全部帖子','text-link',false,'topic'):null}{!query&&<Button variant="outline" onClick={()=>go(forumBrowsePath({section,topic,compose:true}))}>写一条帖子</Button>}{link(communityBrowsePath({source:'external',topic,query}),'看看外部精选','text-link')}</div></div>}
           {morePosts}
         </div>
       </section>
+      <CommunityReadingSidebar key={(runtime?.api.endpoint??'')+':'+(subjectId??'visitor')} runtime={runtime} subjectId={subjectId} navigate={go} posts={section==='all'?items:[]}/>
     </div>}
     {isFeed&&section==='reports'&&<div className="forum-feed">{reportItems.map(item=><article className="forum-card" key={item.reportId}><h2>{link(`/app/community/reports/${item.reportId}`, '查看我的举报或受影响记录')}</h2><p>{item.state==='pending'?'已登记，尚待处理。':'有新的处理记录，可按当前权限查看。'}</p>{item.canAppeal&&<span className="tag">可以提交申诉</span>}</article>)}{!reading&&!error&&!reportItems.length&&connected&&<div className="empty-state">没有读到当前身份可见的举报或处理记录。</div>}{morePosts}</div>}
 

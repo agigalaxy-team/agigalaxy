@@ -178,9 +178,9 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
  if(!runtime||!handoff)return null;
  return <section className="identity-device-workspace">
   <DeviceManagement runtime={runtime} subjectId={subjectId} deviceId={deviceId} connected={connected} onChange={onChange} onManagementChange={onManagementChange} onCurrentChange={value=>{setDeviceState(value);onDeviceStateChange?.(value);}}/>
-  <details id="existing-device" hidden={!showControls&&!open} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-   <summary>{subjectId?'在另一台设备使用':'用已有设备连接'}</summary>
-   <div className="device-connect-panel">
+  <section id="existing-device" className="device-connect-entry" hidden={!showControls&&!open}>
+   <header><div><h2>{subjectId?'在其他设备继续':'接回已有身份'}</h2><p>{subjectId?'新设备先提出申请，由你的管理设备批准。':'使用已有设备的连接链接，原身份和工作继续保留。'}</p></div>{subjectId&&!open&&!activePending&&!localSelection?<div className="button-row"><Button onClick={()=>copyTransfer({kind:'identity',subjectId})}><Link2 size={16}/>复制连接链接</Button><Button variant="outline" onClick={()=>setOpen(true)}>处理连接申请</Button></div>:!open&&!activePending&&!localSelection&&<Button onClick={()=>setOpen(true)}><Monitor size={16}/>连接已有设备</Button>}</header>
+   {(open||activePending||localSelection)&&<div className="device-connect-panel">
     <h2>{subjectId?'连接自己的新设备':'接回你已有的银河身份'}</h2>
     {subjectId?<nav className="device-connect-tabs" aria-label="连接设备"><button aria-current={tab==='invite'?'page':undefined} onClick={()=>change({tab:'invite'})}>给新设备连接链接</button>{canApprove&&<button aria-current={tab==='approve'?'page':undefined} onClick={()=>change({tab:'approve'})}>批准新设备</button>}</nav>:<p>在已有设备的身份设置中复制连接链接，带到这里继续。</p>}
     {(error||readError)&&<p className="message error" role="alert">{error||readError}</p>}{notice&&<output className="message">{notice}</output>}
@@ -206,8 +206,8 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
      {requestError&&<output className="message error">{requestError}</output>}
      {input.approved&&<div className="device-transfer-step"><h3>{approvalCompleted?'这次连接已完成':approvalWaiting?'正在确认这次连接':approvalState?.state==='canceled'?'这次申请已取消':canCopyApproval?'把批准带回新设备':'这份批准已到期'}</h3><p>{approvalCompleted?'新设备已完成这次连接，当前使用状态可以在“我的设备”中查看。':approvalWaiting?'正在读取这份原申请的处理结果。':canCopyApproval?'新设备打开或粘贴这份链接，确认后即可连接。':'需要时在新设备重新发起申请。'}</p>{approvalReadError&&<output>{approvalReadError}</output>}{canCopyApproval&&<Button disabled={busy} onClick={()=>copyTransfer(input.approved)}><Copy size={16}/>复制批准链接</Button>}<Button variant="ghost" disabled={busy} onClick={()=>change({request:'',scopes:[],approved:null})}>处理另一份申请</Button></div>}
     </div>}
-   </div>
-  </details>
+   </div>}
+  </section>
   {draftPreview&&<section className="device-draft-choice"><h3>继续登录前写的求助</h3>{draftPreview.existingDraft?<><p>这个身份也有一份草稿，请选择接下来编辑的内容。</p><div className="device-draft-comparison">{[{value:draftPreview.visitorDraft,label:'登录前的草稿'},{value:draftPreview.existingDraft,label:'当前身份的草稿'}].map(({value,label})=><div key={label}><h4>{label}</h4><strong>{literalTaskText(value?.title)||'尚未填写标题'}</strong><p>{literalTaskText(value?.goal)||literalTaskText(value?.summary)||literalTaskText(value?.situation)||'还没有填写独立说明'}</p></div>)}</div></>:<><strong>{literalTaskText(draftPreview.visitorDraft?.title)||'尚未填写标题'}</strong><p>{literalTaskText(draftPreview.visitorDraft?.goal)||literalTaskText(draftPreview.visitorDraft?.summary)||'可以继续补充独立说明，来源材料回原稿核对。'}</p></>}
    <div className="button-row"><Button disabled={busy} onClick={()=>void run(async()=>{const result=await runtime.visitorDrafts.adopt(draftPreview,{confirmed:true});if(result.currentIdentityChanged)throw Error('草稿已放入原身份，当前身份已变化，请重新查看。');navigate('/app/publish');})}>{draftPreview.existingDraft?'用登录前的草稿继续':'继续编辑'}</Button><Button variant="ghost" onClick={()=>{dismissedDraft.current=draftKey(draftPreview);setDraftPreview(null);if(draftPreview.existingDraft)navigate('/app/publish');}}>{draftPreview.existingDraft?'继续当前身份的草稿':'稍后处理'}</Button></div>{draftPreview.existingDraft&&<p className="device-muted">采用登录前的草稿会替换当前身份的这份草稿；登录前的原稿保留。</p>}
   </section>}

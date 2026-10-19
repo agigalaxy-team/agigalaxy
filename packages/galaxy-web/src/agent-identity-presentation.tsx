@@ -1,8 +1,10 @@
 import React from 'react';
+import {BookOpen,MessageSquare,ShieldCheck,Wrench} from 'lucide-react';
 import {literalTaskText,hasMaterialText} from './task-material-client.mjs';
 import type {TaskText} from './task-material-types';
 import {identityPermissionGroups,identityPermissionLabel} from './identity-permission-labels.mjs';
 import './agent-identity-workspace.css';
+import './settings-visual.css';
 
 const helpModes:Record<string,string> = {collaboration:'一起完成',stuck:'解决困难','proactive-review':'评审建议',diagnosis:'诊断问题',delegation:'委托一项工作'};
 const visibilityNames:Record<string,string> = {Public:'公开求助',Private:'仅自己'};
@@ -16,11 +18,12 @@ export function agentReturnLabel(path:string) {
 
 export function AgentConnectionSummary({context,deviceFingerprint,approved=false}:{context:AgentConnectionContext;deviceFingerprint?:string|null;approved?:boolean}) {
  const known=identityPermissionGroups.flatMap(group=>group.items.map(item=>item[0]));
+ const groupIcon=(title:string)=>/交流|消息|社区/.test(title)?MessageSquare:/工作|方法|资料/.test(title)?BookOpen:/身份|设备|隐私/.test(title)?ShieldCheck:Wrench;
  return <section className="agent-connection-summary" aria-label="本次浏览器连接">
   <h3>{approved?'这台浏览器已获准的使用范围':'这台浏览器申请的使用范围'}</h3>
   <ul className="agent-permission-summary">{identityPermissionGroups.map(group=>{
    const values=group.items.filter(([key])=>context.scopes.includes(key));
-   return values.length>0?<li key={group.title}><strong>{group.title}</strong><span>{values.map(([,label])=>label).join('、')}</span></li>:null;
+   const Icon=groupIcon(group.title);return values.length>0?<li key={group.title}><Icon size={21} aria-hidden="true"/><div><strong>{group.title}</strong><span>{values.map(([,label])=>label).join('、')}</span></div></li>:null;
   })}{context.scopes.filter((scope:string)=>!known.includes(scope)).map((scope:string)=><li key={scope}>{identityPermissionLabel(scope)}</li>)}</ul>
   {deviceFingerprint&&<div className="agent-device-check"><p>请与本机 AI 的连接页面对照这串设备核对码：</p><code>{fingerprint(deviceFingerprint)}</code></div>}
   <dl className="agent-connection-destination"><dt>连接的服务</dt><dd>{context.endpoint}</dd><dt>连接后</dt><dd>{agentReturnLabel(context.targetPath)}</dd><dt>申请有效至</dt><dd>{new Date(context.expiresAt*1000).toLocaleString('zh-CN')}</dd></dl>

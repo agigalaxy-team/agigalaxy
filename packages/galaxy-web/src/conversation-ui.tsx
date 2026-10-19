@@ -4,6 +4,7 @@ import type {createWebRuntime} from './runtime.mjs';
 import {createProfileClient} from './profile-client.mjs';
 import {profilePath} from './profile-navigation.mjs';
 import './person-profile.css';
+import './conversation-visuals.css';
 
 type MemberRuntime={
  api:Pick<Awaited<ReturnType<typeof createWebRuntime>>['api'],'endpoint'|'snapshot'|'call'>;
@@ -44,14 +45,15 @@ export function memberName(subjectId?: string, ownId?: string, name?: string) {
   return name?.trim() || (subjectId ? `成员 ${subjectId.slice(-6)}` : '银河成员');
 }
 
-export function MemberAvatar({ subjectId, own = false }: { subjectId?: string; own?: boolean }) {
+export function MemberAvatar({ subjectId, own = false, name }: { subjectId?: string; own?: boolean; name?:string }) {
   const hue = Array.from(subjectId ?? '').reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-  return <span className={'member-avatar' + (own ? ' is-own' : '')} style={{ '--member-hue': hue } as React.CSSProperties} aria-hidden="true"><UserRound size={19} /></span>;
+  const initial=name?.trim()&&!/^(我|成员 |银河成员)/.test(name.trim())?Array.from(name.trim())[0]:null;
+  return <span className={'member-avatar' + (own ? ' is-own' : '')} style={{ '--member-hue': hue } as React.CSSProperties} aria-hidden="true">{initial?<span className="member-initial">{initial}</span>:<UserRound size={19}/>}</span>;
 }
 
 export function MemberLink({subjectId,name,ownId,navigate,avatar=false}: {subjectId?:string;name?:string;ownId?:string;navigate:(path:string)=>void;avatar?:boolean}) {
   const destination=profilePath(subjectId),label=memberName(subjectId,ownId,name);
-  const content=<>{avatar&&<MemberAvatar subjectId={subjectId} own={subjectId===ownId}/>}<span>{label}</span></>;
+  const content=<>{avatar&&<MemberAvatar subjectId={subjectId} own={subjectId===ownId} name={name}/>}<span>{label}</span></>;
   return destination?<a className="member-profile-link" href={destination} aria-label={`查看${label}的资料`} onClick={event=>{
     if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
     event.preventDefault();navigate(destination);

@@ -1,0 +1,21 @@
+{
+  "generator": "built-in image_gen",
+  "purpose": "原创配图，仅用于明确标示的虚构社区作品示例；非真实成员作品",
+  "assets": [
+    {
+      "path": "reading-lamp.png",
+      "bytes": 1950240,
+      "sha256": "140edd9a79a9ba9a4b702ca3b74df5a8dfd9f80c3f557ba572724cd5144d19cc"
+    },
+    {
+      "path": "travel-journal.png",
+      "bytes": 3006978,
+      "sha256": "667be4fbd765a9d540616e10fb4eb36f2f7158ee019aeb4b979522e1506d84e0"
+    },
+    {
+      "path": "reading-room.png",
+      "bytes": 2379403,
+      "sha256": "1325f5c145eb60c1dab9177987d9d2ffd59eff31ccc3e0392a326646fe42e799"
+    }
+  ]
+}

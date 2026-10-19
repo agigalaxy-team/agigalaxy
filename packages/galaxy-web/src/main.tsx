@@ -57,6 +57,7 @@ import { closeSummaryRuntime } from './summary-runtime.mjs';
 import {createDraftHistoryNavigation,draftNavigationBrowser} from './draft-history-navigation.mjs';
 import '@/app/globals.css';
 import './workspace.css';
+import './porcelain-theme.css';
 import './identity-recovery.css';
 import { SiteShell, StartPage, PageLoading } from './site-shell';
 const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));

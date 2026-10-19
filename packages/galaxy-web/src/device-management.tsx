@@ -1,6 +1,8 @@
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {Laptop, Monitor} from 'lucide-react';
+import {KeyRound,Laptop,Monitor} from 'lucide-react';
 import {Button} from '@/components/ui/button';
+import {identityPermissionGroups,identityPermissionLabel} from './identity-permission-labels.mjs';
+import './settings-visual.css';
 
 type Device = {deviceId:string;keyId:string;epoch:number;scopes:string[];state:string;currentDevice:boolean;canRevoke:boolean};
 type Current = {subjectId:string;endpoint:string;deviceId:string;epoch:number;chainHead:string;canManage:boolean;devices:Device[];recoveryConfigured:boolean;recoveryReadiness:string;checkedAt:string};
@@ -31,6 +33,7 @@ function receiptText(value:Receipt){
  return '正在确认处理结果。';
 }
 const deviceName=(device:{deviceId:string;currentDevice?:boolean})=>device.currentDevice?'当前设备':'设备 '+device.deviceId.slice(-6);
+const permissionOverview=(scopes:string[])=>scopes.includes('*')?'已登记的全部使用范围':identityPermissionGroups.filter(group=>group.items.some(([id])=>scopes.includes(id))).map(group=>group.title).join(' · ')||'尚未提供使用范围';
 
 export function DeviceManagement(props:Props){return <DeviceManagementSession key={JSON.stringify([props.subjectId,props.deviceId,props.connected])} {...props}/>;}
 function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,onManagementChange,onCurrentChange}:Props){
@@ -76,25 +79,24 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
  }
  function prepare(deviceId:string){void run(async valid=>{setPreview(null);const value=await management!.prepareRevoke({deviceId});if(valid())setPreview(value);});}
  if(!subjectId)return null;
- return <details className="room-settings device-management" id="identity-device-management">
-  <summary>我的设备</summary>
-  <style>{'.device-list{list-style:none;padding:0;margin:18px 0}.device-row{display:flex;gap:14px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--border,#e2e8f0)}.device-row>svg{color:#66768d;flex:none;margin-top:3px}.device-row>div{flex:1;min-width:0}.device-row h3{font-size:1rem;margin:0 0 6px}.device-row p{margin:6px 0}.device-management .service-details{font-size:.84rem;margin:12px 0}.device-management code{overflow-wrap:anywhere}.device-confirm{padding:20px;background:var(--muted,#f3f6f9);border-radius:12px;margin:20px 0}.device-confirm h3{margin:0 0 12px}.device-management .device-muted{color:var(--muted-foreground,#64748b);font-size:.88rem}'} </style>
-  <h2>管理可以使用这个身份的设备</h2>
+ return <section className="device-management" id="identity-device-management" aria-label="我的设备">
+  <header className="device-list-heading"><span className="setting-symbol"><Monitor size={25} aria-hidden="true"/></span><div><h2>我的设备</h2><p>查看哪些设备可以使用这个身份。</p></div>{current&&<span className="setting-signal is-neutral">{current.devices.filter(device=>device.state==='active'&&device.epoch===current.epoch).length} 台可使用</span>}</header>
   {!management?<p>设备管理暂时不可用，请稍后重新打开。</p>:<>
    {loading&&<output>正在读取设备…</output>}
    {(error||readError)&&<div className="message error" role="alert">{error||readError} <button className="text-link" disabled={busy} onClick={()=>run(async()=>{})}>再试一次</button></div>}
    {notice&&<output className="message">{notice}</output>}
    {current&&<>
     {!current.canManage&&<p className="device-muted">当前设备没有管理权限。</p>}
-    <ul className="device-list">{current.devices.map(device=><li className="device-row" key={device.deviceId}>
-     {device.currentDevice?<Laptop size={22} aria-hidden="true"/>:<Monitor size={22} aria-hidden="true"/>}<div>
-      <h3>{deviceName(device)}</h3><p className="device-muted">{states[device.state]??'状态暂不可用'}{device.currentDevice&&' · 你正在使用'}</p>
-      <details className="service-details"><summary>设备详情</summary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></details>
+    <ul className="device-list">{current.devices.map(device=><li className={'device-row'+(device.currentDevice?' is-current-device':'')} key={device.deviceId}>
+     <span className="device-glyph">{device.currentDevice?<Laptop size={27} aria-hidden="true"/>:<Monitor size={27} aria-hidden="true"/>}</span><div>
+      <div className="device-row-heading"><h3>{deviceName(device)}</h3><span className={'setting-signal '+(device.state==='active'&&device.epoch===current.epoch?'is-current':'is-neutral')}>{states[device.state]??'状态暂不可用'}</span></div><p className="device-permission-overview">{permissionOverview(device.scopes)}{device.currentDevice&&(connected?' · 本次连接使用这台设备':' · 本机保存的设备')}</p>
+      <details className="service-details"><summary>设备与权限详情</summary><dl><dt>设备标识</dt><dd><code>{device.deviceId}</code></dd><dt>公钥标识</dt><dd><code>{device.keyId}</code></dd><dt>已登记权限</dt><dd>{device.scopes.map(identityPermissionLabel).join('、')}</dd><dt>控制版本</dt><dd>{device.epoch}</dd></dl></details>
       {device.canRevoke&&<Button type="button" variant="outline" disabled={busy||!!pending.active} onClick={()=>prepare(device.deviceId)}>撤销此设备</Button>}
       {device.currentDevice&&device.state==='active'&&current.canManage&&!device.canRevoke&&<p className="device-muted">这是最后一个管理设备。先设置恢复码或连接另一台管理设备，再撤销本机。</p>}
      </div>
     </li>)}</ul>{!current.devices.length&&<p>没有可显示的设备。</p>}
-    <details className="service-details"><summary>服务与恢复设置</summary><p className="break-all">{current.endpoint}</p><p>{current.recoveryConfigured?'已设置恢复码，请自行妥善保存。':'尚未设置恢复码。'}</p></details>
+    <div className="device-recovery-overview"><KeyRound size={24} aria-hidden="true"/><div><strong>恢复码</strong><p>{current.recoveryConfigured?'保管好已保存的恢复码，遗失设备时可用它接回。':'尚未设置，换设备时也可以由已有管理设备批准。'}</p></div><span className="setting-signal is-neutral">{current.recoveryConfigured?'已设置':'尚未设置'}</span></div>
+    <details className="service-details"><summary>当前服务与核对时间</summary><p className="break-all">{current.endpoint}</p><p>最近核对：{new Date(current.checkedAt).toLocaleString('zh-CN')}</p></details>
    </>}
    {preview&&<section className="device-confirm" aria-label="撤销设备" tabIndex={-1} ref={reviewElement}>
     <h3>撤销{deviceName(preview.target)}？</h3>
@@ -111,5 +113,5 @@ function DeviceManagementSession({runtime,subjectId,deviceId,connected,onChange,
    </section>}
    {pending.history.length>0&&<details className="service-details"><summary>以前的设备操作</summary><ul className="device-list">{pending.history.map(row=><li key={row.operationId}><p>设备 {row.deviceId.slice(-6)} · {states[row.state]??'结果待确认'}</p><button className="text-link" disabled={busy} onClick={()=>void run(async valid=>{const r=await management.reconcile(row.operationId);if(valid())setHistoryReceipt(r);})}>查看详情</button>{historyReceipt?.operationId===row.operationId&&<p>{receiptText(historyReceipt)}</p>}</li>)}</ul></details>}
   </>}
- </details>;
+ </section>;
 }

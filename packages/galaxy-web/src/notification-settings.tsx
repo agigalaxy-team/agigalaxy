@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {X} from 'lucide-react';
+import {Bell,BriefcaseBusiness,MessageSquare,X} from 'lucide-react';
 import {z} from 'zod/v4';
 import {inboxOptionsSchema} from '../../galaxy-official/src/shared/notification-inbox-schema.mjs';
 import type {createWebRuntime} from './runtime.mjs';
@@ -70,13 +70,13 @@ export function NotificationSettings({runtime,subjectId,client,open,onClose,onRe
  const candidates=people.filter(id=>id!==subjectId&&!settings?.blockedSubjectIds.includes(id)&&(!form.query.trim()||name(id).toLocaleLowerCase().includes(form.query.trim().toLocaleLowerCase())));
  const title=(id:string)=>rooms[id]||'暂时无法读取的对话 · '+id.slice(-6);
  return <dialog ref={dialog} className="conversation-panel notification-settings-dialog" onClose={onClose} onCancel={event=>{event.preventDefault();if(!busy)onClose();}} aria-labelledby="notification-settings-title">
-  <header><h2 ref={heading} id="notification-settings-title" tabIndex={-1}>通知设置</h2><button className="icon-button" aria-label="关闭设置" disabled={busy} onClick={onClose}><X size={20}/></button></header>
+  <header><span className="notification-settings-symbol"><Bell size={25} aria-hidden="true"/></span><div><p className="notification-settings-eyebrow">按自己的节奏接收进展</p><h2 ref={heading} id="notification-settings-title" tabIndex={-1}>通知设置</h2></div><button className="icon-button" aria-label="关闭设置" disabled={busy} onClick={onClose}><X size={20}/></button></header>
   <div className="notification-settings"><p className="muted">选择哪些进展出现在通知中。屏蔽成员同时影响后续联系。</p>
    {(readError||directoryState.error)&&<output className="message">{readError||directoryState.error}</output>}{error&&<p className="message error" role="alert">{error}</p>}
    {!current||!settings?<output>正在读取当前设置…</output>:<form className="notification-settings-form" onSubmit={event=>void save(event)}>
     <fieldset disabled={busy||!draft.ready}><legend>接收哪些通知</legend>
-     <label className="notification-setting-toggle" aria-label="对话进展：新消息和对话邀请" htmlFor={fieldId+"-rooms"}><input id={fieldId+"-rooms"} type="checkbox" checked={settings.rooms} onChange={e=>edit({rooms:e.target.checked})}/><span><strong>对话进展</strong><small>新消息和对话邀请</small></span></label>
-     <label className="notification-setting-toggle" aria-label="求助与工作：参与、交付及相关回应" htmlFor={fieldId+"-tasks"}><input id={fieldId+"-tasks"} type="checkbox" checked={settings.tasks} onChange={e=>edit({tasks:e.target.checked})}/><span><strong>求助与工作</strong><small>参与、交付及相关回应</small></span></label>
+     <label className="notification-setting-toggle" aria-label="对话进展：新消息和对话邀请" htmlFor={fieldId+"-rooms"}><MessageSquare className="notification-toggle-icon" size={24} aria-hidden="true"/><span><strong>对话进展</strong><small>新消息和对话邀请</small></span><input id={fieldId+"-rooms"} type="checkbox" checked={settings.rooms} onChange={e=>edit({rooms:e.target.checked})}/></label>
+     <label className="notification-setting-toggle" aria-label="求助与工作：参与、交付及相关回应" htmlFor={fieldId+"-tasks"}><BriefcaseBusiness className="notification-toggle-icon" size={24} aria-hidden="true"/><span><strong>求助与工作</strong><small>参与、交付及相关回应</small></span><input id={fieldId+"-tasks"} type="checkbox" checked={settings.tasks} onChange={e=>edit({tasks:e.target.checked})}/></label>
     </fieldset>
     {!!settings.mutedRoomIds.length&&<fieldset disabled={busy||!draft.ready}><legend>已静音的对话</legend><ul className="notification-selection-list">{settings.mutedRoomIds.map((id:string)=><li key={id}><span>{title(id)}</span><button type="button" className="text-link" onClick={()=>listChange('mutedRooms',id,false)}>恢复通知</button></li>)}</ul></fieldset>}
     <fieldset disabled={busy||!draft.ready}><legend>屏蔽成员</legend><p className="muted">屏蔽后，不再接收对方后续联系和相关通知。已公开的资料仍按原分享范围开放。</p>

@@ -1,0 +1,44 @@
+name: Product build and integration checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, reconstruction/full-product-20261012]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/galaxy-official/package-lock.json
+            packages/galaxy-a2a/package-lock.json
+            integrations/native-v2/compact-app/package-lock.json
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: npm run setup
+      - run: npm run lint
+      - run: node node_modules/typescript/bin/tsc --noEmit
+      - run: npm run build
+      - run: npm run test:core
+      - name: Task material permissions and browser client
+        run: node --test --test-concurrency=2 packages/galaxy-official/test/task-material-*.test.mjs packages/galaxy-web/test/task-material-client.test.mjs
+      - name: Normal client setup and native bridge
+        run: node --test integrations/native-v2/setup.test.mjs integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs

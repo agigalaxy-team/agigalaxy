@@ -1,5 +1,5 @@
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {Copy} from 'lucide-react';
+import {Copy,Sparkles} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import type {z} from 'zod/v4';
 import {createWorkContinuationLink,workContinuationPrompt,workContinuationObjectSchema} from '../../galaxy-edge-mcp/src/native-v2/work-continuation-link.mjs';
@@ -39,7 +39,7 @@ export function AgentWorkContinuation({runtime,subjectId,object,title,purpose='�
  }
  const identityReady=!!runtime&&!!subjectId&&runtime.api.snapshot()?.subjectId===subjectId;
  return <div className="agent-work-continuation">
-  <Button variant="outline" type="button" disabled={!identityReady&&!onNeedIdentity} aria-disabled={working===key} onClick={()=>void copy()}><Copy size={16} aria-hidden="true"/>{working===key?'正在准备…':'用自己的 AI 继续'}</Button>
+  <div className="agent-work-launch"><span className="agent-work-symbol"><Sparkles size={23} aria-hidden="true"/></span><div><strong>交给自己的 AI 接着处理</strong><p>继续“{title}”{selectedMaterials.length?'，带上所选 '+selectedMaterials.length+' 份资料的引用':''}。</p></div><Button variant="outline" type="button" disabled={!identityReady&&!onNeedIdentity} aria-disabled={working===key} onClick={()=>void copy()}><Copy size={16} aria-hidden="true"/>{working===key?'正在准备…':'用自己的 AI 继续'}</Button></div>
   {shown&&<p className={shown.error?'message error':'agent-work-notice'} role={shown.error?'alert':'status'}>{shown.notice}</p>}
   {shown?.request&&<details open={shown.manual}><summary>查看要交给 AI 的请求</summary><p>只带入这个页面{selectedMaterials.length?'和你选择的 '+selectedMaterials.length+' 份资料':''}的引用。客户端会按当前许可重新读取；不会发布、发送消息或开启同步。</p><textarea aria-label="给自己的 AI 的请求" readOnly rows={4} value={shown.request} onFocus={event=>event.currentTarget.select()}/></details>}
  </div>;

@@ -1,0 +1,27 @@
+export type ExampleKind='community'|'people'|'projects'|'capsules';
+export type ExamplePerson={slug:string;name:string;initial:string;role:string;about:string;focus:string[];color:string};
+export type ExampleProject={slug:string;title:string;summary:string;image:string;alt:string;owner:string;category:string;sections:{title:string;body:string}[];method:string;post:string};
+export type ExamplePost={slug:string;title:string;topic:string;topicLabel:string;author:string;excerpt:string;paragraphs:string[];project:string;replies:{author:string;body:string}[]};
+export type ExampleMethod={slug:string;title:string;summary:string;author:string;steps:{title:string;body:string}[];project:string};
+export const examplePeople:ExamplePerson[]=[
+ {slug:'lin-yu',name:'林屿',initial:'屿',role:'产品设计 · 日常里的小工具',about:'从日常生活里找问题，把想法做成可以触摸、可以使用的小东西。最近在尝试：让工具安静一点，让人更容易开始。',focus:['产品设计','原型制作','阅读'],color:'sage'},
+ {slug:'mu-zhi',name:'木知',initial:'知',role:'独立开发 · 把经历留成地图',about:'喜欢记录路上的小发现，也喜欢做轻巧的软件。边走边做，把真实使用中的反馈放回下一次迭代。',focus:['独立开发','旅行记录','开源'],color:'clay'},
+ {slug:'chen-an',name:'陈安',initial:'安',role:'空间与社区 · 让交流自然发生',about:'关心一张桌子、一盏灯和一个可以坐下来的地方。正在探索小型线下空间怎样支持自然的阅读与交流。',focus:['空间设计','社区','共创'],color:'blue'}
+];
+export const exampleProjects:ExampleProject[]=[
+ {slug:'quiet-reading-lamp',title:'给晚间阅读做一盏安静的灯',summary:'从桌面空间、翻页动作和光线开始，一次小型阅读灯的设计练习。',image:'/images/examples/reading-lamp.png',alt:'温暖的桌面阅读灯、书本与草图',owner:'lin-yu',category:'实物设计',method:'start-with-a-prototype',post:'light-on-the-desk',sections:[{title:'从一个小问题开始',body:'晚上读书时，桌上总要在书、笔记本和灯座之间挪来挪去。这个练习先把目标缩小：留出翻页和做笔记的空间，同时让光落在正在读的位置。'},{title:'先做可以摆在桌上的原型',body:'用纸板和现成支架做出几个不同高度的形状。先观察手怎样经过、书怎样打开，再决定灯体的尺寸。第一轮不追求精细，而是让问题尽早变得具体。'},{title:'接下来要验证的事',body:'继续比较不同坐姿下的眩光、长时间阅读时的光照，以及收起灯具后桌面的空间。每次只改变一个关键条件，把观察写回设计笔记。'}]},
+ {slug:'a-journal-on-the-road',title:'把旅途做成一本随身手记',summary:'照片、路线和零散的念头，放回它们发生的地方。',image:'/images/examples/travel-journal.png',alt:'旅行手记、地图、相片与随身物品',owner:'mu-zhi',category:'数字工具',method:'keep-a-small-observation',post:'notes-on-the-road',sections:[{title:'记录当时的感觉',body:'相册里有很多照片，却常常忘记为什么拍下它。这个小工具围绕一次停留组织内容：一张照片、一句话、一个地点，几秒钟就能留下来。'},{title:'沿着路线重新看见',body:'回看时先看当天的路线，再进入每个停留点。不要求每次都写一篇完整游记，短的记录也能在后来连成自己的故事。'},{title:'保持记录轻巧',body:'先在断网场景里测试录入与回看。同步应当在有网络时自动继续，已经写下的内容不因为一次连接中断而丢失。'}]},
+ {slug:'a-small-reading-room',title:'一起搭一个周末阅读角',summary:'让一张长桌和几把椅子，成为愿意停留和交换想法的地方。',image:'/images/examples/reading-room.png',alt:'阳光下的小型阅读空间、书架与长桌',owner:'chen-an',category:'空间共创',method:'make-feedback-specific',post:'a-place-to-sit',sections:[{title:'先让人愿意坐下来',body:'这个练习从一个小空间开始：走进来能看见可坐的位置，也能知道哪里可以安静读书、哪里适合轻声交流。'},{title:'用一次真实活动观察',body:'邀请几位朋友带一本想读的书，留出自由阅读和最后的短分享。记录哪里被自然使用，哪里需要额外解释。'},{title:'把观察交给下一次调整',body:'根据坐下、取书和交流的实际路径调整家具。先改变最影响使用的一处，再观察下一次活动是否变得更自然。'}]}
+];
+export const examplePosts:ExamplePost[]=[
+ {slug:'light-on-the-desk',title:'做了一盏阅读灯，想听听大家平时怎么布置书桌',topic:'showcase',topicLabel:'作品与过程',author:'lin-yu',excerpt:'从一个纸板原型开始，发现最难的不是造型，而是给书、手和光留出合适的位置。',project:'quiet-reading-lamp',paragraphs:['最近开始做一个小阅读灯。最初只想让桌面更整洁，但把纸板模型摆到桌上之后，才发现翻页时手会经过灯座，笔记本打开的位置也经常被挡住。','这一版把灯臂向外移了一点，灯座也缩小了。先把外观放一边，拿它和真实的书一起试，问题一下子具体了很多。','你们在阅读时更在意光照范围、眩光，还是桌面空间？也欢迎分享自己的桌面习惯。'],replies:[{author:'mu-zhi',body:'我通常边读边记，最在意打开笔记本后还有没有放手的地方。可以试试把一本书和一本笔记本同时摊开。'},{author:'chen-an',body:'可以在不同坐姿下看一眼灯源是否直接进入视线。桌面很舒服的光，抬头之后的感受可能不一样。'}]},
+ {slug:'notes-on-the-road',title:'旅行记录一定要写成完整游记吗？',topic:'discussion',topicLabel:'交流与想法',author:'mu-zhi',excerpt:'我想先留住当下的一句话，回来之后再让它们连成故事。',project:'a-journal-on-the-road',paragraphs:['每次旅行都想认真记录，最后却往往只剩一大堆照片。写完整游记的门槛太高，等有时间写的时候，很多细节已经忘了。','这次换了一种做法：每次只记一个瞬间。一张照片、一句话、一个地点就够了。回看地图时，这些碎片反而能让我想起当天的感受。','我正在把这种方式做成一个小工具。想知道大家更习惯按时间、地点，还是按主题回看自己的记录。'],replies:[{author:'lin-yu',body:'地点很适合唤起记忆。也许可以让时间是默认顺序，地图作为另一种自然的回看方式。'}]},
+ {slug:'a-place-to-sit',title:'一个小阅读角，怎样让第一次来的人自然坐下来？',topic:'questions',topicLabel:'请教与帮助',author:'chen-an',excerpt:'不想让说明牌越来越多，想从空间本身找到答案。',project:'a-small-reading-room',paragraphs:['我们在尝试布置一个周末开放的小阅读角。现在有书、有桌子，也有几把舒服的椅子，但第一次来的人常常站在门口，不知道能不能直接坐下。','我不想继续增加说明牌，希望从入口视线、座位方向和书的摆放来改善。也许一个已经有人使用的长桌，会比一段介绍更容易理解。','如果你做过类似的空间，哪些小调整真的改变了人的使用方式？'],replies:[{author:'lin-yu',body:'可以观察门口第一眼看见什么。若先看到桌子的侧面，可能比看到一排椅背更容易判断空间怎么用。'}]}
+];
+export const exampleMethods:ExampleMethod[]=[
+ {slug:'start-with-a-prototype',title:'先做一个能摆上桌的原型',summary:'当想法还很模糊时，用最低成本让真实问题出现。',author:'lin-yu',project:'quiet-reading-lamp',steps:[{title:'只写下这次要判断的一个问题',body:'例如“打开一本书和一本笔记本后，桌面是否还有足够空间”。把外观、材料和完整功能先留到以后，让这次制作有明确的用途。'},{title:'用手边材料做出关键尺寸',body:'纸板、胶带或已有零件都可以。只还原影响判断的部分；如果高度和位置是关键，就先把它们做准确。'},{title:'放回真实使用的位置',body:'让原型和实际要用的物品一起出现。观察动作被哪里打断，记下具体时刻，而不只问“你觉得怎么样”。'},{title:'带着观察只改一处',body:'选最影响使用的一个问题调整，再在同样条件下试一次。保留前后记录，避免凭印象判断变化。'}]},
+ {slug:'keep-a-small-observation',title:'把零散观察留成可回看的笔记',summary:'先保存当下的具体细节，再在需要时整理成经验。',author:'mu-zhi',project:'a-journal-on-the-road',steps:[{title:'抓住一个具体瞬间',body:'记录发生了什么、在哪里，以及你为什么留意到它。一个细节通常比一段概括更能帮助以后回想。'},{title:'为记录留一个自然的入口',body:'使用时间、地点或正在做的事情作线索。不要在录入时迫使自己先决定复杂的分类。'},{title:'在回看时连接观察',body:'当几条记录与同一个问题有关，再把它们放在一起。整理应当服务于当前需要理解的事。'}]},
+ {slug:'make-feedback-specific',title:'让反馈回到一次具体的使用',summary:'从动作、情境和结果出发，找到真正值得改动的地方。',author:'chen-an',project:'a-small-reading-room',steps:[{title:'观察一个完整动作',body:'从走进入口开始，看到人怎样选座、拿书和开始阅读。不要只看最终有没有坐下。'},{title:'记录需要额外解释的时刻',body:'停下来询问、试探或绕路的位置，往往能说明哪里缺少自然的提示。先记录事实，再考虑原因。'},{title:'用下一次使用检验调整',body:'改变一个明确位置或表达，观察同类动作是否更顺畅。一次反馈不是最终答案，下一次实际使用才提供新的证据。'}]}
+];
+export const examplePath=(kind:ExampleKind,slug:string)=>'/app/examples/'+kind+'/'+slug;
+export const examplePerson=(slug:string)=>examplePeople.find(person=>person.slug===slug)!;
