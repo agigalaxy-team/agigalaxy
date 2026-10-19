@@ -5,6 +5,8 @@ import {dispatchInformation} from './information-http.mjs';
 import {dispatchTargetGovernance} from './target-governance-http.mjs';
 import {dispatchIdentityGroups} from './identity-group-http.mjs';
 import {dispatchWatchControls} from './watch-control-http.mjs';
+import {serveIdentityCallback} from './identity-callback-page.mjs';
+import {dispatchOfficialAccount} from './official-account-http.mjs';
 import { ServiceError } from '../../shared/service-error.mjs';
 import { body, authenticate } from './request.mjs';
 import {taskMaterialBody} from './task-material-http.mjs';
@@ -16,9 +18,10 @@ import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../
 import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
 import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ officialAccounts,readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
+    if(await dispatchOfficialAccount({officialAccounts,request,response,url,send,recordFailure}))return;
     if(await dispatchCommunityForum({forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchReadingBookmarks({readingBookmarks,access,request,requestId,url,send,consumeSearchPage}))return;
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/challenges')
@@ -324,8 +327,7 @@ export function createRoutes({ readingBookmarks,forum,forumGovernance,receiptSta
     if(personalMcp&&url.pathname==='/mcp/personal')return personalMcp.handle(request,response,{requestId,recordFailure});
     const callback = /^\/v1\/identity\/callback\/([a-z0-9][a-z0-9._-]{0,63})$/.exec(url.pathname);
     if (identity && request.method === 'GET' && callback) {
-      response.setHeader('Referrer-Policy', 'no-referrer');
-      return send(200, await identity.callback(callback[1], url.href));
+      return serveIdentityCallback({identity,providerId:callback[1],returnedUrl:url.href,request,response,send,recordFailure});
     }
     const identityRoute = /^\/v1\/identity\/(providers|begin|status|cancel|confirm|query|revoke)$/.exec(url.pathname);
     if (identity && request.method === 'POST' && identityRoute) {

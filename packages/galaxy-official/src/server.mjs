@@ -1,5 +1,6 @@
 import { loadGovernanceForRuntime } from './operations/governance-review.mjs';
 import { loadIdentityProviders } from './identity-config.mjs';
+import {loadOfficialAccountPortal} from './official-account.mjs';
 import { loadPersonalMcp } from './personal-mcp-config.mjs';
 import { createRuntimeLogger,consoleRuntimeLogger,runtimeLogConfiguration } from './operations/runtime-log.mjs';
 import { loadMetricsConfiguration,createOperationalMetrics,startMetricsListener,closeMetricsListener } from './operations/metrics.mjs';
@@ -126,15 +127,16 @@ try {
   const manifestProfile = await loadNetworkProfile(process.env.GALAXY_NETWORK_PROFILE_FILE);
   startupPhase = 'identity-providers';
   const identityConfiguration = await loadIdentityProviders(process.env.GALAXY_IDENTITY_CONFIG_FILE, { endpoint });
+  const officialAccounts = await loadOfficialAccountPortal(process.env.GALAXY_ACCOUNT_CONFIG_FILE, {endpoint, db, browserOrigins:browserPolicy.origins, identityProviders:identityConfiguration.providers});
   startupPhase = 'attachment-config';
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
-  const services = createServices({ ...governance, communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
+  const services = createServices({ ...governance, officialAccounts,communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
     operator: process.env.GALAXY_OPERATOR, region: process.env.GALAXY_REGION });
   startupPhase = 'personal-mcp';
   const personalMcp=await loadPersonalMcp(process.env.GALAXY_PERSONAL_MCP_CONFIG_FILE,{services,identityProviders:identityConfiguration.providers});
   startupPhase = 'configuration-audit';
   await recordRuntimeConfig(db,{endpoint,component:'api',operatorRef:process.env.GALAXY_OPERATOR_REF,honorRules:governance.honorRules,qualificationPolicies:governance.qualificationPolicies,experienceReviewers:governance.experienceReviewers??[],
-    snapshot:runtimeConfigSnapshot({forumPolicyHash:forumPolicyHash(forumPolicy),personalMcpConfigurationHash:personalMcp?.configurationHash??null,identityConfigurationHash:identityConfiguration.configurationHash,governance,governanceReview,incident:incident.policy(),retirement:retirement.snapshot().policy,release,signingKeyId:kid,trustSequence:trusted.nextState.sequence,requestQuotaHash:digest(JSON.stringify(requestQuotaPolicy)),communityQuotaHash:digest(JSON.stringify(communityPolicy)),browserPolicyHash:digest(JSON.stringify(browserPolicy)),chatConfigurationHash:chatConfiguration.configurationHash,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),network:{type:services.manifest.data.networkType,manifestSha256:digest(canonicalize(services.manifest.data))}})});
+    snapshot:runtimeConfigSnapshot({officialAccountConfigurationHash:officialAccounts?.configurationHash??null,forumPolicyHash:forumPolicyHash(forumPolicy),personalMcpConfigurationHash:personalMcp?.configurationHash??null,identityConfigurationHash:identityConfiguration.configurationHash,governance,governanceReview,incident:incident.policy(),retirement:retirement.snapshot().policy,release,signingKeyId:kid,trustSequence:trusted.nextState.sequence,requestQuotaHash:digest(JSON.stringify(requestQuotaPolicy)),communityQuotaHash:digest(JSON.stringify(communityPolicy)),browserPolicyHash:digest(JSON.stringify(browserPolicy)),chatConfigurationHash:chatConfiguration.configurationHash,resourceBudgetHash:digest(JSON.stringify(resourceBudgetPolicy)),network:{type:services.manifest.data.networkType,manifestSha256:digest(canonicalize(services.manifest.data))}})});
   await services.honor.useRegistry();
   await services.qualification.useRegistry();
   await services.experienceReviews.useRegistry();

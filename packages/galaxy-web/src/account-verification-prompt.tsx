@@ -7,5 +7,5 @@ export function needsAccountVerification(reason:unknown){
 }
 export function AccountVerificationPrompt({required,navigate}:{required:boolean;navigate:(path:string)=>void}){
   if(!required)return null;
-  return <div className="button-row"><Button type="button" variant="outline" onClick={()=>navigate('/app/settings/identity?section=account')}>前往账号验证</Button></div>;
+  return <div className="button-row"><Button type="button" variant="outline" onClick={()=>navigate('/app/settings/identity?section=account')}>关联银河账户</Button></div>;
 }

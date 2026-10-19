@@ -18,7 +18,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
   const busy = new Set();
   function lease() {
     const authority = captureLease(); authority.assertCurrent();
-    if (authority.endpoint !== endpoint) throw error('account_authority_changed', '账号验证所属的身份或服务已改变。');
+    if (authority.endpoint !== endpoint) throw error('account_authority_changed', '银河账户关联所属的身份或服务已改变。');
     return authority;
   }
   function current(authority) {
@@ -26,7 +26,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
     const connection = api.snapshot();
     if (!connection || connection.subjectId !== authority.subjectId || connection.endpoint !== endpoint
       || connection.bindingId !== authority.bindingId || connection.generation !== authority.generation
-      || !connection.scopes.includes('binding')) throw error('connection_required', '请连接当前身份后继续核对原账号验证。');
+      || !connection.scopes.includes('binding')) throw error('connection_required', '请连接当前身份后继续核对原银河账户关联。');
   }
   async function wait(authority, action, {connected = false} = {}) {
     authority.assertCurrent(); if (connected) current(authority);
@@ -40,13 +40,13 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
     if (value.version !== 1 || value.subjectId !== authority.subjectId || value.endpoint !== endpoint
       || !value.operations || typeof value.operations !== 'object' || Array.isArray(value.operations)
       || value.activeId !== null && !uuid.safeParse(value.activeId).success)
-      throw error('account_operation_invalid', '本机原账号验证记录不可用，请保留原操作编号。');
+      throw error('account_operation_invalid', '本机原银河账户关联记录不可用，请保留原操作编号。');
     for (const [id, operation] of Object.entries(value.operations)) {
       if (!uuid.safeParse(id).success || operation?.id !== id || operation.subjectId !== authority.subjectId || operation.endpoint !== endpoint
         || !uuid.safeParse(operation.bindingId).success || typeof operation.state !== 'string')
-        throw error('account_operation_invalid', '本机原账号验证记录不可用，请保留原操作编号。');
+        throw error('account_operation_invalid', '本机原银河账户关联记录不可用，请保留原操作编号。');
     }
-    if (value.activeId && !value.operations[value.activeId]) throw error('account_operation_invalid', '本机原账号验证记录不可用，请保留原操作编号。');
+    if (value.activeId && !value.operations[value.activeId]) throw error('account_operation_invalid', '本机原银河账户关联记录不可用，请保留原操作编号。');
     return value;
   }
   const read = authority => wait(authority, async () => journal(await getLocal(key, authority.subjectId), authority));
@@ -56,9 +56,9 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
   async function save(authority, operation, original, {activate = false, finish = false} = {}) {
     return update(authority, value => {
       const prior = value.operations[operation.id];
-      if (original !== undefined && !same(prior, original)) throw error('account_operation_changed', '原账号验证已改变，请查询同一编号后再继续。');
+      if (original !== undefined && !same(prior, original)) throw error('account_operation_changed', '原银河账户关联已改变，请查询同一编号后再继续。');
       if (activate && value.activeId && value.activeId !== operation.id && !terminal.has(value.operations[value.activeId].state))
-        throw error('account_operation_pending', '请先查询或明确停止上一次账号验证。');
+        throw error('account_operation_pending', '请先查询或明确停止上一次银河账户关联。');
       return {...value, activeId: finish && value.activeId === operation.id ? null : activate ? operation.id : value.activeId,
         operations: {...value.operations, [operation.id]: operation}};
     });
@@ -76,11 +76,11 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
     if (old?.id !== id) return null;
     if (!uuid.safeParse(old.id).success || !uuid.safeParse(old.bindingId).success || !Number.isSafeInteger(old.expiresAt)
       || typeof old.issuer !== 'string' || typeof old.authorizationUrl !== 'string')
-      throw error('account_operation_invalid', '旧账号验证记录不可用，请保留原操作编号。');
+      throw error('account_operation_invalid', '旧银河账户关联记录不可用，请保留原操作编号。');
     let target;
-    try {target = new URL(old.authorizationUrl);} catch {throw error('account_operation_invalid', '旧账号验证地址不可用，请保留原操作编号。');}
+    try {target = new URL(old.authorizationUrl);} catch {throw error('account_operation_invalid', '旧银河账户关联地址不可用，请保留原操作编号。');}
     if (target.protocol !== 'https:' || target.username || target.password || target.hash)
-      throw error('account_operation_invalid', '旧账号验证地址不可用，请保留原操作编号。');
+      throw error('account_operation_invalid', '旧银河账户关联地址不可用，请保留原操作编号。');
     const imported = {version: 1, id, subjectId: authority.subjectId, endpoint, bindingId: old.bindingId, issuer: old.issuer,
       authorizationUrl: old.authorizationUrl, expiresAt: old.expiresAt, state: 'awaiting-login', legacy: true};
     await save(authority, imported, undefined, {activate: !value.activeId}); return imported;
@@ -110,7 +110,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
         source: 'temporary-login-unavailable', galaxyAuthorization: false};
     }
     if (result?.id !== id || result.galaxyAuthorization !== false || !loginStates.includes(result.state)
-      || !Number.isSafeInteger(result.expiresAt)) throw error('account_result_mismatch', '账号验证返回的原编号或状态不一致。');
+      || !Number.isSafeInteger(result.expiresAt)) throw error('account_result_mismatch', '银河账户关联返回的原编号或状态不一致。');
     if (['linked', 'revoked'].includes(result.state)) {
       const found = await durable(authority, id, record);
       if (!found) throw error('account_result_mismatch', '原确认结果尚未能从持久记录核对，请继续查询同一编号。');
@@ -123,7 +123,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
         || intent.bindingId !== authority.bindingId || intent.expiresAt <= now() || intent.issuedAt > now()
         || record?.bindingId && record.bindingId !== intent.bindingId
         || record?.payloadJson && record.payloadJson !== result.payloadJson)
-        throw error('account_preview_changed', '原账号验证所属的身份、连接或确认内容已改变，请先查询原编号。');
+        throw error('account_preview_changed', '原银河账户关联所属的身份、连接或确认内容已改变，请先查询原编号。');
       result = {...result, payloadHash: await wait(authority, () => sha256Hex(result.payloadJson))};
       if (record?.payloadHash && record.payloadHash !== result.payloadHash)
         throw error('account_preview_changed', '本机原账号确认内容已改变，请保留原编号并查询。');
@@ -137,7 +137,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
   }
   const serial = async action => {
     const authority = lease(), owner = [authority.subjectId, authority.deviceId, authority.bindingId, authority.generation].join(':');
-    if (busy.has(owner)) throw error('account_operation_busy', '当前身份已有账号验证操作正在处理。');
+    if (busy.has(owner)) throw error('account_operation_busy', '当前身份已有银河账户关联操作正在处理。');
     busy.add(owner); try {return await action(authority);} finally {busy.delete(owner);}
   };
   return Object.freeze({
@@ -147,7 +147,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
       const value = z.strictObject({endpoint: z.literal(endpoint), providers: z.array(identityProviderSchema).max(8), galaxyAuthorization: z.literal(false)})
         .parse(await call(authority, '/v1/identity/providers', {}));
       if (value.providers.some(provider => provider.redirectUri !== `${endpoint}/v1/identity/callback/${provider.id}`))
-        throw error('account_provider_mismatch', '账号验证回调与当前服务不一致。');
+        throw error('account_provider_mismatch', '银河账户关联回调与当前服务不一致。');
       return value;
     },
     query(input = {}) {return page(lease(), input);},
@@ -165,10 +165,10 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
         && (operation.localRetryStopped || operation.signed || operation.cancelRequested)).map(summary);
     },
     begin(providerId, {confirmed = false} = {}) {return serial(async authority => {
-      if (!confirmed) throw error('account_confirmation_required', '请选择并确认这次账号验证服务。');
+      if (!confirmed) throw error('account_confirmation_required', '请选择并确认这次银河账户关联服务。');
       const value = await read(authority);
       const old = await wait(authority, () => getLocal('account-login', authority.subjectId));
-      if (value.activeId || old && !value.operations[old.id]) throw error('account_operation_pending', '请先查询或明确停止上一次账号验证。');
+      if (value.activeId || old && !value.operations[old.id]) throw error('account_operation_pending', '请先查询或明确停止上一次银河账户关联。');
       const result = identityProviderSchema.extend({loginId: uuid, authorizationUrl: z.url(), expiresAt: z.number().int(),
         subjectId: z.literal(authority.subjectId), bindingId: z.literal(authority.bindingId), endpoint: z.literal(endpoint), galaxyAuthorization: z.literal(false)})
         .parse(await call(authority, '/v1/identity/begin', {providerId}));
@@ -177,7 +177,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
         || target.username || target.password || target.hash || result.expiresAt <= now() || result.expiresAt > now() + 300
         || Object.entries(required).some(([name, expected]) => target.searchParams.getAll(name).length !== 1 || target.searchParams.get(name) !== expected)
         || ['state', 'nonce', 'code_challenge'].some(name => target.searchParams.getAll(name).length !== 1 || !target.searchParams.get(name)))
-        throw error('account_provider_mismatch', '账号验证地址、服务或登录期限不一致。');
+        throw error('account_provider_mismatch', '银河账户关联地址、服务或登录期限不一致。');
       const operation = {version: 1, id: result.loginId, subjectId: authority.subjectId, endpoint, bindingId: authority.bindingId,
         providerId, issuer: result.issuer, authorizationUrl: target.href, expiresAt: result.expiresAt, state: 'awaiting-login'};
       await save(authority, operation, undefined, {activate: true}); return summary(operation);
@@ -254,11 +254,11 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
       await save(authority, {...next, state: result.state, receipt: result}, next, {finish: true}); return result;
     });},
     cancel(id, {confirmed = false} = {}) {return serial(async authority => {
-      if (!confirmed) throw error('account_confirmation_required', '请确认取消这次账号验证。');
+      if (!confirmed) throw error('account_confirmation_required', '请确认取消这次银河账户关联。');
       let record = await original(authority, id);
       const found = await durable(authority, id, record);
       if (found) return {...found, serverOperationCancelled: false};
-      if (!record) throw error('account_operation_unavailable', '没有本机保存的原账号验证，请先查询关联记录。');
+      if (!record) throw error('account_operation_unavailable', '没有本机保存的原银河账户关联，请先查询关联记录。');
       const next = {...record, cancelRequested: true, state: 'awaiting-cancel-result'}; await save(authority, next, record); record = next;
       const result = await call(authority, '/v1/identity/cancel', {id});
       if (result?.id !== id || result.state !== 'canceled') throw error('account_result_mismatch', '取消结果未能核对，请保留原编号。');
@@ -267,7 +267,7 @@ export function createAccountVerificationClient({api, endpoint, captureLease, si
     stop(id, {confirmed = false} = {}) {return serial(async authority => {
       if (!confirmed) throw error('account_confirmation_required', '请确认只停止本机原操作重试。');
       const record = await original(authority, id);
-      if (!record) throw error('account_operation_unavailable', '没有本机保存的原账号验证，请先查询关联记录。');
+      if (!record) throw error('account_operation_unavailable', '没有本机保存的原银河账户关联，请先查询关联记录。');
       await save(authority, {...record, localRetryStopped: true}, record, {finish: true});
       return {id, localRetryStopped: true, serverOperationCancelled: false};
     });},

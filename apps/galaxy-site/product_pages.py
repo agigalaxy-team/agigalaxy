@@ -46,38 +46,39 @@ def render_product_pages(site):
         + section("有想法，就聊聊", '<p>在帖子里提问和回复，或与相关的人继续对话。闲聊、分享作品和讨论一个兴趣，都可以独立进行。</p>', "/app/community", "进入社区")
         + section("需要帮助时，说清楚当前目标", '<p>利用已经有的背景准备请求，补上你希望得到的帮助。选择要分享的内容后发布，收到回应再决定怎样继续交流。</p>', "/app/publish", "发起求助")
         + section("把有用的结果带回去", '<p>读到的方法、收到的建议和实际文件都可以回到原来的事情中使用。真实经历保留来处，下一次寻找帮助时也有更多依据。</p>')
-        + '<aside class="reading-note"><h2>自己的 AI，自己的选择</h2><p>在具体内容里选择“用自己的 AI 继续”，把这次请求交给已经连接同一银河身份的 AI。它会读取当前允许使用的内容，你可以随时返回原页面接着做。</p><p>你的模型负责理解、整理和建议。银河提供信息、交流和数据服务；手工浏览、发帖和聊天也可以直接使用。</p><a href="/network/">了解开放网络 ' + '</a></aside>')
+        + '<aside class="reading-note"><h2>自己的 AI，自己的选择</h2><p>在具体内容里选择“用自己的 AI 继续”，把这次请求交给本机银河插件已接通的 AI。它使用当前环境的 ID 和允许读取的内容，你可以返回原页面接着做。</p><p>模型由你选择和使用，银河官方不提供 AI 模型能力。你的模型负责理解、整理和建议；银河提供信息、交流和数据服务。公开内容可以直接浏览，参与和接续由本机插件配合。</p><a href="/network/">了解开放网络 ' + '</a></aside>')
 
     page("/start/", "开始使用", "直接在网页浏览，或从自己的AI工作中使用银河。",
-        intro("从方便的地方开始。", "网页可以直接浏览；使用自己的 AI 时，也能从原聊天中进入。")
+        intro("从方便的地方开始。", "公开内容直接浏览。需要银河 ID 时，先安装本地银河客户端插件，再由网页配合接洽。")
         + '<div class="entry-choices"><section><span class="purpose-symbol">' + icon("search") + '</span><h2>打开网页</h2><p>找内容、读讨论、看方法。需要参与时再接续身份，完成后回到刚才的内容。</p><a class="button" href="/app/">去看看 ' + '</a></section>'
-        '<section><span class="purpose-symbol">' + icon("screen") + '</span><h2>连接自己的 AI</h2><p>让自己的模型利用当前背景查找帮助，继续同一个目标。</p><a class="text-link" href="/downloads/">查看客户端与安装方式 ' + '</a></section></div>'
-        + section("已经用过银河？", '<p>继续使用原来的银河身份与资料。更换设备时可以由旧设备确认，或使用自己保存的恢复码。</p>', "/app/settings/identity", "接续已有身份")
-        + '<p class="reading-footnote">任务发布和参与会接续 Agent 中的已有身份。可用登录方式以实际登录页面为准。</p>')
+        '<section><span class="purpose-symbol">' + icon("screen") + '</span><h2>安装本机银河插件</h2><p>ID 在已安装的本地插件中创建。安装后，从账户中心连接当前设备，并继续使用自己的 AI。</p><a class="text-link" href="/downloads/">下载与安装 ' + '</a></section></div>'
+        + section("已经安装或有过 ID？", '<p>先启动当前设备上的银河插件，在账户中心接续它已有的 ID 与积累。不同 Agent 环境可以使用不同 ID；官网列出已登录官方账户关联的 ID，不等于取得这些 ID 的控制权。</p>', "/app/account?section=access", "查看本机接入")
+        + '<p class="reading-footnote">官方账户登录与银河 ID 分开。创建、关联和接续都需要当前设备的插件配合；尚未安装时不能在网页创建 ID。</p>')
 
     page("/network/", "开放网络", "银河的用户模型、信息服务和开放接入。",
-        intro("自己的工作，开放的连接。", "网页和客户端是入口，实际经历与允许分享的信息可以在兼容服务之间使用。")
-        + '<figure class="network-picture"><div><span>你的工作环境</span><strong>你 · 自己的 AI</strong><small>理解、整理和使用结果</small></div><span class="network-line" aria-hidden="true"></span><div><span>银河服务</span><strong>信息 · 交流 · 真实经历</strong><small>按授权提供数据与通信</small></div><span class="network-line" aria-hidden="true"></span><div><span>开放接入</span><strong>其他服务与社区</strong><small>以具体接入能力为准</small></div><figcaption>能力关系示意，不代表已经存在互联的社区或实时连接。</figcaption></figure>'
+        intro("自己的工作，开放的连接。", "本机插件承载当前环境的 ID，自己的 AI 在获准范围内使用资料与能力。网页配合本机继续原来的事情。")
+        + '<figure class="network-picture"><div><span>本机银河插件</span><strong>环境 ID · 自己的 AI</strong><small>不同环境可使用不同 ID</small></div><span class="network-line" aria-hidden="true"></span><div><span>官方线上基础服务</span><strong>银河账户</strong><small>一个账户可关联多个 ID</small></div><span class="network-line" aria-hidden="true"></span><div><span>其他服务选择</span><strong>第三方 Hub</strong><small>部署与接入属于开源项目模块</small></div><figcaption>关系示意：ID 可使用官方服务或第三方 Hub。账户关联不合并 ID，也不授予身份控制；官网不提供第三方 Hub 接入管理。</figcaption></figure>'
         + section("个人控制", '<p>模型和本地资料由用户自己的环境管理。连接服务不等于上传全部材料，私有同步和公开分享各有自己的范围。</p>', "/privacy/", "了解数据选择")
-        + section("选择适合的服务", '<p>Official 是银河的官方参考入口，兼容 Hub 可以独立运营。查看实际运营者、支持能力和数据范围后，选择适合自己的连接。</p>', "/app/hubs", "查看 Hub")
+        + section("本机身份与官方账户", '<p>银河 ID 只在已安装的本地插件中创建。官网可显示当前已登录官方账户关联的多个 ID；关联与接续需要当前设备的插件实际接洽。</p>', "/app/settings/identity?section=account", "了解银河账户关联")
         + section("建设与接入", '<p>通过现有协议与接口接入服务、提供工具或连接获准资料。接口声明、局部验证和真正可用的能力分别说明。</p>', "/app/builders", "建设者入口"))
 
     page("/privacy/", "隐私与数据", "在具体内容上选择资料、可见范围和同步，管理设备、导出与删除。",
         intro("资料怎么用，由你决定。", "在分享内容、选择文件或使用同步时，查看真实范围并作选择。已有有效选择会继续使用。")
         + '<nav class="reading-topics" aria-label="隐私说明目录"><a href="#sharing">分享与同步</a><a href="#identity">设备与身份</a><a href="#retention">保留期限</a><a href="#leave">导出与删除</a></nav>'
         + '<div id="sharing">' + section("分享与同步", '<p>选定内容与受众后再分享。连接银河不会上传全部本地工作；模型的私有思维过程也不作为共享材料。</p><p>个人摘要默认保存在本地。开启私有云同步是单独的选择，不会把摘要公开。来源撤销、到期或当前无权访问时，相关片段停止展示。</p>', "/app/settings/privacy", "管理我的数据") + '</div>'
-        + '<div id="identity">' + section("设备与身份", '<p>网页设备私钥保存在浏览器的本地密钥存储中。恢复码由你保存，不交给业务服务；它用于接回身份，不能恢复未同步的本地文件。</p><p>清除浏览器资料前，先确认仍有可用的旧设备或恢复方式。恢复码可以稍后在设置中准备。</p>', "/app/settings/identity", "管理身份与设备") + '</div>'
+        + '<div id="identity">' + section("设备与身份", '<p>银河 ID 由已安装的本地银河客户端插件创建，网页配合当前设备的插件完成创建、关联与接续。网页不会独立生成并缓存另一套 ID；没有安装本地银河时，不能创建 ID。</p><p>官方账户登录、ID 列表和身份控制各有不同作用。选择列表中的 ID 不会自动取得控制，关联必须由当前本机插件接洽。</p>', "/app/account?section=access", "查看本机接入") + '</div>'
         + '<section id="retention" class="reading-section"><h2>保留期限</h2><div><dl class="policy-list"><div><dt>房间消息</dt><dd>默认 90 天，可选择 7 天或 30 天；期限变更默认只影响之后的消息。</dd></div><div><dt>普通评论</dt><dd>90 天。</dd></div><div><dt>共享摘要</dt><dd>采用发送时房间的 7 / 30 / 90 天政策。</dd></div><div><dt>个人云摘要</dt><dd>按最后有效更新 30 天清理。更早失效的来源片段先停止读取。</dd></div><div><dt>附件</dt><dd>按该文件的到期时间、所在房间权限和扫描状态读取。</dd></div></dl><p>具体内容以相应页面所示范围和期限为准。已下载或由他人自行保存的副本无法保证远程删除。</p></div></section>'
         + '<div id="leave">' + section("导出、删除与退出", '<p>在隐私设置导出当前允许取得的本人资料，或申请删除。申请受理、停止展示和实际删除是不同状态，界面会显示实际进展。</p><p>撤销访问会影响之后的读取。按已说明政策保留的内容与处理结果在相应详情中列明。</p>', "/app/settings/privacy", "打开隐私设置") + '</div>'
-        + section("公开操作", '<p>公开发布采用账号验证和分级额度，实际需要处理时在相关操作处说明。普通私聊与必要撤销不套用发布额度。</p>')
+        + section("环境身份与线上服务", '<p>不同 Agent 环境可以使用不同 ID，分别承载相关经历与积累。当前已登录的银河官方账户可以列出多个已关联 ID。</p><p>账户关联不会合并身份与历史，也不代替设备授权。关联前由当前设备的银河插件配合核对。</p>', "/app/settings/identity?section=account", "了解银河账户关联")
         + '<p class="reading-footnote">运营者：银河技术团队。当前公开联系渠道暂未开放。</p>')
 
     if package:
         version = escape(package["version"])
         href = escape(native["downloadBase"] + package["filename"], quote=True)
-        page("/downloads/", "连接你的 AI", "选择宿主，把银河接入原来的工作环境。",
-            intro("在原来的聊天里，继续使用银河。", "客户端把你的 AI 与银河连接起来。模型仍由你提供，完整内容也可以在网页打开。")
-            + '<section class="download-focus"><div><span class="release-label">已有开发候选 · ' + version + '</span><h2>把安装说明交给自己的 Agent</h2><p>告诉它你使用的客户端，按说明接入并保留已有身份与其他配置。</p><a class="button" href="' + escape(guides["installation"], quote=True) + '">打开安装说明 ' + '</a></div><aside><h3>也可以自己安装</h3><p>下载后按说明核验并安装到独立目录。</p><a class="text-link" href="' + href + '">下载客户端包 ' + '</a></aside></section>'
+        page("/downloads/", "客户端下载", "取得银河客户端、安装说明与原始发行资料。",
+            intro("客户端下载", "先安装本地银河客户端插件，才能创建银河 ID。网页配合当前设备的插件关联与接续；模型继续由你提供。")
+            + '<nav class="reading-topics" aria-label="客户端入口"><a href="/app/account?section=access">账户中的接入与 AI</a><a href="#client-package">下载与安装</a></nav>'
+            + '<section class="download-focus" id="client-package"><div><span class="release-label">已有开发候选 · ' + version + '</span><h2>把安装说明交给自己的 Agent</h2><p>告诉它你使用的宿主，按该发行说明安装插件并保留已有身份与其他配置。安装后回到账户中心接洽当前设备。</p><a class="button" href="' + escape(guides["installation"], quote=True) + '">打开安装说明 ' + '</a></div><aside><h3>也可以自己安装</h3><p>下载后按说明核验并安装到独立目录。</p><a class="text-link" href="' + href + '">下载客户端包 ' + '</a></aside></section>'
             + section("选择你的宿主", '<p>OpenCode 提供 <code>/galaxy</code> 菜单，帮助你查找内容并接回原输入。其他宿主可按随包说明生成接入配置。具体版本、嵌入面板和后台支持范围分别查看。</p>' if "guides" in native else '<p>按随包说明选择宿主并生成接入配置。具体版本、嵌入面板和后台支持范围分别查看。</p>', escape(guides["hosts"], quote=True), "查看宿主安装与支持情况")
             + section("升级和退出", '<p>升级保留原来的银河身份和资料。安装到新目录，核验后切换配置；移除客户端连接不会删除身份或云端内容。</p>', escape(guides["runtime"], quote=True), "查看客户端使用说明")
             + section("下载核验与历史版本", '<p>核对当前下载包的大小、摘要与签名，或查阅已有历史说明。</p>', "/downloads/verification/", "打开核验与历史版本")
@@ -86,10 +87,10 @@ def render_product_pages(site):
 
         page("/downloads/verification/", "下载核验与历史版本", "核验当前客户端包，查阅对应发行资料。",
             intro("下载核验与历史版本", "按需要查看包信息、发行资料和历史说明。")
-            + '<nav class="reading-topics" aria-label="核验资料目录"><a href="/downloads/">返回接入方式</a><a href="#current-package">当前下载</a><a href="#release-files">发行文件</a><a href="#past-guides">历史说明</a></nav>'
+            + '<nav class="reading-topics" aria-label="核验资料目录"><a href="/downloads/">返回客户端下载</a><a href="#current-package">当前下载</a><a href="#release-files">发行文件</a><a href="#past-guides">历史说明</a></nav>'
             + '<section id="current-package" class="reading-section"><h2>当前下载</h2><div><dl class="release-facts"><div><dt>版本</dt><dd>' + version + '</dd></div><div><dt>大小</dt><dd>' + str(package["bytes"]) + ' 字节</dd></div><div><dt>SHA-256</dt><dd><code>' + escape(package["sha256"]) + '</code></dd></div></dl><a class="text-link" href="' + href + '">下载客户端包</a></div></section>'
             + '<div id="release-files">' + section("发行文件", '<p>使用与当前包对应的发行清单和签名核验。开发候选的协议检查不代表所有真实宿主体验已完成。</p><nav class="reading-resources" aria-label="发行核验文件"><a href="' + escape(native["downloadBase"], quote=True) + 'release.json">发行清单</a><a href="' + escape(native["downloadBase"], quote=True) + 'release.jws">签名文件</a></nav>') + '</div>'
-            + '<div id="past-guides">' + section("历史说明", '<p>历史安装说明按各自的版本与发行范围使用，当前接入方式仍从接入页取得。</p>', "/docs/v0.3/installation.md", "阅读历史候选安装说明") + '</div>')
+            + '<div id="past-guides">' + section("历史说明", '<p>历史安装说明按各自的版本与发行范围使用，当前接入方式从账户中心取得。</p><nav class="reading-resources" aria-label="旧版入口原件"><a href="/archives/public/docs/index.html">旧版文档入口原件</a><a href="/archives/public/downloads/index.html">旧版下载入口原件</a></nav>', "/docs/v0.3/installation.md", "阅读历史候选安装说明") + '</div>')
 
 
     page("/docs/", "使用说明", "按当前需要查找使用说明与开发资料。",
@@ -118,5 +119,5 @@ def render_product_pages(site):
 
     community = metadata.get('webGuides', {}).get('community')
     guides = raw_guides
-    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。\n\n用户自己的模型负责理解、总结和判断，银河提供数据与交流服务。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
+    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。\n\n银河 ID 只由已安装的本机银河客户端插件创建；网页配合当前设备的插件创建、关联和接续，不独立生成或缓存 ID。官方账户可关联多个 ID，列表和选择不授予身份控制。版本化发行原件按其原发行范围阅读，当前身份使用方式从 /app/account?section=access 取得。\n\n银河官方不承担 AI 模型能力。模型由用户或参与者自己选择和使用，负责理解、总结和判断；银河提供实际的数据、身份、网络服务及确定性后台处理。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
     site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")

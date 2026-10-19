@@ -12,6 +12,7 @@ import urllib.request
 import chrome
 from product_pages import render_product_pages
 from guide_pages import render_versioned_guides
+from public_reading import web_entry_assets
 
 ROOT = Path(__file__).resolve().parent
 
@@ -75,6 +76,7 @@ def main():
     parser.add_argument('--release-data', type=Path, default=ROOT / 'release-data.json')
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
+    parser.add_argument('--web-dist', type=Path, help='Exact completed Web build used for progressive non-home startup')
     args = parser.parse_args()
     output = resolved_file_path(args.output)
     if output == ROOT or output in ROOT.parents or output.is_symlink():
@@ -139,6 +141,15 @@ def main():
             raise ValueError('Archive destination escaped the selected output: ' + name)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
+        # These two catalog entries are also the current product landing pages.
+        # Keep their original bytes at an explicit archive URL before rendering
+        # the redesigned current UI at /docs/ and /downloads/.
+        if name in ('docs/index.html', 'downloads/index.html'):
+            original = output / 'archives' / 'public' / name
+            if original.is_symlink() or not resolved_file_path(original).is_relative_to(output):
+                raise ValueError('Original entry archive escaped the selected output')
+            original.parent.mkdir(parents=True, exist_ok=True)
+            original.write_bytes(raw)
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(copy_archive, catalog['files'].items()))
@@ -162,14 +173,23 @@ def main():
 
     chrome.OUT = output
     chrome.PREVIEW = preview
+    chrome.WEB_ASSETS = web_entry_assets(resolved_file_path(args.web_dist)) if args.web_dist else None
+    chrome.PUBLIC_PAGES.clear()
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
-    for name in ('site.css', 'navigation.js', 'home-experience.css', 'home-experience.js'):
+    for name in ('site.css', 'navigation.js', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
+    chrome.write('assets/selected-shell.css',
+                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'selected-shell.css').read_text(encoding='utf-8'))
+    chrome.write('assets/public-reading.css',
+                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'public-reading.css').read_text(encoding='utf-8'))
+    if chrome.WEB_ASSETS:
+        chrome.write('assets/workspace-entry.json', json.dumps(chrome.WEB_ASSETS, indent=2) + '\n')
     copy_example_images(output)
     copy_external_images(output)
     site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview}
     guide_pages = render_versioned_guides(site, metadata)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
+    chrome.write('assets/public-pages/index.json', json.dumps({'version': 1, 'routes': chrome.PUBLIC_PAGES}, indent=2) + '\n')
     pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/docs/', '/privacy/', '/status/']
     pages.extend(guide_pages.values())
     chrome.write('robots.txt', 'User-agent: *\nDisallow: /\n' if preview else

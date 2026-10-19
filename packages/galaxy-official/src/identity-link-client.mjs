@@ -40,7 +40,7 @@ export function createIdentityLinkClient({ endpoint, sessions, sign, send = post
       if (value.id !== input.providerId || value.redirectUri !== `${endpoint}/v1/identity/callback/${value.id}`
         || target.protocol !== 'https:' || target.username || target.password || target.hash || value.expiresAt <= now() || value.expiresAt > now() + 300
         || target.searchParams.get('redirect_uri') !== value.redirectUri || target.searchParams.get('client_id') !== value.clientId
-        || target.searchParams.get('scope') !== 'openid' || target.searchParams.get('response_type') !== 'code'
+        || !['openid','openid email'].includes(target.searchParams.get('scope')) || target.searchParams.get('response_type') !== 'code'
         || target.searchParams.get('code_challenge_method') !== 'S256' || !target.searchParams.get('state') || !target.searchParams.get('nonce'))
         throw new Error('OIDC login preview mismatch.');
       return value;

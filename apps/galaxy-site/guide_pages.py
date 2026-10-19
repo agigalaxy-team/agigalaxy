@@ -125,9 +125,10 @@ def render_versioned_guides(site, metadata):
         title, content, headings = render_markdown(raw_path.read_text(encoding='utf-8'), source, source_pages)
         sections = ''.join('<a href="#' + anchor + '">' + escape(label) + '</a>' for level, anchor, label in headings if level == 2)
         siblings = ''.join('<a href="' + escape(source_pages[path], quote=True) + '"' + (' aria-current="page"' if current == kind else '') + '>' + LABELS[current] + '</a>' for current, path in guides.items())
-        body = ('<div class="guide-breadcrumb"><a href="/downloads/">连接你的 AI</a><span aria-hidden="true"> / </span><span>本机接入 ' + escape(version) + '</span></div>' +
+        body = ('<div class="guide-breadcrumb"><a href="/downloads/">客户端下载</a><span aria-hidden="true"> / </span><span>本机接入 ' + escape(version) + '</span></div>' +
                 '<nav class="guide-tabs" aria-label="客户端说明">' + siblings + '</nav>' +
                 '<header class="guide-heading"><p class="release-label">开发候选 · ' + escape(version) + '</p><h1>' + escape(title) + '</h1></header>' +
+                '<aside class="reading-note"><h2>当前身份使用方式</h2><p>银河 ID 由已安装的本机银河插件创建，网页配合当前设备的插件关联与接续。下文保留该版本发行说明，按其适用范围阅读；当前接入从<a href="/app/account?section=access">账户中心</a>继续。</p></aside>' +
                 '<div class="guide-layout"><aside class="guide-contents"><nav aria-label="本页目录"><strong>本页内容</strong>' + sections + '</nav>' +
                 '<a class="guide-original" href="' + escape(source, quote=True) + '">供 Agent 读取的 Markdown 原文</a></aside>' +
                 '<article class="guide-body" aria-label="' + escape(LABELS[kind], quote=True) + '">' + content + '</article></div>')

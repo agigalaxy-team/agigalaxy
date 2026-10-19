@@ -1,5 +1,5 @@
 .galaxy-site.selected-shell .selected-account-layout{display:grid;grid-template-columns:208px minmax(0,1fr);width:100%;max-width:none;margin:0;gap:0;align-items:start;min-height:calc(100dvh - var(--selected-header-height,72px))}
-.galaxy-site.selected-shell .selected-account-sidebar{position:sticky;top:var(--selected-header-height,72px);height:calc(100dvh - var(--selected-header-height,72px));border-right:1px solid var(--g-line);padding:28px 16px;background:#fff;overflow-y:auto;min-width:0}
+.galaxy-site.selected-shell .selected-account-sidebar{position:static;align-self:stretch;border-right:1px solid var(--g-line);padding:28px 16px;background:#fff;overflow:visible;min-width:0}
 .galaxy-site .selected-account-sidebar h2{font-size:19px;line-height:1.5;margin:0 12px 22px;color:var(--g-ink)}
 .galaxy-site .selected-account-sidebar nav{display:grid;gap:5px}
 .galaxy-site .selected-account-sidebar nav a{display:flex;align-items:center;gap:11px;color:var(--g-ink);padding:12px;border-radius:9px;text-decoration:none;font-size:14px;line-height:1.5;min-height:44px}

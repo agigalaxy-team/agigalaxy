@@ -1,5 +1,5 @@
 .galaxy-site.galaxy-workspace .community-layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:0; align-items:start; }
-.galaxy-site.galaxy-workspace .community-navigation { position:sticky; top:80px; height:calc(100dvh - 100px); max-height:calc(100dvh - 100px); overflow-y:auto; padding:20px 18px 28px 0; border-right:1px solid var(--g-line); background:#fff; }
+.galaxy-site.galaxy-workspace .community-navigation { position:static; height:auto; max-height:none; overflow:visible; padding:20px 18px 28px 0; border-right:1px solid var(--g-line); background:#fff; }
 .galaxy-site .community-rail-title { margin:0 12px 20px; font-size:21px; font-weight:650; }
 .galaxy-site.galaxy-workspace .community-navigation>.community-domain-links { display:block; flex:none; overflow:visible; border:0; padding:0; }
 .galaxy-site .community-nav-label { margin:22px 12px 8px; font-size:11px; letter-spacing:.1em; color:var(--g-muted); }

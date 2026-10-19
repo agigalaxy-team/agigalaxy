@@ -321,7 +321,7 @@ function TaskCommentsSession({
     if(busyRef.current||!current())return;busyRef.current=true;setBusy(true);setError('');setNotice('');committedRef.current=false;
     try{await fn();}catch(cause){
       if(!current())return;setPreview(null);const required=needsAccountVerification(cause);setVerificationRequired(required);
-      setError(committedRef.current?'内容已发送，列表稍后会自动更新。':required?'发送前需要验证账号。你的文字会保留。':friendlyError(cause));
+      setError(committedRef.current?'内容已发送，列表稍后会自动更新。':required?'发送前需要关联银河账户。你的文字会保留。':friendlyError(cause));
     }finally{try{await local();}catch{}busyRef.current=false;if(current())setBusy(false);}
   }
   const checkLatest=useEffectEvent(async()=>{

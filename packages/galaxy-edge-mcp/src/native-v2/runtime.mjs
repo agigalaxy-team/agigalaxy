@@ -20,6 +20,7 @@ import {createTrustPackageDeviceAdapter} from '../../../galaxy-official/src/trus
 import {createReceiptStatusClient,createReceiptStatusDeviceSigner} from '../../../galaxy-official/src/receipt-status-client.mjs';
 import {createIdentityGroupClientV2} from '../../../galaxy-official/src/identity-group-client-v2.mjs';
 import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/identity-group-device-signer-v2.mjs';
+import {createNativeIdentityAccountClient} from './identity-account-client.mjs';
 
 // Same pinned current-control browser protocol, with a native local signer.
 // No token, PEM or recovery seed is exposed through the returned public methods.
@@ -93,6 +94,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
    bindingId:binding?.bindingId??null,generation:binding?.generation??null,assertCurrent:check});
  }
  const deviceManagement=createIdentityDeviceManagement({endpoint,send,store,getActive:()=>active,captureLease:()=>captureReceiptLease(),now});
+ const identityAccounts=createNativeIdentityAccountClient({api,store,ensureConnection:ensure,syncSelection,captureLease:()=>captureReceiptLease(),readControl:publicControl,sign,now});
  const receiptStatus=Object.freeze({captureLease:()=>captureReceiptLease(),query:async(input,options={})=>{
   const shared=await sharedLease(),owner=active,lease=captureReceiptLease(),check=lease.assertCurrent;
   const getContext=async()=>{check();const current=await trustDevice.current();check();
@@ -274,7 +276,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   }
   return{context,assertCurrent:lease.assertCurrent,assertControl,readControl,signContext,...(openBrowser?{openBrowser}:{})};
  }
- return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,get identityGroups(){return identityGroups();},
+ return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,identityAccounts,get identityGroups(){return identityGroups();},
   authorizationExists:async input=>{const r=await store.get('native-authorization:'+endpoint+':'+input.requestId);return !!r&&JSON.stringify(r.input)===JSON.stringify(input);},
   device:{pending:handoff.pending,offer:handoff.createOffer,approve:handoff.approveOffer,accept:handoff.acceptApproval,reconcile:handoff.reconcile,cancel:handoff.cancel,
    previewOffer:handoff.previewOffer,previewApproval:handoff.previewApproval},

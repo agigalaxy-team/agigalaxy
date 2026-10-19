@@ -47,6 +47,8 @@
 .galaxy-site .selected-messages-layout .message-bubble p{font-size:15px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .galaxy-site.selected-shell .selected-messages-layout .message-bubble .message-quote{background:#f7f1f4;border-left-color:#d8a9be;color:var(--g-muted)}
 .galaxy-site.selected-shell .selected-messages-layout .message-quote span{color:var(--g-muted)}
+.galaxy-site .selected-messages-layout .compose-context{background:var(--g-soft);border-left-color:#d8a9be;color:var(--g-ink)}
+.galaxy-site .selected-messages-layout .compose-context small{color:var(--g-muted)}
 .galaxy-site .selected-messages-layout .conversation-message-actions{display:flex;gap:13px;flex-wrap:wrap;margin-top:4px}
 .galaxy-site .selected-messages-layout .conversation-message-actions button{font-size:11px;min-height:28px;padding:3px 0}
 .galaxy-site.selected-shell .selected-messages-layout .conversation-compose{flex:0 1 auto;min-height:150px;max-height:50%;overflow-y:auto;border-top:1px solid var(--g-line);padding:18px 24px;background:#fff}

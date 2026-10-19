@@ -1,6 +1,5 @@
 import { createBrowserClient, browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { openDeviceKeyStore } from '../../galaxy-core/src/domain/device-key-store.mjs';
-import { createBrowserGenesis } from '../../galaxy-core/src/domain/guid-browser-adapter.mjs';
 import { createIdentityControlClient } from '../../galaxy-core/src/domain/identity-control-client.mjs';
 import { createIdentityDeviceHandoff } from '../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import { createIdentityDeviceManagement } from '../../galaxy-core/src/domain/identity-device-management.mjs';
@@ -377,34 +376,13 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     const material = await store.get(`device:${active.subjectId}:${active.deviceId}`);
     if (!material) throw new Error('本机设备身份材料不可用。'); return material;
   }
-  async function createIdentity({ confirmed = false } = {}) {
-    if (!confirmed) throw new Error('请确认创建本机身份并连接所示银河服务。');
-    const lease = identityLease(); lease.check();
+  /** @param {{confirmed?: boolean}} [_options] */
+  async function createIdentity(_options = {}) {
+    identityLease().check();
+    // Existing browser records remain readable. New Galaxy IDs belong to the
+    // installed local client/plugin; this runtime cannot mint a substitute.
     if (active) return status();
-    let pending = await lease.wait(() => store.get(prefix + 'new-identity'));
-    if (pending && !ownsIdentityPending('new-identity', pending, lease.owner)) throw new Error('请先核对原身份操作。');
-    if (!pending) {
-      const material = await createDeviceMaterial(), genesis = await createBrowserGenesis({ publicKeyPem: material.publicKeyPem, originCode: '5' });
-      lease.check();
-      pending = { subjectId: genesis.id, genesisProof: genesis.genesisProof, deviceId: material.deviceId, installationId: crypto.randomUUID(), operationId: crypto.randomUUID(), owner: ownerKey(lease.owner) };
-      await lease.wait(() => store.put(`device:${genesis.id}:${material.deviceId}`, material));
-      await lease.wait(() => store.put(prefix + 'new-identity', pending));
-    }
-    lease.check();
-    const material = await lease.wait(() => store.get(`device:${pending.subjectId}:${pending.deviceId}`)), client = identityClient(material, material, lease);
-    const savedOperation = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-    let receipt;
-    if (savedOperation?.commit) {
-      receipt = await client.status(pending.operationId);
-      if (receipt.state === 'requested') receipt = await client.retry(pending.operationId, { confirmed: true });
-    } else {
-      const request = { version: 2, kind: 'bootstrap', operationId: pending.operationId, subjectId: pending.subjectId, expectedEpoch: 0, previousEventHash: null,
-        signerKeyId: await identityKeyId(material.publicKeyPem), genesisProof: pending.genesisProof,
-        newDevice: { deviceId: pending.deviceId, publicKeyPem: material.publicKeyPem, scopes: ['manage-identity', ...browserScopes] } };
-      receipt = await client.confirm(await client.prepare(request), { confirmed: true });
-    }
-    if (receipt.state !== 'committed') throw new Error('身份操作尚未完成，请查看原操作状态。');
-    lease.check(); await saveActive(pending, { expectedOwner: lease.owner }); await store.put(prefix + 'new-identity', null); return status();
+    throw Object.assign(new Error('请先安装并打开本机银河客户端，在本地插件中创建银河 ID，再接洽此网页。'), { code: 'local_galaxy_required' });
   }
   /** @param {number} intent @param {string[]|null} permittedScopes @param {{bindingId:string,receipt:string}|null} originalBinding */
   async function establishConnection(intent, permittedScopes = null, originalBinding = null) {
@@ -1333,9 +1311,9 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     sign: async (payload, type, lease) => {
       lease.assertCurrent();
       if (type !== 'galaxy-identity-link+jws') throw new Error('账号关联签名类型不可用。');
-      const material = await store.get(`device:${lease.subjectId}:${lease.deviceId}`); lease.assertCurrent();
-      if (!material?.privateKey) throw new Error('原设备缺少账号关联签名材料。');
-      const signed = await signIdentityPayload(payload, material.privateKey, { type }); lease.assertCurrent(); return signed;
+      // Account association requires the installed local plugin's reviewed
+      // identity.link intent. A browser device key cannot stand in for it.
+      throw Object.assign(new Error('请在当前设备的银河插件中审阅并完成银河账户关联。'), { code: 'local_galaxy_required' });
     } });
   const confirmAccountLink = (id, options) => accounts.confirm(id, options);
   const chatClients = new Map();

@@ -14,7 +14,7 @@ function endpoint(value, allowLoopbackHttp) {
 // discovery and ID Token verification belong to openid-client/the selected AS.
 // The returned identity is not an API credential or a Galaxy authorization.
 export async function createOidcLoginProvider({ id, name, issuer, clientId, redirectUri, clientSecret,
-  allowedOrigins = [], now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
+  allowedOrigins = [], includeAccountProfile = false, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
   if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(id ?? '') || !text(name, 100) || !text(clientId, 200)
     || clientSecret !== undefined && !text(clientSecret, 4096) || !Array.isArray(allowedOrigins) || allowedOrigins.length > 8)
     throw new Error('Invalid OIDC provider configuration.');
@@ -90,6 +90,10 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
         || !Number.isSafeInteger(claims.iat) || !Number.isSafeInteger(claims.exp) || claims.exp <= now()) throw new Error();
       return Object.freeze({ version: 1, providerId: id, issuer: claims.iss, externalSubject: claims.sub, clientId,
         accountVerification: Object.freeze({ method: 'email', verified: claims.email_verified === true }),
+        ...(includeAccountProfile ? {accountProfile: Object.freeze({
+          email: text(claims.email, 320) ? claims.email : null,
+          displayName: text(claims.name, 200) ? claims.name : text(claims.preferred_username, 200) ? claims.preferred_username : null,
+        })} : {}),
         verifiedAt: now(), issuedAt: claims.iat, expiresAt: Math.min(claims.exp, preview.expiresAt),
         authentication: 'oidc-authorization-code-pkce-s256-id-token-signature', galaxyAuthorization: false });
     } catch { throw new Error('OIDC login verification failed.'); }

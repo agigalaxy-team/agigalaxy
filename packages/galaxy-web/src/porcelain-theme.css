@@ -105,3 +105,18 @@ html:has(.galaxy-site), .galaxy-site .site-app-header,
 }
 .galaxy-site { font-family:Inter,"Noto Sans SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
 .galaxy-site select { appearance:none; background-image:none; }
+
+/* Keep the content surfaces on the same palette as the selected internal shell. */
+.galaxy-site .site-content .explore-continue,
+.galaxy-site .site-content .request-extra-fields,
+.galaxy-site .site-content .browse-note {background:#fafbfc;border-color:var(--g-line)}
+.galaxy-site .site-content .empty-state {background:#fafbfc;border-color:var(--g-line)}
+.galaxy-site .site-content .scope-tabs button {color:var(--g-muted)}
+.galaxy-site .site-content .scope-tabs button[aria-current=page] {color:var(--g-accent);border-bottom-color:var(--g-accent)}
+.galaxy-site .site-content .request-visibility>label.selected {background:var(--g-soft);border-color:var(--g-pink-line)}
+.galaxy-site .site-content .request-visibility svg {color:var(--g-accent)}
+.galaxy-site .site-content .request-visibility small {color:var(--g-muted)}
+.galaxy-site .site-content .choice-indicator {border-color:#dce1e7}
+.galaxy-site .site-content .request-visibility>label.selected .choice-indicator {border-color:var(--g-accent)}
+.galaxy-site .site-content .person-identity>.person-portrait,
+.galaxy-site .site-content .person-portrait .member-avatar {background:var(--g-pink-layer);color:var(--g-accent)}

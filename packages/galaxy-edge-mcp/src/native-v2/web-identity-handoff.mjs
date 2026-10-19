@@ -18,6 +18,9 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const codeOf=error=>/^[a-z0-9_-]{1,100}$/.test(error?.code??error?.message??'')?error.code??error.message:'web_identity_operation_failed';
 const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 function targetDescription(path){
+ if(path==='/app/settings/identity?section=account')return '查看当前银河身份与官方账户的关联。';
+ if(path==='/app/account?section=access')return '回到账户中心，继续接入自己的 AI。';
+ if(path==='/app/account')return '回到账户中心，继续原来的事情。';
  if(path.startsWith('/app/search?'))return '围绕“'+new URLSearchParams(path.slice(path.indexOf('?')+1)).get('q')+'”查找方法，随后返回原求助。';
  if(path==='/app/publish')return '继续填写求助。';
  if(path.startsWith('/app/tasks/'))return '继续阅读与处理原求助。';
@@ -33,6 +36,8 @@ export function isWebIdentityTargetPath(path){
  if(typeof path!=='string'||path.length>1500||!path.startsWith('/app/')||/[\\#]/.test(path))return false;
  if(path.includes('?')){
   const parts=path.split('?');if(parts.length!==2||parts[0].includes('%'))return false;
+  if(parts[0]==='/app/account')return parts[1]==='section=access';
+  if(parts[0]==='/app/settings/identity')return parts[1]==='section=account';
   if(parts[0]==='/app/community'){
    const parameters=new URLSearchParams(parts[1]),topic=parameters.get('topic'),query=parameters.get('q'),canonical=new URLSearchParams();
    if(topic!==null){if(!forumReadTopicSchema.safeParse(topic).success)return false;canonical.set('topic',topic);}
@@ -56,7 +61,7 @@ export function isWebIdentityTargetPath(path){
  if(path.includes('%'))return false;
  const object=/^\/app\/(?:tasks|rooms|projects)\/([^/]+)$/i.exec(path),capsule=/^\/app\/(?:capsules|community\/posts)\/([^/]+)(?:\/versions\/([^/]+))?$/i.exec(path);
  return !!object&&uuid(object[1])||!!capsule&&uuid(capsule[1])&&(!capsule[2]||uuid(capsule[2]))
-  ||/^\/app\/(?:community|bookmarks|match|publish|participate|search|capsules|notifications|settings\/(?:privacy|summaries))$/.test(path);
+  ||/^\/app\/(?:account|community|bookmarks|match|publish|participate|search|capsules|notifications|settings\/(?:privacy|summaries))$/.test(path);
 }
 function existingDevice(value,context){
  if(value===null)return null;
@@ -192,7 +197,7 @@ export async function createWebIdentityHandoff({handoffId,navigationId,context:i
     const script='('+browserBridge.toString()+')('+JSON.stringify(boot).replaceAll('<','\\u003c')+');';
     res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'same-origin','x-content-type-options':'nosniff','x-frame-options':'DENY',
      'content-security-policy':"default-src 'none'; script-src 'nonce-"+scriptNonce+"'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"});
-    res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>银河 · 接续已有身份</title><style>body{font:16px/1.65 system-ui;max-width:760px;margin:32px auto;padding:0 20px;background:#fafafa;color:#171717}button{font:inherit;padding:10px 16px;margin:8px}code{overflow-wrap:anywhere}li{margin:8px}h1{font-size:26px}</style><h1>让官网继续使用当前银河身份</h1><p>这次继续使用本机当前银河身份。</p><p>连接后：'+escape(targetDescription(targetPath))+'</p><p>当前服务 <code>'+escape(context.endpoint)+'</code></p><details><summary>准确身份与原目标</summary><p>银河身份 <code>'+escape(context.subjectId)+'</code></p><p>原页面 <code>'+escape(targetPath)+'</code></p></details><p>本机 Agent 保留私钥与原工作定位。官网生成自己的设备钥，只有你明确批准本次设备和权限后才接续。</p><button id="open">打开官网并接续同一身份</button><p id="progress" role="status">本次接续有效期三分钟。关闭窗口只停止传输，已提交的设备操作需查询原结果。</p><section id="offer" hidden><h2>批准官网本次新设备</h2><p>设备公钥指纹 <code id="fingerprint"></code></p><ul id="scopes"></ul><p>批准后，官网将验证公开批准，用自己的新钥完成同一身份接续并连接，然后回到原目标。此次操作不复制私钥、恢复码或原聊天。</p><button id="approve">批准这次显示的设备与权限</button><button id="decline">停止这次接续</button></section><script nonce="'+scriptNonce+'">'+script+'</script></html>');
+    res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>银河 · 接续已有身份</title><style>body{font:16px/1.65 system-ui;max-width:760px;margin:32px auto;padding:0 20px;background:#fff;color:#171717}button{font:inherit;padding:10px 16px;margin:8px 8px 8px 0;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#9d496a}button:focus-visible{outline:3px solid #d8a9be;outline-offset:3px}h2{font-size:18px}section{margin:24px 0}code{overflow-wrap:anywhere}li{margin:8px}h1{font-size:26px}</style><h1>让官网继续使用当前银河身份</h1><p>这次继续使用本机当前银河身份。</p><p>连接后：'+escape(targetDescription(targetPath))+'</p><p>当前服务 <code>'+escape(context.endpoint)+'</code></p><section aria-label="准确身份与原目标"><h2>准确身份与原目标</h2><p>银河身份 <code>'+escape(context.subjectId)+'</code></p><p>原页面 <code>'+escape(targetPath)+'</code></p></section><p>本机 Agent 保留私钥与原工作定位。官网生成自己的设备钥，只有你明确批准本次设备和权限后才接续。</p><button id="open">打开官网并接续同一身份</button><p id="progress" role="status">本次接续有效期三分钟。关闭窗口只停止传输，已提交的设备操作需查询原结果。</p><section id="offer" hidden><h2>批准官网本次新设备</h2><p>设备公钥指纹 <code id="fingerprint"></code></p><ul id="scopes"></ul><p>批准后，官网将验证公开批准，用自己的新钥完成同一身份接续并连接，然后回到原目标。此次操作不复制私钥、恢复码或原聊天。</p><button id="approve">批准这次显示的设备与权限</button><button id="decline">停止这次接续</button></section><script nonce="'+scriptNonce+'">'+script+'</script></html>');
     return;
    }
    if(path===base+'/state'){current();return json(res,200,publicState());}

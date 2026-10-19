@@ -123,21 +123,21 @@ def render_homepage():
             'name': '网页', 'icon': 'globe',
             'copy': '在浏览器中使用银河，随时阅读资料与交流。',
             'title': '打开网页，直接探索',
-            'detail': '先浏览公开内容。需要参与时，再接续自己的银河身份。',
+            'detail': '公开内容直接浏览。需要 ID 时，由网页配合当前设备已安装的银河插件接洽。',
             'href': '/app/', 'action': '进入网页',
         },
         'native': {
             'name': '本机接入', 'icon': 'laptop',
             'copy': '在自己的设备上接入银河，连接获准的资料与工具。',
             'title': '在自己的设备上继续',
-            'detail': '按安装说明接入本机环境，沿用已有身份；本地资料按你的选择使用。',
+            'detail': '先安装本地银河插件，在插件中创建或接续 ID；已有身份与本地资料继续按你的选择使用。',
             'href': '/downloads/', 'action': '查看本机接入',
         },
         'ai': {
             'name': '常用 AI 工具', 'icon': 'plug',
             'copy': '在常用工具中接入银河，继续熟悉的工作方式。',
             'title': '从原来的 AI 对话继续',
-            'detail': '查看支持的宿主与接入方式，把获准的背景交给自己的模型。',
+            'detail': '在所支持的宿主安装银河插件，使用当前环境的 ID，把获准的背景交给自己的模型。',
             'href': '/downloads/', 'action': '查看 AI 工具接入',
         },
     }
@@ -250,7 +250,7 @@ def render_homepage():
 </section>
 
 <section class="gh-access gh-section" aria-labelledby="gh-access-title">
-  <div class="gh-access-copy"><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-access-title">从你熟悉的地方接入</h2><p>带着同一身份，继续原来的事情。</p><div class="gh-entry-choices" role="group" aria-label="选择接入方式">{''.join(entry_choices)}</div><a class="gh-text-action" href="/downloads/">查看接入文档</a></div>
+  <div class="gh-access-copy"><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-access-title">从你熟悉的地方接入</h2><p>先安装本机插件，再创建或接续这个环境的 ID。</p><div class="gh-entry-choices" role="group" aria-label="选择接入方式">{''.join(entry_choices)}</div><a class="gh-text-action" href="/downloads/">查看接入文档</a></div>
   <div class="gh-access-preview"><div class="gh-access-network" data-gh-entry-current="web"><svg class="gh-access-links" viewBox="0 0 520 330" fill="none" aria-hidden="true"><path class="gh-access-link-web" d="M260 165V55"/><path class="gh-access-link-native" d="M247 175C197 172 146 213 133 254"/><path class="gh-access-link-ai" d="M272 175C324 172 374 213 387 254"/></svg><div class="gh-access-brand">{brand_mark()}</div><div role="group" aria-label="接入关系示意">{''.join(entry_nodes)}</div></div><div class="gh-entry-detail" aria-live="polite" aria-atomic="true"><h3 data-gh-entry-title>{entries['web']['title']}</h3><p data-gh-entry-detail>{entries['web']['detail']}</p><a class="gh-text-action" data-gh-entry-link href="{entries['web']['href']}">{entries['web']['action']}</a></div></div>
 </section>
 

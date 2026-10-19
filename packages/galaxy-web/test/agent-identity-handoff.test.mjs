@@ -62,6 +62,13 @@ test('method search continuation retains the exact query and original task witho
  assert.equal(methodSearchIdentityContinuation('not-a-task',query),null);
 });
 
+test('account association is the sole identity return destination and rejects recursive or extra query targets',()=>{
+ const accepted='/app/settings/identity?section=account',base=new URL(website+'/app/settings/identity');
+ base.search=new URLSearchParams({agentConnect:crypto.randomUUID(),agentNavigation:crypto.randomUUID(),agentBridgeOrigin:bridgeOrigin,returnTo:accepted});
+ assert.equal(agentIdentityReturnPath(accepted,website),accepted);assert.equal(readAgentIdentityEntry(base).targetPath,accepted);
+ for(const target of[accepted+'#other',accepted+'&returnTo=%2Fapp%2Faccount',accepted+'&section=access','/app/settings/identity?section=access','/app/settings/identity/child?section=account'])assert.equal(agentIdentityReturnPath(target,website),null);
+});
+
 test('unrelated windows, origins and correlations cannot trigger reads or keys; verified repeated context creates one public offer',async t=>{
  const f=await fixture();t.after(f.stop);const context=await f.context();
  f.message('context',context,{source:{}});f.message('context',context,{origin:website});f.message('context',context,{data:{protocol,version:1,handoffId:crypto.randomUUID(),navigationId:f.entry.navigationId,kind:'context',payload:context}});

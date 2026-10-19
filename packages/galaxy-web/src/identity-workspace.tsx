@@ -179,7 +179,7 @@ function IdentityDeviceSession({runtime,subjectId,deviceId,connected,navigate,on
  if(!runtime||!handoff)return null;
  return <section className="identity-device-workspace">
   <DeviceManagement runtime={runtime} subjectId={subjectId} deviceId={deviceId} connected={connected} onChange={onChange} onManagementChange={onManagementChange} onCurrentChange={value=>{setDeviceState(value);onDeviceStateChange?.(value);}}/>
-  <ReadingDetails id="existing-device" hidden={!showControls&&!open} open={open} onOpenChange={isOpen=>setOpen(isOpen)}>
+  <ReadingDetails mode="inline" id="existing-device" hidden={!showControls&&!open}>
    <ReadingSummary>{subjectId?'在另一台设备使用':'用已有设备连接'}</ReadingSummary>
    <div className="device-connect-panel">
     <h2>{subjectId?'连接自己的新设备':'接回你已有的银河身份'}</h2>

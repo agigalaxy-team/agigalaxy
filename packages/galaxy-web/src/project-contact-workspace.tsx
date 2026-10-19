@@ -333,7 +333,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
       setError(
         projectErrorFlag(e,"resultUnknown")
           ? '上次操作暂未确认，内容已保留。请从提交状态继续。'
-          : projectErrorText(e,'name')==='ZodError'?'请补全必要内容，并核对名称、说明、身份与有效时间。':({account_verification_required:'发布前需要完成账号验证，当前内容仍保留。',recruitment_project_unavailable:'原项目当前不能用于发布招募，请选择公开且进行中的项目。',project_source_unavailable:'原项目介绍当前不能完整公开读取，请先检查项目的分享范围。',project_not_found:'原项目当前不可读取，请重新选择可公开阅读的项目。',recruitment_public_consent_required:'这项招募需要你确认公开发布，请返回预览核对。',invitation_cooldown:'最近发出的联系还在等待对方回应，请保留原内容，稍后再联系。',community_restricted:'当前账号暂时不能进行这类公开操作，内容仍保留；请在账号设置中查看当前限制。'} as Record<string,string>)[code]??projectErrorText(e),
+          : projectErrorText(e,'name')==='ZodError'?'请补全必要内容，并核对名称、说明、身份与有效时间。':({account_verification_required:'发布前需要完成银河账户关联，当前内容仍保留。',recruitment_project_unavailable:'原项目当前不能用于发布招募，请选择公开且进行中的项目。',project_source_unavailable:'原项目介绍当前不能完整公开读取，请先检查项目的分享范围。',project_not_found:'原项目当前不可读取，请重新选择可公开阅读的项目。',recruitment_public_consent_required:'这项招募需要你确认公开发布，请返回预览核对。',invitation_cooldown:'最近发出的联系还在等待对方回应，请保留原内容，稍后再联系。',community_restricted:'当前账号暂时不能进行这类公开操作，内容仍保留；请在账号设置中查看当前限制。'} as Record<string,string>)[code]??projectErrorText(e),
       );
     } finally {
       if (writable)

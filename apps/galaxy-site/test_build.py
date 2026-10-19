@@ -10,6 +10,7 @@ from build import copy_example_images, windows_filesystem_path
 from guide_pages import render_markdown
 import chrome
 from product_pages import render_homepage, render_product_pages
+from public_reading import reading_tree, web_entry_assets
 
 
 class ArchivePathTests(unittest.TestCase):
@@ -45,6 +46,40 @@ class PublicGuideReadingTests(unittest.TestCase):
         for markdown in ['# 安装\n\n[链接](javascript:alert)\n', '# 安装\n\n```text\nnode setup.mjs']:
             with self.subTest(markdown=markdown), self.assertRaises(ValueError):
                 render_markdown(markdown, '/docs/native-client/0.1.10/installation.md', {})
+
+
+class PublicReadingTreeTests(unittest.TestCase):
+    def test_text_and_links_are_data_and_original_code_is_preserved(self):
+        tree = reading_tree('<section><h1>说明</h1><a href="/app/account?section=access">账户</a><pre><code>&lt;script&gt;value&lt;/script&gt;</code></pre></section>')
+        self.assertEqual(tree[0]['children'][2]['children'][0]['children'], ['<script>value</script>'])
+        self.assertEqual(tree[0]['children'][1]['attrs']['href'], '/app/account?section=access')
+
+    def test_executable_tags_attributes_and_unsafe_urls_are_rejected(self):
+        for markup in ['<script>alert(1)</script>', '<style>body{}</style>', '<iframe></iframe>',
+                       '<a href="javascript:alert(1)">x</a>', '<a href="//other.test">x</a>',
+                       '<a href="/app/" onclick="alert(1)">x</a>', '<p style="color:red">x</p>',
+                       '<a href="/app/" href="https://other.test">x</a>', '<div><p>x</div>']:
+            with self.subTest(markup=markup), self.assertRaises(ValueError):
+                reading_tree(markup)
+
+    def test_deep_or_unclosed_content_is_rejected(self):
+        for markup in ['<div>' * 43 + 'x' + '</div>' * 43, '<section>unclosed']:
+            with self.subTest(markup=markup), self.assertRaises(ValueError):
+                reading_tree(markup)
+
+    def test_bootstrap_names_the_exact_existing_build_files(self):
+        with TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / 'assets').mkdir()
+            (directory / 'assets/main-actual.js').write_text('export {}', encoding='utf-8')
+            (directory / 'assets/main-actual.css').write_text('body{}', encoding='utf-8')
+            (directory / 'index.html').write_text('<script type="module" src="/app/assets/main-actual.js"></script><link rel="stylesheet" href="/app/assets/main-actual.css">', encoding='utf-8')
+            assets = web_entry_assets(directory)
+            self.assertEqual(assets['entry'], '/app/assets/main-actual.js')
+            self.assertEqual(set(assets['sha256']), {'/app/assets/main-actual.js', '/app/assets/main-actual.css'})
+            (directory / 'assets/main-actual.js').unlink()
+            with self.assertRaises(ValueError):
+                web_entry_assets(directory)
 
 
 class HomepageParser(HTMLParser):

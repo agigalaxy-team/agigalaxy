@@ -64,7 +64,8 @@ function IdentityOperationSession({runtime,busy,run,onContinue,onReview,displaye
  return <section className="identity-continuity" aria-label="身份接续">
   {active.map(row=><div className="identity-continuity-item" key={row.operationId}>
    <p>{receipts[row.operationId]?.requiresOriginalPreparation?'上次'+(operationNames[row.kind]??'身份接续')+'还未完成。':'正在确认上次'+(operationNames[row.kind]??'身份接续')+'的结果…'}</p>
-   {receipts[row.operationId]?.requiresOriginalPreparation&&onReview&&<Button variant="outline" disabled={busy||applying} onClick={()=>onReview(row)}>{continueNames[row.kind]??'继续接续'}</Button>}
+   {receipts[row.operationId]?.requiresOriginalPreparation&&row.kind==='bootstrap'&&<p>原申请保留。创建新 ID 请在本机银河插件中完成。</p>}
+   {receipts[row.operationId]?.requiresOriginalPreparation&&row.kind!=='bootstrap'&&onReview&&<Button variant="outline" disabled={busy||applying} onClick={()=>onReview(row)}>{continueNames[row.kind]??'继续接续'}</Button>}
    {failed===row.operationId&&<Button variant="outline" disabled={busy||applying} onClick={()=>void continueOriginal(row.operationId)}>再试一次</Button>}
   </div>)}
   {(error||readError)&&<output className="message error">{error||readError}</output>}
