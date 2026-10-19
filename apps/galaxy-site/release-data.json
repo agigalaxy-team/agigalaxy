@@ -1,7 +1,7 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.26",
-  "releaseId": "0.1.26",
+  "version": "0.1.27",
+  "releaseId": "0.1.27",
   "component": "site",
   "backendRelease": "0.1.17",
   "kind": "website-and-browser-workspace",
