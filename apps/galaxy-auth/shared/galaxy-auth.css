@@ -66,12 +66,23 @@
 .auth-footer{margin:0 var(--page-gutter,32px);padding:20px 0;border-top:1px solid var(--g-line);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--g-muted)}
 .auth-footer nav{display:flex;gap:22px;flex-wrap:wrap}
 .auth-landing-actions{margin-top:30px;display:flex;flex-direction:column;align-items:stretch;gap:14px}
+.galaxy-auth-body[data-page-id="login-galaxy-email-code"] .auth-form-context{display:none}
+.auth-form-area .auth-code-destination{font-size:14px;font-weight:500;line-height:1.7;overflow-wrap:anywhere;margin:0 0 24px}
+.auth-form-area .auth-code-description{font-size:13px;line-height:1.8;color:var(--g-muted);margin:0 0 24px}
+.auth-form-area .auth-code-input{font-variant-numeric:tabular-nums;letter-spacing:.3em;text-align:center;font-size:23px;min-height:54px;padding-inline:18px}
+.auth-form-area .auth-code-help{font-size:12px;line-height:1.7;color:var(--g-muted);margin-top:9px}
+.auth-form-area .auth-code-options{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin-top:16px}
+.auth-code-return{display:flex;gap:16px;flex-wrap:wrap}
+.auth-form-area .auth-code-text-button{border:0;background:transparent;padding:5px 0;min-height:36px;font:inherit;font-size:13px;line-height:1.7;color:var(--g-accent);text-align:start;cursor:pointer}
+.auth-form-area .auth-code-text-button:hover:not(:disabled){text-decoration:underline;text-underline-offset:4px}
+.auth-form-area .auth-code-text-button:disabled{color:var(--g-muted);cursor:default}
 @keyframes auth-orbit{to{transform:rotate(360deg)}}
 @keyframes auth-progress{0%{transform:translateX(-100%)}100%{transform:translateX(435%)}}
 @media(max-width:720px){
  .auth-workspace{padding:40px var(--page-gutter,16px);align-items:flex-start}
  .auth-form-area{align-self:flex-start}
  .auth-form-area input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=hidden]),.auth-form-area select,.auth-form-area textarea{font-size:16px}
+ .auth-form-area input.auth-code-input{font-size:23px}
  .auth-form-area .login-pf-settings{gap:12px}
  .auth-footer{gap:12px}
  .auth-footer nav{gap:12px 18px}

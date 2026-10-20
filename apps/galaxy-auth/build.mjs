@@ -5,10 +5,11 @@ import {createHash} from 'node:crypto';
 import {createElement as h} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {GalaxyMark,GlobalRail,SiteHeader,siteChromeStyles} from '../../packages/galaxy-web/src/site-chrome.mjs';
+import {keycloakEmailThemeTemplates} from '../../packages/galaxy-mail/src/layout.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const shellSource=path.resolve(here,'../../packages/galaxy-web/src');
-const args=process.argv.slice(2),outputAt=args.indexOf('--out');
+const args=process.argv.slice(2),outputAt=args.indexOf('--out'),providerAt=args.indexOf('--provider-jar');
 if(outputAt<0||!args[outputAt+1])throw new Error('Pass a new output directory with --out. Existing nonempty directories are preserved.');
 const output=path.resolve(args[outputAt+1]);
 if(output===here||here.startsWith(output+path.sep))throw new Error('Output must not contain the source directory.');
@@ -23,6 +24,18 @@ await write('README.md',await read('README.md'));
 await write('client-contract.json',await read('client-contract.json'));
 await copyTree('licenses','licenses');
 await copyTree('theme/galaxy/login',theme);
+const emailThemes=['galaxy-mail-editorial'];
+for(const name of emailThemes)await copyTree('theme/'+name+'/email','themes/'+name+'/email');
+for(const [name,content] of Object.entries(keycloakEmailThemeTemplates()))await write('themes/galaxy-mail-editorial/email/'+name,content);
+let emailCodeProvider=null;
+if(providerAt>=0){
+ if(!args[providerAt+1])throw new Error('Pass the separately compiled Keycloak 26.7.3 provider JAR after --provider-jar.');
+ const source=path.resolve(args[providerAt+1]),data=await readFile(source);
+ if(!source.endsWith('.jar')||data.length<4||data[0]!==0x50||data[1]!==0x4b)throw new Error('The provider must be a compiled JAR archive.');
+ const target='providers/galaxy-email-code.jar';
+ await write(target,data);
+ emailCodeProvider={path:target,sha256:createHash('sha256').update(data).digest('hex')};
+}
 const resourceSources=Object.fromEntries(await Promise.all([
  ['js/galaxy-auth.js',path.join(here,'shared/galaxy-auth.js')],
  ['js/site-search.js',path.join(shellSource,'site-search.mjs')],
@@ -83,5 +96,5 @@ for(const [target,content] of [['site/index.html','src/landing.html']]){
 const files=[];
 async function inventory(dir=''){for(const name of (await readdir(path.join(output,dir))).sort()){const rel=path.join(dir,name),meta=await stat(path.join(output,rel));if(meta.isDirectory())await inventory(rel);else files.push({path:rel.split(path.sep).join('/'),bytes:meta.size});}}
 await inventory();
-await write('manifest.json',JSON.stringify({schemaVersion:1,name:'galaxy-auth',version:'0.1.0',keycloakVersion:'26.7.3',theme:'galaxy',resourceVersion,files},null,2)+'\n');
+await write('manifest.json',JSON.stringify({schemaVersion:1,name:'galaxy-auth',version:'0.1.0',keycloakVersion:'26.7.3',theme:'galaxy',emailThemes,emailCodeProvider,resourceVersion,files},null,2)+'\n');
 console.log(JSON.stringify({output,theme:'galaxy',keycloakVersion:'26.7.3',fileCount:files.length}));

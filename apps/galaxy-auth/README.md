@@ -11,6 +11,9 @@
 - `src/head.ftl`、`src/form.ftl`：主题宏。保留 Keycloak 会话检查、原生表单 action、隐藏字段、错误及可选认证入口。
 - `shared/`：认证表单布局与提交等待的渐进增强。字体、主题、顶栏与响应式导航直接取共用 `site-foundation.css` 和 `selected-shell.css`；品牌与等待图标从共用 `GalaxyMark` 输出，不维护第二套 SVG。
 - `theme/galaxy/login/`：主题继承、中文与英文文案。
+- `providers/email-code/`：Keycloak 26.7.3 邮件验证码扩展及保留原密码动作的找回流程规划器；包含显式重填邮箱时的账户选择适配。
+- `theme/galaxy-mail-editorial/email/`：用户选定的“精细账笺”中文、英文邮件主题，HTML 与纯文本共用品牌头尾。其余两款仅保留设计参考。
+- `email-designs/`：三款邮件的静态设计预览；其中固定示例码不用于正式模板。
 - `client-contract.json`：独立官方账户登录的公开客户端契约，不含凭据。
 
 在仓库根目录使用已经配置的 Node.js，无需为本目录新增依赖：
@@ -19,7 +22,9 @@
 node apps/galaxy-auth/build.mjs --out /absolute/new/galaxy-auth-release
 ```
 
-输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与记录文件路径、大小的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
+输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、已选择的 `themes/galaxy-mail-editorial/email/`、`site/` 与记录文件路径、大小的 `manifest.json`。唯一邮件布局源为共享包 [`packages/galaxy-mail/src/layout.mjs`](../../packages/galaxy-mail/src/layout.mjs)：注册、重置、系统通知和服务邮件复用同一品牌头尾与排版，各自提供正文。`email-designs/common/email-layout.mjs` 只是该模块的 re-export bridge，不维护第二套布局。构建不会自动启用服务器的新认证流程。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
+
+邮件验证码扩展按[扩展说明](providers/email-code/README.md)单独离线编译。需要完整验证码候选时，在上述构建命令加 `--provider-jar /absolute/provider-candidate/galaxy-email-code-26.7.3.jar`。构建器将它复制到 `providers/galaxy-email-code.jar` 并记录 SHA-256；不自动安装到认证服务器。
 
 构建会为样式、脚本、品牌图片及样式和脚本的相对依赖添加同一内容版本链接，更新后不继续使用认证服务器长缓存中的旧资源。
 
@@ -42,11 +47,19 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 
 `mode=register` 保留一次授权请求的全部参数，只将同 issuer 的 `/protocol/openid-connect/auth` 路径改为 `/protocol/openid-connect/registrations`。这条路径已在真实 26.7.3 隔离实例完成邮件确认与密码设置。当前 realm 的 `verifyEmail=true` 对应先确认邮箱再设置密码，注册首屏不出现密码是该流程的正常行为，主题不得绕过该要求。
 
+本批邮件验证码候选保留正常密码登录。启用后，注册/未验证邮箱的 `VERIFY_EMAIL` 和找回密码的发邮件步骤使用六位一次性邮件码，默认有效期 **600 秒、60 秒重发、每事务最多 5 次错误**。验证码在原认证页面输入，随后继续原密码设置与 OIDC 返回；不会以点击邮件链接代替输入验证码。后端保留过期、限次、重发后旧码作废和一次消费检查，前端倒计时只帮助显示。
+
+扩展默认不启用注册验证码：只有 `galaxy` realm 的 `VERIFY_EMAIL.config` 中 `email-code-enabled` 精确为字符串 `true` 时才启用，缺失、关闭或其他值沿用原 Keycloak 实现。新流程需要同时安装扩展、提供登录与邮件模板，并为目标 realm 选择相应流程及邮件主题；仅部署 CSS 或静态页面不会启用它。正常密码登录的 browser flow 不属于本次替换范围。邮箱变更等其他事件的模板预览不代表其后端已接入数字验证码。
+
+用户已选择第二款“精细账笺” `galaxy-mail-editorial` 与 AGI Galaxy 发件人/署名。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
+
 原 `galaxy-official` 客户端和身份签名关联接口继续处理既有事务。账户登录成功后，关联仍需当前设备的插件完成本机确认；官方账户 Cookie 不代替 subject Bearer、设备授权或签名。
 
 ## 部署顺序与回滚
 
 由拥有本次发布职责的执行者操作生产，主题构建脚本不执行发布。
+
+下面六步说明首次建立静态认证入口和独立账户客户端时的配置。已有这些入口的邮件验证码更新保留原客户端、browser flow、数据库和安全策略；新 JAR 与主题可用后，先选择 `emailTheme=galaxy-mail-editorial`、绑定复制后的 reset flow，最后合并 `VERIFY_EMAIL` 的三项策略及 `email-code-enabled=true`。具体执行与恢复顺序见[验证码扩展说明](providers/email-code/README.md)。
 
 1. 确认目标 Keycloak 版本、realm 与现有路由。主题更新保留数据库、账户、凭据、注册策略及已有客户端。
 2. 构建到新的版本目录，将 `themes/galaxy` 作为只读主题目录交给相同版本的 Keycloak；保留前一主题目录与先前 `loginTheme` 值，不编辑镜像中的内置主题。
@@ -65,7 +78,7 @@ X-Frame-Options: DENY
 Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
 ```
 
-若登录或页面出现故障，切回前一静态发布目录与先前 realm `loginTheme` 值。账户数据与既有客户端不属于主题回滚内容。保留新客户端或停用它，应由发布者按仍在使用的服务端会话接口状态协调，不删除其他客户端。
+仅更新静态页或登录主题时，故障回退为前一静态发布目录与先前 realm `loginTheme` 值。涉及邮件验证码扩展时，先按 checkpoint 恢复启用开关和策略，再恢复原 email theme/reset flow，确认恢复后才能撤下 JAR 或切回旧挂载；恢复失败时保留当前候选供重试。账户数据与既有客户端不属于主题回滚内容。
 
 ## AI-agent 操作说明
 

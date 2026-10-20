@@ -1,0 +1,6 @@
+{
+  "name": "@galaxy/mail",
+  "private": true,
+  "type": "module",
+  "exports": "./src/layout.mjs"
+}
