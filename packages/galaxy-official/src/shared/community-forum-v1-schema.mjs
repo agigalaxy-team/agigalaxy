@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import {ServiceError} from './service-error.mjs';
 import {forumTopicSchema,forumReadTopicSchema} from './community-forum-topics-v1.mjs';
 import {forumAudienceSchema,forumSectionWriteSchema,forumSectionClassificationSchema} from './community-forum-access-v2.mjs';
+import {forumAttachmentReferencesSchema} from './forum-attachments-v1-schema.mjs';
 
 const uuid=z.uuid(),positive=z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 // Limits are explicitly Unicode code points, not user-perceived graphemes.
@@ -12,12 +13,12 @@ const link=z.string().refine(value=>{try{const url=new URL(value);return Array.f
 // may use that object's unchanged owner; an unsigned header cannot replace it.
 const base={schemaVersion:z.literal(1),operationId:uuid,accountId:uuid.optional()};
 const handlers=z.array(z.string().regex(/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/)).max(128);
-const content={versionId:uuid,title:text(160),body:text(8000),links:z.array(link).max(8),publishedUntil:positive,topic:forumTopicSchema.optional(),sectionId:uuid.nullable().optional(),audience:forumAudienceSchema.optional()};
+const content={versionId:uuid,title:text(160),body:text(8000),links:z.array(link).max(8),attachments:forumAttachmentReferencesSchema.optional(),publishedUntil:positive,topic:forumTopicSchema.optional(),sectionId:uuid.nullable().optional(),audience:forumAudienceSchema.optional()};
 export const forumCreatePostSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:z.literal(0),...content});
 export const forumPublishVersionSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:positive,...content});
 export const forumWithdrawPostSchema=z.strictObject({...base,postId:uuid,expectedHeadVersion:positive});
 export const forumWithdrawVersionSchema=z.strictObject({...base,postId:uuid,versionId:uuid,expectedHeadVersion:positive});
-export const forumCreateReplySchema=z.strictObject({...base,replyId:uuid,postId:uuid,postVersionId:uuid,expectedRevision:z.literal(0),body:text(2000),publishedUntil:positive,
+export const forumCreateReplySchema=z.strictObject({...base,replyId:uuid,postId:uuid,postVersionId:uuid,expectedRevision:z.literal(0),body:text(2000),attachments:forumAttachmentReferencesSchema.optional(),publishedUntil:positive,
  replyTo:z.strictObject({replyId:uuid,contentRevision:z.literal(1)}).nullable(),audience:forumAudienceSchema.optional()});
 export const forumWithdrawReplySchema=z.strictObject({...base,replyId:uuid,expectedRevision:z.literal(1)});
 export const forumTargetSchema=z.discriminatedUnion('kind',[

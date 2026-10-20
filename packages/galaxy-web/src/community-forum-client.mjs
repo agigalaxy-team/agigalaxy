@@ -4,11 +4,13 @@ import { forumWriteSpec } from '../../galaxy-official/src/shared/community-forum
 import { bindForumIds } from '../../galaxy-official/src/shared/community-forum-ids-v1.mjs';
 import { forumTopicSchema,forumReadTopicSchema } from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 import { forumAudienceSchema } from '../../galaxy-official/src/shared/community-forum-access-v2.mjs';
+import {createForumAttachmentsClient,forumDraftAttachmentsSchema,forumAttachmentError} from './forum-attachment-client.mjs';
 
 const draftSchema = z.strictObject({
   id: z.uuid(), revision: z.number().int().positive(),
   kind: z.enum(['create-post', 'publish-version', 'create-reply', 'withdraw-post', 'withdraw-version', 'withdraw-reply', 'create-report', 'supplement', 'withdraw-report', 'appeal', 'resolve', 'create-section', 'update-section']),
   title: z.string().default(''), body: z.string().default(''), linksText: z.string().default(''),
+  attachments:forumDraftAttachmentsSchema.default([]),
   topic: forumReadTopicSchema.optional(),
   sectionId: z.uuid().nullable().optional(), audience: forumAudienceSchema.optional(),
   theme: z.string().default(''), description: z.string().default(''), sectionState: z.enum(['active','archived']).default('active'),
@@ -43,13 +45,14 @@ export function forumDraftPayload(value, { maxPermissionSeconds, maxGovernanceHi
   const content = () => ({ versionId: crypto.randomUUID(), title: draft.title.trim(), body: draft.body.trim(),
     links: draft.linksText.split(/\r?\n/).map(line => line.trim()).filter(Boolean), publishedUntil: now + maxPermissionSeconds,
     ...(forumTopicSchema.safeParse(draft.topic).success?{topic:draft.topic}:{}),
+    ...(draft.attachments.length?{attachments:draft.attachments.map(({id,sha256})=>({id,sha256}))}:{}),
     ...(draft.sectionId!==undefined?{sectionId:draft.sectionId}:{}),...(draft.audience?{audience:draft.audience}:{}) });
   switch (draft.kind) {
     case 'create-post': return { ...base, postId: crypto.randomUUID(), expectedHeadVersion: 0, ...content() };
     case 'publish-version': return { ...base, postId: target.postId, expectedHeadVersion: target.expectedHeadVersion, ...content() };
     case 'create-reply': return { ...base, replyId: crypto.randomUUID(), postId: target.postId, postVersionId: target.versionId,
       expectedRevision: 0, body: draft.body.trim(), publishedUntil: now + maxPermissionSeconds, replyTo: draft.replyTo,
-      ...(draft.audience?{audience:draft.audience}:{}) };
+      ...(draft.attachments.length?{attachments:draft.attachments.map(({id,sha256})=>({id,sha256}))}:{}),...(draft.audience?{audience:draft.audience}:{}) };
     case 'create-section': case 'update-section': return {...base,sectionId:target.sectionId??crypto.randomUUID(),expectedVersion:target.expectedVersion??0,
       title:draft.title.trim(),theme:draft.theme.trim(),description:draft.description.trim(),audience:draft.audience,state:draft.sectionState};
     case 'withdraw-post': return { ...base, postId: target.postId, expectedHeadVersion: target.expectedHeadVersion };
@@ -70,12 +73,13 @@ export function forumDraftPayload(value, { maxPermissionSeconds, maxGovernanceHi
 }
 
 export function forumError(reason) {
+  if(typeof reason?.code==='string'&&reason.code.startsWith('attachment_'))return forumAttachmentError(reason);
   if (reason?.name === 'TypeError' && ['Failed to fetch', 'fetch failed', 'NetworkError when attempting to fetch resource.', 'Load failed'].includes(reason.message)) {
     return '暂时无法连接社区，请检查网络后重试。';
   }
   return ({ forum_scope_changed: '身份或连接已改变，请重新打开并核对原稿。', receipt_status_authority_changed: '身份或连接已改变；原稿和原操作仍分别保留。',
-    connection_required: '请先连接当前身份。本机稿仍保留。', account_verification_required: '这次发表需要完成银河账户关联，本机稿已经保留。',
-    verified_account_required: '这次发表需要完成银河账户关联，本机稿已经保留。', invalid_forum_payload: '请检查必填内容、字数、链接和准确目标后，再确认发表。',
+    connection_required: '请登录银河账户后继续，草稿保留。', account_verification_required: '请登录银河账户后继续，草稿保留。',
+    verified_account_required: '请登录银河账户后继续，草稿保留。', invalid_forum_payload: '请检查必填内容、字数和链接后再发表。',
     forum_payload_too_large: '这次内容超出可提交大小，请缩短文字或链接。', forum_quota_exceeded: '今天的此类发表额度已用完，本机稿可以保留。',
     forum_version_conflict: '这条记录已更新，请保留本机稿并重新核对当前版本。', forum_operation_conflict: '同一原操作出现不同内容，请保留原记录核对。',
     forum_head_conflict: '帖子已经有新的变化，请保留本机稿并重新核对当前版本。',
@@ -98,7 +102,6 @@ export function forumError(reason) {
     forum_original_status_unavailable: '草稿所指的原操作暂不能核对。原记录仍保留，请先查询原结果，或明确停止本机重试。',
     forum_cursor_mismatch: '浏览条件已改变，请从当前主题重新读取列表。',
     official_account_session_expired: '请登录银河账户后继续，正在编辑的文字仍保存在此浏览器。',
-    official_account_unavailable: '账户服务暂时不可用，草稿和原操作保留。',
     official_account_changed: '当前登录账户已经变化。原账户的草稿和原操作分别保留，请回到原账户继续。',
     official_account_unavailable: '账户暂时无法连接，草稿保留。连接恢复后继续。',
     account_selection_required: '这个 ID 关联了多个账户，请先选择本次操作的目标账户。',
@@ -114,7 +117,7 @@ export function forumError(reason) {
 // Draft heads and the original-operation journal share one IDB transaction.
 // A second tab can retire an operation without allowing an old queued save,
 // signing completion, or HTTP completion to resurrect its retry body.
-/** @param {any} runtime @param {{subjectId?: string|null, context?: string, browserDrafts?:boolean, account?:{id:string,assertCurrent:()=>void,call:(path:string,input:unknown,options?:{method?:string})=>Promise<any>}|null, targetAccountId?:string|null, now?:()=>number}} [options] */
+/** @param {any} runtime @param {{subjectId?: string|null, context?: string, browserDrafts?:boolean, account?:{id:string,assertCurrent:()=>void,call:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<any>,transfer?:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<Response>}|null, targetAccountId?:string|null, now?:()=>number}} [options] */
 export function createCommunityForumClient(runtime, { subjectId = null, context = 'community', browserDrafts = false, account = null, targetAccountId = null, now=()=>Math.floor(Date.now()/1000) } = {}) {
   const api = runtime.api, endpoint = api.endpoint, original = api.snapshot();
   const lease = subjectId && !account ? runtime.receiptStatus.captureLease() : null;
@@ -157,6 +160,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   const privateCall = async (path, input, method = 'POST', accountId = targetAccountId) => { writeCheck(); return wait(() => account?account.call(path,input,{method}):api.call(path, input, { method, authenticated: true, ...(accountId?{accountId}:{}) })); };
   const readerCall = (path,input,method='POST',accountId=targetAccountId) => account ? wait(()=>account.call(path,input,{method}))
     : subjectId&&api.snapshot() ? wait(()=>api.call(path,input,{method,authenticated:true,...(accountId?{accountId}:{})})) : publicCall(path,input,method);
+  const attachments=createForumAttachmentsClient({endpoint,publicCall,account});
   function rowValue(value) {
     const row = value ?? { version: 1, endpoint, subjectId, ...(account||browserDrafts&&!subjectId?{ownerId}:{}), drafts: {}, active: null, completed: [] };
     if (row.version !== 1 || row.endpoint !== endpoint || row.subjectId !== subjectId || !row.drafts || !Array.isArray(row.completed))
@@ -382,7 +386,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   }
 
   return Object.freeze({
-    check, draft, close() { closed = true; },
+    check, draft, attachments, close() { closed = true; },
     topics: () => publicCall('/v2/community/topics', null, 'GET'),
     posts: input => readerCall('/v2/community/posts/query', input ?? {}),
     post: postId => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}`, null, 'GET'),

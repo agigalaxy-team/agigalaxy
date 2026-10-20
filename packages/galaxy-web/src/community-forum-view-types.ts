@@ -3,12 +3,13 @@ import type {newForumDraft} from './community-forum-client.mjs';
 import {forumCreatePostSchema,forumPublishVersionSchema,forumCreateReplySchema,forumWithdrawPostSchema,forumWithdrawVersionSchema,forumWithdrawReplySchema,forumReportSchema,forumSupplementSchema,forumWithdrawReportSchema,forumAppealSchema,forumResolveSchema,forumTargetSchema,forumPostsQuerySchema} from '../../galaxy-official/src/shared/community-forum-v1-schema.mjs';
 import {forumReadTopicSchema} from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 import {forumAudienceSchema,forumAudienceRuleSchema,forumSectionWriteSchema} from '../../galaxy-official/src/shared/community-forum-access-v2.mjs';
+import type {ForumAttachmentClient,ForumAttachmentView} from './forum-attachments';
 
 export type ForumDraft=ReturnType<typeof newForumDraft>;
 export type ForumKind=ForumDraft['kind'];
 export type ForumDraftRef=Pick<ForumDraft,'id'|'revision'>;
 export type ForumDraftTarget=Partial<{kind:'post-version'|'reply';postId:string;versionId:string;versionNumber:number;replyId:string;contentRevision:1;expectedHeadVersion:number;reportId:string;expectedReportVersion:number;sectionId:string;expectedVersion:number;accountId:string}>;
-export type ForumDraftValues=Partial<Pick<ForumDraft,'title'|'body'|'linksText'|'topic'|'replyTo'|'category'|'resolution'|'hide'|'hideHours'|'audience'|'sectionId'|'theme'|'description'|'sectionState'>>;
+export type ForumDraftValues=Partial<Pick<ForumDraft,'title'|'body'|'linksText'|'attachments'|'topic'|'replyTo'|'category'|'resolution'|'hide'|'hideHours'|'audience'|'sectionId'|'theme'|'description'|'sectionState'>>;
 export type ForumAudience=z.infer<typeof forumAudienceSchema>;
 export type ForumAudienceRule=z.infer<typeof forumAudienceRuleSchema>;
 export type ForumAccessOptions={rules:{kind:string;label:string}[];honors:{ruleId:string;ruleVersion:string;label:string;issuer:string}[];externalCredentials:{kind:'external-credential';issuerId:string;conditionId:string;label:string;issuerName:string}[];externalCredentialsState:string;checkedAt:number};
@@ -26,15 +27,15 @@ export type ForumPostLocator={kind:'post';postId:string};
 export type ForumPostLocation={kind:'post'|'post-version';postId:string;versionId?:string;versionNumber?:number};
 export type ForumVersionLocator={kind:'post-version';postId:string;versionId:string;versionNumber:number};
 export type ForumReplyLocator={kind:'reply';replyId:string;contentRevision:1;postId:string;postVersionId:string};
-export type ForumPostPayload=Pick<z.infer<typeof forumCreatePostSchema>,'title'|'body'|'links'|'topic'>;
-export type ForumContentPayload=Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'>|ForumPostPayload;
+export type ForumPostPayload=Pick<z.infer<typeof forumCreatePostSchema>,'title'|'body'|'links'|'topic'|'attachments'>;
+export type ForumContentPayload=Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'|'attachments'>|ForumPostPayload;
 export type ForumAuthorFields={authorId?:string|null;authorAccountId?:string|null;author?:{kind:'account'|'identity';accountId:string|null;subjectId:string|null;displayName?:string|null}};
 export type ForumContentView={
  locator:ForumPostLocation|ForumReplyLocator;availability:string;checkedAt:number;headVersion?:number;currentVersionId?:string|null;
- payload?:ForumContentPayload;publishedUntil?:number;permissionId?:string;topic?:ForumTopic;createdAt?:number;versionCreatedAt?:number;updatedAt?:number;audience?:ForumAudience;sectionId?:string|null;canParticipate?:boolean;audienceInherited?:boolean;
+  payload?:ForumContentPayload;attachments?:ForumAttachmentView[];publishedUntil?:number;permissionId?:string;topic?:ForumTopic;createdAt?:number;versionCreatedAt?:number;updatedAt?:number;audience?:ForumAudience;sectionId?:string|null;canParticipate?:boolean;audienceInherited?:boolean;
 }&ForumAuthorFields;
 export type ForumPostView=ForumContentView&{locator:ForumPostLocation;payload?:ForumPostPayload};
-export type ForumReplyView=ForumContentView&{locator:ForumReplyLocator;payload?:Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'>};
+export type ForumReplyView=ForumContentView&{locator:ForumReplyLocator;payload?:Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'|'attachments'>};
 export type ForumVersionEntry={locator:ForumVersionLocator;availability:string;checkedAt:number;permissionId?:string;publishedUntil?:number};
 export type ForumOwnedPostSummary=ForumAuthorFields&{locator:ForumPostLocator;headVersion:number;currentVersionId:string|null;state:string;checkedAt:number;availability?:string;payload?:ForumPostPayload;publishedUntil?:number;topic?:ForumTopic;createdAt?:number;versionCreatedAt?:number;updatedAt?:number;audience?:ForumAudience;sectionId?:string|null;canParticipate?:boolean};
 export type ForumOwnedVersion={locator:ForumVersionLocator;state:string;permissionId:string;publishedUntil:number;availability:string};
@@ -51,7 +52,7 @@ export type ForumPending={operationId:string;payloadHash:string;kind:ForumKind;c
 export type ForumReceipt={status:'absent'|'acknowledged'|'none';operationId?:string;payloadHash?:string;locator?:ForumLocator};
 export type ForumPage<T>={items:T[];nextAfter:string|null;order?:'published'|'id'};
 export type ForumClient={
- check:()=>void;close:()=>void;
+  check:()=>void;close:()=>void;attachments:ForumAttachmentClient;
  draft:{load:()=>Promise<ForumDraft|null>;save:(value:ForumDraft)=>Promise<ForumDraft>;flush:()=>Promise<void>;clear:(reference:ForumDraftRef)=>Promise<boolean>;importVisitor:(reference:ForumDraftRef)=>Promise<{status:string;draft:ForumDraft|null}>};
  posts:(input?:ForumPostsQuery)=>Promise<ForumPage<ForumPostView>>;owned:(input?:ForumPostsQuery)=>Promise<ForumPage<ForumOwnedPostSummary>>;reports:(input?:{after?:string})=>Promise<ForumPage<ForumReport>>;
  post:(postId:string)=>Promise<ForumPostView>;version:(postId:string,versionId:string)=>Promise<ForumPostView>;reply:(replyId:string)=>Promise<ForumReplyView>;

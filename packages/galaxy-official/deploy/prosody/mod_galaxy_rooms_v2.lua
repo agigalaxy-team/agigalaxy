@@ -31,6 +31,15 @@ local function authorized(room, subject, revision)
  return room and room._data.galaxy_v2 and room._data.galaxy_v2.revision == revision
   and room._data.galaxy_v2.members[subject] == true;
 end
+local function participant_node(ref)
+ if type(ref) ~= "string" then return nil; end
+ -- Preserve every old identity JID. Accounts have their own explicit namespace;
+ -- no account is enrolled as, or converted into, a Galaxy identity.
+ if #ref == 32 and ref:match("^GUID[A-Z0-9]+$") then return string.lower(ref); end
+ local account = ref:match("^account:([0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+%-[0-9a-f]+)$");
+ if account and #account == 36 and account:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then return "account-" .. account; end
+ return nil;
+end
 local function erased(room_id, message_id)
  local records = tombstones:get(room_id) or {};
  return records[message_id] and records[message_id] > os.time();
@@ -85,17 +94,18 @@ module:hook("iq-set/host/" .. ns .. ":command", function(event)
    room:set_allow_member_invites(false); room:set_whois("anyone");
    room._data.archiving = true;
   end
-  local members = {};
+   local members, addresses = {}, {};
   for _, subject in ipairs(x.members) do
-   if type(subject) ~= "string" or #subject ~= 32 or not subject:match("^GUID[A-Z0-9]+$") then return fail("invalid_chat_request"); end
+    local node = participant_node(subject); if not node then return fail("invalid_chat_request"); end
    members[subject] = true;
+    addresses[node .. "@" .. gateway] = true;
   end
   local old = {};
   for address in room:each_affiliation() do table.insert(old, address); end
   for _, address in ipairs(old) do
-   if not members[string.upper(jid.node(address) or "")] then room:set_affiliation(true, address, "none"); end
+    if not addresses[address] then room:set_affiliation(true, address, "none"); end
   end
-  for subject in pairs(members) do room:set_affiliation(true, string.lower(subject) .. "@" .. gateway, "member"); end
+   for address in pairs(addresses) do room:set_affiliation(true, address, "member"); end
   room:set_name(x.title);
   room._data.galaxy_v2 = { revision = x.revision; members = members; state = x.state };
   room:save(true); return reply({ revision = x.revision });
@@ -131,7 +141,7 @@ module:hook("iq-set/host/" .. ns .. ":command", function(event)
   local sent = datetime.parse(x.sentAt); local expiry = datetime.parse(x.expiresAt);
   if not sent or not expiry or sent > os.time() + 30 or expiry <= os.time() or expiry - sent > 90 * 86400 then return fail("chat_expiry_invalid"); end
   m = { subject = x.subjectId; expires_at = expiry; sent_at = sent; revision = 1; payload_hash = x.payloadHash };
-  local item = st.message({type = "groupchat"; from = room_jid .. "/" .. string.lower(x.subjectId); id = x.messageId})
+   local item = st.message({type = "groupchat"; from = room_jid .. "/" .. participant_node(x.subjectId); id = x.messageId})
    :tag("body"):text(x.text):up():tag("origin-id", { xmlns = "urn:xmpp:sid:0"; id = x.messageId }):up()
    :tag("stanza-id", { xmlns = "urn:xmpp:sid:0"; by = room_jid; id = x.messageId }):up()
    :tag("metadata", { xmlns = ns }):text(json.encode(m)):up();

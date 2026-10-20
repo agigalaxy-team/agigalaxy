@@ -124,6 +124,7 @@ export class CommunityForumV1 {
    await db.query(`INSERT INTO forum_versions_v1(id,post_id,subject_id,account_id,version_number,publication_event_id,permission_id,payload_hash,published_until,state,created_at,topic,section_id,audience)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',$10,$11,$12,$13)`,[p.versionId,p.postId,actor.subjectId??null,state.account.id,number,p.operationId,permit.id,digest(payloadJson),forumStamp(p.publishedUntil),at,p.topic??null,publication.sectionId,JSON.stringify(publication.audience)]);
    await db.query('UPDATE forum_posts_v1 SET current_version_id=$2,head_version=$3,updated_at=$4 WHERE id=$1',[p.postId,p.versionId,headVersion,at]);
+   if(p.attachments?.length){if(!this.attachments)throw new ServiceError('attachment_service_unavailable',503);await this.attachments.bindWithin(db,actor,{references:p.attachments,postId:p.postId,versionId:p.versionId,publishedUntil:p.publishedUntil});}
    await this.complete(db,actor,authorization,{p,consentId,payloadJson,kind:'forum.post.publish',accountId:state.account.id,category:state.quota.category,locator,result});
    return {...result,quota:await this.budget.finishWithin(db,state)};
   },{resourceWrite:true}).catch(error=>{if(error.code==='23505')throw new ServiceError('forum_operation_conflict',409);throw error;});
@@ -147,6 +148,7 @@ export class CommunityForumV1 {
    await this.saveEvent(db,actor,{p,consentId,payloadJson,kind:'create-reply',accountId:state.account.id,result});
    await db.query(`INSERT INTO forum_replies_v1(id,post_id,post_version_id,reply_to_id,subject_id,account_id,revision,publication_event_id,permission_id,payload_hash,published_until,state,created_at,section_id,audience,parent_audience,audience_inherited)
     VALUES($1,$2,$3,$4,$5,$6,1,$7,$8,$9,$10,'published',$11,$12,$13,$14,$15)`,[p.replyId,p.postId,p.postVersionId,p.replyTo?.replyId??null,actor.subjectId??null,state.account.id,p.operationId,permit.id,digest(payloadJson),forumStamp(p.publishedUntil),forumStamp(this.clock()),publication.sectionId,JSON.stringify(publication.audience),JSON.stringify(parentAudience),p.audience===undefined]);
+   if(p.attachments?.length){if(!this.attachments)throw new ServiceError('attachment_service_unavailable',503);await this.attachments.bindWithin(db,actor,{references:p.attachments,postId:p.postId,versionId:p.postVersionId,replyId:p.replyId,publishedUntil:p.publishedUntil});}
    await this.complete(db,actor,authorization,{p,consentId,payloadJson,kind:'forum.reply.publish',accountId:state.account.id,category:'reply',locator,result});
    return {...result,quota:await this.budget.finishWithin(db,state)};
   },{resourceWrite:true}).catch(error=>{if(error.code==='23505')throw new ServiceError('forum_operation_conflict',409);throw error;});
@@ -200,7 +202,7 @@ export class CommunityForumV1 {
   if(await this.hiddenWithin(db,{kind:'post-version',postId,versionId}))return unavailable(locator,'unavailable',now);
   const payload=JSON.parse(row.payload_text);
   if((row.topic??null)!==(payload.topic??null))return unavailable(locator,'unavailable',now);
-  return {locator,...authorship(row),headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload,
+  return {locator,...authorship(row),headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],
    topic:payload.topic??'unclassified',audience:row.audience??legacyForumAudience,sectionId:row.section_id??null,
    canParticipate:await this.canParticipateWithin(db,actor,row),createdAt:forumSeconds(row.post_created_at),versionCreatedAt:forumSeconds(row.created_at),updatedAt:forumSeconds(row.post_updated_at),
    permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),checkedAt:now,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
@@ -215,7 +217,8 @@ export class CommunityForumV1 {
   if(!state.allowed||!row.payload_text||row.erased_at||row.event_erased)return unavailable(locator,state.reasons.includes('content-expired')?'expired':'unavailable',now);
   if(await this.hiddenWithin(db,{kind:'reply',replyId:id,contentRevision:1}))return unavailable(locator,'unavailable',now);
   let parentAvailability='unavailable';if(parent)try{parentAvailability=(await this.readVersionWithin(db,row.post_id,row.post_version_id,{actor})).availability;}catch(error){if(error.status!==404)throw error;}
-  return {locator,...authorship(row),revision:row.revision,availability:'available',payload:JSON.parse(row.payload_text),permissionId:row.permission_id,
+  const payload=JSON.parse(row.payload_text);
+  return {locator,...authorship(row),revision:row.revision,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],permissionId:row.permission_id,
    audience:row.audience??legacyForumAudience,audienceInherited:row.audience_inherited??false,sectionId:row.section_id??null,publishedUntil:forumSeconds(row.published_until),createdAt:forumSeconds(row.created_at),checkedAt:now,parentAvailability,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
  }
  async versionsWithin(db,id,input={},actor=null){

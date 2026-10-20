@@ -17,6 +17,7 @@ const stopPosts=new Set([
   '/v2/watch-controls/stop',
   '/v2/ci/requests/revoke','/v2/ci/proofs/revoke',
   '/v2/chat/attachments/revoke','/v2/chat/shared-summaries/retract',
+  '/v2/community/attachments/revoke',
   '/v2/personal-summaries/delete','/v2/choice-snapshots/delete',
   '/v2/information/watches/stop',
 ]);
@@ -49,6 +50,10 @@ const readPosts=new Set([
   '/v2/choice-snapshots/preferences/read','/v2/choice-snapshots/get','/v2/choice-snapshots/list','/v2/choice-snapshots/receipt',
   '/v2/notifications/query','/v2/notifications/options/read',
   '/v2/chat/rooms/query','/v2/chat/invitations/query','/v2/chat/export/owned',
+  '/v2/chat/rooms/directory','/v2/chat/accounts/query',
+  '/v1/account/bookmarks/status','/v1/account/bookmarks/query','/v1/account/bookmarks/receipt',
+  '/v2/account-bookmarks/status','/v2/account-bookmarks/query','/v2/account-bookmarks/receipt',
+  '/v2/community/attachments/config','/v2/community/attachments/read','/v2/community/attachments/query',
   '/v2/chat/shared-summaries/get','/v2/chat/shared-summaries/list','/v2/chat/shared-summaries/receipt',
   '/v2/chat/attachments/config','/v2/chat/attachments/read','/v2/chat/attachments/query',
   '/v1/builders/manage/read','/v1/builders/owned/query','/v1/builders/events/receipt','/v1/builders/notices/query',
@@ -68,13 +73,14 @@ const moderationReceipt=new RegExp(`^/v1/moderation/reports/${uuid}/receipt$`);
 const roomRead=new RegExp(`^/v2/chat/rooms/${uuid}/(?:read|history|decisions|receipt|agent-grants|agent-participants|join-preview)$`);
 const projectPreferences=new RegExp(`^/v2/projects/${uuid}/preferences/read$`);
 const attachmentExport=new RegExp(`^/v2/chat/attachments/${uuid}/export-content$`);
+const sourceAttachmentRead=new RegExp(`^/v2/(?:chat|community)/attachments/${uuid}/content$`);
 const recruitmentReceipt=new RegExp(`^/v2/recruitment/${uuid}/receipt$`);
 
 export function serviceAccessV2(method,path){
   if(method==='GET'&&(controlState.test(path)||bindingRead.test(path)||path==='/v1/consents'))return 'control';
   if(method==='POST'&&controlPosts.has(path))return 'control';
   if(method==='POST'&&(stopPosts.has(path)||roomStop.test(path)||messageStop.test(path)))return 'stop';
-  if(method==='POST'&&(readPosts.has(path)||caseRead.test(path)||taskCaseLinkReceipt.test(path)||taskOwnerRead.test(path)||taskOwnerControlPrepare.test(path)||moderationReceipt.test(path)||roomRead.test(path)||projectPreferences.test(path)||attachmentExport.test(path)))return 'read';
+  if(method==='POST'&&(readPosts.has(path)||caseRead.test(path)||taskCaseLinkReceipt.test(path)||taskOwnerRead.test(path)||taskOwnerControlPrepare.test(path)||moderationReceipt.test(path)||roomRead.test(path)||projectPreferences.test(path)||attachmentExport.test(path)||sourceAttachmentRead.test(path)))return 'read';
   if(method==='GET'&&(readGets.test(path)||honorGet.test(path)||recruitmentReceipt.test(path)))return 'read';
   return null;
 }

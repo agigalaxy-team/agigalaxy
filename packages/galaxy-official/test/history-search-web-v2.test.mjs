@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
-import {handoffExistingWebIdentity} from './existing-web-identity-fixture.mjs';
+import {handoffExistingWebIdentity,existingWebFixtureWebsite} from './existing-web-identity-fixture.mjs';
 import {createHistoryClient,prepareHistoryQuery} from '../../galaxy-web/src/history-client.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 
@@ -28,7 +28,7 @@ test('history browser queries real visible facts and more than 64 loaded search 
       origin:{kind:'intervention',id:intervention.eventId,version:1},deliverableRefs:[],reportedOutcome:'failed',summary:'Failed synthetic result',limitations:'No production execution'};
     const resultGrant=await put(result);
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
+    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,website:existingWebFixtureWebsite,
       fetch:async(url,options)=>{calls.push(new URL(url).pathname);return fetch(origin+new URL(url).pathname,options);}});
     history=createHistoryClient(runtime);search=createHelpSearchClient(runtime);
     const request=prepareHistoryQuery({subjectId:f.actor.subjectId,query:'History-browser',environment:'Windows',limit:50});

@@ -1,3 +1,4 @@
+import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath} from '../../galaxy-official/src/shared/account-resource-routes.mjs';
 const guid=value=>typeof value==='string'&&/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(value);
 const accountId=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -19,7 +20,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
   const text=await response.text();if(new TextEncoder().encode(text).length>2097152)fail('official_account_response_invalid');
   let result;try{result=JSON.parse(text);}catch{fail('official_account_response_invalid');}
   if(!response.ok){const code=typeof result.error==='string'?result.error:result.error?.code;
-   throw Object.assign(new Error(code??'official_account_unavailable'),{code:response.status===401?'official_account_session_expired':code??'official_account_unavailable',outcome:'rejected'});}
+   throw Object.assign(new Error(code??'official_account_unavailable'),{code:response.status===401?'official_account_session_expired':code??'official_account_unavailable',outcome:'rejected',status:response.status});}
   return result;
  }
  function readSession(value){
@@ -57,12 +58,22 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    if(session?.state!=='signed-in'||!accountId(session.account?.id)||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');
    if(typeof path!=='string'||!path.startsWith('/')||path.startsWith('//')||path.includes('\\')||path.includes('#')||!['GET','POST','DELETE'].includes(method))fail('official_account_request_invalid');
    const parsed=new URL(path,endpoint),route=parsed.pathname;
-   const allowed=/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
+   const allowed=isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
     ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route);
    const queryKeys=route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
    if(parsed.origin!==endpoint||!allowed||[...parsed.searchParams.keys()].some(key=>!queryKeys.includes(key)||parsed.searchParams.getAll(key).length!==1)||parsed.search&&method!=='GET'
     ||method==='DELETE'&&!/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(route))fail('official_account_request_invalid');
     return request(path,{method,signal,headers:{'Content-Type':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},...(['GET','DELETE'].includes(method)?{}:{body:JSON.stringify(input??{})})});
+  },
+  /** @param {string} path @param {unknown} input @param {{method?:string,signal?:AbortSignal,session?:{state:string,account:{id:string|null},csrfToken:string,expiresAt:number}}} [options] @returns {Promise<Response>} */
+  async transfer(path,input,{method='POST',session,signal}={}){
+   if(session?.state!=='signed-in'||!accountId(session.account?.id)||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');
+   if(typeof path!=='string'||!isAccountBinaryPath(path)||method!==(isAccountUploadPath(path)?'PUT':'POST'))fail('official_account_request_invalid');
+   const timeout=AbortSignal.timeout(120000),upload=method==='PUT';
+   const response=await fetcher(endpoint+path,{method,credentials:'include',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:signal?AbortSignal.any([signal,timeout]):timeout,
+    headers:{Accept:upload?'application/json':'application/octet-stream','Content-Type':upload?'application/octet-stream':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},body:upload?input:JSON.stringify(input??{})});
+   if(!response.ok){let value;try{value=await response.json();}catch{}const code=response.status===401?'official_account_session_expired':value?.error?.code??value?.error??'attachment_unavailable';throw Object.assign(Error(code),{code,outcome:'rejected',status:response.status});}
+   return response;
   },
   async logout(session){
    if(session?.state!=='signed-in'||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');

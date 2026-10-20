@@ -5,6 +5,9 @@ DO $$ BEGIN
   END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO galaxy_evidence_worker;
+GRANT SELECT ON forum_attachments_v1,forum_attachment_links_v1 TO galaxy_evidence_worker;
+GRANT UPDATE(state,name,media_type,scan_result,scan_attempts,lease_id,lease_until,last_error,purge_pending,purged_at) ON forum_attachments_v1 TO galaxy_evidence_worker;
+GRANT DELETE ON forum_attachments_v1 TO galaxy_evidence_worker;
 GRANT SELECT(id,account_id,selection,origin_subject_id,expires_at),DELETE ON private_conversation_archives_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT ON private_conversation_deletions_v1 TO galaxy_evidence_worker;
 GRANT SELECT ON forum_sections_v2,forum_section_events_v2,forum_notification_reads_v2 TO galaxy_evidence_worker;

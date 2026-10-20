@@ -69,58 +69,280 @@
       "line": 95
     },
     {
+      "code": "invalid_account_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/account-public-query.mjs",
+      "line": 6
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/account-public-query.mjs",
+      "line": 19
+    },
+    {
+      "code": "external_credentials_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/account-public-query.mjs",
+      "line": 50
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/account-public-query.mjs",
+      "line": 55
+    },
+    {
+      "code": "forum_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/account-public-query.mjs",
+      "line": 56
+    },
+    {
+      "code": "account_selection_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 20
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 22
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 23
+    },
+    {
+      "code": "account_work_source_mismatch",
+      "status": 403,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 57
+    },
+    {
+      "code": "account_work_source_mismatch",
+      "status": 403,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 61
+    },
+    {
+      "code": "account_work_scope_mismatch",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 63
+    },
+    {
+      "code": "account_work_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 65
+    },
+    {
+      "code": "account_work_owner_deleted",
+      "status": 410,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 68
+    },
+    {
+      "code": "account_work_scope_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 70
+    },
+    {
+      "code": "account_work_revision_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 71
+    },
+    {
+      "code": "account_work_owner_deleted",
+      "status": 410,
+      "source": "packages/galaxy-official/src/account-work.mjs",
+      "line": 72
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-archives-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "account_selection_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/adapters/http/account-archives-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "account_work_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "account_selection_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
+      "line": 20
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
+      "line": 21
+    },
+    {
       "code": "attachment_length_required",
       "status": 411,
       "source": "packages/galaxy-official/src/adapters/http/attachment-http.mjs",
-      "line": 15
+      "line": 16
     },
     {
       "code": "browser_origin_not_enabled",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/browser-policy.mjs",
-      "line": 25
+      "line": 26
     },
     {
       "code": "browser_preflight_denied",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/browser-policy.mjs",
-      "line": 35
+      "line": 43
+    },
+    {
+      "code": "invalid_account_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/chat-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/chat-http.mjs",
+      "line": 32
     },
     {
       "code": "unsupported_media_type",
       "status": 415,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 8
+      "line": 9
     },
     {
       "code": "request_too_large",
       "status": 413,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 10
+      "line": 11
     },
     {
       "code": "invalid_json",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 11
+      "line": 12
     },
     {
       "code": "invalid_forum_request",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 12
+      "line": 13
+    },
+    {
+      "code": "invalid_forum_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
+      "line": 14
     },
     {
       "code": "forum_payload_too_large",
       "status": 413,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 13
+      "line": 15
+    },
+    {
+      "code": "invalid_account_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "invalid_account_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
+      "line": 31
+    },
+    {
+      "code": "invalid_forum_payload",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
+      "line": 56
     },
     {
       "code": "forum_event_route_mismatch",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
-      "line": 65
+      "line": 56
+    },
+    {
+      "code": "forum_event_route_mismatch",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/community-forum-http.mjs",
+      "line": 107
+    },
+    {
+      "code": "external_credentials_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/external-credentials-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_external_credential_input",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/external-credentials-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_external_credential_input",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/external-credentials-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/external-credentials-http.mjs",
+      "line": 20
+    },
+    {
+      "code": "invalid_account_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/forum-attachment-http.mjs",
+      "line": 6
+    },
+    {
+      "code": "account_verification_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/forum-attachment-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "attachment_length_required",
+      "status": 411,
+      "source": "packages/galaxy-official/src/adapters/http/forum-attachment-http.mjs",
+      "line": 19
     },
     {
       "code": "invalid_hub_write",
@@ -133,6 +355,48 @@
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/information-http.mjs",
       "line": 22
+    },
+    {
+      "code": "invalid_account_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 7
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 25
+    },
+    {
+      "code": "invalid_account_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 26
+    },
+    {
+      "code": "invalid_archive_cursor",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 31
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 40
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 44
     },
     {
       "code": "invalid_forwarded_address",
@@ -168,19 +432,31 @@
       "code": "invalid_request",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 46
+      "line": 57
     },
     {
       "code": "capacity_limited",
       "status": 503,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 57
+      "line": 68
     },
     {
       "code": "rate_limited",
       "status": 429,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 62
+      "line": 73
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/reading-bookmarks-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "invalid_account_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/reading-bookmarks-http.mjs",
+      "line": 19
     },
     {
       "code": "unsupported_media_type",
@@ -216,79 +492,73 @@
       "code": "invalid_search_v2_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 71
+      "line": 85
     },
     {
       "code": "invalid_recruitment_receipt_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 129
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 203
+      "line": 143
     },
     {
       "code": "invalid_task_owner_control",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 267
+      "line": 263
     },
     {
       "code": "invalid_task_owner_read",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 277
+      "line": 273
     },
     {
       "code": "invalid_search_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 338
+      "line": 333
     },
     {
       "code": "invalid_host",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 489
+      "line": 484
     },
     {
       "code": "method_not_allowed",
       "status": 405,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 490
+      "line": 485
     },
     {
       "code": "access_denied",
       "status": 401,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 519
+      "line": 514
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 525
+      "line": 520
     },
     {
       "code": "invalid_case_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 538
+      "line": 533
     },
     {
       "code": "invalid_case_route",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 539
+      "line": 534
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 559
+      "line": 554
     },
     {
       "code": "unsupported_media_type",
@@ -1371,10 +1641,28 @@
       "line": 304
     },
     {
-      "code": "attachment_upload_timeout",
-      "status": 408,
-      "source": "packages/galaxy-official/src/chat-attachments.mjs",
-      "line": 79
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/chat-actors.mjs",
+      "line": 9
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/chat-actors.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_chat_participant",
+      "status": 400,
+      "source": "packages/galaxy-official/src/chat-actors.mjs",
+      "line": 19
+    },
+    {
+      "code": "chat_participant_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/chat-actors.mjs",
+      "line": 28
     },
     {
       "code": "contact_room_authorization_required",
@@ -1620,55 +1908,151 @@
       "code": "invalid_account_verification",
       "status": 400,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 22
+      "line": 27
     },
     {
       "code": "invalid_account_verification",
       "status": 400,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 24
+      "line": 29
     },
     {
       "code": "identity_provider_unavailable",
       "status": 409,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 32
+      "line": 37
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 49
+    },
+    {
+      "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 65
+    },
+    {
+      "code": "account_selection_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 66
+    },
+    {
+      "code": "account_selection_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 67
+    },
+    {
+      "code": "account_target_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 69
     },
     {
       "code": "account_verification_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 50
+      "line": 70
+    },
+    {
+      "code": "account_target_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 73
+    },
+    {
+      "code": "community_restricted",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 96
+    },
+    {
+      "code": "invalid_forum_audience",
+      "status": 400,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 39
+    },
+    {
+      "code": "forum_condition_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 41
+    },
+    {
+      "code": "forum_condition_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 42
+    },
+    {
+      "code": "forum_condition_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 43
+    },
+    {
+      "code": "forum_condition_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 45
+    },
+    {
+      "code": "forum_section_participation_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 61
+    },
+    {
+      "code": "forum_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 66
+    },
+    {
+      "code": "forum_participation_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 83
+    },
+    {
+      "code": "forum_section_participation_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 84
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 26
+      "line": 30
     },
     {
       "code": "forum_quota_exceeded",
       "status": 429,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 28
+      "line": 32
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 33
+      "line": 37
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 39
+      "line": 43
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 42
+      "line": 46
     },
     {
       "code": "invalid_forum_request",
@@ -1677,148 +2061,178 @@
       "line": 10
     },
     {
-      "code": "not_found",
-      "status": 404,
+      "code": "forum_private_audience_mismatch",
+      "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 26
+      "line": 46
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 29
+      "line": 50
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 53
     },
     {
       "code": "forum_source_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 34
-    },
-    {
-      "code": "forum_content_limit",
-      "status": 413,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 52
+      "line": 58
     },
     {
       "code": "forum_report_source_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 56
-    },
-    {
-      "code": "forum_operation_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 65
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 75
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 77
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 89
-    },
-    {
-      "code": "forum_report_target_mismatch",
-      "status": 400,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 102
+      "line": 64
     },
     {
       "code": "forum_content_limit",
       "status": 413,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 103
+      "line": 78
+    },
+    {
+      "code": "forum_report_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 82
+    },
+    {
+      "code": "forum_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 91
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 108
+      "line": 102
     },
     {
-      "code": "forum_report_version_conflict",
-      "status": 409,
+      "code": "not_found",
+      "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 108
+      "line": 105
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 117
+    },
+    {
+      "code": "forum_report_target_mismatch",
+      "status": 400,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 134
+    },
+    {
+      "code": "forum_content_limit",
+      "status": 413,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 135
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 140
+    },
+    {
+      "code": "account_verification_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 145
     },
     {
       "code": "forum_independent_handler_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 111
+      "line": 146
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 147
+    },
+    {
+      "code": "forum_report_version_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 147
+    },
+    {
+      "code": "forum_independent_handler_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 151
     },
     {
       "code": "forum_report_transition",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 112
+      "line": 152
     },
     {
       "code": "forum_hide_expiry",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 113
+      "line": 153
     },
     {
       "code": "forum_appeal_unavailable",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 115
+      "line": 155
     },
     {
       "code": "forum_report_transition",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 117
+      "line": 157
     },
     {
       "code": "forum_report_transition",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 118
+      "line": 158
     },
     {
       "code": "forum_report_event_limit",
       "status": 413,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 120
+      "line": 160
     },
     {
       "code": "forum_report_account_changed",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 122
+      "line": 162
     },
     {
       "code": "forum_hide_expiry",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 125
+      "line": 167
     },
     {
       "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 139
+      "line": 184
     },
     {
       "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-operations-v1.mjs",
-      "line": 11
+      "line": 13
     },
     {
       "code": "forum_cursor_mismatch",
@@ -1836,43 +2250,49 @@
       "code": "forum_cursor_mismatch",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-page-v1.mjs",
-      "line": 35
+      "line": 36
     },
     {
       "code": "forum_permission_mismatch",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
-      "line": 14
-    },
-    {
-      "code": "forum_permission_mismatch",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
-      "line": 15
-    },
-    {
-      "code": "forum_private_audience_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
       "line": 16
     },
     {
-      "code": "forum_decision_notice_required",
+      "code": "forum_permission_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
       "line": 17
     },
     {
-      "code": "forum_permission_expiry",
+      "code": "forum_private_audience_mismatch",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 18
+    },
+    {
+      "code": "forum_decision_notice_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
       "line": 19
     },
     {
-      "code": "forum_signature_evidence_required",
+      "code": "forum_private_audience_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
-      "line": 25
+      "line": 21
+    },
+    {
+      "code": "forum_decision_notice_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 22
+    },
+    {
+      "code": "forum_permission_expiry",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 24
     },
     {
       "code": "forum_signature_evidence_required",
@@ -1881,91 +2301,181 @@
       "line": 30
     },
     {
+      "code": "forum_signature_evidence_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 35
+    },
+    {
+      "code": "forum_permission_mismatch",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 49
+    },
+    {
+      "code": "account_target_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 51
+    },
+    {
+      "code": "forum_permission_expiry",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
+      "line": 53
+    },
+    {
       "code": "forum_content_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
-      "line": 70
+      "line": 120
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-permissions-v1.mjs",
-      "line": 72
+      "line": 127
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 20
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 23
+    },
+    {
+      "code": "invalid_forum_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 25
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 28
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 56
+    },
+    {
+      "code": "forum_section_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 59
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 60
+    },
+    {
+      "code": "forum_section_version_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 61
+    },
+    {
+      "code": "access_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 75
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 78
+    },
+    {
+      "code": "forum_section_version_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-sections-v2.mjs",
+      "line": 79
     },
     {
       "code": "invalid_forum_request",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 15
+      "line": 18
     },
     {
-      "code": "forum_content_limit",
-      "status": 413,
+      "code": "invalid_forum_request",
+      "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 35
     },
     {
-      "code": "invalid_forum_payload",
-      "status": 400,
+      "code": "forum_signature_evidence_required",
+      "status": 403,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 46
-    },
-    {
-      "code": "forum_post_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 55
+      "line": 36
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 58
+      "line": 44
     },
     {
-      "code": "forum_post_withdrawn",
-      "status": 409,
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 48
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 50
+    },
+    {
+      "code": "not_found",
+      "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 59
     },
     {
-      "code": "forum_head_conflict",
-      "status": 409,
+      "code": "not_found",
+      "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 60
+      "line": 65
     },
     {
-      "code": "forum_operation_conflict",
+      "code": "community_restricted",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 67
+    },
+    {
+      "code": "account_selection_required",
       "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 70
+    },
+    {
+      "code": "community_restricted",
+      "status": 403,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 72
     },
     {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
+      "code": "forum_content_limit",
+      "status": 413,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 80
+      "line": 85
     },
     {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 81
-    },
-    {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 83
-    },
-    {
-      "code": "forum_operation_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 92
-    },
-    {
-      "code": "invalid_forum_action",
+      "code": "invalid_forum_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 96
@@ -1974,73 +2484,97 @@
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 101
+      "line": 103
     },
     {
-      "code": "forum_reply_transition",
+      "code": "forum_post_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 102
+      "line": 109
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 105
+      "line": 112
+    },
+    {
+      "code": "forum_post_withdrawn",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 113
     },
     {
       "code": "forum_head_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 106
+      "line": 114
     },
     {
-      "code": "not_found",
-      "status": 404,
+      "code": "attachment_service_unavailable",
+      "status": 503,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 107
+      "line": 127
     },
     {
-      "code": "forum_version_transition",
+      "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 107
+      "line": 130
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 138
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 139
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 143
+    },
+    {
+      "code": "attachment_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 151
+    },
+    {
+      "code": "forum_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 154
+    },
+    {
+      "code": "invalid_forum_action",
+      "status": 400,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 158
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 131
+      "line": 163
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 144
+      "line": 164
     },
     {
-      "code": "not_found",
-      "status": 404,
+      "code": "forum_reply_transition",
+      "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 155
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 161
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 166
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 167
+      "line": 165
     },
     {
       "code": "not_found",
@@ -2055,8 +2589,20 @@
       "line": 169
     },
     {
+      "code": "forum_head_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 170
+    },
+    {
       "code": "not_found",
       "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 171
+    },
+    {
+      "code": "forum_version_transition",
+      "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 171
     },
@@ -2064,31 +2610,97 @@
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 209
+      "line": 196
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 215
+      "line": 212
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 220
+      "line": 225
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 221
+      "line": 231
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 222
+      "line": 236
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 237
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 238
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 239
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 241
+    },
+    {
+      "code": "invalid_forum_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 281
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 297
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 305
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 310
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 311
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 312
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 348
     },
     {
       "code": "invalid_configuration_request",
@@ -3009,6 +3621,54 @@
       "line": 83
     },
     {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 21
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 24
+    },
+    {
+      "code": "invalid_external_credential_cursor",
+      "status": 400,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 70
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 80
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 100
+    },
+    {
+      "code": "external_credentials_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 107
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 113
+    },
+    {
+      "code": "external_credential_storage_limit",
+      "status": 409,
+      "source": "packages/galaxy-official/src/external-credentials.mjs",
+      "line": 117
+    },
+    {
       "code": "source_adapter_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/fact-source-router-v2.mjs",
@@ -3441,6 +4101,12 @@
       "line": 31
     },
     {
+      "code": "attachment_upload_timeout",
+      "status": 408,
+      "source": "packages/galaxy-official/src/infrastructure/attachment-payload.mjs",
+      "line": 11
+    },
+    {
       "code": "attachment_storage_key_invalid",
       "status": 500,
       "source": "packages/galaxy-official/src/infrastructure/attachment-s3-store.mjs",
@@ -3588,19 +4254,19 @@
       "code": "storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 110
+      "line": 115
     },
     {
       "code": "job_queue_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 111
+      "line": 116
     },
     {
       "code": "export_ticket_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 112
+      "line": 117
     },
     {
       "code": "participation_conflict",
@@ -3939,6 +4605,210 @@
       "line": 37
     },
     {
+      "code": "invalid_account_data",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 11
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 21
+    },
+    {
+      "code": "account_settings_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 36
+    },
+    {
+      "code": "account_settings_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 48
+    },
+    {
+      "code": "account_type_unchanged",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 49
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 57
+    },
+    {
+      "code": "invalid_archive_cursor",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 64
+    },
+    {
+      "code": "invalid_archive_selection",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 75
+    },
+    {
+      "code": "archive_deleted",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 78
+    },
+    {
+      "code": "archive_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 84
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 87
+    },
+    {
+      "code": "archive_chunk_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 89
+    },
+    {
+      "code": "archive_chunk_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 92
+    },
+    {
+      "code": "archive_already_complete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 93
+    },
+    {
+      "code": "archive_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 94
+    },
+    {
+      "code": "archive_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 100
+    },
+    {
+      "code": "archive_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 102
+    },
+    {
+      "code": "archive_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 106
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 108
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 10
+    },
+    {
+      "code": "invalid_account_return",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 54
+    },
+    {
+      "code": "invalid_account_return",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 56
+    },
+    {
+      "code": "invalid_account_return",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 57
+    },
+    {
+      "code": "invalid_account_return",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 59
+    },
+    {
+      "code": "invalid_account_login",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 71
+    },
+    {
+      "code": "invalid_account_login",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 73
+    },
+    {
+      "code": "invalid_account_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 133
+    },
+    {
+      "code": "invalid_account_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 135
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 147
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 149
+    },
+    {
+      "code": "account_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 153
+    },
+    {
+      "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 157
+    },
+    {
+      "code": "account_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 159
+    },
+    {
+      "code": "account_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 164
+    },
+    {
       "code": "service_enrollment_stopped",
       "status": 503,
       "source": "packages/galaxy-official/src/operations/incident.mjs",
@@ -4104,31 +4974,31 @@
       "code": "public_write_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 72
+      "line": 73
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 76
+      "line": 77
     },
     {
       "code": "invitation_cooldown",
       "status": 429,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 82
+      "line": 83
     },
     {
       "code": "community_quota_exceeded",
       "status": 429,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 86
+      "line": 87
     },
     {
       "code": "invalid_public_write",
       "status": 400,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 95
+      "line": 96
     },
     {
       "code": "invalid_qualification_calculation",
@@ -4176,43 +5046,73 @@
       "code": "reading_bookmark_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 43
+      "line": 45
     },
     {
       "code": "reading_bookmark_reader_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 64
+      "line": 66
     },
     {
       "code": "reading_bookmark_reader_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 70
+      "line": 72
     },
     {
       "code": "reading_bookmark_reader_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 77
+      "line": 79
     },
     {
       "code": "reading_bookmark_reader_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 85
+      "line": 87
+    },
+    {
+      "code": "reading_bookmark_reader_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
+      "line": 98
     },
     {
       "code": "reading_bookmark_changed",
       "status": 409,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 114
+      "line": 127
     },
     {
       "code": "reading_bookmark_cursor_unavailable",
       "status": 409,
       "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
-      "line": 140
+      "line": 153
+    },
+    {
+      "code": "reading_bookmark_reader_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
+      "line": 167
+    },
+    {
+      "code": "reading_bookmark_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
+      "line": 188
+    },
+    {
+      "code": "reading_bookmark_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
+      "line": 204
+    },
+    {
+      "code": "reading_bookmark_cursor_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/reading-bookmarks-v1.mjs",
+      "line": 232
     },
     {
       "code": "requester_history_cursor_unavailable",
@@ -4320,49 +5220,73 @@
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/services.mjs",
-      "line": 159
+      "line": 165
+    },
+    {
+      "code": "invalid_archive_cursor",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/account-archive-cursor.mjs",
+      "line": 18
+    },
+    {
+      "code": "account_work_input_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/account-work-schema.mjs",
+      "line": 92
     },
     {
       "code": "invalid_forum_subject",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-ids-v1.mjs",
-      "line": 25
+      "line": 12
+    },
+    {
+      "code": "invalid_forum_subject",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/community-forum-ids-v1.mjs",
+      "line": 38
     },
     {
       "code": "forum_locator_mismatch",
       "status": 409,
       "source": "packages/galaxy-official/src/shared/community-forum-ids-v1.mjs",
-      "line": 40
+      "line": 54
     },
     {
       "code": "invalid_forum_action",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-v1-schema.mjs",
-      "line": 56
+      "line": 66
     },
     {
       "code": "invalid_forum_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-v1-schema.mjs",
-      "line": 58
+      "line": 68
     },
     {
       "code": "forum_payload_too_large",
       "status": 413,
       "source": "packages/galaxy-official/src/shared/community-forum-v1-schema.mjs",
-      "line": 62
+      "line": 72
     },
     {
       "code": "invalid_forum_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-v1-schema.mjs",
-      "line": 63
+      "line": 73
     },
     {
       "code": "invalid_forum_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-v1-schema.mjs",
-      "line": 64
+      "line": 74
+    },
+    {
+      "code": "invalid_external_credential_input",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/external-credentials-schema.mjs",
+      "line": 34
     },
     {
       "code": "signing_unavailable",

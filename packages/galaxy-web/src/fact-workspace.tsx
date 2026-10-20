@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { exactFactRef, getFactClient, latestFacts } from './fact-client.mjs';
 import {exactReadableResult,isResultReference,readTaskResult,taskResultPath,taskResultReturn} from './task-result-navigation.mjs';
 import {WorkResultReading} from './work-result-reading';
+import {ContentShareAction} from './content-share-action';
 import { ciSourceMetadata } from '../../galaxy-official/src/shared/ci-observation-v2-schema.mjs';
 import { githubReference } from '../../galaxy-official/src/shared/github-evidence-schema.mjs';
 import { CiWorkspace } from './ci-workspace';
@@ -835,6 +836,7 @@ function FactSession({task,runtime,subjectId,connected,refresh,navigate,lease}:W
   return (
     <section className={'work-facts'+(resultDetail?' is-result-detail':'')}>
       <header className="work-facts-heading">{resultDetail?<><button className="text-action" onClick={()=>navigate(taskResultReturn(task.taskId,resultSelection.deliveryId))}>{resultSelection.deliveryId?'返回原交付':'返回结果列表'}</button><h1 className="small">工作结果</h1></>:<h2>工作记录</h2>}</header>
+      {!action&&<ContentShareAction runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate} label="分享这项工作" context={{kind:'work',id:task.taskId,title:task.request?.title??'工作记录',returnTo:location.pathname+location.search+location.hash,work:{taskId:task.taskId,...(task.caseId?{caseId:task.caseId}:{}),title:task.request?.title}}}/>}
       {!action&&composeDrafts.map(saved=><WorkComposeCard key={saved.revision??saved.value.kind} saved={saved} busy={busy} pending={!!pending} sourceUnavailable={!!task.caseId&&!facts} composeError={composeError} onResume={resumeCompose} onDiscard={discardSavedCompose}/>)}
       {composeError&&!action&&<p role="alert" className="message error">{composeError}</p>}
       {error && (

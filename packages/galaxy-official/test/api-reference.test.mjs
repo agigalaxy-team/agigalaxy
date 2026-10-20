@@ -40,14 +40,14 @@ test('authored API reference matches real dispatch, concrete service methods and
       const request=Readable.from([Buffer.from(JSON.stringify(input))]);request.method=item.method;
       request.headers={'content-type':'application/json',host:new URL(endpoint).host,...(authorized?{authorization:'Bearer synthetic'}:{})};
       let result;
-      await dispatch({request,response:{setHeader(){}},requestId:id,url:new URL(path,endpoint),send:(status,body)=>{result={status,body};}});
+      await dispatch({request,response:{setHeader(){},getHeader(){}},requestId:id,url:new URL(path,endpoint),send:(status,body)=>{result={status,body};}});
       assert.deepEqual(result,{status:item.status,body:{fixture:item.service+'.'+item.operation}},key);
       assert.equal(calls.length,1,key);
       assert.deepEqual(authentication,authorized?[{token:'synthetic',scope:item.scope==='query-type'?'history':item.scope}]:[],key);
     }
     if(item.authentication==='galaxy-session'){
       const request=Readable.from([Buffer.from(JSON.stringify(input))]);request.method=item.method;request.headers={'content-type':'application/json'};
-      await assert.rejects(dispatch({request,response:{setHeader(){}},requestId:id,url:new URL(path,endpoint),send(){}}),error=>error.status===401,key);
+      await assert.rejects(dispatch({request,response:{setHeader(){},getHeader(){}},requestId:id,url:new URL(path,endpoint),send(){}}),error=>error.status===401,key);
     }
     assert.ok((await readFile(new URL('../../../docs/'+item.documentation,import.meta.url),'utf8')).length);
   }
@@ -56,7 +56,7 @@ test('authored API reference matches real dispatch, concrete service methods and
 test('every documented external route reaches the exact-host Caddy matcher, while probes and unknown routes remain internal',()=>{
   const matchers=officialRoutes({endpoint,apiPort:43121})[0].match;
   const forwards=(method,path,host='official.example.org')=>matchers.some(item=>item.host.includes(host)&&item.method.includes(method)
-    &&(item.path?.includes(path)||item.path_regexp&&new RegExp(item.path_regexp.pattern).test(path)));
+    &&(item.path?.some(pattern=>pattern===path||pattern.endsWith('/*')&&path.startsWith(pattern.slice(0,-1)))||item.path_regexp&&new RegExp(item.path_regexp.pattern).test(path)));
   const missing=[];
   for(const item of [...businessApiReference,...specialApiReference]){
     const yes=forwards(item.method,expand(item.path));

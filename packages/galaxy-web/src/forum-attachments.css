@@ -1,0 +1,17 @@
+.galaxy-site .forum-attachment-composer{margin:10px 0 22px;min-width:0}
+.galaxy-site .forum-attachment-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px}
+.galaxy-site .forum-attachment-tools>button{display:inline-flex;gap:7px;padding-inline:0}
+.galaxy-site .forum-attachment-tools>span{font-size:12px;line-height:1.7;color:var(--g-muted)}
+.galaxy-site .forum-file-input{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.galaxy-site .forum-draft-files,.galaxy-site .forum-content-files>ul{padding:0;margin:8px 0;list-style:none}
+.galaxy-site .forum-draft-files>li,.galaxy-site .forum-content-files>ul>li{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--g-line)}
+.galaxy-site .forum-draft-files>li>svg,.galaxy-site .forum-content-files>ul>li>svg{color:var(--g-muted)}
+.galaxy-site .forum-draft-files strong,.galaxy-site .forum-content-files strong{display:block;font-size:14px;line-height:1.7;overflow-wrap:anywhere;font-weight:550}
+.galaxy-site .forum-draft-files li>div>span,.galaxy-site .forum-content-files li>div>span{display:block;font-size:12px;line-height:1.7;color:var(--g-muted);margin-top:2px}
+.galaxy-site .forum-file-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.galaxy-site .forum-file-actions>button{min-height:40px;font-size:12px}
+.galaxy-site .forum-file-error{font-size:13px;line-height:1.75;color:var(--g-danger,#a74154);margin:10px 0}
+.galaxy-site .forum-file-error>button{margin-left:12px;color:var(--g-accent);min-height:40px}
+.galaxy-site .forum-content-files{margin:20px 0;min-width:0}
+.galaxy-site .forum-content-files button{min-height:40px}
+@media(max-width:600px){.galaxy-site .forum-draft-files>li,.galaxy-site .forum-content-files>ul>li{gap:10px;grid-template-columns:20px minmax(0,1fr)}.galaxy-site .forum-file-actions,.galaxy-site .forum-content-files li>button{grid-column:2;justify-self:start}.galaxy-site .forum-file-actions>button,.galaxy-site .forum-content-files li>button{min-height:44px}.galaxy-site .forum-attachment-tools>span{font-size:12px}.galaxy-site .forum-draft-files strong,.galaxy-site .forum-content-files strong{font-size:14px}}

@@ -1,32 +1,29 @@
 import React from 'react';
-import {Cloud, FileText, Fingerprint, KeyRound, Laptop, Layers3, Monitor, Network, ShieldCheck, SlidersHorizontal, Sparkles} from 'lucide-react';
-import './account-access.css';
+import {Fingerprint,Laptop} from 'lucide-react';
+import {AccountSessionScope,useAccountSessionModel} from './account-session-scope';
+import {AccountSettings} from './account-settings';
 import {LocalGalaxyEntry} from './local-galaxy-entry';
+import {profilePath} from './profile-navigation.mjs';
+import {LoadingFeedback,ReadFailure} from './interaction-feedback';
+import './account-access.css';
+export {IdentityRelationshipDiagram} from './identity-relationship-diagram';
 
-type Navigate = (path:string) => void;
-type Props = {hasIdentity:boolean; connected:boolean; navigate:Navigate};
-
-/** The three objects have separate ownership and lifetimes. Lines express a
- * relationship, never an implied grant of device or material permissions. */
-export function IdentityRelationshipDiagram({compact=false}:{compact?:boolean}) {
-  return <figure className={'identity-relationship'+(compact?' identity-relationship-compact':'')} aria-label="多个主体 ID 与多个在线账户的关联示意">
-    <span className="relationship-diagram-label">关系示意</span>
-    <div className="environment-relationship-network" aria-hidden="true">
-      <svg className="environment-relationship-lines" viewBox="0 0 500 220" preserveAspectRatio="none"><path d="M 185 48 H 310 M 185 172 H 245 V 48 H 310 M 185 48 H 220 V 172 H 310"/><circle cx="245" cy="48" r="3"/><circle cx="220" cy="172" r="3"/></svg>
-      <span className="environment-id environment-id-a"><span className="environment-window-bar"><Layers3 size={13}/>个人或组织主体<i/></span><span className="environment-window-id"><Fingerprint size={20}/><strong>ID A</strong></span><span className="environment-window-data"><FileText size={13}/>经历<SlidersHorizontal size={13}/>配置</span></span>
-      <span className="environment-id environment-id-b"><span className="environment-window-bar"><Layers3 size={13}/>Worker 的 Agent 主体<i/></span><span className="environment-window-id"><Fingerprint size={20}/><strong>ID B</strong></span><span className="environment-window-data"><FileText size={13}/>经历<SlidersHorizontal size={13}/>配置</span></span>
-      <span className="environment-official"><Cloud size={25}/><span><strong>银河账户 A</strong><small>可关联多个 ID</small></span></span>
-      <span className="environment-hub"><Cloud size={25}/><span><strong>银河账户 B</strong><small>同一 ID 也可关联</small></span></span>
-    </div>
-    <figcaption><span><KeyRound size={16}/><strong>设备密钥负责控制</strong><small>登录账户不替代设备授权</small></span><span><Fingerprint size={16}/><strong>主体各自积累</strong><small>账户关联不合并身份与经历</small></span><span><Cloud size={16}/><strong>每条关联分别授权</strong><small>数据、权限与动作来源各自保留</small></span></figcaption><p className="identity-service-choice"><Network size={15}/>本地也可选择第三方 Hub；官网不管理第三方接入。</p>
-  </figure>;
-}
-
-export function AccountAccessWorkspace({hasIdentity,connected,navigate}:Props) {
- const identityTarget='/app/settings/identity?continue=access';
- return <section className="account-access-page"><header className="account-page-heading"><h1>接入</h1></header>
- <section className="account-local-connect"><div className="access-option-icon"><Laptop size={26}/></div><div><h2>在自己的 AI 中使用银河</h2><p>打开已安装银河的 AI 环境，继续当前工作。</p><LocalGalaxyEntry introduction={false} hasIdentity={hasIdentity}/></div></section>
- {hasIdentity&&<section className="account-web-connection"><h2>这台浏览器</h2><p>{connected?'已连接，可继续使用当前身份。':'已有身份记录，连接后继续。'}</p><a href={identityTarget} onClick={event=>{event.preventDefault();navigate(identityTarget);}}>身份与设备</a></section>}
- <nav className="account-access-links" aria-label="接入设置"><a href="/app/settings/identity?section=account" onClick={event=>{event.preventDefault();navigate('/app/settings/identity?section=account');}}>关联银河账户</a><a href="/downloads/">客户端与安装</a><a href="/docs/">接入文档</a></nav>
+export type AccountConnectionAction='overview'|'association'|'native';
+export type AccountAccessProps={endpoint?:string;navigate:(path:string)=>void;identityControls?:React.ReactNode;section?:AccountConnectionAction;returnTo?:string;onAction?:(action:AccountConnectionAction)=>void};
+export function AccountAccessWorkspace(props:AccountAccessProps){return <AccountSessionScope endpoint={props.endpoint}><AccountConnections {...props}/></AccountSessionScope>;}
+function AccountConnections({endpoint,navigate,identityControls,section='overview',returnTo,onAction}:AccountAccessProps){
+ const model=useAccountSessionModel(),session=model.phase==='signed-in'?model.session:null;
+ const choose=(action:AccountConnectionAction)=>{if(onAction)onAction(action);else navigate('/app/account?section=access'+(action==='overview'?'':'&action='+action));};
+ const selected=section!=='overview';
+ const title=section==='association'?'关联本机 ID':section==='native'?'连接本机银河':'本机银河';
+ return <section className="account-access-page account-connections"><header className="account-page-heading">{selected&&<button type="button" className="back-link" onClick={()=>choose('overview')}>本机银河</button>}<h1>{title}</h1></header>
+  {section==='association'?<AccountSettings endpoint={endpoint} navigate={navigate} returnTo={returnTo} embedded/>:selected?<section className="account-connection-action">{identityControls??<LocalGalaxyEntry introduction={false} returnTo={returnTo}/>}</section>:<>
+   <LoadingFeedback active={model.phase==='loading'||model.busy} label="正在读取关联…" scopeKey={model.session?.account.id??'connections'}/>
+   {model.phase==='unavailable'&&<ReadFailure message="账户关联暂时无法读取。" onRetry={()=>void model.refresh()} retrying={model.busy}/>}
+   {model.phase==='offline'&&<p className="account-connection-note">暂时离线，联网后继续读取。</p>}
+   {session&&<section className="account-linked-identities"><header><h2>已关联的 ID</h2><button type="button" className="text-link" onClick={()=>choose('association')}>关联本机 ID</button></header>{session.linkedIds.length?<ul>{session.linkedIds.map(item=>{const path=profilePath(item.subjectId);return <li key={item.subjectId}><Fingerprint size={22} aria-hidden="true"/><div>{path?<a href={path} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(path);}}}><code>{item.subjectId}</code></a>:<code>{item.subjectId}</code>}<p>关联于 {new Date(item.linkedAt).toLocaleDateString('zh-CN')}</p></div></li>;})}</ul>:<p className="account-connection-note">尚未关联本机 ID。</p>}{session.nextAfter&&<button type="button" className="text-link" disabled={model.busy} onClick={()=>void model.more()}>更多关联</button>}</section>}
+   {identityControls?<section className="account-connection-action">{identityControls}</section>:<section className="account-native-continue"><Laptop size={26} aria-hidden="true"/><div><h2>在自己的 AI 中继续工作</h2><LocalGalaxyEntry introduction={false} returnTo={returnTo}/></div></section>}
+   <footer className="account-access-links"><a href="/downloads/">客户端与安装</a><a href="/docs/">使用文档</a></footer>
+  </>}
  </section>;
 }

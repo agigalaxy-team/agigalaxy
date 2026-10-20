@@ -4,6 +4,7 @@ import {Button} from '@/components/ui/button';
 import {Paperclip} from 'lucide-react';
 import {readableTime} from './conversation-ui';
 import {createAttachmentsClient} from './chat-attachments-client.mjs';
+import {ReceivedPackageReader} from './received-package-reader';
 import type {z} from 'zod/v4';
 import {attachmentReferenceSchema} from '../../galaxy-official/src/shared/chat-attachments-schema.mjs';
 import type {attachmentPrepareSchema} from '../../galaxy-official/src/shared/chat-attachments-schema.mjs';
@@ -50,11 +51,14 @@ export function ChatAttachmentFiles(props:{runtime:AttachmentRuntime;items:Attac
 }
 function ChatAttachmentFilesSession({runtime,items}:{runtime:AttachmentRuntime;items:AttachmentDisplay[]}){
  const client:AttachmentsClient=useMemo(()=>createAttachmentsClient(runtime),[runtime]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[clock,setClock]=useState(()=>Date.now());
+ const [opened,setOpened]=useState<{attachmentId:string;file:Blob}|null>(null),reader=useRef<HTMLDialogElement>(null);
+ const displayed=opened&&items.some(item=>item.attachmentId===opened.attachmentId&&item.state==='available'&&(!item.expiresAt||Date.parse(item.expiresAt)>clock))?opened:null;
  useEffect(()=>{const expiry=items.flatMap(item=>item.expiresAt&&Date.parse(item.expiresAt)>clock?[Date.parse(item.expiresAt)]:[]);if(!expiry.length)return;const timer=window.setTimeout(()=>setClock(Date.now()),Math.min(2147483647,Math.max(0,Math.min(...expiry)-Date.now())));return()=>window.clearTimeout(timer);},[items,clock]);
+ useEffect(()=>{if(displayed)reader.current?.showModal();else reader.current?.close();},[displayed]);
  if(!items?.length)return null;
  return <div className="chat-message-attachments" aria-label="消息附件">{error&&<p role="alert">{error}</p>}{items.map(item=>{const available=item.state==='available'&&(!item.expiresAt||Date.parse(item.expiresAt)>clock);return <div className="chat-message-attachment" key={item.attachmentId}><Paperclip size={18} aria-hidden="true"/><div className="chat-message-attachment-info"><strong>{item.name??'附件'}</strong><p>{size(item.size)}{!available?' · '+fileState(item,clock):''}</p>
  {item.expiresAt&&<small>到期时间 {readableTime(item.expiresAt)}</small>}</div>
- {available&&<Button type="button" variant="outline" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await saveAttachment(client,item);}catch{setError('文件当前不可下载，请刷新检查权限、撤回或期限。');}finally{setBusy(false);}}}>下载文件</Button>}</div>;})}</div>;
+ {available&&<><Button type="button" variant="outline" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await saveAttachment(client,item);}catch{setError('文件当前不可下载，请刷新检查权限、撤回或期限。');}finally{setBusy(false);}}}>下载文件</Button>{/^galaxy-trust-package.*\.json$/i.test(item.name??'')&&<Button type="button" variant="ghost" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{const bytes=await client.download(item,{ownExport:false});setOpened({attachmentId:item.attachmentId,file:new Blob([bytes],{type:'application/json'})});}catch{setError('文件当前不可读取，请刷新后重试。');}finally{setBusy(false);}}}>阅读资料包</Button>}</>}</div>;})}<dialog ref={reader} className="conversation-panel" onClose={()=>setOpened(null)}>{displayed&&<ReceivedPackageReader file={displayed.file} onClose={()=>setOpened(null)}/>}</dialog></div>;
 }
 export function ChatAttachmentComposer(props:ComposerProps){
  return <ChatAttachmentComposerSession key={attachmentScope(props.runtime,props.roomId)} {...props}/>;

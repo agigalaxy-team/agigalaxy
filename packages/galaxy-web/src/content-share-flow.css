@@ -1,0 +1,22 @@
+.content-share-flow{min-width:0;color:var(--foreground,#29252a)}
+.content-share-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px}
+.content-share-heading h2{font-size:1.15rem;line-height:1.45;margin:0;overflow-wrap:anywhere}
+.content-share-heading p{margin:6px 0 0;color:var(--muted-foreground,#756c73);overflow-wrap:anywhere}
+.content-share-actions,.content-share-local{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px}
+.content-share-local p{flex-basis:100%;margin:12px 0}
+.content-share-flow label{min-width:0;max-width:100%}
+.content-share-flow label>input:not([type=radio]):not([type=checkbox]){display:block;box-sizing:border-box;width:100%;min-height:42px;border:1px solid var(--border,#e7dfe5);border-radius:8px;padding:8px 12px;background:white;margin-top:8px}
+.content-share-flow .trust-purpose{max-width:none;margin:18px 0 0;padding-bottom:0}
+.content-share-flow .trust-purpose .history-heading{margin:0 0 20px}
+.content-share-flow .trust-purpose .package-reading{margin:16px 0}
+.content-share-flow .trust-purpose .package-source-author,.content-share-flow .trust-purpose :is(.reading-detail-entry,.reading-section)>.reading-detail-link{color:var(--muted-foreground,#756c73)}
+.content-share-flow .trust-purpose .trust-people-list>label.selected{border-color:#e6c2d2;background:#fff6fa}
+.received-package-reader .package-reading p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
+.received-package-reader .package-material-body section{margin-block:18px}
+.conversation-notes .summary-key-list ol{padding-left:20px}
+.conversation-notes .summary-key-list li{padding-block:10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.conversation-notes .summary-key-list li>button:first-child{text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+.conversation-notes .summary-editor{display:grid;gap:16px;margin-block:18px}
+.conversation-notes .summary-editor>label{display:grid;gap:10px;font-weight:500}
+.conversation-notes .summary-editor textarea{box-sizing:border-box;min-height:130px;width:100%;white-space:pre-wrap}
+@media(max-width:600px){.content-share-heading{flex-wrap:wrap;gap:12px}.content-share-actions>button,.content-share-local>button{flex:1 1 180px}.conversation-notes .summary-key-list li{align-items:flex-start}}

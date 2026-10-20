@@ -9,6 +9,7 @@ export type TrustContainer=z.infer<typeof trustContainerSchema>;
 export type TrustFiles=TrustContainer['files'];
 export type TrustSource=z.infer<typeof trustSourceSnapshotSchema>&{authorId?:string;bodyText?:string};
 export type TrustSelection={ref:TrustRef;mode:'reference'|'copy';permissionId?:string;permissionExpiresAt?:number};
+export type ContentShareContext={kind:'profile'|'work'|'material';id:string;title:string;returnTo:string;href?:string;claim?:string;selections?:TrustSelection[];work?:TrustWork};
 export type TrustCompose={claim:string;audienceKind:'subjects'|'public';recipients:string[];recipientQuery:string;days:number;selections:TrustSelection[]};
 export type TrustPermissionForm={source:TrustRef|null;grantee:string;query:string;audienceKind:'subjects'|'public';recipients:string[];recipientQuery:string;days:number};
 export type TrustReading={ref?:TrustRef;state:'available';snapshot:TrustSource;readExpiresAt?:number}|{ref?:TrustRef;state:'unavailable';reason?:string;readExpiresAt?:number};
@@ -37,6 +38,11 @@ export function trustTextBody(text:string){
  try{const value:unknown=JSON.parse(text),body=trustField(value,'event')??trustField(value,'data')??value;return trustObject(body)?body:null;}catch{return null;}
 }
 export function initialCompose(subjectId?:string):TrustCompose{return{claim:'',audienceKind:'subjects',recipients:subjectId?[subjectId]:[],recipientQuery:'',days:1,selections:[]};}
+/** A source supplies context only. Preparation still reads the original service permissions. */
+export function contextualCompose(subjectId:string|undefined,context?:ContentShareContext):TrustCompose{
+ const initial=initialCompose(subjectId);return context?{...initial,claim:context.claim?.slice(0,4000)??'',selections:(context.selections??[]).map(selection=>({...selection,ref:{...selection.ref}}))}:initial;
+}
+export function contentShareDraftKey(context?:ContentShareContext){return context?'trust-package:compose-draft:'+JSON.stringify([context.kind,context.id]):'trust-package:compose-draft';}
 export function initialPermission(subjectId?:string):TrustPermissionForm{return{source:null,grantee:subjectId??'',query:'',audienceKind:'subjects',recipients:subjectId?[subjectId]:[],recipientQuery:'',days:1};}
 function recipients(value:unknown,fallback:string[]){return Array.isArray(value)?value.filter((id):id is string=>typeof id==='string'):typeof value==='string'?value.split(/[\s,，、]+/).filter(Boolean):fallback;}
 export function restoredCompose(value:unknown,subjectId?:string):TrustCompose{

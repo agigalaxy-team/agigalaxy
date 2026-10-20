@@ -1,6 +1,7 @@
 import { lstat, readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../../shared/service-error.mjs';
+import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath} from '../../shared/account-resource-routes.mjs';
 
 export function validateBrowserOrigins(origins = []) {
   if (!Array.isArray(origins) || origins.length > 16) throw new Error('Invalid browser origin policy.');
@@ -25,18 +26,19 @@ export function applyBrowserPolicy(request, response, origins) {
   if (!origins.includes(origin)) throw new ServiceError('browser_origin_not_enabled', 403);
   response.setHeader('Vary', 'Origin');
   response.setHeader('Access-Control-Allow-Origin', origin);
-  const accountSession = /^\/v1\/account\/(session|logout|settings|type-change|archives|work|external-credentials)(?:\/|\?|$)/.test(request.url)
-    || /^\/v2\/community\//.test(request.url);
+  const pathname=new URL(request.url,'https://galaxy.invalid').pathname;
+  const accountSession = /^\/v1\/account\/(session|logout|settings|type-change|archives|work|external-credentials|bookmarks)(?:\/|\?|$)/.test(request.url)
+    || request.url.startsWith('/v2/community/')||isAccountChatJsonPath(pathname)||isAccountBinaryPath(pathname);
   if (accountSession) response.setHeader('Access-Control-Allow-Credentials', 'true');
   response.setHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-Id, X-Galaxy-Content-Sha256');
   // Subject operations keep Bearer transport. Account cookies are accepted only
-  // by the account portal and forum routes, with their own actor/CSRF checks.
+  // by their explicit account-capable routes, with exact actor/CSRF checks.
   if (request.method !== 'OPTIONS') return false;
   const method = request.headers['access-control-request-method'];
   const headers = (request.headers['access-control-request-headers'] ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  const accountHeader=accountSession||/^\/v2\/account-(?:archives|work)\//.test(request.url);
+  const accountHeader=accountSession||/^\/v2\/account-(?:archives|work|bookmarks)\//.test(request.url);
   const credentialDelete=method==='DELETE'&&/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(request.url);
-  const upload=method==='PUT'&&/^\/v2\/chat\/attachments\/[0-9a-f-]{36}\/upload$/.test(request.url);
+  const upload=method==='PUT'&&isAccountUploadPath(pathname);
   if (!['GET', 'POST'].includes(method) && !upload && !credentialDelete || headers.some(header => !['authorization', 'content-type', 'accept', ...(accountHeader ? ['x-galaxy-account-id'] : []),...(accountSession ? ['x-galaxy-account-csrf'] : [])].includes(header)))
     throw new ServiceError('browser_preflight_denied', 403);
   response.setHeader('Access-Control-Allow-Methods', upload?'GET, POST, PUT':credentialDelete?'GET, POST, DELETE':'GET, POST');

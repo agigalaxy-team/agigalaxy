@@ -140,7 +140,8 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
         AND l.client_id=ANY($4::text[]) AND l.revoked_at IS NULL AND ($5::text IS NULL OR l.subject_id>$5)
         GROUP BY l.subject_id ORDER BY l.subject_id LIMIT 101`, [endpoint, session.issuer, session.externalSubject, clients, after ?? null])).rows;
       const linkedIds = rows.slice(0,100).map(row => ({subjectId:row.subject_id, linkedAt:new Date(row.linked_at).toISOString()}));
-      return {state:'signed-in', account:session.account, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
+      const profile=(await db.query('SELECT display_name FROM official_account_profiles_v1 WHERE account_id=$1',[session.accountId])).rows[0];
+      return {state:'signed-in', account:{...session.account,displayName:profile?profile.display_name:session.account.displayName}, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
         expiresAt:session.expiresAt, csrfToken:session.csrfToken, galaxyAuthorization:false};
     },
     async actionActor(request, {write = request.method !== 'GET'} = {}) {

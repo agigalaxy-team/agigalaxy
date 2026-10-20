@@ -9,6 +9,7 @@ import {PersonRecognitions,RecognitionOverview} from './person-recognitions';
 import {PersonProjects} from './person-projects';
 import {AgentWorkContinuation} from './agent-work-continuation';
 import {SaveForLaterButton} from './reading-bookmarks-workspace';
+import {ContentShareAction} from './content-share-action';
 import {PublicIdentityAccounts} from './public-account-relations';
 import {historyRoleLabel} from './history-facts';
 import {MemberAvatar,memberName} from './conversation-ui';
@@ -69,6 +70,7 @@ function PersonSession({runtime,connected,subjectId,targetSubjectId,search,navig
   <Link to={back} navigate={onReturn??navigate} className="person-return">{profileReturnLabel(back)}</Link>
   <header className="person-identity"><span className="person-portrait" aria-hidden="true"><MemberAvatar subjectId={targetSubjectId} own={own}/></span><div><p className="eyebrow">{own?'我的个人资料':'个人资料'}</p><h1>{profile?.displayName??memberName(targetSubjectId)}</h1></div>{own&&<div className="person-identity-actions"><Link to={editorPath} navigate={navigate} className="person-edit-link"><Pencil size={15}/>编辑资料</Link><Link to="/app/account" navigate={navigate} className="person-self-link">我的银河</Link></div>}</header>
   {!own&&profile?.profileSource&&!declarationUnavailable&&<SaveForLaterButton runtime={runtime} connected={connected} subjectId={subjectId} reference={{kind:"person",subjectId:targetSubjectId}} onNeedIdentity={()=>navigate("/app/settings/identity")}/>}
+  {own&&profile&&!declarationUnavailable&&<ContentShareAction runtime={runtime} subjectId={subjectId} connected={connected} navigate={navigate} label="分享这份资料" context={{kind:'profile',id:targetSubjectId,title:profile.displayName??'我的资料',returnTo:base,claim:[profile.displayName,profile.about].filter(Boolean).join('\n\n')}}/>}
   {profile?.profileSource&&!declarationUnavailable&&<AgentWorkContinuation runtime={runtime} subjectId={subjectId} object={{kind:'person',id:targetSubjectId}} title={profile.displayName??memberName(targetSubjectId)} purpose="根据当前允许阅读的介绍和具体经历，理解此人与原来事情相关的经验" returnTo={location.pathname+location.search+location.hash} onNeedIdentity={()=>navigate('/app/settings/identity')}/>}
   {saved&&<output className="person-updated">资料已更新。</output>}
   <nav className="person-tabs" aria-label="个人资料">{[['overview','概览'],['experience','经历与贡献'],['projects','作品与项目'],['recognition','认可']].map(([id,title])=><Link key={id} to={sectionPath(id)} navigate={navigate} aria-current={section===id?'page':undefined}>{title}</Link>)}</nav>

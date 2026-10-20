@@ -23,6 +23,7 @@ import { BuilderProbeWorker } from './builder-probes.mjs';
 import { createCiWorkerV2 } from './ci-worker-v2.mjs';
 import {loadAttachmentConfiguration} from './infrastructure/attachment-configuration.mjs';
 import {ChatAttachmentsService} from './chat-attachments.mjs';
+import {ForumAttachmentsV1Service} from './forum-attachments-v1.mjs';
 
 let db;
 let attachmentConfiguration;
@@ -57,6 +58,7 @@ try {
   const now = () => Math.floor(Date.now() / 1000);
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
   const attachments=attachmentConfiguration?new ChatAttachmentsService({chat:{db,now},...attachmentConfiguration}):null;
+  const forumAttachments=attachmentConfiguration?new ForumAttachmentsV1Service({db,now,...attachmentConfiguration}):null;
   const retirement = await loadRetirementController(process.env.GALAXY_RETIREMENT_FILE, { endpoint, now });
   const incident = await loadIncidentController(process.env.GALAXY_INCIDENT_FILE, { endpoint, now });
   const resourceBudgetPolicy=await loadResourceBudgetPolicy(process.env.GALAXY_RESOURCE_BUDGET_FILE);
@@ -95,7 +97,7 @@ try {
       if(attachments&&!stopping){
         // Storage retention continues during a publication pause; no model or
         // uploaded program executes here. Scanner outage defers only this queue.
-        try {await attachments.purgeExpired({limit:20});if(!paused&&!stopping)await attachments.scanPending({limit:1});}
+        try {await attachments.purgeExpired({limit:20});await forumAttachments.purgeExpired({limit:20});if(!paused&&!stopping){await attachments.scanPending({limit:1});await forumAttachments.scanPending({limit:1});}}
         catch {runtimeLog.write({event:'attachment_processing_deferred'});}
       }
       if (nativeCi.processed) runtimeLog.write({ event: 'ci_v2_observation_job', state: nativeCi.state });

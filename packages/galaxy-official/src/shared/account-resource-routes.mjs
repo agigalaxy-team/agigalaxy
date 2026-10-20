@@ -1,0 +1,11 @@
+const id='[0-9a-f-]{36}';
+const chatGlobal=new RegExp('^/v2/chat/(?:rooms/(?:create|query|directory)|invitations/query|export/owned|accounts/query)$');
+const chatRoom=new RegExp('^/v2/chat/rooms/'+id+'/(?:read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|operation-receipt|cursor|join-preview|join)$');
+const chatMessage=new RegExp('^/v2/chat/rooms/'+id+'/messages/'+id+'/(?:edit|retract|hide|context)$');
+const chatAttachmentJson=/^\/v2\/chat\/attachments\/(?:config|prepare|read|query|revoke)$/;
+const chatAttachmentBinary=new RegExp('^/v2/chat/attachments/'+id+'/(?:upload|content|export-content)$');
+const forumAttachmentBinary=new RegExp('^/v2/community/attachments/'+id+'/(?:upload|content)$');
+export const isAccountChatJsonPath=path=>chatGlobal.test(path)||chatRoom.test(path)||chatMessage.test(path)||chatAttachmentJson.test(path);
+export const isAccountBinaryPath=path=>chatAttachmentBinary.test(path)||forumAttachmentBinary.test(path);
+export const isAccountUploadPath=path=>isAccountBinaryPath(path)&&path.endsWith('/upload');
+export const isAccountBookmarkPath=path=>/^\/v1\/account\/bookmarks\/(?:status|command|query|receipt)$/.test(path);

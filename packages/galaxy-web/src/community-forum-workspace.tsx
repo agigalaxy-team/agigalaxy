@@ -1,11 +1,10 @@
-import { ReadingDetails, ReadingSummary, ReadingSurface } from './reading-details';
+import { ReadingSurface } from './reading-details';
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {MessageCircle, Search} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { AccountVerificationPrompt, needsAccountVerification } from './account-verification-prompt';
-import { createCommunityForumClient, forumDraftPayload, forumError, forumScopeKey, newForumDraft } from './community-forum-client.mjs';
+import { createCommunityForumClient, forumDraftPayload, forumError, newForumDraft } from './community-forum-client.mjs';
 import { forumReplyPath, forumTaskPath, forumVersionPath, normalizeForumOrigin } from './community-forum-origin.mjs';
 import { MemberAvatar, MemberLink, memberName, useMemberNames } from './conversation-ui';
 import { SaveForLaterButton } from './reading-bookmarks-workspace';
@@ -17,11 +16,14 @@ import {forumTopics,forumReadTopicSchema} from '../../galaxy-official/src/shared
 import {ContentCover,contentCoverFromLinks} from './community-content-visuals';
 import {CommunityExternalWorkspace,CommunityReadingSidebar} from './community-highlights';
 import {communityBrowsePath,communitySelection} from './community-navigation';
-import {OfficialAccountLoginNotice,useOfficialAccountSession} from './official-account-panel';
+import {OfficialAccountLoginNotice,type OfficialAccountModel} from './official-account-panel';
+import {AccountSessionScope,useAccountSessionModel} from './account-session-scope';
 import {clearForumLoginDraft,forumLoginDraft,rememberForumLoginDraft,forumAuthorAccountId,forumAuthorSubjectId,forumOwnsContent} from './forum-account-state.mjs';
 import {ForumAudienceEditor,ForumAudienceSummary} from './forum-audience';
 import {useReadTasks} from './use-read-task';
 import {LoadingFeedback,ReadFailure} from './interaction-feedback';
+import {ForumAttachmentComposer,ForumAttachmentFiles,type ForumDraftAttachment} from './forum-attachments';
+import {forumAttachmentDraft} from './forum-attachment-client.mjs';
 import type {ForumAccessOptions,ForumSection,ForumNotification,ForumAuthorFields} from './community-forum-view-types';
 import './community-forum-workspace.css';
 import {availableForumContent,forumPayload,forumPreviewProjection,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumPreviewPayload,type ForumPayload,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPostsQuery} from './community-forum-view-types';
@@ -107,26 +109,28 @@ async function firstForumRead(client:ForumClient,route:{reportId?:string;replyId
  return{kind:'cards' as const,value:section==='owned'?await client.owned(query):await client.posts(query)};
 }
 export function CommunityForumWorkspace(props:Props){
-  const official=useOfficialAccountSession(props.runtime?.api.endpoint),currentOfficial=useRef(official);currentOfficial.current=official;
+ return <AccountSessionScope endpoint={props.runtime?.api.endpoint}><CommunityForumSession {...props}/></AccountSessionScope>;
+}
+function CommunityForumSession(props:Props){
+  const official=useAccountSessionModel(),currentOfficial=useRef(official);currentOfficial.current=official;
   const draftOwner=useRef<{endpoint:string|undefined;session:typeof official.session}>({endpoint:props.runtime?.api.endpoint,session:null});
   if(draftOwner.current.endpoint!==props.runtime?.api.endpoint||official.phase==='signed-out'||official.phase==='loading')draftOwner.current={endpoint:props.runtime?.api.endpoint,session:null};
   if(official.phase==='signed-in')draftOwner.current={endpoint:props.runtime?.api.endpoint,session:official.session};
-  const parameters=new URLSearchParams(props.routeSearch),identityMode=parameters.get('acting')==='identity'&&!!props.subjectId;
   // A temporary connection failure keeps only the local draft's owner. Every
   // network action below still requires the current live account session.
-  const subjectId=identityMode?props.subjectId:undefined,session=official.session??(['offline','unavailable'].includes(official.phase)?draftOwner.current.session:null),accountId=!identityMode?session?.account.id:null,csrfToken=session?.csrfToken,expiresAt=session?.expiresAt;
+  const session=official.session??(['offline','unavailable'].includes(official.phase)?draftOwner.current.session:null),accountId=session?.account.id,csrfToken=session?.csrfToken,expiresAt=session?.expiresAt;
   const account=useMemo(()=>{if(!accountId||!csrfToken||!expiresAt||!official.client)return null;const client=official.client,original={state:'signed-in',account:{id:accountId},csrfToken,expiresAt};
     const assertCurrent=()=>{const value=currentOfficial.current;if(['offline','unavailable'].includes(value.phase))throw Object.assign(Error('official_account_unavailable'),{code:'official_account_unavailable'});if(value.phase!=='signed-in'||value.session?.account.id!==accountId||value.session.csrfToken!==csrfToken||expiresAt*1000<=Date.now())throw Object.assign(Error('official_account_changed'),{code:'official_account_changed'});};
-    return{id:accountId,assertCurrent,call:(path:string,input:unknown,options:{method?:string}={})=>{assertCurrent();return client.call(path,input,{...options,session:original});}};
+    return{id:accountId,assertCurrent,call:(path:string,input:unknown,options:{method?:string;signal?:AbortSignal}={})=>{assertCurrent();return client.call(path,input,{...options,session:original});},transfer:(path:string,input:unknown,options:{method?:string;signal?:AbortSignal}={})=>{assertCurrent();return client.transfer(path,input,{...options,session:original});}};
   },[accountId,csrfToken,expiresAt,official.client]);
-  const authority=useChoiceViewLease(props.runtime,subjectId),key=JSON.stringify([authority.key,identityMode,accountId,csrfToken,official.phase==='loading',identityMode?forumScopeKey(props.runtime,subjectId):props.runtime?.api.endpoint,props.postId,props.versionId,props.replyId,props.reportId,props.memberSectionId,props.section,props.compose,props.manage,identityMode&&props.connected,props.routeSearch]);
+  const key=JSON.stringify([accountId,csrfToken,official.phase==='loading',props.runtime?.api.endpoint,props.postId,props.versionId,props.replyId,props.reportId,props.memberSectionId,props.section,props.compose,props.manage,props.routeSearch]);
  if(!props.postId&&!props.replyId&&!props.reportId&&!props.memberSectionId&&!props.compose&&(!props.section||props.section==='all')&&communitySelection(props.routeSearch).source==='external')return <CommunityExternalWorkspace key={key} runtime={props.runtime} subjectId={props.subjectId} navigate={props.navigate} routeSearch={props.routeSearch}/>;
-  return <CommunityForumView key={key} {...props} subjectId={subjectId} connected={identityMode?props.connected:!!account} localSubjectId={props.subjectId} localConnected={props.connected} account={account} official={official} identityMode={identityMode} targetAccountId={identityMode?parameters.get('account'):null} lease={authority.lease}/>;
+  return <CommunityForumView key={key} {...props} subjectId={undefined} connected={!!account} localSubjectId={props.subjectId} localConnected={props.connected} account={account} official={official}/>;
 }
 type ForumAccount=NonNullable<NonNullable<Parameters<typeof createCommunityForumClient>[1]>['account']>;
-type ForumAccountProps={lease:ChoiceViewLease|null;account:ForumAccount|null;official:ReturnType<typeof useOfficialAccountSession>;identityMode:boolean;targetAccountId:string|null;localSubjectId?:string;localConnected:boolean};
+type ForumAccountProps={account:ForumAccount|null;official:OfficialAccountModel;localSubjectId?:string;localConnected:boolean};
 type DetailSource={key:string;postId:string;versionId:string|null;replyId:string|null;managePost:boolean;ownReply:boolean};
-function CommunityForumView({ runtime, subjectId, connected, navigate, postId, versionId, replyId, reportId, memberSectionId, section: requestedSection = 'all', compose = false, manage = false, routeSearch = '', browseReturn = '/app/community', browseReturnLabel = '社区', registerShellNavigation,lease,account,official,identityMode,targetAccountId,localSubjectId,localConnected }: Props&ForumAccountProps) {
+function CommunityForumView({ runtime, subjectId, connected, navigate, postId, versionId, replyId, reportId, memberSectionId, section: requestedSection = 'all', compose = false, manage = false, routeSearch = '', browseReturn = '/app/community', browseReturnLabel = '社区', registerShellNavigation,account,official,localSubjectId,localConnected }: Props&ForumAccountProps) {
   const section = ['all', 'owned', 'reports','sections','notifications'].includes(requestedSection) ? requestedSection : 'all';
   const isFeed=!postId&&!replyId&&!reportId&&!memberSectionId&&!compose,postFeed=isFeed&&(section==='all'||section==='owned');
   const privatePage=section==='owned'||section==='reports'||section==='notifications';
@@ -143,27 +147,27 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const returnLabel=returnedScope.pathname==='/app/community'?(returnedSelection.query?'搜索结果':returnedScope.searchParams.get('section')==='owned'?'我的帖子':forumTopics.find(value=>value.id===returnedSelection.topic)?.label??(returnedSelection.topic==='unclassified'?'未分类帖子':'社区')):browseReturnLabel;
   const listQuery=useMemo<ForumPostsQuery>(()=>{const selected=forumBrowseSelection(routeSearch,forumTopics.map(value=>value.id));return{...(selected.topic?{topic:forumReadTopicSchema.parse(selected.topic)}:{}),...(selected.query?{query:selected.query}:{}),order:'published'};},[routeSearch]);
   const [queryInput,setQueryInput]=useState(query),[feedOrder,setFeedOrder]=useState<'published'|'id'|null>(null);
-  const browseScope=useMemo(()=>({endpoint:runtime?.api.endpoint??'',subjectId:subjectId??null}),[runtime,subjectId]);
+  const browseEndpoint=runtime?.api.endpoint??'',browseAccountId=account?.id??null;
+  const browseScope=useMemo(()=>({endpoint:browseEndpoint,subjectId:browseAccountId?'account:'+browseAccountId:null}),[browseEndpoint,browseAccountId]);
   const [initialBrowsePosition]=useState(()=>isFeed?readForumBrowsePosition({state:history.state,storage:sessionStore(),scope:browseScope,route:location.pathname+location.search}):null);
   const restoreBrowse=useRef(initialBrowsePosition),pendingBrowseFocus=useRef(isFeed?forumBrowseFocus(history.state,location.pathname+location.search):null),replyAnchor=useRef<string|null>(null);
   const context = memberSectionId?`section:${memberSectionId}`:section==='sections'?'sections':reportId ? `report:${reportId}` : postId ? `post:${postId}` : replyId ? `reply:${replyId}` : 'feed';
-  const client = useMemo<ForumClient|null>(() => runtime ? createCommunityForumClient(runtime, { subjectId: subjectId ?? null, context,account,browserDrafts:!identityMode,targetAccountId }) : null, [runtime, subjectId, context,account,identityMode,targetAccountId]);
-  const detailReads=useReadTasks(JSON.stringify([runtime?.api.endpoint,subjectId,account?.id,targetAccountId,context,versionId,manage]));
+  const client = useMemo<ForumClient|null>(() => runtime ? createCommunityForumClient(runtime, { subjectId:null, context,account,browserDrafts:true }) : null, [runtime, context,account]);
+  const detailReads=useReadTasks(JSON.stringify([runtime?.api.endpoint,account?.id,context,versionId,manage]));
   const detailSource=useRef<DetailSource|null>(null),discussionAppend=useRef(false);
-  const [visitorConflict,setVisitorConflict]=useState<{id:string;revision:number}|null>(null),[actingAccounts,setActingAccounts]=useState<NonNullable<ForumQuota['availableAccounts']>>([]);
-  const [authorizedAccountId,setAuthorizedAccountId]=useState<string|null>(null);
-  const accountReady=identityMode||official.phase!=='loading';
+  const [visitorConflict,setVisitorConflict]=useState<{id:string;revision:number}|null>(null);
+  const accountReady=official.phase!=='loading';
   const alive = useRef(true), working = useRef(false), readEpoch = useRef(0), draftEpoch = useRef(0), composeStarted = useRef(false);
   const editor = useRef<HTMLElement>(null),fieldId=useId();
   const feedPages=useRef(initialBrowsePosition?.pages??1),replyPages=useRef(1),versionPages=useRef(1),replyStarted=useRef(false);
   const [now,setNow]=useState(()=>Math.floor(Date.now()/1000));
   const isAvailable=<T extends ForumContentView|ForumCardView>(value:T|null)=>availableForumContent(value,now);
   const [reading, setReading] = useState(Boolean(client&&(connected||!reportId&&(postId||replyId||memberSectionId||!privatePage)))), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
-  const [verificationRequired, setVerificationRequired] = useState(false);
   const [items, setItems] = useState<ForumCardView[]>([]), [next, setNext] = useState<string | null>(null), [detail, setDetail] = useState<ForumPostView|null>(null);
   const [memberSections,setMemberSections]=useState<ForumSection[]>([]),[sectionDetail,setSectionDetail]=useState<ForumSection|null>(null),[notifications,setNotifications]=useState<ForumNotification[]>([]);
   const [accessOptions,setAccessOptions]=useState<ForumAccessOptions|null>(null),[sectionChoices,setSectionChoices]=useState<ForumSection[]>([]),[sectionChoiceNext,setSectionChoiceNext]=useState<string|null>(null);
   const [linksEditor,setLinksEditor]=useState(false),moreFeed=useRef<HTMLDivElement>(null),moreReplies=useRef<HTMLDivElement>(null);
+  const [attachmentWorking,setAttachmentWorking]=useState(false);
   const [sectionPicker,setSectionPicker]=useState(false),[draftSourceRead,setDraftSourceRead]=useState<{draftId:string;value:ForumPostView}|null>(null);
   const [parent, setParent] = useState<ForumPostView|null>(null), [versions, setVersions] = useState<ForumVersionEntry[]>([]), [replies, setReplies] = useState<ForumReplyView[]>([]);
   const [versionNext, setVersionNext] = useState<number | null>(null), [ownPost, setOwnPost] = useState<ForumOwnedPost|null>(null);
@@ -176,20 +180,20 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const [draftLoading, setDraftLoading] = useState(true), [form, setForm] = useState<ForumDraft|null>(null), formRef = useRef<ForumDraft|null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [saveMessage, setSaveMessage] = useState(''), [saveFailed, setSaveFailed] = useState(false);
-  const [pending, setPending] = useState<ForumPending[]>([]), [retryPreview, setRetryPreview] = useState<ForumReview|null>(null), [quotaRead, setQuota] = useState<{draftId:string;value:ForumQuota}|null>(null);
+  const [pending, setPending] = useState<ForumPending[]>([]), [retryPreview, setRetryPreview] = useState<ForumReview|null>(null);
   const [pendingReason,setPendingReason]=useState(''),retryDialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{if(retryPreview)retryDialog.current?.showModal();else retryDialog.current?.close();},[retryPreview]);
   const [postOptions, setPostOptions] = useState(false);
   const [editorOpen,setEditorOpen]=useState(compose),[discardDraft,setDiscardDraft]=useState(false);
   const recoveryWorking = useRef(false);
-  const [policyRead, setPolicy] = useState<{draftId:string;value:ForumQuota['policy']}|null>(null), [publicationRead, setPublicationUntil] = useState<{draftId:string;value:number}|null>(null);
+  const [policyRead, setPolicy] = useState<{draftId:string;value:ForumQuota['policy']}|null>(null);
   const [preparationFailure, setPreparationError] = useState<{draftId:string;reason:unknown}|null>(null);
   const [reportDetail,setReportDetail]=useState<ForumReport|null>(null),[reportItems,setReportItems]=useState<ForumReport[]>([]),[replyDetail,setReplyDetail]=useState<ForumReplyView|null>(null);
-  const governance=form?.id===governanceRead?.draftId?governanceRead?.value:null,quota=form?.id===quotaRead?.draftId?quotaRead?.value:null,policy=form?.id===policyRead?.draftId?policyRead?.value:null,publicationUntil=form?.id===publicationRead?.draftId?publicationRead?.value:null;
+  const governance=form?.id===governanceRead?.draftId?governanceRead?.value:null,policy=form?.id===policyRead?.draftId?policyRead?.value:null;
   const preparationError=form?.id===preparationFailure?.draftId?preparationFailure?.reason:null;
   const contentDeadline=Math.min(...[detail,parent,replyDetail,...items,...replies].flatMap(value=>value?.availability==='available'&&typeof value.publishedUntil==='number'&&value.publishedUntil>now?[value.publishedUntil]:[]),...notifications.filter(value=>noticeDeadline(value)>now).map(noticeDeadline));
   useEffect(()=>{if(!Number.isFinite(contentDeadline))return;const timer=window.setTimeout(()=>setNow(Math.floor(Date.now()/1000)),Math.min(2147483647,Math.max(0,contentDeadline*1000-Date.now()+1)));return()=>window.clearTimeout(timer);},[contentDeadline]);
-  const current = useCallback(() => { if (!alive.current || !client) return false; try { if(subjectId){if(!lease)return false;lease.assertCurrent();}client.check(); return true; } catch { return false; } },[client,subjectId,lease]);
+  const current = useCallback(() => { if (!alive.current || !client) return false; try { client.check(); return true; } catch { return false; } },[client]);
   const leaveAction=useCallback((action:()=>void)=>{if(!client||!formRef.current){action();return;}void client.draft.flush().then(()=>{if(current())action();}).catch(reason=>{if(current()){setSaveFailed(true);setSaveMessage(forumError(reason));setError('输入尚未保存，先留在本页。可以保留文字后重试恢复草稿。');}});},[client,current]);
   useLayoutEffect(()=>registerShellNavigation?.(current,leaveAction),[registerShellNavigation,current,leaveAction]);
   function rememberBrowse(target?:string) {
@@ -202,7 +206,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   }
   const go = (target: string | null, focus?:ForumFocusTarget) => {
     if(!target)return;
-    if(identityMode&&target.startsWith('/app/community')){const url=new URL(target,location.origin);url.searchParams.set('acting','identity');if(targetAccountId&&!url.searchParams.has('account'))url.searchParams.set('account',targetAccountId);target=url.pathname+url.search+url.hash;}
+    if(target.startsWith('/app/community')){const url=new URL(target,location.origin);url.searchParams.delete('acting');url.searchParams.delete('account');target=url.pathname+url.search+url.hash;}
     const destinationPath=target;
     leaveAction(()=>{const position=rememberBrowse(destinationPath);navigate(destinationPath);
     if(position||focus){const destination=new URL(destinationPath,location.origin),route=destination.pathname+destination.search,returned=route===position?.route;history.replaceState({...history.state,...(position?(returned?{forumBrowse:position}:{browseReturn:position.route,forumBrowseReturn:position}):{}),forumBrowseFocus:focus?{route,target:focus}:null},'',location.href);}});
@@ -230,7 +234,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       history.replaceState({...history.state,forumBrowseFocus:null},'',location.href);
     });return()=>cancelAnimationFrame(frame);
   },[isFeed,reading,error]);
-  const displayError=useCallback((reason:unknown)=>{setError(forumError(reason));setVerificationRequired(needsAccountVerification(reason));if(['official_account_changed','official_account_session_expired'].includes(chatErrorCode(reason)??''))void official.refresh();},[official.refresh]);
+  const refreshAccount=official.refresh;
+  const displayError=useCallback((reason:unknown)=>{setError(forumError(reason));if(['official_account_changed','official_account_session_expired'].includes(chatErrorCode(reason)??''))void refreshAccount();},[refreshAccount]);
   const clearReading=useCallback(()=>{detailReads.cancel();detailSource.current=null;discussionAppend.current=false;setDetail(null);setReplyDetail(null);setReportDetail(null);setParent(null);setItems([]);setReportItems([]);setReplies([]);setVersions([]);setPermission(null);setOwnPost(null);setOwnReply(null);setSectionDetail(null);setMemberSections([]);setNotifications([]);setSectionChoices([]);setVersionsReading(false);setRepliesReading(false);setManagementReading(false);setParentReading(false);setVersionsError('');setRepliesError('');setManagementError('');setParentError('');},[detailReads]);
   async function readDraft() {
     if (!client || !accountReady) return;
@@ -324,7 +329,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   };
   async function run(action: () => Promise<void>) {
     if (!client || working.current||!current()) return;
-    working.current = true; setBusy(true); setError(''); setNotice(''); setVerificationRequired(false);
+    working.current = true; setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (reason) { if (current()) displayError(reason); }
     finally { if (current()) { try { await readPending(); } catch (reason) { if (current()) displayError(reason); } if (current()) { working.current = false; setBusy(false); } } }
   }
@@ -343,6 +348,12 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     void client.draft.save(nextForm).then(() => { if (current() && formRef.current === nextForm) { setSaveFailed(false); setSaveMessage('已保存。'); } })
       .catch((reason: unknown) => { if (current()) { setSaveFailed(true); setSaveMessage(forumError(reason)); } });
   }
+  async function saveAttachments(attachments:ForumDraftAttachment[]){
+    if(!client||!formRef.current||busy||formRef.current.operationId||!current())throw new DOMException('Draft changed','AbortError');
+    const next={...formRef.current,attachments,revision:formRef.current.revision+1};formRef.current=next;setForm(next);setSaveMessage('正在保存…');
+    try{await client.draft.save(next);if(current()&&formRef.current===next){setSaveFailed(false);setSaveMessage('已保存。');}}
+    catch(reason){if(current()){setSaveFailed(true);setSaveMessage(forumError(reason));}throw reason;}
+  }
   async function configForDraft(value: ForumDraft) {
     if (!client) return null;
     if (value.kind === 'create-report') return client.reportConfig({ target: forumSourceTargetFromDraft(value) });
@@ -354,22 +365,25 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   }
   async function prepare(selectedAt:number) {
     if (!client || !formRef.current) return;
-    if(!connected&&!identityMode){await login('login');return;}
+    if(!connected){await login('login');return;}
     const originalForm = formRef.current;
     await client.draft.flush();
     if (!current() || formRef.current !== originalForm) return;
       if(originalForm.kind==='create-post'&&!forumTopics.some(topic=>topic.id===originalForm.topic))throw Error('请选择这篇帖子的主题。');
       if((originalForm.kind==='create-post'||sectionWrite(originalForm.kind))&&!originalForm.audience)throw Object.assign(Error('forum_audience_required'),{code:'forum_audience_required'});
-    let publicationDeadline:number|null=null,currentPolicy = policy,selectedAccountId=typeof originalForm.target.accountId==='string'?originalForm.target.accountId:null;
+    if(typeof originalForm.target.accountId==='string'&&originalForm.target.accountId!==account?.id)throw Object.assign(Error('official_account_changed'),{code:'official_account_changed'});
+    if(publicWrite(originalForm.kind))for(const attachment of originalForm.attachments){
+      const actual=await client.attachments.read(attachment.id);
+      if(actual.attachmentId!==attachment.id||actual.sha256!==attachment.sha256||actual.state!=='available')throw Error('附件尚未就绪，请查看文件状态。');
+    }
+    let publicationDeadline:number|null=null,currentPolicy = policy;
     if (needsAccount(originalForm.kind)) {
       const result = await client.quotas(quotaTarget(originalForm));
       if (!current()) return;
-      setQuota({draftId:originalForm.id,value:result}); currentPolicy = result.policy;if(identityMode&&result.accountId)selectedAccountId=result.accountId; setPolicy({draftId:originalForm.id,value:result.policy});
-      if(result.availableAccounts)setActingAccounts(result.availableAccounts);
-       setAuthorizedAccountId(result.accountVerified&&typeof result.accountId==='string'?result.accountId:null);
+      currentPolicy = result.policy;setPolicy({draftId:originalForm.id,value:result.policy});
       if(result.reason==='account_selection_required')throw Object.assign(Error('account_selection_required'),{code:'account_selection_required'});
       if (!result.accountVerified) throw Object.assign(Error(result.reason??'account_verification_required'), { code: result.reason??'account_verification_required' });
-      if (result.publication){publicationDeadline=result.publication.maxPublishedUntil;setPublicationUntil({draftId:originalForm.id,value:publicationDeadline});}
+      if (result.publication)publicationDeadline=result.publication.maxPublishedUntil;
 
     }
     if (publicWrite(originalForm.kind) && (!currentPolicy || !Number.isSafeInteger(currentPolicy.maxPermissionSeconds) || currentPolicy.maxPermissionSeconds < 1))
@@ -382,7 +396,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     const config = await configForDraft(originalForm);
     if (!current() || formRef.current !== originalForm) return;
     if (config) setGovernance({draftId:originalForm.id,value:config});
-    const knownAccountId=identityMode?selectedAccountId:null;
+    const knownAccountId=account?.id??null;
     const payload = forumPayload(originalForm.kind,forumDraftPayload({...originalForm,target:{...originalForm.target,...(knownAccountId?{accountId:knownAccountId}:{})}}, { maxPermissionSeconds: currentPolicy?.maxPermissionSeconds ?? 0, maxGovernanceHideSeconds: Math.min(config?.maxGovernanceHideSeconds ?? 0, config?.maxPermissionSeconds ?? 0) },selectedAt));
     if (publicWrite(originalForm.kind)) {
       if (!('publishedUntil' in payload)) throw Error('当前稿件不是可公开发表的内容。');
@@ -418,7 +432,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     if (!current()) return;
     if (!isAvailable(source) || !owns(source)) throw Error('只能从当前可读的本人版本准备更新。');
     await begin('publish-version', { postId, expectedHeadVersion: head.headVersion, versionId: source.locator.versionId,versionNumber:source.locator.versionNumber,...(forumAuthorAccountId(source)?{accountId:forumAuthorAccountId(source)}:{}) },
-      { title: source.payload.title, body: source.payload.body, linksText: source.payload.links.join('\n'),topic:source.payload.topic??'unclassified',sectionId:source.sectionId??null,audience:source.audience });
+      { title: source.payload.title, body: source.payload.body, linksText: source.payload.links.join('\n'),attachments:(source.payload.attachments??[]).map(reference=>forumAttachmentDraft({...reference,...source.attachments?.find(item=>item.attachmentId===reference.id),state:source.attachments?.find(item=>item.attachmentId===reference.id)?.state??'unavailable'},{existing:true})),topic:source.payload.topic??'unclassified',sectionId:source.sectionId??null,audience:source.audience });
   }
   async function withdraw(kind:'withdraw-post'|'withdraw-reply',value:ForumOwnedPost|ForumOwnedReply|ForumReplyView){
     if(!client||!current())return;
@@ -442,7 +456,6 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       void readFirst().then(outcome=>{if(outcome.status==='success')return refreshLatest({first:outcome.value,ticket});if(outcome.status==='error')initialFailure(outcome.error,ticket);}).catch(reason=>initialFailure(reason,ticket));
     }
     if(client&&accountReady&&current())void client.pending().then(restoreInput).catch(readFailure);
-    if(client&&subjectId&&connected)void client.quotas(postId?{postId}:replyId?{replyId}:{}).then(value=>{if(current()){if(value.availableAccounts)setActingAccounts(value.availableAccounts);setAuthorizedAccountId(value.accountVerified&&typeof value.accountId==='string'?value.accountId:null);}}).catch(()=>{if(current())setAuthorizedAccountId(null);});
     const tick=()=>{if(!document.hidden){setNow(Math.floor(Date.now()/1000));void tickLatest().catch(readFailure);}};
     const visible=()=>{if(document.hidden)clearPrivateReading();else tick();};
     const offline=()=>{readingVersion.current++;clearPrivateReading();setReading(false);setError('网络已断开，草稿仍保留；恢复连接后重新读取允许的内容。');};
@@ -453,7 +466,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const prepareDraft=useEffectEvent((draftId:string,active:()=>boolean)=>{
     const value=formRef.current;if(!client||!value||value.id!==draftId)return;
     const valid=()=>active()&&current()&&formRef.current?.id===draftId;
-    if(needsAccount(value.kind))void client.quotas(quotaTarget(value)).then(result=>{if(valid()){setQuota({draftId,value:result});setPolicy({draftId,value:result.policy});setPublicationUntil({draftId,value:Math.floor(Date.now()/1000)+result.policy.maxPermissionSeconds});if(result.availableAccounts)setActingAccounts(result.availableAccounts);setAuthorizedAccountId(result.accountVerified&&typeof result.accountId==='string'?result.accountId:null);}}).catch(reason=>{if(valid())setPreparationError({draftId,reason});});
+    if(needsAccount(value.kind))void client.quotas(quotaTarget(value)).then(result=>{if(valid())setPolicy({draftId,value:result.policy});}).catch(reason=>{if(valid())setPreparationError({draftId,reason});});
     if(!publicWrite(value.kind)&&!sectionWrite(value.kind)&&!value.kind.startsWith('withdraw-'))void configForDraft(value).then(result=>{if(result&&valid())setGovernance({draftId,value:result});}).catch(reason=>{if(valid())setPreparationError({draftId,reason});});
     if(publicWrite(value.kind)||sectionWrite(value.kind))void Promise.allSettled([client.accessOptions(),client.sections({limit:50})] as const).then(results=>{if(!valid())return;const options=results[0],sections=results[1];if(options.status==='fulfilled')setAccessOptions(options.value);if(sections.status==='fulfilled'){setSectionChoices(sections.value.items);setSectionChoiceNext(sections.value.nextAfter);}});
     if(value.kind==='create-reply')void client.version(forumTargetString(value.target.postId),forumTargetString(value.target.versionId)).then(source=>{if(valid())setDraftSourceRead({draftId,value:source});}).catch(reason=>{if(valid())setPreparationError({draftId,reason});});
@@ -479,25 +492,23 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const selectedNumber=selected?.locator.versionNumber;
   const earlierVersion=!!selected?.currentVersionId&&selected.currentVersionId!==selectedId;
   const displayNames=useMemberNames(runtime,localSubjectId,localConnected,[...items.map(item=>item.authorId),detail?.authorId,replyDetail?.authorId,parent?.authorId,...replies.map(item=>item.authorId),...(retryPreview?.viewers??[])]);
-  const owns=(value:ForumAuthorFields|null)=>forumOwnsContent(value,{accountId:account?.id??null,subjectId:subjectId??null,targetAccountId:authorizedAccountId});
+  const owns=(value:ForumAuthorFields|null)=>forumOwnsContent(value,{accountId:account?.id??null});
   const own = owns(detail);
   const author=(value:ForumAuthorFields)=>{const id=forumAuthorSubjectId(value),accountId=forumAuthorAccountId(value);
-    if(id)return <MemberLink subjectId={id} name={memberName(id,subjectId,displayNames[id]??undefined)} ownId={subjectId} navigate={go} avatar/>;
-    const label=owns(value)?'我':value.author?.displayName?.trim()||`银河账户${accountId?' '+accountId.slice(-6):''}`;
+    if(!accountId&&id)return <MemberLink subjectId={id} name={memberName(id,localSubjectId,displayNames[id]??undefined)} ownId={localSubjectId} navigate={go} avatar/>;
+    const label=owns(value)?'我':value.author?.displayName?.trim()||'银河账户';
     const content=<><MemberAvatar subjectId={accountId??undefined} name={label}/><span>{label}</span></>;return accountId?<ForumLink target={'/app/accounts/'+accountId} navigate={go} className="member-profile-link forum-account-author">{content}</ForumLink>:<span className="member-profile-link forum-account-author">{content}</span>;};
-  const actingAccountName=official.session?.account.displayName||official.session?.account.email||quota?.currentAccount?.displayName||actingAccounts.find(value=>value.id===(typeof form?.target.accountId==='string'?form.target.accountId:authorizedAccountId))?.displayName||'当前账户';
+  const actingAccountName=official.session?.account.displayName||official.session?.account.email||'当前账户';
   const pendingActive = pending.find(item => item.state === 'awaiting-receipt');
   const recoveryNeedsReview=['authorization-expired','original-binding-changed','original-binding-unavailable','authorization-review-required'].includes(pendingReason);
-  const displayedPublicationUntil = form?.operationId ? pending.find(item => item.operationId === form.operationId)?.publishedUntil ?? null : publicationUntil;
   const editorTitle=form?(form.kind==='create-post'?'写帖子':form.kind==='publish-version'?'编辑帖子':labels[form.kind]):'写帖子';
   async function login(mode:'login'|'register'){
     if(!official.client)throw Error('账户服务暂不可用，请重新读取。');
     await client?.draft.flush();if(!current())return;
-    if(!identityMode&&!account&&formRef.current)rememberForumLoginDraft({endpoint:runtime!.api.endpoint,context,path:location.pathname+location.search+location.hash,draft:formRef.current});
+    if(!account&&formRef.current)rememberForumLoginDraft({endpoint:runtime!.api.endpoint,context,path:location.pathname+location.search+location.hash,draft:formRef.current});
     location.assign(official.client.loginUrl(mode,location.pathname+location.search+location.hash));
   }
-  const accountEntry=<div className="forum-account-entry" aria-label="当前操作账户">{identityMode?<p>由当前 ID 操作所选账户，原作者与本次动作来源分别保留。</p>:official.phase==='loading'?<output>正在读取账户…</output>:account?<p>当前账户：<strong>{official.session?.account.displayName||official.session?.account.email||'已登录银河账户'}</strong><Button variant="ghost" disabled={busy||official.busy} onClick={()=>void run(async()=>{await client!.draft.flush();await official.logout();})}>退出账户</Button></p>:<><p>{official.phase==='offline'?'暂时离线，文字可先保存在此浏览器。':official.phase==='unavailable'?'账户暂时无法读取，草稿保留。':'发帖和回复只需银河账户，无需本地 ID。'}</p>{official.client&&<div className="button-row"><a href={official.client.loginUrl('login',location.pathname+location.search+location.hash)} onClick={event=>{event.preventDefault();void run(()=>login('login'));}}>登录银河账户</a><a href={official.client.loginUrl('register',location.pathname+location.search+location.hash)} onClick={event=>{event.preventDefault();void run(()=>login('register'));}}>注册账户</a></div>}{(official.phase==='unavailable'||official.phase==='offline')&&<Button variant="outline" onClick={()=>void official.refresh()}>重新读取账户</Button>}</>}</div>;
-  const needConnection = identityMode?<div className="message"><p>当前 ID 的原稿保留，连接已有身份后可按授权操作。</p><Button onClick={() => go('/app/settings/identity')}>连接已有身份</Button></div>:accountEntry;
+  const accountEntry=<div className="forum-account-entry" aria-label="当前操作账户">{official.phase==='loading'?<output>正在读取账户…</output>:account?<p><strong>{official.session?.account.displayName||official.session?.account.email||'已登录银河账户'}</strong></p>:<><p>{official.phase==='offline'?'暂时离线，草稿保留。':official.phase==='unavailable'?'账户暂时无法读取，草稿保留。':'登录后继续，草稿会保留。'}</p>{official.client&&<div className="button-row"><a href={official.client.loginUrl('login',location.pathname+location.search+location.hash)} onClick={event=>{event.preventDefault();void run(()=>login('login'));}}>登录</a><a href={official.client.loginUrl('register',location.pathname+location.search+location.hash)} onClick={event=>{event.preventDefault();void run(()=>login('register'));}}>注册</a></div>}{(official.phase==='unavailable'||official.phase==='offline')&&<Button variant="outline" onClick={()=>void official.refresh()}>重试</Button>}</>}</div>;
   async function loadMore(focus=false) {
     if(!client||!next)return;
     if(memberSectionId){const page=await client.posts({...listQuery,sectionId:memberSectionId,after:next});if(current()){feedPages.current++;setItems(old=>[...old,...page.items]);setNext(page.nextAfter);}}
@@ -544,23 +555,20 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   }
   const displayReply = (value: ForumReplyView) => <article className="forum-reply" id={'reply-' + value.locator.replyId} key={value.locator.replyId}>
     <div className="forum-meta">{author(value)}<PostTime createdAt={value.createdAt}/>{link(forumReplyPath(value.locator.replyId)!, '查看此条')}</div>
-    {isAvailable(value) ? <>{value.payload.replyTo && <p className="reply-context">回复 {link(forumReplyPath(value.payload.replyTo.replyId)!, '先前的讨论')}</p>}<Body body={value.payload.body}/><ForumAudienceSummary value={value.audience} options={accessOptions} inherited={value.audienceInherited}/></> : <p>{states[value.availability] ?? '当前无法读取这条回复。'}</p>}
+    {isAvailable(value) ? <>{value.payload.replyTo && <p className="reply-context">回复 {link(forumReplyPath(value.payload.replyTo.replyId)!, '先前的讨论')}</p>}<Body body={value.payload.body}/>{client&&<ForumAttachmentFiles key={value.locator.replyId} client={client.attachments} items={value.attachments??[]} source={{replyId:value.locator.replyId}}/>}<ForumAudienceSummary value={value.audience} options={accessOptions} inherited={value.audienceInherited}/></> : <p>{states[value.availability] ?? '当前无法读取这条回复。'}</p>}
     {isAvailable(value) && <div className="button-row">{isAvailable(selected)&&selected.canParticipate!==false&&value.canParticipate!==false && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId,versionNumber:selectedNumber }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
       {owns(value) ? <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-reply', value))}>撤回我的回复</Button> : <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => startReport(value))}>私有举报</Button>}</div>}
   </article>;
 
   return <section className={'forum-workspace'+(postFeed?' forum-discovery':'')} aria-busy={busy}>
-    {identityMode&&localSubjectId&&<nav className="forum-actor-modes" aria-label="社区操作方式"><button type="button" aria-pressed={!identityMode} onClick={()=>leaveAction(()=>{const url=new URL(location.href);url.searchParams.delete('acting');url.searchParams.delete('account');navigate(url.pathname+url.search+url.hash);})}>官网账户</button><button type="button" aria-pressed={identityMode} onClick={()=>leaveAction(()=>{const url=new URL(location.href);url.searchParams.set('acting','identity');navigate(url.pathname+url.search+url.hash);})}>用已有 ID 授权</button></nav>}
     {privatePage&&!connected&&accountEntry}
-    {!identityMode&&<OfficialAccountLoginNotice search={routeSearch}/>}
-    {identityMode&&actingAccounts.length>1&&!authorizedAccountId&&<section className="forum-target-account" aria-label="本次操作的账户"><p>使用哪个账户发表？</p><div className="button-row">{actingAccounts.map(value=><Button key={value.id} variant={targetAccountId===value.id?'default':'outline'} aria-pressed={targetAccountId===value.id} onClick={()=>{const url=new URL(location.href);url.searchParams.set('account',value.id);go(url.pathname+url.search+url.hash);}}>{value.displayName||({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']||'未命名账户'}</Button>)}</div></section>}
+    <OfficialAccountLoginNotice search={routeSearch}/>
     {isFeed&&<><div className="forum-heading"><div><h1 id={fieldId+'-heading'} className="small" style={{overflowWrap:'anywhere'}}>{feedTitle}</h1><p>{feedDescription}</p></div></div><nav className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论',undefined,postFeed,'tabs')}{link('/app/community?section=sections','成员版块',undefined,section==='sections','tabs')}{link('/app/community?section=notifications','回复提醒',undefined,section==='notifications','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</nav></>}
     {!isFeed&&link(returnPath,<>返回{returnLabel}</>,'back-link')}
     {!isFeed&&(memberSectionId?!sectionDetail:compose||reportId||replyId||!isAvailable(detail))&&<div className="forum-heading"><h1 className="small">{memberSectionId?'版块详情':compose?editorTitle:reportId?'处理记录详情':replyId?'回复详情':manage?'帖子管理':'帖子详情'}</h1></div>}
-    {error && <div className="message error" role="alert">{error}<AccountVerificationPrompt required={identityMode&&verificationRequired} navigate={go} /><Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重新读取当前内容</Button></div>}
+    {error && <div className="message error" role="alert">{error}<Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重试</Button></div>}
     {notice && <output className="message">{notice}</output>}
     {form&&!editorOpen&&!draftLoading&&<aside className="forum-draft-return" aria-label="未提交的草稿"><div><strong>{form.kind==='publish-version'?'这篇帖子的修改尚未发表':form.kind==='create-reply'?'你有尚未发出的回复':'你有尚未提交的草稿'}</strong><p>{form.title||labels[form.kind]} · 仅保存在此浏览器</p></div><Button variant="outline" disabled={busy} onClick={resumeDraft}>继续编辑</Button></aside>}
-    {(!connected && identityMode && (compose || form || reportId || section !== 'all')) && needConnection}
     {visitorConflict&&<aside className="forum-draft-return" aria-label="登录前的草稿"><p>登录前的草稿仍保留在此浏览器。当前账户在这里已有另一份草稿，处理后可以接回原稿。</p><Button variant="outline" disabled={busy||!!form} onClick={()=>run(readDraft)}>接回登录前草稿</Button></aside>}
     {compose && accountReady && !form && !draftLoading && draftLoaded && <Button disabled={busy} onClick={() => run(() => begin('create-post',{},selectedTopic?{topic:selectedTopic.id}:{}))}>开始写这条帖子</Button>}
     {accountReady && !draftLoading && !draftLoaded && <Button variant="outline" disabled={busy} onClick={() => run(()=>readDraft())}>重试恢复草稿</Button>}
@@ -587,9 +595,9 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {(postId&&detail||replyId&&replyDetail) && <>
       {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}<LoadingFeedback active={parentReading} label="正在读取原帖…" scopeKey={detailSource.current?.key??context}/>{parentError&&<ReadFailure message={parentError} onRetry={()=>void loadParent()} retrying={parentReading}/>}{parent&&!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article className="forum-post">
         <div className="forum-meta">{author(detail)}<PostTime createdAt={detail.createdAt} updatedAt={isAvailable(detail)?detail.versionCreatedAt:undefined}/>{isAvailable(detail)&&link(forumBrowsePath({topic:detail.topic??'unclassified'}),forumTopics.find(topic=>topic.id===detail.topic)?.label??'未分类','forum-topic-label')}</div>
-        {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><ForumAudienceSummary value={detail.audience} options={accessOptions}/>{detail.sectionId&&<p className="forum-section-meta">{link('/app/community/sections/'+detail.sectionId,'所在成员版块')}</p>}{(earlierVersion||versions.length>1)&&<div className="forum-version-context"><p>{earlierVersion?'正在阅读较早发表的内容':detail.currentVersionId===selectedId?'正在阅读最新发表的内容':'正在阅读这次发表的内容'}{selectedNumber? ' · 第 '+selectedNumber+' 版':''}。这里的回复保留在这次发表的内容下。</p>{earlierVersion&&link(forumVersionPath(postId!,detail.currentVersionId)!,'阅读更新后的内容','text-link')}</div>}<div className="forum-post-body"><Body body={detail.payload.body}/><Links links={detail.payload.links} titled/></div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
+        {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><ForumAudienceSummary value={detail.audience} options={accessOptions}/>{detail.sectionId&&<p className="forum-section-meta">{link('/app/community/sections/'+detail.sectionId,'所在成员版块')}</p>}{(earlierVersion||versions.length>1)&&<div className="forum-version-context"><p>{earlierVersion?'正在阅读较早发表的内容':detail.currentVersionId===selectedId?'正在阅读最新发表的内容':'正在阅读这次发表的内容'}{selectedNumber? ' · 第 '+selectedNumber+' 版':''}。这里的回复保留在这次发表的内容下。</p>{earlierVersion&&link(forumVersionPath(postId!,detail.currentVersionId)!,'阅读更新后的内容','text-link')}</div>}<div className="forum-post-body"><Body body={detail.payload.body}/><Links links={detail.payload.links} titled/>{client&&selectedId&&<ForumAttachmentFiles key={selectedId} client={client.attachments} items={detail.attachments??[]} source={{postId:detail.locator.postId,versionId:selectedId}}/>}</div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
         {isAvailable(detail) && <div className="forum-post-actions"><Button disabled={busy || !!form || detail.canParticipate===false} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
-          <SaveForLaterButton runtime={runtime} subjectId={localSubjectId} connected={localConnected} reference={{kind:'forum-post',postId:detail.locator.postId}} onNeedIdentity={()=>go('/app/settings/identity')}/>
+          <SaveForLaterButton runtime={runtime} account={official} subjectId={localSubjectId} connected={localConnected} reference={{kind:'forum-post',postId:detail.locator.postId}} onNeedIdentity={()=>go('/app/account')}/>
           {own && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(()=>startVersion())}>编辑帖子</Button>}
           <button className="forum-options-toggle" aria-haspopup="dialog" onClick={()=>setPostOptions(true)}>帖子资料</button></div>}
         {isAvailable(detail)&&selectedId&&<AgentWorkContinuation runtime={runtime} subjectId={localSubjectId} object={{kind:'post',id:detail.locator.postId,versionId:selectedId}} title={detail.payload.title} purpose="接着阅读这次发表的内容，围绕我的问题理解、整理或准备回应" onNeedIdentity={()=>go('/app/settings/identity')}/>}
@@ -622,6 +630,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
         {(['create-post', 'publish-version'].includes(form.kind)||sectionWrite(form.kind)) && <label htmlFor={fieldId+"-title"}>{sectionWrite(form.kind)?'版块名称':'标题'}<Input id={fieldId+"-title"} aria-label={sectionWrite(form.kind)?'版块名称':'标题'} required maxLength={sectionWrite(form.kind)?120:160} value={form.title} onChange={event => change('title', event.target.value)} placeholder="一句话说说你想分享的事" /></label>}
         {sectionWrite(form.kind)&&<><label htmlFor={fieldId+'-theme'}>讨论主题<Input id={fieldId+'-theme'} required maxLength={400} value={form.theme} onChange={event=>change('theme',event.target.value)} placeholder="在这个版块持续讨论什么"/></label><label htmlFor={fieldId+'-description'}>版块说明（可选）<Textarea id={fieldId+'-description'} maxLength={4000} value={form.description} onChange={event=>change('description',event.target.value)}/></label>{form.kind==='update-section'&&<label><input type="checkbox" checked={form.sectionState==='archived'} onChange={event=>change('sectionState',event.target.checked?'archived':'active')}/>归档版块，停止接收新帖子</label>}</>}
         {['create-post', 'publish-version', 'create-reply', 'create-report', 'supplement', 'appeal', 'resolve'].includes(form.kind) && <label htmlFor={fieldId+"-body"}>{publicWrite(form.kind) ? form.kind === 'create-reply' ? '回复内容' : '正文' : form.kind === 'appeal' ? '我的申诉说明' : form.kind === 'resolve' ? '我的处理理由' : '我的说明'}<Textarea id={fieldId+"-body"} aria-label={publicWrite(form.kind) ? form.kind === 'create-reply' ? '回复内容' : '正文' : form.kind === 'appeal' ? '我的申诉说明' : form.kind === 'resolve' ? '我的处理理由' : '我的说明'} required maxLength={form.kind === 'create-reply' ? 2000 : publicWrite(form.kind) ? 8000 : 1600} value={form.body} onChange={event => change('body', event.target.value)} placeholder={publicWrite(form.kind) ? '用自己的话写下来。' : '只写需要说明的事实，不复制目标的私有内容。'} /></label>}
+        {publicWrite(form.kind)&&client&&<ForumAttachmentComposer key={form.id} client={client.attachments} draftId={form.id} value={form.attachments} onChange={saveAttachments} disabled={busy||!!form.operationId} canUpload={official.phase==='signed-in'} offline={official.phase==='offline'} onLogin={()=>{if(official.phase==='unavailable')void official.refresh();else void run(()=>login('login'));}} onBusyChange={setAttachmentWorking}/>}
         {['create-post','publish-version'].includes(form.kind)&&<div className="forum-publication-topic"><label htmlFor={fieldId+'-topic'}>发布到<select id={fieldId+'-topic'} aria-label="发布主题" required={form.kind==='create-post'} value={form.kind==='create-post'?(forumTopics.some(topic=>topic.id===form.topic)?form.topic:''):form.topic??'unclassified'} onChange={event=>change('topic',event.target.value?forumReadTopicSchema.parse(event.target.value):undefined)}>{form.kind==='create-post'?<option value="" disabled>选择一个主题</option>:<option value="unclassified">未分类</option>}{forumTopics.map(topic=><option key={topic.id} value={topic.id}>{topic.label}</option>)}</select></label></div>}
         {['create-post','publish-version'].includes(form.kind)&&<div className="forum-editor-tools"><Button type="button" variant="ghost" onClick={()=>setLinksEditor(true)}>{form.linksText.trim()?'编辑链接':'添加链接'}</Button>{linksEditor&&<ReadingSurface open title="相关链接" onClose={()=>setLinksEditor(false)}><label htmlFor={fieldId+'-links'}>每行一条，最多 8 条<Textarea id={fieldId+'-links'} value={form.linksText} maxLength={32768} onChange={event=>change('linksText',event.target.value)} placeholder="https://…"/></label><Button type="button" onClick={()=>setLinksEditor(false)}>完成</Button></ReadingSurface>}</div>}
         {['create-post','publish-version'].includes(form.kind)&&<section className="forum-section-post-choice" aria-label="发布位置"><Button type="button" variant="ghost" onClick={()=>setSectionPicker(true)}>{audienceSection?audienceSection.title:form.sectionId?'原所属版块':'社区讨论'} · 修改位置</Button>{sectionPicker&&<ReadingSurface open title="选择成员版块" onClose={()=>setSectionPicker(false)}><fieldset className="forum-section-post-choice"><legend>发布位置</legend><label><input type="radio" name={fieldId+'-section'} checked={!form.sectionId} onChange={()=>{chooseSection(null);setSectionPicker(false);}}/>社区讨论</label>{sectionChoices.map(value=><label key={value.sectionId}><input type="radio" name={fieldId+'-section'} checked={form.sectionId===value.sectionId} disabled={value.state!=='active'||connected&&!value.canParticipate&&value.sectionId!==form.sectionId} onChange={()=>{chooseSection(value);setSectionPicker(false);}}/><span><strong>{value.title}</strong><br/>{value.theme}{value.state==='archived'?' · 已归档':connected&&!value.canParticipate?' · 当前不满足参与条件':''}</span></label>)}{!sectionChoices.length&&<p>暂未读取到可选版块，可以直接发帖。</p>}{sectionChoiceNext&&<Button type="button" variant="outline" onClick={()=>void run(async()=>{const page=await client!.sections({after:sectionChoiceNext,limit:50});if(current()){setSectionChoices(old=>[...old,...page.items]);setSectionChoiceNext(page.nextAfter);}})}>继续读取版块</Button>}<Button type="button" variant="ghost" onClick={()=>setSectionPicker(false)}>取消</Button></fieldset></ReadingSurface>}</section>}
@@ -631,11 +640,10 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       </fieldset>
       {publicWrite(form.kind) && <p className="forum-publication-note">以 {actingAccountName} 发表 · 可随时撤回</p>}
       {form.kind.startsWith('withdraw-') && <PreviewBody value={{ kind: form.kind, payload: {} }} />}
-      {preparationError!==null&&preparationError!==undefined && <div className="message error" role="alert">{forumError(preparationError)}<AccountVerificationPrompt required={identityMode&&needsAccountVerification(preparationError)} navigate={go} /></div>}
-      {identityMode && needsAccount(form.kind) && quota?.accountVerified === false && quota.reason!=='account_selection_required' && <div className="message"><p>发表前需要完成银河账户关联。正在编辑的内容保留在此浏览器。</p><AccountVerificationPrompt required navigate={go} /></div>}
+      {preparationError!==null&&preparationError!==undefined && <div className="message error" role="alert">{forumError(preparationError)}</div>}
       {form.kind === 'create-report' && governance && !governance.moderatorIds.length && <p>当前没有可接收此记录的处理者，将保留待处理状态，不承诺响应时间。</p>}
       {!form.operationId && !publicWrite(form.kind) && !sectionWrite(form.kind) && !form.kind.startsWith('withdraw-') && governance && <p className="muted">{form.kind === 'resolve' ? '这份独立处理理由会告知举报者和目标作者。' : `这份说明只向当前获准的 ${governance.moderatorIds.length} 位处理者披露，目标作者不会因此获得举报者说明。`} 私有内容按本次明确许可读取，最长 {Math.floor(governance.maxPermissionSeconds / 86400)} 天；记录被接受不代表已经解决。</p>}
-      <div className="button-row"><Button type="submit" disabled={busy || identityMode&&!connected || !!form.operationId || !!pendingActive || saveFailed}>{!connected&&!identityMode?'登录后继续':publicWrite(form.kind) ? '发表' : sectionWrite(form.kind)?'保存版块': form.kind.startsWith('withdraw-') ? '确认撤回' : form.kind === 'create-report' ? '提交私有举报' : form.kind === 'appeal' ? '提交申诉' : '提交私有记录'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>run(keepDraft)}>暂存并返回</Button><button type="button" className="text-link" disabled={busy||!!form.operationId} onClick={()=>setDiscardDraft(true)}>放弃草稿</button></div></form>
+      <div className="button-row"><Button type="submit" disabled={busy || attachmentWorking || form.attachments.some(item=>item.state!=='available') || !!form.operationId || !!pendingActive || saveFailed}>{!connected?'登录后继续':publicWrite(form.kind) ? '发表' : sectionWrite(form.kind)?'保存版块': form.kind.startsWith('withdraw-') ? '确认撤回' : form.kind === 'create-report' ? '提交私有举报' : form.kind === 'appeal' ? '提交申诉' : '提交私有记录'}</Button><Button type="button" variant="outline" disabled={busy||attachmentWorking} onClick={()=>run(keepDraft)}>暂存并返回</Button><button type="button" className="text-link" disabled={busy||attachmentWorking||!!form.operationId} onClick={()=>setDiscardDraft(true)}>放弃草稿</button></div></form>
       {discardDraft&&<div className="forum-discard-choice" role="alert"><p>删除这份尚未提交的草稿？已发表的内容会保留。</p><div className="button-row"><Button variant="outline" disabled={busy} onClick={()=>setDiscardDraft(false)}>保留草稿</Button><Button variant="ghost" disabled={busy} onClick={()=>run(removeDraft)}>删除这份草稿</Button></div></div>}
       <output className={saveFailed ? 'message error' : 'muted'}>{saveMessage}</output>
       {saveFailed && <Button variant="outline" disabled={busy} onClick={() => run(readDraft)}>重新读取本机版本</Button>}

@@ -53,6 +53,7 @@ import { ManifestService } from './manifest.mjs';
 import { createSigningService } from './signing-service.mjs';
 import { ChatService } from './chat.mjs';
 import {ChatAttachmentsService} from './chat-attachments.mjs';
+import {ForumAttachmentsV1Service} from './forum-attachments-v1.mjs';
 import { ServiceError } from './shared/service-error.mjs';
 import {WatchControlV2Service} from './watch-control-v2.mjs';
 import { OutcomeMaterialServiceV2 } from './outcome-material-v2.mjs';
@@ -152,8 +153,9 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   history.v2 = new HistoryV2Service(access, { cases, verificationRecords, assistance, profiles, capsules });
   const search=new SearchService(access,{history,proofs,capsules,builders,index:new SearchIndex({db,endpoint,now})});
   const notifications = new NotificationService(access, assistance, context, capsules, incident);
-  const chat = new ChatService({ db, access, transport: chatTransport, now,
+  const chat = new ChatService({ db, access, accounts:communityAccounts, transport: chatTransport, now,
     resolveControlParty: async (tx, subjectId) => {
+      if(subjectId.startsWith('account:'))return subjectId;
       try { return `account:${(await communityAccounts.resolveWithin(tx, { subjectId })).id}`; }
       catch (error) { if (error.code === 'account_verification_required') return `subject:${subjectId}`; throw error; }
     },
@@ -171,6 +173,8 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   });
   const attachments=new ChatAttachmentsService({chat,...attachmentConfiguration});
   chat.attachments=attachments;
+  const forumAttachments=new ForumAttachmentsV1Service({forum,...attachmentConfiguration});
+  forum.attachments=forumAttachments;
   const outcomeMaterials=new OutcomeMaterialServiceV2(access,{consents,chat,records:verificationRecords,attachments});
   const watchControls=new WatchControlV2Service(access,{chat,assistance});
   cases.sources = createFactSourceRouter({verificationRecords,configurations,chat,outcomeMaterials});
@@ -191,7 +195,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   const sharedSummaries = new ChatSharedSummaryService({ db, access, chat });
   const projects = new ProjectV2Service(access, { consents, profiles, notifications,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor) });
-  const readingBookmarks = new ReadingBookmarksV1(access, {forum, capsules: capsules.v2, projects, profiles});
+  const readingBookmarks = new ReadingBookmarksV1(access, {forum, capsules: capsules.v2, projects, profiles,accounts:communityAccounts,chat});
   discovery.v2 = new DiscoveryV2Service(access, { profiles, projects, inbox, notifications, history: history.v2 });
   const recruitment = new RecruitmentV2Service(access, { projects, consents, discovery: discovery.v2, assistance, inbox, publicWrites });
   discovery.v2.recruitment = recruitment;
@@ -203,7 +207,7 @@ export function createServices({ db, endpoint, signingKey, kid, trustedKeys,
   inbox.informationWatches=informationWatches;
   const contacts = new ContactV2Service(access, { consents, discovery: discovery.v2, inbox, publicWrites,
     requireAccountWithin: (tx, actor) => communityAccounts.resolveWithin(tx, actor), createRoomWithin: createChatContactAdapter(chat) });
-  return { officialAccounts,externalCredentials,accountWork,readingBookmarks,taskMaterials,forum,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
+  return { officialAccounts,externalCredentials,accountWork,readingBookmarks,taskMaterials,forum,forumAttachments,forumGovernance,taskOwnerControl,taskOwnerRead,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, discovery, projects, contacts, inbox, summaries, search, incident, profiles, builders, capsules, honor, bindings, access, consents, evidence, assistance, context, qualification, moderation, notifications, history, cases,
     identity: new IdentityLinkService(access, identityProviders, { accountRegistry: communityAccounts }), communityAccounts, publicWrites, verificationRecords, chat,
     receiptStatus,watchControls,identityGroups,identityControl: new IdentityControlService({ db, endpoint, now, allowedScopes }),
     proofs, retirement, deletion: new DeletionService(access), dataExport: new DataExportService(access, { forum,forumGovernance, choices, assistance, context, proofs, capsules, builders, moderation, cases, verificationRecords, projects, contacts, summaries, recruitment, outcomeMaterials }, retirement), audit: new AuditService(access, { auditReaderIds, auditReviewerIds }),

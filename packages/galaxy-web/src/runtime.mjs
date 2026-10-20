@@ -1,10 +1,10 @@
 import { createBrowserClient, browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { openDeviceKeyStore } from '../../galaxy-core/src/domain/device-key-store.mjs';
-import { createIdentityControlClient } from '../../galaxy-core/src/domain/identity-control-client.mjs';
+import {createWebStorage,openWebContentStore} from './web-content-store.mjs';
 import { createIdentityDeviceHandoff } from '../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import { createIdentityDeviceManagement } from '../../galaxy-core/src/domain/identity-device-management.mjs';
 import { createVisitorDraftAdoption } from '../../galaxy-core/src/domain/visitor-draft-adoption.mjs';
-import { createDeviceMaterial, identityKeyId, importRecoveryMaterial, parseRecoveryCode, signIdentityPayload } from '../../galaxy-core/src/domain/identity-material.mjs';
+import { identityKeyId, signIdentityPayload } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { taskRequestV2Schema, taskEnvelopeV2Schema, participationProposalV2Schema, participationEventV2Schema } from '../../galaxy-official/src/shared/task-schema-v2.mjs';
 import { equalJson, sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 import { createChatClient } from './chat-client.mjs';
@@ -32,10 +32,21 @@ export async function loadWebConfiguration(fetcher = globalThis.fetch) {
   return { endpoint: config.endpoint, trustedKeys: new Map(config.signingKeys.map(pin => [pin.kid, pin])), operator: config.operator ?? '银河技术团队' };
 }
 
-export async function createWebRuntime(config, { store: suppliedStore, fetch, now = () => Math.floor(Date.now() / 1000), waitForClock, website = globalThis.location?.origin } = {}) {
-  const store = suppliedStore ?? await openDeviceKeyStore();
+export async function createWebRuntime(config, { store: suppliedStore, openIdentityStore=openDeviceKeyStore,openContentStore=openWebContentStore,fetch, now = () => Math.floor(Date.now() / 1000), waitForClock, website = globalThis.location?.origin } = {}) {
   const prefix = `galaxy-web:${config.endpoint}:`, activeKey = prefix + 'active';
-  let active = await store.get(activeKey), closed = false;
+  const store=suppliedStore??createWebStorage({prefix,openIdentityStore,openContentStore});
+  let savedActive=null,handoff=null;
+  try{
+    savedActive=await store.get(activeKey);
+    handoff=savedActive&&await store.get(prefix+savedActive.subjectId+':agent-continuity:'+savedActive.deviceId);
+  }catch(error){if(suppliedStore)throw error;savedActive=null;handoff=null;}
+  // A browser-minted identity is retired. Only a device introduced by the
+  // installed client's signed handoff may be selected by this web runtime.
+  // Retain old records without loading their key or connection preferences.
+  let active = handoff?.type === 'galaxy-web-agent-handoff-history'
+    && handoff.endpoint === config.endpoint && handoff.context?.subjectId === savedActive.subjectId
+    ? savedActive : null, closed = false;
+  const retiredSelection=active===null?savedActive:null;
   let connectionIntent = 0, connectionPreferenceTail = Promise.resolve(), resumingConnection = null;
   const connectionPreferenceKey = owner => prefix + 'connection:' + owner.subjectId + ':' + owner.deviceId;
   const saveConnectionPreference = (owner, value, intent) => {
@@ -79,7 +90,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
       const purpose=args[0].startsWith('/v2/requester-history/')?'requester-history':args[0].startsWith('/v2/contributions/')?args[1]?.purpose??'honor':null;
       if (markTaskRead(result, scope, new WeakSet(), null, null, purpose) && scope !== taskDraftScope().key) throw Object.assign(new Error('任务读取期间身份或连接已改变。'), { code: 'task_material_scope_changed' });
       return result; },
-    async connect(...args) { const result = await browserApi.connect(...args); invalidateReceiptLifecycle(); return result; },
+    async connect(...args) { await agentContinuity.requireCurrent(); const result = await browserApi.connect(...args); invalidateReceiptLifecycle(); return result; },
     disconnect() { invalidateReceiptLifecycle(); return browserApi.disconnect(); },
     close() { invalidateReceiptLifecycle(); return browserApi.close(); },
   });
@@ -152,6 +163,12 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
       const checked = Object.hasOwn(options, 'expectedOwner');
       const changed = () => { throw Object.assign(new Error('当前身份或页面已改变，请重新核对原身份操作。'), { code:'device_handoff_owner_changed' }); };
       if (closed || checked && options.expectedOwner !== active) changed();
+      const assertSelection=()=>{if(closed||checked&&options.expectedOwner!==active)changed();};
+      // Device authorization alone cannot reintroduce the retired manual web
+      // route. The installed client's signed handoff must name this device.
+      const nativeEvidence=createAgentIdentityEvidence({endpoint:config.endpoint,website,store,getActive:()=>value,getPendingHandoff:()=>null,publicControl,
+        captureIdentityLease:()=>({check:assertSelection,wait:async action=>{assertSelection();const result=await action();assertSelection();return result;}}),now});
+      await nativeEvidence.requireCurrent();assertSelection();
       if (checked) {
         if (typeof store.update !== 'function') throw Object.assign(new Error('本机存储暂不能安全切换设备，原身份仍保留。'), { code:'local_atomic_update_unavailable' });
         await store.update(activeKey, current => {
@@ -159,6 +176,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
           // Another window may have completed this same confirmed operation.
           // Keep its exact result; only a different selection is a conflict.
           if (equalJson(current ?? null, value ?? null)) return current;
+          if(options.expectedOwner===null&&retiredSelection&&equalJson(current,retiredSelection))return value;
           if (!equalJson(current ?? null, options.expectedOwner ?? null)) changed();
           return value;
         });
@@ -189,187 +207,11 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     getPendingHandoff: deviceHandoff.pending, publicControl, captureIdentityLease: identityLease, now });
   const deviceManagement = createIdentityDeviceManagement({ endpoint: config.endpoint, send: api.send, store,
     getActive: () => active, captureLease: captureReceiptLease, now });
-  const identityClient = (material, newDevice = material, lease = identityLease()) => createIdentityControlClient({ endpoint: config.endpoint, now,
-    send: (...args) => lease.wait(() => api.send(...args)),
-    store: { get: key => lease.wait(() => store.get(key)), put: (key, value) => lease.wait(() => store.put(key, value)) },
-    signController: challenge => lease.wait(() => signIdentityPayload(challenge, material.privateKey)),
-    signNewDevice: challenge => lease.wait(() => signIdentityPayload(challenge, newDevice.privateKey)) });
-  const ownerKey = value => value ? `${value.subjectId}:${value.deviceId}` : null;
   function identityLease() {
     const owner = active;
     const check = () => { if (closed || active !== owner) throw new Error('当前身份或页面已改变，请回到原身份重新核对原操作。'); };
     const wait = async action => { check(); const result = await action(); check(); return result; };
     return { owner, check, wait };
-  }
-  const identitySlots = [['new-identity', 'bootstrap'], ['recovery', 'set-recovery'], ['recover-operation', 'recover'], ['recovery-save-operation', 'declare-recovery-saved']];
-  function ownsIdentityPending(slot, pending, owner) {
-    if (Object.hasOwn(pending, 'owner')) return pending.owner === ownerKey(owner)
-      || (slot === 'recover-operation' && owner?.subjectId === pending.subjectId && owner?.deviceId === pending.deviceId);
-    // Compatibility for local operations created before explicit initiator metadata.
-    if (slot === 'new-identity') return !owner;
-    if (slot === 'recover-operation') return !owner || (owner.subjectId === pending.subjectId && owner.deviceId === pending.deviceId);
-    return !!owner && owner.subjectId === pending.subjectId;
-  }
-  async function canUseIdentityPending(slot, pending, lease) {
-    if (!ownsIdentityPending(slot, pending, lease.owner)) return false;
-    if (Object.hasOwn(pending, 'owner') || slot === 'new-identity' || slot === 'recover-operation') return true;
-    // Older recovery records have no owner field: the original signer must
-    // still be this exact device, not merely another device of the same ID.
-    const material = await lease.wait(() => store.get(`device:${lease.owner.subjectId}:${lease.owner.deviceId}`));
-    return !!material && pending.signerKeyId === await lease.wait(() => identityKeyId(material.publicKeyPem));
-  }
-  const recoveryError = (code, message) => Object.assign(new Error(message), { code });
-  function requireDisplayedRecoveryOperation(operationId) {
-    if (typeof operationId !== 'string' || !operationId.trim()) throw recoveryError('recovery_display_operation_required', '请使用实际展示的准确恢复材料 operationId 确认保存。');
-  }
-  function requireRecoveryAtomicStore() {
-    if (typeof store.update !== 'function') throw recoveryError('local_atomic_update_unavailable', '本机存储不支持原子更新，不能安全保存恢复材料。');
-  }
-  const recoveryUpdate = (key, updater, lease) => {
-    requireRecoveryAtomicStore();
-    return lease.wait(() => store.update(key, value => { lease.check(); return updater(value); }));
-  };
-  const releaseRecoverySlot = (slot, operationId, lease) => recoveryUpdate(prefix + slot,
-    current => current?.operationId === operationId ? null : current, lease);
-  function sameRecoveryPreparation(left, right) {
-    return !!left && !!right && ['operationId', 'subjectId', 'owner', 'expectedEpoch', 'previousEventHash', 'signerKeyId', 'generation', 'publicKeyPem']
-      .every(key => left[key] === right[key]);
-  }
-  async function retainRecoveryReceipt(subjectId, operationId, receipt, lease, { purge = false, publicKeyPem } = {}) {
-    if (receipt.subjectId !== subjectId || receipt.operationId !== operationId || receipt.state !== 'committed') throw new Error('原恢复材料回执不一致。');
-    return recoveryUpdate(`pending-recovery:${subjectId}:${operationId}`, current => {
-      if (!current || current.operationId !== operationId) throw new Error('原恢复材料已不可用。');
-      if (purge) return { operationId, publicKeyPem: current.publicKeyPem ?? publicKeyPem, receipt, saveDeclared: true, status: 'registered-save-declared' };
-      return { ...current, receipt, status: current.saveDeclared ? 'registered-save-declared' : 'registered-awaiting-save-declaration' };
-    }, lease);
-  }
-  async function currentOriginalIdentityDevice(pending, receipt, material, lease) {
-    const control = await lease.wait(() => publicControl(pending.subjectId)), keyId = await lease.wait(() => identityKeyId(material.publicKeyPem));
-    const current = control.devices.find(row => row.device_id === pending.deviceId && row.status === 'active' && row.epoch === control.epoch);
-    if (!current || receipt.epoch !== control.epoch || current.public_key !== material.publicKeyPem || current.key_id !== keyId
-      || pending.request?.newDevice && pending.request.newDevice.publicKeyPem !== material.publicKeyPem)
-      throw recoveryError('recovery_device_not_current', '原操作对应的设备已失效，请核对当前身份控制。');
-    return control;
-  }
-  async function retireOriginalRecovery(pending, record, lease) {
-    const requestHash = record?.request ? await lease.wait(() => sha256Hex(JSON.stringify(record.request))) : null;
-    await recoveryUpdate(prefix + 'recovery-operation-history:' + pending.subjectId, history => [...(history ?? []).filter(item => item.operationId !== pending.operationId),
-      { operationId: pending.operationId, subjectId: pending.subjectId, kind: 'recover', originalOwner: pending.owner ?? null,
-        expectedEpoch: pending.request.expectedEpoch, signerKeyId: pending.request.signerKeyId, requestHash, state: record?.state ?? 'local-prepared',
-        reason: 'explicit-new-recovery-after-original-ended', retiredAt: now() }], lease);
-    await recoveryUpdate(prefix + 'recover-operation', current => {
-      if (current?.operationId !== pending.operationId || !equalJson(current, pending)) throw recoveryError('recovery_display_operation_changed', '原恢复操作已经改变，请重新读取。');
-      return null;
-    }, lease);
-    await recoveryUpdate(`pending-recovery:${pending.subjectId}:${pending.operationId}`, current => current ? {
-      operationId: pending.operationId, publicKeyPem: current.publicKeyPem, saveDeclared: false, status: 'original-ended-before-recovery' } : current, lease);
-  }
-  async function archivePriorRecoveryPreparation(pending, lease, currentControl) {
-    const record = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-    const historyKey = prefix + 'recovery-operation-history:' + pending.subjectId;
-    const requestHash = record?.request ? await lease.wait(() => sha256Hex(JSON.stringify(record.request))) : null;
-    const retired = { operationId: pending.operationId, subjectId: pending.subjectId, kind: 'set-recovery', originalOwner: pending.owner ?? null,
-      signerKeyId: pending.signerKeyId, expectedEpoch: pending.expectedEpoch, requestHash, state: record?.state ?? 'local-prepared',
-      reason: 'another-device-or-identity-selected', retiredAt: now() };
-    // Keep the exact original operation and its query proof in their existing
-    // operation store. This index contains neither recovery code nor retry input.
-    await recoveryUpdate(historyKey, history => [...(history ?? []).filter(item => item.operationId !== pending.operationId), retired], lease);
-    const replaced = lease.owner?.request?.kind === 'recover' && pending.subjectId === lease.owner.subjectId
-      && pending.expectedEpoch < currentControl.epoch
-      && currentControl.devices.some(row => row.device_id === lease.owner.deviceId && row.status === 'active' && row.epoch === currentControl.epoch);
-    if (replaced) {
-      const materialKey = `pending-recovery:${pending.subjectId}:${pending.operationId}`;
-      await recoveryUpdate(materialKey, material => material ? { operationId: pending.operationId, publicKeyPem: pending.publicKeyPem,
-        saveDeclared: !!material.saveDeclared, status: 'superseded-by-identity-recovery' } : material, lease);
-    }
-    await recoveryUpdate(prefix + 'recovery', current => {
-      if (!sameRecoveryPreparation(current, pending)) throw recoveryError('recovery_display_operation_changed', '原恢复材料已经改变，请重新读取。');
-      return null;
-    }, lease);
-  }
-  async function localIdentityOperations(lease) {
-    const rows = [];
-    for (const [slot, kind] of identitySlots) {
-      const pending = await lease.wait(() => store.get(prefix + slot));
-      if (!pending || !await canUseIdentityPending(slot, pending, lease)) continue;
-      const record = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-      if (!record) continue;
-      if (record && (record.request.subjectId !== pending.subjectId || record.request.kind !== kind)) throw new Error('原身份操作记录不一致。');
-      rows.push({ slot, kind, pending, state: record?.state ?? 'prepared' });
-    }
-    return rows;
-  }
-  async function pendingIdentityOperations() {
-    const lease = identityLease();
-    return (await localIdentityOperations(lease)).map(({ kind, pending, state }) => ({ kind, operationId: pending.operationId, subjectId: pending.subjectId, state }));
-  }
-  async function readOriginalIdentityOperation(operationId, lease) {
-    const row = (await localIdentityOperations(lease)).find(item => item.pending.operationId === operationId);
-    if (!row) throw new Error('当前身份没有这个待核对的原操作。');
-    const operationKey = `identity-operation:${config.endpoint}:${operationId}`;
-    const original = await lease.wait(() => store.get(operationKey));
-    if (!original || original.request?.operationId !== operationId || original.request.subjectId !== row.pending.subjectId
-      || original.request.kind !== row.kind) throw new Error('原身份操作记录不一致。');
-    const originalBytes = JSON.stringify([original.request, original.commit ?? null]);
-    const read = async key => {
-      const value = await lease.wait(() => store.get(key));
-      if (key === operationKey && JSON.stringify([value?.request, value?.commit ?? null]) !== originalBytes)
-        throw new Error('原身份请求或已保存签名已变化，请重新读取原操作。');
-      return value;
-    };
-    const client = createIdentityControlClient({ endpoint: config.endpoint, now,
-      store: { get: read, put: async (key, value) => { await read(key); return lease.wait(() => store.put(key, value)); } },
-      send: (...args) => lease.wait(() => api.send(...args)),
-      signController: () => { throw new Error('只查询原操作不会签署新的身份变更。'); } });
-    const receipt = await lease.wait(() => client.status(operationId));
-    return { ...row, receipt, client, hasOriginalCommit: !!original.commit };
-  }
-  async function queryIdentityOperation(operationId) {
-    const { kind, receipt, hasOriginalCommit } = await readOriginalIdentityOperation(operationId, identityLease());
-    return { kind, operationId: receipt.operationId, subjectId: receipt.subjectId, state: receipt.state,
-      registered: receipt.registered !== false, hasOriginalCommit,
-      canContinueOriginalCommit: receipt.state === 'requested' && hasOriginalCommit,
-      requiresOriginalPreparation: !hasOriginalCommit && !['committed', 'expired', 'canceled'].includes(receipt.state) };
-  }
-  async function continueIdentityOperation(operationId, { confirmed = false } = {}) {
-    if (!confirmed) throw new Error('请确认使用这个已确认结果在本机继续。');
-    const lease = identityLease(), original = await readOriginalIdentityOperation(operationId, lease);
-    const { slot, kind, pending, client, hasOriginalCommit } = original;
-    let receipt = original.receipt;
-    // A signed original may have stopped before its commit reached the service.
-    // Read its exact status first, then transport the same saved commit only.
-    // This client has no signing capability and its store fences changed bytes.
-    if (receipt.state === 'requested' && hasOriginalCommit)
-      receipt = await lease.wait(() => client.retry(operationId, { confirmed: true }));
-    if (receipt.state !== 'committed') throw new Error('原操作还没有得到服务确认，不能在本机继续。');
-    let replacementCode;
-    if (kind === 'bootstrap' || kind === 'recover') {
-      const material = await lease.wait(() => store.get(`device:${pending.subjectId}:${pending.deviceId}`));
-      if (!material) throw new Error('原操作的本机设备材料已不可用。');
-      await currentOriginalIdentityDevice(pending, receipt, material, lease);
-      if (kind === 'recover') {
-        const next = await lease.wait(() => store.get(`pending-recovery:${pending.subjectId}:${pending.operationId}`));
-        replacementCode = next?.code;
-        await retainRecoveryReceipt(pending.subjectId, pending.operationId, receipt, lease);
-      }
-      lease.check();
-      await saveActive(pending, { expectedOwner: lease.owner, disconnect: kind === 'recover' });
-      if (closed || active !== pending) throw new Error('当前身份或页面已改变，请重新核对。');
-      if (kind === 'bootstrap') await store.put(prefix + slot, null);
-    } else {
-      const recoveryOperationId = kind === 'set-recovery' ? pending.operationId : pending.recoveryOperationId ?? lease.owner?.operationId;
-      if (!recoveryOperationId) throw new Error('原恢复材料引用已不可用。');
-      if (kind === 'set-recovery') await retainRecoveryReceipt(pending.subjectId, recoveryOperationId, receipt, lease, { purge: true, publicKeyPem: pending.publicKeyPem });
-      else await recoveryUpdate(`pending-recovery:${pending.subjectId}:${recoveryOperationId}`, current => {
-        if (!current || current.operationId !== recoveryOperationId) throw new Error('原恢复材料引用已不可用。');
-        return { operationId: recoveryOperationId, publicKeyPem: current.publicKeyPem, receipt, saveDeclared: true, status: 'registered-save-declared' };
-      }, lease);
-      await releaseRecoverySlot(slot, pending.operationId, lease);
-      if (kind === 'declare-recovery-saved') await releaseRecoverySlot('recover-operation', recoveryOperationId, lease);
-    }
-    return { ...await status(), kind, operationId,
-      ...(kind === 'declare-recovery-saved' ? { recoveryOperationId: pending.recoveryOperationId ?? lease.owner?.operationId } : {}),
-      ...(replacementCode ? { replacementCode } : {}) };
   }
   async function device() {
     if (!active) throw new Error('先创建或连接已有银河身份。');
@@ -379,9 +221,6 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
   /** @param {{confirmed?: boolean}} [_options] */
   async function createIdentity(_options = {}) {
     identityLease().check();
-    // Existing browser records remain readable. New Galaxy IDs belong to the
-    // installed local client/plugin; this runtime cannot mint a substitute.
-    if (active) return status();
     throw Object.assign(new Error('请先安装并打开本机银河客户端，在本地插件中创建银河 ID，再接洽此网页。'), { code: 'local_galaxy_required' });
   }
   /** @param {number} intent @param {string[]|null} permittedScopes @param {{bindingId:string,receipt:string}|null} originalBinding */
@@ -389,6 +228,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     const lease = identityLease(), selected = lease.owner;
     const check = () => { lease.check(); if (!selected || connectionIntent !== intent) throw new Error('当前连接选择已改变。'); };
     check();
+    await lease.wait(() => agentContinuity.requireCurrent());
     const state = await lease.wait(() => publicControl(selected.subjectId)), material = await lease.wait(device);
     check();
     const current = state.devices.find(row => row.device_id === selected.deviceId && row.status === 'active' && row.epoch === state.epoch);
@@ -438,152 +278,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     return saveConnectionPreference(selected, {version:1,enabled:false,endpoint:config.endpoint,
       subjectId:selected.subjectId,deviceId:selected.deviceId,scopes:[]}, intent);
   }
-  async function prepareRecovery() {
-    const lease = identityLease(), selected = lease.owner;
-    requireRecoveryAtomicStore();
-    const material = await lease.wait(device), state = await lease.wait(() => publicControl(selected.subjectId));
-    let pending = await lease.wait(() => store.get(prefix + 'recovery'));
-    if (pending && !await canUseIdentityPending('recovery', pending, lease)) { await archivePriorRecoveryPreparation(pending, lease, state); pending = null; }
-    if (!pending) {
-      const operationId = crypto.randomUUID(), recovery = await lease.wait(() => store.prepareRecovery(selected.subjectId, operationId));
-      const candidate = { subjectId: selected.subjectId, operationId, owner: ownerKey(selected), expectedEpoch: state.epoch, previousEventHash: state.chainHead,
-        signerKeyId: await lease.wait(() => identityKeyId(material.publicKeyPem)), generation: state.recovery?.generation ?? 0, publicKeyPem: recovery.publicKeyPem };
-      pending = await recoveryUpdate(prefix + 'recovery', current => current ?? candidate, lease);
-      if (pending.operationId !== operationId) await recoveryUpdate(`pending-recovery:${selected.subjectId}:${operationId}`, current => current ? {
-        operationId, publicKeyPem: current.publicKeyPem, saveDeclared: false, status: 'unclaimed-local-preparation' } : current, lease);
-    }
-    if (!await canUseIdentityPending('recovery', pending, lease)) throw recoveryError('recovery_display_operation_changed', '当前恢复材料已改变，请回到原身份重新读取。');
-    const recovery = await lease.wait(() => store.get(`pending-recovery:${selected.subjectId}:${pending.operationId}`));
-    if (!recovery?.code || recovery.publicKeyPem !== pending.publicKeyPem) throw recoveryError('recovery_display_operation_changed', '当前恢复材料已经保存或改变，请重新读取。');
-    return { operationId: pending.operationId, subjectId: selected.subjectId, code: recovery.code, replaces: pending.generation > 0 };
-  }
-  /** @param {{operationId?: string, confirmed?: boolean}} [options] */
-  async function saveRecovery({ operationId, confirmed = false } = {}) {
-    if (!confirmed) throw new Error('请在复制或下载后声明已保存。');
-    requireDisplayedRecoveryOperation(operationId); requireRecoveryAtomicStore();
-    const lease = identityLease(), selected = lease.owner;
-    const displayed = await lease.wait(() => store.get(prefix + 'recovery'));
-    if (!displayed || displayed.operationId !== operationId || !await canUseIdentityPending('recovery', displayed, lease)) throw recoveryError('recovery_display_operation_changed', '实际展示的恢复材料已经改变，不能确认另一份材料。');
-    const pending = await recoveryUpdate(prefix + 'recovery', current => {
-      if (!sameRecoveryPreparation(current, displayed)) throw recoveryError('recovery_display_operation_changed', '实际展示的恢复材料已经改变，请重新读取。');
-      return current;
-    }, lease);
-    await recoveryUpdate(`pending-recovery:${selected.subjectId}:${pending.operationId}`, current => {
-      if (!current || current.operationId !== operationId || current.publicKeyPem !== pending.publicKeyPem) throw recoveryError('recovery_display_operation_changed', '实际展示的恢复材料已经改变，请重新读取。');
-      return { ...current, saveDeclared: true };
-    }, lease);
-    const material = await lease.wait(device), client = identityClient(material, material, lease), request = { version: 2, kind: 'set-recovery', operationId: pending.operationId,
-      subjectId: pending.subjectId, expectedEpoch: pending.expectedEpoch, previousEventHash: pending.previousEventHash, signerKeyId: pending.signerKeyId,
-      recoveryGeneration: pending.generation, nextRecoveryPublicKey: pending.publicKeyPem, saveDeclaration: true };
-    const savedOperation = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-    let receipt = savedOperation?.commit ? await client.status(pending.operationId) : await client.confirm(await client.prepare(request), { confirmed: true });
-    if (receipt.state === 'requested') receipt = await client.retry(pending.operationId, { confirmed: true });
-    if (receipt.state !== 'committed') throw new Error('恢复材料保存状态待查询。');
-    // Once the user has saved it, keep only the local receipt, not a second copy
-    // of the recovery secret alongside the device whose loss it should survive.
-    await retainRecoveryReceipt(selected.subjectId, pending.operationId, receipt, lease, { purge: true, publicKeyPem: pending.publicKeyPem });
-    await releaseRecoverySlot('recovery', pending.operationId, lease); return receipt;
-  }
-  async function recover(code, { confirmed = false } = {}) {
-    if (!confirmed) throw new Error('请确认恢复同一身份并撤销旧设备控制。');
-    requireRecoveryAtomicStore();
-    const lease = identityLease();
-    try { const parsed = parseRecoveryCode(code); parsed.seed.fill(0); }
-    catch { throw recoveryError('recovery_code_invalid', '恢复码格式不完整或不受支持，请核对保存的原码。'); }
-    const recovery = await lease.wait(() => importRecoveryMaterial(code)), state = await lease.wait(() => publicControl(recovery.subjectId));
-    let pending = await lease.wait(() => store.get(prefix + 'recover-operation'));
-    if (pending && !ownsIdentityPending('recover-operation', pending, lease.owner)) throw new Error('另一个身份仍有原恢复操作待核对，请先回到原身份。');
-    if (pending && pending.subjectId !== recovery.subjectId) throw new Error('请先核对原恢复操作，不会用另一恢复码覆盖它。');
-    if (pending) {
-      const record = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-      const original = record?.commit ? await identityClient(recovery, recovery, lease).status(pending.operationId) : null;
-      // Only this explicit recovery choice may prepare again after an exact
-      // terminal result (or an unsigned expired local challenge). Background
-      // continuation never replaces the original ID, signatures or deadline.
-      if (['expired', 'canceled'].includes(original?.state) || record && !record.commit && record.expiresAt <= now()) {
-        if (state.recovery?.publicKeyPem !== recovery.publicKeyPem) throw recoveryError('recovery_material_not_current', '恢复码已更换、已使用或不属于当前身份。');
-        await retireOriginalRecovery(pending, { ...record, state: original?.state ?? record.state }, lease); pending = null;
-      }
-    }
-    if (!pending) {
-      if (state.recovery?.publicKeyPem !== recovery.publicKeyPem) throw recoveryError('recovery_material_not_current', '恢复码已更换、已使用或不属于当前身份。');
-      const material = await lease.wait(createDeviceMaterial), operationId = crypto.randomUUID();
-      await lease.wait(() => store.put(`device:${recovery.subjectId}:${material.deviceId}`, material));
-      const next = await lease.wait(() => store.prepareRecovery(recovery.subjectId, operationId));
-      const candidate = { subjectId: recovery.subjectId, genesisProof: state.genesisProof, deviceId: material.deviceId, installationId: crypto.randomUUID(), operationId, owner: ownerKey(lease.owner),
-        request: { version: 2, kind: 'recover', operationId, subjectId: recovery.subjectId, expectedEpoch: state.epoch, previousEventHash: state.chainHead,
-          signerKeyId: await lease.wait(() => identityKeyId(recovery.publicKeyPem)), recoveryGeneration: state.recovery.generation, nextRecoveryPublicKey: next.publicKeyPem,
-          newDevice: { deviceId: material.deviceId, publicKeyPem: material.publicKeyPem, scopes: ['manage-identity', ...browserScopes] } } };
-      pending = await recoveryUpdate(prefix + 'recover-operation', current => current ?? candidate, lease);
-      if (pending.operationId !== operationId) await recoveryUpdate(`pending-recovery:${recovery.subjectId}:${operationId}`, current => current ? {
-        operationId, publicKeyPem: current.publicKeyPem, saveDeclared: false, status: 'unclaimed-local-preparation' } : current, lease);
-    }
-    if (!ownsIdentityPending('recover-operation', pending, lease.owner) || pending.subjectId !== recovery.subjectId)
-      throw recoveryError('recovery_display_operation_changed', '原恢复操作已由另一身份选择，请重新读取。');
-    const material = await lease.wait(() => store.get(`device:${pending.subjectId}:${pending.deviceId}`)), client = identityClient(recovery, material, lease);
-    if (!material) throw recoveryError('recovery_device_material_unavailable', '原恢复操作的本机设备材料已不可用。');
-    const savedOperation = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${pending.operationId}`));
-    if (!savedOperation?.commit && (state.recovery?.publicKeyPem !== recovery.publicKeyPem
-      || pending.request.signerKeyId !== await lease.wait(() => identityKeyId(recovery.publicKeyPem))))
-      throw recoveryError('recovery_material_not_current', '恢复码已更换、已使用或不属于这次原恢复操作。');
-    let receipt = savedOperation?.commit ? await client.status(pending.operationId) : await client.confirm(await client.prepare(pending.request), { confirmed: true });
-    if (receipt.state === 'requested') receipt = await client.retry(pending.operationId, { confirmed: true });
-    if (receipt.state !== 'committed') throw new Error('恢复操作尚未完成，请查询原操作。');
-    await currentOriginalIdentityDevice(pending, receipt, material, lease);
-    await retainRecoveryReceipt(pending.subjectId, pending.operationId, receipt, lease);
-    const next = await lease.wait(() => store.get(`pending-recovery:${pending.subjectId}:${pending.operationId}`));
-    await saveActive(pending, { expectedOwner: lease.owner, disconnect: true });
-    if (closed || active !== pending) throw new Error('当前身份或页面已改变，请重新核对。');
-    return { ...await status(), replacementCode: next.code, operationId: pending.operationId };
-  }
-  /** @param {{operationId?: string, confirmed?: boolean}} [options] */
-  async function confirmRecoveredCode({ operationId, confirmed = false } = {}) {
-    if (!confirmed || !active?.request || active.request.kind !== 'recover') throw new Error('没有待确认的恢复后材料。');
-    requireDisplayedRecoveryOperation(operationId); requireRecoveryAtomicStore();
-    const lease = identityLease(), selected = lease.owner;
-    if (operationId !== selected.operationId) throw recoveryError('recovery_display_operation_changed', '实际展示的恢复后材料已经改变，请重新读取。');
-    const state = await lease.wait(() => publicControl(selected.subjectId)), originalGeneration = selected.request.recoveryGeneration + 1;
-    if (state.recovery?.generation !== originalGeneration || state.recovery.publicKeyPem !== selected.request.nextRecoveryPublicKey) throw recoveryError('recovery_material_not_current', '实际展示的恢复后材料已被更换，不能声明当前另一份恢复码已保存。');
-    const material = await lease.wait(device), client = identityClient(material, material, lease), key = prefix + 'recovery-save-operation';
-    let request = await lease.wait(() => store.get(key));
-    if (request && !await canUseIdentityPending('recovery-save-operation', request, lease)) throw new Error('请先回到原身份核对新码保存声明。');
-    if (!request || request.subjectId !== selected.subjectId) {
-      const candidate = { version: 2, kind: 'declare-recovery-saved', operationId: crypto.randomUUID(), subjectId: selected.subjectId, expectedEpoch: state.epoch,
-        previousEventHash: state.chainHead, signerKeyId: await lease.wait(() => identityKeyId(material.publicKeyPem)), recoveryGeneration: originalGeneration, saveDeclaration: true,
-        owner: ownerKey(selected), recoveryOperationId: operationId };
-      request = await recoveryUpdate(key, current => current ?? candidate, lease);
-    }
-    if (!await canUseIdentityPending('recovery-save-operation', request, lease) || request.subjectId !== selected.subjectId
-      || request.recoveryGeneration !== originalGeneration || request.recoveryOperationId && request.recoveryOperationId !== operationId) throw recoveryError('recovery_display_operation_changed', '原恢复后材料保存操作已经改变，请核对原操作。');
-    const saved = await lease.wait(() => store.get(`identity-operation:${config.endpoint}:${request.operationId}`));
-    const { owner: _owner, recoveryOperationId: _recoveryOperationId, ...publicRequest } = request;
-    let receipt = saved?.commit ? await client.status(request.operationId) : await client.confirm(await client.prepare(publicRequest), { confirmed: true });
-    if (receipt.state === 'requested') receipt = await client.retry(request.operationId, { confirmed: true });
-    if (receipt.state !== 'committed') throw new Error('恢复材料保存声明尚未确认。');
-    await recoveryUpdate(`pending-recovery:${selected.subjectId}:${operationId}`, current => {
-      if (!current || current.operationId !== operationId || current.publicKeyPem !== selected.request.nextRecoveryPublicKey) throw recoveryError('recovery_display_operation_changed', '原恢复后材料已经改变，请核对原回执。');
-      return { operationId, publicKeyPem: current.publicKeyPem, receipt, status: 'registered-save-declared', saveDeclared: true };
-    }, lease);
-    await releaseRecoverySlot('recover-operation', operationId, lease); await releaseRecoverySlot('recovery-save-operation', request.operationId, lease); return receipt;
-  }
-  async function pendingRecoveryCode() {
-    const lease = identityLease(), selected = lease.owner;
-    if (!selected) return null;
-    const recovered = selected.request?.kind === 'recover' && await lease.wait(() => store.get(`pending-recovery:${selected.subjectId}:${selected.operationId}`));
-    if (recovered?.code) {
-      const material = await lease.wait(() => store.get(`device:${selected.subjectId}:${selected.deviceId}`));
-      if (!material) throw recoveryError('recovery_device_material_unavailable', '原恢复操作的本机设备材料已不可用。');
-      const control = await currentOriginalIdentityDevice(selected, recovered.receipt, material, lease);
-      if (control.recovery?.generation !== selected.request.recoveryGeneration + 1 || control.recovery.publicKeyPem !== selected.request.nextRecoveryPublicKey)
-        throw recoveryError('recovery_material_not_current', '原恢复后的材料已被更换，不能再作为当前恢复码展示。');
-      return { operationId: selected.operationId, subjectId: selected.subjectId, code: recovered.code, recovered: true };
-    }
-    const pending = await lease.wait(() => store.get(prefix + 'recovery'));
-    if (!pending || !await canUseIdentityPending('recovery', pending, lease)) return null;
-    const material = await lease.wait(() => store.get(`pending-recovery:${selected.subjectId}:${pending.operationId}`));
-    return material?.code ? { operationId: pending.operationId, subjectId: selected.subjectId, code: material.code, recovered: false } : null;
-  }
-  async function status() { return { identity: active ? { subjectId: active.subjectId, deviceId: active.deviceId } : null, connection: api.snapshot(), endpoint: config.endpoint, localDraftGeneration }; }
+  async function status() { return { identity: active ? { subjectId: active.subjectId, deviceId: active.deviceId, source:'native-handoff' } : null, connection: api.snapshot(), endpoint: config.endpoint, localDraftGeneration }; }
   const localKey = name => prefix + (active?.subjectId ?? 'visitor') + ':' + name;
   function taskLease() {
     const connection = api.snapshot();
@@ -1361,7 +1056,7 @@ export async function createWebRuntime(config, { store: suppliedStore, fetch, no
     if(groupSubject!==subjectId){groupSubject=subjectId;const check=()=>{if(closed||active?.subjectId!==subjectId)throw new Error('identity_group_identity_changed');};
       groupClient=createIdentityGroupClientV2({api,subjectId,now,sign:groupSigner,getLocal:async name=>{check();const v=await store.get(prefix+subjectId+':'+name);check();return v;},putLocal:async(name,value)=>{check();await store.put(prefix+subjectId+':'+name,value);check();}});}
     return groupClient;}
-  return Object.freeze({ api, accounts, get chat(){return currentChat();}, get notifications(){return currentNotifications();}, privacy, trustPackages, receiptStatus, get identityGroups(){return identityGroups();}, deviceHandoff, deviceManagement, agentContinuity, visitorDrafts, taskDraftScope, createTaskDraftClient, status, createIdentity, connect, resumeConnection, prepareRecovery, saveRecovery, recover, confirmRecoveredCode, pendingRecoveryCode, pendingIdentityOperations, queryIdentityOperation, continueIdentityOperation, confirmAccountLink, publicControl, publishTask, reconcilePublication, resumePublication,
+  return Object.freeze({ api, accounts, get chat(){return currentChat();}, get notifications(){return currentNotifications();}, privacy, trustPackages, receiptStatus, get identityGroups(){return identityGroups();}, deviceHandoff, deviceManagement, agentContinuity, visitorDrafts, taskDraftScope, createTaskDraftClient, status, createIdentity, connect, resumeConnection, confirmAccountLink, publicControl, publishTask, reconcilePublication, resumePublication,
     taskEvent, reconcileTaskEvent, resumeTaskEvent, reviewTaskAuthorization, reauthorizeTaskOperation, proposeParticipation, participationEvent,
     readParticipationComposeDraft, saveParticipationComposeDraft, clearParticipationComposeDraft,
     reviewTaskStop, stopTaskOperation, stoppedTaskOperations, queryStoppedTaskOperation, onTaskOperationStopped,

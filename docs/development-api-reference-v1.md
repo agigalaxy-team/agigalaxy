@@ -2,7 +2,7 @@
 
 由实际路由、独立分发检查及显式接口描述生成。本文件是开发参考，公开 API 端点列表为空；目标服务的部署和运行状态以具体部署记录为准。不能把官网域名作为这里的服务器地址。
 
-当前服务 0.1.0；Schema83；95 个业务路由与 12 个发现、协议或内部路由。
+当前服务 0.1.0；Schema91；95 个业务路由与 28 个发现、协议或内部路由。
 
 GET/DELETE 的 Personal MCP 条目明确为认证后405；不是成功可用操作。所有方法和配置条件见 [JSON目录](development-api-reference-v1.json)。
 
@@ -118,6 +118,22 @@ JSON中 input.fields 是精确顶层字段；input.schema 指向业务 schema �
 
 | 方法与路径 | 行为 | 详细说明 |
 |---|---|---|
+| POST `/v1/account/bookmarks/status` | Account-private source locator with exact account and CSRF; source permissions are rechecked. | [说明](account-participation-v3.md) |
+| POST `/v2/account-bookmarks/status` | Explicit authorized target account; identity records are not adopted by the account. | [说明](account-participation-v3.md) |
+| POST `/v1/account/bookmarks/command` | Account-private source locator with exact account and CSRF; source permissions are rechecked. | [说明](account-participation-v3.md) |
+| POST `/v2/account-bookmarks/command` | Explicit authorized target account; identity records are not adopted by the account. | [说明](account-participation-v3.md) |
+| POST `/v1/account/bookmarks/query` | Account-private source locator with exact account and CSRF; source permissions are rechecked. | [说明](account-participation-v3.md) |
+| POST `/v2/account-bookmarks/query` | Explicit authorized target account; identity records are not adopted by the account. | [说明](account-participation-v3.md) |
+| POST `/v1/account/bookmarks/receipt` | Account-private source locator with exact account and CSRF; source permissions are rechecked. | [说明](account-participation-v3.md) |
+| POST `/v2/account-bookmarks/receipt` | Explicit authorized target account; identity records are not adopted by the account. | [说明](account-participation-v3.md) |
+| POST `/v2/chat/accounts/query` | Current participant account lookup. Search respects public query settings; exact known recipients retain their existing profile visibility. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/config` | Source-bound post/reply file preparation, status and revocation; config returns actual limits. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/prepare` | Source-bound post/reply file preparation, status and revocation; config returns actual limits. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/read` | Source-bound post/reply file preparation, status and revocation; config returns actual limits. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/query` | Source-bound post/reply file preparation, status and revocation; config returns actual limits. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/revoke` | Source-bound post/reply file preparation, status and revocation; config returns actual limits. | [说明](account-participation-v3.md) |
+| PUT `/v2/community/attachments/{id}/upload` | Exact prepared bytes, owner and digest; unavailable until scanner accepts. | [说明](account-participation-v3.md) |
+| POST `/v2/community/attachments/{id}/content` | Exact post version or reply and parent authorization is checked before returning private stored bytes. | [说明](account-participation-v3.md) |
 | GET `/.well-known/galaxy-network.json` | Signed Manifest, ETag and conditional 304; default capability labels binding/sessions/docs-mcp only. | [说明](connection-contract-v0.2.md) |
 | GET `/.well-known/galaxy-signing-keys.json` | Configured public keyring; no private keys. | [说明](connection-contract-v0.2.md) |
 | GET `/v1/policy` | Public Manifest policy. | [说明](connection-contract-v0.2.md) |
@@ -135,4 +151,4 @@ JSON中 input.fields 是精确顶层字段；input.schema 指向业务 schema �
 
 `node scripts/build-api-reference.mjs` 重建目录及错误字面量索引；`--check` 只检查文件是否匹配。来源扫描限于 Official src，不读取工作区凭据或项目归档。错误索引包含静态 ServiceError 声明；动态/库错误及每个端点的可达状态不由静态扫描推断。
 
-开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，命令见[开发检查参考](development-checks.md)。
+AI Agent应先读取版本、配置和目标模块说明，再在明确隔离的服务上使用对应便携客户端或原生宿主。验证入口 `node --test packages/galaxy-official/test/api-reference.test.mjs` 检查路由、认证要求、代理可达性和生成目录；业务真实性仍由对应业务工作流和生产验收证明。

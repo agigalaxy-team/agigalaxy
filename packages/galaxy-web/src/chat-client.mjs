@@ -1,5 +1,5 @@
 import { chatCreateSchema, chatDecisionSchema, chatSendSchema, chatEditSchema, chatPageSchema, chatMessageReceiptResultSchema,
-  chatDirectorySchema,chatContextSchema,chatOperationReceiptSchema,chatOperationReceiptResultSchema } from '../../galaxy-official/src/shared/chat-schema.mjs';
+  chatParticipantRefSchema,chatDirectorySchema,chatContextSchema,chatOperationReceiptSchema,chatOperationReceiptResultSchema } from '../../galaxy-official/src/shared/chat-schema.mjs';
 import {chatSendRequestHash,chatEditRequestHash} from '../../galaxy-official/src/shared/chat-message-request-hash.mjs';
 export {chatSendRequestHash,chatEditRequestHash};
 const stoppedIndexWrites = new Map();
@@ -161,7 +161,7 @@ export function createChatClient({ api, getLocal, putLocal, updateLocal, subject
     pending: roomId => read(roomId,begin()),
     /** @param {{explicitRetry?:boolean}} [options] */
     resumePending: (roomId,options={}) => serial(roomId,lease => resume(roomId,lease,options)),
-    /** @param {{cursor?:string|null,limit?:number}} [input] @returns {Promise<import('./chat-workspace-types').ChatDirectory>} */
+    /** @param {{cursor?:string|null,limit?:number,query?:string}} [input] @returns {Promise<import('./chat-workspace-types').ChatDirectory>} */
     directory(input={}){const lease=begin(),parsed=chatDirectorySchema.parse(input);return guarded(lease,()=>api.call('/v2/chat/rooms/directory',parsed));},
     /** @param {{limit?:number}} [input] @returns {Promise<import('./chat-workspace-types').ChatContext>} */
     context(roomId,messageId,input={}){if(!/^[0-9a-f-]{36}$/i.test(messageId))throw new Error('无效消息标识。');
@@ -227,7 +227,7 @@ export function createChatClient({ api, getLocal, putLocal, updateLocal, subject
      * @param {{confirmed?:boolean,onJournal?:(locator:import('./chat-workspace-types').ChatJournalLocator)=>void|Promise<void>}} [options]
      * @returns {Promise<{room:import('./chat-workspace-types').ChatRoom,invitation:import('./chat-workspace-types').ChatDecision}>} */
     startConversation(input,{confirmed=false,onJournal}={}){
-      if(typeof input.inviteeSubjectId!=='string'||!/^GUID[A-Z0-9]{28}$/.test(input.inviteeSubjectId))throw new Error('无效邀请对象。');
+      if(!chatParticipantRefSchema.safeParse(input.inviteeSubjectId).success)throw new Error('无效邀请对象。');
       const creation=chatCreateSchema.parse({roomId:input.roomId??crypto.randomUUID(),operationId:input.operationId??crypto.randomUUID(),title:input.title?.trim()||'对话'});
       const invitationInput=chatDecisionSchema.parse({decisionId:input.decisionId??crypto.randomUUID(),expectedRevision:1,action:'invite',targetSubjectId:input.inviteeSubjectId});
       return commit(null,'/v2/chat/rooms/create',creation,confirmed,onJournal,{kind:'start',invitationInput});

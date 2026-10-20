@@ -9,7 +9,7 @@ export type ChatProposal=Omit<z.infer<typeof chatDecisionSchema>,'decisionId'|'e
 export type ChatRoom={
  roomId:string;title:string;kind:'ordinary'|'ai-subzone';parentRoomId:string|null;taskRefs:string[];
  revision:number;memberRevision:number;state:string;mode:string;ownerSubjectId:string|null;persistent:boolean;retentionDays:7|30|90;
- decisionRequired:boolean;members:{subjectId:string;joinedAt:string;singleMemberPromptDismissed:boolean}[];transportAvailable:boolean;
+ decisionRequired:boolean;members:{subjectId:string;displayName?:string|null;actor?:{kind:'identity'|'official-account';actorRef:string;accountId:string|null;galaxySubjectId:string|null};joinedAt:string;singleMemberPromptDismissed:boolean}[];transportAvailable:boolean;
 };
 export type ChatDecision={
  decisionId:string;roomId:string;action:z.infer<typeof chatDecisionSchema>['action'];payload:z.infer<typeof chatDecisionSchema>;

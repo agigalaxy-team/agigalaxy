@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
-import {handoffExistingWebIdentity} from './existing-web-identity-fixture.mjs';
+import {handoffExistingWebIdentity,existingWebFixtureWebsite} from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
 test('Browser help composition and local choice versions use actual API, survive source failure and never imply application or cloud sync',async()=>{
@@ -22,7 +22,7 @@ test('Browser help composition and local choice versions use actual API, survive
       origin:{kind:'intervention',id:intervention.eventId,version:1},deliverableRefs:[],reportedOutcome:'partial',summary:'Partial result not a success certificate',limitations:'Synthetic'};
     const resultGrant=await put(result);
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+    runtime=await createWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,website:existingWebFixtureWebsite,
       fetch:async(url,options)=>{const path=new URL(url).pathname;requests.push(path);if(taskFailure&&path==='/v2/search/query'&&JSON.parse(options.body).type==='task')throw new Error('synthetic task transport interruption');return fetch(origin+path,options);}});
     client=createHelpSearchClient(runtime);
     await runtime.putLocal('personal-summary-preferences',{cloudSyncEnabled:true});

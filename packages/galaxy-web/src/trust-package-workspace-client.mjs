@@ -2,6 +2,7 @@ import {createTaskLocalDraftClient,taskLocalDraftView} from './task-local-draft-
 import {createProfileClient} from './profile-client.mjs';
 import {trustAudienceAllows} from '../../galaxy-official/src/trust-package.mjs';
 import {trustCanonical} from '../../galaxy-official/src/shared/trust-package-crypto.mjs';
+import {trustContainerSchema} from '../../galaxy-official/src/shared/trust-package-schema.mjs';
 
 export const trustReferenceKey=ref=>JSON.stringify([ref.endpoint,ref.kind,ref.id,ref.version]);
 export function matchingTrustPermission(permissions,ref,audience,subjectId,now=Math.floor(Date.now()/1000)){
@@ -21,6 +22,15 @@ export function createTrustPackageWorkspaceClient(runtime,{subjectId,connected=t
    ||['subjectId','bindingId','generation'].some(key=>initial?.[key]!==current?.[key]))throw Error('trust_identity_changed');}
  const wait=async fn=>{check();try{const value=await fn();check();return value;}catch(error){check();throw error;}};
  const call=(path,input)=>wait(()=>runtime.api.call(path,input));
+  const exportKey=contextKey=>'trust-package:context-export:'+contextKey;
+  async function readExport(contextKey){
+   const record=await wait(()=>runtime.getLocal(exportKey(contextKey),subjectId));
+   if(!record)return null;
+   const parsed=trustContainerSchema.safeParse(record.container);
+   if(record.contextKey!==contextKey||record.endpoint!==endpoint||record.subjectId!==subjectId||!parsed.success)throw Error('trust_original_package_unavailable');
+   const manifest=JSON.parse(parsed.data.manifestJson);if(manifest.subjectId!==subjectId||manifest.packageId!==record.packageId)throw Error('trust_original_package_unavailable');
+   return {...record,container:parsed.data};
+  }
  function draft(name){
   const local=createTaskLocalDraftClient({captureLease:()=>({endpoint,subjectId,deviceId:scope.deviceId,
    bindingId:initial?.bindingId??null,generation:initial?.generation??null,assertCurrent:check}),
@@ -40,7 +50,9 @@ export function createTrustPackageWorkspaceClient(runtime,{subjectId,connected=t
  async function names(ids){const profile=createProfileClient(runtime,{subjectId,authenticated:connected});
   try{const values=[];for(let start=0;start<ids.length;start+=20)values.push(...await wait(()=>profile.displayNames(ids.slice(start,start+20))));return values;}
   finally{profile.close();}}
- return Object.freeze({check,close(){closed=true;},draft,names,
+  return Object.freeze({check,close(){closed=true;},draft,names,readExport,
+   /** @param {Record<string, unknown> | null} [compose] Local form retained with this exact export. */
+   rememberExport:(contextKey,result,compose=null)=>wait(()=>runtime.putLocal(exportKey(contextKey),{contextKey,endpoint,subjectId,packageId:result.packageId,container:result.container,...(compose?{compose:clone(compose)}:{})},subjectId)),
   async peoplePage(kind,{after}={}){const page=await call(kind==='contacts'?'/v2/contacts/query':'/v2/chat/rooms/query',
    {...(kind==='contacts'?{direction:'both',limit:50}:{limit:30}),...(after?{after}:{})}),found=new Map();
    if(kind==='contacts')for(const item of page.items??[]){if(item.state!=='accepted')continue;const id=item.initiatorId===subjectId?item.recipientId:item.initiatorId;if(id&&id!==subjectId)found.set(id,'联系人');}
@@ -88,8 +100,10 @@ export function createTrustPackageWorkspaceClient(runtime,{subjectId,connected=t
   },
   permissions:(role,{after}={})=>call('/v2/trust-package/permissions/query',{role,...(after?{after}:{})}),
   permissionStatus:id=>call('/v2/trust-package/permissions/status',{id}),
-  async exportReceipt(locator){if(locator.kind!=='trust-package-export'||locator.endpoint!==endpoint||locator.subjectId!==subjectId)throw Error('trust_operation_unavailable');
-   const saved=await wait(()=>runtime.trustPackages.lastExport());return{state:saved?.packageId===locator.packageId?'acknowledged':'absent',packageId:locator.packageId};}
+   async exportReceipt(locator){if(locator.kind!=='trust-package-export'||locator.endpoint!==endpoint||locator.subjectId!==subjectId)throw Error('trust_operation_unavailable');
+    const scoped=typeof locator.contextKey==='string'?await readExport(locator.contextKey):null;
+    if(scoped?.packageId===locator.packageId)return{state:'acknowledged',packageId:locator.packageId};
+    const saved=await wait(()=>runtime.trustPackages.lastExport());return{state:saved?.packageId===locator.packageId?'acknowledged':'absent',packageId:locator.packageId};}
  });
 }
 

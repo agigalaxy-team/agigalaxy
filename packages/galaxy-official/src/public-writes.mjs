@@ -44,7 +44,7 @@ export class PublicWriteService {
       resetAt: iso((Math.floor(now / DAY) + 1) * DAY), policyVersion: this.policy.version };
   }
   async status(actor) {
-    return this.access.runAuthorized(actor, 'binding', async db => {
+    return this.accounts.runAuthorized(actor, 'binding', async db => {
       let account;
       try { account = await this.accounts.resolveWithin(db, actor); }
       catch (error) { if (error.code === 'account_verification_required') return { accountVerified: false, quotas: [], reason: error.code }; throw error; }
@@ -62,13 +62,14 @@ export class PublicWriteService {
     if (!parsed.success || parsed.data.kind === 'invitation' && (!parsed.data.recipientId || !(parsed.data.taskId || parsed.data.roomId || parsed.data.contactId)))
       throw new ServiceError('invalid_public_write');
     const op = parsed.data, now = this.access.now(),category=op.kind==='recruitment'?'task':op.kind;
+    const accountActor=actor.kind==='official-account',actorRef=accountActor?'account:'+actor.accountId:actor.subjectId;
     // Same account lock covers quota check, insertion and the caller's business write.
     // Caller must already be in its authorized transaction; rollback refunds a failed operation.
     const account = await this.accounts.resolveWithin(db, actor, { lock: true });
     const prior = (await db.query('SELECT * FROM community_write_receipts WHERE account_id=$1 AND category=$2 AND operation_id=$3',
       [account.id, category, op.operationId])).rows[0];
     if (prior) {
-      if (prior.payload_hash !== op.payloadHash || prior.task_id !== (op.taskId ?? null) || prior.room_id !== (op.roomId ?? null) || prior.contact_id !== (op.contactId ?? null) || prior.recruitment_id !== (op.recruitmentId ?? null) || prior.recipient_id !== (op.recipientId ?? null))
+      if (prior.actor_ref!==actorRef || prior.payload_hash !== op.payloadHash || prior.task_id !== (op.taskId ?? null) || prior.room_id !== (op.roomId ?? null) || prior.contact_id !== (op.contactId ?? null) || prior.recruitment_id !== (op.recruitmentId ?? null) || prior.recipient_id !== (op.recipientId ?? null))
         throw new ServiceError('public_write_conflict', 409);
       return this.quotaWithin(db, account, category, now);
     }
@@ -85,8 +86,8 @@ export class PublicWriteService {
     const quota = await this.quotaWithin(db, account, category, now);
     if (quota.remaining === 0) throw Object.assign(new ServiceError('community_quota_exceeded', 429), { quota,
       retryAfterSeconds: Math.ceil(Date.parse(quota.resetAt) / 1000 - now) });
-    await db.query(`INSERT INTO community_write_receipts(account_id,operation_id,category,subject_id,payload_hash,task_id,recipient_id,created_at,room_id,contact_id,recruitment_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [account.id, op.operationId, category, actor.subjectId, op.payloadHash, op.taskId ?? null, op.recipientId ?? null, iso(now), op.roomId ?? null, op.contactId ?? null,op.recruitmentId??null]);
+    await db.query(`INSERT INTO community_write_receipts(account_id,operation_id,category,subject_id,payload_hash,task_id,recipient_id,created_at,room_id,contact_id,recruitment_id,actor_ref,actor_kind)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, [account.id, op.operationId, category, accountActor?null:actor.subjectId, op.payloadHash, op.taskId ?? null, op.recipientId ?? null, iso(now), op.roomId ?? null, op.contactId ?? null,op.recruitmentId??null,actorRef,accountActor?'official-account':'identity']);
     await db.query(`INSERT INTO community_daily_usage(account_id,day,category,used) VALUES($1,$2,$3,1)
       ON CONFLICT(account_id,day,category) DO UPDATE SET used=community_daily_usage.used+1`, [account.id, iso(now).slice(0,10), category]);
     return { ...quota, used: quota.used + 1, remaining: quota.remaining - 1 };

@@ -14,6 +14,8 @@ import { ServiceError } from '../../shared/service-error.mjs';
 import { body, authenticate } from './request.mjs';
 import {taskMaterialBody} from './task-material-http.mjs';
 import {dispatchAttachments} from './attachment-http.mjs';
+import {dispatchForumAttachments} from './forum-attachment-http.mjs';
+import {dispatchChat} from './chat-http.mjs';
 import {dispatchOutcomeMaterials} from './outcome-material-http.mjs';
 import {dispatchTrustPackages} from './trust-package-http.mjs';
 import { searchQuerySchema,searchScope } from '../../shared/search-schema.mjs';
@@ -21,16 +23,17 @@ import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../
 import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
 import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ officialAccounts,externalCredentials,accountWork,communityAccounts,readingBookmarks,forum,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ officialAccounts,externalCredentials,accountWork,communityAccounts,readingBookmarks,forum,forumAttachments,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
     if(dispatchIdentityReturn({request,response,url}))return;
+    if(await dispatchReadingBookmarks({readingBookmarks,officialAccounts,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchAccountWork({accountWork,officialAccounts,access,request,requestId,url,send}))return;
     if(await dispatchExternalCredentials({externalCredentials,officialAccounts,request,response,url,send}))return;
     if(await dispatchOfficialAccount({officialAccounts,externalCredentials,forum,request,response,url,send,recordFailure}))return;
     if(await dispatchAccountArchives({access,communityAccounts,request,url,send}))return;
+    if(await dispatchForumAttachments({forumAttachments,officialAccounts,access,request,response,requestId,url,send}))return;
     if(await dispatchCommunityForum({officialAccounts,forum,forumGovernance,access,request,requestId,url,send,consumeSearchPage}))return;
-    if(await dispatchReadingBookmarks({readingBookmarks,access,request,requestId,url,send,consumeSearchPage}))return;
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/challenges')
       return send(201,await receiptStatus.challenge(await body(request,null)));
     if(receiptStatus&&request.method==='POST'&&url.pathname==='/v2/receipt-status/query')
@@ -41,7 +44,8 @@ export function createRoutes({ officialAccounts,externalCredentials,accountWork,
     if(await dispatchInformation({information,informationWatches,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchHubs({hubs,peering,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchTrustPackages({trustPackages,access,request,requestId,url,send,consumeSearchPage}))return;
-    if(await dispatchAttachments({attachments,access,request,response,requestId,url,send}))return;
+    if(await dispatchAttachments({attachments,officialAccounts,access,request,response,requestId,url,send}))return;
+    if(await dispatchChat({chat,officialAccounts,access,request,requestId,url,send}))return;
     if(await dispatchOutcomeMaterials({materials:outcomeMaterials,access,request,requestId,url,send}))return;
     const configurationPaths={'/v2/configurations/events':'submit','/v2/configurations/read':'get','/v2/configurations/query':'query','/v2/configurations/versions':'versions','/v2/configurations/receipt':'receipt'};
     if(configurations&&request.method==='POST'&&configurationPaths[url.pathname]){
@@ -193,24 +197,6 @@ export function createRoutes({ officialAccounts,externalCredentials,accountWork,
     if (sharedSummaries && request.method === 'POST' && sharedAction) {
       const actor = { ...await authenticate(request, access, 'binding'), httpRequestId: requestId };
       return send(200, await sharedSummaries[sharedAction[1]](actor, await body(request, null)));
-    }
-    if (chat && request.method === 'POST' && url.pathname.startsWith('/v2/chat/')) {
-      const actor = { ...await authenticate(request, access, 'binding'), httpRequestId: requestId };
-      const input = await body(request, null);
-      const globalMethod = { '/v2/chat/rooms/create': 'create', '/v2/chat/rooms/query': 'list', '/v2/chat/rooms/directory':'directory',
-        '/v2/chat/invitations/query': 'invitations', '/v2/chat/export/owned': 'exportOwned' }[url.pathname];
-      if (globalMethod) return send(200, await chat[globalMethod](actor, input));
-      const roomRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/(read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|operation-receipt|cursor|agent-grants|agent-participants|agent-grant|agent-revoke|join-preview|join)$/.exec(url.pathname);
-      if (roomRoute) {
-        const method = { read: 'get', history: 'history', decisions: 'decisions', propose: 'proposeDecision', vote: 'voteDecision', accept: 'acceptInvite',
-          leave: 'leave', dismiss: 'dismissDecision', send: 'send', receipt: 'messageStatus', 'operation-receipt':'operationStatus', cursor: 'cursor', 'agent-grants': 'queryAgentGrants', 'agent-participants':'queryAgentParticipants', 'agent-grant': 'grantAgent', 'agent-revoke': 'revokeAgent', 'join-preview':'joinPreview',join:'join' }[roomRoute[2]];
-        return send(200, await chat[method](actor, roomRoute[1], input));
-      }
-      const messageRoute = /^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/messages\/([0-9a-f-]{36})\/(edit|retract|hide)$/.exec(url.pathname);
-      if (messageRoute) return send(200, await chat[messageRoute[3]](actor, messageRoute[1], messageRoute[2], input));
-      const contextRoute=/^\/v2\/chat\/rooms\/([0-9a-f-]{36})\/messages\/([0-9a-f-]{36})\/context$/.exec(url.pathname);
-      if(contextRoute)return send(200,await chat.messageContext(actor,contextRoute[1],contextRoute[2],input));
-      throw new ServiceError('not_found', 404);
     }
     const controlRoute = /^\/v2\/identity\/control\/(challenges|commit|status|cancel)$/.exec(url.pathname);
     if (identityControl && request.method === 'POST' && controlRoute)

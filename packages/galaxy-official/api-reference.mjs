@@ -75,6 +75,13 @@ for(const name of ['config','submit','read','query'])add('POST','/v1/deletion-re
 
 export const businessApiReference=Object.freeze(entries.map(entry=>Object.freeze(entry)));
 export const specialApiReference=Object.freeze([
+  ...['status','command','query','receipt'].flatMap(action=>[
+    {method:'POST',path:'/v1/account/bookmarks/'+action,authentication:'official-account-cookie',meaning:'Account-private source locator with exact account and CSRF; source permissions are rechecked.',documentation:'account-participation-v3.md'},
+    {method:'POST',path:'/v2/account-bookmarks/'+action,authentication:'galaxy-session',meaning:'Explicit authorized target account; identity records are not adopted by the account.',documentation:'account-participation-v3.md'}]),
+  {method:'POST',path:'/v2/chat/accounts/query',authentication:'official-account-cookie-or-galaxy-session',meaning:'Current participant account lookup. Search respects public query settings; exact known recipients retain their existing profile visibility.',documentation:'account-participation-v3.md'},
+  ...['config','prepare','read','query','revoke'].map(action=>({method:'POST',path:'/v2/community/attachments/'+action,authentication:action==='config'?'none':'official-account-cookie-or-galaxy-session',meaning:'Source-bound post/reply file preparation, status and revocation; config returns actual limits.',documentation:'account-participation-v3.md'})),
+  {method:'PUT',path:'/v2/community/attachments/{id}/upload',authentication:'official-account-cookie-or-galaxy-session',meaning:'Exact prepared bytes, owner and digest; unavailable until scanner accepts.',documentation:'account-participation-v3.md'},
+  {method:'POST',path:'/v2/community/attachments/{id}/content',authentication:'source-specific-optional-account',meaning:'Exact post version or reply and parent authorization is checked before returning private stored bytes.',documentation:'account-participation-v3.md'},
   {method:'GET',path:'/.well-known/galaxy-network.json',authentication:'none',meaning:'Signed Manifest, ETag and conditional 304; default capability labels binding/sessions/docs-mcp only.',documentation:'connection-contract-v0.2.md'},
   {method:'GET',path:'/.well-known/galaxy-signing-keys.json',authentication:'none',meaning:'Configured public keyring; no private keys.',documentation:'connection-contract-v0.2.md'},
   {method:'GET',path:'/v1/policy',authentication:'none',meaning:'Public Manifest policy.',documentation:'connection-contract-v0.2.md'},
