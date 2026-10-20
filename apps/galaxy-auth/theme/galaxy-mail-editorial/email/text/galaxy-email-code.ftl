@@ -13,7 +13,5 @@ ${msg("galaxyEmailCodeTextCode", code)}
 
 ${msg("galaxyEmailCodeExpiry", expiresInMinutes?c)}
 
-${msg("galaxyEmailCodeContinuation" + actionSuffix)}
-
-${msg("galaxyEmailCodeSafety")}
+${msg("galaxyEmailCodeSafety" + actionSuffix)}
 </@layout.emailLayout>

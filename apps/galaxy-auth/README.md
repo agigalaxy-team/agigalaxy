@@ -12,7 +12,7 @@
 - `shared/`：认证表单布局与提交等待的渐进增强。字体、主题、顶栏与响应式导航直接取共用 `site-foundation.css` 和 `selected-shell.css`；品牌与等待图标从共用 `GalaxyMark` 输出，不维护第二套 SVG。
 - `theme/galaxy/login/`：主题继承、中文与英文文案。
 - `providers/email-code/`：Keycloak 26.7.3 邮件验证码扩展及保留原密码动作的找回流程规划器；包含显式重填邮箱时的账户选择适配。
-- `theme/galaxy-mail-editorial/email/`：用户选定的“精细账笺”中文、英文邮件主题，HTML 与纯文本共用品牌头尾。其余两款仅保留设计参考。
+- `theme/galaxy-mail-editorial/email/`：用户最新选定的“品牌信笺”中文、英文邮件主题，HTML 与纯文本共用品牌头尾，沿用既有主题名称。其余候选仅保留设计参考。
 - `email-designs/`：三款邮件的静态设计预览；其中固定示例码不用于正式模板。
 - `client-contract.json`：独立官方账户登录的公开客户端契约，不含凭据。
 
@@ -51,7 +51,7 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 
 扩展默认不启用注册验证码：只有 `galaxy` realm 的 `VERIFY_EMAIL.config` 中 `email-code-enabled` 精确为字符串 `true` 时才启用，缺失、关闭或其他值沿用原 Keycloak 实现。新流程需要同时安装扩展、提供登录与邮件模板，并为目标 realm 选择相应流程及邮件主题；仅部署 CSS 或静态页面不会启用它。正常密码登录的 browser flow 不属于本次替换范围。邮箱变更等其他事件的模板预览不代表其后端已接入数字验证码。
 
-用户已选择第二款“精细账笺” `galaxy-mail-editorial` 与 AGI Galaxy 发件人/署名。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
+用户最新选择“品牌信笺”，继续使用 `galaxy-mail-editorial` 与 AGI Galaxy 发件人/署名。邮件Logo是原轨道图形的PNG版本，由认证站公开静态资源提供；图片被邮箱阻止时仍有相邻品牌文字和完整正文。页尾包含真实官网和隐私链接。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
 
 原 `galaxy-official` 客户端和身份签名关联接口继续处理既有事务。账户登录成功后，关联仍需当前设备的插件完成本机确认；官方账户 Cookie 不代替 subject Bearer、设备授权或签名。
 

@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {createElement as h} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {GalaxyMark,GlobalRail,SiteHeader,siteChromeStyles} from '../../packages/galaxy-web/src/site-chrome.mjs';
-import {keycloakEmailThemeTemplates} from '../../packages/galaxy-mail/src/layout.mjs';
+import {keycloakEmailThemeTemplates,EMAIL_LOGO_URL} from '../../packages/galaxy-mail/src/layout.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const shellSource=path.resolve(here,'../../packages/galaxy-web/src');
@@ -63,6 +63,8 @@ const themeProperties=(await read('theme/galaxy/login/theme.properties'))
 await write(theme+'/theme.properties',themeProperties);
 await write(theme+'/resources/img/galaxy-mark.svg',mark+'\n');
 await write('site/assets/img/galaxy-mark.svg',mark+'\n');
+const emailLogoPath='site/assets/img/galaxy-mail-logo.png';
+await copyFile(path.resolve(here,'../../packages/galaxy-mail/assets/galaxy-mail-logo.png'),path.join(output,emailLogoPath));
 const websiteOrigin='https://agigalaxy.org';
 const contentMarker='@@AUTHENTICATION_CONTENT@@';
 const chromeLabels={
@@ -96,5 +98,5 @@ for(const [target,content] of [['site/index.html','src/landing.html']]){
 const files=[];
 async function inventory(dir=''){for(const name of (await readdir(path.join(output,dir))).sort()){const rel=path.join(dir,name),meta=await stat(path.join(output,rel));if(meta.isDirectory())await inventory(rel);else files.push({path:rel.split(path.sep).join('/'),bytes:meta.size});}}
 await inventory();
-await write('manifest.json',JSON.stringify({schemaVersion:1,name:'galaxy-auth',version:'0.1.0',keycloakVersion:'26.7.3',theme:'galaxy',emailThemes,emailCodeProvider,resourceVersion,files},null,2)+'\n');
+await write('manifest.json',JSON.stringify({schemaVersion:1,name:'galaxy-auth',version:'0.1.0',keycloakVersion:'26.7.3',theme:'galaxy',emailThemes,emailDesign:'brand-letterhead',emailLogo:{path:emailLogoPath,url:EMAIL_LOGO_URL},emailCodeProvider,resourceVersion,files},null,2)+'\n');
 console.log(JSON.stringify({output,theme:'galaxy',keycloakVersion:'26.7.3',fileCount:files.length}));

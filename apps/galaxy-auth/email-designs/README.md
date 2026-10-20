@@ -1,11 +1,11 @@
 # AGI Galaxy 邮件布局
 
-用户已选择 B“精细账笺”及 AGI Galaxy 品牌，并要求保留头尾供其他银河邮件复用。A、C 保留为历史设计预览。正式主题为 `galaxy-mail-editorial`；模板交付不表示已经部署。正常登录继续使用密码；正式邮件码用于注册邮箱验证、找回密码。邮箱变更只提供历史设计预览，当前 Provider 合同未包含该用途。
+用户已选择精修版“品牌信笺”及 AGI Galaxy 品牌，注册、重置密码、系统通知和服务邮件共用头尾。预览接口沿用 `b` 标识和 `b-editorial` 文件名，A、C 保留为历史设计预览。正式主题为 `galaxy-mail-editorial`；实际部署状态见项目运行记录。正常登录继续使用密码；正式邮件码用于注册邮箱验证、找回密码。邮箱变更只提供历史设计预览，当前 Provider 合同未包含该用途。
 
 | 方案 | HTML 预览 | 独立 Keycloak email theme |
 |---|---|---|
 | A 品牌简洁（历史） | [a-brand.html](a-brand.html) | `galaxy-mail-brand` |
-| B 精细账笺（已选） | [b-editorial.html](b-editorial.html) | `galaxy-mail-editorial` |
+| 品牌信笺（已选） | [b-editorial.html](b-editorial.html) | `galaxy-mail-editorial` |
 | C 柔和服务（历史） | [c-service.html](c-service.html) | `galaxy-mail-service` |
 
 品牌与署名采用 `AGI Galaxy`。发件人显示名由发件配置决定，正文品牌由 Provider 的 `brand` 提供，模板不自行修改发件配置。
@@ -26,7 +26,7 @@ const email = renderEmailPreview({
 
 预览仅使用固定示例码 `482913` 和示例有效期，并明确标示预览，不接收真实验证码。已选 B 另有 [系统通知](b-editorial-system.html) 与 [服务通知](b-editorial-service.html) 的中性内容样例，不虚构个人请求、服务变更或运行结果。两类通知没有验证码块或验证码防误用提示。默认文件为注册场景，其他文件加用途后缀；`change-email` 仅保留原设计预览。TXT 使用真实 LF 换行，正式纯文本 FTL 也直接保留段落换行。
 
-需要更新预览文件时，在本目录执行 `node write-previews.mjs`；仅重新产出纯文本用 `node write-previews.mjs --text-only`。这两个入口只写固定示例文件，不发送邮件。
+更新现行预览时，在本目录执行 `node write-previews.mjs --selected-only`，保留其他历史文件；仅重新产出纯文本可加 `--text-only`。省略 `--selected-only` 会重建所有设计样例。这些入口只写固定示例文件，不发送邮件。
 
 ## 正式模板合同
 
@@ -42,11 +42,11 @@ const email = renderEmailPreview({
 
 注册 subject key 为 `galaxyEmailCodeSubjectRegister`，找回密码为 `galaxyEmailCodeSubjectReset`。验证码不进入标题。realm 默认语言为 `zh-CN`，支持 `zh-CN` 与 `en`；按 Keycloak 约定分别使用 `messages_zh_CN.properties`、`messages_en.properties`。
 
-正式模板位于 `../theme/galaxy-mail-editorial/email/`，包含 HTML/text 公共 `template.ftl`、导入公共壳的 `galaxy-email-code.ftl`、两个语言包和默认纯文本事件的薄包装。HTML 自动转义变量，使用表格和内联样式；不请求外部资源、不依赖图片。验证码正文没有确认链接。主题继承 `keycloak`，原系统事件内容与参数继续按 Keycloak 处理。
+正式模板位于 `../theme/galaxy-mail-editorial/email/`，包含 HTML/text 公共 `template.ftl`、导入公共壳的 `galaxy-email-code.ftl`、两个语言包和默认纯文本事件的薄包装。HTML 自动转义变量，使用表格和内联样式；原Logo以公开HTTPS的PNG呈现，不使用SVG data URI、脚本或追踪资源，图片加载失败时仍可阅读品牌与操作内容。验证码正文没有确认链接。主题继承 `keycloak`，原系统事件内容与参数继续按 Keycloak 处理。
 
 ## 同一头尾与正文插槽
 
-唯一布局源为共享包 [`packages/galaxy-mail/src/layout.mjs`](../../../packages/galaxy-mail/src/layout.mjs)。B 预览、普通通知渲染和正式 FreeMarker 模板均消费此源，注册、重置、系统通知和服务邮件复用同一品牌头尾与排版。旧 [`common/email-layout.mjs`](common/email-layout.mjs) 仅作 re-export bridge，不是第二份布局实现。公共头尾只包含 AGI Galaxy、用途栏目和域名；标题、段落、验证码及对应提醒属于正文。
+唯一布局源为共享包 [`packages/galaxy-mail/src/layout.mjs`](../../../packages/galaxy-mail/src/layout.mjs)。已选预览、普通通知渲染和正式 FreeMarker 模板均消费此源，注册、重置、系统通知和服务邮件复用同一品牌头尾与排版。旧 [`common/email-layout.mjs`](common/email-layout.mjs) 仅作 re-export bridge，不是第二份布局实现。公共头尾包含原Logo、AGI Galaxy、用途栏目、官网及隐私链接；标题、段落、验证码及对应提醒属于正文。
 
 本目录中的模块可直接导入共享包的纯文本参数渲染器，生成普通系统/服务内容，无传输或存储副作用：
 
@@ -93,4 +93,4 @@ for (const [name, source] of Object.entries(keycloakEmailThemeTemplates())) {
 
 源码中的四份 FTL 是同源生成产物；需要刷新源码文件时可用本目录 `write-shared-templates.mjs`。构建仍直接调用同一导出，避免依赖人工刷新。邮件目录沿既有只读 themes 挂载提供给 Keycloak，realm 的 `emailTheme` 使用已选 `galaxy-mail-editorial`，`loginTheme=galaxy` 保持。
 
-选定的共用主题已完成两语言、两用途、HTML/纯文本的 8 个验证码渲染组合，以及 104 个既有 Keycloak 邮件模板组合；共用预览在 320 与 736 宽度检查注册、找回、系统和服务四个场景。三款早期候选另保留原 24 个渲染组合的历史结果。渲染检查不发送邮件，真实 Provider、浏览器流程、SMTP 与发布观察分别保留在项目运行记录中。
+必要检查覆盖两语言、两用途的HTML/纯文本验证码模板、继承的Keycloak事件邮件，以及普通系统和服务渲染器。桌面与窄屏分别核对正常加载和禁图状态。渲染检查不发送邮件，真实Provider流程、模板检查和发布观察分别保留在项目运行记录中，不据模板检查承诺实际投递结果。

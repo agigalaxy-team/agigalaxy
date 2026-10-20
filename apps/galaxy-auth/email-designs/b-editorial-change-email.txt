@@ -14,12 +14,11 @@ AGI Galaxy
 
 10 分钟内有效
 
-验证后，继续完成邮箱变更。
-
 请勿将验证码告知他人。若非本人操作，可忽略这封邮件。
 
 AGI Galaxy
-agigalaxy.org
+https://agigalaxy.org/
+隐私与数据: https://agigalaxy.org/privacy/
 
 示例验证码，仅用于设计预览。有效期为示例值。
 

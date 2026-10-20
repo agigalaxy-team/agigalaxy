@@ -3,7 +3,8 @@ import {EMAIL_DESIGNS, EMAIL_SCENARIOS, renderEmailPreview} from './render-email
 
 // Emit only the fixed synthetic design artifacts; never calls an email service.
 const textOnly = process.argv.includes('--text-only');
-for (const design of EMAIL_DESIGNS) {
+const designs = process.argv.includes('--selected-only') ? EMAIL_DESIGNS.filter(design => design.selected) : EMAIL_DESIGNS;
+for (const design of designs) {
   for (const scenario of EMAIL_SCENARIOS) {
     if (scenario.designs && !scenario.designs.includes(design.id)) continue;
     const name = scenario.id === 'register' ? design.file : design.file.replace('.html', `-${scenario.id}.html`);

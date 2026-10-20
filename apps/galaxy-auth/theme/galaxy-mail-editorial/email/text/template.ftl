@@ -7,5 +7,6 @@ ${category?has_content?then(category, msg("galaxyMailDefaultCategory"))}
 <#nested>
 
 ${brandName}
-agigalaxy.org
+https://agigalaxy.org/
+${msg("galaxyMailPrivacy")}: https://agigalaxy.org/privacy/
 </#macro>

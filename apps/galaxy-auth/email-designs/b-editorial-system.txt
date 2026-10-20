@@ -11,7 +11,8 @@ AGI Galaxy
 公开资料与私有内容分别设置，按自己的需要选择。
 
 AGI Galaxy
-agigalaxy.org
+https://agigalaxy.org/
+隐私与数据: https://agigalaxy.org/privacy/
 
 内容为预览样例，未发送邮件。
 

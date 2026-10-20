@@ -69,7 +69,7 @@ export function renderEmailPreview({design = 'b', scenario = 'register', senderN
     const rendered = scene.kind === 'notice'
       ? renderGalaxyEmail({subject: scene.subject, title: scene.title, paragraphs: scene.paragraphs, note: scene.note, category: scene.purpose, brand: senderName, preheader: scene.preheader})
       : renderCodeEmail({title: scene.title, introduction: scene.introduction, instruction: scene.instruction, code: EMAIL_PREVIEW.code,
-        expiry, continuation: scene.continuation, safety, category: scene.purpose, brand: senderName, preheader: scene.preheader});
+        expiry, safety: scene.safety || safety, category: scene.purpose, brand: senderName, preheader: scene.preheader});
     const label = '<div style="padding:16px 12px 0;font-family:' + font + ';font-size:11px;line-height:20px;text-align:center;color:#a398a1;">预览样例</div>';
     const sampleNote = scene.kind === 'notice' ? '内容为预览样例，未发送邮件。' : '示例验证码，仅用于设计预览。有效期为示例值。';
     const html = rendered.html.replace(/(<body\b[^>]*>)/, '$1' + label).replace('</body>', text(sampleNote, 'padding:0 12px 20px;font-size:11px;line-height:20px;text-align:center;color:#a398a1;') + '\n</body>');

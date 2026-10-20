@@ -1,25 +1,27 @@
 /** Visual candidates only. Password login is unchanged; these are email-code actions. */
 export const EMAIL_DESIGNS = Object.freeze([
   {id: 'a', name: '品牌简洁', description: '横排品牌、左对齐正文，验证码一眼可见。', file: 'a-brand.html', theme: 'galaxy-mail-brand', selected: false, historical: true},
-  {id: 'b', name: '精细账笺', description: '编辑式标题、细线分区与侧注，安静而有秩序。', file: 'b-editorial.html', theme: 'galaxy-mail-editorial', selected: true, historical: false},
+  {id: 'b', name: '品牌信笺', description: '原轨道Logo、淡粉信笺抬头、整段验证码与共用链接页尾。', file: 'b-editorial.html', theme: 'galaxy-mail-editorial', selected: true, historical: false},
   {id: 'c', name: '柔和服务', description: '居中阅读、柔和留白，适合日常账户通知。', file: 'c-service.html', theme: 'galaxy-mail-service', selected: false, historical: true},
 ]);
 
 export const EMAIL_SCENARIOS = Object.freeze([
   {
-    id: 'register', name: '注册邮箱验证', purpose: '注册账户',
+    id: 'register', name: '注册邮箱验证', purpose: '账户服务',
     subject: '验证你的 AGI Galaxy 邮箱', title: '验证你的邮箱',
     preheader: '输入验证码，完成 AGI Galaxy 账户的邮箱验证。',
-    introduction: '你正在注册 AGI Galaxy 账户。',
-    instruction: '请回到注册页面，输入下方验证码。',
+    introduction: '我们收到了使用此邮箱注册 AGI Galaxy 账户的请求。',
+    instruction: '请在注册页面输入以下验证码。',
+    safety: '仅用于本次邮箱验证，请勿转发或告知他人。若非本人操作，可忽略此邮件。',
     continuation: '验证后，继续完成账户注册。',
   },
   {
-    id: 'reset-password', name: '找回密码', purpose: '重设密码',
-    subject: '重设 AGI Galaxy 密码的验证码', title: '重设你的密码',
+    id: 'reset-password', name: '找回密码', purpose: '账户服务',
+    subject: '重设 AGI Galaxy 密码的验证码', title: '重置账户密码',
     preheader: '在找回密码页面输入验证码，继续设置新密码。',
-    introduction: '你正在为 AGI Galaxy 账户找回密码。',
-    instruction: '请回到找回密码页面，输入下方验证码。',
+    introduction: '我们收到了重置 AGI Galaxy 账户密码的请求。',
+    instruction: '请在找回密码页面输入以下验证码，核验后设置新密码。',
+    safety: '仅用于本次密码重置，请勿转发或告知他人。若非本人操作，可忽略此邮件。',
     continuation: '验证后，设置新的登录密码。',
   },
   {
