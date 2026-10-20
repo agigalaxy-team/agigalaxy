@@ -30,11 +30,13 @@ export function conversationArchiveParts(file,sessionIds){
  for(let offset=0;offset<bytes.length;offset+=249856)parts.push(decoder.decode(bytes.slice(offset,offset+249856),{stream:offset+249856<bytes.length}));
  return parts;
 }
-export async function exportConversationArchive(call,id){
+export async function exportConversationArchive(call,id,{signal}={}){
  const parts=[],seen=new Set();let sequence=0,archive=null;
  while(sequence!==null){
-  if(!Number.isSafeInteger(sequence)||sequence<0||seen.has(sequence))throw Error('会话导出的分页位置无效，请重新导出。');seen.add(sequence);
-  const result=await call('/v1/account/archives/export',{id,sequence});
+   signal?.throwIfAborted();
+   if(!Number.isSafeInteger(sequence)||sequence<0||seen.has(sequence))throw Error('会话导出的分页位置无效，请重新导出。');seen.add(sequence);
+   const result=await call('/v1/account/archives/export',{id,sequence});
+   signal?.throwIfAborted();
   if(typeof result.content!=='string'||result.archive?.id!==id)throw Error('会话导出内容与当前选择不一致。');
   archive=result.archive;parts.push(result.content);sequence=result.nextSequence;
  }

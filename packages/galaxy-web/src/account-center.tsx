@@ -94,9 +94,9 @@ export function WorkOverview({runtime,subjectId,connected,navigate}:Pick<Account
   if(local.current.endpoint!==runtime?.api.endpoint||official.phase==='signed-out'||official.phase==='loading')local.current={endpoint:runtime?.api.endpoint,session:null};
   if(official.phase==='signed-in')local.current={endpoint:runtime?.api.endpoint,session:official.session};
   const session=official.session??(['offline','unavailable'].includes(official.phase)?local.current.session:null);
-  const readCloud:AccountWorkCall=async(path,input,method='POST')=>{
+  const readCloud:AccountWorkCall=async(path,input,method='POST',options)=>{
     if(official.phase!=='signed-in'||!official.client||!official.session||official.session.account.id!==session?.account.id)throw Object.assign(Error('official_account_session_expired'),{code:'official_account_session_expired'});
-    return official.client.call(path,input,{method,session:official.session});
+    return official.client.call(path,input,{method,session:official.session,signal:options?.signal});
   };
  return <section className="personal-work"><header className="profile-heading"><h1 className="small">工作概览</h1><NavLink to="/app/publish" navigate={navigate} className="primary-action">发起求助</NavLink></header>
   <nav className="work-filter-links" aria-label="查看我的工作">{[['/app/participate?view=requested','我发布的'],['/app/participate?view=participating','我参与的'],['/app/rooms','对话']].map(([to,title])=><NavLink key={to} to={to} navigate={navigate}>{title}</NavLink>)}</nav>

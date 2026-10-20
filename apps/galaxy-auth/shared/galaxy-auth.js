@@ -7,11 +7,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     const error=document.getElementById(`input-error-${field.name==='password-new'?'password':field.name}`)||document.getElementById('input-error');
     if(error)field.setAttribute('aria-describedby',[...new Set([...(field.getAttribute('aria-describedby')||'').split(/\s+/).filter(Boolean),error.id])].join(' '));
   }
+  const submission=createAuthenticationSubmission({forms:document.forms,
+    status:document.getElementById('auth-submit-status'),progress:document.getElementById('auth-progress'),message:document.getElementById('auth-submit-message')});
+  for(const form of document.forms)form.addEventListener('submit',submission.submit);
+  window.addEventListener('offline',submission.offline);
+  window.addEventListener('online',submission.online);
+  window.addEventListener('pagehide',submission.reset);
+  window.addEventListener('pageshow',submission.reset);
+});
+
+// This controller describes navigation feedback. It cannot cancel or replay
+// the identity provider's form submission and never decides its outcome.
+function createAuthenticationSubmission({forms,status,progress,message}){
   const timers=new WeakMap();
   let pendingForm=null;
-  const status=document.getElementById('auth-submit-status');
-  const progress=document.getElementById('auth-progress');
-  const message=document.getElementById('auth-submit-message');
   const feedback=state=>{
     if(message)message.textContent=message.dataset[state]||message.dataset.pending;
     if(status){status.hidden=false;status.dataset.state=state;}
@@ -21,8 +30,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     window.clearTimeout(timers.get(form));timers.delete(form);
     delete form.dataset.submitting;form.removeAttribute('aria-busy');
   };
-  for(const form of document.forms){
-    form.addEventListener('submit',event=>{
+  const submit=event=>{
+      const form=event.currentTarget;
       if(event.defaultPrevented||!form.checkValidity())return;
       if(form.dataset.submitting==='true'){event.preventDefault();return;}
       form.dataset.submitting='true';
@@ -40,15 +49,20 @@ document.addEventListener('DOMContentLoaded',()=>{
         restore(form);
         if(pendingForm===form)feedback('delayed');
       },15000));
-    });
-  }
-  window.addEventListener('online',()=>{
+  };
+  const offline=()=>{
+    if(!pendingForm||status?.hidden)return;
+    for(const form of forms)restore(form);
+    feedback('offline');
+  };
+  const online=()=>{
     if(status?.dataset.state==='offline')feedback('reconnected');
-  });
-  window.addEventListener('pageshow',()=>{
-    for(const form of document.forms)restore(form);
+  };
+  const reset=()=>{
+    for(const form of forms)restore(form);
     pendingForm=null;
     if(status){status.hidden=true;delete status.dataset.state;}
     if(progress)progress.hidden=true;
-  });
-});
+  };
+  return {submit,offline,online,reset};
+}

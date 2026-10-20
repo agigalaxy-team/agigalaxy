@@ -9,6 +9,7 @@
 | 接口、数据与配置 | [技术参考索引](TECHNICAL_REFERENCE_INDEX.md) |
 | 账户、ID 与公开来源 | [公开查询](account-public-query-v1.md)、[外部凭据](external-credentials.md) |
 | 客户端及官网说明 | [客户端](../../../../02-architecture/current/CLIENT_EXPERIENCE.md)、[官网](../../../../02-architecture/current/PUBLIC_CONTENT.md) |
+| 读取、加载和复制交互复用 | [客户端交互模块](client-interactions.md) |
 | 工作方法及检查命令 | [项目工作规则](../../../../02-architecture/current/WORK_RULES.md)、[开发检查参考](development-checks.md) |
 | 资料去向和历史 | [文档目录](../../../../02-architecture/current/DOCUMENT_COVERAGE.md)、[归档](../../../../02-architecture/current/ARCHIVE.md) |
 

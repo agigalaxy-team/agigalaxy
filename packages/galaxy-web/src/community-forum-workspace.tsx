@@ -20,6 +20,8 @@ import {communityBrowsePath,communitySelection} from './community-navigation';
 import {OfficialAccountLoginNotice,useOfficialAccountSession} from './official-account-panel';
 import {clearForumLoginDraft,forumLoginDraft,rememberForumLoginDraft,forumAuthorAccountId,forumAuthorSubjectId,forumOwnsContent} from './forum-account-state.mjs';
 import {ForumAudienceEditor,ForumAudienceSummary} from './forum-audience';
+import {useReadTasks} from './use-read-task';
+import {LoadingFeedback,ReadFailure} from './interaction-feedback';
 import type {ForumAccessOptions,ForumSection,ForumNotification,ForumAuthorFields} from './community-forum-view-types';
 import './community-forum-workspace.css';
 import {availableForumContent,forumPayload,forumPreviewProjection,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumPreviewPayload,type ForumPayload,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPostsQuery} from './community-forum-view-types';
@@ -123,6 +125,7 @@ export function CommunityForumWorkspace(props:Props){
 }
 type ForumAccount=NonNullable<NonNullable<Parameters<typeof createCommunityForumClient>[1]>['account']>;
 type ForumAccountProps={lease:ChoiceViewLease|null;account:ForumAccount|null;official:ReturnType<typeof useOfficialAccountSession>;identityMode:boolean;targetAccountId:string|null;localSubjectId?:string;localConnected:boolean};
+type DetailSource={key:string;postId:string;versionId:string|null;replyId:string|null;managePost:boolean;ownReply:boolean};
 function CommunityForumView({ runtime, subjectId, connected, navigate, postId, versionId, replyId, reportId, memberSectionId, section: requestedSection = 'all', compose = false, manage = false, routeSearch = '', browseReturn = '/app/community', browseReturnLabel = '社区', registerShellNavigation,lease,account,official,identityMode,targetAccountId,localSubjectId,localConnected }: Props&ForumAccountProps) {
   const section = ['all', 'owned', 'reports','sections','notifications'].includes(requestedSection) ? requestedSection : 'all';
   const isFeed=!postId&&!replyId&&!reportId&&!memberSectionId&&!compose,postFeed=isFeed&&(section==='all'||section==='owned');
@@ -145,6 +148,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const restoreBrowse=useRef(initialBrowsePosition),pendingBrowseFocus=useRef(isFeed?forumBrowseFocus(history.state,location.pathname+location.search):null),replyAnchor=useRef<string|null>(null);
   const context = memberSectionId?`section:${memberSectionId}`:section==='sections'?'sections':reportId ? `report:${reportId}` : postId ? `post:${postId}` : replyId ? `reply:${replyId}` : 'feed';
   const client = useMemo<ForumClient|null>(() => runtime ? createCommunityForumClient(runtime, { subjectId: subjectId ?? null, context,account,browserDrafts:!identityMode,targetAccountId }) : null, [runtime, subjectId, context,account,identityMode,targetAccountId]);
+  const detailReads=useReadTasks(JSON.stringify([runtime?.api.endpoint,subjectId,account?.id,targetAccountId,context,versionId,manage]));
+  const detailSource=useRef<DetailSource|null>(null),discussionAppend=useRef(false);
   const [visitorConflict,setVisitorConflict]=useState<{id:string;revision:number}|null>(null),[actingAccounts,setActingAccounts]=useState<NonNullable<ForumQuota['availableAccounts']>>([]);
   const [authorizedAccountId,setAuthorizedAccountId]=useState<string|null>(null);
   const accountReady=identityMode||official.phase!=='loading';
@@ -153,7 +158,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const feedPages=useRef(initialBrowsePosition?.pages??1),replyPages=useRef(1),versionPages=useRef(1),replyStarted=useRef(false);
   const [now,setNow]=useState(()=>Math.floor(Date.now()/1000));
   const isAvailable=<T extends ForumContentView|ForumCardView>(value:T|null)=>availableForumContent(value,now);
-  const [reading, setReading] = useState(Boolean(client&&(connected||(!reportId&&(postId||replyId||section==='all'))))), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [reading, setReading] = useState(Boolean(client&&(connected||!reportId&&(postId||replyId||memberSectionId||!privatePage)))), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [items, setItems] = useState<ForumCardView[]>([]), [next, setNext] = useState<string | null>(null), [detail, setDetail] = useState<ForumPostView|null>(null);
   const [memberSections,setMemberSections]=useState<ForumSection[]>([]),[sectionDetail,setSectionDetail]=useState<ForumSection|null>(null),[notifications,setNotifications]=useState<ForumNotification[]>([]);
@@ -163,6 +168,10 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const [parent, setParent] = useState<ForumPostView|null>(null), [versions, setVersions] = useState<ForumVersionEntry[]>([]), [replies, setReplies] = useState<ForumReplyView[]>([]);
   const [versionNext, setVersionNext] = useState<number | null>(null), [ownPost, setOwnPost] = useState<ForumOwnedPost|null>(null);
   const [ownReply, setOwnReply] = useState<ForumOwnedReply|null>(null);
+  const [versionsReading,setVersionsReading]=useState(!!(postId||replyId)),[versionsError,setVersionsError]=useState('');
+  const [repliesReading,setRepliesReading]=useState(!!postId),[repliesError,setRepliesError]=useState('');
+  const [managementReading,setManagementReading]=useState(manage),[managementError,setManagementError]=useState('');
+  const [parentReading,setParentReading]=useState(!!replyId),[parentError,setParentError]=useState('');
   const [replyNext, setReplyNext] = useState<string | null>(null), [permission, setPermission] = useState<ForumPermission|null>(null), [governanceRead, setGovernance] = useState<{draftId:string;value:ForumConfig}|null>(null);
   const [draftLoading, setDraftLoading] = useState(true), [form, setForm] = useState<ForumDraft|null>(null), formRef = useRef<ForumDraft|null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -222,7 +231,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     });return()=>cancelAnimationFrame(frame);
   },[isFeed,reading,error]);
   const displayError=useCallback((reason:unknown)=>{setError(forumError(reason));setVerificationRequired(needsAccountVerification(reason));if(['official_account_changed','official_account_session_expired'].includes(chatErrorCode(reason)??''))void official.refresh();},[official.refresh]);
-  const clearReading=useCallback(()=>{setDetail(null);setReplyDetail(null);setReportDetail(null);setParent(null);setItems([]);setReportItems([]);setReplies([]);setVersions([]);setPermission(null);setOwnPost(null);setOwnReply(null);setSectionDetail(null);setMemberSections([]);setNotifications([]);setSectionChoices([]);},[]);
+  const clearReading=useCallback(()=>{detailReads.cancel();detailSource.current=null;discussionAppend.current=false;setDetail(null);setReplyDetail(null);setReportDetail(null);setParent(null);setItems([]);setReportItems([]);setReplies([]);setVersions([]);setPermission(null);setOwnPost(null);setOwnReply(null);setSectionDetail(null);setMemberSections([]);setNotifications([]);setSectionChoices([]);setVersionsReading(false);setRepliesReading(false);setManagementReading(false);setParentReading(false);setVersionsError('');setRepliesError('');setManagementError('');setParentError('');},[detailReads]);
   async function readDraft() {
     if (!client || !accountReady) return;
     const ticket = ++draftEpoch.current, before = formRef.current;
@@ -249,12 +258,43 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     if(result.status==='acknowledged'){setPendingReason('');await finish(result,kind);return;}
     const value=await client!.reviewOperation(operationId);if(current())setRetryPreview(value);
   }
+  const sourceCurrent=(source:DetailSource)=>current()&&detailSource.current?.key===source.key;
+  const readFirst=()=>detailReads.run({lane:'primary',key:JSON.stringify([reportId,replyId,postId,versionId,memberSectionId,section,listQuery])},()=>firstForumRead(client!,{reportId,replyId,postId,versionId,memberSectionId,section,query:listQuery}));
+  async function loadVersions(source=detailSource.current){
+    if(!client||!source)return;const depth=versionPages.current;
+    return detailReads.run({lane:'versions',key:source.key+':'+depth},async({signal})=>{
+      let afterVersion:number|undefined,nextAfterVersion:number|null=null;const rows:ForumVersionEntry[]=[];
+      for(let page=0;page<depth;page++){const result=await client.versions(source.postId,afterVersion===undefined?{}:{afterVersion});if(signal.aborted)throw new DOMException('Read replaced','AbortError');rows.push(...result.items);nextAfterVersion=result.nextAfterVersion??null;if(nextAfterVersion===null)break;if(nextAfterVersion===afterVersion)throw Error('版本分页暂时无法继续。');afterVersion=nextAfterVersion;}
+      return{items:rows,nextAfterVersion};
+    },{onStart:()=>{setVersionsReading(true);setVersionsError('');},onSuccess:value=>{if(sourceCurrent(source)){setVersions(value.items);setVersionNext(value.nextAfterVersion);}},onError:()=>{if(sourceCurrent(source)){setVersions([]);setVersionNext(null);setVersionsError('版本记录暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source))setVersionsReading(false);}});
+  }
+  async function loadDiscussion(source=detailSource.current,after?:string){
+    if(!client||!source||!source.versionId||source.replyId){setRepliesReading(false);return;}
+    if(!after&&discussionAppend.current)return;if(after)discussionAppend.current=true;
+    const selectedVersion=source.versionId,depth=replyPages.current,requestedReply=replyAnchor.current??(/^#reply-([0-9a-f-]{36})$/.exec(location.hash)?.[1]);
+    return detailReads.run({lane:'replies',key:JSON.stringify([source.key,after??null,depth,requestedReply])},async({signal})=>{
+      const valid=()=>sourceCurrent(source)&&!signal.aborted;
+      if(after){const page=await client.replies({postId:source.postId,postVersionId:selectedVersion,after});return{...page,pagesRead:1};}
+      return readPages<ForumReplyView>(after=>client.replies({postId:source.postId,postVersionId:selectedVersion,...(after?{after}:{})}),depth,valid,undefined,requestedReply?item=>item.locator.replyId===requestedReply:undefined);
+    },{onStart:()=>{setRepliesReading(true);setRepliesError('');},onSuccess:page=>{if(page&&sourceCurrent(source)){replyPages.current=after?replyPages.current+page.pagesRead:page.pagesRead;setReplies(old=>after?[...new Map([...old,...page.items].map(item=>[item.locator.replyId,item])).values()]:page.items);setReplyNext(page.nextAfter??null);if(requestedReply&&page.items.some(item=>item.locator.replyId===requestedReply))replyAnchor.current=null;}},onError:()=>{if(sourceCurrent(source)){setReplies([]);setReplyNext(null);setRepliesError('讨论暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source)){discussionAppend.current=false;setRepliesReading(false);}}});
+  }
+  async function loadManagement(source=detailSource.current){
+    if(!client||!source)return;
+    if(!source.managePost&&!source.ownReply){setManagementReading(false);setManagementError('');return;}
+    return detailReads.run({lane:'management',key:source.key},async()=>{
+      const [post,reply]=await Promise.all([source.managePost?client.ownPost(source.postId):null,source.ownReply&&source.replyId?client.ownReply(source.replyId):null]);return{post,reply};
+    },{onStart:()=>{setManagementReading(true);setManagementError('');},onSuccess:value=>{if(sourceCurrent(source)){setOwnPost(value.post);setOwnReply(value.reply);}},onError:()=>{if(sourceCurrent(source)){setOwnPost(null);setOwnReply(null);setManagementError('暂时无法读取你的管理操作。');}},onSettled:()=>{if(sourceCurrent(source))setManagementReading(false);}});
+  }
+  async function loadParent(source=detailSource.current){
+    if(!client||!source?.replyId||!source.versionId){setParentReading(false);return;}
+    return detailReads.run({lane:'parent',key:source.key},()=>client.version(source.postId,source.versionId!),{onStart:()=>{setParentReading(true);setParentError('');},onSuccess:value=>{if(sourceCurrent(source))setParent(value);},onError:()=>{if(sourceCurrent(source)){setParent(null);setParentError('暂时无法读取原帖。');}},onSettled:()=>{if(sourceCurrent(source))setParentReading(false);}});
+  }
   const refresh=async(initial?:{first:Awaited<ReturnType<typeof firstForumRead>>;ticket:number})=>{
     if(!client||!current()||!connected&&(reportId||!postId&&!replyId&&!memberSectionId&&privatePage))return;
     setReading(true);
     const ticket=initial?.ticket??++readEpoch.current,valid=()=>current()&&ticket===readEpoch.current,startedAt=Math.floor(Date.now()/1000);
     try{
-      const first=initial?.first??await firstForumRead(client,{reportId,replyId,postId,versionId,memberSectionId,section,query:listQuery});if(!valid())return;
+      const outcome=initial?{status:'success' as const,value:initial.first}:await readFirst();if(!valid()||outcome.status==='superseded')return;if(outcome.status==='error')throw outcome.error;const first=outcome.value;
       if(first.kind==='section'){const page=await readPages<ForumCardView>(after=>client.posts({...listQuery,sectionId:first.value.sectionId,...(after?{after}:{})}),feedPages.current,valid);if(page&&valid()){setSectionDetail(first.value);setItems(page.items);setNext(page.nextAfter);setError('');}}
       else if(first.kind==='sections'){const page=await readPages(after=>client.sections(after?{after}:{}),feedPages.current,valid,first.value);if(page&&valid()){setMemberSections(page.items);setNext(page.nextAfter);setError('');}}
       else if(first.kind==='notifications'){const page=await readPages(after=>client.notifications(after?{after}:{}),feedPages.current,valid,first.value);if(page&&valid()){setNotifications(leaseNotices(page.items,startedAt));setNext(page.nextAfter);setError('');}}
@@ -262,26 +302,14 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       else if(first.kind==='reply'||first.kind==='post'){
         let value:ForumPostView|null=first.kind==='post'?first.value:null;
         const reply=first.kind==='reply'?first.value:null;
-        const parentView=reply?await client.version(reply.locator.postId,reply.locator.postVersionId):null;
-        if(!valid())return;
         if(value&&postId&&!versionId&&value.currentVersionId)value=await client.version(postId,value.currentVersionId);
         if(!valid())return;
-        const selected=reply?parentView:value;if(!selected)return;
-        const sourcePostId=selected.locator.postId,sourceVersionId=selected.locator.versionId;
-        let afterVersion:number|undefined,versionCursor:number|null=null;const versionItems:ForumVersionEntry[]=[];
-        for(let page=0;page<versionPages.current;page++){
-          const result=await client.versions(sourcePostId,afterVersion===undefined?{}:{afterVersion});if(!valid())return;
-          versionItems.push(...result.items);versionCursor=result.nextAfterVersion??null;
-          if(versionCursor===null)break;if(versionCursor===afterVersion)throw Error('版本分页暂时无法继续。');afterVersion=versionCursor;
-        }
-        const requestedReply=replyAnchor.current??(/^#reply-([0-9a-f-]{36})$/.exec(location.hash)?.[1]);
-        const replyPage=sourceVersionId?await readPages(after=>client.replies({postId:sourcePostId,postVersionId:sourceVersionId,...(after?{after}:{})}),replyPages.current,valid,undefined,requestedReply?item=>item.locator.replyId===requestedReply:undefined):null;
-        if(replyPage)replyPages.current=replyPage.pagesRead;
-        if(requestedReply&&replyPage?.items.some(item=>item.locator.replyId===requestedReply))replyAnchor.current=null;
-        if(!valid())return;
-        const ownerView=manage&&connected&&postId?await client.ownPost(postId):null;
-        const ownerReply=reply&&connected&&owns(reply)?await client.ownReply(reply.locator.replyId):null;
-        if(valid()){setDetail(value);setReplyDetail(reply);setParent(parentView);setVersions(versionItems);setVersionNext(versionCursor);setOwnPost(ownerView);setOwnReply(ownerReply);setReplies(replyPage?.items??[]);setReplyNext(replyPage?.nextAfter??null);setError('');}
+        const sourcePostId=reply?reply.locator.postId:value?.locator.postId,sourceVersionId=reply?reply.locator.postVersionId:value?.locator.versionId;
+        if(!sourcePostId)return;
+        const source:DetailSource={key:JSON.stringify([sourcePostId,sourceVersionId??null,reply?.locator.replyId??null]),postId:sourcePostId,versionId:sourceVersionId??null,replyId:reply?.locator.replyId??null,managePost:!!(manage&&connected&&postId),ownReply:!!(reply&&connected&&owns(reply))};
+        if(detailSource.current?.key!==source.key){detailReads.cancel();discussionAppend.current=false;replyPages.current=1;setParent(null);setVersions([]);setVersionNext(null);setReplies([]);setReplyNext(null);setOwnPost(null);setOwnReply(null);setVersionsError('');setRepliesError('');setManagementError('');setParentError('');}
+        detailSource.current=source;setDetail(value);setReplyDetail(reply);setError('');setReading(false);
+        void loadVersions(source);void loadDiscussion(source);void loadManagement(source);void loadParent(source);
       }else if(first.kind==='reports'){
         const page=await readPages(after=>client.reports(after?{after}:{}),feedPages.current,valid,first.value);if(page&&valid()){feedPages.current=page.pagesRead;setReportItems(page.items);setNext(page.nextAfter);setError('');}
       }else{
@@ -411,7 +439,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   useEffect(()=>{
     const life=alive,readingVersion=readEpoch,draftVersion=draftEpoch;life.current=true;
     if(client&&current()&&(connected||!reportId&&(postId||replyId||memberSectionId||!privatePage))){const ticket=++readingVersion.current;
-      void firstForumRead(client,{reportId,replyId,postId,versionId,memberSectionId,section,query:listQuery}).then(first=>refreshLatest({first,ticket})).catch(reason=>initialFailure(reason,ticket));
+      void readFirst().then(outcome=>{if(outcome.status==='success')return refreshLatest({first:outcome.value,ticket});if(outcome.status==='error')initialFailure(outcome.error,ticket);}).catch(reason=>initialFailure(reason,ticket));
     }
     if(client&&accountReady&&current())void client.pending().then(restoreInput).catch(readFailure);
     if(client&&subjectId&&connected)void client.quotas(postId?{postId}:replyId?{replyId}:{}).then(value=>{if(current()){if(value.availableAccounts)setActingAccounts(value.availableAccounts);setAuthorizedAccountId(value.accountVerified&&typeof value.accountId==='string'?value.accountId:null);}}).catch(()=>{if(current())setAuthorizedAccountId(null);});
@@ -489,8 +517,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   }
   useEffect(()=>{if(!next||!moreFeed.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current)void run(()=>loadMore());},{rootMargin:'300px'});observer.observe(moreFeed.current);return()=>observer.disconnect();},[next,busy]);
   const morePosts=<div ref={moreFeed} className="forum-load-more">{next&&<Button variant="ghost" disabled={busy} onClick={()=>run(()=>loadMore(true))}>更多内容</Button>}</div>;
-  async function readMoreReplies(){if(!client||!replyNext||!postId||!selectedId)return;const page=await client.replies({postId,postVersionId:selectedId,after:replyNext});if(current()){replyPages.current++;setReplies(old=>[...new Map([...old,...page.items].map(item=>[item.locator.replyId,item])).values()]);setReplyNext(page.nextAfter??null);}}
-  useEffect(()=>{if(!replyNext||!moreReplies.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current)void run(readMoreReplies);},{rootMargin:'250px'});observer.observe(moreReplies.current);return()=>observer.disconnect();},[replyNext,busy]);
+  async function readMoreReplies(){if(replyNext)await loadDiscussion(detailSource.current,replyNext);}
+  useEffect(()=>{if(!replyNext||!moreReplies.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current&&!repliesReading)void readMoreReplies();},{rootMargin:'250px'});observer.observe(moreReplies.current);return()=>observer.disconnect();},[replyNext,busy,repliesReading]);
   async function readNotice(value:ForumNotification,open=false){try{await client!.readNotification(value.replyId);if(current()){setNotifications(old=>old.map(item=>item.replyId===value.replyId?{...item,read:true}:item));if(open)go(forumVersionPath(value.postId,value.postVersionId)+'#reply-'+value.replyId);}}catch(reason){if(current())setNotifications(old=>old.filter(item=>item.replyId!==value.replyId));throw reason;}}
   function resumeDraft(){setEditorOpen(true);setDiscardDraft(false);requestAnimationFrame(()=>{editor.current?.scrollIntoView({block:'start'});editor.current?.querySelector<HTMLElement>('input,textarea')?.focus({preventScroll:true});});}
   async function keepDraft(){await client!.draft.flush();if(!current())return;setEditorOpen(false);setDiscardDraft(false);setNotice('草稿已留在此浏览器，可以稍后继续。');if(compose)go(feedPath);}
@@ -536,7 +564,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {visitorConflict&&<aside className="forum-draft-return" aria-label="登录前的草稿"><p>登录前的草稿仍保留在此浏览器。当前账户在这里已有另一份草稿，处理后可以接回原稿。</p><Button variant="outline" disabled={busy||!!form} onClick={()=>run(readDraft)}>接回登录前草稿</Button></aside>}
     {compose && accountReady && !form && !draftLoading && draftLoaded && <Button disabled={busy} onClick={() => run(() => begin('create-post',{},selectedTopic?{topic:selectedTopic.id}:{}))}>开始写这条帖子</Button>}
     {accountReady && !draftLoading && !draftLoaded && <Button variant="outline" disabled={busy} onClick={() => run(()=>readDraft())}>重试恢复草稿</Button>}
-    {(!postFeed)&&reading && !detail && !replyDetail && !reportDetail && !sectionDetail && !items.length && !reportItems.length && !memberSections.length && !notifications.length && <output className="empty-state">正在读取当前允许的内容…</output>}
+    <LoadingFeedback active={(!postFeed)&&reading&&!detail&&!replyDetail&&!reportDetail&&!sectionDetail&&!items.length&&!reportItems.length&&!memberSections.length&&!notifications.length} label="正在读取当前内容…" scopeKey={context}/>
     {isFeed&&section==='sections'&&<><div className="button-row"><Button disabled={busy||!!form||draftLoading} onClick={()=>void run(beginSection)}>创建讨论版块</Button></div><div className="forum-section-directory">{memberSections.map(value=><article className="forum-section-row" key={value.sectionId}><h2>{link('/app/community/sections/'+value.sectionId,value.title)}</h2><p>{value.theme}</p>{value.description&&<p className="forum-excerpt">{value.description}</p>}<div className="forum-section-meta">{link('/app/accounts/'+value.maintainerAccountId,'查看维护者')}{value.category&&<span>{forumTopics.find(topic=>topic.id===value.category)?.label??'未分类'}</span>}{value.state==='archived'&&<span>已归档</span>}{value.canMaintain&&<span>由你维护</span>}</div><ForumAudienceSummary value={value.audience} options={accessOptions}/></article>)}{!reading&&!error&&!memberSections.length&&<p className="empty-state">还没有可读版块。</p>}</div>{morePosts}</>}
     {memberSectionId&&sectionDetail&&<><header className="forum-section-heading"><p className="forum-section-meta">成员版块{sectionDetail.state==='archived'?' · 已归档':''}{sectionDetail.category?' · '+(forumTopics.find(topic=>topic.id===sectionDetail.category)?.label??'未分类'):''}</p><h1>{sectionDetail.title}</h1><p>{sectionDetail.theme}</p>{sectionDetail.description&&<Body body={sectionDetail.description}/>}<p>{link('/app/accounts/'+sectionDetail.maintainerAccountId,'版块维护者')}</p><ForumAudienceSummary value={sectionDetail.audience} options={accessOptions}/><div className="button-row">{sectionDetail.state==='active'&&(sectionDetail.canParticipate||!connected)&&<Button disabled={busy||!!form||draftLoading} onClick={()=>void run(()=>begin('create-post',{}, {sectionId:sectionDetail.sectionId,audience:sectionDetail.audience,...(sectionDetail.category&&sectionDetail.category!=='unclassified'?{topic:sectionDetail.category}:{})}))}>在此版块发帖</Button>}{sectionDetail.canMaintain&&<Button variant="outline" disabled={busy||!!form||draftLoading} onClick={()=>void run(maintainSection)}>维护版块</Button>}{link('/app/community?section=sections','全部成员版块')}</div>{sectionDetail.state==='archived'?<p>版块已停止接收新帖子，已有内容仍按各自许可读取。</p>:connected&&!sectionDetail.canParticipate&&<p>当前账户可以阅读此版块，但不符合它的参与条件。</p>}</header><div className="forum-feed">{items.map(value=>card(value))}{!reading&&!error&&!items.length&&<p>这里还没有当前可读取的帖子。</p>}{morePosts}</div></>}
     {isFeed&&section==='notifications'&&<><ul className="forum-notifications">{notifications.filter(value=>noticeDeadline(value)>now).map(value=><li key={value.replyId} data-unread={!value.read||undefined}><p className="forum-meta">{value.read?'已读':'新回复'} · {new Date(typeof value.at==='number'?value.at*1000:value.at).toLocaleString('zh-CN')}</p><h2>{value.title}</h2><div className="forum-meta">{author(value)}</div><p>{value.preview}</p><div className="button-row"><Button variant="outline" disabled={busy} onClick={()=>void run(()=>readNotice(value,true))}>阅读这条回复</Button>{!value.read&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>readNotice(value))}>标为已读</Button>}</div></li>)}</ul>{!reading&&!error&&connected&&!notifications.some(value=>noticeDeadline(value)>now)&&<p className="empty-state">暂时没有新回复。</p>}{!connected&&<p className="muted">登录银河账户后查看与你有关的回复。</p>}{morePosts}</>}
@@ -547,7 +575,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
         {query&&<div className="forum-search-context">{link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results')}</div>}
         <div className="forum-feed" aria-busy={reading}>
           {items.map(value=>card(value,section==='owned'))}
-          {reading&&!items.length&&<output className="empty-state">正在读取帖子…</output>}
+          <LoadingFeedback active={reading&&!items.length} label="正在读取帖子…" scopeKey={feedPath}/>
           {!reading&&!error&&!items.length&&(section==='all'||connected)&&<div className="forum-result-empty"><h3 tabIndex={-1}>{query?'没有找到相符的帖子':section==='owned'?'这里还没有你的帖子':topic?'这个主题还没有可读的帖子':'社区还没有可读的帖子'}</h3><p>{query?'可以换一个词，或清除搜索继续浏览。':section==='owned'?'发表后，可以在这里找到并继续自己的内容。':'可以浏览其他主题，也可以写下自己的第一段内容。'}</p><div className="button-row">{query?link(forumBrowsePath({section,topic}),'清除搜索','text-link',false,'results'):topic?link(forumBrowsePath({section}),'浏览全部帖子','text-link',false,'topic'):null}{!query&&<Button variant="outline" onClick={()=>go(forumBrowsePath({section,topic,compose:true}))}>写一条帖子</Button>}{link(communityBrowsePath({source:'external',topic,query}),'看看外部精选','text-link')}</div></div>}
           {morePosts}
         </div>
@@ -557,7 +585,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     {isFeed&&section==='reports'&&<div className="forum-feed">{reportItems.map(item=><article className="forum-card" key={item.reportId}><h2>{link(`/app/community/reports/${item.reportId}`, '查看我的举报或受影响记录')}</h2><p>{item.state==='pending'?'已登记，尚待处理。':'有新的处理记录，可按当前权限查看。'}</p>{item.canAppeal&&<span className="tag">可以提交申诉</span>}</article>)}{!reading&&!error&&!reportItems.length&&connected&&<div className="empty-state">暂无处理记录。</div>}{morePosts}</div>}
 
     {(postId&&detail||replyId&&replyDetail) && <>
-      {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}{!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article className="forum-post">
+      {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}<LoadingFeedback active={parentReading} label="正在读取原帖…" scopeKey={detailSource.current?.key??context}/>{parentError&&<ReadFailure message={parentError} onRetry={()=>void loadParent()} retrying={parentReading}/>}{parent&&!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article className="forum-post">
         <div className="forum-meta">{author(detail)}<PostTime createdAt={detail.createdAt} updatedAt={isAvailable(detail)?detail.versionCreatedAt:undefined}/>{isAvailable(detail)&&link(forumBrowsePath({topic:detail.topic??'unclassified'}),forumTopics.find(topic=>topic.id===detail.topic)?.label??'未分类','forum-topic-label')}</div>
         {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><ForumAudienceSummary value={detail.audience} options={accessOptions}/>{detail.sectionId&&<p className="forum-section-meta">{link('/app/community/sections/'+detail.sectionId,'所在成员版块')}</p>}{(earlierVersion||versions.length>1)&&<div className="forum-version-context"><p>{earlierVersion?'正在阅读较早发表的内容':detail.currentVersionId===selectedId?'正在阅读最新发表的内容':'正在阅读这次发表的内容'}{selectedNumber? ' · 第 '+selectedNumber+' 版':''}。这里的回复保留在这次发表的内容下。</p>{earlierVersion&&link(forumVersionPath(postId!,detail.currentVersionId)!,'阅读更新后的内容','text-link')}</div>}<div className="forum-post-body"><Body body={detail.payload.body}/><Links links={detail.payload.links} titled/></div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
         {isAvailable(detail) && <div className="forum-post-actions"><Button disabled={busy || !!form || detail.canParticipate===false} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
@@ -565,15 +593,16 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
           {own && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(()=>startVersion())}>编辑帖子</Button>}
           <button className="forum-options-toggle" aria-haspopup="dialog" onClick={()=>setPostOptions(true)}>帖子资料</button></div>}
         {isAvailable(detail)&&selectedId&&<AgentWorkContinuation runtime={runtime} subjectId={localSubjectId} object={{kind:'post',id:detail.locator.postId,versionId:selectedId}} title={detail.payload.title} purpose="接着阅读这次发表的内容，围绕我的问题理解、整理或准备回应" onNeedIdentity={()=>go('/app/settings/identity')}/>}
-        {postOptions&&<ReadingSurface open title="帖子资料" onClose={()=>setPostOptions(false)}><section className="forum-post-details" aria-label="帖子资料"><h2>版本与相关操作</h2><nav className="forum-versions" aria-label="帖子版本">{versions.map(value=>link(forumVersionPath(postId!,value.locator.versionId)!,`版本 ${value.locator.versionNumber}${value.locator.versionId===selectedId?' · 正在阅读':''}`))}{versionNext!==null&&<Button variant="ghost" disabled={busy} onClick={()=>run(async()=>{const page=await client!.versions(postId!,{afterVersion:versionNext});if(current()){versionPages.current++;setVersions(old=>[...old,...page.items]);setVersionNext(page.nextAfterVersion??null);}})}>更早版本</Button>}</nav><p className="muted">{detail.publishedUntil&&<>此版可读取至 {date(detail.publishedUntil)}。</>}各次更新保留相应讨论。</p><div className="button-row">
+        {postOptions&&<ReadingSurface open title="帖子资料" onClose={()=>setPostOptions(false)}><section className="forum-post-details" aria-label="帖子资料"><h2>版本与相关操作</h2><LoadingFeedback active={versionsReading} label="正在读取版本记录…" scopeKey={detailSource.current?.key??context}/>{versionsError&&<ReadFailure message={versionsError} onRetry={()=>void loadVersions()} retrying={versionsReading}/>}<nav className="forum-versions" aria-label="帖子版本">{versions.map(value=>link(forumVersionPath(postId!,value.locator.versionId)!,`版本 ${value.locator.versionNumber}${value.locator.versionId===selectedId?' · 正在阅读':''}`))}{versionNext!==null&&<Button variant="ghost" disabled={busy||versionsReading} onClick={()=>{versionPages.current++;void loadVersions();}}>更早版本</Button>}</nav><p className="muted">{detail.publishedUntil&&<>此版可读取至 {date(detail.publishedUntil)}。</>}各次更新保留相应讨论。</p><div className="button-row">
           <Button variant="ghost" disabled={busy} onClick={() => run(async () => { const value = await client!.version(postId!,forumTargetString(selectedId)); if (!isAvailable(value)) throw Error('此版本当前不可读，不能继续采用它准备任务。'); if (current()) go(forumTaskPath({ postId, versionId: selectedId, returnTo: location.pathname + location.hash },{selectMaterial:!!localSubjectId&&value.authorId===localSubjectId})); })}>为这件事准备任务</Button>
           {!own&&<Button variant="ghost" disabled={busy||!!form} onClick={()=>run(()=>startReport(detail))}>举报</Button>}{own&&link(`/app/community/posts/${postId}?manage=1`,'管理我的版本')}</div></section></ReadingSurface>}
       </article>}
+      <LoadingFeedback active={managementReading} label="正在读取你的管理操作…" scopeKey={detailSource.current?.key??context}/>{managementError&&<ReadFailure message={managementError} onRetry={()=>void loadManagement()} retrying={managementReading}/>}
       {replyId&&ownReply&&ownReply.state!=='withdrawn'&&<div className="forum-owner-actions"><Button variant="ghost" disabled={busy||!!form} onClick={()=>run(()=>withdraw('withdraw-reply',ownReply))}>撤回我的回复</Button></div>}
       {ownPost && <section className="forum-card" aria-label="本人帖子管理"><h2>管理帖子</h2><div className="button-row">{ownPost.state !== 'withdrawn' && <><Button disabled={busy || !!form} onClick={() => run(() => isAvailable(detail)?startVersion():begin('publish-version', { postId, expectedHeadVersion: ownPost.headVersion,...(forumAuthorAccountId(ownPost)?{accountId:forumAuthorAccountId(ownPost)}:{}) },{audience:ownPost.audience,sectionId:ownPost.sectionId}))}>编辑内容</Button><Button variant="outline" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-post', ownPost))}>撤回整条帖子</Button></>}</div>
         {ownPost.versionLocators.map((value) => <article className="forum-reply" key={value.locator.versionId}><h3>{link(forumVersionPath(postId!, value.locator.versionId)!, `第 ${value.locator.versionNumber} 版`)}</h3><p>读取许可至 {date(value.publishedUntil)}。{value.availability !== 'available' && (states[value.availability] ?? '当前不可读。')}</p><div className="button-row">{value.state !== 'withdrawn' && ownPost.state !== 'withdrawn' && <Button variant="outline" disabled={busy || !!form} onClick={() => run(() => begin('withdraw-version', { postId, versionId: value.locator.versionId, expectedHeadVersion: ownPost.headVersion,...(forumAuthorAccountId(ownPost)?{accountId:forumAuthorAccountId(ownPost)}:{}) }))}>撤回此版</Button>}</div></article>)}<PermissionDetail value={permission} />
       </section>}
-      {!replyId&&detail&&<section className="forum-replies" aria-label="这版帖子的回复"><h2>{versions.length>1&&selectedNumber?'第 '+selectedNumber+' 版下的讨论':'讨论'}{replies.length>0&&<span>{replies.length}{replyNext?'+':''}</span>}</h2>{!isAvailable(detail)&&<p className="muted">原帖当前不可读，已有回复按各自的公开范围展示。</p>}{replies.map(displayReply)}{!replies.length&&<p className="forum-discussion-empty">还没有回复，分享你的想法吧。</p>}<div ref={moreReplies}>{replyNext&&<Button variant="ghost" disabled={busy} onClick={()=>run(readMoreReplies)}>更多回复</Button>}</div>{isAvailable(detail)&&detail.canParticipate!==false&&!form&&<button className="forum-reply-start" onClick={()=>run(()=>begin('create-reply',{postId,versionId:selectedId,versionNumber:detail.locator.versionNumber}))}><MemberAvatar subjectId={subjectId}/><span>写下你的回复…</span><MessageCircle size={18}/></button>}</section>}
+      {!replyId&&detail&&<section className="forum-replies" aria-label="这版帖子的回复"><h2>{versions.length>1&&selectedNumber?'第 '+selectedNumber+' 版下的讨论':'讨论'}{replies.length>0&&<span>{replies.length}{replyNext?'+':''}</span>}</h2>{!isAvailable(detail)&&<p className="muted">原帖当前不可读，已有回复按各自的公开范围展示。</p>}{replies.map(displayReply)}<LoadingFeedback active={repliesReading} label="正在读取讨论…" scopeKey={detailSource.current?.key??context}/>{repliesError&&<ReadFailure message={repliesError} onRetry={()=>void loadDiscussion()} retrying={repliesReading}/>}{!repliesReading&&!repliesError&&!replies.length&&<p className="forum-discussion-empty">还没有回复，分享你的想法吧。</p>}<div ref={moreReplies}>{replyNext&&<Button variant="ghost" disabled={busy||repliesReading} onClick={()=>void readMoreReplies()}>更多回复</Button>}</div>{isAvailable(detail)&&detail.canParticipate!==false&&!form&&<button className="forum-reply-start" onClick={()=>run(()=>begin('create-reply',{postId,versionId:selectedId,versionNumber:detail.locator.versionNumber}))}><MemberAvatar subjectId={subjectId}/><span>写下你的回复…</span><MessageCircle size={18}/></button>}</section>}
       <footer className="forum-reading-return">{link(returnPath,<>继续浏览{returnLabel==='社区'?'社区帖子':returnLabel}</>)}</footer>
     </>}
 

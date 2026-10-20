@@ -1,5 +1,11 @@
 const formForAction={galaxy_local_panel_settings_save:'settings',galaxy_local_panel_work_sync_save:'work'};
 const copy=value=>value===undefined?undefined:structuredClone(value);
+export function sameLocalSelection(left,right){
+  if(left===right)return true;
+  if(!left||!right||typeof left!=='object'||typeof right!=='object'||Array.isArray(left)!==Array.isArray(right))return false;
+  const keys=Object.keys(left);
+  return keys.length===Object.keys(right).length&&keys.every(key=>Object.hasOwn(right,key)&&sameLocalSelection(left[key],right[key]));
+}
 
 // Private reading and unfinished choices stay in this mounted panel only.
 // A response for another local identity discards both before it is rendered.
@@ -8,11 +14,12 @@ export function createLocalPanelMemory(){
   return {
     useIdentity(galaxyId){if(owner!==galaxyId){pages.clear();drafts.clear();listPositions.clear();owner=galaxyId;}},
     remember(page,position={}){this.useIdentity(page.galaxyId);pages.set(page.view,{page,position});if(!page.selectedWork&&!page.selectedArchive)listPositions.set(page.view,position);},
+    update(page){this.useIdentity(page.galaxyId);pages.set(page.view,{page,position:pages.get(page.view)?.position??{}});},
     page(view){return pages.get(view)?.page;},
     position(view){return pages.get(view)?.position;},
     listPosition(view){return listPositions.get(view);},
     draft(key){return copy(drafts.get(key));},
-    edit(key,value,original){if(JSON.stringify(value)===JSON.stringify(original))drafts.delete(key);else drafts.set(key,copy(value));},
+    edit(key,value,original){if(sameLocalSelection(value,original))drafts.delete(key);else drafts.set(key,copy(value));},
     completed(action){const key=formForAction[action];if(key)drafts.delete(key);},
     clear(){pages.clear();drafts.clear();listPositions.clear();owner=null;},
   };

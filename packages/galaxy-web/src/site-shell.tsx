@@ -9,6 +9,10 @@ import {primaryNavigation,workspaceLocation} from './workspace-location.mjs';
 import {isPublicReadingRoute} from './public-reading-contract.mjs';
 import type {createWebRuntime} from './runtime.mjs';
 import './selected-shell.css';
+import {GalaxyMark} from './galaxy-mark';
+import {PageLoading} from './interaction-feedback';
+export {GalaxyMark} from './galaxy-mark';
+export {PageLoading} from './interaction-feedback';
 
 type Props={path:string;search?:string;connected:boolean;subjectId?:string;navigate:(path:string)=>void;onDisconnect?:()=>void;children:React.ReactNode};
 const capabilityGroups=[
@@ -24,7 +28,6 @@ function workRoute(path:string,search:string){
   ||path==='/app/capsules'&&params.get('mode')==='author'
   ||/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)&&(params.get('records')==='mine'||params.get('section')==='collaboration');
 }
-export function GalaxyMark(){return <span className="galaxy-mark" aria-hidden="true"><svg width="31" height="31" viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="16" rx="13" ry="6" transform="rotate(-36 16 16)" stroke="currentColor" strokeWidth="1.65"/><ellipse cx="16" cy="16" rx="6" ry="13" transform="rotate(-36 16 16)" stroke="currentColor" strokeWidth="1.65"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/><circle cx="26" cy="7" r="2.2" fill="#d8a9be" stroke="#ffffff" strokeWidth="1.5"/></svg></span>;}
 export function SiteShell({path,search='',connected,subjectId,navigate,onDisconnect,children}:Props){
  const community=path==='/app/community'||path.startsWith('/app/community/');
  const settings=path==='/app/account'||path==='/app/bookmarks'||path==='/app/history'||path.startsWith('/app/settings/');
@@ -82,5 +85,4 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
   <main id="main-content" className={'workspace-main site-content'+(settings?' settings-page':'')+(community?' community-page':'')+(messages?' messages-shell-page':'')+(publicPage?' public-content':'')} tabIndex={-1}>{community?<CommunityLayout path={path} search={search} navigate={navigate}>{children}</CommunityLayout>:settings?<Suspense fallback={<PageLoading label="正在打开账户与设置…"/>}><SettingsLayout path={path} search={search} subjectId={subjectId} navigate={navigate}>{children}</SettingsLayout></Suspense>:children}</main>
  </div>;
 }
-export function PageLoading({label='正在读取当前资料…'}:{label?:string}){return <div className="page-loading"><output className="loading-label"><GalaxyMark/><span>{label}</span></output><div className="skeleton skeleton-title"/><div className="skeleton skeleton-line"/><div className="skeleton skeleton-line short"/><div className="skeleton-pair"><div className="skeleton skeleton-card"/><div className="skeleton skeleton-card"/></div></div>;}
 export function StartPage({runtime,navigate}:{runtime:Awaited<ReturnType<typeof createWebRuntime>>|null;navigate:(path:string)=>void}){return <PublicBrowseWorkspace runtime={runtime} navigate={navigate}/>;}

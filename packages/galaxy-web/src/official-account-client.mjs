@@ -11,8 +11,9 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
  const origin=new URL(endpoint);
  if(origin.protocol!=='https:'||origin.origin!==endpoint||origin.username||origin.password)fail('official_account_configuration_invalid');
  const websiteOrigin=new URL(website).origin;
- async function request(path,{anonymous=false,...options}={}){
-  const response=await fetcher(endpoint+path,{...options,credentials:anonymous?'omit':'include',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000),
+  async function request(path,{anonymous=false,signal,...options}={}){
+   const timeout=AbortSignal.timeout(10000);
+   const response=await fetcher(endpoint+path,{...options,credentials:anonymous?'omit':'include',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:signal?AbortSignal.any([signal,timeout]):timeout,
    headers:{Accept:'application/json',...options.headers}});
   if(Number(response.headers.get('content-length'))>2097152)fail('official_account_response_invalid');
   const text=await response.text();if(new TextEncoder().encode(text).length>2097152)fail('official_account_response_invalid');
@@ -37,22 +38,22 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    expiresAt:value.expiresAt,csrfToken:value.csrfToken,galaxyAuthorization:false};
  }
  return Object.freeze({
-  async session({after}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');return readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):'')));},
-  async publicAccount(id){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true});},
-   /** @param {string} id @param {{after?:string,limit?:number}} [page] */
-   async publicPosts(id,{after,limit=20}={}){if(!accountId(id)||after!==undefined&&(typeof after!=='string'||after.length>512||!/^fp1\.[A-Za-z0-9_-]+$/.test(after))||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/posts?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
-  /** @param {string} id @param {{after?:string,limit?:number}} [page] */
-  async publicLinkedIds(id,{after,limit=20}={}){if(!accountId(id)||after!==undefined&&!guid(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/ids?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
-  /** @param {string} id @param {{after?:string,limit?:number}} [page] */
-  async publicCredentials(id,{after,limit=20}={}){if(!accountId(id)||after!==undefined&&!accountId(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/credentials?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
-  /** @param {string} id @param {{after?:string,limit?:number}} [page] */
-  async publicAccountsForId(id,{after,limit=20}={}){if(!guid(id)||after!==undefined&&!accountId(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/by-id/'+id+'?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true});},
+   async session({after,signal}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');return readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):''),{signal}));},
+   async publicAccount(id,{signal}={}){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true,signal});},
+    /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
+    async publicPosts(id,{after,limit=20,signal}={}){if(!accountId(id)||after!==undefined&&(typeof after!=='string'||after.length>512||!/^fp1\.[A-Za-z0-9_-]+$/.test(after))||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/posts?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true,signal});},
+   /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
+   async publicLinkedIds(id,{after,limit=20,signal}={}){if(!accountId(id)||after!==undefined&&!guid(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/ids?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true,signal});},
+   /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
+   async publicCredentials(id,{after,limit=20,signal}={}){if(!accountId(id)||after!==undefined&&!accountId(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/credentials?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true,signal});},
+   /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
+   async publicAccountsForId(id,{after,limit=20,signal}={}){if(!guid(id)||after!==undefined&&!accountId(after)||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/by-id/'+id+'?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true,signal});},
   loginUrl(mode='login',target='/app/account'){
    if(!['login','register'].includes(mode))fail('official_account_mode_invalid');
    return endpoint+'/v1/account/login?'+new URLSearchParams({mode,returnTo:returnPath(target,websiteOrigin)});
   },
-/** @param {string} path @param {unknown} input @param {{method?:string,session?:{state:string,account:{id:string|null},csrfToken:string,expiresAt:number}}} [options] */
-  async call(path,input,{method='POST',session}={}){
+/** @param {string} path @param {unknown} input @param {{method?:string,signal?:AbortSignal,session?:{state:string,account:{id:string|null},csrfToken:string,expiresAt:number}}} [options] */
+   async call(path,input,{method='POST',session,signal}={}){
    if(session?.state!=='signed-in'||!accountId(session.account?.id)||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');
    if(typeof path!=='string'||!path.startsWith('/')||path.startsWith('//')||path.includes('\\')||path.includes('#')||!['GET','POST','DELETE'].includes(method))fail('official_account_request_invalid');
    const parsed=new URL(path,endpoint),route=parsed.pathname;
@@ -61,7 +62,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    const queryKeys=route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
    if(parsed.origin!==endpoint||!allowed||[...parsed.searchParams.keys()].some(key=>!queryKeys.includes(key)||parsed.searchParams.getAll(key).length!==1)||parsed.search&&method!=='GET'
     ||method==='DELETE'&&!/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(route))fail('official_account_request_invalid');
-   return request(path,{method,headers:{'Content-Type':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},...(['GET','DELETE'].includes(method)?{}:{body:JSON.stringify(input??{})})});
+    return request(path,{method,signal,headers:{'Content-Type':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},...(['GET','DELETE'].includes(method)?{}:{body:JSON.stringify(input??{})})});
   },
   async logout(session){
    if(session?.state!=='signed-in'||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');

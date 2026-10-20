@@ -176,7 +176,7 @@ def main():
     chrome.WEB_ASSETS = web_entry_assets(resolved_file_path(args.web_dist)) if args.web_dist else None
     chrome.PUBLIC_PAGES.clear()
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
-    for name in ('site.css', 'navigation.js', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
+    for name in ('site.css', 'navigation.js', 'interaction-copy.mjs', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
     chrome.write('assets/selected-shell.css',
                  (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'selected-shell.css').read_text(encoding='utf-8'))

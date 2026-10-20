@@ -25,6 +25,7 @@ import {createLocalConversationArchive} from '../../../packages/galaxy-core/src/
 import {redactLocalWorkData} from '../../../packages/galaxy-core/src/local-data-redaction.mjs';
 import {prepareOpenCodeLocalWork,isOpenCodePreparationDeferred,deferOpenCodePreparation} from './local-preparation.mjs';
 import {setWorkArchiveSelection} from './work-archive-choice.mjs';
+import {createReadTaskController} from '../../shared/read-task.mjs';
 
 const MODULE_LABELS: Record<string, string> = {
   'galaxy-id': '银河 ID 与本地身份卡',
@@ -88,6 +89,7 @@ function compactModules(modules: (string | ModuleEntry)[], language: string) {
 
 export function createGalaxyAdapter(connectionController: ConnectionController | null = null, { readCaseSubmission = null, discovery = null, dataDirectory: configuredDirectory, nativeTools = null, readWorkContext = null, recordWork = true, readLocalIdentity = undefined, onWorkSessionComplete = undefined,connectionUnavailable=false }: { readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null; discovery?: DiscoverySource | null; dataDirectory?: string; nativeTools?: {call(name:string,args:Record<string,unknown>):Promise<unknown>;openLink?:(url:string)=>Promise<unknown>} | null; readWorkContext?: (()=>Promise<HostWorkContext | null>) | null; recordWork?: boolean; readLocalIdentity?: (directory:string)=>Promise<{id:string}|null>; onWorkSessionComplete?: (input:{host:string;sessionId:string})=>Promise<unknown>;connectionUnavailable?:boolean } = {}) {
 let closed = false, attached = false;
+const localPageReads=createReadTaskController('opencode-local-work');
 let disposeHost: Action | null = null;
 let disposeLifecycle: Action | null = null;
 let workRecorder: ReturnType<typeof createOpenCodeWorkRecorder> | null = null;
@@ -95,6 +97,7 @@ let closing: Promise<void> | null = null;
 function close() {
   if (closed) return closing ?? Promise.resolve();
   closed = true;
+  localPageReads.dispose();
   try { disposeHost?.(); }
   finally {
     disposeHost = null;
@@ -148,6 +151,8 @@ return {
     let purposeMenu: ReturnType<typeof createPurposeMenu> | null = null;
     let firstPreparationVisible=false;
 
+    function nextPage(){localPageReads.cancel();return ++pageGeneration;}
+
     function clearMenuKeys() {
       if (disposeMenuKeys) disposeMenuKeys();
       disposeMenuKeys = null;
@@ -156,7 +161,7 @@ return {
     function closeGalaxy() {
       if(firstPreparationVisible){firstPreparationVisible=false;void deferOpenCodePreparation(dataDirectory).catch(()=>{});}
       connectionGeneration++;
-      pageGeneration++;
+      nextPage();
       discoveryAbort?.abort();
       connectionController?.cancel();
       pendingConnection = null;
@@ -255,7 +260,7 @@ return {
 
     function showInfo(title: string, message: string, onConfirm: Action) {
       if (closed) return;
-      const page = ++pageGeneration;
+      const page = nextPage();
       let transitioning = false;
       const cleanup = pageCleanup(page, installMenuKeys({}, closeGalaxy, null, { includeZero: false }), () => transitioning);
       api.ui.dialog.setSize('xlarge');
@@ -280,7 +285,7 @@ return {
 
     function showPrompt({ title, placeholder, value, onConfirm, onCancel = closeGalaxy }: Prompt) {
       if (closed) return;
-      const page = ++pageGeneration;
+      const page = nextPage();
       let transitioning = false;
       // A prompt collects actual content or a value required by the operation.
       // Authorization comes from the corresponding exact native choice.
@@ -314,7 +319,7 @@ return {
       const {title,options,routes:inputRoutes,onBack,onEscape=closeGalaxy}=prepared;
       let routes: Routes=inputRoutes;
       if (closed) return;
-      const page = ++pageGeneration;
+      const page = nextPage();
       let transitioning = false;
       routes = { 0: onBack, ...routes };
       const reopen = () => showSelect({ title, options, routes, onBack, onEscape });
@@ -1182,13 +1187,19 @@ return {
       });
     }
 
+    async function readLocalWorkPage<T>(key:string,title:string,onReturn:Action,read:()=>Promise<T>,present:(value:T)=>void,unavailable:string){
+      showInfo(title,activeLanguage==='zh-CN'?'正在读取…':'Loading…',onReturn);
+      return localPageReads.run({lane:'page',key},async()=>read(),{
+        onSuccess:present,onError:()=>showInfo('Galaxy',unavailable,onReturn),
+      });
+    }
+
     async function showLocalWorkHistory(onReturn: Action, after?: string) {
       const chinese = activeLanguage === 'zh-CN', recorder = workRecorder;
       if (!recorder) return showInfo('Galaxy', chinese ? '当前入口未取得本机记录位置。请恢复所选配置后重开；已有资料保留。' : 'The local recording location is unavailable. Restore the selected configuration and reopen.', onReturn);
-      await recorder.refresh();
-      try {
-        const page = await recorder.history.list({after, limit: 6});
-        if (closed) return;
+      return readLocalWorkPage(JSON.stringify(['history',after]),chinese?'本地工作履历':'Local work history',onReturn,async()=>{
+        await recorder.refresh();return recorder.history.list({after,limit:6});
+      },page=>{
         if (!page.galaxyId) return showQuickInitialize(()=>void showLocalWorkHistory(onReturn,after));
         const options: MenuOption[] = [], routes: Routes = {};
         page.items.forEach((work: LocalWorkListItem, index: number) => {
@@ -1198,15 +1209,18 @@ return {
         });
         if (page.nextAfter) {options.push({number:'n',title:chinese?'下一组工作':'Next group'});routes.n=()=>void showLocalWorkHistory(onReturn,page.nextAfter);}
         showSelect({title:(chinese?'本地工作履历':'Local work history')+(page.items.length?'':chinese?'\n还没有本地工作记录。保持客户端启用并照常工作即可。':'\nNo local work recorded yet. Continue working with the client active.'), options, routes, onBack:onReturn});
-      } catch {showInfo('Galaxy', chinese ? '本地记录暂不可读，已有资料保留。' : 'Local history is temporarily unavailable; existing material is retained.', onReturn);}
+      },chinese?'本地记录暂不可读，已有资料保留。':'Local history is temporarily unavailable; existing material is retained.');
     }
 
     async function showLocalWorkDetails(workId: string, onReturn: Action, afterSequence = 0) {
       const chinese = activeLanguage === 'zh-CN', recorder = workRecorder;
       if (!recorder) return onReturn();
-      try {
-        const detail = await recorder.history.get({workId,afterSequence,limit:6});
-        if (!detail || closed) return onReturn();
+      return readLocalWorkPage(JSON.stringify(['detail',workId,afterSequence]),chinese?'本地工作履历':'Local work history',onReturn,async()=>{
+        const detail=await recorder.history.get({workId,afterSequence,limit:6});
+        const archiveSettings=detail&&recorder.archive&&detail.work.host==='opencode'?await recorder.archive.settings():null;
+        return {detail,archiveSettings};
+      },({detail,archiveSettings})=>{
+        if (!detail) return onReturn();
         const back = () => void showLocalWorkDetails(workId,onReturn,afterSequence);
         const work = detail.work;
         const processingLabels:Record<string,string>={'pending':'等待整理','running':'自己的AI正在整理','failed':'整理未完成，原记录保留','model-unavailable':'等待宿主模型可用','idle':'当前材料已整理'};
@@ -1226,8 +1240,8 @@ return {
               +(Array.isArray(facts.tools)&&facts.tools.length?'\n'+(chinese?'工具接入：':'Connected tools: ')+facts.tools.join('、'):'');
           }).join('\n\n'),back);
         }
-        if(recorder.archive&&work.host==='opencode'){
-          const archive=recorder.archive,settings=await archive.settings(),listed=settings.settings.sessions.some((item:{host:string;sessionId:string})=>item.host===work.host&&item.sessionId===work.sessionId),selected=settings.settings.enabled&&listed;
+        if(recorder.archive&&archiveSettings&&work.host==='opencode'){
+          const archive=recorder.archive,settings=archiveSettings,listed=settings.settings.sessions.some((item:{host:string;sessionId:string})=>item.host===work.host&&item.sessionId===work.sessionId),selected=settings.settings.enabled&&listed;
           options.push({number:'a',title:selected?(chinese?'停止为这段工作另存完整消息':'Stop saving full messages'):(chinese?'为这段工作保存完整消息':'Save full messages for this work'),description:chinese?'本人私有保存，回读所选会话可取得的消息；排除凭据，不读取附件正文，不因此上传。':'Private copies of available selected messages; credentials excluded, attachment bodies unread, no upload.'});
           routes.a=async()=>{
             showInfo(chinese?'正在保存':'Saving',chinese?'正在更新这段工作的保存设置。':'Updating saving settings for this work.',back);
@@ -1285,21 +1299,23 @@ return {
         }
         if(detail.nextAfter!==null){options.push({number:'n',title:chinese?'后续过程记录':'More observations'});routes.n=()=>void showLocalWorkDetails(workId,onReturn,detail.nextAfter);}
         showSelect({title:work.title,options,routes,onBack:onReturn});
-      }catch{showInfo('Galaxy',chinese?'这段本地工作暂不可读，已有资料保留。':'This local work is temporarily unavailable.',onReturn);}
+      },chinese?'这段本地工作暂不可读，已有资料保留。':'This local work is temporarily unavailable.');
     }
 
     async function showQuickInitialize(onReturn: Action,firstStart=false):Promise<unknown> {
+      const requestedPage=pageGeneration,stillHere=()=>!closed&&requestedPage===pageGeneration;
       const owner=await workRecorder?.history.identity();
       const snapshot=await store.getLocalSnapshot(dataDirectory);
-      if(owner||snapshot.identity){firstPreparationVisible=false;await workRecorder?.refresh();return onReturn();}
+      if(!stillHere())return;
+      if(owner||snapshot.identity){firstPreparationVisible=false;await workRecorder?.refresh();if(stillHere())return onReturn();return;}
       const chinese=activeLanguage==='zh-CN';
       if(snapshot.recoveryRequired)return showInfo(chinese?'本地资料需要恢复':'Local recovery needed',chinese?'上次本机准备尚未完成。请保留现有资料，恢复后再开始记录。':'The previous preparation was interrupted. Keep existing material and recover before recording.',onReturn);
-      const initialize=async(subjectType:'person'|'organization')=>{try{
+      const initialize=async(subjectType:'person'|'organization')=>{const operationPage=pageGeneration,atOriginalPage=()=>!closed&&operationPage===pageGeneration;firstPreparationVisible=false;try{
         // A real TUI start choice is sufficient for this local-only operation.
         // No browser approval or account association repeats the same decision.
         if(!await workRecorder?.history.identity())await prepareOpenCodeLocalWork(dataDirectory,{subjectType});
-        firstPreparationVisible=false;await workRecorder?.refresh();onReturn();
-      }catch{showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}};
+        await workRecorder?.refresh();if(atOriginalPage())onReturn();
+      }catch{if(atOriginalPage())showInfo('Galaxy',chinese?'本机准备未完成，请保留现有资料再试。':'Device preparation is incomplete; retain current material before retrying.',onReturn);}};
       firstPreparationVisible=firstStart;
       const later=async()=>{firstPreparationVisible=false;await deferOpenCodePreparation(dataDirectory).catch(()=>{});closeGalaxy();};
       showSelect({title:chinese?'开始使用银河\n普通工作会自动记录到本机，供本人回看与自己的 AI 整理；保留事实、来源和有限片段，默认不另存全部会话。\n上传预设“履历概况”，接入在线服务前不关联、不上传。沿用已有身份；新身份默认为个人，类型创建后不可更改。':'Start using Galaxy\nOrdinary work is recorded on this device for your review and AI summaries. Facts, sources and bounded excerpts are retained; full conversations are not copied by default.\nUpload is preset to history overview, with no connection or upload before choosing a service. Existing identity is reused; new identities are personal by default and their type is permanent.',
@@ -1354,7 +1370,7 @@ return {
 
     async function openGalaxy() {
       if (closed) return;
-      const page = ++pageGeneration;
+      const page = nextPage();
       try {
         if(nativeTools){await showConsole();return;}
         const status = await store.getGalaxyIntegrationStatus(dataDirectory);

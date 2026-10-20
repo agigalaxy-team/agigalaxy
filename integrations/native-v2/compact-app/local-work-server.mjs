@@ -27,11 +27,11 @@ export function registerLocalWorkPanelTools(server,{resourceUri,local,reviewActi
     if(!galaxyId)return {view:input.view??'history',galaxyId:null,notInitialized:true};
     const view=input.view??'history';
     if(view==='privacy'){
-      const [work,archives,archiveSettings,targets]=await Promise.all([collect(local.work.list,galaxyId),collect(local.archive.list,galaxyId),local.archive.settings(),local.availableAccounts()]);
+      const [work,archives,archiveSettings]=await Promise.all([collect(local.work.list,galaxyId),collect(local.archive.list,galaxyId),local.archive.settings()]);
       const choices=new Map(work.map(item=>[JSON.stringify([item.host,item.sessionId]),{workId:item.workId,host:item.host,sessionId:item.sessionId,title:item.title,updatedAt:item.updatedAt}]));
       for(const item of archives){const key=JSON.stringify([item.host,item.sessionId]);choices.set(key,{...(choices.get(key)??{host:item.host,sessionId:item.sessionId,updatedAt:item.updatedAt}),archiveSessionId:item.archiveSessionId});}
       for(const item of archiveSettings.settings.sessions){const key=JSON.stringify([item.host,item.sessionId]);if(!choices.has(key))choices.set(key,{...item,title:'已保存的会话'});}
-      return {view,galaxyId,privacy,archiveSettings,work:{items:work},archives:{items:archives},sessionChoices:[...choices.values()],accounts:targets.accounts,accountSettingsUrl:targets.accountSettingsUrl,accountsUnavailable:!!targets.unavailable,accountConnectionRequired:targets.connected===false,
+      return {view,galaxyId,privacy,archiveSettings,work:{items:work},archives:{items:archives},sessionChoices:[...choices.values()],accountsPending:!!(local.cloud&&local.workCloud),
         archiveSync:await local.cloud?.settings(),workSync:await local.workCloud?.settings()};
     }
     if(view==='archive'){
@@ -79,7 +79,11 @@ export function registerLocalWorkPanelTools(server,{resourceUri,local,reviewActi
   add('galaxy_local_panel_work_delete',workDeleteInputSchema,'Delete this selected local work record through actual user choice.',(input,context)=>reviewed('galaxy_local_work_delete',input,context,()=>local.deleteLocalWork(input),'history'),{write:true,appOnly:true});
   if(local.cloud&&local.workCloud){
     add('galaxy_local_panel_sync_accounts',z.strictObject({galaxyId:z.string().min(1)}),'Read actual account targets only after the panel user asks to configure private cloud copies.',async input=>{
-      return component(await snapshot({view:'privacy',galaxyId:input.galaxyId}));
+      if((await local.privacyGet()).galaxyId!==input.galaxyId)throw new Error('local_identity_changed');
+      const targets=await local.availableAccounts();
+      if((await local.privacyGet()).galaxyId!==input.galaxyId)throw new Error('local_identity_changed');
+      return component({view:'privacy',galaxyId:input.galaxyId,accountUpdate:true,accounts:targets.accounts,accountSettingsUrl:targets.accountSettingsUrl,
+        accountsPending:false,accountsUnavailable:!!targets.unavailable,accountConnectionRequired:targets.connected===false});
     },{appOnly:true});
     const save=(kind,schema)=>add('galaxy_local_panel_'+kind+'_sync_save',schema.safeExtend({galaxyId:z.string().min(1)}),
       'Save this panel user’s exact private account/source selection through real Native choice; no implicit old-material selection.',async(input,context)=>{

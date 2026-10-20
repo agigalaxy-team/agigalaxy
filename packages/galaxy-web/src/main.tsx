@@ -64,6 +64,7 @@ import './porcelain-theme.css';
 import './identity-recovery.css';
 import './full-width-layout.css';
 import { SiteShell, StartPage, PageLoading } from './site-shell';
+import {LoadingFeedback} from './interaction-feedback';
 import {isPublicReadingRoute,PublicReadingWorkspace} from './public-reading-workspace';
 const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));
 const AccountAccessWorkspace = lazy(() => import('./account-access').then(module => ({default: module.AccountAccessWorkspace})));
@@ -170,6 +171,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const agentIdentityEntry=useMemo(()=>readAgentIdentityEntry({pathname:path,search:routeSearch,origin:location.origin}),[path,routeSearch]);
   const identitySettingsPage=path==='/app/settings/identity'&&!agentIdentityEntry&&new URLSearchParams(routeSearch).get('section')!=='account';
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [configError, setConfigError] = useState('');
+  const actionInProgress=useRef<symbol|null>(null),[actionOrigin,setActionOrigin]=useState<string|null>(null);
   const taskId=/^\/app\/tasks\/([0-9a-f-]{36})$/.exec(path)?.[1]??null;
   const taskReadScope=JSON.stringify([taskId,status?.connection?.bindingId,status?.connection?.generation]);
   const taskPage=useMemo(()=>createTaskPageView<Task>({taskId,scope:taskReadScope,read:runtime&&taskId?()=>runtime.api.call(`/v2/tasks/${taskId}`,null,{method:'GET',authenticated:!!runtime.api.snapshot()}):null,isCurrent:()=>location.pathname===`/app/tasks/${taskId}`}),[runtime,taskId,taskReadScope]);
@@ -467,9 +469,13 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
     return () => { active = false; document.removeEventListener('visibilitychange', refresh); };
   }, [runtime]);
   async function run(action: () => Promise<void>) {
-    if(busy)return;const origin=location.pathname;setBusy(true);setError('');setNotice('');
-    try{await action();}catch(reason){if(location.pathname===origin)setError(readable(reason));}
-    finally{try{if(runtime)setStatus(await runtime.status());}catch(reason){if(location.pathname===origin)setError(readable(reason));}finally{setBusy(false);}}
+    if(actionInProgress.current)return;
+    const ticket=Symbol('current-action'),origin=location.pathname+location.search,selected=runtime;
+    actionInProgress.current=ticket;setBusy(true);setActionOrigin(origin);setError('');setNotice('');
+    const stillHere=()=>location.pathname+location.search===origin;
+    try{await action();}catch(reason){if(stillHere())setError(readable(reason));}
+    finally{try{if(selected){const next=await selected.status();if(identityRuntime.current===selected)setStatus(next);}}catch(reason){if(stillHere())setError(readable(reason));}
+      finally{if(actionInProgress.current===ticket){actionInProgress.current=null;setBusy(false);setActionOrigin(null);}}}
   }
   function disconnectFromShell() {
     if(!runtime)return;
@@ -548,11 +554,11 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const enteringRecoveryCode=identityMethod==='recovery'&&!savingRecoveryCode&&!recoveryConnectReady;
   const recoveryFlow=savingRecoveryCode||enteringRecoveryCode||recoveryConnectReady;
   return <SiteShell path={path} search={routeSearch} connected={connected} subjectId={status?.identity?.subjectId} navigate={navigateFromShell} onDisconnect={disconnectFromShell}>
-        {!publicReadingPage&&busy && <output className="operation-progress"><span/>正在处理当前操作，请稍候…</output>}
+        {!publicReadingPage&&<LoadingFeedback active={busy&&actionOrigin===path+routeSearch} scopeKey={actionOrigin??''} className="workspace-operation-feedback" label="正在完成当前操作…" detail="处理仍在继续，请保留当前页面。"/>}
         {!publicReadingPage&&configError && <section className="connection-unavailable" role="alert"><h1 className="small">暂时连不上银河</h1><p>可以重试，或先浏览介绍与使用文档。</p><div className="button-row"><Button onClick={retryConfiguration}>重新连接</Button><a className="text-link" href="/docs/">阅读使用文档</a></div><ReadingDetails className="technical-details"><ReadingSummary>连接问题详情</ReadingSummary><p>{configError}</p></ReadingDetails></section>}
         {!publicReadingPage&&error && (task||!/^\/app\/tasks\/[0-9a-f-]{36}$/.test(path)) && <div className="message error" role="alert">{error}</div>}{!publicReadingPage&&notice && <output className="message">{notice}</output>}
         {historySavePending&&<div className="message"><output>先保存当前输入，再继续离开。保存失败时，输入会留在本页。</output><Button variant="outline" onClick={()=>draftHistory.current?.resume()}>保存并继续</Button></div>}
-        <Suspense fallback={<PageLoading label="正在打开页面…"/>}>
+        <Suspense fallback={<PageLoading label="正在打开页面…" scopeKey={path+routeSearch}/> }>
         {publicReadingPage&&<PublicReadingWorkspace path={path} search={routeSearch} hash={routeHash} navigate={navigateFromShell}/>}
         {!knownPath && <section><h1 className="small">找不到这个页面</h1><p>没有找到这个页面。可以返回发现，继续浏览。</p><Button onClick={() => navigate('/app/')}>回到发现</Button></section>}
         {(path === '/app/' || path === '/app') && <StartPage runtime={runtime} navigate={navigate}/>}

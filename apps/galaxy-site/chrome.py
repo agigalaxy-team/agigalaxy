@@ -146,7 +146,7 @@ def page(path, title, description, body):
 <title>{escape(title)} · 银河</title><meta name="description" content="{escape(description)}">
 <meta name="theme-color" content="#ffffff"><link rel="canonical" href="{ORIGIN}{path}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet"{static_style} href="/assets/site.css">
-{home_assets}{shell_assets}<script src="/assets/navigation.js" defer></script>{bootstrap}</head>
+{home_assets}{shell_assets}<script type="module" src="/assets/navigation.js"></script>{bootstrap}</head>
 <body{body_class}>{root_start}<a class="skip" href="#main">跳到内容</a>
 {rail}{header}
 <div class="navigation-progress" role="status" aria-live="polite" hidden>{brand_mark('navigation-orbit')}<span>正在打开页面</span></div>
