@@ -1,17 +1,5 @@
+@import './site-foundation.css';
 /* Approved porcelain theme: white surfaces, neutral divisions, local pale pink. */
-.galaxy-site {
-  --g-canvas:#fff; --g-surface:#fff; --g-paper:#fff; --g-ink:#202735; --g-muted:#68717f;
-  --g-line:#e9ecf0; --g-accent:#9d496a; --g-soft:#fff5f8;
-  --g-pink:#f8e5ed; --g-pink-layer:#fceef4; --g-pink-line:#eccfdc;
-  --background:#fff; --foreground:var(--g-ink); --card:#fff;
-  --card-foreground:var(--g-ink); --popover:#fff; --popover-foreground:var(--g-ink);
-  --primary:var(--g-pink); --primary-foreground:#392c36;
-  --secondary:#f7f8fa; --secondary-foreground:var(--g-ink);
-  --muted:#f7f8fa; --muted-foreground:var(--g-muted);
-  --accent:var(--g-soft); --accent-foreground:var(--g-ink);
-  --border:var(--g-line); --input:#dce1e7; --ring:#c087a0;
-  color-scheme:light;
-}
 html:has(.galaxy-site), .galaxy-site .site-app-header,
 .galaxy-site .site-app-footer, .galaxy-site .site-menu-dialog {background:#fff}
 .galaxy-site .site-app-header {height:74px;backdrop-filter:none}

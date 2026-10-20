@@ -15,7 +15,7 @@
         </#list>
     </#if>
     <title>${msg("galaxyAccount")} · 银河</title>
-    <link rel="icon" href="${url.resourcesPath}/img/galaxy-mark.svg" type="image/svg+xml" />
+    <link rel="icon" href="${url.resourcesPath}/img/galaxy-mark.svg?v=@@resource-version@@" type="image/svg+xml" />
     <#if themeResources?? && themeResources.stylesCommon?has_content>
         <@themeResourceTags.renderStyles themeResources.stylesCommon url.resourcesCommonPath />
     <#elseif properties.stylesCommon?has_content>
@@ -37,6 +37,7 @@
             <script src="${url.resourcesPath}/${script}" type="text/javascript"></script>
         </#list>
     </#if>
+    <script type="module" src="${url.resourcesPath}/js/search-entry.js?v=@@resource-version@@"></script>
     <script type="importmap">
         {
             "imports": {

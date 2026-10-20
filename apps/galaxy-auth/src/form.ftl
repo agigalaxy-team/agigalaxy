@@ -1,4 +1,4 @@
-<header class="auth-form-heading"><p class="auth-eyebrow">${msg("galaxyAccount")}</p><h1 id="kc-page-title"><#nested "header"></h1>
+<header class="auth-form-heading"><h1 id="kc-page-title"><#nested "header"></h1>
 <p class="auth-form-context"><#if pageId == 'register' && !(passwordRequired??)>${msg("galaxyRegisterContext")}<#elseif client?? && client.clientId?? && client.clientId == 'galaxy-official'>${msg("galaxyLinkContext")}<#else>${msg("galaxyContext")}</#if></p>
 <#if auth?has_content && auth.showUsername() && !auth.showResetCredentials()><#nested "show-username"><div id="kc-username"><span id="kc-attempted-username">${auth.attemptedUsername}</span><a id="reset-login" href="${url.loginRestartFlowUrl}">${msg("restartLoginTooltip")}</a></div></#if>
 <#if displayRequiredFields><p class="auth-required"><span aria-hidden="true">*</span> ${msg("requiredFields")}</p></#if></header>
@@ -10,6 +10,6 @@
 <#nested "socialProviders">
 <#if displayInfo><div id="kc-info" class="${properties.kcSignUpClass!}"><div id="kc-info-wrapper"><#nested "info"></div></div></#if>
 </div></div>
-<div class="auth-submit-status" id="auth-submit-status" role="status" hidden><img src="${url.resourcesPath}/img/galaxy-mark.svg" alt=""><span id="auth-submit-message" data-offline="${msg("galaxyOffline")}" data-pending="${msg("galaxyPending")}" data-delayed="${msg("galaxyDelayed")}" data-reconnected="${msg("galaxyReconnected")}">${msg("galaxyPending")}</span></div>
+<div class="auth-submit-status" id="auth-submit-status" role="status" hidden><img src="${url.resourcesPath}/img/galaxy-mark.svg?v=@@resource-version@@" alt=""><span id="auth-submit-message" data-offline="${msg("galaxyOffline")}" data-pending="${msg("galaxyPending")}" data-delayed="${msg("galaxyDelayed")}" data-reconnected="${msg("galaxyReconnected")}">${msg("galaxyPending")}</span></div>
 <p class="auth-form-footer">${msg("galaxyFooterNote")}</p>
 <@loginFooter.content/>

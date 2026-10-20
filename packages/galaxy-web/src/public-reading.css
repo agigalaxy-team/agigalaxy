@@ -1,8 +1,6 @@
 /* Shared reading layout for static fallback and the same App after startup. */
 .galaxy-site.selected-shell.selected-public-shell {
   --page-gutter:32px;
-  --g-ink:#202735;--g-muted:#667080;--g-line:#e9ecf0;--g-canvas:#fff;
-  --g-soft:#fff8fb;--g-pink:#fbedf3;--g-accent:#a64c74;
   --ink:var(--g-ink);--muted:var(--g-muted);--line:var(--g-line);
   --accent:var(--g-accent);--pink:var(--g-pink);
 }

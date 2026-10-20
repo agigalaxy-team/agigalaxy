@@ -77,6 +77,7 @@ def main():
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
     parser.add_argument('--web-dist', type=Path, help='Exact completed Web build used for progressive non-home startup')
+    parser.add_argument('--node', default='node', help='Node.js executable used by the shared website UI renderer')
     args = parser.parse_args()
     output = resolved_file_path(args.output)
     if output == ROOT or output in ROOT.parents or output.is_symlink():
@@ -94,6 +95,8 @@ def main():
         metadata.update(version=args.site_release, releaseId=args.site_release,
                         backendRelease=args.api_release, unpublishedLocalPreview=False)
         metadata.pop('baseReleaseRecord', None)
+
+    chrome.configure_shell(args.node)
 
     # This catalog contains publicly served historical documents and downloads.
     # Their exact bytes remain available across a website redesign.
@@ -178,8 +181,9 @@ def main():
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
     for name in ('site.css', 'navigation.js', 'interaction-copy.mjs', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
-    chrome.write('assets/selected-shell.css',
-                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'selected-shell.css').read_text(encoding='utf-8'))
+    for name in chrome.shared_shell()['styles']:
+        chrome.write('assets/' + name,
+                     (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / name).read_text(encoding='utf-8'))
     chrome.write('assets/public-reading.css',
                  (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'public-reading.css').read_text(encoding='utf-8'))
     if chrome.WEB_ASSETS:

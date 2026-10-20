@@ -20,7 +20,7 @@ if(!siteOnly&&websiteArgs.includes('--web-dist'))throw Error('Use --web-output f
 
 for (const [command, args] of [
   ...(siteOnly ? [] : [[process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--config', 'packages/galaxy-web/vite.config.mjs','--outDir',webOutput]]]),
-  [python[0], [...python.slice(1), '-X', 'utf8', 'apps/galaxy-site/build.py', ...websiteArgs,...(siteOnly?[]:['--web-dist',webOutput])]],
+  [python[0], [...python.slice(1), '-X', 'utf8', 'apps/galaxy-site/build.py', '--node', process.execPath, ...websiteArgs,...(siteOnly?[]:['--web-dist',webOutput])]],
 ]) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', windowsHide: true });
   if (result.error) throw result.error;

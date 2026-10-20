@@ -1,4 +1,5 @@
-/* The current public pages and the React workspace use the same shell. */
+@import './site-foundation.css';
+/* The same layout is used by the Web, public pages and authentication. */
 .galaxy-site.selected-shell {
   --selected-rail-width:80px;
   --selected-header-height:72px;
@@ -53,7 +54,9 @@
 .galaxy-site.selected-shell .selected-header-actions .reading-detail-link {font-size:13px;min-height:40px}
 .galaxy-site.selected-shell .selected-notifications,.galaxy-site.selected-shell .selected-account-entry {display:flex;align-items:center;justify-content:center;min-height:38px;min-width:38px;gap:7px;color:var(--g-ink);text-decoration:none;font-size:13px}
 .galaxy-site.selected-shell .selected-account-entry {border-radius:50%;background:var(--g-soft);padding:0 9px}
-.galaxy-site.selected-shell .selected-header-actions .site-create {display:flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;background:var(--g-pink);border:0;border-radius:8px;color:var(--g-ink);text-decoration:none;font-size:13px;white-space:nowrap}
+.galaxy-site.selected-shell .selected-header-actions .site-create {display:flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;background:var(--g-pink);border:0;border-radius:8px;color:var(--g-ink);text-decoration:none;font-size:13px;font-weight:550;white-space:nowrap}
+.galaxy-site.selected-shell .site-content,.galaxy-site.selected-shell .site-content :where([id]) {scroll-margin-top:calc(var(--selected-header-height) + 12px)}
+.galaxy-site.selected-shell .site-content {outline:none}
 .galaxy-site.selected-shell .site-content {max-width:none;width:calc(100% - var(--selected-rail-width));margin:0 0 0 var(--selected-rail-width);padding:28px var(--page-gutter,32px) 40px;min-height:calc(100dvh - var(--selected-header-height) - var(--selected-bottom-height));min-width:0}
 .galaxy-site.selected-shell .site-content.settings-page,.galaxy-site.selected-shell .site-content.messages-shell-page {padding:0}
 .galaxy-site.selected-shell .site-content.community-page {padding:24px var(--page-gutter,32px) 36px}

@@ -6,9 +6,10 @@
 
 ## 源码与构建
 
-- `src/layout.html`：静态入口与真实 Keycloak 页面共用的顶栏、固定顶级侧栏和单列认证表单。
+- `../../packages/galaxy-web/src/site-chrome.mjs`：官网、公开页与认证页直接调用的顶栏、六项导航、搜索、图标与品牌。构建时用 ReactDOMServer 输出认证外壳，不加载网页业务运行时。
+- `src/layout.html`：静态入口与真实 Keycloak 页面共用的认证内容区，保留语言选择、表单位置与页脚。
 - `src/head.ftl`、`src/form.ftl`：主题宏。保留 Keycloak 会话检查、原生表单 action、隐藏字段、错误及可选认证入口。
-- `shared/`：样式、表单渐进增强与原始轨道品牌 SVG。品牌取自现行官网原始资产，不用生成近似图代替。
+- `shared/`：认证表单布局与提交等待的渐进增强。字体、主题、顶栏与响应式导航直接取共用 `site-foundation.css` 和 `selected-shell.css`；品牌与等待图标从共用 `GalaxyMark` 输出，不维护第二套 SVG。
 - `theme/galaxy/login/`：主题继承、中文与英文文案。
 - `client-contract.json`：独立官方账户登录的公开客户端契约，不含凭据。
 
@@ -19,6 +20,10 @@ node apps/galaxy-auth/build.mjs --out /absolute/new/galaxy-auth-release
 ```
 
 输出目录必须新建或为空。构建器不清空已有目录。产物为 `themes/galaxy/login/`、`site/` 与记录文件路径、大小的 `manifest.json`。主题与静态入口不包含注册用户、邮件、会话 Cookie、OAuth 请求内容或账户凭据。`site/` 可由静态服务器呈现；登录表单由 Keycloak 会话和原生 action 驱动。
+
+构建会为样式、脚本、品牌图片及样式和脚本的相对依赖添加同一内容版本链接，更新后不继续使用认证服务器长缓存中的旧资源。
+
+顶栏搜索调用与官网共用的 `site-search.mjs`，认证产物以 `.js` 扩展名提供同一 ESM 内容，适配 Keycloak 的 JavaScript 媒体类型。搜索只将文字带到固定官网搜索页，不转递当前认证地址的参数。认证提交的等待反馈只绑定内容区内的 Keycloak 表单。顶栏、导航和搜索不需要加载官网的账户或身份运行时；Keycloak 表单与会话检查沿原流程执行。
 
 ## 官方账户接续契约
 
@@ -57,7 +62,7 @@ Cache-Control: no-store
 Referrer-Policy: no-referrer
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
-Content-Security-Policy: default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
 ```
 
 若登录或页面出现故障，切回前一静态发布目录与先前 realm `loginTheme` 值。账户数据与既有客户端不属于主题回滚内容。保留新客户端或停用它，应由发布者按仍在使用的服务端会话接口状态协调，不删除其他客户端。

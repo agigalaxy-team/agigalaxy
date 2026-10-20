@@ -1,16 +1,11 @@
-<a class="auth-skip" href="#main">{{galaxySkip}}</a>
-<header class="auth-header"><a class="auth-brand" href="https://agigalaxy.org/" aria-label="{{galaxyHome}}"><img src="@@asset@@/img/galaxy-mark.svg" alt=""><span>银河 <span class="location">· {{galaxyArea}}</span></span></a><div class="auth-header-side"><a class="auth-header-return" href="https://agigalaxy.org/app/account">{{galaxyReturnCenter}}</a>@@languages@@</div></header>
-<nav class="auth-rail" aria-label="{{galaxyNavigation}}">
-<a href="https://agigalaxy.org/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4Z"/></svg><span>{{galaxyHome}}</span></a>
-<a href="https://agigalaxy.org/app/"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m15 9-2 4-4 2 2-4Z"/></svg><span>{{galaxyDiscover}}</span></a>
-<a href="https://agigalaxy.org/app/community"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v11H9l-4 4Z"/><path d="M8 9h8M8 12h5"/></svg><span>{{galaxyCommunity}}</span></a>
-<a href="https://agigalaxy.org/app/rooms"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span>{{galaxyMessages}}</span></a>
-<a href="https://agigalaxy.org/app/work"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="13" rx="2"/><path d="M8 7V4h8v3M4 12h16M10 11v3h4v-3"/></svg><span>{{galaxyWork}}</span></a>
-<a class="account-nav" href="https://agigalaxy.org/app/account" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span>{{galaxyAccountCenter}}</span></a>
-</nav>
 <div id="auth-progress" class="auth-progress" hidden></div>
-<main id="main" class="auth-main" tabindex="-1"><div class="auth-workspace">
-<section class="auth-form-area" aria-labelledby="kc-page-title">@@form@@</section>
+<div class="auth-workspace">
+  <section class="auth-form-area" aria-labelledby="kc-page-title">
+    <div class="auth-language-options">@@languages@@</div>
+    @@form@@
+  </section>
 </div>
-<footer class="auth-footer"><span>GALAXY · {{galaxyOnlineCaption}}</span><nav aria-label="{{galaxyHelp}}"><a href="https://agigalaxy.org/privacy/">{{galaxyPrivacy}}</a><a href="https://agigalaxy.org/docs/">{{galaxyHelp}}</a><a href="https://agigalaxy.org/status/">{{galaxyStatus}}</a></nav></footer>
-</main>
+<footer class="auth-footer">
+  <span>GALAXY · {{galaxyOnlineCaption}}</span>
+  <nav aria-label="{{galaxyHelp}}"><a href="https://agigalaxy.org/privacy/">{{galaxyPrivacy}}</a><a href="https://agigalaxy.org/docs/">{{galaxyHelp}}</a><a href="https://agigalaxy.org/status/">{{galaxyStatus}}</a></nav>
+</footer>

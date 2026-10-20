@@ -1,15 +1,18 @@
 /* Progressive enhancement only. The identity provider owns form action and tokens. */
 document.addEventListener('DOMContentLoaded',()=>{
-  document.querySelectorAll('input[tabindex],a[tabindex],button[tabindex]').forEach(element=>{
+  const authenticationArea=document.querySelector('.auth-form-area');
+  if(!authenticationArea)return;
+  authenticationArea.querySelectorAll('input[tabindex],a[tabindex],button[tabindex]').forEach(element=>{
     if(Number(element.getAttribute('tabindex'))>0)element.removeAttribute('tabindex');
   });
-  for(const field of document.querySelectorAll('input[aria-invalid="true"],textarea[aria-invalid="true"]')){
+  for(const field of authenticationArea.querySelectorAll('input[aria-invalid="true"],textarea[aria-invalid="true"]')){
     const error=document.getElementById(`input-error-${field.name==='password-new'?'password':field.name}`)||document.getElementById('input-error');
     if(error)field.setAttribute('aria-describedby',[...new Set([...(field.getAttribute('aria-describedby')||'').split(/\s+/).filter(Boolean),error.id])].join(' '));
   }
-  const submission=createAuthenticationSubmission({forms:document.forms,
+  const forms=authenticationArea.querySelectorAll('form');
+  const submission=createAuthenticationSubmission({forms,
     status:document.getElementById('auth-submit-status'),progress:document.getElementById('auth-progress'),message:document.getElementById('auth-submit-message')});
-  for(const form of document.forms)form.addEventListener('submit',submission.submit);
+  for(const form of forms)form.addEventListener('submit',submission.submit);
   window.addEventListener('offline',submission.offline);
   window.addEventListener('online',submission.online);
   window.addEventListener('pagehide',submission.reset);

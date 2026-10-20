@@ -1,15 +1,15 @@
 import React,{lazy,Suspense,useEffect} from 'react';
-import {Bell,BriefcaseBusiness,Compass,Home,MessageCircle,MessagesSquare,Plus,Search,UserRound} from 'lucide-react';
+import {GlobalRail,SiteHeader,ShellSearch,StandardHeaderActions} from './site-chrome.mjs';
+import {siteSearchTarget} from './site-search.mjs';
 import {CommunityLayout} from './community-navigation';
 import {PublicBrowseWorkspace} from './public-browse-workspace';
 import {ReadingDetails,ReadingSummary} from './reading-details';
 const SettingsLayout=lazy(()=>import('./account-center').then(module=>({default:module.SettingsLayout})));
 import {carryHelpOrigin} from './help-origin-client.mjs';
-import {primaryNavigation,workspaceLocation} from './workspace-location.mjs';
+import {workspaceLocation} from './workspace-location.mjs';
 import {isPublicReadingRoute} from './public-reading-contract.mjs';
 import type {createWebRuntime} from './runtime.mjs';
 import './selected-shell.css';
-import {GalaxyMark} from './galaxy-mark';
 import {PageLoading} from './interaction-feedback';
 export {GalaxyMark} from './galaxy-mark';
 export {PageLoading} from './interaction-feedback';
@@ -19,7 +19,6 @@ const capabilityGroups=[
  {title:'发现与协作',links:[['/app/match','寻找同行'],['/app/projects','浏览项目'],['/app/information','资料与关注'],['/app/hubs','Hub 社区']]},
  {title:'建设与管理',links:[['/app/builders','建设者与接入'],['/app/worker-packs','Worker Pack'],['/app/governance','举报与处理'],['/app/reviews','复核邀请与记录']]},
 ];
-const primaryIcons:Record<string,typeof Home>={home:Home,discover:Compass,community:MessagesSquare,messages:MessageCircle,work:BriefcaseBusiness,account:UserRound};
 function workRoute(path:string,search:string){
  const params=new URLSearchParams(search);
  return ['/app/work','/app/publish','/app/configurations','/app/qualification-permissions','/app/information'].includes(path)
@@ -57,31 +56,23 @@ export function SiteShell({path,search='',connected,subjectId,navigate,onDisconn
  const searchContents=(event:React.SubmitEvent<HTMLFormElement>)=>{
   event.preventDefault();const value=new FormData(event.currentTarget).get('q'),query=typeof value==='string'?value.trim():'';
   if(community){const params=new URLSearchParams(search);for(const key of ['compose','manage','section','before','cursor'])params.delete(key);if(query)params.set('q',query);else params.delete('q');const encoded=params.toString();go('/app/community'+(encoded?'?'+encoded:''));}
-  else go('/app/find'+(query?'?q='+encodeURIComponent(query):''));
+  else go(siteSearchTarget(query));
  };
  const publishTarget=carryHelpOrigin('/app/publish',path+search+location.hash);
  const activeTitle=workspaceLocation(path);
  useEffect(()=>{if(!publicPage)document.title='银河 · '+activeTitle;},[activeTitle,publicPage]);
- const railLink=({href:target,label,icon}:{href:string;label:string;icon:string})=>{const Icon=primaryIcons[icon];return <a key={target} href={target} aria-current={current(target)?'page':undefined} onClick={event=>follow(event,target)}><Icon size={22} aria-hidden/><span>{label}</span></a>;};
  // This delegates native link clicks, including keyboard activation and links rendered in dialogs.
  // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
  return <div className={'galaxy-workspace galaxy-site selected-shell'+(publicPage?' selected-public-shell':'')} onClick={followDocumentLink}><a href="#main-content" className="site-skip">跳到内容</a>
-  <aside className="selected-global-rail" aria-label="银河全局导航">
-   <nav className="selected-rail-primary" aria-label="主要功能">{primaryNavigation.map(railLink)}</nav>
-  </aside>
-  <header className="site-app-header selected-app-header"><div className="site-header-inner">
-   <a href="/" className="selected-header-brand" aria-label="银河首页"><GalaxyMark/></a>
-   <p className="selected-context-title" aria-label={'当前位置：银河 · '+activeTitle}><span>银河</span><span className="selected-context-divider" aria-hidden="true">·</span><span>{activeTitle}</span></p>
-   <search className="selected-header-search"><form onSubmit={searchContents}><Search size={18}/><input key={community?search:'public-search'} name="q" type="search" maxLength={160} defaultValue={community?new URLSearchParams(search).get('q')??'':''} placeholder={community?'搜索社区内容':'搜索公开内容'} aria-label={community?'搜索社区内容':'搜索银河公开内容'}/></form></search>
-   <div className="selected-header-actions">
+  <GlobalRail isCurrent={current} onFollow={follow}/>
+  <SiteHeader location={activeTitle}
+   searchNode={<ShellSearch onSubmit={searchContents} inputKey={community?search:'public-search'} defaultValue={community?new URLSearchParams(search).get('q')??'':''} placeholder={community?'搜索社区内容':'搜索公开内容'} labels={{searchLabel:community?'搜索社区内容':'搜索银河公开内容'}}/>}
+   actionsNode={<StandardHeaderActions onFollow={follow} publishTarget={community?'/app/community?compose=post':publishTarget} publishLabel={community?'写帖子':'发起求助'} directoryNode={
     <ReadingDetails key={path+search} className="selected-function-directory"><ReadingSummary>功能目录</ReadingSummary>
      <div className="selected-directory-groups">{capabilityGroups.map(group=><section key={group.title}><h3>{group.title}</h3><nav>{group.links.map(([target,title])=>link(target,title))}</nav></section>)}<section><h3>使用与资料</h3><nav>{accountLinks.map(([target,title])=>link(target,title))}<a href="/docs/">文档</a><a href="/privacy/">隐私与数据</a><a href="/status/">服务与版本</a></nav>{connected&&<button type="button" className="text-link" onClick={()=>onDisconnect?.()}>退出本次连接</button>}</section></div>
     </ReadingDetails>
-    <a className="selected-notifications" href="/app/notifications" aria-label="通知" onClick={event=>follow(event,'/app/notifications')}><Bell size={20}/></a>
-    <a className="site-create" aria-label={community?'写帖子':'发起求助'} href={community?'/app/community?compose=post':publishTarget} onClick={event=>follow(event,community?'/app/community?compose=post':publishTarget)}><Plus size={17}/><span>{community?'写帖子':'发起求助'}</span></a>
-    <a className="selected-account-entry" href="/app/account" aria-label="账户中心" onClick={event=>follow(event,'/app/account')}><UserRound size={20}/><span>账户</span></a>
-   </div>
-  </div></header>
+   }/>}/>
+
   <main id="main-content" className={'workspace-main site-content'+(settings?' settings-page':'')+(community?' community-page':'')+(messages?' messages-shell-page':'')+(publicPage?' public-content':'')} tabIndex={-1}>{community?<CommunityLayout path={path} search={search} navigate={navigate}>{children}</CommunityLayout>:settings?<Suspense fallback={<PageLoading label="正在打开账户与设置…"/>}><SettingsLayout path={path} search={search} subjectId={subjectId} navigate={navigate}>{children}</SettingsLayout></Suspense>:children}</main>
  </div>;
 }

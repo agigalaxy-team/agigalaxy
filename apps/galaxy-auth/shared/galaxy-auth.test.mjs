@@ -29,3 +29,26 @@ test('a page lifecycle reset removes the old wait before another explicit submis
  f.controller.submit(event);assert.equal(f.callbacks.size,1);assert.equal(f.status.dataset.state,'pending');assert.equal(f.form.value,'retained input');
  f.controller.reset();
 });
+test('shared header search stays outside authentication submission and field enhancement',()=>{
+ const ready=[],listeners=new Map(),windowListeners=new Map(),timers=new Map();let timer=0;
+ const authenticationForm={dataset:{},attributes:{},checkValidity:()=>true,
+  addEventListener(type,listener){listeners.set(type,listener);},
+  setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];}};
+ const searchForm={dataset:{},attributes:{},addEventListener(){throw new Error('Authentication must not bind shared search.');}};
+ const area={querySelectorAll(selector){return selector==='form'?[authenticationForm]:[];}};
+ const status={hidden:true,dataset:{}},progress={hidden:true},message={dataset:{pending:'pending'}};
+ const document={addEventListener(type,listener){if(type==='DOMContentLoaded')ready.push(listener);},
+  querySelector(selector){return selector==='.auth-form-area'?area:null;},
+  getElementById(id){return {'auth-submit-status':status,'auth-progress':progress,'auth-submit-message':message}[id]??null;},
+  get forms(){throw new Error('Authentication must not enumerate all page forms.');}};
+ const window={addEventListener(type,listener){windowListeners.set(type,listener);},
+  setTimeout(listener){timers.set(++timer,listener);return timer;},clearTimeout(id){timers.delete(id);}};
+ runInNewContext(source,{document,window,navigator:{onLine:true}});
+ ready[0]();
+ assert.equal(typeof listeners.get('submit'),'function');
+ assert.equal(searchForm.dataset.submitting,undefined);
+ listeners.get('submit')({currentTarget:authenticationForm,defaultPrevented:false,preventDefault(){}});
+ assert.equal(authenticationForm.attributes['aria-busy'],'true');assert.equal(status.hidden,false);
+ windowListeners.get('pagehide')();
+ assert.equal(status.hidden,true);assert.equal(timers.size,0);assert.deepEqual(searchForm.attributes,{});
+});
