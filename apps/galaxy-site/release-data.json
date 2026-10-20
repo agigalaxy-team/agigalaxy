@@ -1,7 +1,7 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.31",
-  "releaseId": "0.1.31",
+  "version": "0.1.32",
+  "releaseId": "0.1.32",
   "component": "site",
   "backendRelease": "0.1.19",
   "kind": "website-and-browser-workspace",
@@ -318,7 +318,7 @@
     }
   ],
   "webGuides": {
-    "accountAndComments": "https://agigalaxy.org/docs/web/0.1.11/account-and-comments.html",
-    "community": "https://agigalaxy.org/docs/web/0.1.19/community.md"
+    "accountAndComments": "https://agigalaxy.org/docs/web/0.1.32/participation.md",
+    "community": "https://agigalaxy.org/docs/web/0.1.32/participation.md"
   }
 }
