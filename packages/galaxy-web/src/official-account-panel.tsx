@@ -9,7 +9,7 @@ import {useReadTasks} from './use-read-task';
 import {LoadingFeedback,ReadFailure} from './interaction-feedback';
 
 type Client=ReturnType<typeof createOfficialAccountClient>;
-export type OfficialSession={state:'signed-in';account:{id:string|null;displayName:string|null;email:string|null;emailVerified:boolean};linkedIds:{subjectId:string;linkedAt:string}[];nextAfter:string|null;expiresAt:number;csrfToken:string;galaxyAuthorization:false};
+export type OfficialSession={state:'signed-in';account:{id:string|null;uid?:string|null;displayName:string|null;email:string|null;emailVerified:boolean};linkedIds:{subjectId:string;linkedAt:string}[];nextAfter:string|null;expiresAt:number;csrfToken:string;galaxyAuthorization:false};
 type Model={phase:'loading'|'signed-in'|'signed-out'|'unavailable'|'offline';session:OfficialSession|null;client:Client|null;busy:boolean;error:string;refresh:()=>Promise<void>;more:()=>Promise<void>;logout:()=>Promise<void>};
 export type OfficialAccountModel=Model;
 const isOnline=()=>navigator.onLine!==false;

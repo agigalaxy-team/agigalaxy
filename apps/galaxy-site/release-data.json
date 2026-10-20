@@ -1,9 +1,9 @@
 {
   "site": "AGI Galaxy Network",
-  "version": "0.1.32",
-  "releaseId": "0.1.32",
+  "version": "0.1.33",
+  "releaseId": "0.1.33",
   "component": "site",
-  "backendRelease": "0.1.19",
+  "backendRelease": "0.1.20",
   "kind": "website-and-browser-workspace",
   "publicDocsVersion": "0.1.8",
   "documentVersions": [
@@ -318,7 +318,7 @@
     }
   ],
   "webGuides": {
-    "accountAndComments": "https://agigalaxy.org/docs/web/0.1.32/participation.md",
-    "community": "https://agigalaxy.org/docs/web/0.1.32/participation.md"
+    "accountAndComments": "https://agigalaxy.org/docs/web/0.1.33/participation.md",
+    "community": "https://agigalaxy.org/docs/web/0.1.33/participation.md"
   }
 }

@@ -4,6 +4,7 @@ import {accountPublicQueryV1MigrationSql} from './account-public-query-v1-schema
 import {accountChatV3MigrationSql} from './account-chat-v3-schema.mjs';
 import {accountReadingBookmarksV2MigrationSql} from './account-reading-bookmarks-v2-schema.mjs';
 import {forumAttachmentsV1MigrationSql} from './forum-attachments-v1-schema.mjs';
+import {accountUidV1MigrationSql} from './account-uid-v1-schema.mjs';
 import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
 import {communityForumTopicsV1MigrationSql} from './community-forum-topics-v1-schema.mjs';
 import {readingBookmarksV1MigrationSql} from './reading-bookmarks-v1-schema.mjs';
@@ -554,7 +555,8 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
   {version:88,sql:externalCredentialsV1MigrationSql},
   {version:89,sql:accountWorkV1MigrationSql},
   {version:90,sql:accountPublicQueryV1MigrationSql},
-  {version:91,sql:[accountChatV3MigrationSql,accountReadingBookmarksV2MigrationSql,forumAttachmentsV1MigrationSql].join('\n')});
+  {version:91,sql:[accountChatV3MigrationSql,accountReadingBookmarksV2MigrationSql,forumAttachmentsV1MigrationSql].join('\n')},
+  {version:92,sql:accountUidV1MigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

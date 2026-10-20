@@ -19,8 +19,13 @@ export async function dispatchOfficialAccount({officialAccounts,forum,externalCr
     response.setHeader('Cache-Control','no-store');response.setHeader('Referrer-Policy','no-referrer');
     const query=new AccountPublicQuery({data:officialAccounts.data,accounts:forum?.accounts,externalCredentials,forum}),
       byId=/^\/v1\/account\/public\/by-id\/(GUID[0-9A-Z]{28})$/.exec(url.pathname),
+      byUid=/^\/v1\/account\/public\/by-uid\/([A-Za-z0-9]{6,16})$/.exec(url.pathname),
       list=/^\/v1\/account\/public\/([0-9a-f-]{36})\/(ids|credentials|posts)$/.exec(url.pathname);
     if(byId){send(200,await query.accountsForId(byId[1],publicPage(url)));return true;}
+    if(byUid){
+      if(url.search)throw new ServiceError('invalid_account_query');
+      send(200,await officialAccounts.data.publicProfileByUid(byUid[1],{publicPosts:forum?.publicForAccount?accountId=>forum.publicForAccount(accountId):undefined}));return true;
+    }
     if(list){send(200,await query[list[2]==='ids'?'linkedIds':list[2]](list[1],publicPage(url)));return true;}
     if(!/^\/v1\/account\/public\/[0-9a-f-]{36}$/.test(url.pathname))throw new ServiceError('not_found',404);
     if(url.search)throw new ServiceError('invalid_account_query');

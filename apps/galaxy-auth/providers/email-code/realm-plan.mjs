@@ -2,9 +2,73 @@ export const galaxyEmailCodeProvider = Object.freeze({
   requiredAction: 'VERIFY_EMAIL',
   resetAuthenticator: 'galaxy-reset-email-code',
   resetChooseUser: 'galaxy-reset-choose-user',
+  registrationAction: 'galaxy-registration-user-creation',
   enableKey: 'email-code-enabled',
   defaultPolicy: Object.freeze({ 'code-ttl-seconds': '600', 'resend-seconds': '60', 'max-attempts': '5' }),
 });
+
+/** Copies only the selected registration tree; browser/reset/profile stay as
+ * supplied. The action is safe only with native verify-first registration. */
+export function planRegistrationContinuationRealm(representation, {
+  registrationAlias = 'galaxy registration continue',
+} = {}) {
+  if (!representation || representation.realm !== 'galaxy') throw new Error('Expected the explicitly scoped galaxy realm');
+  if (representation.verifyEmail !== true || representation.registrationEmailAsUsername !== true
+    || representation.duplicateEmailsAllowed !== false || representation.registrationAllowed === false) {
+    throw new Error('Registration continuation requires unique email usernames and email verification');
+  }
+  if (typeof registrationAlias !== 'string' || !registrationAlias.trim() || registrationAlias.length > 120) throw new Error('Invalid registration flow alias');
+  const realm = structuredClone(representation);
+  const verify = realm.requiredActions?.find((action) => action.providerId === 'VERIFY_EMAIL' || action.alias === 'VERIFY_EMAIL');
+  if (!verify || verify.enabled === false || verify.config?.[galaxyEmailCodeProvider.enableKey] !== 'true') throw new Error('Enable the installed email-code required action before registration continuation');
+  const flows = realm.authenticationFlows;
+  if (!Array.isArray(flows)) throw new Error('Provide the selected registration tree');
+  const originalAlias = realm.registrationFlow || 'registration';
+  const root = flows.find((flow) => flow.alias === originalAlias);
+  if (!root) throw new Error('The selected registration flow was not supplied');
+  const selected = new Map();
+  const walk = (flow) => {
+    if (selected.has(flow.alias)) return;
+    selected.set(flow.alias, flow);
+    for (const step of flow.authenticationExecutions ?? []) {
+      if (!step.authenticatorFlow) continue;
+      const child = flows.find((candidate) => candidate.alias === step.flowAlias);
+      if (!child) throw new Error('A referenced registration subflow was not supplied');
+      walk(child);
+    }
+  };
+  walk(root);
+  const actions = [...selected.values()].flatMap((flow) => (flow.authenticationExecutions ?? []).map((step, index) => ({ flow, step, index })));
+  const creation = actions.filter(({ step }) => ['registration-user-creation', galaxyEmailCodeProvider.registrationAction].includes(step.authenticator));
+  const password = actions.filter(({ step }) => step.authenticator === 'registration-password-action');
+  if (creation.length !== 1 || creation[0].step.requirement !== 'REQUIRED'
+    || password.length !== 1 || password[0].step.requirement !== 'REQUIRED'
+    || creation[0].flow !== password[0].flow || creation[0].index >= password[0].index) {
+    throw new Error('Expected required native user-creation then deferred-password actions in one registration form');
+  }
+  const configAlias = password[0].step.authenticatorConfig;
+  const passwordConfig = configAlias ? realm.authenticatorConfig?.find((item) => item.alias === configAlias) : null;
+  if (configAlias && !passwordConfig) throw new Error('The native registration password settings were not supplied');
+  if (passwordConfig?.config?.always_set_password_on_register_form === 'true') throw new Error('Registration must verify email before setting a password');
+  if (creation[0].step.authenticator === galaxyEmailCodeProvider.registrationAction) return realm;
+  if (flows.some((flow) => flow.alias === registrationAlias)) throw new Error('New registration alias is already used');
+  const aliases = new Map([...selected.keys()].map((alias) => [alias,
+    alias === originalAlias ? registrationAlias : `${registrationAlias} / ${alias}`]));
+  for (const flow of selected.values()) {
+    const copy = structuredClone(flow);
+    delete copy.id;
+    copy.alias = aliases.get(flow.alias);
+    copy.builtIn = false;
+    for (const step of copy.authenticationExecutions ?? []) {
+      delete step.id;
+      if (step.authenticatorFlow) step.flowAlias = aliases.get(step.flowAlias);
+      if (step.authenticator === 'registration-user-creation') step.authenticator = galaxyEmailCodeProvider.registrationAction;
+    }
+    flows.push(copy);
+  }
+  realm.registrationFlow = registrationAlias;
+  return realm;
+}
 
 /**
  * Pure realm-representation transformation for a release owner / local fixture.
@@ -110,7 +174,23 @@ export function planEmailCodeRealm(representation, {
 export function createEmailCodeFixtureRealmPatch({ policy, emailTheme } = {}) {
   const representation = {
     realm: 'galaxy', verifyEmail: true, resetCredentialsFlow: 'reset credentials',
+    registrationFlow: 'registration', registrationEmailAsUsername: true, duplicateEmailsAllowed: false,
     authenticationFlows: [
+      {
+        alias: 'registration', providerId: 'basic-flow', topLevel: true, builtIn: true,
+        authenticationExecutions: [
+          { flowAlias: 'registration form', authenticator: 'registration-page-form', authenticatorFlow: true, requirement: 'REQUIRED', priority: 10 },
+        ],
+      },
+      {
+        alias: 'registration form', providerId: 'form-flow', topLevel: false, builtIn: true,
+        authenticationExecutions: [
+          { authenticator: 'registration-user-creation', authenticatorFlow: false, requirement: 'REQUIRED', priority: 20 },
+          { authenticator: 'registration-password-action', authenticatorFlow: false, requirement: 'REQUIRED', priority: 50 },
+          { authenticator: 'registration-recaptcha-action', authenticatorFlow: false, requirement: 'DISABLED', priority: 60 },
+          { authenticator: 'registration-terms-and-conditions', authenticatorFlow: false, requirement: 'DISABLED', priority: 70 },
+        ],
+      },
       {
         alias: 'reset credentials', description: 'Reset credentials', providerId: 'basic-flow', topLevel: true, builtIn: true,
         authenticationExecutions: [
@@ -137,7 +217,9 @@ export function createEmailCodeFixtureRealmPatch({ policy, emailTheme } = {}) {
       { alias: 'VERIFY_PROFILE', name: 'Verify Profile', providerId: 'VERIFY_PROFILE', enabled: true, defaultAction: false, priority: 100, config: {} },
     ],
   };
-  const planned = planEmailCodeRealm(representation, { policy, emailTheme });
-  const { authenticationFlows, authenticatorConfig, requiredActions, resetCredentialsFlow } = planned;
-  return { authenticationFlows, authenticatorConfig, requiredActions, resetCredentialsFlow, ...(emailTheme ? { emailTheme } : {}) };
+  const planned = planRegistrationContinuationRealm(planEmailCodeRealm(representation, { policy, emailTheme }));
+  const { authenticationFlows, authenticatorConfig, requiredActions, resetCredentialsFlow, registrationFlow,
+    registrationEmailAsUsername, duplicateEmailsAllowed } = planned;
+  return { authenticationFlows, authenticatorConfig, requiredActions, resetCredentialsFlow, registrationFlow,
+    registrationEmailAsUsername, duplicateEmailsAllowed, ...(emailTheme ? { emailTheme } : {}) };
 }

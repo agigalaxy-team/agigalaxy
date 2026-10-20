@@ -1,12 +1,12 @@
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ServiceError } from './shared/service-error.mjs';
 import {lockControllerMappingsWithin} from './controller-mapping-lock.mjs';
 import {transaction} from './database.mjs';
+import {ensureOfficialAccountProfileWithin,upsertOfficialAccountWithin} from './official-account-uid.mjs';
 
 const iso = seconds => new Date(seconds * 1000).toISOString();
 export const communityAccountView = (row, currentAccountId = null) => ({
-  id:row.id,accountId:row.id,displayName:row.display_name??null,subjectType:row.subject_type??null,
+  id:row.id,accountId:row.id,uid:row.uid,displayName:row.display_name??null,subjectType:row.subject_type??null,
   endpoint:row.endpoint,current:row.id===currentAccountId
 });
 const linkInput = z.strictObject({ subjectId: z.string().min(1).max(128), linkId: z.uuid(),
@@ -35,14 +35,13 @@ export class CommunityAccountRegistry {
       AND issuer=$4 AND external_subject=$5 AND revoked_at IS NULL`,
     [data.linkId, data.subjectId, data.endpoint, data.issuer, data.externalSubject])).rows[0];
     if (!link || !this.providers.has(JSON.stringify([link.issuer, link.client_id]))) throw new ServiceError('identity_provider_unavailable', 409);
-    const account = (await db.query(`INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at)
-      VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(endpoint,issuer,external_subject)
-      DO UPDATE SET verified_at=EXCLUDED.verified_at,verification_method=EXCLUDED.verification_method RETURNING id`,
-    [randomUUID(), data.endpoint, data.issuer, data.externalSubject, data.verificationMethod, iso(data.verifiedAt)])).rows[0];
+    const account=await upsertOfficialAccountWithin(db,{endpoint:data.endpoint,issuer:data.issuer,externalSubject:data.externalSubject,
+      verificationMethod:data.verificationMethod,verifiedAt:data.verifiedAt});
+    await ensureOfficialAccountProfileWithin(db,account.id,{now:this.access.now()});
     await db.query(`INSERT INTO community_account_links(identity_link_id,account_id,subject_id,created_at)
       VALUES($1,$2,$3,$4) ON CONFLICT(identity_link_id) DO NOTHING`,
     [data.linkId, account.id, data.subjectId, iso(this.access.now())]);
-    return { accountId: account.id, accountVerified: true, galaxyAuthorization: false };
+    return { accountId:account.id,accountVerified:true,galaxyAuthorization:false };
   }
   async availableWithin(db, actor) {
     if(actor.kind==='official-account'){
@@ -74,10 +73,10 @@ export class CommunityAccountRegistry {
     return {...found,...current};
   }
   async publicChoicesWithin(db,{query='',after=null,limit=20}={}){
-    const rows=(await db.query(`SELECT a.id,a.endpoint,p.display_name,p.subject_type FROM community_accounts a
+    const rows=(await db.query(`SELECT a.id,a.uid,a.endpoint,p.display_name,p.subject_type FROM community_accounts a
       JOIN official_account_profiles_v1 p ON p.account_id=a.id AND p.query_enabled=true
       WHERE a.endpoint=$1 AND ($2::uuid IS NULL OR a.id>$2) AND
-      ($3::text='' OR position(lower($3::text) in lower(coalesce(p.display_name,'')))>0 OR a.id::text=$3::text)
+      ($3::text='' OR position(lower($3::text) in lower(coalesce(p.display_name,'')))>0 OR a.id::text=$3::text OR a.uid=upper($3::text))
       ORDER BY a.id LIMIT $4`,[this.access.endpoint,after,query,limit+1])).rows;
     return {items:rows.slice(0,limit).map(row=>communityAccountView(row)),nextAfter:rows.length>limit?rows[limit-1].id:null};
   }

@@ -9,7 +9,7 @@ type Client=ReturnType<typeof createOfficialAccountClient>;
 type Page<T>={items:T[];nextAfter:string|null;checkedAt:number};
 type Props={endpoint?:string;navigate:(path:string)=>void};
 type LinkedId={subjectId:string;linkedAt:string};
-type LinkedAccount={accountId:string;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement';linkedAt:string};
+type LinkedAccount={accountId:string;uid?:string|null;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement';linkedAt:string};
 type Credential={id:string;title:string;issuer:{name:string;uri:string};subject:{id:string|null;binding:string};scope:string[];issuedAt:string|null;validFrom:string|null;expiresAt:string|null;signature:{state:string};validity:{state:string};revocation:{state:string;source:string|null;checkedAt:string|null;validUntil:string|null};source?:{credentialId:string|null;format:string};galaxyIssued:false};
 const at=(value:string|null|undefined)=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-CN',{hour12:false}):'未提供';
 const typeLabel=(value:LinkedAccount['subjectType'])=>({person:'个人账户',organization:'组织账户',agent:'Agent 账户'})[value??'person'];
@@ -48,9 +48,9 @@ export function PublicIdentityAccounts({subjectId,endpoint,navigate,showProfileL
  const state=usePublicPage<LinkedAccount>(endpoint,subjectId,(client,after)=>client.publicAccountsForId(subjectId,{after}));
  return <section className="person-section public-account-relations" aria-busy={state.busy}><h2>关联的开放账户</h2>{showProfileLink&&<Follow path={profilePath(subjectId)!} navigate={navigate}>查看此 ID 的公开资料</Follow>}<ReadingState state={state}/>{state.value&&<>{state.value.items.length?<ul>{state.value.items.map(item=><li key={item.accountId}><Follow path={'/app/accounts/'+item.accountId} navigate={navigate}>{item.displayName||'银河账户'}</Follow><small>{item.subjectType?typeLabel(item.subjectType):'主体类型尚未记录'} · 账户持有者声明</small><small>关联于 {at(item.linkedAt)}</small></li>)}</ul>:<p>当前没有允许展示此关联的账户。</p>}<More state={state} label="更多开放账户"/></>}</section>;
 }
-export function PublicAccountMatch({accountId,endpoint,navigate}:Props&{accountId:string}){
- const state=usePublicPage<Omit<LinkedAccount,'linkedAt'>>(endpoint,accountId,async client=>({items:[await client.publicAccount(accountId)],nextAfter:null,checkedAt:Math.floor(Date.now()/1000)}));
- return <section className="public-account-relations" aria-busy={state.busy}><h2>公开账户</h2><ReadingState state={state}/>{state.value?.items.map(item=><p key={item.accountId}><Follow path={'/app/accounts/'+item.accountId} navigate={navigate}>{item.displayName||'银河账户'}</Follow><small>{item.subjectType?typeLabel(item.subjectType):'主体类型尚未记录'} · 账户持有者声明</small></p>)}</section>;
+export function PublicAccountMatch({accountId,uid,endpoint,navigate}:Props&({accountId:string;uid?:never}|{uid:string;accountId?:never})){
+ const state=usePublicPage<Omit<LinkedAccount,'linkedAt'>>(endpoint,uid??accountId!,async client=>({items:[await(uid?client.publicAccountByUid(uid):client.publicAccount(accountId!))],nextAfter:null,checkedAt:Math.floor(Date.now()/1000)}));
+ return <section className="public-account-relations" aria-busy={state.busy}><h2>公开账户</h2><ReadingState state={state}/>{state.value?.items.map(item=><p key={item.accountId}><Follow path={'/app/accounts/'+item.accountId} navigate={navigate}>{item.displayName||'银河账户'}</Follow>{item.uid&&<small>UID <code>{item.uid}</code></small>}<small>{item.subjectType?typeLabel(item.subjectType):'主体类型尚未记录'} · 账户持有者声明</small></p>)}</section>;
 }
 function CredentialFacts({value,now}:{value:Credential;now:number}){
  const validity=value.expiresAt&&Date.parse(value.expiresAt)<=now?'已过期':value.validFrom&&Date.parse(value.validFrom)>now?'尚未到生效时间':({valid:'在材料所述有效期内',expired:'已过期','not-yet-valid':'尚未到生效时间'} as Record<string,string>)[value.validity.state]??'有效期尚无法确认';

@@ -2,6 +2,17 @@ import * as oidc from 'openid-client';
 import { randomUUID } from 'node:crypto';
 
 const text = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max && !/\p{Cc}/u.test(value);
+function accountDisplayName(claims) {
+  if (text(claims.name, 200) && claims.name.trim()) return claims.name;
+  const username = text(claims.preferred_username, 200) ? claims.preferred_username : null;
+  if (!username?.trim()) return null;
+  const candidate = username.normalize('NFKC').trim();
+  const email = typeof claims.email === 'string' ? claims.email.normalize('NFKC').trim() : '';
+  // Email-as-username is a login identifier, not a public nickname. Leave the
+  // profile unnamed rather than publishing an address as its default name.
+  if (candidate.toLowerCase() === email.toLowerCase() || /[^\s@<>]+@[^\s@<>]+/u.test(candidate)) return null;
+  return username;
+}
 function endpoint(value, allowLoopbackHttp) {
   const url = new URL(value);
   const loopback = url.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(url.hostname);
@@ -92,7 +103,7 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
         accountVerification: Object.freeze({ method: 'email', verified: claims.email_verified === true }),
         ...(includeAccountProfile ? {accountProfile: Object.freeze({
           email: text(claims.email, 320) ? claims.email : null,
-          displayName: text(claims.name, 200) ? claims.name : text(claims.preferred_username, 200) ? claims.preferred_username : null,
+          displayName: accountDisplayName(claims),
         })} : {}),
         verifiedAt: now(), issuedAt: claims.iat, expiresAt: Math.min(claims.exp, preview.expiresAt),
         authentication: 'oidc-authorization-code-pkce-s256-id-token-signature', galaxyAuthorization: false });

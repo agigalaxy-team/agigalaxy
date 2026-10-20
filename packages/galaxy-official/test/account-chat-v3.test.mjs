@@ -11,7 +11,10 @@ test('account-only chat preserves invitations, group consent, messages, files an
  const f=await accountChatFixture();t.after(f.close);const[a,b,c]=f.people,roomId=await joinAccountConversation(f,a,b);
  assert.equal(Number((await f.db.query('SELECT count(*) AS n FROM subjects')).rows[0].n),0);
  assert.equal((await f.chat.people(a,{query:'乙'})).items.length,0,'private account is not globally searchable');
- assert.equal((await f.chat.people(a,{accountId:b.accountId})).items[0].actorRef,chatActorRef(b),'a known exact recipient can be invited');
+ const knownRecipient=(await f.chat.people(a,{accountId:b.accountId})).items[0];
+ assert.equal(knownRecipient.actorRef,chatActorRef(b),'a known exact recipient can be invited');
+ assert.match(knownRecipient.uid,/^G[A-Z0-9]{10}[0-9]$/);
+ assert.equal((await f.chat.people(a,{query:knownRecipient.uid})).items.length,0,'UID lookup cannot make a private account globally searchable');
  assert.equal((await f.publicWrites.status(a)).quotas.find(item=>item.category==='invitation').used,1,'real account invitation quota is retained');
  await assert.rejects(f.chat.history(c,roomId),/chat_access_denied/);
  const original={clientMessageId:randomUUID(),text:'一起讨论的原文'},sent=await f.chat.send(a,roomId,original);
@@ -20,6 +23,8 @@ test('account-only chat preserves invitations, group consent, messages, files an
  await f.chat.cursor(b,roomId,{kind:'human',sequence:history.messages[0].sequence,visibleMessageIds:[sent.messageId]});
  assert.equal((await f.db.query('SELECT message_id FROM chat_human_message_reads WHERE room_id=$1 AND subject_id=$2',[roomId,chatActorRef(b)])).rows[0].message_id,sent.messageId);
  assert.equal((await f.chat.directory(a,{query:'乙'})).rooms[0].roomId,roomId,'member-name search is restricted to the current participant’s rooms');
+ assert.equal((await f.chat.directory(a,{query:knownRecipient.uid.toLowerCase()})).rooms[0].roomId,roomId);
+ assert.equal((await f.chat.get(a,roomId)).members.find(member=>member.actor.accountId===b.accountId).uid,knownRecipient.uid);
  assert.equal((await f.chat.directory(c,{query:'乙'})).rooms.length,0);
  const reply=await f.chat.send(b,roomId,{clientMessageId:randomUUID(),text:'原文回应',replyTo:sent.messageId});
  assert.equal((await f.chat.messageContext(a,roomId,reply.messageId)).target.replyTo,sent.messageId);

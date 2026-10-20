@@ -10,7 +10,7 @@ import {publicAccountReturn,profileReturnLabel} from './profile-navigation.mjs';
 import './online-account-settings.css';
 
 type PublicPosts={items:ForumPostView[];nextAfter?:string|null;scanTruncated:boolean;checkedAt:number};
-type PublicAccount={accountId:string;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement';publicQuery?:{showLinkedIds:boolean;showExternalCredentials:boolean};posts?:PublicPosts};
+type PublicAccount={accountId:string;uid?:string|null;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement';publicQuery?:{showLinkedIds:boolean;showExternalCredentials:boolean};posts?:PublicPosts};
 export function PublicAccountWorkspace({accountId,endpoint,navigate,onReturn}:{accountId:string;endpoint?:string;navigate:(path:string)=>void;onReturn?:(path:string)=>void}){
  const [value,setValue]=useState<PublicAccount|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[attempt,setAttempt]=useState(0),[now,setNow]=useState(()=>Math.floor(Date.now()/1000));
  const loadedPages=useRef(1),snapshot=useRef(value),more=useRef<HTMLDivElement>(null),request=useRef<((append?:boolean)=>Promise<void>)|null>(null);
@@ -62,7 +62,7 @@ export function PublicAccountWorkspace({accountId,endpoint,navigate,onReturn}:{a
   {loading&&<output>正在加载账户资料…</output>}
   {error&&<div className="message"><h1>账户资料暂不可读</h1><p>{error}</p><Button variant="outline" onClick={()=>setAttempt(value=>value+1)}>重试</Button></div>}
   {value&&<>
-   <header className="public-online-account-heading"><UserRound size={28}/><div><h1>{value.displayName||'银河账户'}</h1><p>{({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']??'主体类型尚未记录'} · 账户持有者声明</p></div></header>
+   <header className="public-online-account-heading"><UserRound size={28}/><div><h1>{value.displayName||'银河账户'}</h1>{value.uid&&<p className="account-uid"><span>UID</span> <code>{value.uid}</code></p>}<p>{({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']??'主体类型尚未记录'} · 账户持有者声明</p></div></header>
    {value.publicQuery?.showLinkedIds&&<PublicLinkedIds key={'ids:'+accountId} accountId={accountId} endpoint={endpoint} navigate={navigate}/>}
    {value.publicQuery?.showExternalCredentials&&<PublicExternalCredentials key={'credentials:'+accountId} accountId={accountId} endpoint={endpoint}/>}
    {value.posts&&<section><h2>公开发表的内容</h2>{value.posts.items.filter(item=>availableForumContent(item,now)).map(item=>{const path=forumVersionPath(item.locator.postId,item.locator.versionId??item.currentVersionId)??'/app/community';return <article key={item.locator.postId} className="public-account-post"><h3><a href={path} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(path);}}}>{item.payload?.title}</a></h3><p>{item.payload?.body.slice(0,220)}</p></article>;})}{!value.posts.items.some(item=>availableForumContent(item,now))&&(value.posts.nextAfter?<output>正在加载可公开的帖子…</output>:<p>当前没有可展示的公开帖子。</p>)}<div ref={more}>{value.posts.nextAfter&&<Button variant="ghost" disabled={busy} onClick={()=>void request.current?.(true)}>{busy?'正在加载…':'更多帖子'}</Button>}</div></section>}

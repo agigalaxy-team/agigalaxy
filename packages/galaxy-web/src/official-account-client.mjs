@@ -1,6 +1,7 @@
 import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath} from '../../galaxy-official/src/shared/account-resource-routes.mjs';
 const guid=value=>typeof value==='string'&&/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(value);
 const accountId=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const accountUid=value=>typeof value==='string'&&/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,16}$/.test(value);
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 
 function returnPath(value,website){
@@ -35,12 +36,14 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
   const linkedIds=value.linkedIds.map(item=>{if(!guid(item?.subjectId)||seen.has(item.subjectId)||typeof item.linkedAt!=='string'||!Number.isFinite(Date.parse(item.linkedAt)))fail('official_account_response_invalid');
    seen.add(item.subjectId);return{subjectId:item.subjectId,linkedAt:item.linkedAt};});
   if(account.id!==undefined&&!accountId(account.id))fail('official_account_response_invalid');
-  return{state:'signed-in',account:{id:account.id??null,displayName:account.displayName,email:account.email,emailVerified:account.emailVerified},linkedIds,nextAfter:value.nextAfter,
+  if(account.uid!==undefined&&account.uid!==null&&!accountUid(account.uid))fail('official_account_response_invalid');
+  return{state:'signed-in',account:{id:account.id??null,uid:account.uid??null,displayName:account.displayName,email:account.email,emailVerified:account.emailVerified},linkedIds,nextAfter:value.nextAfter,
    expiresAt:value.expiresAt,csrfToken:value.csrfToken,galaxyAuthorization:false};
  }
  return Object.freeze({
    async session({after,signal}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');return readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):''),{signal}));},
    async publicAccount(id,{signal}={}){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true,signal});},
+   async publicAccountByUid(uid,{signal}={}){if(!accountUid(uid))fail('official_account_request_invalid');return request('/v1/account/public/by-uid/'+encodeURIComponent(uid.toUpperCase()),{method:'GET',anonymous:true,signal});},
     /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
     async publicPosts(id,{after,limit=20,signal}={}){if(!accountId(id)||after!==undefined&&(typeof after!=='string'||after.length>512||!/^fp1\.[A-Za-z0-9_-]+$/.test(after))||!Number.isInteger(limit)||limit<1||limit>50)fail('official_account_request_invalid');return request('/v1/account/public/'+id+'/posts?'+new URLSearchParams({limit:String(limit),...(after?{after}:{})}),{method:'GET',anonymous:true,signal});},
    /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */

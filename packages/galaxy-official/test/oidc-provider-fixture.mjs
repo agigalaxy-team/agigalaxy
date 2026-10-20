@@ -5,7 +5,7 @@ import Provider from 'oidc-provider';
 
 // A real, independent authorization server library, confined to a fresh local
 // HTTP fixture. Only its test interaction route chooses a synthetic account.
-export async function oidcProviderFixture(redirectUris, { extraClients = [], resources = [], introspectionClientId, emailVerified = false } = {}) {
+export async function oidcProviderFixture(redirectUris, { extraClients = [], resources = [], introspectionClientId, emailVerified = false, profileClaims = null } = {}) {
   let provider, account = 'synthetic-oidc-subject';
   const failures = [], requests = [];
   const server = createServer((request, response) => {
@@ -46,9 +46,10 @@ export async function oidcProviderFixture(redirectUris, { extraClients = [], res
       }, pkce: { required: () => true },
       interactions: { url: (_context, interaction) => `/interaction/${interaction.uid}` },
       conformIdTokenClaims: false,
-      claims: { openid: ['sub'], email: ['email', 'email_verified'] },
+      claims: { openid: ['sub'], email: ['email', 'email_verified', ...(profileClaims ? ['name', 'preferred_username'] : [])] },
       findAccount: async (_context, subject) => ({ accountId: subject, claims: async () => ({ sub: subject,
-        email: 'synthetic@example.invalid', email_verified: emailVerified }) }),
+        email: 'synthetic@example.invalid', email_verified: emailVerified,
+        ...(profileClaims ? {name: profileClaims.name, preferred_username: profileClaims.preferred_username} : {}) }) }),
     });
   } catch (error) { await new Promise(resolve => server.close(resolve)); throw error; }
   async function authorize(authorizationUrl) {

@@ -47,6 +47,10 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 
 `mode=register` 保留一次授权请求的全部参数，只将同 issuer 的 `/protocol/openid-connect/auth` 路径改为 `/protocol/openid-connect/registrations`。这条路径已在真实 26.7.3 隔离实例完成邮件确认与密码设置。当前 realm 的 `verifyEmail=true` 对应先确认邮箱再设置密码，注册首屏不出现密码是该流程的正常行为，主题不得绕过该要求。
 
+注册首屏只收集邮箱，不显示姓名。后台 User Profile 同时取消 `firstName`、`lastName` 的必填要求，保留其可选字段、校验、权限和已有值；具体配置由 [`realm-profile.mjs`](realm-profile.mjs) 从实际完整 profile 生成，见[姓名配置说明](realm-profile.md)。注册专用模板只过滤这两个字段，不修改其他资料表单。门户在首次建立在线账户资料时持久化12位字母数字混合UID，并将其作为初始展示用户名；用户名可在资料中编辑，固定UID不变。登录邮箱、上游姓名与公开名称分别处理，原有自选资料保持。UID的数据迁移与查询合同见[账户公开查询](../../docs/account-public-query-v1.md)。
+
+Keycloak 在邮箱验证和密码设置前就创建账户记录，因此中断注册可能留下已占用邮箱的未完成记录。注册流程的显式 `galaxy-registration-user-creation` 动作只接续仍需设置密码、没有登录凭据或外部登录关联的本地启用记录，重新验证本次邮箱后沿原生密码设置与返回继续；不会覆盖已有资料、删除原账户或跳过邮箱核验。已有完整账户继续使用登录或找回密码。同邮箱多个注册事务完成时，注册专用密码保护委托原生密码规则，并阻止旧事务改写已完成账户的密码。
+
 本批邮件验证码候选保留正常密码登录。启用后，注册/未验证邮箱的 `VERIFY_EMAIL` 和找回密码的发邮件步骤使用六位一次性邮件码，默认有效期 **600 秒、60 秒重发、每事务最多 5 次错误**。验证码在原认证页面输入，随后继续原密码设置与 OIDC 返回；不会以点击邮件链接代替输入验证码。后端保留过期、限次、重发后旧码作废和一次消费检查，前端倒计时只帮助显示。
 
 扩展默认不启用注册验证码：只有 `galaxy` realm 的 `VERIFY_EMAIL.config` 中 `email-code-enabled` 精确为字符串 `true` 时才启用，缺失、关闭或其他值沿用原 Keycloak 实现。新流程需要同时安装扩展、提供登录与邮件模板，并为目标 realm 选择相应流程及邮件主题；仅部署 CSS 或静态页面不会启用它。正常密码登录的 browser flow 不属于本次替换范围。邮箱变更等其他事件的模板预览不代表其后端已接入数字验证码。
@@ -60,6 +64,8 @@ API 服务器管理 state、nonce、S256 verifier、代码交换、签名校验�
 由拥有本次发布职责的执行者操作生产，主题构建脚本不执行发布。
 
 下面六步说明首次建立静态认证入口和独立账户客户端时的配置。已有这些入口的邮件验证码更新保留原客户端、browser flow、数据库和安全策略；新 JAR 与主题可用后，先选择 `emailTheme=galaxy-mail-editorial`、绑定复制后的 reset flow，最后合并 `VERIFY_EMAIL` 的三项策略及 `email-code-enabled=true`。具体执行与恢复顺序见[验证码扩展说明](providers/email-code/README.md)。
+
+未完成注册接续的后续更新保留原 browser/reset 绑定与已选邮件主题：先安装匹配 JAR 和注册模板，再将完整 profile 的两个姓名字段设为可选，复制当前 registration 树并仅替换用户创建动作，最后绑定该副本。原配置、原树及只读挂载保留供回退；恢复原 profile 和 registration 绑定并确认后，才撤下新 JAR。部署不通过 Admin API修改具体用户、密码或邮箱已验证状态。
 
 1. 确认目标 Keycloak 版本、realm 与现有路由。主题更新保留数据库、账户、凭据、注册策略及已有客户端。
 2. 构建到新的版本目录，将 `themes/galaxy` 作为只读主题目录交给相同版本的 Keycloak；保留前一主题目录与先前 `loginTheme` 值，不编辑镜像中的内置主题。

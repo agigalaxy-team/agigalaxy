@@ -4,6 +4,7 @@ import {transaction} from './database.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {expirePrivateConversationsWithin} from './operations/private-conversation-retention.mjs';
 import {archiveAfterSchema,archiveCursorFor,archiveCursorAfter} from './shared/account-archive-cursor.mjs';
+import {accountUidPattern,ensureOfficialAccountProfileWithin} from './official-account-uid.mjs';
 
 const types=z.enum(['person','organization','agent']);
 const retention=z.number().int().min(1).max(36500).nullable();
@@ -21,22 +22,21 @@ export class OfficialAccountData {
   owner(actor){if(actor?.kind!=='official-account'||actor.endpoint!==this.endpoint||!z.uuid().safeParse(actor.accountId).success)throw new ServiceError('official_account_login_required',401);return actor.accountId;}
   archiveOwner(actor){if(actor?.kind==='linked-id'&&actor.accountAuthorized===true&&actor.endpoint===this.endpoint&&z.uuid().safeParse(actor.accountId).success&&/^GUID[0-9A-Z]{28}$/.test(actor.subjectId??''))return actor.accountId;return this.owner(actor);}
   archiveOrigin(actor){return actor?.kind==='linked-id'?actor.subjectId:null;}
-  async ensureWithin(db,accountId,{subjectType=null,displayName=null}={}){
-    await db.query(`INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,updated_at)
-      VALUES($1,$2,$3,$4) ON CONFLICT(account_id) DO NOTHING`,[accountId,subjectType,displayName,iso(this.now()*1000)]);
+  ensureWithin(db,accountId,{subjectType=null}={}){
+    return ensureOfficialAccountProfileWithin(db,accountId,{subjectType,now:this.now()});
   }
-  async settings(actor){const id=this.owner(actor);await this.ensureWithin(this.db,id);const row=(await this.db.query('SELECT * FROM official_account_profiles_v1 WHERE account_id=$1',[id])).rows[0];
+  async settings(actor){const id=this.owner(actor),row=await this.ensureWithin(this.db,id);
     const history=(await this.db.query('SELECT previous_type,next_type,revision,reason,basis,created_at FROM official_account_type_history_v1 WHERE account_id=$1 ORDER BY revision DESC LIMIT 100',[id])).rows;
-    return {accountId:id,subjectType:row.subject_type,displayName:row.display_name,revision:row.revision,
+    return {accountId:id,uid:row.uid,subjectType:row.subject_type,displayName:row.display_name,revision:row.revision,
       publicQuery:{enabled:row.query_enabled,scope:row.query_scope,showLinkedIds:row.query_linked_ids===true,showExternalCredentials:row.query_external_credentials===true},archiveRetentionDays:row.archive_retention_days,
       typeHistory:history.map(v=>({previousType:v.previous_type,nextType:v.next_type,revision:v.revision,reason:v.reason,basis:v.basis,createdAt:iso(v.created_at)}))};}
   async updateSettings(actor,input){const id=this.owner(actor),data=parse(z.strictObject({expectedRevision:z.number().int().nonnegative(),displayName:z.string().trim().min(1).max(120).nullable(),
     publicQuery:z.strictObject({enabled:z.boolean(),scope:z.enum(['profile','profile-and-public-posts']),showLinkedIds:z.boolean().optional(),showExternalCredentials:z.boolean().optional()}),archiveRetentionDays:retention}),input);
-    return this.run(async db=>{await this.ensureWithin(db,id);const row=(await db.query('SELECT * FROM official_account_profiles_v1 WHERE account_id=$1 FOR UPDATE',[id])).rows[0];
+    return this.run(async db=>{const profile=await this.ensureWithin(db,id),row=(await db.query('SELECT * FROM official_account_profiles_v1 WHERE account_id=$1 FOR UPDATE',[id])).rows[0];
       if(row.revision!==data.expectedRevision)throw new ServiceError('account_settings_changed',409);
       await db.query(`UPDATE official_account_profiles_v1 SET display_name=$2,query_enabled=$3,query_scope=$4,archive_retention_days=$5,revision=revision+1,updated_at=$6,
         query_linked_ids=$7,query_external_credentials=$8 WHERE account_id=$1`,
-        [id,data.displayName,data.publicQuery.enabled,data.publicQuery.scope,data.archiveRetentionDays,iso(this.now()*1000),
+        [id,data.displayName??profile.uid,data.publicQuery.enabled,data.publicQuery.scope,data.archiveRetentionDays,iso(this.now()*1000),
           data.publicQuery.showLinkedIds??row.query_linked_ids??false,data.publicQuery.showExternalCredentials??row.query_external_credentials??false]);
       // A changed cleanup preference applies to the owner's existing archives
       // from their original creation time. Content already expired is not read.
@@ -52,10 +52,17 @@ export class OfficialAccountData {
         [randomUUID(),id,revision,row.subject_type,data.subjectType,data.reason,data.basis,at]);
       await db.query('UPDATE official_account_profiles_v1 SET subject_type=$2,revision=$3,updated_at=$4 WHERE account_id=$1',[id,data.subjectType,revision,at]);
       return {accountId:id,previousType:row.subject_type,subjectType:data.subjectType,revision,basisKind:'account-owner-statement',permissionsChanged:false};});}
-  async publicProfile(accountId,{publicPosts}={}){parse(z.uuid(),accountId);const row=(await this.db.query(`SELECT p.* FROM official_account_profiles_v1 p JOIN community_accounts a ON a.id=p.account_id
+  async publicProfileByUid(uid,options={}){
+    if(typeof uid!=='string'||!accountUidPattern.test(uid.toUpperCase()))throw new ServiceError('not_found',404);
+    const row=(await this.db.query(`SELECT a.id FROM community_accounts a JOIN official_account_profiles_v1 p ON p.account_id=a.id
+      WHERE a.uid=$1 AND a.endpoint=$2 AND p.query_enabled=true`,[uid.toUpperCase(),this.endpoint])).rows[0];
+    if(!row)throw new ServiceError('not_found',404);
+    return this.publicProfile(row.id,options);
+  }
+  async publicProfile(accountId,{publicPosts}={}){parse(z.uuid(),accountId);const row=(await this.db.query(`SELECT p.*,a.uid FROM official_account_profiles_v1 p JOIN community_accounts a ON a.id=p.account_id
     WHERE p.account_id=$1 AND a.endpoint=$2 AND p.query_enabled=true`,[accountId,this.endpoint])).rows[0];
     if(!row)throw new ServiceError('not_found',404);
-    return {accountId,displayName:row.display_name,subjectType:row.subject_type,typeSource:'account-owner-statement',
+    return {accountId,uid:row.uid,displayName:row.display_name,subjectType:row.subject_type,typeSource:'account-owner-statement',
       publicQuery:{scope:row.query_scope,showLinkedIds:row.query_linked_ids===true,showExternalCredentials:row.query_external_credentials===true},
       ...(row.query_scope==='profile-and-public-posts'&&publicPosts?{posts:await publicPosts(accountId)}:{})};}
   async cleanup(actor){const id=this.archiveOwner(actor);return this.run(async db=>({deleted:await expirePrivateConversationsWithin(db,this.now(),{accountId:id,originSubjectId:this.archiveOrigin(actor)})}));}

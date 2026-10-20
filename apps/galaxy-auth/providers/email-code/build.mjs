@@ -74,6 +74,8 @@ await writeFile(path.join(output, 'provider.json'), `${JSON.stringify({
   enableKey: 'email-code-enabled',
   resetAuthenticator: 'galaxy-reset-email-code',
   resetChooseUser: 'galaxy-reset-choose-user',
+  registrationAction: 'galaxy-registration-user-creation',
+  registrationPasswordGuard: 'UPDATE_PASSWORD',
   templates: { login: 'galaxy-email-code.ftl', email: 'galaxy-email-code.ftl' },
   defaults: { 'code-ttl-seconds': '600', 'resend-seconds': '60', 'max-attempts': '5' },
   testClasses: testClasses ? path.basename(testClasses) : null,

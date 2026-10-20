@@ -69,6 +69,7 @@ public final class GalaxyVerifyEmailCode extends VerifyEmail {
         String action = data.getFirst("action");
         if ("cancel".equals(action)) {
             code.invalidate();
+            RegistrationContinuation.clear(context.getAuthenticationSession());
             // cancel() only cancels an application-initiated action (AIA).
             // A mandatory registration action would immediately be requested
             // again. Failure terminates this authentication through Keycloak's
@@ -93,6 +94,9 @@ public final class GalaxyVerifyEmailCode extends VerifyEmail {
         // advance the original action. The remaining registration / password
         // actions, client redirect, PKCE and state remain Keycloak's own.
         context.getUser().setEmailVerified(true);
+        if (RegistrationContinuation.hasTransaction(context.getAuthenticationSession())) {
+            RegistrationContinuation.prove(context.getAuthenticationSession());
+        }
         context.getAuthenticationSession().removeAuthNote(Constants.VERIFY_EMAIL_KEY);
         context.getEvent().clone().event(EventType.VERIFY_EMAIL).user(context.getUser()).success();
         context.success();
@@ -118,6 +122,20 @@ public final class GalaxyVerifyEmailCode extends VerifyEmail {
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
             context.failure("galaxyCodeUnavailable");
             return true;
+        }
+        var authentication = context.getAuthenticationSession();
+        if (RegistrationContinuation.hasTransaction(authentication)) {
+            if (!RegistrationContinuation.current(context.getSession(), context.getRealm(), authentication, user)) {
+                context.failure("galaxyCodeUnavailable");
+                return true;
+            }
+            if (RegistrationContinuation.proved(authentication) && user.isEmailVerified()) {
+                context.success();
+                return true;
+            }
+            // An old verified flag is not proof for a new registration tab.
+            // A resumed, still credentialless user must consume this tab's code.
+            if (RegistrationContinuation.resumed(authentication)) return false;
         }
         if (!user.isEmailVerified()) return false;
         if ("true".equals(context.getAuthenticationSession().getAuthNote(AuthenticationManager.NEW_USER_REGISTERED))) {

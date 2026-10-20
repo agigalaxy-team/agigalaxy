@@ -20,10 +20,23 @@ node apps/galaxy-auth/providers/email-code/build.mjs --keycloak-dir /absolute/ke
 java -cp "/absolute/new-provider-candidate/classes:/absolute/new-provider-candidate/test-classes:/absolute/keycloak-26.7.3/lib/lib/main/*" org.agigalaxy.keycloak.emailcode.EmailCodeChallengeStoreTest
 java -cp "/absolute/new-provider-candidate/classes:/absolute/new-provider-candidate/test-classes:/absolute/keycloak-26.7.3/lib/lib/main/*:/absolute/keycloak-26.7.3/lib/lib/boot/*" org.agigalaxy.keycloak.emailcode.EmailCodeTemplateProviderTest
 java -cp "/absolute/new-provider-candidate/classes:/absolute/new-provider-candidate/test-classes:/absolute/keycloak-26.7.3/lib/lib/main/*:/absolute/keycloak-26.7.3/lib/lib/boot/*" org.agigalaxy.keycloak.emailcode.EmailCodeRequiredActionTest
+java -cp "/absolute/new-provider-candidate/classes:/absolute/new-provider-candidate/test-classes:/absolute/keycloak-26.7.3/lib/lib/main/*:/absolute/keycloak-26.7.3/lib/lib/boot/*" org.agigalaxy.keycloak.emailcode.RegistrationContinuationTest
 node --test apps/galaxy-auth/providers/email-code/realm-plan.test.mjs
 ```
 
 Windows classpath 分隔符使用 `;`。8 个行为情境包含普通即时缓存，以及 26.7.3 的 `put` 延迟提交、`get` 可读己写、原子 `remove` 只见已提交、`putIfAbsent` / `replace` 立即生效的合同；另覆盖重发遇到相同数字的有界重抽。3 个真实 Provider 合同情境分别经过注册、找回及不可变 Map 对照；真实 `processTemplate` 会原地补入上下文字段，因此必须传入可变属性表，运行该测试还需 `lib/lib/boot/*` 的日志依赖。实际浏览器事务、SMTP 与 required action 渲染仍由本地真实 Keycloak 隔离用例覆盖。
+
+## 未完成注册接续
+
+26.7.3 原生 `RegistrationUserCreation` 在表单成功时已保存用户，邮箱验证和延后设置密码随后执行。中途失败或取消不删除用户，因此重填原生表单会遇到重复邮箱。新增显式 FormAction **`galaxy-registration-user-creation`**，正常新注册仍委托原生创建；仅接续启用的本地用户、没有任何登录凭据或外部登录/存储关系、仍需 `UPDATE_PASSWORD` 的记录。它复用原 REGISTRATION UserProfile 校验，但不调用现有用户 profile 的 create/update，不覆盖姓名、属性或已有资料；重填的 password/password-confirm 被移除。
+
+每次接续在原 AuthenticationSession 中绑定实际用户和当前邮箱，重新消费本标签的邮件码；已验证但尚未设密码也不能凭旧 verified 标记跳过。错误、到期、重发和取消沿原邮件码规则。码通过后，薄包装 **`GalaxyRegistrationUpdatePassword`** 沿用 `UPDATE_PASSWORD`、order 100，仅对本注册 note 重核邮箱 proof、当前仍无凭据和待设密码状态，再委托原生密码策略与保存。没有本 note 的密码修改/找回和其他 realm 完全委托原实现。另以立即原子 reserve/replace 串行化首个密码写入，原生校验失败或事务回滚释放同 owner，成功保留有界完成占位；占位最多一小时，旧清理不移除替换 owner。其他标签已完成后，旧密码页不能覆盖正式账户。
+
+`realm-plan.mjs` 另导出纯函数 `planRegistrationContinuationRealm(representation, {registrationAlias?})`，默认副本名 `galaxy registration continue`；无 CLI、相对依赖、HTTP 或写入。输入含当前 `registrationFlow`、完整 root/子流程、被引用的 `authenticatorConfig` 和 `requiredActions`。它只复制当前 registration 树并替换唯一 user-creation 执行，保留原 requirement/priority/config、验证码和条款等其余步骤，输出同类 realm representation；原树不改，再次规划幂等。要求精确 `galaxy`、唯一邮箱作用户名、verifyEmail 及邮件码启用；同一 form 中原生 user creation/password 均 REQUIRED 且顺序正确，不能配置 `always_set_password_on_register_form=true`。运行时也检查原生延后密码 note，配置不符合就不接管重复邮箱。
+
+先使同一 JAR 内原邮件码、新 FormAction 和密码包装可用，再应用资料规则与复制注册树，最后绑定副本；回退先恢复原 registration binding/资料规则再卸新 JAR，不删除用户或改已有凭据。`/authentication/form-action-providers` 可查询新 FormAction。`createEmailCodeFixtureRealmPatch` 为全新本机夹具同时提供新注册副本和既有 reset 邮件码配置。
+
+`RegistrationContinuationTest` 的五个情境覆盖原用户/资料保留、未完成范围、本事务 proof、旧密码页拒绝以及占位提交/回滚；native 数据库与密码策略、真实双标签和 OIDC 返回仍由本机 Keycloak 操作覆盖。
 
 ## Provider 与流程
 

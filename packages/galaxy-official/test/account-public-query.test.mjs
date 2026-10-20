@@ -20,7 +20,7 @@ async function accountBrowser(f,name){
   return {status:response.status,body:await response.json()};}
  async function settings(publicQuery){const current=await request('/v1/account/settings');assert.equal(current.status,200);const saved=await request('/v1/account/settings',{
   expectedRevision:current.body.revision,displayName:name,archiveRetentionDays:current.body.archiveRetentionDays,publicQuery});assert.equal(saved.status,200,JSON.stringify(saved.body));return saved;}
- return {id:session.account.id,request,settings};
+ return {id:session.account.id,uid:session.account.uid,request,settings};
 }
 
 test('anonymous account↔ID lookup uses current real associations and independent display choices without changing old clients',{timeout:60000},async()=>{
@@ -29,8 +29,13 @@ test('anonymous account↔ID lookup uses current real associations and independe
   await f.login(f.owner,'public relation one');await f.login(f.responder,'public relation one');await f.login(f.owner,'public relation two');await f.login(f.owner,'private relation');
   const base='/v1/account/public/',anonymous=path=>f.request(path,{authorization:false});
   assert.equal((await anonymous(base+first.id)).status,404);
+  assert.equal((await anonymous(base+'by-uid/'+first.uid)).status,404);
   await first.settings({enabled:true,scope:'profile'});
   const oldProfile=await anonymous(base+first.id);assert.equal(oldProfile.status,200);assert.equal(oldProfile.body.publicQuery.showLinkedIds,false);assert.equal(oldProfile.body.publicQuery.showExternalCredentials,false);
+  const byUid=await anonymous(base+'by-uid/'+first.uid.toLowerCase());assert.equal(byUid.status,200);assert.equal(byUid.body.accountId,first.id);assert.equal(byUid.body.uid,first.uid);
+  const browserUid=await fetch(f.origin+base+'by-uid/'+first.uid,{headers:{Origin:f.website}});assert.equal(browserUid.status,200);
+  assert.equal(browserUid.headers.get('access-control-allow-origin'),f.website);assert.equal(browserUid.headers.get('access-control-allow-credentials'),null);await browserUid.arrayBuffer();
+  assert.equal((await anonymous(base+'by-uid/'+first.uid+'?limit=1')).status,400);
   assert.equal((await anonymous(base+first.id+'/ids')).status,404);assert.equal((await anonymous(base+first.id+'/credentials')).status,404);
   assert.deepEqual((await anonymous(base+'by-id/'+f.owner.actor.subjectId)).body.items,[]);
   await first.settings({enabled:true,scope:'profile',showLinkedIds:true,showExternalCredentials:true});

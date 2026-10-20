@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createEmailCodeFixtureRealmPatch, planEmailCodeRealm } from './realm-plan.mjs';
+import { createEmailCodeFixtureRealmPatch, planEmailCodeRealm, planRegistrationContinuationRealm } from './realm-plan.mjs';
 
 function fixture() {
   return {
@@ -45,6 +45,79 @@ test('email-code plan copies reset tree and adapts email plus explicit re-select
   assert.equal(result.authenticatorConfig.at(-1).config['email-code-enabled'], undefined);
   assert.equal(result.emailTheme, 'candidate-a');
   assert.equal(original.emailTheme, undefined);
+});
+
+function registrationFixture() {
+  const result = fixture();
+  result.registrationEmailAsUsername = true;
+  result.duplicateEmailsAllowed = false;
+  result.registrationAllowed = true;
+  result.requiredActions[0].config['email-code-enabled'] = 'true';
+  result.authenticationFlows[1] = {
+    id: 'original-registration', alias: 'registration', providerId: 'basic-flow', builtIn: true, topLevel: true,
+    authenticationExecutions: [{ id: 'form-execution', flowAlias: 'registration form', authenticator: 'registration-page-form', authenticatorFlow: true, requirement: 'REQUIRED', priority: 10 }],
+  };
+  result.authenticationFlows.push({
+    id: 'original-form', alias: 'registration form', providerId: 'form-flow', topLevel: false, builtIn: true,
+    authenticationExecutions: [
+      { id: 'creation', authenticator: 'registration-user-creation', requirement: 'REQUIRED', priority: 20 },
+      { id: 'password', authenticator: 'registration-password-action', authenticatorConfig: 'registration password', requirement: 'REQUIRED', priority: 50 },
+      { id: 'captcha', authenticator: 'registration-recaptcha-action', requirement: 'DISABLED', priority: 60 },
+      { id: 'terms', authenticator: 'registration-terms-and-conditions', requirement: 'DISABLED', priority: 70 },
+    ],
+  });
+  result.authenticatorConfig.push({ alias: 'registration password', config: { always_set_password_on_register_form: 'false', retained: 'setting' } });
+  result.userProfile = { attributes: [{ name: 'firstName', permissions: { view: ['admin', 'user'] } }] };
+  return result;
+}
+
+test('registration continuation copies the real form tree and replaces only user creation', () => {
+  const original = registrationFixture();
+  const planned = planRegistrationContinuationRealm(original);
+  assert.deepEqual(planned.authenticationFlows.slice(0, original.authenticationFlows.length), original.authenticationFlows);
+  assert.equal(planned.authenticationFlows.length, original.authenticationFlows.length + 2);
+  const form = planned.authenticationFlows.find((flow) => flow.alias === 'galaxy registration continue / registration form');
+  const expected = structuredClone(original.authenticationFlows.at(-1));
+  delete expected.id;
+  expected.alias = form.alias;
+  expected.builtIn = false;
+  expected.authenticationExecutions.forEach((step) => { delete step.id; });
+  expected.authenticationExecutions[0].authenticator = 'galaxy-registration-user-creation';
+  assert.deepEqual(form, expected);
+  for (const key of ['clients', 'browserFlow', 'resetCredentialsFlow', 'authenticatorConfig', 'requiredActions', 'userProfile']) assert.deepEqual(planned[key], original[key]);
+  assert.equal(original.registrationFlow, 'registration');
+  assert.deepEqual(planRegistrationContinuationRealm(planned), planned);
+});
+
+test('registration continuation refuses unverified-first or ambiguous registration shapes', () => {
+  const passwordFirst = registrationFixture();
+  passwordFirst.authenticatorConfig.at(-1).config.always_set_password_on_register_form = 'true';
+  assert.throws(() => planRegistrationContinuationRealm(passwordFirst), /verify email before/);
+  for (const override of [{ verifyEmail: false }, { registrationEmailAsUsername: false }, { duplicateEmailsAllowed: true }, { registrationAllowed: false }]) {
+    assert.throws(() => planRegistrationContinuationRealm({ ...registrationFixture(), ...override }));
+  }
+  const disabled = registrationFixture();
+  disabled.requiredActions[0].config['email-code-enabled'] = 'false';
+  assert.throws(() => planRegistrationContinuationRealm(disabled));
+  const missingPasswordConfig = registrationFixture();
+  missingPasswordConfig.authenticatorConfig.pop();
+  assert.throws(() => planRegistrationContinuationRealm(missingPasswordConfig));
+  const reordered = registrationFixture();
+  reordered.authenticationFlows.at(-1).authenticationExecutions.reverse();
+  assert.throws(() => planRegistrationContinuationRealm(reordered));
+  const missingChild = registrationFixture();
+  missingChild.authenticationFlows.pop();
+  assert.throws(() => planRegistrationContinuationRealm(missingChild));
+});
+
+test('fresh fixtures enable the explicit registration continuation alongside the existing reset code flow', () => {
+  const patch = createEmailCodeFixtureRealmPatch();
+  assert.equal(patch.registrationEmailAsUsername, true);
+  assert.equal(patch.duplicateEmailsAllowed, false);
+  assert.equal(patch.registrationFlow, 'galaxy registration continue');
+  const steps = patch.authenticationFlows.flatMap((flow) => flow.authenticationExecutions ?? []);
+  assert.equal(steps.filter((step) => step.authenticator === 'galaxy-registration-user-creation').length, 1);
+  assert.equal(steps.filter((step) => step.authenticator === 'galaxy-reset-email-code').length, 1);
 });
 
 test('repeat planning retains the selected flow and can use bounded fixture timings without duplicate execution', () => {

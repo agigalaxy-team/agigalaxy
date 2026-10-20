@@ -69,3 +69,34 @@ test('insecure issuer discovery is restricted to explicitly enabled loopback tes
     await assert.rejects(createOidcLoginProvider({ ...options, issuer }), /HTTPS/);
   await assert.rejects(createOidcLoginProvider({ ...options, issuer: 'http://example.org', allowLoopbackHttp: true }), /HTTPS/);
 });
+
+test('signed OIDC profiles never turn an email login identifier into a default display name', {timeout: 45000}, async t => {
+  const redirectUri = 'https://official.example.org/v1/account/callback';
+  const profileClaims = {};
+  const issuer = await oidcProviderFixture([redirectUri], {emailVerified: true, profileClaims});
+  t.after(issuer.close);
+  const provider = await createOidcLoginProvider({id: 'profile', name: 'Synthetic profile', issuer: issuer.issuer,
+    clientId: 'galaxy-fixture', redirectUri, allowLoopbackHttp: true, includeAccountProfile: true});
+  for (const item of [
+    {name: '林舟', username: 'synthetic@example.invalid', expected: '林舟'},
+    {name: undefined, username: 'galaxy-reader', expected: 'galaxy-reader'},
+    {name: undefined, username: '@galaxy-reader', expected: '@galaxy-reader'},
+    {name: undefined, username: 'synthetic@example.invalid', expected: null},
+    {name: '   ', username: '  Synthetic@EXAMPLE.invalid  ', expected: null},
+    {name: '', username: 'other@example.invalid', expected: null},
+    {name: undefined, username: 'Reader <other@example.invalid>', expected: null},
+    {name: undefined, username: 'synthetic＠example.invalid', expected: null},
+    {name: undefined, username: undefined, expected: null},
+  ]) {
+    profileClaims.name = item.name;
+    profileClaims.preferred_username = item.username;
+    const login = await provider.begin();
+    const identity = await provider.complete(login, await issuer.authorize(login.authorizationUrl));
+    assert.equal(identity.accountProfile.displayName, item.expected);
+    assert.equal(identity.accountProfile.email, 'synthetic@example.invalid');
+    assert.equal(identity.externalSubject, 'synthetic-oidc-subject');
+    assert.equal(identity.accountVerification.verified, true);
+    assert.equal(identity.galaxyAuthorization, false);
+  }
+  assert.deepEqual(issuer.failures, []);
+});

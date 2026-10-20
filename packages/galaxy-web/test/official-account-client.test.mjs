@@ -26,6 +26,29 @@ test('official session reads and pagination use only the deployed authority and 
  assert.equal(requests.every(item=>item.options.credentials==='include'&&item.options.redirect==='error'&&item.options.cache==='no-store'),true);
 });
 
+test('account UID is retained independently of the editable username and may be absent in an older response',async()=>{
+ const value=signedIn(),client=createOfficialAccountClient({endpoint,website,now,fetch:async()=>response(value)});
+ assert.equal((await client.session()).account.uid,null);
+ value.account.uid='A7C4E2G8J6L3';
+ assert.equal((await client.session()).account.uid,value.account.uid);
+ value.account.displayName='新的用户名';
+ const renamed=await client.session();
+ assert.equal(renamed.account.displayName,'新的用户名');assert.equal(renamed.account.uid,'A7C4E2G8J6L3');
+ for(const uid of ['not a uid','123456789012','ABCDEFGHIJKL','A1234','A1234567890123456']){
+  value.account.uid=uid;await assert.rejects(client.session(),{code:'official_account_response_invalid'});
+ }
+});
+
+test('exact UID lookup uses the public account endpoint without Cookie or identity authority',async()=>{
+ const requests=[],client=createOfficialAccountClient({endpoint,website,now,fetch:async(url,options)=>{requests.push({url,options});return response({accountId:'8cc1659c-4d6f-46bb-8313-73bb6e461120',uid:'A7C4E2G8J6L3',displayName:'新的用户名'});}});
+ const account=await client.publicAccountByUid('a7c4e2g8j6l3');
+ assert.equal(requests[0].url,endpoint+'/v1/account/public/by-uid/A7C4E2G8J6L3');
+ assert.equal(requests[0].options.credentials,'omit');assert.equal(requests[0].options.headers.Authorization,undefined);
+ assert.equal(account.uid,'A7C4E2G8J6L3');assert.equal(account.displayName,'新的用户名');
+ await assert.rejects(client.publicAccountByUid('name@example.org'),{code:'official_account_request_invalid'});
+ assert.equal(requests.length,1);
+});
+
 test('login preserves a same-site application target and rejects external or recursive-looking targets',()=>{
  const client=createOfficialAccountClient({endpoint,website,now});
  const url=new URL(client.loginUrl('register','/app/settings/identity?section=account'));

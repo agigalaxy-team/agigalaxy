@@ -1,9 +1,10 @@
-import {randomBytes, randomUUID, createHash, timingSafeEqual} from 'node:crypto';
+import {randomBytes, createHash, timingSafeEqual} from 'node:crypto';
 import {lstat, readFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import {createOidcLoginProvider} from './oidc-login.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {OfficialAccountData} from './official-account-data.mjs';
+import {upsertOfficialAccountWithin} from './official-account-uid.mjs';
 
 const opaque = () => randomBytes(32).toString('base64url');
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -109,18 +110,13 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
         const account = await provider.complete(record.preview, url.href);
         if (account.issuer !== description.issuer || account.clientId !== description.clientId || account.expiresAt <= now() || typeof account.externalSubject !== 'string') throw Error();
         if (sessions.size >= 10000) throw Error();
-        const newId = randomUUID();
-        const accountRow = (await db.query(`INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at)
-          VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(endpoint,issuer,external_subject)
-          DO UPDATE SET verified_at=EXCLUDED.verified_at,verification_method=EXCLUDED.verification_method RETURNING id`,
-        [newId, endpoint, account.issuer, account.externalSubject,
-          account.accountVerification?.verified === true ? 'email' : 'external-account', new Date(now()*1000).toISOString()])).rows[0];
-        if (!accountRow?.id) throw unavailable();
-        await data.ensureWithin(db,accountRow.id,{subjectType:accountRow.id===newId?'person':null,displayName:account.accountProfile?.displayName??null});
+        const accountRow=await upsertOfficialAccountWithin(db,{endpoint,issuer:account.issuer,externalSubject:account.externalSubject,
+          verificationMethod:account.accountVerification?.verified===true?'email':'external-account',verifiedAt:now()});
+        const profile=await data.ensureWithin(db,accountRow.id,{subjectType:accountRow.created?'person':null});
         const prior = cookieValue(request, sessionCookie); if (prior) sessions.delete(hash(prior));
         const token = opaque();
         sessions.set(hash(token), {accountId:accountRow.id, issuer:account.issuer, externalSubject:account.externalSubject,
-          account:{id:accountRow.id, displayName:account.accountProfile?.displayName ?? null, email:account.accountProfile?.email ?? null, emailVerified:account.accountVerification?.verified === true},
+          account:{id:accountRow.id,uid:accountRow.uid,displayName:profile.display_name,email:account.accountProfile?.email??null,emailVerified:account.accountVerification?.verified===true},
           csrfToken:opaque(), expiresAt:now() + 3600});
         cookies.push(cookie(sessionCookie, token, 3600));
       } catch {
@@ -140,8 +136,8 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
         AND l.client_id=ANY($4::text[]) AND l.revoked_at IS NULL AND ($5::text IS NULL OR l.subject_id>$5)
         GROUP BY l.subject_id ORDER BY l.subject_id LIMIT 101`, [endpoint, session.issuer, session.externalSubject, clients, after ?? null])).rows;
       const linkedIds = rows.slice(0,100).map(row => ({subjectId:row.subject_id, linkedAt:new Date(row.linked_at).toISOString()}));
-      const profile=(await db.query('SELECT display_name FROM official_account_profiles_v1 WHERE account_id=$1',[session.accountId])).rows[0];
-      return {state:'signed-in', account:{...session.account,displayName:profile?profile.display_name:session.account.displayName}, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
+      const profile=await data.ensureWithin(db,session.accountId);
+      return {state:'signed-in', account:{...session.account,uid:profile.uid,displayName:profile.display_name}, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
         expiresAt:session.expiresAt, csrfToken:session.csrfToken, galaxyAuthorization:false};
     },
     async actionActor(request, {write = request.method !== 'GET'} = {}) {

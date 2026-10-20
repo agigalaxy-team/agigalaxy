@@ -178,7 +178,7 @@ public final class EmailCodeTemplateProviderTest {
 
     // Only supplies state for this rendering test. Transaction/cache semantics
     // are covered independently by EmailCodeChallengeStoreTest.
-    private static final class ImmediateCache implements SingleUseObjectProvider {
+    static final class ImmediateCache implements SingleUseObjectProvider {
         private final Map<String, Map<String, String>> entries = new HashMap<>();
         @Override public void put(String key, long seconds, Map<String, String> notes) {
             entries.put(key, new HashMap<>(notes));

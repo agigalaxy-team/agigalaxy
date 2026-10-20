@@ -41,9 +41,9 @@ export class ChatService {
  }
  async people(actor,input={}){const x=parse(chatPeopleSchema,input);return this.run(actor,false,async db=>{
    if(!this.accounts)fail('chat_account_adapter_unavailable',503);
-   if(x.accountId||x.accountIds){const rows=(await db.query(`SELECT a.id,p.display_name,p.subject_type FROM community_accounts a
+   if(x.accountId||x.accountIds){const rows=(await db.query(`SELECT a.id,a.uid,p.display_name,p.subject_type FROM community_accounts a
      LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.id WHERE a.id=ANY($1::uuid[]) AND a.endpoint=$2`,[x.accountIds??[x.accountId],this.access.endpoint])).rows;
-     return{items:rows.map(row=>({actorRef:'account:'+row.id,accountId:row.id,displayName:row.display_name??null,subjectType:row.subject_type??null})),nextAfter:null};}
+     return{items:rows.map(row=>({actorRef:'account:'+row.id,accountId:row.id,uid:row.uid,displayName:row.display_name??null,subjectType:row.subject_type??null})),nextAfter:null};}
    const page=await this.accounts.publicChoicesWithin(db,x);
    return{items:page.items.map(row=>({...row,actorRef:'account:'+row.id})),nextAfter:page.nextAfter};
  });}
@@ -67,7 +67,7 @@ export class ChatService {
      throw error;
    }
  }
- async members(db,roomId){return(await db.query('SELECT m.*,p.display_name FROM chat_memberships m LEFT JOIN chat_participants_v3 a ON a.actor_ref=m.subject_id LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.account_id WHERE m.room_id=$1 AND m.left_at IS NULL ORDER BY m.subject_id',[roomId])).rows;}
+ async members(db,roomId){return(await db.query('SELECT m.*,p.display_name,account.uid FROM chat_memberships m LEFT JOIN chat_participants_v3 a ON a.actor_ref=m.subject_id LEFT JOIN community_accounts account ON account.id=a.account_id LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.account_id WHERE m.room_id=$1 AND m.left_at IS NULL ORDER BY m.subject_id',[roomId])).rows;}
  async requireRoom(db,actor,roomId,{member=true,write=false}={}){
   uuid(roomId);const r=(await db.query(`SELECT * FROM chat_rooms WHERE room_id=$1 ${write?'FOR UPDATE':'FOR SHARE'}`,[roomId])).rows[0];
   if(!r)fail('chat_room_not_found',404);
@@ -97,7 +97,7 @@ export class ChatService {
   joinRule:{...roomRule(r,this.now()),ruleHash:roomRuleHash(roomRule(r,this.now()))},administratorSubjectIds:administrators(ctx),successionExpiresAt:r.succession_expires_at,
   managementAuthority:{basis:'current-room-role-and-explicit-shared-rule',managerLimit:10,privateMaterialsGranted:false,otherAgentControlGranted:false},
   membershipBasis:'explicit-subject-and-verified-control-relationships',connectionCount:null,
-  decisionRequired:r.state==='single-member-decision',members:members.map(m=>({subjectId:m.subject_id,actor:chatActorView(m.subject_id),displayName:m.display_name??null,joinedAt:m.joined_at,singleMemberPromptDismissed:m.dismissed_revision===r.revision})),
+  decisionRequired:r.state==='single-member-decision',members:members.map(m=>({subjectId:m.subject_id,actor:chatActorView(m.subject_id),uid:m.uid??null,displayName:m.display_name??null,joinedAt:m.joined_at,singleMemberPromptDismissed:m.dismissed_revision===r.revision})),
   transportAvailable:this.transport?.available===true,governance:ctx.governance};}
  async project(ctx){if(!this.transport)fail('chat_transport_unavailable',503);return this.transport.project({roomId:ctx.room.room_id,revision:ctx.room.revision,title:ctx.room.title,
   state:ctx.room.state,members:ctx.members.map(m=>m.subject_id)});}
@@ -144,8 +144,9 @@ export class ChatService {
     AND r.created_order<=$2 AND m.joined_order<=$2
     AND ($6::text='' OR position(lower($6) in lower(r.title))>0 OR EXISTS(
       SELECT 1 FROM chat_memberships other JOIN chat_participants_v3 participant ON participant.actor_ref=other.subject_id
+      JOIN community_accounts account ON account.id=participant.account_id
       JOIN official_account_profiles_v1 profile ON profile.account_id=participant.account_id
-      WHERE other.room_id=r.room_id AND other.left_at IS NULL AND position(lower($6) in lower(COALESCE(profile.display_name,'')))>0))
+      WHERE other.room_id=r.room_id AND other.left_at IS NULL AND (position(lower($6) in lower(COALESCE(profile.display_name,'')))>0 OR account.uid=upper($6))))
   ) SELECT room_id,sort_order::text FROM candidates WHERE ($3::bigint IS NULL OR sort_order<$3 OR (sort_order=$3 AND room_id::text<$4))
    ORDER BY sort_order DESC,room_id DESC LIMIT $5`,[chatActorRef(actor),watermark,cursor?.lastOrder??null,cursor?.lastRoomId??'',x.limit+1,x.query??''])).rows;
   const last=rows[Math.min(rows.length,x.limit)-1];

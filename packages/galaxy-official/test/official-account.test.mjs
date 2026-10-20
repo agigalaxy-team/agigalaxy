@@ -14,7 +14,7 @@ import {createApi} from '../src/http.mjs';
 test('official login is cookie-bound, lists independently signed IDs, and cannot authorize a Galaxy subject', {timeout:60000}, async t => {
   const endpoint = 'https://official.example.org', website = 'https://galaxy.example.org';
   const callback = endpoint + '/v1/account/callback', associationCallback = endpoint + '/v1/identity/callback/fixture';
-  const issuer = await oidcProviderFixture([callback,associationCallback],{emailVerified:true});
+  const issuer = await oidcProviderFixture([callback,associationCallback],{emailVerified:true,profileClaims:{name:'Upstream profile name',preferred_username:'upstream-profile-user'}});
   t.after(issuer.close);
   let clock = Math.floor(Date.now()/1000);
   const provider = await createOidcLoginProvider({id:'fixture',name:'Synthetic account',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:associationCallback,allowLoopbackHttp:true,now:()=>clock});
@@ -52,10 +52,17 @@ test('official login is cookie-bound, lists independently signed IDs, and cannot
   assert.equal(empty.value.state,'signed-in'); assert.deepEqual(empty.value.linkedIds,[]);
   assert.equal(empty.value.account.email,'synthetic@example.invalid'); assert.equal(empty.value.account.emailVerified,true);
   assert.match(empty.value.account.id,/^[0-9a-f-]{36}$/);
+  assert.match(empty.value.account.uid,/^G[A-Z0-9]{10}[0-9]$/);
+  assert.equal(empty.value.account.displayName,empty.value.account.uid,'the first name is persisted UID, not an OIDC name or email');
   const accountHeaders={Cookie:cookie(),Origin:website,'X-Galaxy-Account-ID':empty.value.account.id,'X-Galaxy-Account-CSRF':empty.value.csrfToken};
   assert.deepEqual(await officialAccounts.actionActor({method:'POST',headers:Object.fromEntries(Object.entries(accountHeaders).map(([key,value])=>[key.toLowerCase(),value]))}),
     {kind:'official-account',accountId:empty.value.account.id,endpoint});
-  assert.equal((await request('/v1/account/settings',{headers:accountHeaders})).status,200);
+  const initialSettings=await request('/v1/account/settings',{headers:accountHeaders});assert.equal(initialSettings.status,200);
+  assert.equal((await initialSettings.json()).uid,empty.value.account.uid);
+  const renamed=await request('/v1/account/settings',{method:'POST',headers:{...accountHeaders,'Content-Type':'application/json'},
+    body:JSON.stringify({expectedRevision:0,displayName:'Owner edited profile',publicQuery:{enabled:false,scope:'profile'},archiveRetentionDays:null})});
+  assert.equal(renamed.status,200);await renamed.arrayBuffer();
+  assert.equal((await session()).value.account.displayName,'Owner edited profile');
   assert.equal((await request('/v1/account/settings',{headers:{...accountHeaders,'X-Galaxy-Account-ID':other.actor.bindingId}})).status,409,'another tab/account cannot redirect an old action');
   assert.equal((await request('/v1/account/settings',{method:'POST',headers:{...accountHeaders,'Content-Type':'application/json','X-Galaxy-Account-CSRF':'x'.repeat(43)},body:'{}'})).status,403);
   assert.equal(empty.response.headers.get('access-control-allow-credentials'),'true');
@@ -92,6 +99,8 @@ test('official login is cookie-bound, lists independently signed IDs, and cannot
   assert.equal(stale.headers.getSetCookie().length,0,'an old callback cannot clear the new browser login');
   const newerResult=await finish(newerLogin);assert.equal(newerResult.headers.get('location'),website+'/app/work');
   assert.equal((await session()).value.account.id,empty.value.account.id,'the newer login remains completable after an old tab returns');
+  const relogged=(await session()).value.account;assert.equal(relogged.uid,empty.value.account.uid);
+  assert.equal(relogged.displayName,'Owner edited profile','OIDC claims cannot overwrite a chosen name on later login');
   issuer.setAccount('another-official-account');
   await finish(await start());
   assert.notEqual((await session()).value.account.id,empty.value.account.id);
