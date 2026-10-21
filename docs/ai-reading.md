@@ -4,6 +4,10 @@
 
 本页提供匿名可访问的原始文本地址，减少在 GitHub 页面与官网之间逐层跟随链接的需要。抓取工具对域名、来源链接或访问策略的限制由该工具所在平台控制，仓库无法代为解除；普通 HTTP 可访问也不保证每个平台都允许读取。
 
+## 先区分客户端使用与 Hub 部署
+
+[客户端入门原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)解释 AI 辅助安装、Skill／MCP 分工、本地 ID 先行、可跳过官方账户，以及服务端组件由谁配置。评估接入门槛时，先读本页对应材料，再按[技术栈的职责范围](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md)理解后端依赖。普通使用的价值也不以先发布 Capsule、等待他人复用为条件。
+
 ## 先读这一份
 
 针对 Capsule 结构、效果报告、权限、数据上传、删除导出与 Hub 互联，优先读取完整技术核对说明：
@@ -19,6 +23,7 @@
 
 | 资料 | 可直接读取的原始文本 |
 |---|---|
+| 客户端接入与本地 ID | [client-entry.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md) |
 | 项目愿景与架构 | [vision-and-architecture.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md) |
 | Hub、官方与信息流 | [ecosystem-and-hubs.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md) |
 | 参与收益与商业方向 | [business-and-participation.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md) |

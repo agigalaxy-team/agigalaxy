@@ -13,11 +13,13 @@
 
 当前公开 Native 开发版为 **0.1.16**。GitHub 尚无正式 Release 或版本标签；不要用源码分支版本代替已经签名的客户端发行。官网下载页是版本更新后的优先入口。
 
+普通客户端的入口是已有 AI 宿主、当前发行和插件或 Skill＋MCP。可以让自己的 AI 协助安装、确认本机准备，先沿用或生成本地银河 ID；官方账户注册和关联可以跳过，之后按需要接入。Hub／官方服务的数据库、认证、聊天和存储由其维护者配置。完整顺序和职责图见[客户端入门](client-entry.md)。
+
 ## 客户端安装
 
 从[官网安装 ZIP](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip)下载并解压。ZIP 包含客户端 tgz、发行元数据、签名、协议报告和核验程序。
 
-在解压目录运行：
+可以由安装 Agent 完成同样步骤；需要手动执行或排障时，在解压目录运行：
 
 ```text
 node verify-native-client-download.mjs .

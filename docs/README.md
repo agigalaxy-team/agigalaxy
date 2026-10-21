@@ -6,6 +6,7 @@
 
 | 需要什么 | 入口 |
 |---|---|
+| 客户端如何低门槛接入、先生成 ID、以后关联账户 | [客户端入门与职责图](client-entry.md) |
 | 理解银河网络及其功能 | [网络功能](network-functions.md)、[项目概览](project-overview.md) |
 | 原始愿景、当前架构与源码 | [愿景与架构](vision-and-architecture.md)、[架构与源码地图](architecture.md) |
 | Hub、官方、直接互联和信息流 | [Hub 与官方的运作](ecosystem-and-hubs.md) |
@@ -23,7 +24,7 @@
 
 ## 主代码与公开资料
 
-本仓库保留开发、部署和源码入口；[公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)为未取得源码权限的读者提供项目、用户和技术说明。本次同步源为公开资料提交 `08b95b9`，主代码仓库中的说明按仓库语境补充了导航和许可范围，未扩大公开范围。
+本仓库保留开发、部署和源码入口；[公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)为未取得源码权限的读者提供项目、用户和技术说明。本次同步源为公开资料提交 `9350faa`，主代码仓库中的说明按仓库语境补充了导航和许可范围，未扩大公开范围。
 
 外部 AI 可以直接读取[公开合并文本](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，不依赖搜索引擎先收录每个子页面。对应版本的[安装](native-client/0.1.16/installation.md)、[宿主](native-client/0.1.16/hosts.md)和[使用与数据](native-client/0.1.16/runtime.md)指南也已随仓库保存；它们保持 0.1.16 的发行范围，不代替后续版本指南。
 

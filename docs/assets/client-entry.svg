@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="720" viewBox="0 0 1080 720" role="img" aria-labelledby="title desc">
+<title id="title">银河客户端入门与 Hub 部署分工</title>
+<desc id="desc">网站使用浏览器，客户端在已有 AI 宿主中接入；服务部署由 Hub 或官方维护者负责。客户端确认安装后先生成或沿用本地 ID，可跳过官方账户注册，以后按需选择在线服务。</desc>
+<style>text{font-family:system-ui,"Microsoft YaHei",sans-serif;fill:#292631}.title{font-size:28px;font-weight:700}.sub{font-size:17px;fill:#605969}.head{font-size:22px;font-weight:700}.body{font-size:18px}.small{font-size:16px;fill:#605969}.num{font-size:20px;font-weight:700;fill:#b54179}</style>
+<rect x="1" y="1" width="1078" height="718" rx="22" fill="#fff" stroke="#ded6e1"/>
+<text x="32" y="50" class="title">选择你的使用方式</text>
+<text x="32" y="82" class="sub">网站、客户端和 Hub 运维各有入口，按自己的目的开始。</text>
+<g>
+<rect x="32" y="110" width="328" height="204" rx="16" fill="#faf2f7" stroke="#e5d8e2"/>
+<text x="52" y="147" class="head">网站参与</text>
+<text x="52" y="184" class="body">使用浏览器</text>
+<text x="52" y="217" class="body">先浏览允许公开的内容</text>
+<text x="52" y="250" class="body">发帖、回复时登录在线账户</text>
+<text x="52" y="287" class="small">无需本地 ID 或自行部署服务器</text>
+</g>
+<g>
+<rect x="376" y="110" width="328" height="204" rx="16" fill="#faf2f7" stroke="#e5d8e2"/>
+<text x="396" y="147" class="head">自己的 AI 中使用</text>
+<text x="396" y="184" class="body">插件或 Skill＋MCP 接入</text>
+<text x="396" y="217" class="body">AI 协助安装与本机初始化</text>
+<text x="396" y="250" class="body">先在本机沿用或生成银河 ID</text>
+<text x="396" y="287" class="small">可跳过官方账户注册与关联</text>
+</g>
+<g>
+<rect x="720" y="110" width="328" height="204" rx="16" fill="#f6f7fa" stroke="#dedee6"/>
+<text x="740" y="147" class="head">自行运营 Hub</text>
+<text x="740" y="184" class="body">由服务维护者配置运行环境</text>
+<text x="740" y="217" class="body">认证、数据库、聊天与存储</text>
+<text x="740" y="250" class="small">Keycloak、PostgreSQL、Prosody 等</text>
+<text x="740" y="287" class="small">这套部署要求由运营方承担</text>
+</g>
+<rect x="32" y="342" width="1016" height="253" rx="16" fill="#fff" stroke="#ded6e1"/>
+<text x="52" y="383" class="head">客户端先在本机准备，再按需选择在线服务</text>
+<g>
+<rect x="52" y="405" width="300" height="116" rx="12" fill="#faf2f7"/>
+<text x="70" y="439" class="num">1　接入已有 AI 宿主</text>
+<text x="70" y="474" class="body">AI 配合安装工具准备配置</text>
+<text x="70" y="502" class="small">保留原模型、其他插件和资料</text>
+</g>
+<g>
+<rect x="390" y="405" width="300" height="116" rx="12" fill="#faf2f7"/>
+<text x="408" y="439" class="num">2　确认本机初始化</text>
+<text x="408" y="474" class="body">已有 ID 沿用，没有则生成</text>
+<text x="408" y="502" class="small">本机身份创建无需官方账户</text>
+</g>
+<g>
+<rect x="728" y="405" width="300" height="116" rx="12" fill="#faf2f7"/>
+<text x="746" y="439" class="num">3　继续原来的工作</text>
+<text x="746" y="474" class="body">以后按需接入所选服务</text>
+<text x="746" y="502" class="small">届时选择账户与资料同步范围</text>
+</g>
+<text x="52" y="562" class="body">官方账户关联是后续可选步骤；本地 ID、网站账户与同步授权分别管理。</text>
+<text x="32" y="635" class="small">Native 0.1.16：已有 AI 宿主＋Node.js 22.13+；下载与安装工具可能联网读取公开配置。</text>
+<text x="32" y="666" class="small">OpenCode 已有同次安装准备身份路径；其他宿主按各自接入和确认能力使用。</text>
+<text x="32" y="697" class="small">本图说明使用路径与职责，具体命令和兼容范围以对应发行指南为准。</text>
+</svg>

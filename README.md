@@ -40,6 +40,14 @@
 
 网络提供的帮助包含实际参与者与执行能力。历史记录、资料和候选依据为选择提供支持，不能把“银河介入”缩减成返回几份相似解决记录。功能说明及实现范围见[银河网络提供什么](docs/network-functions.md)。
 
+## 客户端先从本地 ID 开始
+
+在已有 AI 宿主中，通过插件或 **Skill＋MCP** 接入，让自己的 AI 配合安装工具发现环境、安装和初始化。确认本机准备后，程序沿用已有身份，或生成本地银河 ID；**可以跳过官方账户注册和关联，先继续本地工作**，以后按需选择官方服务或第三方 Hub，并确定同步与隐私范围。
+
+![网站、客户端与 Hub 运维的职责](docs/assets/client-entry.svg)
+
+Keycloak、PostgreSQL、Prosody 和相应存储由所用服务的维护者部署。当前 Native 0.1.16 的实际前置条件是已有 AI 宿主和 Node.js 22.13+；OpenCode 已有同次安装准备本机身份的路径，其他宿主按实际插件或 MCP／Skill 支持完成。详见[客户端入门](docs/client-entry.md)。
+
 ## 在自己的 AI 中怎样使用
 
 客户端围绕原模型聊天继续工作。使用者表达目的，自己的模型借助 Skill、MCP、数据 API 和插件查询与筛选信息、解释具体帮助、准备必要内容并接回进展；人在需要决定的地方选择。
@@ -65,7 +73,8 @@
 | 查看对话、消息与协作交流 | [消息](https://agigalaxy.org/app/rooms) |
 | 查看本人工作和继续已有事情 | [我的工作](https://agigalaxy.org/app/work) |
 | 管理在线资料、接入与收藏 | [账户](https://agigalaxy.org/app/account) |
-| 接入自己的 AI 或自行运行服务 | [客户端下载](https://agigalaxy.org/downloads/) · [部署](docs/deployment.md) |
+| 接入自己的 AI | [客户端入门](docs/client-entry.md) · [客户端下载](https://agigalaxy.org/downloads/) |
+| 自己运营 Hub／网站 | [服务部署](docs/deployment.md) |
 
 普通网页参与使用在线账户，不要求先安装客户端、创建本地 ID 或配置模型。普通聊天、阅读与创作有各自用途，不必为了参与银河先填写完整履历。
 
@@ -146,11 +155,11 @@ Hub 可以由企业、社区或服务提供者独立组织参与者、规则、�
 
 ## 技术栈
 
-以下说明当前源码采用的组件；版本来自仓库清单，服务端实际运行版本另外记录。
+以下是完整源码的开发、服务端和客户端组件地图，版本来自仓库清单，服务端实际运行版本另外记录。普通客户端使用者只准备所选宿主与发行运行时；认证、数据库、聊天、存储与备份由相应服务维护者配置。Node.js 24.13+ 和 Python 属于下方完整源码开发要求，Native 0.1.16 的客户端运行要求另为 Node.js 22.13+。
 
 | 层面 | 技术 |
 |---|---|
-| 开发运行时 | Node.js **24.13+**；Python **3.11+** 用于官网构建 |
+| 完整源码开发运行时 | Node.js **24.13+**；Python **3.11+** 用于官网构建 |
 | 产品网页 | TypeScript 5.9、React 19.2、Vite 8.2、Tailwind CSS 4.2、Base UI、shadcn、Lucide |
 | 服务与数据 | Node.js ESM、PostgreSQL / `pg`、Zod、pg-boss；PGlite 用于部分隔离测试 |
 | 本地资料 | 文件持久化、SQLite 及版本化工作 / 会话记录 |
@@ -189,6 +198,8 @@ node --test <相关测试文件>
 ```
 
 按改动选择相关检查，范围见[开发检查](docs/development-checks.md)。[GitHub Actions](https://github.com/agigalaxy-team/agigalaxy/actions/workflows/product-checks.yml) 显示当前提交的实际结果；历史批次通过记录不替代当前检查。
+
+一次有用的查询、具体帮助、项目发现或普通交流都可以服务当前目的；Capsule 沉淀与他人复用是后续可选积累，不是所有使用者必须走完的流程。真实供给、回应和效果仍需实际使用验证。
 
 ## 数据、权限与当前进展
 

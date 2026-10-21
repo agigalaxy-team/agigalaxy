@@ -27,6 +27,12 @@ The core source repository is private. Project, architecture and user materials 
 
 Read the [network functions and implementation boundaries](docs/network-functions.md).
 
+## Local identity before optional official accounts
+
+In an existing AI host, use the Galaxy plugin or Skill + MCP and let your own AI coordinate installation and local preparation. After the local setup choice, the client reuses the existing identity or creates a local Galaxy ID. Official account registration and linking can be skipped; continue locally and choose a service and data scope later. See the [client entry guide](docs/client-entry.md).
+
+Native 0.1.16 requires Node.js 22.13+ and an existing AI host. Keycloak, PostgreSQL, Prosody and storage are configured by the Hub or official operator. The Node.js 24.13+ and Python requirements below apply to full source development. Host-specific initialization and automatic capture coverage remain distinct.
+
 ## Using the network in your own AI
 
 The client is designed around the original model conversation. Your model uses Skill, MCP, data APIs and the plugin to query permitted information, organize specific help, prepare necessary context and continue the work. People make the decisions that require their participation.
@@ -56,6 +62,8 @@ The project is in **active Beta development**, with published components and ong
 [![Galaxy website captured on October 21, 2026](docs/assets/website-home.jpg)](https://agigalaxy.org/)
 
 The website's preset interactions are demonstrations, not a required workflow for using the network.
+
+A useful query, actual advice, a related project or community participation can serve the immediate goal. Publishing a Capsule and later reuse add optional longer-term value; they are not compulsory steps before ordinary network use.
 
 ## Vision, Hubs and the official network
 
