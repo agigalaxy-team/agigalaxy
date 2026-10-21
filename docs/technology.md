@@ -33,9 +33,9 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 | 服务端数据 | PostgreSQL | Hub／官方的业务数据持久化，由服务维护者配置 |
 | 客户端宿主接入 | 插件、MCP、MCP Apps、Skill | 在已有 AI 环境中连接工具、初始化本地身份并使用宿主支持的界面；由安装程序和 AI 协助处理配置 |
 | 专用 Agent 执行接入 | A2A | 所支持执行环境的协作接口；普通客户端初次接入无需全部配置 |
-| 认证 | Keycloak / OpenID Connect | 所配置网站环境的账户认证 |
-| 通信 | Prosody / XMPP | 相应即时通信服务 |
-| 文件 | S3 兼容存储、ClamAV | 对象存储及配置的文件安全扫描 |
+| Hub／官方服务端认证 | Keycloak / OpenID Connect | 由服务维护者配置，承接相应网站环境的账户认证 |
+| Hub／官方服务端聊天 | Prosody / XMPP | 服务器内部的消息传输与归档；客户端经银河 HTTPS 业务接口使用，无需安装、配置 XMPP 或单独注册 XMPP 账户 |
+| Hub／官方服务端文件 | S3 兼容存储、ClamAV | 由服务维护者配置对象存储和文件安全扫描 |
 
 表中技术来自当前实现采用的依赖与组件，各项不一定在每种入口中同时运行。安装客户端也不要求用户先部署完整网站配套服务。公开客户端 0.1.16 要求 Node.js 22.13+，其他组成部分的运行版本独立管理。
 
@@ -43,7 +43,7 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 
 银河保留 Hub、Bridge、MCP 和 A2A 等接入基础。协议存在、某项接入已经实现和完整独立生态成熟是不同阶段，跨环境行为需要实际验证。
 
-当前 Hub 有 `galaxy-direct-proof/1` 的两方有限范围直接互联实现，通过 HTTPS、选定公钥、协议与来源授权检查交换选定证明或非叙述贡献字段。Prosody / XMPP 承担相应聊天室通信与存储接入；采用 XMPP 本身不证明跨站聊天室联邦已经成立。身份、签名、来源、撤回与交换边界见[技术核对说明](technical-faq.md)。
+当前 Hub 有 `galaxy-direct-proof/1` 的两方有限范围直接互联实现，通过 HTTPS、选定公钥、协议与来源授权检查交换选定证明或非叙述贡献字段。Prosody / XMPP 承担 Hub／官方服务器内部的聊天传输与归档，普通客户端只调用银河的 HTTPS 业务接口；采用 XMPP 本身不证明跨站聊天室联邦已经成立。身份、签名、来源、撤回与交换边界见[技术核对说明](technical-faq.md)。
 
 更完整的五层职责见[愿景与架构](vision-and-architecture.md)。官方公共入口、参考 Hub、第三方 Hub 与可选 Relay 的职责及信息流见[Hub 与官方的运作](ecosystem-and-hubs.md)。
 

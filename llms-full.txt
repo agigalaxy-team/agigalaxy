@@ -23,7 +23,7 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 在自己的 AI 环境中使用银河 | 已有 AI 宿主；当前 Native 0.1.16 所需的 Node.js 22.13+；按宿主安装插件或 Skill＋MCP | 本机初始化时先沿用或创建本地 ID，可以跳过官方账户注册和关联 |
 | 自己运营 Hub 或维护官方服务 | 部署环境、数据库、认证、通信、存储及运维配置 | 由运营方管理服务和访问规则；其技术栈不转化为普通客户端用户的安装任务 |
 
-Keycloak、PostgreSQL、Prosody / XMPP、对象存储和扫描服务属于相应服务环境。使用已有 Hub 的普通用户不需要在自己电脑上部署这些组件，也不需要先学习 MCP 或 A2A 协议才能表达使用目标。A2A 是专用 Agent 执行接入的一种方式，不是所有客户端初次安装都要配置的模块。
+Keycloak、PostgreSQL、Prosody / XMPP、对象存储和扫描服务属于相应 Hub／官方服务端环境。客户端聊天通过银河的 HTTPS 业务接口使用；XMPP 连接留在服务器内部，普通客户端无需安装或配置 XMPP，也无需单独注册 XMPP 账户。使用已有 Hub 的普通用户不需要在自己电脑上部署这些组件，也不需要先学习 MCP 或 A2A 协议才能表达使用目标。A2A 是专用 Agent 执行接入的一种方式，不是所有客户端初次安装都要配置的模块。
 
 ## 由自己的 AI 协助接入
 
@@ -263,7 +263,7 @@ Bridge 把获准的外部事件或资料映射进银河可理解的结构，说�
 | `galaxy-direct-proof/1` 的有限证明与贡献字段查询 | 面向任意资料的通用联邦、完整全网公共索引、跨站聊天室联邦 |
 | 来源、版本、许可、退出与撤回的相应处理 | 设计中的可选 Relay、全面托管和具有保证的商业套餐 |
 
-Prosody / XMPP 承担相应聊天室通信和存储接入；它与这里的 HTTPS Hub 交换不是同一条传递路径。详见[技术核对说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。
+Prosody / XMPP 在 Hub／官方服务器内部承担聊天传输与归档。普通客户端经银河 HTTPS 业务接口使用聊天，无需部署、配置 XMPP 或单独注册 XMPP 账户；服务端聊天组件与这里的 HTTPS Hub 证明交换属于不同职责。详见[技术核对说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。
 
 ## 整理依据
 
@@ -408,7 +408,7 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 产品界面 | React、TypeScript、Vite、Tailwind CSS | 网络功能、真实内容与完整使用过程 | 现有网站与产品界面基础 |
 | 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已接入源码和候选，完整运营范围继续整合 |
 | 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 已进入工程接线；不以队列存在代替功能交付 |
-| 聊天与存储接入 | [Prosody / XMPP](https://prosody.im/) | 房间业务、成员、消息许可与实际保留规则 | 有相应实现；不是跨 Hub 通用资料联邦 |
+| Hub／官方服务端聊天与归档 | [Prosody / XMPP](https://prosody.im/) | 服务器侧的房间、成员、消息许可与保留规则；向客户端提供银河 HTTPS 业务接口 | 客户端无需部署或配置 XMPP、无需单独 XMPP 账户；该实现不构成跨 Hub 通用资料联邦 |
 | 文件与对象存储 | S3 兼容接口、ClamAV；[Garage](https://garagehq.deuxfleurs.fr/)作为自部署对象存储工程选择 | 上传、业务引用、可见性、扫描与生命周期 | 原有接口与扫描基础保留，自部署标准与运行覆盖继续落实 |
 | 指标、告警与日志 | Prometheus、Alertmanager、Grafana OSS、Loki、Alloy | 业务关联、安全日志和统一维护入口 | 已选定的运行工具组合，真实集中采集覆盖需分别核对 |
 | 统一备份与恢复 | [restic](https://restic.net/)、[pgBackRest](https://pgbackrest.org/) | 整站资料范围、恢复点对应、隔离恢复与实际结果 | 已采用的运行保障方案；部署配置和一次构建不等于完成灾备验收 |
@@ -442,7 +442,7 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 
 ## 0. 初次接入是否需要先搭建服务或注册官方账户
 
-普通客户端在已有 AI 宿主中通过插件或 Skill＋MCP 接入，AI 可以协助完成环境发现、安装和本机初始化。程序在本机沿用或生成银河 ID，可以跳过官方在线账户注册和关联；Keycloak、PostgreSQL、Prosody 等由相应 Hub／官方服务维护者部署。
+普通客户端在已有 AI 宿主中通过插件或 Skill＋MCP 接入，AI 可以协助完成环境发现、安装和本机初始化。程序在本机沿用或生成银河 ID，可以跳过官方在线账户注册和关联；Keycloak、PostgreSQL、Prosody 等由相应 Hub／官方服务维护者部署；客户端聊天经银河 HTTPS 业务接口使用，不直接配置 XMPP 连接或单独注册 XMPP 账户。
 
 当前实现中 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 负责本机准备，`galaxy_native_connect` 另行连接所选服务；ID 在 Hub 的接入与在线账户注册不是同一个动作。OpenCode 的 `setup.mjs` 已将本机准备接到同次安装选择，其他宿主按其插件或 MCP／Skill 能力初始化。当前安装工具仍读取所选官网的公开配置，Node.js 22.13+ 也是 0.1.16 的真实运行要求；不据此宣称完整安装完全离线或任何宿主都能一键完成。
 
@@ -588,7 +588,7 @@ OpenCode 的自动采集依赖其公开事件接口。其他宿主的事件、�
 
 Bridge 描述外部系统的来源对象、目标对象、映射规则、授权、去重、撤回和出处。映射或一份声明并不证明第三方系统已经独立运行；来源观察和作者陈述仍保留各自含义。
 
-**Prosody / XMPP 用于相应聊天室通信与存储接入。** 已核对的适配器使用私有本机 XMPP 组件，配合房间与归档能力处理消息。上述 Hub 互联通过 HTTPS 和有限签名交换完成；不能因为采用 XMPP 就声称已经实现跨站聊天室联邦、全局身份互信或完整离线企业网络。
+**Prosody / XMPP 是 Hub／官方服务端内部的聊天基础设施。普通银河客户端通过 HTTPS 调用银河聊天业务接口，无需安装 Prosody、配置 XMPP 服务器或单独注册 XMPP 账户。** 已核对的适配器在 Hub 服务器侧运行，只连接该服务器的私有回环地址，配合房间与归档能力处理消息。上述 Hub 互联通过 HTTPS 和有限签名交换完成；不能因为采用 XMPP 就声称已经实现跨站聊天室联邦、全局身份互信或完整离线企业网络。
 
 Hub、Bridge 和有限互联有具体实现基础，多独立运营者、企业完整环境和长期互通效果仍需要实际部署及使用验证。
 
@@ -961,9 +961,9 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 | 服务端数据 | PostgreSQL | Hub／官方的业务数据持久化，由服务维护者配置 |
 | 客户端宿主接入 | 插件、MCP、MCP Apps、Skill | 在已有 AI 环境中连接工具、初始化本地身份并使用宿主支持的界面；由安装程序和 AI 协助处理配置 |
 | 专用 Agent 执行接入 | A2A | 所支持执行环境的协作接口；普通客户端初次接入无需全部配置 |
-| 认证 | Keycloak / OpenID Connect | 所配置网站环境的账户认证 |
-| 通信 | Prosody / XMPP | 相应即时通信服务 |
-| 文件 | S3 兼容存储、ClamAV | 对象存储及配置的文件安全扫描 |
+| Hub／官方服务端认证 | Keycloak / OpenID Connect | 由服务维护者配置，承接相应网站环境的账户认证 |
+| Hub／官方服务端聊天 | Prosody / XMPP | 服务器内部的消息传输与归档；客户端经银河 HTTPS 业务接口使用，无需安装、配置 XMPP 或单独注册 XMPP 账户 |
+| Hub／官方服务端文件 | S3 兼容存储、ClamAV | 由服务维护者配置对象存储和文件安全扫描 |
 
 表中技术来自当前实现采用的依赖与组件，各项不一定在每种入口中同时运行。安装客户端也不要求用户先部署完整网站配套服务。公开客户端 0.1.16 要求 Node.js 22.13+，其他组成部分的运行版本独立管理。
 
@@ -971,7 +971,7 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 
 银河保留 Hub、Bridge、MCP 和 A2A 等接入基础。协议存在、某项接入已经实现和完整独立生态成熟是不同阶段，跨环境行为需要实际验证。
 
-当前 Hub 有 `galaxy-direct-proof/1` 的两方有限范围直接互联实现，通过 HTTPS、选定公钥、协议与来源授权检查交换选定证明或非叙述贡献字段。Prosody / XMPP 承担相应聊天室通信与存储接入；采用 XMPP 本身不证明跨站聊天室联邦已经成立。身份、签名、来源、撤回与交换边界见[技术核对说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。
+当前 Hub 有 `galaxy-direct-proof/1` 的两方有限范围直接互联实现，通过 HTTPS、选定公钥、协议与来源授权检查交换选定证明或非叙述贡献字段。Prosody / XMPP 承担 Hub／官方服务器内部的聊天传输与归档，普通客户端只调用银河的 HTTPS 业务接口；采用 XMPP 本身不证明跨站聊天室联邦已经成立。身份、签名、来源、撤回与交换边界见[技术核对说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。
 
 更完整的五层职责见[愿景与架构](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md)。官方公共入口、参考 Hub、第三方 Hub 与可选 Relay 的职责及信息流见[Hub 与官方的运作](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md)。
 

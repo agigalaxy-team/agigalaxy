@@ -48,7 +48,7 @@
 | 产品界面 | React、TypeScript、Vite、Tailwind CSS | 网络功能、真实内容与完整使用过程 | 现有网站与产品界面基础 |
 | 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已接入源码和候选，完整运营范围继续整合 |
 | 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 已进入工程接线；不以队列存在代替功能交付 |
-| 聊天与存储接入 | [Prosody / XMPP](https://prosody.im/) | 房间业务、成员、消息许可与实际保留规则 | 有相应实现；不是跨 Hub 通用资料联邦 |
+| Hub／官方服务端聊天与归档 | [Prosody / XMPP](https://prosody.im/) | 服务器侧的房间、成员、消息许可与保留规则；向客户端提供银河 HTTPS 业务接口 | 客户端无需部署或配置 XMPP、无需单独 XMPP 账户；该实现不构成跨 Hub 通用资料联邦 |
 | 文件与对象存储 | S3 兼容接口、ClamAV；[Garage](https://garagehq.deuxfleurs.fr/)作为自部署对象存储工程选择 | 上传、业务引用、可见性、扫描与生命周期 | 原有接口与扫描基础保留，自部署标准与运行覆盖继续落实 |
 | 指标、告警与日志 | Prometheus、Alertmanager、Grafana OSS、Loki、Alloy | 业务关联、安全日志和统一维护入口 | 已选定的运行工具组合，真实集中采集覆盖需分别核对 |
 | 统一备份与恢复 | [restic](https://restic.net/)、[pgBackRest](https://pgbackrest.org/) | 整站资料范围、恢复点对应、隔离恢复与实际结果 | 已采用的运行保障方案；部署配置和一次构建不等于完成灾备验收 |

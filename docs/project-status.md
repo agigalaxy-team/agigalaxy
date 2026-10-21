@@ -66,6 +66,6 @@
 
 ## 已同步的公开介绍
 
-主代码仓库现包含[客户端本地先行入门与职责图](client-entry.md)、愿景与架构、[Hub 与官方的信息流](ecosystem-and-hubs.md)、[参与价值与商业方向](business-and-participation.md)、[开放组件](open-components.md)、[实现核对](technical-faq.md)、0.1.16 随版指南镜像、合成 JSON 与 AI 阅读包。公开对应资料位于 [agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public)，本轮同步源为 `9350faa`。
+主代码仓库现包含[客户端本地先行入门与职责图](client-entry.md)、愿景与架构、[Hub 与官方的信息流](ecosystem-and-hubs.md)、[参与价值与商业方向](business-and-participation.md)、[开放组件](open-components.md)、[实现核对](technical-faq.md)、0.1.16 随版指南镜像、合成 JSON 与 AI 阅读包。公开对应资料位于 [agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public)，本轮同步源为 `5d907ba`。
 
 本次同步修改项目介绍与资料入口，不改变线上服务、核心仓库可见性、产品许可、模型引擎采用决定或功能完成状态；未选定的价格、分成和服务条款继续保持未定。

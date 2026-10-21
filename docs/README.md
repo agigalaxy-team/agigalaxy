@@ -24,7 +24,7 @@
 
 ## 主代码与公开资料
 
-本仓库保留开发、部署和源码入口；[公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)为未取得源码权限的读者提供项目、用户和技术说明。本次同步源为公开资料提交 `9350faa`，主代码仓库中的说明按仓库语境补充了导航和许可范围，未扩大公开范围。
+本仓库保留开发、部署和源码入口；[公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)为未取得源码权限的读者提供项目、用户和技术说明。本次同步源为公开资料提交 `5d907ba`，主代码仓库中的说明按仓库语境补充了导航和许可范围，未扩大公开范围。
 
 外部 AI 可以直接读取[公开合并文本](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，不依赖搜索引擎先收录每个子页面。对应版本的[安装](native-client/0.1.16/installation.md)、[宿主](native-client/0.1.16/hosts.md)和[使用与数据](native-client/0.1.16/runtime.md)指南也已随仓库保存；它们保持 0.1.16 的发行范围，不代替后续版本指南。
 

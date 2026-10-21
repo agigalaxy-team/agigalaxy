@@ -31,7 +31,7 @@ Read the [network functions and implementation boundaries](docs/network-function
 
 In an existing AI host, use the Galaxy plugin or Skill + MCP and let your own AI coordinate installation and local preparation. After the local setup choice, the client reuses the existing identity or creates a local Galaxy ID. Official account registration and linking can be skipped; continue locally and choose a service and data scope later. See the [client entry guide](docs/client-entry.md).
 
-Native 0.1.16 requires Node.js 22.13+ and an existing AI host. Keycloak, PostgreSQL, Prosody and storage are configured by the Hub or official operator. The Node.js 24.13+ and Python requirements below apply to full source development. Host-specific initialization and automatic capture coverage remain distinct.
+Native 0.1.16 requires Node.js 22.13+ and an existing AI host. Keycloak, PostgreSQL, Prosody and storage are configured by the Hub or official operator. Chat uses Galaxy HTTPS business APIs; Prosody/XMPP runs inside the Hub server. Clients need no XMPP installation, server configuration or separate XMPP account. The Node.js 24.13+ and Python requirements below apply to full source development. Host-specific initialization and automatic capture coverage remain distinct.
 
 ## Using the network in your own AI
 
@@ -73,7 +73,7 @@ Galaxy organizes authorized local context, concrete help and collaboration, actu
 
 Independent Hubs manage their own members, rules, data and commercial services. The official public network is an optional discovery and service entry; an official reference Hub is one operator instance. Selected public metadata and source references may support discovery, while source services retain authority over bodies and later actions. A complete global index remains a development direction.
 
-The current bilateral implementation, **`galaxy-direct-proof/1`**, exchanges only scoped `ci-proof-v2` and selected non-narrative `contribution-summary` fields over signed HTTPS requests. Agreements, exact source grants, requester, purpose, expiry and current permissions are checked. It excludes raw task context, full private messages, project files, model control and payment or execution rights. It uses no official Relay and records an official protocol fee of zero; third-party service and local operating costs are separate. XMPP serves chat integration and does not establish general cross-Hub federation.
+The current bilateral implementation, **`galaxy-direct-proof/1`**, exchanges only scoped `ci-proof-v2` and selected non-narrative `contribution-summary` fields over signed HTTPS requests. Agreements, exact source grants, requester, purpose, expiry and current permissions are checked. It excludes raw task context, full private messages, project files, model control and payment or execution rights. It uses no official Relay and records an official protocol fee of zero; third-party service and local operating costs are separate. XMPP serves chat transport and archiving inside the Hub server; ordinary clients use Galaxy HTTPS business APIs. This does not establish general cross-Hub federation.
 
 The [Hub and official-network guide](docs/ecosystem-and-hubs.md) explains local operation, selective discovery, direct queries, Bridge mapping, revocation and optional Relay. Independent deployment, multiple actual operators and sustained interoperability still need delivery and validation.
 

@@ -128,7 +128,7 @@ Hub 可以由企业、社区或服务提供者独立组织参与者、规则、�
 | Hub 之间直接查询 | 双方先明确服务地址、公钥、协议与用途，再按具体来源、请求者、版本和有效期发起签名请求，来源 Hub 核对当前许可后返回允许字段。 |
 | Bridge 接外部系统 | 按来源和映射交换获准事实，保留去重、撤回与出处；一次接入不授予任意导出外部资料的权利。 |
 
-当前直接互联实现为 **`galaxy-direct-proof/1`**，来源限定为 `ci-proof-v2` 与选定非叙述字段的 `contribution-summary`。它不传送原任务上下文、完整私聊、项目文件、模型控制或付款执行权限；不经官方 Relay，协议记录的官方费用为 0。请求会暴露必要的对端、主体与用途信息，不能称为匿名查询。XMPP 用于聊天接入，Hub 证明交换另经 HTTPS 完成。
+当前直接互联实现为 **`galaxy-direct-proof/1`**，来源限定为 `ci-proof-v2` 与选定非叙述字段的 `contribution-summary`。它不传送原任务上下文、完整私聊、项目文件、模型控制或付款执行权限；不经官方 Relay，协议记录的官方费用为 0。请求会暴露必要的对端、主体与用途信息，不能称为匿名查询。XMPP 用于 Hub 服务器内部的聊天传输与归档；普通客户端经银河 HTTPS 业务接口使用聊天，无需配置 XMPP 或单独注册 XMPP 账户。Hub 证明交换另经其限定的 HTTPS 协议完成。
 
 可选全局发现、Relay、完整独立发行与多运营者长期互通，需要继续交付与验证。角色、四类信息流、许可撤回、退出和收费边界见 [Hub 与官方的运作](docs/ecosystem-and-hubs.md)。
 
@@ -165,7 +165,7 @@ Hub 可以由企业、社区或服务提供者独立组织参与者、规则、�
 | 本地资料 | 文件持久化、SQLite 及版本化工作 / 会话记录 |
 | 身份与签名 | Ed25519、JOSE、规范化 JSON；OIDC / OAuth、Keycloak 主题与扩展 |
 | AI 与 Agent | 用户自带模型；MCP、MCP Apps、A2A SDK 与宿主适配 |
-| 聊天与文件 | Prosody / XMPP、S3 兼容适配、Garage 选型、ClamAV 扫描 |
+| Hub／官方服务端聊天与文件 | Prosody / XMPP（服务器内部聊天与归档）、S3 兼容适配、Garage 选型、ClamAV 扫描；由服务维护者配置，客户端经银河 HTTPS 业务接口使用 |
 | 运营后台候选 | Payload 3.91、Next.js 16.4、独立管理 OIDC 与 PostgreSQL CMS 数据库 |
 | 部署与运行工具 | Caddy、systemd、Docker Compose；Prometheus、Alertmanager、Grafana OSS、Loki、Alloy、restic、pgBackRest 的配置与编排 |
 

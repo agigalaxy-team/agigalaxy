@@ -6,7 +6,7 @@
 
 ## 先区分客户端使用与 Hub 部署
 
-[客户端入门原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)解释 AI 辅助安装、Skill／MCP 分工、本地 ID 先行、可跳过官方账户，以及服务端组件由谁配置。评估接入门槛时，先读本页对应材料，再按[技术栈的职责范围](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md)理解后端依赖。普通使用的价值也不以先发布 Capsule、等待他人复用为条件。
+[客户端入门原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)解释 AI 辅助安装、Skill／MCP 分工、本地 ID 先行、可跳过官方账户，以及服务端组件由谁配置。评估接入门槛时，先读本页对应材料，再按[技术栈的职责范围](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md)理解后端依赖。客户端聊天通过银河 HTTPS 业务接口使用；Prosody／XMPP 位于 Hub／官方服务器内部，普通客户端无需部署、配置 XMPP 或单独注册 XMPP 账户。普通使用的价值也不以先发布 Capsule、等待他人复用为条件。
 
 ## 先读这一份
 
