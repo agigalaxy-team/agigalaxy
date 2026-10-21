@@ -2,12 +2,18 @@
 
 Public project and user documentation. Beta; core implementation managed separately.
 
+- Network manifesto: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md
+- Growth, data and contribution: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md
+- Community governance direction: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md
 - Client entry and local identity: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md
 - Reading guide: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ai-reading.md
 - Combined plain text: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt
 - Capsule JSON example (synthetic): https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/examples/capsule-v2.json
 
 ## Documents
+- 银河网络宣言: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md
+- 冷启动、数据价值与贡献激励: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md
+- 共同治理与开源生态资助: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md
 - 从安装到本地 ID：客户端怎样开始使用: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md
 - 项目愿景与架构: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md
 - Hub、银河官方与信息传递: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md

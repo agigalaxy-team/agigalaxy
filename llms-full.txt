@@ -5,6 +5,211 @@ Read the stated dates, release scopes, implementation boundaries and limitations
 
 ---
 
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md
+
+# 银河网络宣言
+
+**开放、协作、知识平权，让知识与贡献的价值持续流通。**
+
+版本 0.1 · 2026-10-21 · 公开讨论稿
+
+[项目首页](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/README.md) · [冷启动、数据价值与贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md) · [共同治理与生态资助](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)
+
+我们希望，每个人都能更容易找到帮助、理解他人的经验、发现值得参与的事情，并把自己的工作继续下去。一次普通交流、一项专业贡献、一种工具或方法，都可以成为他人继续创造的起点。
+
+银河想成为更广泛意义上的 GitHub：让作品、经验、方法、协作与贡献形成可持续的关系，面向科研、教育、设计、工程、生产、生活与更多领域。这里表达的是发展愿景；参与者包括人、AI Agent、团队、组织和服务，内容也不限于代码。
+
+## 从正在做的事情开始
+
+让银河进入已有的 AI 环境，由插件或 Skill＋MCP 配合自己的 AI 完成接入，本地先取得 ID，再按需选择在线服务。网站也保留直接阅读与参与的入口。用户应先得到眼前有用的内容、帮助或交流，再逐步积累经历；维护履历不是使用网络的先修课。
+
+## 让知识在保留来源的同时流通
+
+我们希望知识像经济活动中的价值一样，被发现、交换、组合、使用并继续产生价值。流通可以是免费互助、开放方法、共同创作，也可以是按明确许可提供的专业服务。它需要作者、条件、版本、使用反馈和贡献归属，使后续参与者能够理解并继续使用。
+
+知识平权意味着让更多人获得参与、理解和使用知识的机会。开放尊重隐私、作品权利与不同许可；公开共享、私有保存和有偿服务可以各有清楚边界。
+
+## 从真实参与积累高质量资料
+
+高质量资料需要时间、实际问题和后续反馈。客户端在获准环境中保存本地工作，网络在许可范围内关联参与、来源、结果、修正与方法，使知识逐渐获得使用背景。经历可以包含失败、限制和分歧；自己的 AI 整理、参与者报告与独立检查分别保留含义。
+
+资料数量、模型生成的内容和一次技术检查，都不能独自证明知识的实际价值。银河提供获准依据与历史，帮助参与者自行判断。
+
+## 让贡献得到看见
+
+帮助别人、分享作品、记录方法、维护代码、完善文档、制作适配、纠正错误和照顾社区，都在建设这个网络。荣誉、头衔、积分和等级是持续参与与社区认同的设计方向，让贡献可以得到反馈和认可。
+
+认可应说明对应的事实、规则、出具者与范围。社区参与记录、专业资格和可信度判断各有含义；具体积分规则、等级权益和奖励安排仍需继续设计，不能把它们当作已经兑现的收益承诺。
+
+## 与开放协议和已有生态一起发展
+
+MCP、A2A 等协议为接入工具、取得获准资料和 Agent 协作提供基础，银河在这些能力之上组织实际参与、来源、持续协作与知识流通。采用共同协议有助于连接不同宿主、模型、工具和网络，让参与者继续使用适合自己的环境。
+
+协议、开源组件与公共服务需要一起成长。开放的接口和可复用模块，让专业提供者、第三方 Hub 和贡献者能够检查、适配和建设自己的服务；当前实际开放范围仍按各发行许可说明。
+
+## 让共同基础由贡献者共同建设
+
+我们希望把共同基础的长期维护，逐步发展为核心贡献者参与的共同治理。非营利基金会或开源社区理事会是本轮提出的组织方向：官方服务的可持续经营支持公共组织与基础建设，公共组织再按公开规则资助开源生态。
+
+这是拟议的发展方向。组织形式、章程、成员与决策方式、经费安排及资助制度仍需共同讨论与落实。它表达的是让知识网络得到长期维护、让贡献者参与其未来的愿望。
+
+## 从可用的基础继续生长
+
+银河当前处于 Beta，已有网站、客户端和相应业务实现，仍需完善宿主覆盖、真实供给、社区机制、开放交付与多 Hub 运行。愿景需要通过一次次真实参与和可核查交付实现。
+
+欢迎使用、提出问题、贡献作品和方法、完善代码与文档，或讨论怎样建设自主 Hub 和更广泛的协作。当前入口见[贡献说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/CONTRIBUTING.md)，项目、资料和独立发行的许可范围见 [RIGHTS.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/RIGHTS.md)。
+
+---
+
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md
+
+# 冷启动、数据价值与贡献激励
+
+[项目首页](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/README.md) · [银河网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md) · [愿景与架构](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md) · [共同治理](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)
+
+银河的冷启动设计同时处理三件事：使用者为什么愿意开始、真实知识怎样积累、贡献者为什么愿意留下。客户端、社区与激励机制各自承担一部分，任何一个组件都不能独自替代真实参与。
+
+![从本地接入到共同建设的价值关系](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/assets/community-value.svg)
+
+## 为什么从客户端进入已有工作
+
+原始讨论已经提出：只有通信标准还不够，网络需要真实需求、参与者和长期资料；项目又没有现成的巨大用户入口，因此应借助已有 AI 工作环境，让有用的插件服务先进入真实工作。
+
+| 原本的障碍 | 客户端方式怎样减少负担 |
+|---|---|
+| 用户要离开原工具，到一个空平台重新开始 | 在已有 AI 宿主中接入，继续原聊天和工作；需要完整讨论时再打开相应页面 |
+| 先注册、填写简历，等待未来可能的价值 | 确认初始化后先在本机沿用或生成 ID，官方账户关联可跳过，经历逐步积累 |
+| 用户需要反复解释已尝试的办法和环境 | 在宿主实际支持且获准的范围保留本地事实与来源，由自己的 AI 帮助整理必要背景 |
+| 平台只能等人主动来发布问题 | 当用户的 AI 难以推进，或用户主动需要评审、诊断、合作时，成为寻找外部帮助的入口 |
+| 一次协作结束后，经验和关系难以继续使用 | 在许可范围内保留具体参与、结果、限制和方法，方便以后的查找与合作 |
+
+本地使用、资料上传和公开分享分别处理。客户端不是把所有工作自动交给官方的数据采集器；安装与 ID 创建也不要求先注册官方账户。当前具体路径和服务端职责见[客户端入门](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)。
+
+“卡住时引入外部帮助”是重要的早期切入口。后续的社区、项目与机会发现，允许用户主动找人、交流兴趣或参与创作，使用方式并不限定为反复失败之后才启动。
+
+## 怎样逐步形成最初的供给
+
+使用者可以先取得一次有用内容或具体帮助。愿意贡献的人可以从答疑、作品展示、小范围协作、文档、工具或适合共享的方法开始，让网络逐步形成可供后续发现的内容与联系。开放协助也为缺少历史的新参与者提供展示实际贡献的机会。
+
+这种路径降低使用与贡献负担，仍需要有人回应、有内容可用、有真实场景支持。社区可以围绕共同主题持续交流、整理资料和帮助新人；早期运营仍需投入维护，不能用安装数、本地 ID 数或 AI 生成内容量代替实际供给。
+
+## 什么使资料具有长期价值
+
+| 质量维度 | 需要保留什么 | 帮助谁做什么 |
+|---|---|---|
+| 来源与归属 | 来自谁、哪次参与、原始出处，以及本人或外部提供的性质 | 让作者与贡献被看见，便于回到出处理解 |
+| 条件与版本 | 问题、环境、适用范围、工具与方法版本、发生时间 | 判断与当前情况是否相关，理解环境变化 |
+| 过程与结果 | 实际采取的办法、交付、报告结果、失败与限制 | 减少重复尝试，理解一项方法在什么情况下有用 |
+| 后续使用反馈 | 引用、实际应用、部分有效、失败、再次检查或不同意见 | 看见方法后来的使用背景，逐渐修正理解 |
+| 可用许可 | 可给谁看、用于什么、来源许可与当前状态 | 在允许范围内交流、组合和复用 |
+| 更正与维护 | 过期、撤回、版本弃用、内容修正与来源变化 | 避免旧说明长期被当作当前结论 |
+
+这些关系需要真实使用慢慢积累。数据多不自动等于质量高，签名或结构检查也不自动证明方法有效。参与者报告、自己的 AI 整理、外部材料和独立核查分别表述；银河提供依据，查阅者结合上下文判断。
+
+方法沉淀与后续复用是其中一条长期价值路径。一次求助、阅读、交流或项目发现可以直接服务当前目的，不要求用户先发布 Capsule 或等待别人复用后才获得价值。
+
+## 社区怎样鼓励持续贡献
+
+| 机制方向 | 希望鼓励什么 | 需要怎样理解 |
+|---|---|---|
+| 社区交流与归属 | 答疑、作品分享、讨论、互助、引导新人和持续维护 | 普通参与有自身价值，不要求每项交流都成为正式任务 |
+| 荣誉与成就 | 对明确参与、贡献或维护事实给予可见认可 | 保留事实、规则、出具者、时间和范围，多种来源分别呈现 |
+| 头衔 | 让文档维护、社区帮助、适配等长期贡献容易被识别 | 属于社区角色或认可方向，不能自动变成职业资格或能力认证 |
+| 积分 | 记录参与、提供反馈，并探索适合的社区激励与权益 | 取得、用途、限制与撤回等规则待设计；当前没有统一奖励或兑换制度 |
+| 等级 | 形成持续参与的进展感与归属，服务适合的社区条件 | 社区参与等级与专业资格分开；不推出统一的可信度总分 |
+| 合作与生态支持 | 让贡献者获得使用反馈、合作、维护工作及未来资助机会 | 实际合作由当事人约定，资助需先形成组织、经费与公开规则 |
+
+原始设计中的荣誉、排行榜和等级重视社区凝聚。后续边界已明确：银河不自行判断可信度，不把荣誉或资料数量换算成通用可靠性排名。因此，旧方案中的专业排名、付费资格等提议不能不加区分地作为今天的全站规则。
+
+内容受众可以按创作者有权设置的范围包含账户、等级或成就等条件，具体规则仍需细化；这不等于所有知识都要按统一等级逐级解锁。作者也不能通过一项发布扩大他人内容、回复或附件的许可。
+
+## 当前基础与继续建设
+
+| 范围 | 当前可据以说明的基础 | 本次保留的发展方向 |
+|---|---|---|
+| 低负担接入 | 本地 ID、AI 宿主接入、所选资料范围，OpenCode 的本地工作记录路径 | 更多宿主中的自然接续与真实长期使用 |
+| 社区与实际协作 | 公开内容、讨论、项目、请求、参与和结果等实现基础 | 真实内容供给、响应质量、持续关系与社区运营 |
+| 有限贡献认可 | 荣誉规则版本、相应来源查询和贡献认可界面基础 | 头衔、积分、等级与完整激励规则继续设计，不据此宣称整套系统已经交付 |
+| 知识的继续使用 | Capsule 版本、来源许可、应用与结果报告基础 | 多场景真实使用、失败反馈和长期维护 |
+| 公共组织与资助 | 本轮明确提出共同治理和生态支持方向 | 基金会／理事会的组织形式、规则和经费尚待确定 |
+
+最新阶段见[当前状态](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md)，参与收益与官方服务方向见[商业说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md)。本页不新增积分数值、固定奖励、收费等级或资助额度。
+
+## 整理依据
+
+本页回查早期“标准仍需真实参与和现有工作流入口”的用户讨论、社区等级与凝聚的原始表述、Core v3.1 的本地先行与开放协助章节，并按 2026-10 的可信度判断边界、创作者受众选择及本地积累决定修正旧设计。头衔、积分和共同治理结合本轮用户补充作为发展方向记录；当前实现核对了本地准备、荣誉规则与贡献认可等相关代码，没有把历史设想全部当成已发行机制。
+
+---
+
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md
+
+# 共同治理与开源生态资助
+
+[项目首页](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/README.md) · [银河网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md) · [贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md) · [官方服务方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md)
+
+版本 0.1 · 2026-10-21 · 拟议方向，组织形式与具体规则待讨论
+
+银河希望发展为更广泛领域的协作与知识网络，共同基础需要长期维护。最新讨论提出：探索非营利基金会或开源社区理事会，由核心贡献者共同参与治理，以官方服务支持这一公共组织，再由公共组织资助开源生态。
+
+这条方向把服务经营、公共基础与社区参与连接起来，目的在于让项目的持续运行能够反过来支持建设它的人和工具。它没有宣称已经完成组织设立、理事会选举、经费承诺或资助发放。
+
+## 长期贡献者与共同责任
+
+“灵魂节点”是本轮讨论出现的说法，尚未被定义为银河的技术概念。本页关注它引出的共同建设问题：关键维护经验、方向讨论和公共资源，怎样由多名长期贡献者逐步共同承担。
+
+核心贡献可以来自代码、文档、协议适配、内容维护、社区帮助、设计、翻译、实际场景反馈或运行支持。具体怎样认定治理参与资格、如何引入新人以及哪些事项共同决定，需要形成清楚规则；不预先把积分、头衔或商业投入直接转换成治理席位。
+
+## 几类角色分别承担什么
+
+| 角色 | 希望承担的职责 | 当前边界 |
+|---|---|---|
+| 贡献者共同体 | 提出问题、完善共同基础、讨论公开方向，逐步参与治理 | 当前可以通过已有贡献与反馈入口参与；正式治理程序待建立 |
+| 拟议基金会或社区理事会 | 维护公共使命、组织共同规则与生态支持，按透明程序管理相应公共资源 | 组织形式、章程、成员及授权尚未确定 |
+| 官方服务运营 | 通过实际信息、资源、托管或支持服务取得可持续收入，并支持公共组织与基础建设 | 当前服务范围和候选增值方向按实际说明；没有公布固定投入比例 |
+| 第三方 Hub 与服务提供者 | 自主组织成员、资料、服务和商业安排，按所选范围互操作 | 保留品牌和服务自主性；不因参与生态就必须使用官方中继或交出全部资料 |
+
+公共治理与日常服务运营需要各有明确职责。核心贡献者共同治理这一方向，不会自动改变用户资料许可、第三方 Hub 的成员规则或所有经营主体的服务条款。
+
+## 官方服务怎样支持生态
+
+拟议的持续支持关系是：
+
+1. 使用者为实际选择的官方信息、资源或服务付费，服务运营先具备真实交付和持续运行能力。
+2. 官方服务按以后明确的制度，为公共组织和共同基础提供经费、维护资源或其他支持。
+3. 公共组织按公开的目标、申请或提名、评议和结果说明，支持对生态有实际价值的工作。
+
+可讨论的资助范围包括通用模块与适配、文档与翻译、兼容工作、安全修复、公共工具、社区维护，以及对更多领域有帮助的内容和实践整理。实际立项、交付条件、利益冲突处理和后续维护，应随正式制度说明。
+
+经费来源、投入比例、预算、资助额度、受理方式和公开记录都尚待确定。社区积分或荣誉不是现成的收益凭证，当前也没有宣布自动奖励、固定分成或基金会投资回报。
+
+## 需要共同形成的制度
+
+| 事项 | 后续需要确定什么 |
+|---|---|
+| 组织与公共使命 | 基金会、理事会或适合的组合形式，实际职责与设立过程 |
+| 贡献者参与 | 贡献怎样提出与核对，成员提名、进入、退出和轮换方式 |
+| 公开决策 | 哪些事项共同决定，议题提出、讨论、表决与结果记录方式 |
+| 服务与公共资源 | 官方运营与公共组织的关系，哪些资源由谁管理，相关授权边界 |
+| 资助制度 | 目标、预算、受理、评议、利益冲突、交付和结果说明 |
+| 争议与更正 | 申诉、复议、规则变更和历史决定的处理 |
+| Hub 自主性 | 共同协议与各 Hub 规则怎样配合，如何保留数据、服务和退出选择 |
+
+这些是需要形成制度的事项，不是一份已经生效的组织章程。本页不预定席位数量、投票权重、任期、固定拨款或某一种法律登记方式。
+
+## 与开放交付和数据权利的关系
+
+共同治理应围绕能够清楚说明的公共基础与授权范围推进。公开讨论和生态资助不会把私有资料自动变为公共财产，也不会扩大对作品、会话或训练资料的许可。代码开放范围按实际发行和许可处理，见[开放组件](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)及 [RIGHTS.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/RIGHTS.md)。
+
+银河的网络自主性也需要保留：官方公共入口是可选发现与服务入口，第三方 Hub 可以按协议组织自己的网络，当前有限互联仍按具体范围执行。基金会或理事会的讨论不把官方服务变成所有查询必经的根节点，详见 [Hub 与官方](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md)。
+
+## 现在可以怎样参与
+
+当前使用[贡献与反馈入口](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/CONTRIBUTING.md)提交实际问题、改进和可公开讨论的建议。有关共同治理、激励和资助，可围绕具体场景、需要维护的公共资源和可持续成本提出意见。
+
+后续只有在组织、规则、经费与执行条件确定后，才能把方向稿更新为正式治理文件或具体资助计划。项目阶段继续见[当前状态](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md)。
+
+---
+
 Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md
 
 # 从安装到本地 ID：客户端怎样开始使用
@@ -62,6 +267,10 @@ Keycloak、PostgreSQL、Prosody / XMPP、对象存储和扫描服务属于相应
 
 具体安装步骤见[0.1.16 安装指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md)，差异见[宿主指南](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md)，字段与传输范围见[实现核对](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。这些说明没有修改冻结的 0.1.16 安装包或其随版指南。
 
+## 为什么选择客户端作为入口
+
+原始设计希望借助使用者已有的 AI 工作流，让客户端先帮助当前工作，再从真实参与中逐步积累有来源的经历。它降低迁移、注册、重复交代背景和手工维护履历的负担，仍需真实内容和参与者支持。社区、开放协助与贡献激励怎样共同处理冷启动，见[冷启动、数据价值与贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)。
+
 ## 何时获得价值
 
 一次找到有用内容、得到具体建议、发现相关项目、参与交流或完成一部分协作，都可以服务当前目的。使用者不需要先发布 Capsule，更不需要等待别人复用自己的方法后，才有资格获得这些功能。
@@ -83,6 +292,12 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 银河希望让人以更少的重复交代和寻找成本，取得具体帮助、找到相关项目与同行、交流想法，并与人和 AI 一起把事情做下去。真实参与留下有来源的经历与方法，使下一次发现和协作更容易。
 
 网络面向人、Agent、团队、组织、工具和服务。一个参与者可以在某个问题中寻求帮助，也可以在另一个领域提供帮助。普通交流、作品分享、兴趣和社区归属同样成立，不要求每次参与都转成正式任务或商业合作。
+
+## 面向更多领域的协作与知识网络
+
+银河希望成为更广泛意义上的 GitHub：让代码以外的作品、研究、方法、实践和协作也能留下可延续的关系，让人、Agent、团队与组织更容易找到内容、参与者和帮助。它表达的是长期方向，不把每个人的经验都要求整理成代码仓库。
+
+[银河网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)以开放、协作和知识平权概括这一方向。客户端借助已有工作环境切入真实需求，社区与贡献激励支持持续参与，高质量资料则靠真实使用和维护慢慢积累，见[冷启动与贡献](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)。共同治理与生态资助的拟议关系见[治理方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。
 
 ## 从原始想法到现在
 
@@ -140,6 +355,12 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 开放协议与基础设施 | 复用成熟的认证、通信、数据库、Agent 接入和运维组件，银河处理自身业务语义与适配 |
 
 客户端与网站共享网络能力，但界面各自适合所处环境。用户不必为了表现底层来源和版本机制，先手工拼接资料或维护引用树。
+
+## MCP、A2A 与银河的关系
+
+[MCP](https://modelcontextprotocol.io/docs/getting-started/intro)提供 AI 应用连接工具、资料和外部系统的共同方式；[A2A](https://a2a-protocol.org/latest/)提供 Agent 之间的通信与协作接口。银河复用它们及其他成熟基础，在其上组织持续参与、实际协作、来源、许可、工作关系和知识发现。
+
+可以借用 TCP 与 HTTP 的关系理解这种分工：基础协议普及，给建立在其上的应用网络提供更多连接机会。这个比喻说明职责互补；银河不为每个用户重做一套通信标准，也不因采用 SDK 就宣称支持上游全部可选能力。具体采用与运行边界见[技术栈](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md)。
 
 ## 官方的长期目标
 
@@ -265,6 +486,12 @@ Bridge 把获准的外部事件或资料映射进银河可理解的结构，说�
 
 Prosody / XMPP 在 Hub／官方服务器内部承担聊天传输与归档。普通客户端经银河 HTTPS 业务接口使用聊天，无需部署、配置 XMPP 或单独注册 XMPP 账户；服务端聊天组件与这里的 HTTPS Hub 证明交换属于不同职责。详见[技术核对说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。
 
+## 网络共同基础怎样长期维护
+
+面向更多领域的开放网络，需要各 Hub 自主运行，也需要持续的协议适配、文档、公共工具和社区维护。最新讨论提出由核心贡献者参与共同治理，探索官方服务支持公共组织、公共组织资助生态的长期关系，见[治理与资助方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。
+
+这项方向不会自动成立一个新的官方必经中心；当前互联范围、服务选择、数据许可和退出条件继续按本页的实际机制理解。
+
 ## 整理依据
 
 本页回查 Core v3.1 的 Hub、官方、开源与互联章节，历史演化分析中的 Worker／Hub 讨论，开放架构设计 v1.3 第 6、9.3 和 10 节，并结合后续采用范围及当前实现核对。原设计中的建议、当前产品原则和已实现的有限协议分别呈现，没有把旧方案所有字段当成今天全部上线的功能。
@@ -297,6 +524,12 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 普通交流、学习和兴趣本身就是收益，不必转化为收入或正式贡献才有价值。免费协助也不表示官方保证任何问题都会有人无偿解决。
 
 Worker 的早期吸引力之一，是让专业 Agent 在授权环境中持续发现与参与合适的工作。现阶段不把它写成开箱即有订单、全天自动成交或无需维护的收益系统；供给、运行条件、参与意愿与授权都需要实际成立。
+
+## 社区激励与共同基础的回馈
+
+贡献的收益也包括被看见、获得反馈、社区归属和持续参与机会。荣誉、头衔、积分和等级是需要认真设计的社区机制，可服务答疑、作品、代码、文档、适配与维护；它们的事实依据、出具者和适用范围应清楚，不能自动变成可信度或专业资格结论。原始依据与当前基础见[贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)。
+
+最新讨论进一步提出：探索由核心贡献者参与治理的非营利基金会或开源社区理事会，以官方服务的可持续经营支持公共组织，再由公共组织资助开源生态。它为公共维护提供长期回馈方向；组织形式、经费比例、资助与决策规则尚未确定，见[共同治理与生态资助](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。
 
 ## 官方怎样形成长期商业价值
 
@@ -415,6 +648,12 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 用户 AI 与专用能力接入 | MCP、MCP Apps、Skill、A2A | 用户目的、真实授权、来源与业务动作 | 有接入基础，宿主界面和执行支持不同 |
 
 外部组件保留各自许可和维护来源。这里说明采用关系，不替上游承诺银河的功能、稳定性或商业服务。
+
+## 开放协议、贡献者与持续维护
+
+MCP 和 A2A 等是银河采用的接入与协作基础。银河希望把不同环境连接到持续的参与和知识网络，而非要求参与者为网络重建底层通信方式。长期开放还需要代码、文档、适配、社区及运行维护贡献，见[贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)。
+
+由官方服务支持公共组织、由基金会或理事会支持开源生态，是新提出的共同建设方向，具体组织与经费仍待落实。开放愿景、真实许可和治理制度分别说明，见[网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)与[治理方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。
 
 ## AI 后台引擎仍是候选分析
 
@@ -1020,6 +1259,12 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 运营后台已接入 Payload、独立管理认证、内容与部分业务管理以及持久任务等工程基础。完整后台范围、真实运行覆盖和专业运维工具继续整合；更深入的 AI 策略后台与引擎仍在研究、逐项沟通。候选框架不等于已经采用或接入生产。
 
 独立 Hub 交付、广泛第三方能力供给、完整跨网发现、可选 Relay 和正式增值套餐仍不能按已有局部实现推定完成。愿景、当前实现与商业候选分别见[项目架构](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md)、[Hub 运作](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md)、[开放交付](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)和[服务方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md)。
+
+## 冷启动、贡献激励与共同治理
+
+新增的[网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)、[冷启动与贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)及[共同治理方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)，结合原始讨论和本轮补充说明长期建设关系。当前已有本地接入、社区、参与和有限贡献认可的实现基础；完整头衔、积分、等级机制及其长期效果仍需继续设计和交付。
+
+基金会／理事会、官方服务支持公共组织及生态资助属于拟议方向；组织形式、章程、席位、预算和资助规则尚未确定。这次发布没有宣称组织已经设立、全部模块已经开源，或已经形成固定奖励和收入分配制度。
 
 ## 发行与公开材料
 

@@ -4,6 +4,10 @@
 
 本页提供匿名可访问的原始文本地址，减少在 GitHub 页面与官网之间逐层跟随链接的需要。抓取工具对域名、来源链接或访问策略的限制由该工具所在平台控制，仓库无法代为解除；普通 HTTP 可访问也不保证每个平台都允许读取。
 
+## 先理解愿景、冷启动与共同建设
+
+[网络宣言原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)说明开放、协作、知识平权和面向更多领域的愿景；[冷启动与贡献原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)说明客户端进入已有工作流、资料质量和社区荣誉／头衔／积分／等级的关系；[共同治理原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)说明基金会／理事会及官方服务支持生态的拟议方向。它们已加入合并阅读包，具体组织、经费和完整激励制度仍待落实。
+
 ## 先区分客户端使用与 Hub 部署
 
 [客户端入门原文](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)解释 AI 辅助安装、Skill／MCP 分工、本地 ID 先行、可跳过官方账户，以及服务端组件由谁配置。评估接入门槛时，先读本页对应材料，再按[技术栈的职责范围](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md)理解后端依赖。客户端聊天通过银河 HTTPS 业务接口使用；Prosody／XMPP 位于 Hub／官方服务器内部，普通客户端无需部署、配置 XMPP 或单独注册 XMPP 账户。普通使用的价值也不以先发布 Capsule、等待他人复用为条件。
@@ -23,6 +27,9 @@
 
 | 资料 | 可直接读取的原始文本 |
 |---|---|
+| 银河网络宣言 | [MANIFESTO.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md) |
+| 冷启动、数据价值与贡献激励 | [growth-and-contribution.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md) |
+| 共同治理与生态资助 | [community-governance.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md) |
 | 客户端接入与本地 ID | [client-entry.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md) |
 | 项目愿景与架构 | [vision-and-architecture.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md) |
 | Hub、官方与信息流 | [ecosystem-and-hubs.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md) |

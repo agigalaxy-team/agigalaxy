@@ -58,6 +58,12 @@
 
 官网现有部分展示以资料组合和出处交互为中心，容易产生上述误解；相应展示仍需单独修订与发布。本次 GitHub 文档修正不代表已经修改线上页面。具体功能及源码边界见[网络功能](network-functions.md)。
 
+## 新增的社区与共同治理方向
+
+[网络宣言](../MANIFESTO.md)和[冷启动与贡献说明](growth-and-contribution.md)补充客户端切入口、知识价值、社区凝聚和荣誉／头衔／积分／等级的设计关系。当前代码有有限荣誉规则、来源查询和贡献认可界面基础，不能据此宣称完整激励机制与长期效果已经交付。
+
+[共同治理与生态资助](community-governance.md)记录本轮提出的基金会／理事会、核心贡献者参与，以及官方服务支持公共组织并回馈开源生态的方向。组织、章程、决策及经费规则仍待确定，本次仅更新资料。
+
 ## 后续方向
 
 继续完善实际宿主接入、外部依赖整链、资料与发行一致性、工程诊断以及完整后台运营。后台的自动规则、AI 决策、人机协作与人工接管仍需按已讨论范围逐项落实；不从一个框架名称推导完整系统已经实现。
@@ -66,6 +72,6 @@
 
 ## 已同步的公开介绍
 
-主代码仓库现包含[客户端本地先行入门与职责图](client-entry.md)、愿景与架构、[Hub 与官方的信息流](ecosystem-and-hubs.md)、[参与价值与商业方向](business-and-participation.md)、[开放组件](open-components.md)、[实现核对](technical-faq.md)、0.1.16 随版指南镜像、合成 JSON 与 AI 阅读包。公开对应资料位于 [agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public)，本轮同步源为 `5d907ba`。
+主代码仓库现包含[客户端本地先行入门与职责图](client-entry.md)、愿景与架构、[Hub 与官方的信息流](ecosystem-and-hubs.md)、[参与价值与商业方向](business-and-participation.md)、[开放组件](open-components.md)、[实现核对](technical-faq.md)、0.1.16 随版指南镜像、合成 JSON 与 AI 阅读包。公开对应资料位于 [agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public)，本轮同步源为 `e7698d2`。
 
 本次同步修改项目介绍与资料入口，不改变线上服务、核心仓库可见性、产品许可、模型引擎采用决定或功能完成状态；未选定的价格、分成和服务条款继续保持未定。

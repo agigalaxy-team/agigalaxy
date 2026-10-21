@@ -32,6 +32,12 @@
 
 独立 Hub 交付、广泛第三方能力供给、完整跨网发现、可选 Relay 和正式增值套餐仍不能按已有局部实现推定完成。愿景、当前实现与商业候选分别见[项目架构](vision-and-architecture.md)、[Hub 运作](ecosystem-and-hubs.md)、[开放交付](open-components.md)和[服务方向](business-and-participation.md)。
 
+## 冷启动、贡献激励与共同治理
+
+新增的[网络宣言](../MANIFESTO.md)、[冷启动与贡献激励](growth-and-contribution.md)及[共同治理方向](community-governance.md)，结合原始讨论和本轮补充说明长期建设关系。当前已有本地接入、社区、参与和有限贡献认可的实现基础；完整头衔、积分、等级机制及其长期效果仍需继续设计和交付。
+
+基金会／理事会、官方服务支持公共组织及生态资助属于拟议方向；组织形式、章程、席位、预算和资助规则尚未确定。这次发布没有宣称组织已经设立、全部模块已经开源，或已经形成固定奖励和收入分配制度。
+
 ## 发行与公开材料
 
 - 本次核对的官网 Native 客户端开发版为 **0.1.16**，安装要求与宿主差异见[下载与安装指南](getting-started.md)。后续版本从[官网下载页](https://agigalaxy.org/downloads/)取得。

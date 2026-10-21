@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810" role="img" aria-labelledby="title desc">
+<title id="title">银河的冷启动、知识价值与共同建设</title>
+<desc id="desc">从已有 AI 环境低负担接入，在实际帮助和交流中积累有来源、条件、许可和反馈的资料，通过贡献认可与拟议共同治理支持长期建设。MCP、A2A 等提供连接与协作基础。</desc>
+<style>text{font-family:system-ui,"Microsoft YaHei",sans-serif;fill:#292631}.title{font-size:27px;font-weight:700}.head{font-size:21px;font-weight:700}.body{font-size:18px}.small{font-size:16px;fill:#605969}.accent{fill:#b54179;font-size:20px;font-weight:700}</style>
+<rect x="1" y="1" width="1078" height="808" rx="22" fill="#fff" stroke="#ded6e1"/>
+<text x="32" y="48" class="title">从一次有用的参与，长成共同维护的知识网络</text>
+<text x="32" y="80" class="body">低负担接入、真实内容与长期贡献，一起支持冷启动和持续建设。</text>
+<rect x="32" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
+<text x="48" y="144" class="accent">进入已有工作</text><text x="48" y="180" class="body">插件或 Skill＋MCP</text><text x="48" y="212" class="body">先在本机取得 ID</text><text x="48" y="250" class="small">按需接入所选在线服务</text>
+<rect x="292" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
+<text x="308" y="144" class="accent">服务眼前目的</text><text x="308" y="180" class="body">帮助、项目与交流</text><text x="308" y="212" class="body">真实参与和使用反馈</text><text x="308" y="250" class="small">无需先发布完整方法</text>
+<rect x="552" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
+<text x="568" y="144" class="accent">积累可用知识</text><text x="568" y="180" class="body">来源、条件与结果</text><text x="568" y="212" class="body">许可、版本与修正</text><text x="568" y="250" class="small">高质量来自时间与实用</text>
+<rect x="812" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
+<text x="828" y="144" class="accent">继续发现与协作</text><text x="828" y="180" class="body">内容、参与者与机会</text><text x="828" y="212" class="body">经验可以继续发挥作用</text><text x="828" y="250" class="small">保留原作者和实际范围</text>
+<rect x="32" y="309" width="1016" height="117" rx="14" fill="#f6f7fa" stroke="#dedee6"/>
+<text x="52" y="347" class="head">质量来自真实关系与持续维护</text>
+<text x="52" y="383" class="body">发生了什么、在什么条件下、谁提供、允许怎样使用、后来有什么反馈。</text>
+<text x="52" y="410" class="small">资料数量、模型整理和技术检查分别说明；本地保存、上传与公开分别选择。</text>
+<rect x="32" y="454" width="492" height="180" rx="14" fill="#faf2f7" stroke="#e5d8e2"/>
+<text x="52" y="493" class="head">社区与贡献认可</text>
+<text x="52" y="529" class="body">互助、作品、代码、文档、适配与维护</text>
+<text x="52" y="562" class="body">荣誉、头衔、积分、等级等激励方向</text>
+<text x="52" y="600" class="small">规则继续设计，社区认可不等于可信度总分</text>
+<rect x="548" y="454" width="500" height="180" rx="14" fill="#faf2f7" stroke="#e5d8e2"/>
+<text x="568" y="493" class="head">共同治理与生态资助（拟议）</text>
+<text x="568" y="529" class="body">核心贡献者参与共同基础的长期建设</text>
+<text x="568" y="562" class="body">官方服务支持公共组织，组织支持生态</text>
+<text x="568" y="600" class="small">基金会／理事会形式、制度和经费尚待确定</text>
+<text x="32" y="684" class="head">开放协议承接连接，银河组织持续参与与知识流通</text>
+<text x="32" y="720" class="body">MCP：工具与获准资料接入　　A2A：所支持 Agent 之间的协作接口</text>
+<text x="32" y="755" class="small">面向更多领域的作品、方法、项目与社区；保留自主 Hub、来源与资料控制。</text>
+<text x="32" y="787" class="small">本图说明产品与生态关系，当前 Beta 的实际能力和交付范围见项目状态。</text>
+</svg>

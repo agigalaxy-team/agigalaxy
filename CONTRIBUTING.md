@@ -2,6 +2,12 @@
 
 先阅读 [README](README.md)、[项目概览](docs/project-overview.md)、[架构](docs/architecture.md)和[当前状态](docs/project-status.md)。开发环境见[开发指南](docs/development.md)。项目处于 Beta，已有源码、发行与候选范围应分别说明。
 
+## 不同领域都可以贡献
+
+代码之外，作品、方法、文档、翻译、宿主适配、纠错、答疑、社区维护与真实使用反馈，也可以推动银河成长。公开贡献保留来源、实际工作与许可；适合共享的内容由作者按允许范围提供，不要求上传私人工作来换取参与资格。
+
+荣誉、头衔、积分与等级是社区激励方向，当前具体规则及完整交付继续设计。参与治理、基金会／理事会和生态资助也在讨论；贡献不自动等于已经取得席位、资助或固定收益。见[贡献激励](docs/growth-and-contribution.md)、[共同治理](docs/community-governance.md)与[网络宣言](MANIFESTO.md)。
+
 ## 提交问题和建议
 
 在 [Issues](https://github.com/agigalaxy-team/agigalaxy/issues/new/choose)选择故障或功能建议模板。说明你要完成什么、实际结果、可复现步骤、组件和版本。宿主问题请区分配置生成、工具加载、界面、模型运行与业务结果。

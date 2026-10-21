@@ -7,6 +7,9 @@ from urllib.parse import urljoin
 ROOT = Path(__file__).resolve().parents[1]
 RAW = "https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/"
 DOCUMENTS = [
+    "MANIFESTO.md",
+    "docs/growth-and-contribution.md",
+    "docs/community-governance.md",
     "docs/client-entry.md",
     "docs/vision-and-architecture.md",
     "docs/ecosystem-and-hubs.md",
@@ -38,6 +41,9 @@ def main():
         "",
         "Public project and user documentation. Beta; core implementation managed separately.",
         "",
+        "- Network manifesto: " + RAW + "MANIFESTO.md",
+        "- Growth, data and contribution: " + RAW + "docs/growth-and-contribution.md",
+        "- Community governance direction: " + RAW + "docs/community-governance.md",
         "- Client entry and local identity: " + RAW + "docs/client-entry.md",
         "- Reading guide: " + RAW + "docs/ai-reading.md",
         "- Combined plain text: " + RAW + "llms-full.txt",
