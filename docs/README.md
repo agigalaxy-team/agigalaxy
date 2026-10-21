@@ -7,7 +7,12 @@
 | 需要什么 | 入口 |
 |---|---|
 | 理解银河网络及其功能 | [网络功能](network-functions.md)、[项目概览](project-overview.md) |
-| 查看组件、五层职责和源码 | [架构与源码地图](architecture.md) |
+| 原始愿景、当前架构与源码 | [愿景与架构](vision-and-architecture.md)、[架构与源码地图](architecture.md) |
+| Hub、官方、直接互联和信息流 | [Hub 与官方的运作](ecosystem-and-hubs.md) |
+| 参与者、贡献者与运营者的收益 | [参与价值与商业方向](business-and-participation.md) |
+| 开放模块、上游复用与许可 | [开放组件](open-components.md)、[许可范围](../RIGHTS.md) |
+| Capsule 结构、结果报告和数据流 | [实现核对说明](technical-faq.md)、[合成 JSON](../examples/capsule-v2.json) |
+| 给外部 AI 或抓取工具阅读 | [直接阅读入口](ai-reading.md)、[索引](../llms.txt)、[合并文本](../llms-full.txt) |
 | 安装客户端、下载源码和查看宿主差异 | [下载与安装](downloads.md) |
 | 准备开发环境、预览与排障 | [开发指南](development.md)、[检查命令](development-checks.md) |
 | 自行部署网站、API 和依赖 | [部署指南](deployment.md) |
@@ -15,6 +20,12 @@
 | 核对阶段、版本和仍存在的问题 | [项目状态](project-status.md) |
 | 查具体接口和实现 | [技术参考索引](TECHNICAL_REFERENCE_INDEX.md) |
 | 提交问题或代码 | [贡献](../CONTRIBUTING.md)、[支持](../SUPPORT.md) |
+
+## 主代码与公开资料
+
+本仓库保留开发、部署和源码入口；[公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)为未取得源码权限的读者提供项目、用户和技术说明。本次同步源为公开资料提交 `08b95b9`，主代码仓库中的说明按仓库语境补充了导航和许可范围，未扩大公开范围。
+
+外部 AI 可以直接读取[公开合并文本](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，不依赖搜索引擎先收录每个子页面。对应版本的[安装](native-client/0.1.16/installation.md)、[宿主](native-client/0.1.16/hosts.md)和[使用与数据](native-client/0.1.16/runtime.md)指南也已随仓库保存；它们保持 0.1.16 的发行范围，不代替后续版本指南。
 
 ## 用户指南
 
@@ -34,4 +45,4 @@
 
 带 v1 / v2 / 日期的文件说明其对应协议或实现，不等于最新产品状态。历史技术正文、私人运行记录和产品决策工作区未全部随源码分发；不能用指向仓库外的相对路径当作 GitHub 文档入口。
 
-当前总览以本目录的项目、架构、状态及组件说明为入口。公开版本的文档和下载保留自己的地址与发行内容，不为修改介绍而覆盖历史安装包。当前仓库没有统一根许可证，许可范围见[客户端记录](native-client-license-v2.md)。
+当前总览以本目录的网络、愿景、Hub 信息流、参与价值、架构、状态及组件说明为入口。公开版本的文档和下载保留自己的地址与发行内容，不为修改介绍而覆盖历史安装包。当前仓库没有统一根许可证，许可范围见[客户端记录](native-client-license-v2.md)。

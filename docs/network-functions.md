@@ -88,3 +88,9 @@ Hub、Bridge 和开放接口为企业、社区、服务提供方及外部系统�
 - [项目](../packages/galaxy-official/src/projects-v2.mjs)与[招募](../packages/galaxy-official/src/recruitment-v2.mjs)：实际项目、机会与联系状态。
 - [网页](../packages/galaxy-web/README.md)、[A2A](../packages/galaxy-a2a/README.md)、[API 目录](development-api-reference-v1.md)：用户入口、执行接入与接口定位。
 - [架构](architecture.md)与[数据说明](privacy-and-data.md)：这些网络活动所依赖的身份、历史、来源和权限。
+
+## 网络生态、参与价值与实现核对
+
+自主 Hub 的内部运行、官方可选发现、双边直接查询和 Bridge 信息流见 [Hub 与官方](ecosystem-and-hubs.md)。各类使用者、贡献者、合作方与运营者的价值，以及官方长期目标和候选增值服务见[参与与商业](business-and-participation.md)。
+
+[愿景与架构](vision-and-architecture.md)把网络功能与五层职责联系起来；[开放组件](open-components.md)区分逻辑模块、当前发行与成熟基础复用。[技术核对](technical-faq.md)解释 Capsule 字段与受来源约束的结果报告，避免把应用报告当作独立成功证明。

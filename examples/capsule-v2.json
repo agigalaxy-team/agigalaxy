@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "kind": "version",
+  "id": "11111111-1111-4111-8111-111111111111",
+  "capsuleId": "22222222-2222-4222-8222-222222222222",
+  "expectedRevision": 0,
+  "version": 1,
+  "title": "合成示例：缩小问题复现范围",
+  "problemPattern": "多个条件同时变化，暂时无法定位影响结果的因素。",
+  "environment": {
+    "name": "example-environment",
+    "version": "1.0"
+  },
+  "solutionStrategy": "建立最小可复现样例，逐项改变条件，记录每一步观察，再决定后续排查。",
+  "tools": ["example-observation-tool"],
+  "skills": [],
+  "mcpRefs": [],
+  "verificationMethod": "比较条件变更前后的实际观察；核对结果是否能在相同条件下再次出现。",
+  "limitations": ["仅为结构示例，不包含真实工作、实际结果或可用许可。"],
+  "capabilityId": "example/problem-isolation",
+  "applicableScope": "需要逐项比较条件的合成演示。",
+  "license": "UNSPECIFIED-EXAMPLE",
+  "contributors": [],
+  "publicationClass": "formal-source-success",
+  "synthetic": true,
+  "sourceResolution": {
+    "caseId": "33333333-3333-4333-8333-333333333333",
+    "resultId": "44444444-4444-4444-8444-444444444444",
+    "resultVersion": 1,
+    "proofIds": [],
+    "verificationRefs": []
+  },
+  "sourceRefs": [
+    {
+      "kind": "attempt",
+      "id": "55555555-5555-4555-8555-555555555555",
+      "version": 1,
+      "caseId": "33333333-3333-4333-8333-333333333333"
+    }
+  ],
+  "permissionRefs": [],
+  "attributionRefs": [],
+  "externalReferences": [],
+  "redactionConfirmed": true
+}

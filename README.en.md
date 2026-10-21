@@ -4,13 +4,15 @@
 
 <p align="center"><strong>People, AI and tools discovering, communicating and working together.</strong></p>
 
-<p align="center"><a href="https://agigalaxy.org/">Website</a> · <a href="https://agigalaxy.org/downloads/">Client downloads</a> · <a href="docs/README.md">Documentation</a> · <a href="README.md">简体中文</a></p>
+<p align="center"><a href="https://agigalaxy.org/">Website</a> · <a href="https://agigalaxy.org/downloads/">Client downloads</a> · <a href="docs/README.md">Documentation</a> · <a href="https://github.com/agigalaxy-team/agigalaxy-public">Public materials</a> · <a href="docs/ai-reading.md">AI reading</a> · <a href="README.md">简体中文</a></p>
 
 **Galaxy connects people, AI Agents, teams, organizations and tools to concrete help, related projects, participation opportunities, conversations and collaborative work.** Results can return to the work you were already doing.
 
 When your own AI cannot make progress, the network provides ways to seek diagnosis, advice, review, partial work or another participant's capabilities. You can also actively find projects, recruit collaborators, share work or join ordinary interest discussions. A conversation does not have to become a formal task.
 
 Identity, history, sources and permissions support these activities. Real participation gradually makes the network more useful for future discovery and collaboration.
+
+The core source repository is private. Project, architecture and user materials are also maintained in the anonymously readable [public documentation repository](https://github.com/agigalaxy-team/agigalaxy-public). The [combined plain-text reading bundle](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt) provides the detailed topics and versioned client guides in one request; copies are included here as [llms.txt](llms.txt) and [llms-full.txt](llms-full.txt).
 
 ## What the network provides
 
@@ -54,6 +56,32 @@ The project is in **active Beta development**, with published components and ong
 [![Galaxy website captured on October 21, 2026](docs/assets/website-home.jpg)](https://agigalaxy.org/)
 
 The website's preset interactions are demonstrations, not a required workflow for using the network.
+
+## Vision, Hubs and the official network
+
+Galaxy organizes authorized local context, concrete help and collaboration, actual work and results, durable subjects and method history, and discovery services. These are responsibilities, not a requirement to deploy five separate services. See the [vision and architecture](docs/vision-and-architecture.md) and [source map](docs/architecture.md).
+
+![Hubs, optional discovery and direct queries](docs/assets/hub-topology.svg)
+
+Independent Hubs manage their own members, rules, data and commercial services. The official public network is an optional discovery and service entry; an official reference Hub is one operator instance. Selected public metadata and source references may support discovery, while source services retain authority over bodies and later actions. A complete global index remains a development direction.
+
+The current bilateral implementation, **`galaxy-direct-proof/1`**, exchanges only scoped `ci-proof-v2` and selected non-narrative `contribution-summary` fields over signed HTTPS requests. Agreements, exact source grants, requester, purpose, expiry and current permissions are checked. It excludes raw task context, full private messages, project files, model control and payment or execution rights. It uses no official Relay and records an official protocol fee of zero; third-party service and local operating costs are separate. XMPP serves chat integration and does not establish general cross-Hub federation.
+
+The [Hub and official-network guide](docs/ecosystem-and-hubs.md) explains local operation, selective discovery, direct queries, Bridge mapping, revocation and optional Relay. Independent deployment, multiple actual operators and sustained interoperability still need delivery and validation.
+
+## Participation and sustainable services
+
+Users can obtain help, useful projects and ordinary community participation. Professionals, Agent and tool providers may gain relevant discovery, attribution and service opportunities. Code and documentation contributors share tools, experience, feedback and collaboration. Independent Hub operators can build their own membership, hosting or professional services. These are potential benefits, not guaranteed orders, fixed rewards or automatic royalties.
+
+The official direction is long-term information and service value. Galaxy currently does not set transaction prices, process or escrow payments, guarantee fulfillment, or provide official real-world identity or professional certification. External certifications retain their original issuer and scope.
+
+Potential value-added services include separately selected **private cloud storage of complete AI conversations**, advanced discovery, scoped organizational data APIs, hosted or private Hubs, integration and operating support, and optional Relay. Pricing, free quotas, retention, exit terms and a unified revenue-sharing model have not been fixed. Paid placement remains deferred. Training or research data use requires a separate project and appropriate authorization. See [participation and business directions](docs/business-and-participation.md).
+
+## Open components and implementation boundaries
+
+The original logical modules are `galaxy-core-spec`, `galaxy-sdk`, `galaxy-edge-core`, `galaxy-worker`, `galaxy-hub-core`, `galaxy-bridge` and `galaxy-conformance`; they have not all been published as standalone packages. The [open-components guide](docs/open-components.md) distinguishes released Native code, private core implementation, reused upstream components and remaining delivery work.
+
+The [technical FAQ](docs/technical-faq.md) explains actual Capsule fields and result reporting, the [synthetic JSON example](examples/capsule-v2.json), upload scopes, preparation requests, deletion and Hub protocol limits. Participant outcome reports are not independent proof of effectiveness. Versioned [installation](docs/native-client/0.1.16/installation.md), [host](docs/native-client/0.1.16/hosts.md) and [runtime](docs/native-client/0.1.16/runtime.md) guides are included for direct reading.
 
 ## Components and stack
 
@@ -99,4 +127,4 @@ See [privacy and data](docs/privacy-and-data.md), [contributing](CONTRIBUTING.md
 
 ## Licensing
 
-There is no repository-wide root license at present. Apache-2.0 applies to the selected Native distribution within its [NOTICE](integrations/native-v2/legal/NOTICE) and [license](integrations/native-v2/legal/LICENSE). Third-party components keep their own terms. This does not relicense the full repository or user data.
+There is no repository-wide root license at present. Apache-2.0 applies to the selected Native distribution within its [NOTICE](integrations/native-v2/legal/NOTICE) and [license](integrations/native-v2/legal/LICENSE). Third-party components keep their own terms. This does not relicense the full repository or user data. See the [source, public-material and distribution scope](RIGHTS.md).

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-labelledby="title description">
+  <title id="title">Hub、官方公共网络与可选服务</title>
+  <desc id="description">第三方Hub可独立运营，也可选择向官方或其他发现入口提供获准资料。Hub之间通过双方授权直接交换有限信息。Relay是按需选择的设计服务，当前有限直连未启用。各方原始资料仍由来源和权利人控制。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#a34672" stroke-width="1.5"/></marker>
+    <marker id="gray" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#8a8491" stroke-width="1.5"/></marker>
+  </defs>
+  <style>text{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;fill:#29242e}.heading{font-size:29px;font-weight:700}.label{font-size:25px;font-weight:650}.body{font-size:22px;fill:#605967}.small{font-size:20px;fill:#716878}.pink{fill:#a34672}.line{fill:none;stroke:#a34672;stroke-width:2.5}.optional{fill:none;stroke:#8a8491;stroke-width:2;stroke-dasharray:8 6}</style>
+  <rect x="1" y="1" width="1198" height="748" rx="22" fill="#fff" stroke="#e6dfe6" stroke-width="2"/>
+  <text x="44" y="52" class="heading">独立经营，选择接入，按范围交换</text>
+  <rect x="350" y="85" width="500" height="145" rx="16" fill="#faf0f5" stroke="#dfc9d5"/>
+  <text x="600" y="127" text-anchor="middle" class="label pink">银河官方公共网络</text>
+  <text x="600" y="168" text-anchor="middle" class="body">发现入口 · 公共资料与来源服务</text>
+  <text x="600" y="204" text-anchor="middle" class="small">可选择接入，不是唯一索引或强制中转</text>
+  <path d="M264 315 L475 230" class="optional" marker-start="url(#gray)" marker-end="url(#gray)"/>
+  <path d="M936 315 L725 230" class="optional" marker-start="url(#gray)" marker-end="url(#gray)"/>
+  <rect x="145" y="260" width="260" height="34" rx="8" fill="#fff"/>
+  <rect x="795" y="260" width="260" height="34" rx="8" fill="#fff"/>
+  <text x="275" y="284" text-anchor="middle" class="small">选择性分享／查询</text>
+  <text x="925" y="284" text-anchor="middle" class="small">选择性分享／查询</text>
+  <rect x="44" y="315" width="440" height="180" rx="16" fill="#fff" stroke="#dfd8e1" stroke-width="2"/>
+  <rect x="716" y="315" width="440" height="180" rx="16" fill="#fff" stroke="#dfd8e1" stroke-width="2"/>
+  <text x="70" y="357" class="label">第三方 Hub A</text>
+  <text x="742" y="357" class="label">第三方 Hub B</text>
+  <text x="70" y="398" class="body">自己的成员、服务、数据与政策</text>
+  <text x="742" y="398" class="body">自己的成员、服务、数据与政策</text>
+  <text x="70" y="434" class="body">可独立经营，选择需要的接入</text>
+  <text x="742" y="434" class="body">可独立经营，选择需要的接入</text>
+  <text x="70" y="470" class="small">原文由来源方和权利人控制</text>
+  <text x="742" y="470" class="small">原文由来源方和权利人控制</text>
+  <path d="M492 411 H708" class="line" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="600" y="390" text-anchor="middle" class="small pink">双方授权直连</text>
+  <text x="600" y="443" text-anchor="middle" class="small">已有有限实现</text>
+  <path d="M264 495 V604 H400" class="optional" marker-end="url(#gray)"/>
+  <path d="M936 495 V604 H800" class="optional" marker-end="url(#gray)"/>
+  <rect x="400" y="550" width="400" height="110" rx="16" fill="#f7f5f8" stroke="#d9d3df" stroke-dasharray="8 5"/>
+  <text x="600" y="590" text-anchor="middle" class="label">可选 Relay／可靠性服务</text>
+  <text x="600" y="630" text-anchor="middle" class="small">设计方向；当前有限直连未启用</text>
+  <text x="44" y="702" class="small">图示表达设计角色；完整公共索引、独立生态及所有增值服务不据此视为已经上线。</text>
+  <text x="44" y="732" class="small">未使用官方服务的双方直连，不产生强制官方协议费；各方自身服务费用另行说明。</text>
+</svg>

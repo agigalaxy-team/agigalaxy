@@ -60,3 +60,11 @@ Hub 是服务环境；Worker 执行获准任务；Bridge 保留外部观察来�
 | 管理应用与配置 | [运营后台](../apps/galaxy-admin/README.md) |
 
 根目录 `app/` 与相应 demo 脚本保留早期演示用途。当前生产网页不能从该目录推断，完整服务也不能由前端预览端口推断。
+
+## Hub 和官方之间的信息流
+
+Hub 内部数据按本地业务和来源许可处理。选择性公共发现只提供允许的元数据、摘要与引用，不让官方自动取得所有正文。当前 `galaxy-direct-proof/1` 为双边 HTTPS 签名查询，只交换获准 `ci-proof-v2` 和选定非叙述贡献字段；不是全站资料复制，也不是 XMPP 聊天联邦。
+
+![Hub 与官方信息流](assets/hub-topology.svg)
+
+角色、协议协商、逐来源授权、请求与返回、后续联系、Bridge、撤回和可选 Relay 见 [Hub 与官方的运作](ecosystem-and-hubs.md)。原始模块职责与当前开源复用见[开放组件](open-components.md)，Capsule 与上传流程的具体字段和边界见[实现核对](technical-faq.md)。

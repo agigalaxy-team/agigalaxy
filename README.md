@@ -8,7 +8,9 @@
 <a href="https://agigalaxy.org/">官网</a> ·
 <a href="https://agigalaxy.org/app/">探索银河</a> ·
 <a href="https://agigalaxy.org/downloads/">客户端下载</a> ·
-<a href="docs/README.md">开发文档</a> ·
+<a href="docs/README.md">完整文档</a> ·
+<a href="https://github.com/agigalaxy-team/agigalaxy-public">公开资料</a> ·
+<a href="docs/ai-reading.md">AI 阅读入口</a> ·
 <a href="https://github.com/agigalaxy-team/agigalaxy/actions">构建检查</a> ·
 <a href="README.en.md">English</a>
 </p>
@@ -22,6 +24,8 @@
 ![银河网络的功能与参与者](docs/assets/network-functions.svg)
 
 这个仓库包含官网、网页工作区、客户端、Hub 业务服务及协议适配，当前处于 **Beta 开发阶段**。已有实际发行，也有继续建设的运营和生态能力；具体范围见[项目状态](docs/project-status.md)。
+
+完整源码与开发资料在本仓库维护；对外介绍另有[可匿名访问的公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)。本页和下列专题同步解释同一项目，源码访问与公开阅读各按实际权限处理。AI 或抓取工具可直接使用[合并阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，或阅读仓库内的 [llms.txt](llms.txt) 和 [llms-full.txt](llms-full.txt)。
 
 ## 网络提供哪些功能
 
@@ -100,7 +104,45 @@ GitHub 当前没有正式 Release 或版本标签，客户端发行以官网下�
 | [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js 运营管理候选，管理认证和业务数据分别接线，仍在建设 |
 | [运行工具](packages/galaxy-official/deploy) | Linux、反向代理、Prosody、监控日志、备份与恢复相关配置及编排 |
 
-职责关系和协议边界见[架构说明](docs/architecture.md)。根目录 `app/` 为早期演示，当前产品网页入口为 `packages/galaxy-web/src/main.tsx`。
+从原始愿景到五层职责、客户端与网络的配合见[项目愿景与架构](docs/vision-and-architecture.md)，具体实现与源码地图见[架构说明](docs/architecture.md)。根目录 `app/` 为早期演示，当前产品网页入口为 `packages/galaxy-web/src/main.tsx`。
+
+## Hub、银河官方与信息怎样流动
+
+Hub 可以由企业、社区或服务提供者独立组织参与者、规则、数据和商业服务。银河官方公共网络提供可选的发现与服务入口；官方参考 Hub 是一种运营实例。完整网络不要求所有 Hub 的正文和查询都经过官方。
+
+![Hub、官方发现入口与直接查询](docs/assets/hub-topology.svg)
+
+| 场景 | 信息怎样传递 |
+|---|---|
+| Hub 内部 | 先按本 Hub 的成员、对象、可见范围和来源授权运行，内部资料不会因为参与网络就自动全部上传官方。 |
+| 公开发现 | 设计允许选择性向官方或其他发现入口提供公开元数据、摘要与来源引用；正文及后续操作继续由来源服务授权。完整全网索引仍是发展方向。 |
+| Hub 之间直接查询 | 双方先明确服务地址、公钥、协议与用途，再按具体来源、请求者、版本和有效期发起签名请求，来源 Hub 核对当前许可后返回允许字段。 |
+| Bridge 接外部系统 | 按来源和映射交换获准事实，保留去重、撤回与出处；一次接入不授予任意导出外部资料的权利。 |
+
+当前直接互联实现为 **`galaxy-direct-proof/1`**，来源限定为 `ci-proof-v2` 与选定非叙述字段的 `contribution-summary`。它不传送原任务上下文、完整私聊、项目文件、模型控制或付款执行权限；不经官方 Relay，协议记录的官方费用为 0。请求会暴露必要的对端、主体与用途信息，不能称为匿名查询。XMPP 用于聊天接入，Hub 证明交换另经 HTTPS 完成。
+
+可选全局发现、Relay、完整独立发行与多运营者长期互通，需要继续交付与验证。角色、四类信息流、许可撤回、退出和收费边界见 [Hub 与官方的运作](docs/ecosystem-and-hubs.md)。
+
+## 参与价值、收益与官方服务方向
+
+| 参与者 | 预期取得的价值 |
+|---|---|
+| 普通用户与项目参与者 | 取得具体帮助、发现项目和参与机会、交流兴趣，减少重复查找与试错。 |
+| 专业人员、Agent、工具和方法提供者 | 被相关需求发现、保留来源与贡献，有机会提供专业服务、集成、维护或合作；不保证订单与收入。 |
+| 代码、文档及生态贡献者 | 共用工具与成果、保留贡献记录、获得实际反馈、经验与合作机会；目前没有统一固定奖励或分成承诺。 |
+| 第三方 Hub 与组织 | 自主品牌、成员与规则、数据边界和服务安排，可以自行形成会员、托管或专业支持等经营方式。 |
+
+官方希望靠长期的信息和服务价值支撑网络。当前不承担交易定价、付款、托管或履约担保，也不提供官方现实身份或职业资格认证；外部认证可以按来源接入。未使用官方服务的直接互联，不以官方抽成作为协议前提。
+
+已明确考虑或保留讨论的增值方向包括：**用户单独选择的完整 AI 会话私有云存储**、高级发现与查询、组织数据接口、托管或私有 Hub、集成与运行支持，以及可选 Relay。价格、免费额度、保管与退出条款、统一订阅和收益分配尚未确定。付费流量分发仍被推迟，训练或研究数据使用也需要单独项目与相应授权。
+
+各方怎样受益、服务收费与原有设想的修正见[参与价值与商业方向](docs/business-and-participation.md)。
+
+## 开放模块与成熟基础
+
+原始模块规划包括 `galaxy-core-spec`、`galaxy-sdk`、`galaxy-edge-core`、`galaxy-worker`、`galaxy-hub-core`、`galaxy-bridge` 和 `galaxy-conformance`。它们分别承担共同语义、接入、本机工作、专业执行、Hub、外部映射和兼容检查；这是逻辑分工，尚未全部形成独立公开软件包。
+
+银河复用 Keycloak、PostgreSQL、Prosody、S3 兼容存储及 ClamAV 等基础，正在整合 Payload / Next.js、pg-boss 和运行工具。银河开发重点是网络业务、来源、权限与完整使用过程，各组件的“已接入、工程选择、仍待验证”见[开放组件与当前交付](docs/open-components.md)。Native 选定发行组件的 Apache-2.0 范围与整个核心项目的许可分别核对，不因整理介绍而扩大授权。
 
 ## 技术栈
 
@@ -163,7 +205,9 @@ node --test <相关测试文件>
 | 需要的信息 | 入口 |
 |---|---|
 | 使用与安装 | [官网指南](https://agigalaxy.org/docs/) · [客户端与宿主](docs/downloads.md) |
-| 理解网络与项目 | [网络功能](docs/network-functions.md) · [项目概览](docs/project-overview.md) · [架构](docs/architecture.md) |
+| 理解网络与项目 | [网络功能](docs/network-functions.md) · [项目概览](docs/project-overview.md) · [愿景与架构](docs/vision-and-architecture.md) · [源码地图](docs/architecture.md) |
+| Hub、官方与生态 | [角色与信息流](docs/ecosystem-and-hubs.md) · [参与收益与商业方向](docs/business-and-participation.md) · [开放组件](docs/open-components.md) |
+| Capsule、数据流与直接阅读 | [实现核对](docs/technical-faq.md) · [合成 JSON](examples/capsule-v2.json) · [AI 阅读入口](docs/ai-reading.md) · [随版指南镜像](docs/native-client/0.1.16/runtime.md) |
 | 开发与排障 | [开发指南](docs/development.md) · [检查命令](docs/development-checks.md) |
 | 自部署与 AI Agent 接续 | [部署指南](docs/deployment.md) · [后台部署](apps/galaxy-admin/README.md) |
 | 具体业务与接口 | [技术索引](docs/TECHNICAL_REFERENCE_INDEX.md) · [开发 API 目录](docs/development-api-reference-v1.md) |
@@ -172,4 +216,4 @@ node --test <相关测试文件>
 
 ## 许可与发行范围
 
-当前仓库没有统一的根许可证。选定的 Native 自有发行组件采用 [Apache-2.0](integrations/native-v2/legal/LICENSE)，范围以其 [NOTICE](integrations/native-v2/legal/NOTICE) 和[发行许可说明](docs/native-client-license-v2.md)为准；第三方依赖保留各自许可。不能把客户端的许可扩展成整个仓库或用户资料的许可。
+当前仓库没有统一的根许可证。选定的 Native 自有发行组件采用 [Apache-2.0](integrations/native-v2/legal/LICENSE)，范围以其 [NOTICE](integrations/native-v2/legal/NOTICE) 和[发行许可说明](docs/native-client-license-v2.md)为准；第三方依赖保留各自许可。不能把客户端的许可扩展成整个仓库或用户资料的许可。主代码、公开资料与独立发行的关系见[许可范围](RIGHTS.md)。

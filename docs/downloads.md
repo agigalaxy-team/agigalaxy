@@ -51,6 +51,10 @@ node setup.mjs https://agigalaxy.org
 
 保存完整会话需要另行选择宿主和准确范围；普通工作履历不等于完整聊天记录。详见[数据说明](privacy-and-data.md)和[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.16/runtime/)。
 
+## 仓库内随版指南与直接阅读
+
+0.1.16 的[安装](native-client/0.1.16/installation.md)、[宿主](native-client/0.1.16/hosts.md)和[使用与数据](native-client/0.1.16/runtime.md)指南已按官网该发行内容保存为可直接阅读的 Markdown 镜像，注明原始地址与核对日期。公开对应文本、抓取工具入口和合并资料见 [AI 阅读说明](ai-reading.md)。随版镜像不随着新的客户端发行自动变更。
+
 ## 发行与许可
 
 [发行文件与历史版本](https://agigalaxy.org/downloads/verification/)提供实际发行资料。客户端许可范围见 [Native NOTICE](../integrations/native-v2/legal/NOTICE) 和[许可记录](native-client-license-v2.md)；当前仓库没有统一根许可证。
