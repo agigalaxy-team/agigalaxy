@@ -33,16 +33,19 @@ import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './reading-book
 import {readProfileDisplayNames} from '../../../galaxy-official/src/profile-display-names.mjs';
 import {registerWorkContinuationTools} from './work-continuation.mjs';
 import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './local-work-tools.mjs';
+import {nativeDiagnostics,registerDiagnosticTool} from './diagnostics.mjs';
 
 export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifact,watchHost,watchHostDriverFactory,notificationOptions}={}){
+ const diagnostics=runtime.diagnostics??nativeDiagnostics();
  const configuredHost=createConfiguredWatchHost(watchHost,{createDriver:watchHostDriverFactory});
  let currentSubject='';const choice=createNativeChoice({identity:()=>currentSubject,website:runtime.website,store:runtime.store});
  let closing=false,closed,localClosed;const inFlight=new Set(),outbound=new Set();
  class NativeMcpServer extends McpServer{
   registerTool(name,configuration,handler){
+   registerDiagnosticTool(name);
    return super.registerTool(name,configuration,async(...args)=>{
     if(closing)return presentNativeResult(name,{isError:true,...nativeResult({error:'native_runtime_closed',sideEffect:false})});
-    const operation=Promise.resolve().then(()=>handler(...args));inFlight.add(operation);
+    const operation=diagnostics.run('tool',()=>handler(...args),{event:'native_tool',tool:name,resultFailed:value=>value?.isError===true});inFlight.add(operation);
     try{return presentNativeResult(name,await operation,{readOnly:configuration.annotations?.readOnlyHint===true});}finally{inFlight.delete(operation);}
    });
   }
@@ -120,7 +123,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
   render:data=>workerPanelResult(data,{componentOnly:!!compact&&nativeCompactUiAdvertised(server)})
  }):null;
  const previousClose=server.server.onclose,protocolClose=server.close.bind(server);
- server.server.onclose=()=>{void cleanup().catch(()=>{});previousClose?.();};
+ server.server.onclose=()=>{void cleanup().catch(error=>diagnostics.emit({event:'native_runtime',stage:'shutdown',outcome:'failed',error}));previousClose?.();};
  registerHelpTools(server,{flow:runtime.helpFlow,review:reviewOperation});
  registerNativeCapsuleWorkTools(server,{runtime,review:reviewOperation});
  registerNativeWorkSelectionTools(server,{runtime});
@@ -131,6 +134,7 @@ export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifa
    if(getReviewScope&&scopeKey!==getReviewScope())throw Error('native_choice_scope_changed');return run(input);
   },{scopeKey,singleUse:singleUseChoice});}return nativeResult(await run(input));}
   catch(error){const code=/^[a-z0-9_-]{1,100}$/.test(error.code??error.message)?error.code??error.message:'native_operation_failed';
+   diagnostics.emit({event:'native_tool',stage:'tool',outcome:'failed',tool:name,error});
    return{isError:true,...nativeResult({error:code,mayNeedReceiptReconciliation:write})};}});
  const localWork=registerNativeLocalWorkTools(register,runtime);
  compact?.registerLocalWork(localWork);

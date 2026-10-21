@@ -1,5 +1,6 @@
 const DEFAULT_FALLBACK_SECONDS = 15 * 60;
 import {nativeWatchHostSchema} from './watch.mjs';
+import {nativeDiagnostics} from './diagnostics.mjs';
 
 /**
  * Connects the local Watch state machine to a host event source and an
@@ -19,6 +20,7 @@ export function createNativeWatchRuntime({
   hostDriver = null,
   getHostLease = null,
 } = {}) {
+  const diagnostics=nativeDiagnostics();
   if (!watch || typeof watch.check !== 'function' || typeof watch.status !== 'function') {
     throw new Error('watch_runtime_watch_required');
   }
@@ -30,8 +32,8 @@ export function createNativeWatchRuntime({
 
   let closed = false, disposing;
   const runners = new Map(), operations = new Set();
-  const track = run => {
-    const operation = Promise.resolve().then(run);
+  const track = (run,stage='runtime') => {
+    const operation = diagnostics.run(stage,run,{event:'native_watch',independent:true});
     operations.add(operation);
     operation.then(() => operations.delete(operation), () => operations.delete(operation));
     return operation;
@@ -55,7 +57,8 @@ export function createNativeWatchRuntime({
     if (!isCurrent(runner) || runner.inFlight || runner.pending) return;
     let result;
     try { result = await watch.status(runner.watchId); }
-    catch {
+    catch(error) {
+      diagnostics.emit({event:'native_watch',stage:'watch-status',outcome:'failed',error});
       if (!isCurrent(runner)) return;
       // A transient host/API failure must not permanently orphan an active
       // Watch. Keep the local runtime alive and retry on the bounded fallback.
@@ -103,7 +106,7 @@ export function createNativeWatchRuntime({
       }
       return result;
      } finally { runner.inFlight = null; await scheduleNext(runner); }
-    });
+    },'watch-check');
     return runner.inFlight;
   }
 
@@ -114,7 +117,7 @@ export function createNativeWatchRuntime({
       const receipt = await watch.ack(runner.watchId, workId);
       if (!hostCurrent(runner)) return { state: 'binding-changed', modelCalls, workSuppressed: true };
       return { state: 'processed', workId, modelCalls, execution, receipt };
-    } catch { return { state: 'host-completed-ack-unconfirmed', workId, modelCalls, execution, retryOriginalAckOnly: true }; }
+    } catch(error) {diagnostics.emit({event:'native_watch',stage:'watch-ack',outcome:'unknown',error}); return { state: 'host-completed-ack-unconfirmed', workId, modelCalls, execution, retryOriginalAckOnly: true }; }
   }
   async function processHost(runner, result) {
     const workId = result.work.workId;
@@ -125,9 +128,9 @@ export function createNativeWatchRuntime({
     await watch.recordHostExecution(runner.watchId, workId, journal({state:'dispatching'}));
     if (!hostCurrent(runner)) return { state: 'binding-changed', modelCalls: 0, workSuppressed: true };
     runner.abort = new AbortController();
-    const execution = await hostDriver.run({ watchId: runner.watchId, work: result.work, purpose: scope.purpose,
+    const execution = await diagnostics.run('watch-host',()=>hostDriver.run({ watchId: runner.watchId, work: result.work, purpose: scope.purpose,
       ...runner.host, scopeKey: runner.hostScopeKey, isCurrent: () => hostCurrent(runner), signal: runner.abort.signal,
-      onState: async state => { runner.execution={workId,...journal(state)};await watch.recordHostExecution(runner.watchId, workId, journal(state)); } });
+      onState: async state => { runner.execution={workId,...journal(state)};await watch.recordHostExecution(runner.watchId, workId, journal(state)); } }),{event:'native_watch',resultFailed:value=>['failed','unknown'].includes(value?.state)});
     const hostTurnsAttempted=execution.hostTurnDispatches??0,modelCalls=hostTurnsAttempted?null:0;
     if (!hostCurrent(runner)) return { state: 'suspended-host', modelCalls, hostTurnsAttempted, workSuppressed: true };
     // Keep only control metadata in the local journal. Returned analysis is
@@ -274,8 +277,8 @@ export function createNativeWatchRuntime({
   }
 
   function dispose() {
-    return disposing ??= (async () => {
-      closed = true;
+    closed = true;
+    return disposing ??= diagnostics.run('shutdown',async () => {
       const errors = [];
       for (const runner of runners.values()) {
         try { cancel(runner);cancelExpiry(runner); } catch (error) { errors.push(error); }
@@ -294,7 +297,7 @@ export function createNativeWatchRuntime({
       runners.clear();
       if (hostDriver?.close) { try { await hostDriver.close(); } catch (error) { errors.push(error); } }
       if (errors.length) throw new AggregateError(errors, 'watch_runtime_cleanup_failed');
-    })();
+    },{event:'native_watch'});
   }
 
   return Object.freeze({ activate, check, ack, stop, pause, status, dispose, reconcileHost, isActive: watchId => runners.has(watchId), notify: event => {

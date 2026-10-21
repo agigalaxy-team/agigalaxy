@@ -7,6 +7,7 @@ from html import escape
 import json
 
 from home_page import render_homepage
+from cms_content import content_slot
 
 
 def icon(name):
@@ -32,7 +33,7 @@ def render_product_pages(site):
     guides = {kind: site.get('GUIDE_PAGES', {}).get(kind, path) for kind, path in raw_guides.items()}
 
     def intro(title, text):
-        return f'<header class="reading-intro"><h1>{title}</h1><p>{text}</p></header>'
+        return content_slot('page-intro', f'<header class="reading-intro"><h1>{title}</h1><p>{text}</p></header>')
 
     def section(title, text, href=None, label=None):
         link = f'<a class="text-link" href="{href}">{label} </a>' if href else ''

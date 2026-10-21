@@ -14,6 +14,7 @@ import { useChoiceViewLease } from './choice-retained-operations';
 import type { ChoiceViewLease } from './choice-retained-operations';
 import type { SourceView, TargetClient, TargetConfig, TargetDraft, TargetEvent, TargetEventProjection, TargetInfo, TargetLocator, TargetPayload, TargetPending, TargetPreview, TargetProjection, TargetReference, TargetReport, TargetScope, TargetSimpleKind, TargetStopped, WorkspaceProps } from './governance-workspace-types';
 import { categoryLabels, fullTime, governanceError, governanceLabels as labels, GovernanceEvents, GovernancePeople, GovernancePreview, GovernanceSource, useGovernanceDraft } from './governance-presentation';
+import {AccountChatGovernanceWorkspace} from './account-chat-governance-workspace';
 
 const emptyDraft:TargetDraft={action:'',summary:'',category:'other',viewers:[],audienceChosen:false,rule:'',scopes:[],hours:24,verdict:'dismissed'};
 type TargetWorkspaceProps=WorkspaceProps&{target?:TargetReference};
@@ -23,6 +24,10 @@ const simpleKind=(kind:string):kind is TargetSimpleKind=>['supplement','appeal',
 const isTargetEvent=(payload:unknown):payload is TargetEvent=>targetModerationSchemaV2.safeParse(payload).success;
 const targetPayload=(payload:unknown):TargetPayload=>isTargetEvent(payload)?payload:targetReportSchemaV2.parse(payload);
 export function TargetGovernanceWorkspace(props:TargetWorkspaceProps){
+ if(new URLSearchParams(location.search).get('accountChat')==='1')return <AccountChatGovernanceWorkspace runtime={props.runtime} target={props.target} reportId={props.reportId} navigate={props.navigate}/>;
+ return <NativeTargetGovernanceWorkspace {...props}/>;
+}
+function NativeTargetGovernanceWorkspace(props:TargetWorkspaceProps){
  const view=useChoiceViewLease(props.runtime,props.subjectId);
  return <TargetGovernanceSession key={JSON.stringify([view.key,props.runtime.api.endpoint,props.subjectId,props.connected,props.reportId,props.target?.type,props.target?.id])} {...props} connected={props.connected&&!!view.lease} lease={view.lease}/>;
 }

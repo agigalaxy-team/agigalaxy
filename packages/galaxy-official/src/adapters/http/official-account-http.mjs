@@ -31,7 +31,7 @@ export async function dispatchOfficialAccount({officialAccounts,forum,externalCr
     if(url.search)throw new ServiceError('invalid_account_query');
     send(200,await officialAccounts.data.publicProfile(url.pathname.split('/').at(-1),{publicPosts:forum?.publicForAccount?accountId=>forum.publicForAccount(accountId):undefined}));
   }
-  else if (request.method === 'POST' && url.pathname === '/v1/account/logout') {await body(request,[]); send(200,officialAccounts.logout(request,response));}
+  else if (request.method === 'POST' && url.pathname === '/v1/account/logout') {await body(request,[]); send(200,await officialAccounts.logout(request,response));}
   else if(url.pathname==='/v1/account/settings'&&request.method==='GET')send(200,await officialAccounts.data.settings(await officialAccounts.actionActor(request,{write:false})));
   else if(url.pathname==='/v1/account/archives'&&request.method==='GET'){if([...url.searchParams.keys()].some(key=>!['after','limit'].includes(key))||[...url.searchParams.keys()].some(key=>url.searchParams.getAll(key).length!==1))throw new ServiceError('invalid_archive_cursor');send(200,await officialAccounts.data.listArchives(await officialAccounts.actionActor(request,{write:false}),{...(url.searchParams.has('after')?{after:url.searchParams.get('after')}:{}),...(url.searchParams.has('limit')?{limit:Number(url.searchParams.get('limit'))}:{})}));}
   else if(request.method==='POST'){

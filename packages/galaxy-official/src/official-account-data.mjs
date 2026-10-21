@@ -1,12 +1,11 @@
-import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import {transaction} from './database.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {expirePrivateConversationsWithin} from './operations/private-conversation-retention.mjs';
 import {archiveAfterSchema,archiveCursorFor,archiveCursorAfter} from './shared/account-archive-cursor.mjs';
 import {accountUidPattern,ensureOfficialAccountProfileWithin} from './official-account-uid.mjs';
+import {changeAccountTypeWithin} from './business-admin-domain.mjs';
 
-const types=z.enum(['person','organization','agent']);
 const retention=z.number().int().min(1).max(36500).nullable();
 const selection=z.strictObject({workspaceId:z.string().min(1).max(512).nullable(),sessionIds:z.array(z.string().min(1).max(256)).min(1).max(1000),scopeId:z.uuid().optional()});
 const parse=(schema,value)=>{const result=schema.safeParse(value);if(!result.success)throw new ServiceError('invalid_account_data');return result.data;};
@@ -42,16 +41,8 @@ export class OfficialAccountData {
       // from their original creation time. Content already expired is not read.
       await db.query(`UPDATE private_conversation_archives_v1 SET expires_at=CASE WHEN $2::integer IS NULL THEN NULL ELSE created_at+($2::text||' days')::interval END WHERE account_id=$1`,[id,data.archiveRetentionDays]);
       return {accountId:id,revision:row.revision+1};});}
-  async changeType(actor,input){const id=this.owner(actor),data=parse(z.strictObject({expectedRevision:z.number().int().nonnegative(),subjectType:types,
-    reason:z.string().trim().min(8).max(2000),basis:z.string().trim().min(8).max(4000),preserveHistory:z.literal(true)}),input);
-    return this.run(async db=>{await this.ensureWithin(db,id);const row=(await db.query('SELECT * FROM official_account_profiles_v1 WHERE account_id=$1 FOR UPDATE',[id])).rows[0];
-      if(row.revision!==data.expectedRevision)throw new ServiceError('account_settings_changed',409);
-      if(row.subject_type===data.subjectType)throw new ServiceError('account_type_unchanged',409);
-      const revision=row.revision+1,at=iso(this.now()*1000);
-      await db.query(`INSERT INTO official_account_type_history_v1(id,account_id,revision,previous_type,next_type,reason,basis,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [randomUUID(),id,revision,row.subject_type,data.subjectType,data.reason,data.basis,at]);
-      await db.query('UPDATE official_account_profiles_v1 SET subject_type=$2,revision=$3,updated_at=$4 WHERE account_id=$1',[id,data.subjectType,revision,at]);
-      return {accountId:id,previousType:row.subject_type,subjectType:data.subjectType,revision,basisKind:'account-owner-statement',permissionsChanged:false};});}
+  async changeType(actor,input){const accountId=this.owner(actor);
+    return this.run(db=>changeAccountTypeWithin(db,{accountId,endpoint:this.endpoint,now:this.now(),source:{kind:'account-owner',accountId},input}));}
   async publicProfileByUid(uid,options={}){
     if(typeof uid!=='string'||!accountUidPattern.test(uid.toUpperCase()))throw new ServiceError('not_found',404);
     const row=(await this.db.query(`SELECT a.id FROM community_accounts a JOIN official_account_profiles_v1 p ON p.account_id=a.id
@@ -59,10 +50,12 @@ export class OfficialAccountData {
     if(!row)throw new ServiceError('not_found',404);
     return this.publicProfile(row.id,options);
   }
-  async publicProfile(accountId,{publicPosts}={}){parse(z.uuid(),accountId);const row=(await this.db.query(`SELECT p.*,a.uid FROM official_account_profiles_v1 p JOIN community_accounts a ON a.id=p.account_id
+  async publicProfile(accountId,{publicPosts}={}){parse(z.uuid(),accountId);const row=(await this.db.query(`SELECT p.*,a.uid,
+    (SELECT h.actor_kind FROM official_account_type_history_v1 h WHERE h.account_id=p.account_id ORDER BY h.revision DESC LIMIT 1) AS type_actor
+    FROM official_account_profiles_v1 p JOIN community_accounts a ON a.id=p.account_id
     WHERE p.account_id=$1 AND a.endpoint=$2 AND p.query_enabled=true`,[accountId,this.endpoint])).rows[0];
     if(!row)throw new ServiceError('not_found',404);
-    return {accountId,uid:row.uid,displayName:row.display_name,subjectType:row.subject_type,typeSource:'account-owner-statement',
+    return {accountId,uid:row.uid,displayName:row.display_name,subjectType:row.subject_type,typeSource:row.type_actor==='business-operator'?'operator-recorded-statement':'account-owner-statement',
       publicQuery:{scope:row.query_scope,showLinkedIds:row.query_linked_ids===true,showExternalCredentials:row.query_external_credentials===true},
       ...(row.query_scope==='profile-and-public-posts'&&publicPosts?{posts:await publicPosts(accountId)}:{})};}
   async cleanup(actor){const id=this.archiveOwner(actor);return this.run(async db=>({deleted:await expirePrivateConversationsWithin(db,this.now(),{accountId:id,originSubjectId:this.archiveOrigin(actor)})}));}

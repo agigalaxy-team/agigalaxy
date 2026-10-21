@@ -32,9 +32,12 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   let url;
   try { url = new URL(request.url, endpoint); } catch { throw new ServiceError('invalid_request'); }
   const consentList = request.method === 'GET' && url.pathname === '/v1/consents';
-  const oidcCallback = request.method === 'GET' && (/^\/v1\/identity\/callback\/[a-z0-9][a-z0-9._-]{0,63}$/.test(url.pathname) || url.pathname === '/v1/account/callback');
+  const oidcCallback = request.method === 'GET' && (/^\/v1\/identity\/callback\/[a-z0-9][a-z0-9._-]{0,63}$/.test(url.pathname) || url.pathname === '/v1/account/callback' || url.pathname === '/v1/operations/callback');
+  const operationsQuery=request.method==='GET'&&/^\/v1\/operations\/(?:login|users(?:\/[0-9a-f-]{36}(?:\/(?:audit|links|type-history))?)?|audit|jobs|search\/failures|content\/publications|chat-reports|community\/(?:sections|reports|posts)|resources\/(?:projects|methods)|files|notices|rules\/(?:resource-budget|community-quota|forum-quota)\/history|retention\/runs)$/.test(url.pathname)
+    &&url.search.length<=8192&&[...url.searchParams.keys()].every(key=>['returnTo','query','after','limit','accountId','resourceId','queue','state','category','kind','processing'].includes(key)&&url.searchParams.getAll(key).length===1);
   const identityReturn=request.method==='GET'&&/^\/v1\/identity\/return\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=8192;
   const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
+  const accountNoticeQuery=request.method==='GET'&&url.pathname==='/v1/account/notifications/notices'&&url.search.length<=512&&[...url.searchParams.keys()].every(key=>['after','limit','unreadOnly'].includes(key)&&url.searchParams.getAll(key).length===1);
   const publicAccountQuery=request.method==='GET'&&/^\/v1\/account\/public\/(?:[0-9a-f-]{36}\/(?:ids|credentials)|by-id\/GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26})$/.test(url.pathname)
     &&url.search.length<=160&&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1);
   const publicAccountPostsQuery=request.method==='GET'&&/^\/v1\/account\/public\/[0-9a-f-]{36}\/posts$/.test(url.pathname)
@@ -52,7 +55,7 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
     && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(url.searchParams.get(keys[0]));
   const allowedQuery = consentList ? keys.every(key => key === 'after') && url.searchParams.getAll('after').length === 1
     : oidcCallback && url.search.length <= 8192 && keys.every(key => ['code','state','iss','error','error_description','error_uri','session_state'].includes(key))
-      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || publicAccountQuery || publicAccountPostsQuery || identityReturn;
+      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || accountQuery || accountNoticeQuery || publicAccountQuery || publicAccountPostsQuery || identityReturn || operationsQuery;
   if (url.origin !== endpoint || url.username || url.password || url.hash || (url.search && !allowedQuery))
     throw new ServiceError('invalid_request');
   return url;

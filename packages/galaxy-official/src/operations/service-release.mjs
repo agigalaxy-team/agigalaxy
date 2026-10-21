@@ -33,8 +33,10 @@ export async function createServiceRelease({ directory, releaseId, configuration
   if (!isAbsolute(directory) || !isAbsolute(sourceDirectory) || !label(releaseId) || !label(configurationVersion)) throw new Error('Explicit release configuration required.');
   // The generator knows exactly these SQL versions. Never infer another tree's
   // schema from a package version or execute arbitrary imported migration code.
-  const migrationBytes = await readFile(join(sourceDirectory, migrationPath));
-  if (sha(migrationBytes) !== sha(await readFile(join(sourceRoot, migrationPath)))) throw new Error('Use the release generator belonging to the selected migration source.');
+  if (resolve(sourceDirectory)!==resolve(sourceRoot)) {
+    const migrationBytes = await readFile(join(sourceDirectory, migrationPath));
+    if (sha(migrationBytes) !== sha(await readFile(join(sourceRoot, migrationPath)))) throw new Error('Use the release generator belonging to the selected migration source.');
+  }
   const manifest = { version: 1, kind: 'galaxy-official-service-release', releaseId, configurationVersion,
     createdAt: new Date().toISOString(), minimumNode: '24.13.0',
     entries: { api: 'packages/galaxy-official/src/server.mjs', worker: 'packages/galaxy-official/src/worker.mjs',

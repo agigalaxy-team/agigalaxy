@@ -1,0 +1,309 @@
+{
+  "version": 1,
+  "targetHostname": null,
+  "projectName": "galaxy-operations",
+  "directories": {
+    "configuration": "/etc/galaxy/operations",
+    "data": "/var/lib/galaxy/operations",
+    "captures": "/var/lib/galaxy/backups/operations-staging",
+    "restores": "/var/lib/galaxy/restores",
+    "status": "/var/lib/galaxy/backup-status/operations"
+  },
+  "tools": {
+    "docker": "/usr/bin/docker",
+    "systemctl": "/usr/bin/systemctl",
+    "node": "/opt/galaxy/runtime/node-v24.19.0-linux-x64/bin/node",
+    "restic": "/opt/galaxy/runtime/restic-0.19.1-linux-amd64/restic"
+  },
+  "images": {
+    "grafana": "grafana/grafana:13.2.4",
+    "loki": "grafana/loki:3.7.8",
+    "alloy": "grafana/alloy:v1.21.0",
+    "postgresBase": "postgres@sha256:a10c981235b4f635e65df0cfb66a5598064628128505dbc6a3ed4ca303717521",
+    "postgresBackup": "galaxy-postgres-pgbackrest:18.6-2.60.0"
+  },
+  "grafana": {
+    "rootUrl": "https://admin.agigalaxy.org/monitoring/",
+    "issuer": "https://admin.agigalaxy.org/realms/galaxy-operations",
+    "clientId": "galaxy-operations-grafana",
+    "clientSecretFile": "/etc/galaxy/operations-secrets/grafana.client-secret",
+    "secretKeyFile": "/etc/galaxy/operations-secrets/grafana.secret-key",
+    "bootstrapPasswordFile": "/etc/galaxy/operations-secrets/grafana.bootstrap-password",
+    "port": 13000,
+    "roles": {
+      "viewer": "galaxy-monitoring-viewer",
+      "editor": "galaxy-monitoring-editor",
+      "admin": "galaxy-monitoring-admin"
+    }
+  },
+  "monitoring": {
+    "mode": "managed",
+    "prometheusUrl": "http://127.0.0.1:9090",
+    "alertmanagerUrl": "http://127.0.0.1:9093",
+    "blackboxTarget": "127.0.0.1:9115",
+    "apiTarget": null,
+    "workerTarget": null,
+    "prometheusBinary": "/opt/galaxy/runtime/prometheus-3.13.3.linux-amd64/prometheus",
+    "alertmanagerBinary": null,
+    "blackboxBinary": null,
+    "prometheusData": "/var/lib/galaxy/prometheus",
+    "alertmanagerData": "/var/lib/galaxy/operations/alertmanager",
+    "receiverConfigurationFile": null,
+    "website": "https://agigalaxy.org/",
+    "liveness": "https://official.agigalaxy.org/healthz",
+    "readiness": "https://official.agigalaxy.org/readyz"
+  },
+  "logs": [
+    {
+      "component": "caddy-access",
+      "path": "/var/log/galaxy/pilot/caddy/access.json",
+      "release": "unreported"
+    }
+  ],
+  "journals": [
+    {
+      "component": "api",
+      "unit": "galaxy-api@pilot.service"
+    },
+    {
+      "component": "worker",
+      "unit": "galaxy-worker@pilot.service"
+    },
+    {
+      "component": "admin",
+      "unit": "galaxy-admin-pilot.service",
+      "release": "0.1.1"
+    },
+    {
+      "component": "publisher",
+      "unit": "galaxy-content-publisher-pilot.service",
+      "release": "0.1.21"
+    },
+    {
+      "component": "caddy",
+      "unit": "caddy.service",
+      "release": "unreported"
+    },
+    {
+      "component": "prometheus",
+      "unit": "galaxy-prometheus.service",
+      "release": "3.13.3"
+    },
+    {
+      "component": "alertmanager",
+      "unit": "galaxy-alertmanager.service",
+      "release": "0.34.1"
+    },
+    {
+      "component": "blackbox",
+      "unit": "galaxy-blackbox-exporter.service",
+      "release": "0.29.0"
+    },
+    {
+      "component": "backup",
+      "unit": "galaxy-operations-backup.service",
+      "release": "unreported"
+    },
+    {
+      "component": "log-collector",
+      "unit": "galaxy-component-logs.service",
+      "release": "unreported"
+    }
+  ],
+  "loki": {
+    "port": 13100,
+    "grpcPort": 19095,
+    "retentionDays": 14
+  },
+  "alloy": {
+    "port": 12345
+  },
+  "postgres": [
+    {
+      "id": "business",
+      "container": "galaxy-pilot-database-1",
+      "projectName": "galaxy-pilot",
+      "composeFile": "/etc/galaxy/pilot/database.compose.json",
+      "service": "database",
+      "dataPath": "/var/lib/postgresql/18/docker",
+      "socketPath": "/var/run/postgresql",
+      "administrator": "galaxy_pilot_migration",
+      "database": "galaxy_pilot",
+      "systemIdentifier": null,
+      "uid": null,
+      "gid": null,
+      "serverCommand": null,
+      "repository": "/var/lib/galaxy/backups/pgbackrest/business",
+      "cipherFile": "/etc/galaxy/operations-secrets/pgbackrest.business.cipher",
+      "retentionFull": 2
+    },
+    {
+      "id": "accounts",
+      "container": "galaxy-accounts-pilot-database-1",
+      "projectName": "galaxy-accounts-pilot",
+      "composeFile": "/etc/galaxy/pilot/keycloak/compose.json",
+      "service": "database",
+      "dataPath": "/var/lib/postgresql/18/docker",
+      "socketPath": "/var/run/postgresql",
+      "administrator": "galaxy_accounts",
+      "database": "galaxy_accounts",
+      "systemIdentifier": null,
+      "uid": null,
+      "gid": null,
+      "serverCommand": null,
+      "repository": "/var/lib/galaxy/backups/pgbackrest/accounts",
+      "cipherFile": "/etc/galaxy/operations-secrets/pgbackrest.accounts.cipher",
+      "retentionFull": 2
+    }
+  ],
+  "backup": {
+    "repositoryFile": "/etc/galaxy/operations-secrets/restic.repository",
+    "passwordFile": "/etc/galaxy/operations-secrets/restic.password",
+    "credentialEnvironmentFile": null,
+    "resticHost": "galaxy-production",
+    "minimumFreeBytes": 21474836480,
+    "maxCaptureBytes": 107374182400,
+    "maxPauseSeconds": 180,
+    "statusGroupId": 978,
+    "calendar": "*-*-* 03:15:00 UTC",
+    "keycloakRealms": [
+      "galaxy",
+      "galaxy-operations"
+    ],
+    "writers": [
+      {
+        "kind": "systemd",
+        "name": "galaxy-api@pilot.service"
+      },
+      {
+        "kind": "systemd",
+        "name": "galaxy-worker@pilot.service"
+      },
+      {
+        "kind": "systemd",
+        "name": "galaxy-admin-pilot.service"
+      },
+      {
+        "kind": "systemd",
+        "name": "galaxy-content-publisher-pilot.service"
+      },
+      {
+        "kind": "container",
+        "name": "galaxy-accounts-pilot-keycloak-1"
+      },
+      {
+        "kind": "container",
+        "name": "galaxy-chat-pilot-chat-1"
+      },
+      {
+        "kind": "container",
+        "name": "galaxy-attachment-storage"
+      },
+      {
+        "kind": "container",
+        "name": "galaxy-operations-grafana"
+      }
+    ],
+    "sources": [
+      {
+        "id": "configuration",
+        "kind": "tree",
+        "path": "/etc/galaxy"
+      },
+      {
+        "id": "prosody",
+        "kind": "tree",
+        "path": "/var/lib/galaxy/chat/pilot"
+      },
+      {
+        "id": "garage",
+        "kind": "tree",
+        "path": "/var/lib/galaxy/attachments-pilot/garage"
+      },
+      {
+        "id": "website-release",
+        "kind": "tree",
+        "path": "/srv/galaxy/website/current"
+      },
+      {
+        "id": "auth-release",
+        "kind": "tree",
+        "path": "/srv/galaxy/auth/releases/registration-continuation-20261020"
+      },
+      {
+        "id": "api-release",
+        "kind": "tree",
+        "path": "/opt/galaxy/releases/0.1.21"
+      },
+      {
+        "id": "cms-media",
+        "kind": "tree",
+        "path": "/var/lib/galaxy/cms/pilot/media"
+      },
+      {
+        "id": "cms-configuration",
+        "kind": "tree",
+        "path": "/etc/galaxy/cms-pilot"
+      },
+      {
+        "id": "grafana",
+        "kind": "tree",
+        "path": "/var/lib/galaxy/operations/grafana",
+        "optional": true
+      }
+    ]
+  },
+  "environment": "production",
+  "dockerLogs": [
+    {
+      "component": "postgres-business",
+      "container": "galaxy-pilot-database-1",
+      "release": "18.6"
+    },
+    {
+      "component": "postgres-accounts",
+      "container": "galaxy-accounts-pilot-database-1",
+      "release": "18.6"
+    },
+    {
+      "component": "keycloak",
+      "container": "galaxy-accounts-pilot-keycloak-1",
+      "release": "26.7.3"
+    },
+    {
+      "component": "prosody",
+      "container": "galaxy-chat-pilot-chat-1",
+      "release": "unreported"
+    },
+    {
+      "component": "garage",
+      "container": "galaxy-attachment-storage",
+      "release": "unreported"
+    },
+    {
+      "component": "clamav",
+      "container": "galaxy-attachment-scanner",
+      "release": "unreported"
+    },
+    {
+      "component": "grafana",
+      "container": "galaxy-operations-grafana",
+      "release": "13.2.4"
+    },
+    {
+      "component": "loki",
+      "container": "galaxy-operations-loki",
+      "release": "3.7.8"
+    },
+    {
+      "component": "alloy",
+      "container": "galaxy-operations-alloy",
+      "release": "1.21.0"
+    }
+  ],
+  "logCollection": {
+    "maxFileBytes": 10485760,
+    "files": 3,
+    "journalMaxAgeHours": 24
+  }
+}

@@ -12,6 +12,8 @@ export async function targetRestrictionsWithin(db, type, id, now) {
   }
   const rows = (await db.query(`SELECT id,restriction_scopes,restriction_until,restriction_event_id FROM target_reports_v2
     WHERE ${type === 'task' ? 'task_id' : 'room_id'}=ANY($1::uuid[]) AND restriction_until>$2 ORDER BY id`, [ids, new Date(now * 1000)])).rows;
+  if(type==='room')rows.push(...(await db.query(`SELECT id,restriction_scopes,restriction_until,restriction_event_id FROM account_chat_reports_v1
+    WHERE room_id=ANY($1::uuid[]) AND restriction_until>$2 ORDER BY id`,[ids,new Date(now*1000)])).rows);
   return { scopes: [...new Set(rows.flatMap(r => r.restriction_scopes))], restrictions: rows.map(r => ({ reportId: r.id,
     eventId: r.restriction_event_id, scopes: r.restriction_scopes, until: new Date(r.restriction_until).toISOString() })),
     authority: 'current-target-operation-restrictions; not-capability-or-source-permission' };

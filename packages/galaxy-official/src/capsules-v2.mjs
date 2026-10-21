@@ -5,6 +5,7 @@ import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
 import { transaction } from './database.mjs';
 import { recordObjectAudit } from './infrastructure/object-audit.mjs';
+import {operationsVisibilityWithin} from './operations-content-visibility.mjs';
 import {capsuleReceiptV2Schema,capsuleVersionsV2Schema,capsulePermissionsQueryV2Schema} from './shared/capsule-v2-schema.mjs';
 const absent = e => e instanceof ServiceError && [400, 403, 404, 409, 422, 503].includes(e.status);
 const json = value => JSON.stringify(value);
@@ -116,11 +117,13 @@ export class CapsuleServiceV2 extends CapsuleSourcesV2 {
     }
     return { deprecated, securityIssue, notices };
   }
-  async versionWithin(db, actor, capsuleId, versionId, { tolerateUnavailableSource = true } = {}) {
+  async versionWithin(db, actor, capsuleId, versionId, { tolerateUnavailableSource = true,ignoreOperationsVisibility=false } = {}) {
     const rows = (await db.query("SELECT * FROM capsule_events WHERE capsule_id=$1 AND kind='version' AND ($2::uuid IS NULL OR id=$2) ORDER BY revision DESC", [capsuleId, versionId ?? null])).rows;
     // A no-version read targets the latest published version, and does not
     // silently fall back to an old visible version when that latest one is private.
     const row = rows[0]; rule(row?.payload_text, 'capsule_unavailable', 404);
+    const operationsVisibility=await operationsVisibilityWithin(db,{endpoint:this.access.endpoint,kind:'method',id:capsuleId,now:this.access.now()});
+    rule(!operationsVisibility.hidden||ignoreOperationsVisibility||actor?.subjectId===row.subject_id,'capsule_unavailable',404);
     const grant = await this.legacy.grant(db, row, 'capsule.publish');
     rule(this.legacy.visible(grant, actor), 'capsule_unavailable', 404);
     const raw = JSON.parse(row.payload_text), payload = raw.schemaVersion === 2 ? parse(row.payload_text, capsuleVersionV2Schema) : raw;

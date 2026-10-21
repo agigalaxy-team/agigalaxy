@@ -1,5 +1,6 @@
 import {ServiceError} from './shared/service-error.mjs';
 import {forumAudienceSchema,legacyForumAudience} from './shared/community-forum-access-v2.mjs';
+import {operationsVisibilityWithin} from './operations-content-visibility.mjs';
 
 const unavailable=error=>error instanceof ServiceError&&[403,404,409,422,503].includes(error.status);
 export class CommunityForumAccessV2{
@@ -50,6 +51,8 @@ export class CommunityForumAccessV2{
  }
  async sectionAllowedWithin(db,section,viewer,mode='read'){
   if(!section)return false;
+  const operational=await operationsVisibilityWithin(db,{endpoint:this.forum.access.endpoint,kind:'forum-section',id:section.id,now:this.forum.clock()});
+  if(operational.hidden&&(mode==='participate'||viewer?.accountId!==section.maintainer_account_id))return false;
   if(viewer?.accountId===section.maintainer_account_id)return mode!=='participate'||section.state==='active';
   if(mode==='participate'&&section.state!=='active')return false;
   return await this.ruleWithin(db,section.audience.read,viewer)&&(mode==='read'||await this.ruleWithin(db,section.audience.participate,viewer));

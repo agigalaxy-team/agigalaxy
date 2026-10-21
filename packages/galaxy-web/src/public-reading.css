@@ -1,3 +1,4 @@
+@import '../../../apps/galaxy-site/cms-content.css';
 /* Shared reading layout for static fallback and the same App after startup. */
 .galaxy-site.selected-shell.selected-public-shell {
   --page-gutter:32px;

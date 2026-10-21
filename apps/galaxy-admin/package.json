@@ -1,0 +1,38 @@
+{
+  "name": "@agi-galaxy/admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.13.0" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "types": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "payload": "payload",
+    "generate:importmap": "payload generate:importmap",
+    "generate:types": "payload generate:types",
+    "migrate:create": "payload migrate:create",
+    "migrate": "payload migrate"
+  },
+  "dependencies": {
+    "@payloadcms/db-postgres": "3.91.0",
+    "@payloadcms/next": "3.91.0",
+    "@payloadcms/translations": "3.91.0",
+    "@payloadcms/ui": "3.91.0",
+    "graphql": "^16.8.1",
+    "next": "16.4.2",
+    "payload": "3.91.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "sass": "1.105.2",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}

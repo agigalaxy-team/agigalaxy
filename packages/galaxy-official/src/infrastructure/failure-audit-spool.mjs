@@ -40,7 +40,7 @@ export async function createFailureAuditSpool({ path, endpoint, write, maxEvents
   const status = () => {
     if (closed) return { ready: false, closed: true, pending: null, delivery };
     try { const pending = count(); return { ready: storageAvailable && pending < maxEvents, pending, delivery }; }
-    catch { storageAvailable = false; return { ready: false, pending: null, delivery }; }
+    catch(error) { storageAvailable = false;log({event:'failure_audit_spool_failed',stage:'audit-spool-status',error});return { ready: false, pending: null, delivery }; }
   };
   const flush = () => {
     if (closed) return Promise.resolve();
@@ -48,14 +48,15 @@ export async function createFailureAuditSpool({ path, endpoint, write, maxEvents
     active = (async () => {
       let rows;
       try { rows = db.prepare('SELECT request_id,event_json FROM pending ORDER BY rowid LIMIT ?').all(batchSize); }
-      catch { storageAvailable = false; return; }
+      catch(error) { storageAvailable = false;log({event:'failure_audit_spool_failed',stage:'audit-spool-read',error});return; }
       for (const row of rows) {
+        const startedAt=performance.now();
         try {
           const event = eventSchema.parse(JSON.parse(row.event_json));
           const result=await write(event);
           db.prepare('DELETE FROM pending WHERE request_id=? AND event_json=?').run(row.request_id, row.event_json);
           storageAvailable = true; delivery = result?.state==='suppressed-by-deletion'?'suppressed-by-deletion':'recorded';
-        } catch { delivery = 'retry-pending'; break; }
+        } catch(error) { delivery = 'retry-pending';log({event:'failure_audit_delivery',stage:'audit-delivery',requestId:row.request_id,delivery,startedAt,error});break; }
       }
       if (rows.length) log({ event: 'failure_audit_delivery', delivery, pending: status().pending });
     })().finally(() => { active = null; });
@@ -80,7 +81,7 @@ export async function createFailureAuditSpool({ path, endpoint, write, maxEvents
       storageAvailable = true;
       void flush();
       return 'queued';
-    } catch { storageAvailable = false; log({ event: 'failure_audit_spool_failed' }); return 'failed'; }
+    } catch(error) { storageAvailable = false; log({event:'failure_audit_spool_failed',stage:'audit-spool-record',requestId:input?.requestId,error}); return 'failed'; }
   };
   const timer = setInterval(() => { void flush(); }, intervalMs);
   timer.unref();

@@ -5,6 +5,17 @@ import {accountChatV3MigrationSql} from './account-chat-v3-schema.mjs';
 import {accountReadingBookmarksV2MigrationSql} from './account-reading-bookmarks-v2-schema.mjs';
 import {forumAttachmentsV1MigrationSql} from './forum-attachments-v1-schema.mjs';
 import {accountUidV1MigrationSql} from './account-uid-v1-schema.mjs';
+import {officialAccountSessionsV1MigrationSql} from './official-account-sessions-v1-schema.mjs';
+import {operationsOperatorV1MigrationSql} from './operations-operator-schema-v1.mjs';
+import {businessAdminV1MigrationSql} from './business-admin-v1-schema.mjs';
+import {operationsJobsMigrationSql} from './operations-jobs-schema-v1.mjs';
+import {contentPublicationsV1MigrationSql} from './content-publications-v1-schema.mjs';
+import {accountChatGovernanceV1MigrationSql} from './account-chat-governance-v1-schema.mjs';
+import {operationsManagementAuditV1MigrationSql} from './operations-management-audit-v1-schema.mjs';
+import {operationsBusinessV1MigrationSql,operationsBusinessAuditActions} from './operations-business-v1-schema.mjs';
+import {operationsProductV1MigrationSql} from './operations-product-v1-schema.mjs';
+import {operationsProductAuditActions} from '../shared/operations-product-schema.mjs';
+import {operationsJobsExpansionV1MigrationSql} from './operations-jobs-expansion-v1-schema.mjs';
 import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
 import {communityForumTopicsV1MigrationSql} from './community-forum-topics-v1-schema.mjs';
 import {readingBookmarksV1MigrationSql} from './reading-bookmarks-v1-schema.mjs';
@@ -556,7 +567,16 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
   {version:89,sql:accountWorkV1MigrationSql},
   {version:90,sql:accountPublicQueryV1MigrationSql},
   {version:91,sql:[accountChatV3MigrationSql,accountReadingBookmarksV2MigrationSql,forumAttachmentsV1MigrationSql].join('\n')},
-  {version:92,sql:accountUidV1MigrationSql});
+  {version:92,sql:accountUidV1MigrationSql},
+  {version:93,sql:[officialAccountSessionsV1MigrationSql,operationsOperatorV1MigrationSql,businessAdminV1MigrationSql,operationsJobsMigrationSql,contentPublicationsV1MigrationSql].join('\n')},
+  {version:94,sql:accountChatGovernanceV1MigrationSql},
+  {version:95,sql:operationsManagementAuditV1MigrationSql},
+  {version:96,sql:operationsBusinessV1MigrationSql},
+  {version:97,sql:[operationsProductV1MigrationSql,operationsJobsExpansionV1MigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

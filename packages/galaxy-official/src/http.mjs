@@ -8,6 +8,8 @@ import { createRoutes } from './adapters/http/routes.mjs';
 import { clientAddressReader, fixedWindowLimiter, requestUrl } from './adapters/http/policy.mjs';
 import { boundedReadiness } from './adapters/http/readiness.mjs';
 import { validateBrowserOrigins, applyBrowserPolicy } from './adapters/http/browser-policy.mjs';
+import {withRuntimeDiagnosticContext} from './shared/runtime-diagnostics.mjs';
+import {runtimeLogEvent} from './operations/runtime-log.mjs';
 
 export function createApi({ readiness = async () => true, failureAudit = null, logger = () => {}, rateLimit = 60,
   healthRateLimit = 120, searchPageLimit = 25, readinessTimeoutMs = 2000, trustedProxyAddresses = [], browserOrigins = [], releaseId, requestQuotaPolicy=null, quotaNow=Date.now, metrics=null, ...services }) {
@@ -20,13 +22,14 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
   const healthLimit = fixedWindowLimiter({ limit: healthRateLimit });
   const searchPages=fixedWindowLimiter({limit:searchPageLimit,now:quotaNow});
   const quotas=requestQuotaPolicy?createRequestQuotas(requestQuotaPolicy,{now:quotaNow}):null;
-  const recordFailure = async (requestId, status, code, route, actor = null) => {
+  const log=input=>{try{logger(runtimeLogEvent(input));}catch{/* No raw request/error fallback. */}};
+  const recordFailure = async (requestId, status, code, route, actor = null,diagnostic={}) => {
     let auditStatus;
     if (failureAudit) {
       try { auditStatus = await failureAudit({ requestId, status, route, actor }); }
-      catch { auditStatus = 'failed'; }
+      catch (error) { auditStatus = 'failed';log({event:'http_failure_audit_failed',requestId,route,stage:'audit-spool-record',error}); }
     }
-    try { logger({ requestId, status, code, ...(failureAudit ? { auditStatus } : {}) }); } catch { /* No raw request/error output. */ }
+    log({event:'http_rejected',requestId,status,code,route,...diagnostic,...(failureAudit?{auditStatus}:{})});
   };
   const server = createServer(async (request, response) => {
     let metricPath,bodyBytes=0;
@@ -47,6 +50,8 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
       response.once('close',()=>finishMetric({method:request.method,path:metricPath,status:response.writableFinished?response.statusCode:499,bodyBytes,receivedBodyBytes:consumedBodyBytes(request)}));
     }
     const requestId = randomUUID();
+    const startedAt=performance.now();
+    let stage='http-request';
     response.setHeader('X-Request-Id', requestId);
     if (releaseId !== undefined) response.setHeader('X-Galaxy-Release', releaseId);
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -55,30 +60,39 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
     response.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
     const send = (status, payload) => { response.statusCode = status; response.end(JSON.stringify(payload)); };
     let routeTag = 'http.request';
+    let completed=false;
+    const complete=()=>{if(completed)return;completed=true;log({event:'http_completed',requestId,route:routeTag,
+      status:response.writableFinished?response.statusCode:499,stage,startedAt});};
+    response.once('finish',complete);response.once('close',complete);
     let failureRecorded = false;
-    const failed = (status, code) => {
+    const failed = (status, code,error) => {
       if (failureRecorded) return Promise.resolve();
       failureRecorded = true;
-      return recordFailure(requestId, status, code, routeTag, authenticatedRequestActor(request));
+      return recordFailure(requestId,status,code,routeTag,authenticatedRequestActor(request),{stage,startedAt,...(error===undefined?{}:{error})});
     };
     request.once('aborted', () => { void failed(499, 'request_aborted'); });
     response.once('close', () => { if (!response.writableFinished) void failed(499, 'connection_closed'); });
     try {
+      stage='http-address';
       const address = addressOf(request);
       let url;
+      stage='http-url';
       try { url = requestUrl(request, services.bindings.endpoint, allowedBrowserOrigins); }
       catch (error) { limit(address, response); throw error; }
       routeTag = failureRoute(request.method, url.pathname);
       metricPath=url.pathname;
       const probe = request.method === 'GET' && ['/healthz', '/readyz'].includes(url.pathname);
+      stage='http-quota';
       // Probe quota is independent from business traffic, but remains bounded.
       if(probe)healthLimit(address,response);
       else if(quotas)bindRequestQuota(request,quotas.begin({method:request.method,path:url.pathname,hasCredential:request.headers.authorization!==undefined,address,response}));
       else limit(address,response);
+      stage='http-browser-policy';
       if (applyBrowserPolicy(request, response, allowedBrowserOrigins)) return;
       if (probe) {
+        stage='http-readiness';
         if (url.pathname === '/healthz') return send(200, { status: 'ok' });
-        const ready = await checkReadiness() && (!services.incident || services.incident.canProcessEvidence());
+        const ready = await withRuntimeDiagnosticContext({requestId,stage},()=>checkReadiness()) && (!services.incident || services.incident.canProcessEvidence());
         if (!ready) await failed(503, 'service_unavailable');
         return send(ready ? 200 : 503, { status: ready ? 'ready' : 'unavailable' });
       }
@@ -93,16 +107,17 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
         }
         return send(200,status);
       }
-      await dispatch({ request, response, requestId, url, send,recordFailure:failed,consumeSearchPage:(actor,after)=>{
+      stage='http-dispatch';
+      await withRuntimeDiagnosticContext({requestId,stage},()=>dispatch({ request, response, requestId, url, send,recordFailure:failed,consumeSearchPage:(actor,after)=>{
         if(after===undefined)return;
         try{searchPages(actor?'subject:'+actor.subjectId:'anonymous:'+address,response);}
         catch(error){response.setHeader('X-Galaxy-Quota-Category','search-pagination');throw error;}
-      } });
+      } }));
     } catch (error) {
       const status = error instanceof ServiceError ? error.status : 500;
       const code = error instanceof ServiceError ? error.code : 'internal_error';
       metrics?.quotaRejected(code);
-      await failed(status, code);
+      await failed(status, code,error);
       if (!response.headersSent) {
         const communityError = ['community_quota_exceeded','invitation_cooldown','community_restricted'].includes(code);
         if (communityError && Number.isSafeInteger(error.retryAfterSeconds) && error.retryAfterSeconds > 0)
@@ -121,7 +136,7 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
     const status = error.code === 'HPE_HEADER_OVERFLOW' ? 431 : error.code === 'ERR_HTTP_REQUEST_TIMEOUT' ? 408 : 400;
     metrics?.parserError(status);
     const requestId = randomUUID();
-    void recordFailure(requestId, status, 'http_parse_failed', 'http.parser');
+    void recordFailure(requestId,status,'http_parse_failed','http.parser',null,{stage:'http-parser',error});
     if (socket.writable) socket.end(`HTTP/1.1 ${status} ${status === 431 ? 'Request Header Fields Too Large' : status === 408 ? 'Request Timeout' : 'Bad Request'}\r\nConnection: close\r\nContent-Length: 0\r\nX-Request-Id: ${requestId}\r\n\r\n`);
     else socket.destroy();
   });

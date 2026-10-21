@@ -5,6 +5,12 @@ DO $$ BEGIN
   END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO galaxy_evidence_worker;
+GRANT USAGE ON SCHEMA galaxy_jobs TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA galaxy_jobs TO galaxy_evidence_worker;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA galaxy_jobs TO galaxy_evidence_worker;
+GRANT EXECUTE ON FUNCTION galaxy_jobs.job_now() TO galaxy_evidence_worker;
+GRANT USAGE ON TYPE galaxy_jobs.job_state TO galaxy_evidence_worker;
+GRANT UPDATE(search_recovery_count,search_recovery_generation,search_recovery_at) ON jobs TO galaxy_evidence_worker;
 GRANT SELECT ON forum_attachments_v1,forum_attachment_links_v1 TO galaxy_evidence_worker;
 GRANT UPDATE(state,name,media_type,scan_result,scan_attempts,lease_id,lease_until,last_error,purge_pending,purged_at) ON forum_attachments_v1 TO galaxy_evidence_worker;
 GRANT DELETE ON forum_attachments_v1 TO galaxy_evidence_worker;
@@ -125,3 +131,15 @@ GRANT SELECT(id,subject_id,kind) ON subject_control_events TO galaxy_evidence_wo
 GRANT UPDATE(payload_text,erased_at) ON forum_events_v1,forum_governance_events_v1 TO galaxy_evidence_worker;
 GRANT EXECUTE ON FUNCTION public.galaxy_worker_prune_forum_authorizations(timestamptz) TO galaxy_evidence_worker;
 GRANT EXECUTE ON FUNCTION public.galaxy_worker_lock_closed_forum_reports(timestamptz) TO galaxy_evidence_worker;
+GRANT SELECT,UPDATE ON account_chat_reports_v1,account_chat_governance_events_v1,account_chat_governance_materials_v1 TO galaxy_evidence_worker;
+
+-- Queue delegation reads only the stored management principal and current
+-- directory roles; the worker never receives browser tokens or signing keys.
+GRANT SELECT ON operations_content_visibility_v1,forum_operations_events_v1,operations_operator_principals_v1 TO galaxy_evidence_worker;
+GRANT INSERT ON business_admin_audit_v1 TO galaxy_evidence_worker;
+GRANT SELECT(sequence) ON business_admin_audit_v1 TO galaxy_evidence_worker;
+GRANT USAGE,SELECT ON SEQUENCE business_admin_audit_v1_sequence_seq TO galaxy_evidence_worker;
+GRANT SELECT ON operations_product_rules_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE ON operations_policy_processes_v1 TO galaxy_evidence_worker;
+GRANT SELECT,UPDATE ON account_operations_notices_v1,operations_notices_v1,operations_retention_runs_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE ON operations_retention_observations_v1 TO galaxy_evidence_worker;

@@ -9,6 +9,7 @@ import { builderSearchFields } from './shared/builders-schema.mjs';
 import { searchSourceTypes } from './shared/search-schema.mjs';
 
 const iso=seconds=>new Date(seconds*1000).toISOString();
+const hiddenSource=error=>error instanceof ServiceError&&[401,403,404,409,410,422].includes(error.status);
 const sources=`SELECT 'case' AS type,id,subject_id FROM cases UNION ALL SELECT 'history',id,subject_id FROM cases
   UNION ALL SELECT 'proof',id,subject_id FROM proofs UNION ALL SELECT 'capsule',id,subject_id FROM capsules
   UNION ALL SELECT type,id,owner_id FROM builders WHERE type IN ('worker','hub')`;
@@ -16,9 +17,9 @@ const sources=`SELECT 'case' AS type,id,subject_id FROM cases UNION ALL SELECT '
 // This index supplies public candidates only. A serving API must re-read each
 // source with its normal authorization and signature checks before returning it.
 export class SearchIndex {
-  constructor({db,endpoint,now=()=>Math.floor(Date.now()/1000),readGrant,maxAgeSeconds=60}){
+  constructor({db,endpoint,now=()=>Math.floor(Date.now()/1000),readGrant,maxAgeSeconds=60,jobs=null}){
     if(new URL(endpoint).origin!==endpoint||!Number.isInteger(maxAgeSeconds)||maxAgeSeconds<1||maxAgeSeconds>60)throw new Error('Invalid search index configuration');
-    Object.assign(this,{db,endpoint,now,readGrant,maxAgeSeconds});
+    Object.assign(this,{db,endpoint,now,readGrant,maxAgeSeconds,jobs});
   }
   async configure({enabled,rebuild=false}){
     if(typeof enabled!=='boolean')throw new Error('Explicit index state required');
@@ -51,6 +52,98 @@ export class SearchIndex {
       const rows=(await db.query('SELECT source_type,source_id,subject_id FROM search_documents WHERE valid_until<=$1 ORDER BY valid_until,source_type,source_id LIMIT 100',[iso(this.now())])).rows;
       for(const row of rows)await db.query('SELECT public.galaxy_queue_search_source($1,$2,$3)',[row.source_type,row.source_id,row.subject_id]);
       return {queued:rows.length};
+    });
+  }
+  // A first-document failure is absent from search_documents, so refreshing
+  // expired documents cannot find it. Retry only failed source generations;
+  // neither a full rebuild nor deleting a still-valid projection is needed.
+  async recoverFailed(limit=50){
+    if(!this.jobs)return {queued:0,configured:false};
+    if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid search recovery batch');
+    return transaction(this.db,async db=>{
+      if(!(await db.query('SELECT 1 FROM search_index_control WHERE enabled AND endpoint=$1',[this.endpoint])).rows.length)return {queued:0};
+      const rows=(await db.query(`SELECT j.* FROM jobs j WHERE j.kind='search-index' AND j.state='failed' AND j.attempts>=5
+        AND (j.search_recovery_generation<>COALESCE((j.payload->>'generation')::int,1) OR j.search_recovery_count<3)
+        AND NOT EXISTS(SELECT 1 FROM search_documents d WHERE d.source_type=j.payload->>'sourceType'
+          AND d.source_id=(j.payload->>'sourceId')::uuid AND d.valid_until>$1)
+        AND NOT EXISTS(SELECT 1 FROM galaxy_jobs.job q WHERE q.name='search-recovery' AND q.state IN ('created','retry','active','cancelled')
+          AND q.data->>'jobId'=j.id::text AND q.data->>'generation'=j.payload->>'generation')
+        ORDER BY j.available_at,j.id LIMIT $2 FOR UPDATE OF j SKIP LOCKED`,[iso(this.now()),limit])).rows;
+      let queued=0;
+      for(const job of rows){
+        const generation=job.payload.generation??1;
+        const attempt=(job.search_recovery_generation===generation?job.search_recovery_count:0)+1;
+        const start=Math.max(this.now(),Date.parse(job.available_at)/1000)+Math.min(3600,60*2**(attempt-1));
+        const id=await this.jobs.enqueue('search-recovery',{jobId:job.id,subjectId:job.payload.subjectId,generation,recoveryAttempt:attempt},
+          {key:`search:${job.id}:${generation}:${attempt}`,startAfter:iso(start),db});
+        if(id){
+          await db.query('UPDATE jobs SET search_recovery_generation=$2,search_recovery_count=$3,search_recovery_at=$4 WHERE id=$1',
+            [job.id,generation,attempt,iso(start)]);
+          queued++;
+        }
+      }
+      return {queued};
+    });
+  }
+  async recoverJob({jobId,generation,recoveryAttempt},{signal}={}){
+    if(typeof jobId!=='string'||!Number.isInteger(generation)||generation<1||!Number.isInteger(recoveryAttempt)||recoveryAttempt<1||recoveryAttempt>3)
+      throw new ServiceError('invalid_search_recovery',400);
+    return transaction(this.db,async db=>{
+      signal?.throwIfAborted();
+      const job=(await db.query("SELECT * FROM jobs WHERE id=$1 AND kind='search-index' FOR UPDATE",[jobId])).rows[0];
+      if(!job||job.state!=='failed'||job.attempts<5||job.payload.generation!==generation
+        ||job.search_recovery_generation!==generation||job.search_recovery_count!==recoveryAttempt)return {state:'superseded'};
+      if(!(await db.query('SELECT 1 FROM search_index_control WHERE enabled AND endpoint=$1',[this.endpoint])).rows.length)return {state:'disabled'};
+      // Source/consent/binding checks still execute through build() on every
+      // actual attempt. The recovery job is never evidence or read authority.
+      await db.query("UPDATE jobs SET state='pending',attempts=0,lease_id=NULL,locked_until=NULL,available_at=$2 WHERE id=$1",[job.id,iso(this.now())]);
+      return {state:'requeued',jobId:job.id,generation};
+    });
+  }
+  async failures({after,limit=50}={}){
+    if(!Number.isInteger(limit)||limit<1||limit>100||after!==undefined&&!/^[0-9a-f-]{36}$/i.test(after))throw new ServiceError('invalid_search_recovery',400);
+    const rows=(await this.db.query(`SELECT j.id,j.payload,j.attempts,j.available_at,j.search_recovery_count,j.search_recovery_generation,j.search_recovery_at,
+      EXISTS(SELECT 1 FROM galaxy_jobs.job q WHERE q.name='search-recovery' AND q.state IN ('created','retry','active')
+        AND q.data->>'jobId'=j.id::text AND q.data->>'generation'=j.payload->>'generation') AS recovery_pending
+      FROM jobs j WHERE j.kind='search-index' AND j.state='failed' AND ($1::uuid IS NULL OR j.id>$1) ORDER BY j.id LIMIT $2`,[after??null,limit+1])).rows;
+    return {items:rows.slice(0,limit).map(j=>({jobId:j.id,sourceType:j.payload.sourceType,sourceId:j.payload.sourceId,
+      subjectId:j.payload.subjectId,generation:j.payload.generation,attempts:j.attempts,
+      recoveryAttempts:j.search_recovery_generation===j.payload.generation?j.search_recovery_count:0,
+      automaticRecoveryPending:j.recovery_pending,
+      automaticRecoveryExhausted:j.search_recovery_generation===j.payload.generation&&j.search_recovery_count>=3&&!j.recovery_pending,
+      recoveryAt:j.search_recovery_at?new Date(j.search_recovery_at).toISOString():null})),nextAfter:rows.length>limit?rows[limit-1].id:null};
+  }
+  async failureStatus(jobId){
+    if(typeof jobId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId))throw new ServiceError('invalid_search_recovery',400);
+    const j=(await this.db.query(`SELECT j.id,j.state,j.payload,j.attempts,j.search_recovery_count,j.search_recovery_generation,j.search_recovery_at,
+      EXISTS(SELECT 1 FROM galaxy_jobs.job q WHERE q.name='search-recovery' AND q.state IN ('created','retry','active')
+        AND q.data->>'jobId'=j.id::text AND q.data->>'generation'=j.payload->>'generation') AS recovery_pending
+      FROM jobs j JOIN search_index_control c ON c.singleton AND c.endpoint=$2 WHERE j.id=$1 AND j.kind='search-index'`,[jobId,this.endpoint])).rows[0];
+    if(!j)return null;
+    return {jobId:j.id,state:j.state,generation:j.payload.generation,sourceType:j.payload.sourceType,sourceId:j.payload.sourceId,
+      subjectId:j.payload.subjectId,attempts:j.attempts,
+      recoveryAttempts:j.search_recovery_generation===j.payload.generation?j.search_recovery_count:0,
+      automaticRecoveryPending:j.recovery_pending,
+      automaticRecoveryExhausted:j.search_recovery_generation===j.payload.generation&&j.search_recovery_count>=3&&!j.recovery_pending,
+      recoveryAt:j.search_recovery_at?new Date(j.search_recovery_at).toISOString():null};
+  }
+  // Only the authenticated operations controller may expose this method. It
+  // targets one failed generation; it cannot retry a newer source by accident.
+  async retryFailed({jobId,expectedGeneration},{audit}={}){
+    if(typeof jobId!=='string'||!/^[0-9a-f-]{36}$/i.test(jobId)||!Number.isInteger(expectedGeneration)||expectedGeneration<1)
+      throw new ServiceError('invalid_search_recovery',400);
+    return transaction(this.db,async db=>{
+      const job=(await db.query("SELECT * FROM jobs WHERE id=$1 AND kind='search-index' FOR UPDATE",[jobId])).rows[0];
+      if(!job)throw new ServiceError('search_job_not_found',404);
+      if(job.state!=='failed'||job.payload.generation!==expectedGeneration)throw new ServiceError('search_recovery_conflict',409);
+      if(!(await db.query('SELECT 1 FROM search_index_control WHERE enabled AND endpoint=$1',[this.endpoint])).rows.length)throw new ServiceError('search_index_disabled',409);
+      await db.query("DELETE FROM galaxy_jobs.job WHERE name='search-recovery' AND state='cancelled' AND data->>'jobId'=$1 AND data->>'generation'=$2",
+        [job.id,String(expectedGeneration)]);
+      await db.query(`UPDATE jobs SET state='pending',attempts=0,lease_id=NULL,locked_until=NULL,available_at=$2,
+        search_recovery_count=0,search_recovery_generation=$3,search_recovery_at=NULL WHERE id=$1`,[job.id,iso(this.now()),expectedGeneration]);
+      const result={jobId:job.id,generation:expectedGeneration,state:'pending'};
+      await audit?.(db,result);
+      return result;
     });
   }
   async build(db,job){
@@ -122,7 +215,7 @@ export class SearchIndex {
         await caseSource(payload.sourceResolution.caseId,subjectId,false);
         title=payload.title;summary=payload.problemPattern;searchText=title+' '+summary;version=row.id;
         metadata={sourceType:type,versionId:row.id,version:payload.version,capabilityId:payload.capabilityId};break;
-      }catch(error){if(!(error instanceof ServiceError))throw error;}}
+      }catch(error){if(!hiddenSource(error))throw error;}}
       if(!version)throw new ServiceError('index_capsule_unavailable',404);
     }else throw new Error('Invalid search job kind');
     if(validUntil<=this.now())throw new ServiceError('index_source_expired',404);
@@ -144,7 +237,7 @@ export class SearchIndex {
     await afterClaim?.(job); // A stopped process leaves a reclaimable lease.
     try{return await transaction(this.db,async db=>{
       signal?.throwIfAborted();let document;
-      try{document=await this.build(db,job);}catch(error){if(!(error instanceof ServiceError))throw error;}
+      try{document=await this.build(db,job);}catch(error){if(!hiddenSource(error))throw error;}
       await beforeCommit?.(job,document);signal?.throwIfAborted();
       const current=(await db.query("SELECT * FROM jobs WHERE id=$1 AND kind='search-index' FOR UPDATE",[job.id])).rows[0];
       if(!current||current.state!=='running'||current.lease_id!==job.lease_id||Date.parse(current.locked_until)<=this.now()*1000)return {processed:false,leaseLost:true};

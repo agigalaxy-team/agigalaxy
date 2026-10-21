@@ -1,5 +1,6 @@
 import {createLocalWorkHistory} from '../../../packages/galaxy-core/src/work-history/index.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
+import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
 
 const asTime = value => Number.isFinite(value) && value >= 0 ? new Date(value).toISOString() : undefined;
 const modelName = model => model && typeof model.providerID === 'string' && typeof (model.modelID ?? model.id) === 'string'
@@ -18,6 +19,8 @@ const content = text => ({excerpt: short(text), originalLength: typeof text === 
  * @param {{dataDirectory?: string, getIdentity?: (directory: string) => WorkRecorderIdentity | Promise<WorkRecorderIdentity>, history?: ReturnType<typeof createLocalWorkHistory>, archive?: ReturnType<typeof import('../../../packages/galaxy-core/src/conversation-archive/index.mjs').createLocalConversationArchive>, onSessionComplete?: (input: {host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
  */
 export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history = createLocalWorkHistory({dataDirectory, getIdentity}), archive, onSessionComplete, pollMs = 2000} = {}) {
+  const diagnostics=nativeDiagnostics('host-client');
+  diagnostics.emit({event:'host_recording',stage:'recording',outcome:'started',host:'opencode'});
   let accepting = true, closing, chain = Promise.resolve(), active = null, errorCode = null, selectedModel, actualModel;
   let environmentKey = '', lastSession = '', lastOwner = '';
   let selectedModelKey = '', actualModelKey = '', selectedModelSpec;
@@ -31,7 +34,10 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
   const currentSession = () => api.route?.current?.name === 'session' ? api.route.current.params?.sessionID : null;
   function report(error) {
     const code = typeof error?.code === 'string' ? error.code : 'local_work_recording_unavailable';
-    if (errorCode !== code) api.ui?.toast?.({variant: 'warning', title: '银河 · 本地记录', message: '本地工作记录暂未保存，已有资料保留。可在本地工作履历查看状态。'});
+    if (errorCode !== code) {
+      diagnostics.emit({event:'host_recording',stage:'recording',outcome:'failed',host:'opencode',error});
+      api.ui?.toast?.({variant: 'warning', title: '银河 · 本地记录', message: '本地工作记录暂未保存，已有资料保留。可在本地工作履历查看状态。'});
+    }
     errorCode = code;
   }
   function enqueue(operation) {
@@ -78,13 +84,16 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
     await saveEnvironment();
     const session=api.state?.session?.get?.(sessionId);
     if(session?.id===sessionId&&session.title)await save({sourceId:'session-title',revision:Number.isFinite(session.time?.updated)?session.time.updated:undefined,kind:'session',title:short(session.title,180),source:{kind:'host-event'},details:{event:'session-title',title:short(session.title,180)}});
-    await synchronizeArchiveSelection().catch(() => {archiveBackfillState={state:'unavailable',reason:'local_archive_selection_unavailable'};});
+    await synchronizeArchiveSelection().catch(error => {
+      if(archiveBackfillState?.reason!=='local_archive_selection_unavailable')diagnostics.emit({event:'host_archive',stage:'archive-backfill',outcome:'failed',host:'opencode',error});
+      archiveBackfillState={state:'unavailable',reason:'local_archive_selection_unavailable'};
+    });
     return true;
   }
   function backfillArchive({galaxyId, host = 'opencode', sessionId}) {
     const key = JSON.stringify([galaxyId, host, sessionId]);
     if (archiveJobs.has(key)) return archiveJobs.get(key);
-    const task = (async () => {
+    const task = diagnostics.run('archive-backfill',async () => {
       if (!accepting || !archive || host !== 'opencode') return {state:'unavailable',reason:'host_archive_unavailable'};
       const settings = await archive.settings();
       if (settings.galaxyId !== galaxyId) return {state:'cancelled',reason:'local_identity_changed'};
@@ -111,7 +120,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
         notifyArchiveReady(galaxyId,sessionId);
         return {state:'copied',host,sessionId,copied,coverage:'host-returned-messages',hostCompleteness:'not-guaranteed',attachmentsRead:false};
       } finally {clearTimeout(deadline);archiveControllers.delete(controller);}
-    })().catch(() => ({state:'unavailable',reason:'host_messages_unavailable'}));
+    },{event:'host_archive',host:'opencode',independent:true,resultOutcome:value=>value?.state==='cancelled'?'cancelled':value?.state==='unavailable'?'deferred':'succeeded'}).catch(() => ({state:'unavailable',reason:'host_messages_unavailable'}));
     archiveJobs.set(key,task);
     void task.then(value => {archiveBackfillState=value;archiveJobs.delete(key);});
     return task;
@@ -135,10 +144,10 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
       while(accepting&&archiveSyncRequests.has(key)) {
         const request=archiveSyncRequests.get(key);archiveSyncRequests.delete(key);
         if((await history.identity())?.id!==request.galaxyId)continue;
-        try {archiveSyncState=await onSessionComplete({host:request.host,sessionId:request.sessionId});}
+        try {archiveSyncState=await diagnostics.run('archive-sync',()=>onSessionComplete({host:request.host,sessionId:request.sessionId}),{event:'host_archive',host:'opencode',independent:true});}
         catch {archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};}
       }
-    })().catch(()=>{archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};});
+    })().catch(error=>{diagnostics.emit({event:'host_archive',stage:'archive-sync',outcome:'failed',host:'opencode',error});archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};});
     archiveSyncJobs.set(key,task);void task.then(()=>archiveSyncJobs.delete(key));
   }
   async function save(value) {
@@ -150,6 +159,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
     const result=await history.observe({galaxyId: active.galaxyId, host: 'opencode', sessionId: active.sessionId, ...value});
     if(!result.late)seen.set(key, encoded);
     if (seen.size > 5000) seen.delete(seen.keys().next().value);
+    if(errorCode)diagnostics.emit({event:'host_recording',stage:'recording',outcome:'succeeded',host:'opencode'});
     errorCode = null;
   }
   function inWindow(info, part) {
@@ -201,7 +211,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
     if (archive && inWindow(info) && (info.role === 'user' || info.time?.completed)) {
       const hostSession=api.state?.session?.get?.(active.sessionId),workspaceId=hostSession?.workspaceID??hostSession?.directory;
       try {await archive.captureMessage({galaxyId: active.galaxyId, host: 'opencode', sessionId: active.sessionId, messageId: info.id, message: info, parts: [...combined.values()],...(workspaceId?{workspaceId}:{})});}
-      catch {archiveBackfillState={state:'unavailable',reason:'local_archive_capture_unavailable'};}
+      catch(error) {if(archiveBackfillState?.reason!=='local_archive_capture_unavailable')diagnostics.emit({event:'host_archive',stage:'archive-capture',outcome:'failed',host:'opencode',error});archiveBackfillState={state:'unavailable',reason:'local_archive_capture_unavailable'};}
     }
     if(info.role==='assistant'&&info.time?.completed&&inWindow(info)) {
       const completedKey=JSON.stringify([active.galaxyId,info.sessionID,info.id,info.time.completed]);
@@ -270,7 +280,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
       'session.error', 'session.updated', 'server.connected', 'tui.session.select', 'session.next.model.switched', 'mcp.tools.changed', 'installation.updated'])
       disposers.push(api.event.on(type, event => {void enqueue(() => receive(event));}));
   }
-  const ready = enqueue(reconcile);
+  const ready = enqueue(()=>diagnostics.run('recording',reconcile,{event:'host_recording',host:'opencode'}));
   const timer = setInterval(() => {void enqueue(async () => {
     const owner = await history.identity();
     if (currentSession() !== lastSession || owner?.id !== lastOwner || !api.event?.on || errorCode) await reconcile();
@@ -283,7 +293,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
     for (const dispose of disposers.splice(0)) dispose();
     for (const controller of archiveControllers) controller.abort();
     archiveSyncRequests.clear();
-    closing = Promise.all([chain, summarizer.close(), Promise.allSettled([...archiveJobs.values(),...archiveSyncJobs.values()])]).then(() => {messages.clear(); parts.clear(); seen.clear();completedMessages.clear();});
+    closing = diagnostics.run('shutdown',()=>Promise.all([chain, summarizer.close(), Promise.allSettled([...archiveJobs.values(),...archiveSyncJobs.values()])]).then(() => {messages.clear(); parts.clear(); seen.clear();completedMessages.clear();}),{event:'host_recording',host:'opencode'});
     return closing;
   }
   return {history, archive, ready, refresh: () => enqueue(reconcile), backfillArchive, close,

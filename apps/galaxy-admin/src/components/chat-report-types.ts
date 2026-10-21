@@ -1,0 +1,12 @@
+export type ReportState='received'|'reviewing'|'resolved'|'appealed'|'withdrawn';
+export type ReportCategory='advertising'|'harassment'|'privacy'|'misrepresentation'|'other';
+export type ChatScope='sending-paused'|'invitations-paused';
+export type ReportItem={reportId:string;target:{type:'room';id:string;version:number};currentTarget:{type:'room';id:string;version:number;state:string}|null;category:ReportCategory;version:number;state:ReportState;reporterAccountId:string|null;createdAt:string;updatedAt:string;closedAt:string|null;handling:string;ownRestriction:{scopes:ChatScope[];until:string;eventId:string}|null;canModerate:boolean;materialsExpired:boolean;roomHistoryGranted:false;readExpiresAt:number};
+export type ReportMaterial={eventId:string;messageId:string;revision:number;roomId:string;authorRef:string;sentAt:string;sourceExpiresAt:string;state:'available'|'unavailable';text:string|null;attachments:{attachmentId:string;name?:string;mediaType?:string;size?:number;state:string;contentAvailable:boolean}[]};
+export type ReportEvent={eventId:string;kind:string;version:number;at:string;actorKind:string;accountId:string|null;operatorId:string|null;summary:string|null;decision?:{rule:string;verdict:string|null;scopes:ChatScope[];until:number|null}};
+export type ReportDetail=ReportItem&{materials:ReportMaterial[];events:ReportEvent[]};
+export type ReportPage={items:ReportItem[];nextAfter:string|null;readExpiresAt:number};
+export type ReportResource=ReportPage|ReportDetail;
+export const reportStates:Record<ReportState,string>={received:'待处理',reviewing:'处理中',resolved:'已处理',appealed:'申诉中',withdrawn:'已撤回'};
+export const reportCategories:Record<ReportCategory,string>={advertising:'广告',harassment:'骚扰',privacy:'隐私',misrepresentation:'冒用与误导',other:'其他'};
+export const scopeLabels:Record<ChatScope,string>={'sending-paused':'暂停发送消息','invitations-paused':'暂停发出邀请'};

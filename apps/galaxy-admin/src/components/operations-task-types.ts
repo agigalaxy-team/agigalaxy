@@ -1,0 +1,14 @@
+export const operationQueues=['information-watch','search-recovery','content-publication','account-notice','retention-cleanup'] as const;
+export type OperationQueue=typeof operationQueues[number];
+export const queueLabels:Record<OperationQueue,string>={'information-watch':'持续关注','search-recovery':'检索自动恢复','content-publication':'官网发布','account-notice':'站内通知投递','retention-cleanup':'到期清理'};
+export type OperationJob={id:string;queue:OperationQueue;state:string;createdAt:string|null;startedAt:string|null;completedAt:string|null;availableAt:string|null;retryCount:number;retryLimit:number;subjectId:string|null;resourceId:string|null;error:string|null};
+export type OperationJobPage={queue:OperationQueue;items:OperationJob[];nextAfter:string|null};
+export type SearchFailure={jobId:string;sourceType:string;sourceId:string;subjectId:string;generation:number;attempts:number;recoveryAttempts:number;automaticRecoveryPending:boolean;automaticRecoveryExhausted:boolean;recoveryAt:string|null};
+export type SearchFailurePage={items:SearchFailure[];nextAfter:string|null};
+export type SearchRecoveryJob=SearchFailure&{state:string};
+export type SearchRetryResult={jobId:string;generation:number;state:'pending'};
+export const operationStates:Record<string,string>={created:'等待执行',retry:'等待重试',active:'正在执行',completed:'已完成',cancelled:'已取消',failed:'执行失败'};
+export const searchStates:Record<string,string>={pending:'等待检索',running:'正在检索',completed:'检索处理完成',failed:'检索失败'};
+export const sourceTypes:Record<string,string>={case:'求助案例',history:'工作履历',proof:'依据记录',capsule:'经验胶囊',worker:'Worker',hub:'Hub'};
+export const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const canCancelJob=(job:OperationJob)=>['created','retry','active'].includes(job.state);

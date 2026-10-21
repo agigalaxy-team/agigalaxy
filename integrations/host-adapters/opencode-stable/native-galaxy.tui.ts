@@ -4,6 +4,7 @@ import {readNativeConfiguration} from '../../../packages/galaxy-edge-mcp/src/nat
 import {createNativeStore} from '../../../packages/galaxy-edge-mcp/src/native-v2/store.mjs';
 import {readJson,localPaths,resolveDataDir} from '../../../packages/galaxy-core/src/storage/files.mjs';
 import type {StableHostApi} from './adapter-types.ts';
+import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
 export {prepareOpenCodeLocalWork} from './local-preparation.mjs';
 
 type Options={configPath?:string;dataDirectory?:string;endpoint?:string;openLink?:(url:string)=>Promise<unknown>;openBrowser?:(url:string)=>Promise<unknown>};
@@ -12,6 +13,7 @@ type Options={configPath?:string;dataDirectory?:string;endpoint?:string;openLink
 // configuration, with the same real tools and choices used by stdio clients.
 // OpenCode continues to own its providers, conversation and unsent prompt.
 export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDirectory,endpoint:installedEndpoint,openLink,openBrowser}:Options={}){
+  const diagnostics=nativeDiagnostics('host-client');
   return createGalaxyPlugin(async()=>{
   // The public service configuration locates the same user-owned local store.
   // Reading it does not start Native, authenticate or run a model.
@@ -30,7 +32,7 @@ export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDire
         const {syncSelectedArchivesForSession}=await import('../../../packages/galaxy-edge-mcp/src/native-v2/archive-sync-bridge.mjs');
         return syncSelectedArchivesForSession({dataDirectory:config.dataDirectory,nativeConfiguration:{endpoint:config.endpoint,website:config.website,trustedKeys:config.trustedKeys},host,sessionId});
       };
-    }catch{connectionUnavailable=true;}
+    }catch(error){diagnostics.emit({event:'host_bridge',stage:'configuration',outcome:'failed',host:'opencode',error});connectionUnavailable=true;}
   }
   if(identityEndpoint){
       const local=createNativeStore(dataDirectory),endpoint=identityEndpoint;
@@ -47,7 +49,7 @@ export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDire
   return{
    ...adapter,
    tui:async(api:StableHostApi)=>{
-    const stop=()=>{bridge.close().catch(()=>console.error('Galaxy local connection could not finish closing.'));};
+    const stop=()=>{bridge.close().catch((error:unknown)=>diagnostics.emit({event:'host_bridge',stage:'shutdown',outcome:'failed',host:'opencode',error}));};
     unregister=api.lifecycle?.onDispose(stop);
     if(api.lifecycle?.signal.aborted){stop();unregister?.();return;}
     try{await adapter.tui(api);}catch(error){await bridge.close();unregister?.();throw error;}

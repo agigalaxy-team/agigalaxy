@@ -27,9 +27,11 @@ export function applyBrowserPolicy(request, response, origins) {
   response.setHeader('Vary', 'Origin');
   response.setHeader('Access-Control-Allow-Origin', origin);
   const pathname=new URL(request.url,'https://galaxy.invalid').pathname;
-  const accountSession = /^\/v1\/account\/(session|logout|settings|type-change|archives|work|external-credentials|bookmarks)(?:\/|\?|$)/.test(request.url)
+  const operationsSession=/^\/v1\/operations\//.test(pathname);
+  const accountSession = /^\/v1\/account\/(session|logout|settings|type-change|archives|work|external-credentials|bookmarks|chat-reports)(?:\/|\?|$)/.test(request.url)
+    || /^\/v1\/account\/notifications\/notices(?:\/[0-9a-f-]{36}\/read)?$/.test(pathname)
     || request.url.startsWith('/v2/community/')||isAccountChatJsonPath(pathname)||isAccountBinaryPath(pathname);
-  if (accountSession) response.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (accountSession||operationsSession) response.setHeader('Access-Control-Allow-Credentials', 'true');
   response.setHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-Id, X-Galaxy-Content-Sha256');
   // Subject operations keep Bearer transport. Account cookies are accepted only
   // by their explicit account-capable routes, with exact actor/CSRF checks.
@@ -39,10 +41,10 @@ export function applyBrowserPolicy(request, response, origins) {
   const accountHeader=accountSession||/^\/v2\/account-(?:archives|work|bookmarks)\//.test(request.url);
   const credentialDelete=method==='DELETE'&&/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(request.url);
   const upload=method==='PUT'&&isAccountUploadPath(pathname);
-  if (!['GET', 'POST'].includes(method) && !upload && !credentialDelete || headers.some(header => !['authorization', 'content-type', 'accept', ...(accountHeader ? ['x-galaxy-account-id'] : []),...(accountSession ? ['x-galaxy-account-csrf'] : [])].includes(header)))
+  if (!['GET', 'POST'].includes(method) && !upload && !credentialDelete || headers.some(header => !['authorization', 'content-type', 'accept', ...(accountHeader ? ['x-galaxy-account-id'] : []),...(accountSession ? ['x-galaxy-account-csrf'] : []),...(operationsSession?['x-galaxy-operator-csrf']:[])].includes(header)))
     throw new ServiceError('browser_preflight_denied', 403);
   response.setHeader('Access-Control-Allow-Methods', upload?'GET, POST, PUT':credentialDelete?'GET, POST, DELETE':'GET, POST');
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept' + (accountHeader ? ', X-Galaxy-Account-ID' : '')+(accountSession ? ', X-Galaxy-Account-CSRF' : ''));
+  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept' + (accountHeader ? ', X-Galaxy-Account-ID' : '')+(accountSession ? ', X-Galaxy-Account-CSRF' : '')+(operationsSession?', X-Galaxy-Operator-CSRF':''));
   response.setHeader('Access-Control-Max-Age', '300');
   response.statusCode = 204; response.end(); return true;
 }

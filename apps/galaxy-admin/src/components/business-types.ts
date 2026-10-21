@@ -1,0 +1,10 @@
+export type AccountType='person'|'organization'|'agent'|null;
+export type BusinessUser={accountId:string;uid:string;displayName:string|null;subjectType:AccountType;profileRevision:number;createdAt:string;verifiedAt:string|null;identity:{state:'available'|'not-found'|'temporarily-unavailable'|'not-configured';issuer?:string;externalSubject?:string;email:string|null;emailVerified:boolean|null;enabled:boolean|null};restriction:{scope:'community-participation';active:boolean;until:string|null;reason:string|null;revision:number};links:{activeCount:number;revokedCount:number}};
+export type TypeHistoryItem={previousType:AccountType;nextType:AccountType;revision:number;reason:string;basis:string;createdAt:string;actorKind?:string;operatorId?:string};
+export type LinkedId={subjectId:string;linkedAt:string;revokedAt:string|null;state:'active'|'revoked'};
+export type UserDetail={account:BusinessUser;profile:{revision:number;publicQuery:{enabled:boolean;scope:string;showLinkedIds:boolean;showExternalCredentials:boolean}};typeHistory:TypeHistoryItem[];typeHistoryNextAfter:number|null;linkedIds:{items:LinkedId[];nextAfter:string|null};checkedAt:number;permissions:{canManage:boolean}};
+export type UserPage={items:BusinessUser[];nextAfter:string|null;checkedAt:number};
+export type AuditEvent={id:string;sequence:string|number;operatorId:string;operatorRole:string;action:string;accountId:string;operationId:string;httpRequestId:string|null;selection:Record<string,unknown>;result:Record<string,unknown>;createdAt:string};
+export type AuditPage={items:AuditEvent[];nextAfter:string|null;checkedAt:number};
+export const typeLabel=(value:AccountType)=>value==='person'?'个人':value==='organization'?'组织':value==='agent'?'Agent':'未设置';
+export const timeLabel=(value:string|null)=>value?new Date(value).toLocaleString('zh-CN'):'未记录';

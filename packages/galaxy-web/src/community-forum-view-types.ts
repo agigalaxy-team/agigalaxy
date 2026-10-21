@@ -29,7 +29,7 @@ export type ForumVersionLocator={kind:'post-version';postId:string;versionId:str
 export type ForumReplyLocator={kind:'reply';replyId:string;contentRevision:1;postId:string;postVersionId:string};
 export type ForumPostPayload=Pick<z.infer<typeof forumCreatePostSchema>,'title'|'body'|'links'|'topic'|'attachments'>;
 export type ForumContentPayload=Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'|'attachments'>|ForumPostPayload;
-export type ForumAuthorFields={authorId?:string|null;authorAccountId?:string|null;author?:{kind:'account'|'identity';accountId:string|null;subjectId:string|null;displayName?:string|null}};
+export type ForumAuthorFields={authorId?:string|null;authorAccountId?:string|null;author?:{kind:'account'|'identity'|'business-operator';accountId?:string|null;subjectId?:string|null;operatorId?:string;displayName?:string|null}};
 export type ForumContentView={
  locator:ForumPostLocation|ForumReplyLocator;availability:string;checkedAt:number;headVersion?:number;currentVersionId?:string|null;
   payload?:ForumContentPayload;attachments?:ForumAttachmentView[];publishedUntil?:number;permissionId?:string;topic?:ForumTopic;createdAt?:number;versionCreatedAt?:number;updatedAt?:number;audience?:ForumAudience;sectionId?:string|null;canParticipate?:boolean;audienceInherited?:boolean;
@@ -43,8 +43,8 @@ export type ForumOwnedPost=ForumOwnedPostSummary&{versionLocators:ForumOwnedVers
 export type ForumOwnedReply=ForumAuthorFields&{locator:ForumReplyLocator;revision:number;state:string;permissionId:string;publishedUntil:number;availability:string};
 export type ForumCardView=ForumPostView|ForumOwnedPostSummary;
 export type ForumReportEvent=ForumAuthorFields&{operationId:string;governanceEventId:string;version:number;kind:'report'|'supplement'|'withdraw'|'appeal'|'resolve';payload?:ForumPreviewPayload;availability?:string};
-export type ForumReport={reportId:string;target:ForumTarget;version:number;state:string;events:ForumReportEvent[];canAppeal:boolean;canSupplement:boolean;canWithdrawReport:boolean;canModerate:boolean;actionAccountId?:string|null;decisionRecipients?:string[];decisionAccountRecipients?:string[]};
-export type ForumConfig={moderatorIds:string[];maxPermissionSeconds:number;maxGovernanceHideSeconds:number;report?:ForumReport};
+export type ForumReport={reportId:string;target:ForumTarget;version:number;state:string;events:ForumReportEvent[];canAppeal:boolean;canSupplement:boolean;canWithdrawReport:boolean;canModerate:boolean;actionAccountId?:string|null;decisionRecipients?:string[];decisionAccountRecipients?:string[];operationsHandling?:boolean;operationsDisclosure?:string};
+export type ForumConfig={moderatorIds:string[];maxPermissionSeconds:number;maxGovernanceHideSeconds:number;report?:ForumReport;operationsHandling?:boolean;operationsDisclosure?:string};
 export type ForumAccountChoice={id:string;accountId?:string;displayName?:string|null;subjectType?:'person'|'organization'|'agent'|null;current?:boolean};
 export type ForumQuota={accountVerified:boolean;accountId?:string|null;currentAccount?:ForumAccountChoice|null;availableAccounts?:ForumAccountChoice[];reason?:string;policyHash:string;policy:{maxPermissionSeconds:number};publication?:{checkedAt:number;minPublishedUntil:number;maxPublishedUntil:number;maxPermissionSeconds:number}};
 export type ForumPermission={kind?:string;publishedUntil:number;originBindingExpiresAt?:number|null;stoppedReasons:string[]};

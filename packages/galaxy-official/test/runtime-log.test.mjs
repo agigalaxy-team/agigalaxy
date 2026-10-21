@@ -58,3 +58,19 @@ test('write failure reaches runtime metrics and never serializes the original er
   await logger.close();
   assert.throws(()=>runtimeLogConfiguration({GALAXY_RUNTIME_LOG_DIRECTORY:'relative'}));
 });
+
+test('shared sink preserves release/environment, supports a strict Native formatter and rejects a broken formatter',async()=>{
+  const lines=[],sink=new Writable({write(chunk,_encoding,done){lines.push(chunk.toString());done();}});
+  const logger=consoleRuntimeLogger('native',{destination:sink,release:'0.1.17',environment:'local',
+    eventFormatter:input=>({event:input.event==='native_ready'?'native_ready':'runtime_event_rejected',stage:'startup'})});
+  logger.write({event:'native_ready',body:'private-tool-input'});logger.updateContext({release:'0.1.18'});
+  logger.write({event:'native_ready'});await logger.close();sink.end();await finished(sink);
+  const records=lines.map(line=>JSON.parse(line));
+  assert.deepEqual(records.map(row=>row.release),['0.1.17','0.1.18']);
+  assert.ok(records.every(row=>row.environment==='local'&&row.component==='native'&&row.event==='native_ready'));
+  assert.doesNotMatch(lines.join(''),/private-tool-input/);
+  const fallback=[],broken=consoleRuntimeLogger('api',{destination:new Writable({write(_chunk,_encoding,done){done();}}),
+    eventFormatter:()=>null,fallback:{write:line=>fallback.push(line)}});
+  broken.write({password:'private-password'});assert.equal(broken.status().droppedRecords,1);
+  assert.doesNotMatch(fallback.join(''),/private-password/);await broken.close();
+});

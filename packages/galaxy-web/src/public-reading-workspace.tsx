@@ -1,5 +1,5 @@
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {initialPublicReadingPage,isPublicReadingRoute,loadPublicReadingPage} from './public-reading-contract.mjs';
+import {initialPublicReadingPage,isPublicReadingRoute,loadPublicReadingPage,loadPublicReadingRoutes} from './public-reading-contract.mjs';
 import {attachCopyTarget,copyStatusText} from '../../../apps/galaxy-site/interaction-copy.mjs';
 import './public-reading.css';
 
@@ -27,7 +27,7 @@ function content(nodes:Node[],scope:string,position:{region:string;next:number})
   const instanceId=node.tag==='pre'?position.region+':'+position.next++:'';
   const children=node.children.length?content(node.children,scope,position):null;
   if(node.tag==='pre'){const {key:_key,...attributes}=props;return <ReadingCode key={index} attributes={attributes} text={nodeText(node.children)} scope={scope} instanceId={instanceId}>{children}</ReadingCode>;}
-  return React.createElement(node.tag,props,children);
+  return node.tag==='img'?React.createElement(node.tag,props):React.createElement(node.tag,props,children);
 });}
 
 /** Public content is rendered from a checked tree, never executable HTML. */
@@ -36,6 +36,7 @@ export function PublicReadingWorkspace({path,search='',hash='',navigate}:Props){
   const [attempt,setAttempt]=useState(0),container=useRef<HTMLDivElement>(null);
   const current=state.path===path?state.page:null;
   useEffect(()=>{
+    void loadPublicReadingRoutes();
     const controller=new AbortController();let active=true;
     void loadPublicReadingPage(path,{signal:controller.signal}).then(page=>{if(active)setState({path,page,error:''});},()=>{if(active)setState({path,page:null,error:'这份说明暂时无法读取，可以重试或返回原来的页面。'});});
     return()=>{active=false;controller.abort();};

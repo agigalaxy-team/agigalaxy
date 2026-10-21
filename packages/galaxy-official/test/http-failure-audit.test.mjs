@@ -62,7 +62,7 @@ test('HTTP failure records only fixed route and verified caller metadata, never 
       if(row!==records[1]){assert.equal(row.credential_scopes,null);assert.equal(row.scope,null);}
       assert.equal(row.idempotency_key, row.request_id);
     }
-    assert.ok(logs.every(entry => entry.auditStatus === 'recorded'));
+    assert.ok(logs.filter(entry=>entry.event==='http_rejected').every(entry => entry.auditStatus === 'recorded'));
     const serialized = JSON.stringify({ records, logs });
     for (const secret of ['private-body-secret', 'private-backend-detail', 'private-path-secret', 'private-query-secret', f.credential, f.actor.credentialHash])
       assert.ok(!serialized.includes(secret));

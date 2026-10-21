@@ -5,12 +5,14 @@ import {chatActorRef,isAccountChatRef} from './chat-actors.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
 import {attachmentPrepareSchema,attachmentReadSchema,attachmentQuerySchema,attachmentPolicySchema,defaultAttachmentPolicy} from './shared/chat-attachments-schema.mjs';
+import {retryFileProcessingWithin} from './operations-file-processing.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),hash=x=>createHash('sha256').update(x).digest('hex');
 const failure=(code,status=409)=>{throw new ServiceError(code,status);};
 const parse=(schema,input)=>{const r=schema.safeParse(input);if(!r.success)failure('invalid_attachment_request',400);return r.data;};
 const deleted="('requested','review-needed','approved','partial','primary-erased')";
 export class ChatAttachmentsService {
- constructor({chat,store,scanner,policy=defaultAttachmentPolicy}){Object.assign(this,{chat,store,scanner});this.access=chat.access;this.db=chat.db;this.now=chat.now;this.policy=attachmentPolicySchema.parse(policy);}
+ constructor({chat,store,scanner,policy=defaultAttachmentPolicy,logger=()=>{}}){Object.assign(this,{chat,store,scanner,logger});this.access=chat.access;this.db=chat.db;this.now=chat.now;this.policy=attachmentPolicySchema.parse(policy);}
+ diagnostic(input){try{this.logger(input);}catch{}}
  specification(){return {supported:!!this.store&&!!this.scanner,storageRuntimeVerified:false,retentionDays:30,startsAt:'first-upload-start',
   maxFileBytes:this.policy.maxFileBytes,maxSubjectBytes:this.policy.maxSubjectBytes,maxFilesPerMessage:this.policy.maxFilesPerMessage,
   purpose:'temporary-room-attachment',publicStorageUrls:false,automaticEvidence:false,scanGuaranteesSafety:false};}
@@ -23,6 +25,7 @@ export class ChatAttachmentsService {
   expiryMeaning:row.expires_at?'uploaded-file-30d':'upload-preparation-deadline',scan:row.scan_result,
   retryAfter:row.lease_until,cleanupPending:row.purge_pending,objectRemoved:!!row.purged_at,automaticEvidence:false};}
  async row(db,id,lock='SHARE'){return(await db.query(`SELECT * FROM chat_attachments WHERE id=$1 FOR ${lock}`,[id])).rows[0];}
+ async retryProcessingWithin(db,row,input){this.configured();return retryFileProcessingWithin(db,{table:'chat_attachments',row,input,now:this.now(),authorUnavailable:await this.authorPending(db,row)});}
  async authorPending(db,row){if(isAccountChatRef(row.subject_id))return false;return !!(await db.query(`SELECT id FROM deletion_requests WHERE subject_id=$1 AND state IN ${deleted} LIMIT 1`,[row.subject_id])).rows.length;}
  async roomRow(db,actor,id,{write=false,agentGrantId,own=false}={}){
   const located=(await db.query('SELECT room_id FROM chat_attachments WHERE id=$1',[id])).rows[0];if(!located)failure('attachment_unavailable',404);
@@ -120,6 +123,24 @@ export class ChatAttachmentsService {
    return {bytes,name:row.name,mediaType:row.media_type,sha256:row.sha256,attachmentId:row.id};
   });
  }
+ // Only the governance domain supplies this callback after establishing a
+ // real operator and an explicit case selection. It grants no room identity,
+ // history query, reusable URL or reporter credential.
+ async selectedCaseContentWithin(db,{attachmentId,roomId,messageId,revision,assertCase}){
+  this.configured();if(typeof assertCase!=='function')failure('attachment_unavailable',404);
+  const current=async()=>{
+   const selection=await assertCase();
+   if(selection?.roomId!==roomId||selection.messageId!==messageId||selection.revision!==revision)failure('attachment_unavailable',404);
+   const row=await this.row(db,attachmentId);
+   if(!row||row.room_id!==roomId||row.message_id!==messageId||this.status(row)!=='available'||await this.authorPending(db,row))failure('attachment_content_unavailable',404);
+   const message=(await db.query('SELECT state,revision,expires_at FROM chat_message_refs WHERE message_id=$1 AND room_id=$2 FOR SHARE',[messageId,roomId])).rows[0];
+   if(!message||message.state!=='accepted'||message.revision!==revision||Date.parse(message.expires_at)<=this.now()*1000)failure('attachment_message_unavailable',404);
+   return row;
+  };
+  let row=await current();const bytes=await this.store.get({key:row.storage_key,keyId:row.encryption_key_id,size:Number(row.byte_size)});
+  if(!bytes||hash(bytes)!==row.sha256)failure('attachment_storage_integrity_failed',502);
+  row=await current();return{bytes,name:row.name,mediaType:row.media_type,sha256:row.sha256,attachmentId:row.id};
+ }
  async revoke(actor,input){const x=parse(attachmentReadSchema,input);return this.chat.run(actor,true,async db=>{
   const row=await this.row(db,x.attachmentId,'UPDATE');if(!row||row.subject_id!==chatActorRef(actor))failure('attachment_unavailable',404);
   return this.receipt((await db.query('UPDATE chat_attachments SET revoked_at=COALESCE(revoked_at,$2),purge_pending=true WHERE id=$1 RETURNING *',[row.id,stamp(this.now())])).rows[0]);});}
@@ -129,6 +150,7 @@ export class ChatAttachmentsService {
     const r=(await db.query(`SELECT * FROM chat_attachments WHERE state IN ('scan-pending','scanning') AND revoked_at IS NULL AND purge_pending=false AND expires_at>$1 AND (lease_until IS NULL OR lease_until<=$1) ORDER BY uploaded_at LIMIT 1 FOR UPDATE SKIP LOCKED`,[stamp(this.now())])).rows[0];
     if(!r)return null;return(await db.query("UPDATE chat_attachments SET state='scanning',lease_id=$2,lease_until=$3,scan_attempts=scan_attempts+1 WHERE id=$1 RETURNING *",[r.id,lease,stamp(this.now()+120)])).rows[0];});
    if(!row)break;
+   const startedAt=performance.now();
    try{if(await this.authorPending(this.db,row))failure('attachment_author_unavailable');
     const bytes=await this.store.get({key:row.storage_key,keyId:row.encryption_key_id,size:Number(row.byte_size)});if(!bytes||hash(bytes)!==row.sha256)failure('attachment_storage_integrity_failed');
     const result=await this.scanner.scan(bytes);if(!['clean','blocked'].includes(result.state))failure('attachment_scan_incomplete',503);
@@ -136,7 +158,7 @@ export class ChatAttachmentsService {
      if(await this.authorPending(db,current))failure('attachment_author_unavailable');
      const invalid=current.revoked_at||this.expired(current);
      await db.query("UPDATE chat_attachments SET state=$2,scan_result=$3,lease_id=NULL,lease_until=NULL,last_error=NULL,purge_pending=$4 WHERE id=$1",[row.id,invalid||result.state==='blocked'?'blocked':'available',JSON.stringify(result),!!invalid||result.state==='blocked']);});scanned++;
-   }catch(error){await this.db.query("UPDATE chat_attachments SET state='scan-pending',lease_id=NULL,lease_until=$3,last_error=$4 WHERE id=$1 AND lease_id=$2",[row.id,lease,stamp(this.now()+60),error instanceof ServiceError?error.code:'attachment_scan_failed']);}
+   }catch(error){this.diagnostic({event:'attachment_processing_deferred',stage:'attachment-scan',resourceId:row.id,startedAt,error});await this.db.query("UPDATE chat_attachments SET state='scan-pending',lease_id=NULL,lease_until=$3,last_error=$4 WHERE id=$1 AND lease_id=$2",[row.id,lease,stamp(this.now()+60),error instanceof ServiceError?error.code:'attachment_scan_failed']);}
   }
   return {scanned};
  }
@@ -145,8 +167,8 @@ export class ChatAttachmentsService {
    (a.revoked_at IS NOT NULL OR COALESCE(a.expires_at,a.prepare_expires_at)<=$1
    OR EXISTS(SELECT 1 FROM chat_message_refs m WHERE m.message_id=a.message_id AND m.state='retracted'))`,[stamp(this.now())]);
   const rows=(await this.db.query('SELECT id FROM chat_attachments WHERE purge_pending=true AND purged_at IS NULL AND (lease_until IS NULL OR lease_until<=$1) ORDER BY created_at LIMIT $2',[stamp(this.now()),limit])).rows;let removed=0;
-  for(const {id} of rows){try{await transaction(this.db,async db=>{const r=await this.row(db,id,'UPDATE');if(!r.purge_pending||r.purged_at||r.lease_until&&Date.parse(r.lease_until)>this.now()*1000)return;
-    await this.store.erase({key:r.storage_key});await db.query("UPDATE chat_attachments SET state='erased',name='',media_type='',purge_pending=false,purged_at=$2,lease_id=NULL,lease_until=NULL,last_error=NULL WHERE id=$1",[r.id,stamp(this.now())]);removed++;});}catch(e){if(!(e instanceof ServiceError))throw e;}}
+  for(const {id} of rows){const startedAt=performance.now();try{await transaction(this.db,async db=>{const r=await this.row(db,id,'UPDATE');if(!r.purge_pending||r.purged_at||r.lease_until&&Date.parse(r.lease_until)>this.now()*1000)return;
+    await this.store.erase({key:r.storage_key});await db.query("UPDATE chat_attachments SET state='erased',name='',media_type='',purge_pending=false,purged_at=$2,lease_id=NULL,lease_until=NULL,last_error=NULL WHERE id=$1",[r.id,stamp(this.now())]);removed++;});}catch(e){this.diagnostic({event:'attachment_processing_deferred',stage:'attachment-cleanup',resourceId:id,startedAt,error:e});await this.db.query("UPDATE chat_attachments SET last_error='attachment_cleanup_failed' WHERE id=$1 AND purge_pending=true AND purged_at IS NULL",[id]);if(!(e instanceof ServiceError))throw e;}}
   const metadata=await this.db.query("DELETE FROM chat_attachments a WHERE a.purged_at IS NOT NULL AND (a.purged_at<$1 OR EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=a.subject_id AND d.state IN ('partial','primary-erased')))",[stamp(this.now()-180*86400)]);
   return {objectRemoved:removed,metadataRemoved:metadata.rowCount??metadata.affectedRows??0,physicalBlockErasure:'storage-garbage-collection'};
  }

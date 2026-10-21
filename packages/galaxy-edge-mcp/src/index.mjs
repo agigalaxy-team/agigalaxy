@@ -24,6 +24,8 @@ import {resolveDataDir,localPaths,readJson} from '../../galaxy-core/src/storage/
 import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './native-v2/local-work-tools.mjs';
 import {createNativeChoice,nativeResult} from './native-v2/choice.mjs';
 import {createNativeStore} from './native-v2/store.mjs';
+import {nativeDiagnostics} from './native-v2/diagnostics.mjs';
+import {installRuntimeFailureHandlers} from '../../galaxy-official/src/operations/runtime-log.mjs';
 
 const dataDir = process.env.GALAXY_DATA_DIR;
 const INITIALIZATION_CONFIRMATION = 'I_CONFIRM_LOCAL_GALAXY_INITIALIZATION';
@@ -351,9 +353,18 @@ function createServer() {
   return server;
 }
 
-void serveStdio(createServer, {
-  onerror(error) {
-    console.error(`Galaxy Integration MCP error: ${error.stack ?? error.message}`);
-  },
+const diagnostics=nativeDiagnostics();
+let handle;
+const uninstall=installRuntimeFailureHandlers({
+  logger:input=>diagnostics.emit({event:'native_runtime',stage:'shutdown',outcome:'failed',error:input.error}),
+  onFatal:async()=>{try{await handle?.close();}finally{uninstall();}},
 });
-console.error('Galaxy Integration MCP v0.4 is running on stdio. It is local-only and does not publish data.');
+try{
+  handle=serveStdio(createServer,{
+    onerror:error=>diagnostics.emit({event:'native_transport',stage:'transport',outcome:'failed',error}),
+  });
+  diagnostics.emit({event:'native_runtime',stage:'runtime',outcome:'succeeded'});
+}catch(error){
+  diagnostics.emit({event:'native_runtime',stage:'runtime',outcome:'failed',error});
+  process.exitCode=1;uninstall();
+}

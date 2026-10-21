@@ -5,6 +5,7 @@ import { canReadProjection } from './domain/consent-policy.mjs';
 import { projectCaseReviews } from './domain/case-review.mjs';
 import { transaction } from './database.mjs';
 import { recordObjectAudit } from './infrastructure/object-audit.mjs';
+import {operationsVisibilityWithin} from './operations-content-visibility.mjs';
 function parse(payloadJson,schema){try{if(typeof payloadJson!=='string'||Buffer.byteLength(payloadJson)>16000)throw new Error();return schema.parse(JSON.parse(payloadJson));}catch{throw new ServiceError('invalid_capsule_payload');}}
 export class CapsuleService {
   constructor(access,consents,proofs){Object.assign(this,{access,consents,proofs});}
@@ -39,6 +40,8 @@ export class CapsuleService {
     return proofs;
   }
   async version(db,actor,capsuleId,versionId){
+    const operational=await operationsVisibilityWithin(db,{endpoint:this.access.endpoint,kind:'method',id:capsuleId,now:this.access.now()});
+    if(operational.hidden){const owner=(await db.query('SELECT subject_id FROM capsules WHERE id=$1',[capsuleId])).rows[0];if(actor?.subjectId!==owner?.subject_id)throw new ServiceError('capsule_unavailable',404);}
     const row=(await db.query("SELECT * FROM capsule_events WHERE capsule_id=$1 AND kind='version' AND ($2::uuid IS NULL OR id=$2) ORDER BY revision DESC",[capsuleId,versionId??null])).rows;
     if(row[0]?.payload_text && JSON.parse(row[0].payload_text).schemaVersion===2)throw new ServiceError('unsupported_semantics',409);
     for(const candidate of row){try{const grant=await this.grant(db,candidate,'capsule.publish');if(!this.visible(grant,actor))continue;

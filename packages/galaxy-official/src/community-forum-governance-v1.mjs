@@ -63,7 +63,7 @@ export class CommunityForumGovernanceV1 {
   try{accounts.push((await this.accounts.resolveWithin(db,actor)).id);}catch(error){if(!['account_verification_required','account_selection_required'].includes(error.code))throw error;}
   if(q.target){const source=await this.targetWithin(db,q.target,{actor});if(source.view.availability!=='available')throw new ServiceError('forum_report_source_unavailable',403);parties.push(source.authorId);if(source.row.account_id)accounts.push(source.row.account_id);}
   const ids=await this.eligible(db,parties.filter(Boolean),accounts);
-  return {moderatorIds:ids,configured:ids.length>0,guaranteesResponse:false,maxAppeals:this.policy.maxAppeals,maxPermissionSeconds:this.policy.maxPermissionSeconds,maxGovernanceHideSeconds:this.policy.maxGovernanceHideSeconds,automaticAccountRestriction:false};
+  return {moderatorIds:ids,configured:ids.length>0||this.operationsHandling===true,operationsHandling:this.operationsHandling===true,...(this.operationsHandling?{operationsDisclosure:'仅发送给运营处理人员'}:{}),guaranteesResponse:false,maxAppeals:this.policy.maxAppeals,maxPermissionSeconds:this.policy.maxPermissionSeconds,maxGovernanceHideSeconds:this.policy.maxGovernanceHideSeconds,automaticAccountRestriction:false};
  });}
  async save(db,actor,{p,consentId,payloadJson,kind,reportId,version,permissionId,accountId,result}){
   await db.query(`INSERT INTO forum_governance_events_v1(id,operation_id,report_id,subject_id,account_id,version,kind,consent_id,permission_id,payload_text,payload_hash,created_at,resolution,effect_until,result,actor_kind,http_request_id)
@@ -84,7 +84,8 @@ export class CommunityForumGovernanceV1 {
     permit=await this.permissions.captureWithin(db,actor,{consentId,payloadJson,spec,eventId:p.operationId,accountId:state.account.id,allowedViewers:this.handlers(p,eligible),allowedAccountViewers:[]}),at=forumStamp(this.access.now());
    await db.query(`INSERT INTO forum_reports_v1(id,subject_id,reporter_id,account_id,target,target_author_id,version,state,created_at,reporter_account_id,target_author_account_id,account_governance)
     VALUES($1,$2,$2,$3,$4,$5,1,'pending',$6,$3,$7,$8)`,[p.reportId,actor.subjectId??null,state.account.id,JSON.stringify(p.target),source.authorId,at,source.row.account_id,actor.kind==='official-account'||!!p.accountId||!source.authorId]);
-   const result={acknowledged:true,reportId:p.reportId,governanceEventId:p.operationId,version:1,state:'pending',accountId:state.account.id,subjectId:actor.subjectId??null,handlingState:eligible.some(id=>permit.grant.viewers.includes(id))?'awaiting-independent-handler':'awaiting-authorized-handler',authority:'accepted-operation-only'};
+   if(actor.kind==='official-account'&&this.operationsHandling)await db.query('UPDATE forum_reports_v1 SET operations_disclosed=true WHERE id=$1',[p.reportId]);
+   const result={acknowledged:true,reportId:p.reportId,governanceEventId:p.operationId,version:1,state:'pending',accountId:state.account.id,subjectId:actor.subjectId??null,handlingState:actor.kind==='official-account'&&this.operationsHandling?'awaiting-operations-handler':eligible.some(id=>permit.grant.viewers.includes(id))?'awaiting-independent-handler':'awaiting-authorized-handler',authority:'accepted-operation-only'};
    await this.save(db,actor,{p,consentId,payloadJson,kind:'report',reportId:p.reportId,version:1,permissionId:permit.id,accountId:state.account.id,result});
    await this.finish(db,actor,authorization,{p,consentId,payloadJson,accountId:state.account.id,kind:'report',category:'report',locator:{kind:'report',reportId:p.reportId},result});
    return {...result,quota:await this.forum.budget.finishWithin(db,state)};
@@ -96,7 +97,14 @@ export class CommunityForumGovernanceV1 {
    const permitted=await this.permissions.statusWithin(db,event.permission_id,{visibility:'Private',viewerId:actor.subjectId,viewerActor:actor,payloadHash:event.payload_hash});
    if(permitted.allowed)items.push({operationId:event.operation_id,governanceEventId:event.id,version:event.version,kind:event.kind,authorId:event.subject_id,authorAccountId:event.account_id,
     author:{kind:event.subject_id?'identity':'account',subjectId:event.subject_id??null,accountId:event.account_id??null},payload:JSON.parse(event.payload_text),checkedAt:this.access.now()});
-  }return items;
+  }
+  if(this.partyContext(actor,row).party||items.length&&await this.independent(db,actor.subjectId,this.parties(row),this.accountParties(row))){
+   const decisions=(await db.query('SELECT * FROM forum_operations_events_v1 WHERE report_id=$1 AND retained_until>$2 ORDER BY version',[row.id,forumStamp(this.access.now())])).rows;
+   for(const event of decisions)items.push({operationId:event.id,governanceEventId:event.id,version:event.version,kind:'resolve',authorId:null,authorAccountId:null,
+    author:{kind:'business-operator',operatorId:event.operator_id},payload:{kind:'resolve',reportId:row.id,reason:event.summary,resolution:event.resolution,
+     effect:event.effect_until?{kind:'hide-version',until:forumSeconds(event.effect_until)}:null},checkedAt:this.access.now()});
+  }
+  return items.sort((a,b)=>a.version-b.version);
  }
  async readWithin(db,actor,id){
   const row=await this.row(db,id);if(!row)throw new ServiceError('not_found',404);
@@ -105,9 +113,11 @@ export class CommunityForumGovernanceV1 {
   if(!context.party&&(!independent||!events.length))throw new ServiceError('not_found',404);
   const canModerate=!!actor.scopes?.includes('moderation')&&independent&&events.some(event=>['report','supplement','appeal'].includes(event.kind));
   const narrativeCount=Number((await db.query("SELECT count(*) n FROM forum_governance_events_v1 WHERE report_id=$1 AND kind IN ('report','supplement')",[id])).rows[0].n);
-  const decision=row.decision_event_id?(await db.query('SELECT id,operation_id,version,kind,resolution,effect_until FROM forum_governance_events_v1 WHERE id=$1',[row.decision_event_id])).rows[0]:null;
+  let decision=row.decision_event_id?(await db.query('SELECT id,operation_id,version,kind,resolution,effect_until FROM forum_governance_events_v1 WHERE id=$1',[row.decision_event_id])).rows[0]:null;
+  if(row.decision_event_id&&!decision)decision=(await db.query("SELECT id,id AS operation_id,version,'resolve' AS kind,resolution,effect_until FROM forum_operations_events_v1 WHERE id=$1",[row.decision_event_id])).rows[0];
   return {reportId:id,target:row.target,version:row.version,state:row.state,
-   handlingState:canModerate?'awaiting-or-recorded-handler':events.length&&this.moderatorIds.length?'pending-or-recorded':'awaiting-authorized-handler',
+   operationsHandling:row.operations_disclosed===true,...(row.operations_disclosed===true?{operationsDisclosure:'仅发送给运营处理人员'}:{}),
+   handlingState:row.operations_disclosed===true?(['pending','appealed'].includes(row.state)?'awaiting-operations-handler':'recorded'):canModerate?'awaiting-or-recorded-handler':events.length&&this.moderatorIds.length?'pending-or-recorded':'awaiting-authorized-handler',
    decisionLocator:decision?{governanceEventId:decision.id,operationId:decision.operation_id,version:decision.version,kind:decision.kind,resolution:decision.resolution,effectUntil:decision.effect_until?forumSeconds(decision.effect_until):null}:null,
    events,actionAccountId:context.accountId,canAppeal:context.party&&!!row.decision_event_id&&['resolved','withdrawn'].includes(row.state)&&row.appeal_count<this.policy.maxAppeals,
    canSupplement:context.reporter&&['pending','appealed'].includes(row.state)&&narrativeCount<this.policy.maxReportEvents,
@@ -184,6 +194,8 @@ export class CommunityForumGovernanceV1 {
   },{resourceWrite:true,control}).catch(error=>{if(error.code==='23505')throw new ServiceError('forum_operation_conflict',409);throw error;});
  }
  async hiddenWithin(db,target){
+  if((await db.query(`SELECT 1 FROM forum_reports_v1 r JOIN forum_operations_events_v1 e ON e.id=r.restriction_event_id
+   WHERE r.target=$1::jsonb AND r.restriction_until>$2 AND e.effect_until>$2 LIMIT 1`,[JSON.stringify(target),forumStamp(this.access.now())])).rows.length)return true;
   const rows=(await db.query(`SELECT r.reporter_id,r.target_author_id,r.reporter_account_id,r.target_author_account_id,r.account_governance,r.restriction_event_id,e.subject_id,e.permission_id,e.payload_hash,e.effect_until FROM forum_reports_v1 r
    JOIN forum_governance_events_v1 e ON e.id=r.restriction_event_id WHERE r.target=$1::jsonb AND r.restriction_until>$2`,[JSON.stringify(target),forumStamp(this.access.now())])).rows;
   for(const row of rows){if(!await this.independent(db,row.subject_id,this.parties(row),this.accountParties(row)))continue;

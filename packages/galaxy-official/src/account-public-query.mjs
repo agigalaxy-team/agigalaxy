@@ -33,7 +33,8 @@ export class AccountPublicQuery {
   }
   async accountsForId(subjectId,input={}){
     parse(subjectIdSchema,subjectId);const page=parse(pageSchema(z.uuid()),input);
-    const rows=(await this.data.db.query(`SELECT a.id,a.uid,p.display_name,p.subject_type,p.query_scope,p.query_linked_ids,p.query_external_credentials,MIN(l.created_at) AS linked_at
+    const rows=(await this.data.db.query(`SELECT a.id,a.uid,p.display_name,p.subject_type,p.query_scope,p.query_linked_ids,p.query_external_credentials,MIN(l.created_at) AS linked_at,
+      (SELECT h.actor_kind FROM official_account_type_history_v1 h WHERE h.account_id=a.id ORDER BY h.revision DESC LIMIT 1) AS type_actor
       FROM community_account_links g JOIN community_accounts a ON a.id=g.account_id
       JOIN official_account_profiles_v1 p ON p.account_id=a.id AND p.query_enabled=true AND p.query_linked_ids=true
       JOIN external_identity_links l ON l.id=g.identity_link_id AND l.subject_id=g.subject_id
@@ -42,7 +43,7 @@ export class AccountPublicQuery {
       AND EXISTS(SELECT 1 FROM jsonb_array_elements($4::jsonb) provider WHERE provider->>0=l.issuer AND provider->>1=l.client_id)
       GROUP BY a.id,p.account_id ORDER BY a.id LIMIT $5`,[subjectId,this.data.endpoint,page.after??null,this.providers(),page.limit+1])).rows;
     const items=rows.slice(0,page.limit).map(row=>({accountId:row.id,uid:row.uid,displayName:row.display_name??null,subjectType:row.subject_type??null,
-      typeSource:'account-owner-statement',linkedAt:iso(row.linked_at),publicQuery:publicFlags(row)}));
+      typeSource:row.type_actor==='business-operator'?'operator-recorded-statement':'account-owner-statement',linkedAt:iso(row.linked_at),publicQuery:publicFlags(row)}));
     return {subjectId,items,nextAfter:rows.length>page.limit?items.at(-1).accountId:null,checkedAt:this.data.now()};
   }
   async credentials(accountId,input={}){

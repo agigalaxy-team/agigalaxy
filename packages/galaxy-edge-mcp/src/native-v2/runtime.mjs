@@ -23,10 +23,11 @@ import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/id
 import {createNativeIdentityAccountClient} from './identity-account-client.mjs';
 import {createNativeArchiveSync} from './archive-sync.mjs';
 import {createNativeWorkSync} from './work-sync.mjs';
+import {nativeDiagnostics} from './diagnostics.mjs';
 
 // Same pinned current-control browser protocol, with a native local signer.
 // No token, PEM or recovery seed is exposed through the returned public methods.
-export async function createNativeRuntime({dataDirectory,endpoint,website,trustedKeys,fetch,now=()=>Math.floor(Date.now()/1000),openBrowser,autoResumePrivateSync=true}){
+export async function createNativeRuntime({dataDirectory,endpoint,website,trustedKeys,fetch,now=()=>Math.floor(Date.now()/1000),openBrowser,autoResumePrivateSync=true,diagnostics=nativeDiagnostics()}){
  const store=createNativeStore(dataDirectory),activeKey='native-active:'+endpoint;
  const localIdentityWithin=async directory=>{const selected=await store.readWithin(directory,activeKey);
   return selected?{id:selected.subjectId,genesisProof:selected.genesisProof}:await readJson(localPaths(directory).identity,null)??await readJson(localPaths(directory).legacyIdentity,null);};
@@ -35,11 +36,11 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   function resumePrivateSync(delay=0){
    if(!autoResumePrivateSync||closed||resumeRunning)return;if(resumeTimer){if(delay)return;clearTimeout(resumeTimer);}
    resumeTimer=setTimeout(()=>{resumeTimer=null;
-    let reschedule=false;resumeRunning=(async()=>{const connection=await store.readConnection(endpoint);if(!connection.permission?.enabled)return null;
+    let reschedule=false;resumeRunning=diagnostics.run('private-sync',async()=>{const connection=await store.readConnection(endpoint);if(!connection.permission?.enabled)return null;
      const [work,archive]=await Promise.all([workSync.settings(),archiveSync.settings()]);if(!work.choice.enabled&&!archive.choice.enabled)return null;
      const results=[];if(work.choice.enabled)results.push(await workSync.flush());if(archive.choice.enabled)results.push(await archiveSync.flush());
      return results.some(result=>result.items?.some(item=>['unknown','not-synced','prepared'].includes(item.state)));
-    })().catch(()=>true).then(retry=>{reschedule=retry!==null;resumeDelay=retry?Math.min(resumeDelay*2,300000):60000;}).finally(()=>{resumeRunning=null;if(!closed&&reschedule)resumePrivateSync(resumeDelay);});
+    },{event:'native_private_sync',independent:true,resultOutcome:value=>value===null?'stopped':value===true?'deferred':'succeeded'}).catch(()=>true).then(retry=>{reschedule=retry!==null;resumeDelay=retry?Math.min(resumeDelay*2,300000):60000;}).finally(()=>{resumeRunning=null;if(!closed&&reschedule)resumePrivateSync(resumeDelay);});
    },delay);resumeTimer.unref?.();
   }
  const authorityChanged=()=>{throw Object.assign(new Error('native_connection_selection_changed'),{code:'native_connection_selection_changed'});};
@@ -67,7 +68,13 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
  // Fence a connection/close ABA even when both ordinary snapshots are null.
  // Numeric generation remains owned by the canonical browser API.
  let receiptLifecycle={};
- const browserApi=createBrowserClient({endpoint,trustedKeys,fetch,sign,now});
+ const nativeFetch=fetch??globalThis.fetch;
+ const diagnosticFetch=(url,options)=>diagnostics.run('http',async()=>{
+  const response=await nativeFetch(url,options);
+  diagnostics.emit({event:'native_http',stage:'http',outcome:response.ok?'succeeded':'failed',status:response.status,upstreamRequestId:response.headers?.get?.('x-request-id')});
+  return response;
+ },{event:'native_http',resultFailed:response=>!response.ok});
+ const browserApi=createBrowserClient({endpoint,trustedKeys,fetch:diagnosticFetch,sign,now});
  const api=Object.freeze({...browserApi,
   connect:async(...args)=>{const result=await browserApi.connect(...args);receiptLifecycle={};return result;},
   disconnect:()=>{receiptLifecycle={};return browserApi.disconnect();},
@@ -119,7 +126,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
   const signReceiptStatus=createReceiptStatusDeviceSigner({endpoint,trustedKeys,now,getContext,
    getPrivateKey:async()=>{check();const material=await store.get('device:'+owner.subjectId+':'+owner.deviceId);check();
     if(!material?.privateKey)throw new Error('receipt_status_device_key_unavailable');return material.privateKey;}});
-  check();const result=await createReceiptStatusClient({endpoint,trustedKeys,now,fetch,getContext,signReceiptStatus}).query(input,options);await shared.assertCurrent();check();return result;
+  check();const result=await createReceiptStatusClient({endpoint,trustedKeys,now,fetch:diagnosticFetch,getContext,signReceiptStatus}).query(input,options);await shared.assertCurrent();check();return result;
  }});
  // Trusted Worker composition reuses the canonical signer and saved-Consent
  // protocol. It cannot establish a connection or approve a model-supplied action.
@@ -304,7 +311,7 @@ export async function createNativeRuntime({dataDirectory,endpoint,website,truste
  const archiveSync=createNativeArchiveSync({dataDirectory,endpoint,getIdentity:localIdentityWithin,call});
  const workSync=createNativeWorkSync({dataDirectory,endpoint,getIdentity:localIdentityWithin,call});
   resumePrivateSync();
-  return Object.freeze({website,api:{call,snapshot:api.snapshot,endpoint},store,localIdentityWithin,archiveSync,workSync,resumePrivateSync,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,identityAccounts,get identityGroups(){return identityGroups();},
+  return Object.freeze({website,diagnostics,api:{call,snapshot:api.snapshot,endpoint},store,localIdentityWithin,archiveSync,workSync,resumePrivateSync,initialize,command,connect,ensureConnection:ensure,authorize,navigation,status,prepareWebIdentityContext,helpFlow,trustPackages,receiptStatus,workerAuthorization,deviceManagement,identityAccounts,get identityGroups(){return identityGroups();},
   authorizationExists:async input=>{const r=await store.get('native-authorization:'+endpoint+':'+input.requestId);return !!r&&JSON.stringify(r.input)===JSON.stringify(input);},
   device:{pending:handoff.pending,offer:handoff.createOffer,approve:handoff.approveOffer,accept:handoff.acceptApproval,reconcile:handoff.reconcile,cancel:handoff.cancel,
    previewOffer:handoff.previewOffer,previewApproval:handoff.previewApproval},

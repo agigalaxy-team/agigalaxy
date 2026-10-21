@@ -5,6 +5,7 @@ import {getLocalUploadPrivacy,setLocalUploadPrivacy,initializeLocalWorkerGalaxyI
 import {localPaths,readJson} from '../../../galaxy-core/src/storage/files.mjs';
 import {archiveSyncChoiceSchema,archiveCloudTargetSchema,archiveCloudListSchema,archiveCloudItemSchema,archiveCloudExportSchema,archiveSyncFlushSchema} from './archive-sync.mjs';
 import {workSyncChoiceSchema,workSyncFlushSchema,workCloudListSchema,workCloudItemSchema} from './work-sync.mjs';
+import {nativeDiagnostics} from './diagnostics.mjs';
 
 export const nativeUploadPrivacyInputSchema = z.strictObject({galaxyId:z.string().min(1).max(512).optional(),
   level:z.enum(['local-only','history-overview','work-content','conversation-archive']),
@@ -29,6 +30,7 @@ export function nativeLocalIdentityReader(runtime) {
 }
 
 export function createNativeLocalWorkServices(runtime) {
+  const diagnostics=runtime.diagnostics??nativeDiagnostics();
   const dataDirectory = runtime.store.dataDirectory, getIdentity = nativeLocalIdentityReader(runtime);
   const work = createLocalWorkHistory({dataDirectory,getIdentity});
   const archive = createLocalConversationArchive({dataDirectory,getIdentity});
@@ -36,7 +38,7 @@ export function createNativeLocalWorkServices(runtime) {
   const allArchives=async galaxyId=>{const items=[];let after;do{const page=await archive.list({galaxyId,limit:100,...(after?{after}:{})});items.push(...page.items);after=page.nextAfter;}while(after);return items;};
   let timer,pendingCleanup,lastCleanupError=null;
   function maintain() {
-    return pendingCleanup??=archive.cleanup().then(result=>{lastCleanupError=null;return result;},error=>{
+    return pendingCleanup??=diagnostics.run('archive-cleanup',()=>archive.cleanup(),{event:'host_archive',independent:true}).then(result=>{lastCleanupError=null;return result;},error=>{
       lastCleanupError=/^[a-z0-9_]{1,100}$/.test(error.code??error.message)?error.code??error.message:'local_archive_cleanup_failed';
       return {state:'cleanup-failed',error:lastCleanupError};
     }).finally(()=>{pendingCleanup=null;});
@@ -48,7 +50,7 @@ export function createNativeLocalWorkServices(runtime) {
     prepareLocal:input=>runtime.initialize({initializationPath:'personal-galaxy',subjectType:input.subjectType},{confirmed:true}),
     async availableAccounts(){const connection=await runtime.store.readConnection?.(runtime.api.endpoint);
       if(!connection?.permission?.enabled||!runtime.archiveSync)return {accounts:[],connected:false,accountSettingsUrl};
-      try{return {...await runtime.archiveSync.accounts(),connected:true,accountSettingsUrl};}catch{return {accounts:[],connected:true,unavailable:true,accountSettingsUrl};}},
+      try{return {...await runtime.archiveSync.accounts(),connected:true,accountSettingsUrl};}catch(error){diagnostics.emit({event:'native_private_sync',stage:'private-sync',outcome:'failed',error});return {accounts:[],connected:true,unavailable:true,accountSettingsUrl};}},
     async saveSettings(input){const parsed=nativeLocalSettingsInputSchema.safeParse(input);if(!parsed.success)throw new Error('local_settings_invalid');const x=parsed.data;
       const privacy=await getLocalUploadPrivacy(dataDirectory,{getIdentity}),owner=privacy.galaxyId;if(!owner||x.galaxyId&&x.galaxyId!==owner)throw new Error('local_identity_changed');
       const key='local-settings:'+runtime.api.endpoint+':'+owner+':'+x.choiceId,previous=await runtime.store.get(key);
@@ -65,7 +67,7 @@ export function createNativeLocalWorkServices(runtime) {
     },
     async deleteLocalArchive(input){const result=await archive.deleteSession(input);await runtime.archiveSync?.cancelLocalSource(input);return result;},
     async deleteLocalWork(input){const result=await work.deleteWork(input);await runtime.workSync?.cancelLocalSource(input);return result;},
-    async summarize(input){const result=await work.submitSummary(input);void runtime.workSync?.flush({workId:result.workId}).catch(()=>{});return result;},
+    async summarize(input){const result=await work.submitSummary(input);if(runtime.workSync)void diagnostics.run('private-sync',()=>runtime.workSync.flush({workId:result.workId}),{event:'native_private_sync',independent:true}).catch(()=>{});return result;},
     startMaintenance(){if(timer)return;void maintain();timer=setInterval(()=>{void maintain();},60*60*1000);timer.unref?.();},
     async close(){clearInterval(timer);timer=null;await pendingCleanup;},
     maintenanceStatus:()=>({automaticCleanupError:lastCleanupError}),

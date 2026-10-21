@@ -1,5 +1,6 @@
 import {InMemoryTransport,PROTOCOL_VERSION_META_KEY,CLIENT_INFO_META_KEY,CLIENT_CAPABILITIES_META_KEY,isCallToolResult,isJSONRPCResultResponse,isJSONRPCErrorResponse} from '@modelcontextprotocol/server';
 import {startNativeStdio} from '../../../packages/galaxy-edge-mcp/src/native-v2/stdio.mjs';
+import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
 
 /**
  * A trusted foreground client of the actual Native MCP entry. The host owns
@@ -9,6 +10,7 @@ import {startNativeStdio} from '../../../packages/galaxy-edge-mcp/src/native-v2/
  * @param {{configPath?:string,requestTimeoutMs?:number,openBrowser?:(url:string)=>Promise<unknown>}} [options]
  */
 export function createNativeRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONFIG,requestTimeoutMs=30000,openBrowser}={}){
+ const diagnostics=nativeDiagnostics('host-client');
  if(!Number.isSafeInteger(requestTimeoutMs)||requestTimeoutMs<=0)throw Error('native_bridge_timeout_invalid');
  let sequence=0,closed=false,starting=null,product=null,wire=null,closing=null;
  /** @type {Map<number,{resolve:(value:unknown)=>void,reject:(reason:Error)=>void,timer:ReturnType<typeof setTimeout>}>} */
@@ -33,7 +35,7 @@ export function createNativeRuntimeBridge({configPath=process.env.GALAXY_NATIVE_
  async function start(){
   if(closed)throw Error('native_bridge_closed');
   if(starting)return starting;
-  const operation=(async()=>{
+  const operation=diagnostics.run('bridge-start',async()=>{
    const[a,b]=InMemoryTransport.createLinkedPair();
    try{
     const current=await startNativeStdio({configPath,transport:a,...(openBrowser?{openBrowser}:{})});
@@ -55,23 +57,25 @@ export function createNativeRuntimeBridge({configPath=process.env.GALAXY_NATIVE_
     if(product){await product.close();product=null;}
     await b.close();wire=null;throw error;
    }
-  })();
+  },{event:'host_bridge',host:'opencode'});
   starting=operation;
   try{await operation;}catch(error){if(starting===operation)starting=null;throw error;}
  }
  /** @param {string} name @param {Record<string,unknown>} [args] */
  async function call(name,args={}){
+  return diagnostics.run('bridge-request',async()=>{
   await start();
   const result=await request('tools/call',{name,arguments:args,_meta:context});
   if(!isCallToolResult(result))throw Error('native_bridge_result_invalid');
   return result;
+  },{event:'host_bridge',host:'opencode',tool:name,resultFailed:value=>value?.isError===true});
  }
  function close(){
   closed=true;rejectPending();
-  return closing??=Promise.resolve().then(async()=>{
+  return closing??=diagnostics.run('shutdown',async()=>{
    try{await starting;}catch{ /* A missing configuration created no product. */ }
    try{await product?.close();}finally{await wire?.close();product=null;wire=null;}
-  });
+  },{event:'host_bridge',host:'opencode'});
  }
  return Object.freeze({call,close});
 }

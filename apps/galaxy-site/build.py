@@ -75,6 +75,7 @@ def main():
     parser.add_argument('--api-release', default=os.environ.get('GALAXY_API_RELEASE'))
     parser.add_argument('--release-data', type=Path, default=ROOT / 'release-data.json')
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
+    parser.add_argument('--preserved-public-source', type=Path, help='Copy the selected existing public release files without fetching or recalculating archive digests')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
     parser.add_argument('--web-dist', type=Path, help='Exact completed Web build used for progressive non-home startup')
     parser.add_argument('--node', default='node', help='Node.js executable used by the shared website UI renderer')
@@ -106,6 +107,9 @@ def main():
         raise ValueError('Unexpected public archive origin')
     cache = ROOT / '.cache' / 'public-archive'
     archive_source = resolved_file_path(args.archive_source) if args.archive_source else None
+    preserved_source = resolved_file_path(args.preserved_public_source) if args.preserved_public_source else None
+    if preserved_source and (archive_source or not preserved_source.is_dir() or preserved_source.is_symlink()):
+        raise ValueError('Choose one existing public release directory')
     cache.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -121,7 +125,12 @@ def main():
         if cached.is_symlink():
             raise ValueError('Archive cache must contain regular files')
         source = archive_source.joinpath(*relative.parts) if archive_source else None
-        if source and source.exists():
+        if preserved_source:
+            selected = preserved_source / ('archives/public/' + name if name in ('docs/index.html', 'downloads/index.html') else name)
+            if selected.is_symlink() or not selected.is_file() or not resolved_file_path(selected).is_relative_to(preserved_source):
+                raise ValueError('The selected existing release is missing a public file: ' + name)
+            raw = selected.read_bytes()
+        elif source and source.exists():
             if source.is_symlink() or not resolved_file_path(source).is_relative_to(archive_source):
                 raise ValueError('Captured public asset escaped the selected source')
             raw = source.read_bytes()
@@ -130,7 +139,7 @@ def main():
             cached.write_bytes(raw)
         else:
             raw = cached.read_bytes() if cached.exists() else None
-        if raw is None or hashlib.sha256(raw).hexdigest() != digest:
+        if not preserved_source and (raw is None or hashlib.sha256(raw).hexdigest() != digest):
             if args.offline:
                 raise ValueError('Missing verified archive: ' + name)
             with urllib.request.urlopen(origin + '/' + urllib.parse.quote(name), timeout=30) as response:
@@ -179,13 +188,14 @@ def main():
     chrome.WEB_ASSETS = web_entry_assets(resolved_file_path(args.web_dist)) if args.web_dist else None
     chrome.PUBLIC_PAGES.clear()
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
-    for name in ('site.css', 'navigation.js', 'interaction-copy.mjs', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
+    for name in ('site.css', 'cms-content.css', 'navigation.js', 'interaction-copy.mjs', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
     for name in chrome.shared_shell()['styles']:
         chrome.write('assets/' + name,
                      (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / name).read_text(encoding='utf-8'))
     chrome.write('assets/public-reading.css',
-                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'public-reading.css').read_text(encoding='utf-8'))
+                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'public-reading.css').read_text(encoding='utf-8')
+                 .replace("'../../../apps/galaxy-site/cms-content.css'", "'/assets/cms-content.css'"))
     if chrome.WEB_ASSETS:
         chrome.write('assets/workspace-entry.json', json.dumps(chrome.WEB_ASSETS, indent=2) + '\n')
     copy_example_images(output)
@@ -204,7 +214,8 @@ def main():
     print(json.dumps({'output': str(output), 'preview': preview,
                       'siteRelease': metadata['version'], 'apiRelease': metadata['backendRelease'],
                       'clientVersion': metadata['nativeClientDownload']['package']['version'],
-                      'publicArchiveFilesVerified': len(catalog['files'])}))
+                      'publicArchiveFilesCopied': len(catalog['files']),
+                      'archiveDigestChecks': not bool(preserved_source)}))
 
 
 if __name__ == '__main__':

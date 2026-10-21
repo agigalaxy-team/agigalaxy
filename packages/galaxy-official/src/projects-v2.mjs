@@ -8,6 +8,7 @@ import { ServiceError } from './shared/service-error.mjs';
 import { digest } from './shared/digest.mjs';
 import { recordObjectAudit } from './infrastructure/object-audit.mjs';
 import { transaction } from './database.mjs';
+import {operationsVisibilityWithin} from './operations-content-visibility.mjs';
 
 const fail = (code,status=409) => {throw new ServiceError(code,status);};
 const stamp = now => new Date(now*1000).toISOString();
@@ -67,15 +68,17 @@ export class ProjectV2Service {
     if(!result.success&&!allowPartial)fail('project_source_unavailable',404);
     return {document:result.success?result.data:raw,fields:[...visible.keys()].map(field=>({field,operationId:sources.get(field).operation_id,subjectId:sources.get(field).subject_id}))};
   }
-  async readWithin(db,actor,projectId,{includeArchived=false}={}) {
+  async readWithin(db,actor,projectId,{includeArchived=false,ignoreOperationsVisibility=false}={}) {
     const project=await this.rowWithin(db,projectId),own=actor?.subjectId===project.owner_id;
     if(project.state!=='active'&&!(includeArchived&&own))fail('project_not_found',404);
     const policy=(await db.query('SELECT * FROM project_events_v2 WHERE operation_id=$1',[project.policy_event_id])).rows[0];
     const grant=await this.grantWithin(db,policy);
     if(!canReadProjection(grant,{viewerId:actor?.subjectId??null,projection:'history',now:this.access.now()}))fail('project_not_found',404);
-    const material=await this.documentWithin(db,actor,project),roles=actor?await this.rolesWithin(db,project,actor.subjectId):[];
+    const roles=actor?await this.rolesWithin(db,project,actor.subjectId):[],operationsVisibility=await operationsVisibilityWithin(db,{endpoint:this.access.endpoint,kind:'project',id:projectId,now:this.access.now()});
+    if(operationsVisibility.hidden&&!ignoreOperationsVisibility&&!roles.length)fail('project_not_found',404);
+    const material=await this.documentWithin(db,actor,project);
     return {schemaVersion:2,projectId,ownerId:project.owner_id,creatorId:project.creator_id,revision:project.revision,state:project.state,
-      document:material.document,visibility:grant.visibility,classification:'self-declared',capabilityVerified:false,legalOwnershipVerified:false,
+      document:material.document,visibility:grant.visibility,...(roles.length?{operationsVisibility}:{}),classification:'self-declared',capabilityVerified:false,legalOwnershipVerified:false,
       source:{documentEventId:project.document_event_id,policyEventId:project.policy_event_id,sourceStatementId:project.source_statement_id,fieldSources:material.fields},
       ownRoles:roles,permissions:{edit:roles.some(r=>['owner','editor'].includes(r)),represent:roles.some(r=>['owner','representative'].includes(r)),
         manage:roles.includes('owner'),privateFiles:false,agentControl:false}};

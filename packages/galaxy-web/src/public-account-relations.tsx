@@ -9,7 +9,7 @@ type Client=ReturnType<typeof createOfficialAccountClient>;
 type Page<T>={items:T[];nextAfter:string|null;checkedAt:number};
 type Props={endpoint?:string;navigate:(path:string)=>void};
 type LinkedId={subjectId:string;linkedAt:string};
-type LinkedAccount={accountId:string;uid?:string|null;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement';linkedAt:string};
+type LinkedAccount={accountId:string;uid?:string|null;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement'|'operator-recorded-statement';linkedAt:string};
 type Credential={id:string;title:string;issuer:{name:string;uri:string};subject:{id:string|null;binding:string};scope:string[];issuedAt:string|null;validFrom:string|null;expiresAt:string|null;signature:{state:string};validity:{state:string};revocation:{state:string;source:string|null;checkedAt:string|null;validUntil:string|null};source?:{credentialId:string|null;format:string};galaxyIssued:false};
 const at=(value:string|null|undefined)=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-CN',{hour12:false}):'未提供';
 const typeLabel=(value:LinkedAccount['subjectType'])=>({person:'个人账户',organization:'组织账户',agent:'Agent 账户'})[value??'person'];

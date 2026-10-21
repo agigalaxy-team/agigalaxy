@@ -168,3 +168,37 @@ GRANT UPDATE(revoked_at) ON forum_permissions_v1 TO galaxy_api;
 GRANT UPDATE(version,state,appeal_count,decision_event_id,restriction_event_id,restriction_until,closed_at,audit_until) ON forum_reports_v1 TO galaxy_api;
 GRANT UPDATE(used) ON forum_daily_usage_v1 TO galaxy_api;
 GRANT UPDATE(revocation_kind,revocation_control_event_id,revocation_request_id) ON bindings TO galaxy_api;
+
+-- Persistent public account sessions and separate operator authentication.
+GRANT SELECT,INSERT,DELETE ON oidc_login_transactions_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE,DELETE ON official_account_logins_v1,official_account_sessions_v1,
+  operations_operator_logins_v1,operations_operator_sessions_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON operations_operator_principals_v1 TO galaxy_api;
+GRANT UPDATE(display_name,updated_at) ON operations_operator_principals_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON business_admin_audit_v1 TO galaxy_api;
+GRANT USAGE,SELECT ON SEQUENCE business_admin_audit_v1_sequence_seq TO galaxy_api;
+GRANT UPDATE(restricted_until,restriction_reason,restriction_revision) ON community_accounts TO galaxy_api;
+GRANT UPDATE(state,attempts,lease_id,locked_until,available_at,search_recovery_count,search_recovery_generation,search_recovery_at) ON jobs TO galaxy_api;
+
+-- pg-boss runtime DML only; its schema/queues are installed by migration 93.
+GRANT USAGE ON SCHEMA galaxy_jobs TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA galaxy_jobs TO galaxy_api;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA galaxy_jobs TO galaxy_api;
+GRANT EXECUTE ON FUNCTION galaxy_jobs.job_now() TO galaxy_api;
+GRANT USAGE ON TYPE galaxy_jobs.job_state TO galaxy_api;
+GRANT SELECT,INSERT ON site_publications_v1 TO galaxy_api;
+GRANT UPDATE(job_id,state,error,updated_at) ON site_publications_v1 TO galaxy_api;
+GRANT USAGE,SELECT ON SEQUENCE site_publications_v1_sequence_seq TO galaxy_api;
+GRANT SELECT,INSERT ON account_chat_reports_v1,account_chat_governance_events_v1,account_chat_governance_materials_v1 TO galaxy_api;
+GRANT UPDATE ON account_chat_reports_v1,account_chat_governance_events_v1,account_chat_governance_materials_v1 TO galaxy_api;
+
+-- Operations business changes preserve immutable source authorizations.
+GRANT SELECT,INSERT,UPDATE ON operations_content_visibility_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON forum_operations_events_v1 TO galaxy_api;
+GRANT UPDATE(operations_disclosed) ON forum_reports_v1 TO galaxy_api;
+GRANT UPDATE(operations_retry_revision) ON chat_attachments,forum_attachments_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON operations_product_commands_v1,operations_product_rules_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON operations_policy_processes_v1,operations_notices_v1,operations_retention_runs_v1 TO galaxy_api;
+GRANT SELECT ON operations_retention_observations_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON account_operations_notices_v1 TO galaxy_api;
+GRANT USAGE,SELECT ON SEQUENCE account_operations_notices_v1_sequence_seq,operations_notices_v1_sequence_seq,operations_retention_runs_v1_sequence_seq TO galaxy_api;

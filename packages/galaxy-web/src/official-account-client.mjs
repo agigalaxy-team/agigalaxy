@@ -61,11 +61,17 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    if(session?.state!=='signed-in'||!accountId(session.account?.id)||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');
    if(typeof path!=='string'||!path.startsWith('/')||path.startsWith('//')||path.includes('\\')||path.includes('#')||!['GET','POST','DELETE'].includes(method))fail('official_account_request_invalid');
    const parsed=new URL(path,endpoint),route=parsed.pathname;
-   const allowed=isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
-    ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route);
-   const queryKeys=route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
+   const noticeList=route==='/v1/account/notifications/notices',noticeRead=/^\/v1\/account\/notifications\/notices\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/read$/i.test(route);
+   const allowed=/^\/v1\/account\/chat-reports\/(?:config|source|query|report|event|receipt|get)$/.test(route)||isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
+    ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route)||noticeList&&method==='GET'||noticeRead&&method==='POST';
+   const queryKeys=noticeList?['after','limit','unreadOnly']:route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
    if(parsed.origin!==endpoint||!allowed||[...parsed.searchParams.keys()].some(key=>!queryKeys.includes(key)||parsed.searchParams.getAll(key).length!==1)||parsed.search&&method!=='GET'
     ||method==='DELETE'&&!/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(route))fail('official_account_request_invalid');
+   if(noticeList){
+    const after=parsed.searchParams.get('after'),limit=parsed.searchParams.get('limit'),unreadOnly=parsed.searchParams.get('unreadOnly');
+    if(after!==null&&(!/^[1-9][0-9]{0,18}$/.test(after)||BigInt(after)>9223372036854775807n)
+      ||limit!==null&&!/^(?:[1-9]|[1-9][0-9]|100)$/.test(limit)||unreadOnly!==null&&!['true','false'].includes(unreadOnly))fail('official_account_request_invalid');
+   }
     return request(path,{method,signal,headers:{'Content-Type':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},...(['GET','DELETE'].includes(method)?{}:{body:JSON.stringify(input??{})})});
   },
   /** @param {string} path @param {unknown} input @param {{method?:string,signal?:AbortSignal,session?:{state:string,account:{id:string|null},csrfToken:string,expiresAt:number}}} [options] @returns {Promise<Response>} */

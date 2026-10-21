@@ -5,19 +5,23 @@ import {transaction} from './database.mjs';
 import {readAttachmentPayload} from './infrastructure/attachment-payload.mjs';
 import {attachmentPolicySchema,defaultAttachmentPolicy} from './shared/chat-attachments-schema.mjs';
 import {forumAttachmentPrepareSchema,forumAttachmentReadSchema,forumAttachmentContentSchema,forumAttachmentQuerySchema,forumAttachmentReferencesSchema} from './shared/forum-attachments-v1-schema.mjs';
+import {retryFileProcessingWithin} from './operations-file-processing.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),hash=x=>createHash('sha256').update(x).digest('hex');
 const fail=(code,status=409)=>{throw new ServiceError(code,status);};
 const parse=(schema,input)=>{const r=schema.safeParse(input);if(!r.success)fail('invalid_attachment_request',400);return r.data;};
 const sourceKey=source=>source.replyId?'reply:'+source.replyId:'post:'+source.versionId;
 
 export class ForumAttachmentsV1Service{
- constructor({forum,db=forum?.access.db,now=forum?()=>forum.clock():()=>Math.floor(Date.now()/1000),accounts=forum?.accounts,store,scanner,policy=defaultAttachmentPolicy}){Object.assign(this,{forum,db,now,accounts,store,scanner});this.policy=attachmentPolicySchema.parse(policy);}
+ constructor({forum,db=forum?.access.db,now=forum?()=>forum.clock():()=>Math.floor(Date.now()/1000),accounts=forum?.accounts,store,scanner,policy=defaultAttachmentPolicy,logger=()=>{}}){Object.assign(this,{forum,db,now,accounts,store,scanner,logger});this.policy=attachmentPolicySchema.parse(policy);}
+ diagnostic(input){try{this.logger(input);}catch{}}
  specification(){return{supported:!!this.store&&!!this.scanner,maxFileBytes:this.policy.maxFileBytes,maxFilesPerMessage:4,purpose:'post-or-reply-attachment',draftRetentionDays:7,retention:'published-source-expiry',publicStorageUrls:false,automaticEvidence:false,scanGuaranteesSafety:false};}
  configured(){if(!this.store||!this.scanner)fail('attachment_service_unavailable',503);}
  expired(row){return Date.parse(row.expires_at??row.prepare_expires_at)<=this.now()*1000;}
  state(row){return row.purged_at?'erased':row.revoked_at?'revoked':this.expired(row)?'expired':row.state;}
  receipt(row){return{attachmentId:row.id,name:row.name,mediaType:row.media_type,size:Number(row.byte_size),sha256:row.sha256,state:this.state(row),createdAt:row.created_at,uploadedAt:row.uploaded_at,expiresAt:row.expires_at??row.prepare_expires_at,uploadRetryAt:row.lease_until??null,uploadRetryable:!row.published_at&&!row.revoked_at&&!row.purged_at&&!this.expired(row)&&['prepared','uploading'].includes(row.state)&&(!row.lease_until||Date.parse(row.lease_until)<=this.now()*1000),scan:row.scan_result,cleanupPending:row.purge_pending,objectRemoved:!!row.purged_at};}
  async row(db,id,lock='SHARE'){return(await db.query(`SELECT * FROM forum_attachments_v1 WHERE id=$1 FOR ${lock}`,[id])).rows[0];}
+ async authorPending(db,row){return !!row.subject_id&&!!(await db.query("SELECT 1 FROM deletion_requests WHERE subject_id=$1 AND state IN ('requested','review-needed','approved','partial','primary-erased') LIMIT 1",[row.subject_id])).rows.length;}
+ async retryProcessingWithin(db,row,input){this.configured();return retryFileProcessingWithin(db,{table:'forum_attachments_v1',row,input,now:this.now(),authorUnavailable:await this.authorPending(db,row)});}
  run(actor,write,operation){if(!actor)fail('account_verification_required',401);return this.accounts.runAuthorized(actor,write?'assistance':'binding',async(db,_authorization,current)=>{const account=await this.accounts.resolveWithin(db,current,{lock:write});return operation(db,current,account);},{resourceWrite:write});}
  async owned(db,actor,account,id,lock='SHARE'){const row=await this.row(db,id,lock);if(!row||row.account_id!==account.id)fail('attachment_unavailable',404);return row;}
  async prepare(actor,input){const x=parse(forumAttachmentPrepareSchema,input);this.configured();if(x.size>this.policy.maxFileBytes)fail('attachment_too_large',413);
@@ -65,9 +69,10 @@ export class ForumAttachmentsV1Service{
  revoke(actor,input){const x=parse(forumAttachmentReadSchema,input);return this.run(actor,true,async(db,current,account)=>{const row=await this.owned(db,current,account,x.attachmentId,'UPDATE');return this.receipt((await db.query('UPDATE forum_attachments_v1 SET revoked_at=COALESCE(revoked_at,$2),purge_pending=true WHERE id=$1 RETURNING *',[row.id,stamp(this.now())])).rows[0]);});}
  async scanPending({limit=1}={}){this.configured();if(!Number.isInteger(limit)||limit<1||limit>4)fail('invalid_attachment_scan_limit',400);let scanned=0;
   for(let i=0;i<limit;i++){const lease=randomUUID(),row=await transaction(this.db,async db=>{const row=(await db.query("SELECT * FROM forum_attachments_v1 WHERE state IN ('scan-pending','scanning') AND revoked_at IS NULL AND purge_pending=false AND expires_at>$1 AND (lease_until IS NULL OR lease_until<=$1) ORDER BY uploaded_at LIMIT 1 FOR UPDATE SKIP LOCKED",[stamp(this.now())])).rows[0];if(!row)return null;return(await db.query("UPDATE forum_attachments_v1 SET state='scanning',lease_id=$2,lease_until=$3,scan_attempts=scan_attempts+1 WHERE id=$1 RETURNING *",[row.id,lease,stamp(this.now()+120)])).rows[0];});if(!row)break;
+   const startedAt=performance.now();
    try{const bytes=await this.store.get({key:row.storage_key,keyId:row.encryption_key_id,size:Number(row.byte_size)});if(!bytes||hash(bytes)!==row.sha256)fail('attachment_storage_integrity_failed');const result=await this.scanner.scan(bytes);if(!['clean','blocked'].includes(result.state))fail('attachment_scan_incomplete',503);
     await transaction(this.db,async db=>{const current=await this.row(db,row.id,'UPDATE');if(current.lease_id!==lease)return;const invalid=current.revoked_at||this.expired(current);await db.query("UPDATE forum_attachments_v1 SET state=$2,scan_result=$3,lease_id=NULL,lease_until=NULL,last_error=NULL,purge_pending=$4 WHERE id=$1",[row.id,invalid||result.state==='blocked'?'blocked':'available',JSON.stringify(result),!!invalid||result.state==='blocked']);});scanned++;
-   }catch(error){await this.db.query("UPDATE forum_attachments_v1 SET state='scan-pending',lease_id=NULL,lease_until=$3,last_error=$4 WHERE id=$1 AND lease_id=$2",[row.id,lease,stamp(this.now()+60),error instanceof ServiceError?error.code:'attachment_scan_failed']);}
+   }catch(error){this.diagnostic({event:'attachment_processing_deferred',stage:'attachment-scan',resourceId:row.id,startedAt,error});await this.db.query("UPDATE forum_attachments_v1 SET state='scan-pending',lease_id=NULL,lease_until=$3,last_error=$4 WHERE id=$1 AND lease_id=$2",[row.id,lease,stamp(this.now()+60),error instanceof ServiceError?error.code:'attachment_scan_failed']);}
   }return{scanned};
  }
  async purgeExpired({limit=20}={}){this.configured();if(!Number.isInteger(limit)||limit<1||limit>100)fail('invalid_attachment_cleanup_limit',400);
@@ -75,7 +80,7 @@ export class ForumAttachmentsV1Service{
    (a.published_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM forum_attachment_links_v1 l JOIN forum_posts_v1 p ON p.id=l.post_id JOIN forum_versions_v1 v ON v.id=l.version_id LEFT JOIN forum_replies_v1 r ON r.id=l.reply_id
     WHERE l.attachment_id=a.id AND l.published_until>$1 AND p.state='published' AND v.state='published' AND (l.reply_id IS NULL OR r.state='published'))))`,[stamp(this.now())]);
   const rows=(await this.db.query('SELECT id FROM forum_attachments_v1 WHERE purge_pending=true AND purged_at IS NULL AND (lease_until IS NULL OR lease_until<=$1) ORDER BY created_at LIMIT $2',[stamp(this.now()),limit])).rows;let removed=0;
-  for(const {id} of rows){await transaction(this.db,async db=>{const row=await this.row(db,id,'UPDATE');if(!row.purge_pending||row.purged_at||row.lease_until&&Date.parse(row.lease_until)>this.now()*1000)return;await this.store.erase({key:row.storage_key});await db.query("UPDATE forum_attachments_v1 SET state='erased',name='',media_type='',purge_pending=false,purged_at=$2,lease_id=NULL,lease_until=NULL,last_error=NULL WHERE id=$1",[id,stamp(this.now())]);removed++;});}
+  for(const {id} of rows){try{await transaction(this.db,async db=>{const row=await this.row(db,id,'UPDATE');if(!row.purge_pending||row.purged_at||row.lease_until&&Date.parse(row.lease_until)>this.now()*1000)return;await this.store.erase({key:row.storage_key});await db.query("UPDATE forum_attachments_v1 SET state='erased',name='',media_type='',purge_pending=false,purged_at=$2,lease_id=NULL,lease_until=NULL,last_error=NULL WHERE id=$1",[id,stamp(this.now())]);removed++;});}catch(error){await this.db.query("UPDATE forum_attachments_v1 SET last_error='attachment_cleanup_failed' WHERE id=$1 AND purge_pending=true AND purged_at IS NULL",[id]);throw error;}}
   const result=await this.db.query('DELETE FROM forum_attachments_v1 WHERE purged_at<$1',[stamp(this.now()-180*86400)]);return{objectRemoved:removed,metadataRemoved:result.rowCount??0};
  }
 }

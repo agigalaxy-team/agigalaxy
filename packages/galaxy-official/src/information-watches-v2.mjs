@@ -26,16 +26,24 @@ function parse(schema, input) {
   return p.data;
 }
 const refKey = (ref) => ref.id;
-const runtime = {
-  scheduledBy: 'user-host',
-  cloudModel: false,
-  continuesAfterHostExit: false,
-  modelCalls: 0,
-};
-
 export class InformationWatchServiceV2 {
-  constructor(access, { information, retirement = null }) {
-    Object.assign(this, { access, information, retirement });
+  constructor(access, { information, retirement = null, jobs = null }) {
+    Object.assign(this, { access, information, retirement, jobs });
+  }
+  runtime(row = null) {
+    const background = !!this.jobs && (!row || row.state === 'active' && seconds(row.expires_at) > this.now()
+      && !!row.background_authority && row.background_state !== 'authorization-required');
+    return { scheduledBy: background ? 'galaxy-service' : 'user-host', cloudModel: false,
+      continuesAfterHostExit: background, modelCalls: 0 };
+  }
+  async queueWithin(db, row) {
+    if (!this.jobs || row.state !== 'active' || !row.background_authority || row.background_state === 'authorization-required'
+      || seconds(row.expires_at) <= this.now()) return null;
+    return this.jobs.enqueue('information-watch', { watchId: row.id, subjectId: row.subject_id,
+      revision: row.revision, checkRevision: row.check_revision }, {
+      key: `watch:${row.id}:${row.revision}:${row.check_revision}`,
+      startAfter: row.next_check_at ?? stamp(this.now()), db,
+    });
   }
   now() {
     return this.access.now();
@@ -73,8 +81,9 @@ export class InformationWatchServiceV2 {
         continuationAvailable: !!s.after,
         state: s.state ?? 'not-checked',
       })),
-      hostRuntimeState: 'last-check-only; host-running-state-not-confirmed',
-      ...runtime,
+      hostRuntimeState: this.jobs ? row.background_state : 'last-check-only; host-running-state-not-confirmed',
+      backgroundState: this.jobs ? row.background_state : 'not-configured',
+      ...this.runtime(row),
     };
   }
   async command(actor, input) {
@@ -178,13 +187,29 @@ export class InformationWatchServiceV2 {
           );
           row = await this.rowWithin(db, actor, x.watchId);
         }
+        if (['start', 'revise', 'resume'].includes(x.action)) {
+          // Store the exact accepted delegation, never its temporary Bearer.
+          const required = ['notifications', ...new Set(row.plan.sources.map(s => informationScope(s.source)))];
+          if (!required.every(scope => authorization.credentialScopes.includes(scope))) fail('information_source_scope_required', 403);
+          const control = authorization.identityControl;
+          const authority = { bindingId: authorization.callerBindingId, scopes: required,
+            deviceId: control?.deviceId ?? actor.deviceId ?? null,
+            keyId: control?.keyId ?? actor.keyId ?? null,
+            controlEpoch: control?.epoch ?? actor.controlEpoch ?? 0 };
+          await db.query("UPDATE information_watches_v2 SET background_authority=$2,background_state='scheduled',background_error=NULL WHERE id=$1",
+            [row.id, JSON.stringify(authority)]);
+        } else {
+          await db.query('UPDATE information_watches_v2 SET background_state=$2 WHERE id=$1', [row.id, row.state]);
+        }
+        row = await this.rowWithin(db, actor, row.id);
+        await this.queueWithin(db, row);
         const result = {
           operationId: x.operationId,
           watchId: x.watchId,
           revision: row.revision,
           state: this.view(row).state,
           requestHash,
-          ...runtime,
+          ...this.runtime(row),
         };
         await db.query(
           'INSERT INTO information_watch_operations_v2(operation_id,subject_id,watch_id,request_hash,result,created_at) VALUES($1,$2,$3,$4,$5,$6)',
@@ -235,7 +260,7 @@ export class InformationWatchServiceV2 {
         return {
           items: [this.view(await this.rowWithin(db, actor, x.watchId))],
           nextAfter: null,
-          ...runtime,
+          ...this.runtime(),
         };
       const rows = (
         await db.query(
@@ -252,7 +277,7 @@ export class InformationWatchServiceV2 {
       return {
         items: rows.slice(0, x.limit).map((r) => this.view(r)),
         nextAfter: rows.length > x.limit ? rows[x.limit - 1].id : null,
-        ...runtime,
+        ...this.runtime(),
       };
     });
   }
@@ -342,7 +367,8 @@ export class InformationWatchServiceV2 {
       changes,
     };
   }
-  async check(actor, input) {
+  async check(actor, input, { signal } = {}) {
+    signal?.throwIfAborted();
     const x = parse(informationWatchCheckSchema, input);
     if (this.retirement && !this.retirement.canProcessEvidence())
       fail('service_writes_stopped', 410);
@@ -353,17 +379,18 @@ export class InformationWatchServiceV2 {
       return row;
     });
     if (capture.state !== 'active' || seconds(capture.expires_at) <= this.now())
-      return { state: this.view(capture).state, changed: false, ...runtime };
+      return { state: this.view(capture).state, changed: false, ...this.runtime(capture) };
     if (capture.next_check_at && seconds(capture.next_check_at) > this.now())
       return {
         state: 'not-due',
         nextCheckAt: seconds(capture.next_check_at),
-        ...runtime,
+        ...this.runtime(capture),
       };
     const scan = {},
       baseline = { ...capture.baseline },
       changes = [];
     for (const selected of capture.plan.sources) {
+      signal?.throwIfAborted();
       const result = await this.scanSource(
         actor,
         selected,
@@ -380,6 +407,7 @@ export class InformationWatchServiceV2 {
       changes.push(...result.changes);
     }
     return this.run(actor, true, async (db) => {
+      signal?.throwIfAborted();
       const row = await this.rowWithin(db, actor, x.watchId, true);
       if (
         row.state !== 'active' ||
@@ -387,7 +415,7 @@ export class InformationWatchServiceV2 {
         row.check_revision !== capture.check_revision ||
         seconds(row.expires_at) <= this.now()
       )
-        return { state: 'superseded-during-check', changed: false, ...runtime };
+        return { state: 'superseded-during-check', changed: false, ...this.runtime(row) };
       const failed = Object.values(scan).some(
           (s) => s.state === 'temporarily-unavailable',
         ),
@@ -401,7 +429,7 @@ export class InformationWatchServiceV2 {
             ? 0
             : 900);
       await db.query(
-        'UPDATE information_watches_v2 SET baseline=$3,scan=$4,check_revision=check_revision+1,last_checked_at=$5,next_check_at=$6,failures=$7 WHERE id=$1 AND subject_id=$2',
+        "UPDATE information_watches_v2 SET baseline=$3,scan=$4,check_revision=check_revision+1,last_checked_at=$5,next_check_at=$6,failures=$7,background_state='scheduled',background_error=NULL WHERE id=$1 AND subject_id=$2",
         [
           row.id,
           actor.subjectId,
@@ -452,6 +480,8 @@ export class InformationWatchServiceV2 {
           ],
         );
       }
+      signal?.throwIfAborted();
+      await this.queueWithin(db, { ...row, check_revision: row.check_revision + 1, next_check_at: stamp(next) });
       return {
         state: partial
           ? 'coverage-in-progress'
@@ -469,7 +499,7 @@ export class InformationWatchServiceV2 {
           complete: s.complete,
           sourceState: s.state,
         })),
-        ...runtime,
+        ...this.runtime(row),
       };
     });
   }
@@ -529,7 +559,7 @@ export class InformationWatchServiceV2 {
             : { key: c.key, kind: 'current-source-recheck-required' },
         ),
       })),
-      ...runtime,
+      ...this.runtime(capture.watch),
     };
   }
   async eraseSubjectWithin(db, subjectId) {

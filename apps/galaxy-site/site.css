@@ -1,4 +1,5 @@
 /* Shared public pages. The homepage has its own content composition. */
+@import url('/assets/cms-content.css');
 :root {
   color-scheme:light;
   --ink:#202735;
@@ -245,3 +246,4 @@ thead {background:#f8f8fa}
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+

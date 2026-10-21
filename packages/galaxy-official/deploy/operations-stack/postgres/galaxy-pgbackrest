@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+# The secret is injected into this one child process, never into arguments or logs.
+test -r /run/secrets/pgbackrest_repository_cipher
+PGBACKREST_REPO1_CIPHER_PASS="$(cat /run/secrets/pgbackrest_repository_cipher)"
+test -n "$PGBACKREST_REPO1_CIPHER_PASS"
+export PGBACKREST_REPO1_CIPHER_PASS
+exec /usr/local/bin/pgbackrest "$@"

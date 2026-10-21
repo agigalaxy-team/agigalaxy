@@ -2,10 +2,15 @@ import { migrations } from './infrastructure/migrations.mjs';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 
-export function openDatabase(connectionString) {
+const diagnosticLoggers=new WeakMap();
+const report=(logger,event)=>{try{logger?.(event);}catch{/* Diagnostics do not replace the database error. */}};
+export function openDatabase(connectionString,{logger}={}) {
   if (!connectionString) throw new Error('DATABASE_URL is required.');
-  return new pg.Pool({ connectionString, max: 8, connectionTimeoutMillis: 5000,
+  const pool=new pg.Pool({ connectionString, max: 8, connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000, statement_timeout: 10000, application_name: 'galaxy-official' });
+  diagnosticLoggers.set(pool,logger);
+  pool.on('error',error=>report(logger,{event:'database_pool_failed',stage:'database-pool',error}));
+  return pool;
 }
 
 export async function transaction(pool, operation, {isolation='read committed'}={}) {
@@ -15,7 +20,10 @@ export async function transaction(pool, operation, {isolation='read committed'}=
     if(isolation==='repeatable read')await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     return operation(db);
   });
-  const client = await pool.connect();
+  const startedAt=performance.now();
+  let client;
+  try{client=await pool.connect();}
+  catch(error){report(diagnosticLoggers.get(pool),{event:'database_pool_failed',stage:'database-connect',startedAt,error});throw error;}
   let discard;
   try {
     await client.query(isolation==='repeatable read'?'BEGIN ISOLATION LEVEL REPEATABLE READ':'BEGIN');
@@ -24,7 +32,7 @@ export async function transaction(pool, operation, {isolation='read committed'}=
     return result;
   } catch (error) {
     try { await client.query('ROLLBACK'); }
-    catch (rollbackError) { discard = rollbackError; }
+    catch (rollbackError) { discard = rollbackError;report(diagnosticLoggers.get(pool),{event:'database_transaction_failed',stage:'transaction-rollback',startedAt,error:rollbackError}); }
     // Keep the operation failure while discarding a connection whose transaction
     // state could not be reset. It must never return to the usable pool.
     throw error;
@@ -33,7 +41,7 @@ export async function transaction(pool, operation, {isolation='read committed'}=
 
 
 // Role setup is opt-in administrative work. Runtime services never invoke it.
-export const migrationRoles = Object.freeze(['api', 'worker', 'deletion-review']);
+export const migrationRoles = Object.freeze(['api', 'worker', 'deletion-review', 'content-publisher']);
 export function validateMigrationRoles(roles) {
   if (!Array.isArray(roles) || new Set(roles).size !== roles.length || roles.some(role => !migrationRoles.includes(role)))
     throw new Error('Explicit supported migration roles required.');

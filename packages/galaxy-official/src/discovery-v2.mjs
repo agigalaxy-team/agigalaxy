@@ -99,7 +99,7 @@ export class DiscoveryV2Service {
     if(this.projects)for(const record of (await db.query("SELECT id,created_at FROM projects_v2 WHERE owner_id=$1 AND state='active' ORDER BY id",[row.subject_id])).rows){
       let view;
       try{view=await this.projects.readWithin(db,actor,record.id);}catch(error){if(error instanceof ServiceError&&[403,404].includes(error.status))continue;throw error;}
-      if(!view.document.discoverable)continue;
+      if(view.operationsVisibility?.hidden||!view.document.discoverable)continue;
       const project={...view.document,id:view.projectId},specific=await this.projects.effectiveWishWithin(db,row.subject_id,project.id);
       const match=matchProjects(context.source,project,context.wish,specific);if(!match)continue;
       const opportunityRef={sourceKind:'project',subjectId:row.subject_id,projectId:project.id,documentEventId:view.source.documentEventId,policyEventId:view.source.policyEventId};

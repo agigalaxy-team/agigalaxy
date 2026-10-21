@@ -1,5 +1,5 @@
 import * as oidc from 'openid-client';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const text = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max && !/\p{Cc}/u.test(value);
 function accountDisplayName(claims) {
@@ -13,6 +13,16 @@ function accountDisplayName(claims) {
   if (candidate.toLowerCase() === email.toLowerCase() || /[^\s@<>]+@[^\s@<>]+/u.test(candidate)) return null;
   return username;
 }
+function signedOperatorRoles(claims, clientId) {
+  const result=[];
+  for(const source of [claims.realm_access?.roles,claims.resource_access?.[clientId]?.roles]){
+    if(source===undefined)continue;
+    if(!Array.isArray(source)||source.length>128||source.some(value=>!text(value,160)||value.trim()!==value))
+      throw new Error('Invalid signed operator roles.');
+    result.push(...source);
+  }
+  return [...new Set(result)];
+}
 function endpoint(value, allowLoopbackHttp) {
   const url = new URL(value);
   const loopback = url.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(url.hostname);
@@ -25,9 +35,11 @@ function endpoint(value, allowLoopbackHttp) {
 // discovery and ID Token verification belong to openid-client/the selected AS.
 // The returned identity is not an API credential or a Galaxy authorization.
 export async function createOidcLoginProvider({ id, name, issuer, clientId, redirectUri, clientSecret,
-  allowedOrigins = [], includeAccountProfile = false, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
+  allowedOrigins = [], includeAccountProfile = false, includeOperatorRoles = false, transactionStore = null,
+  now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
   if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(id ?? '') || !text(name, 100) || !text(clientId, 200)
-    || clientSecret !== undefined && !text(clientSecret, 4096) || !Array.isArray(allowedOrigins) || allowedOrigins.length > 8)
+    || clientSecret !== undefined && !text(clientSecret, 4096) || !Array.isArray(allowedOrigins) || allowedOrigins.length > 8
+    || typeof includeAccountProfile!=='boolean'||typeof includeOperatorRoles!=='boolean')
     throw new Error('Invalid OIDC provider configuration.');
   const authority = endpoint(issuer, allowLoopbackHttp), callback = endpoint(redirectUri, allowLoopbackHttp);
   const origins = new Set([authority.origin, ...allowedOrigins.map(value => {
@@ -70,29 +82,39 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
       if (!origins.has(url.origin)) throw new Error();
     }
   } catch { throw new Error('OIDC provider discovery failed.'); }
-  const pending = new WeakMap();
   const description = Object.freeze({ id, name, issuer: configuration.serverMetadata().issuer, clientId,
     redirectUri: callback.href, protocol: 'openid-connect', grant: 'authorization_code', pkce: 'S256', loginLifetimeSeconds: 300 });
+  const providerKey=createHash('sha256').update(JSON.stringify({id,issuer:description.issuer,clientId,redirectUri:callback.href,includeAccountProfile,includeOperatorRoles})).digest('hex');
+  function operations(store) {
+    if(store!==null&&(!store||['put','take','cancel'].some(method=>typeof store[method]!=='function')))
+      throw new Error('Invalid OIDC transaction store.');
+    const pending = new WeakMap();
   async function begin() {
     const verifier = oidc.randomPKCECodeVerifier(), state = oidc.randomState(), nonce = oidc.randomNonce();
     const authorization = oidc.buildAuthorizationUrl(configuration, { redirect_uri: callback.href, scope: 'openid email',
       response_type: 'code', code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256', state, nonce });
     const preview = Object.freeze({ ...description, loginId: randomUUID(), authorizationUrl: authorization.href, expiresAt: now() + 300 });
-    pending.set(preview, { verifier, state, nonce });
+    if(store)await store.put({providerKey,loginId:preview.loginId,expiresAt:preview.expiresAt,verifier,state,nonce});
+    else pending.set(preview, { verifier, state, nonce });
     return preview;
   }
   async function complete(preview, returnedUrl) {
-    const record = pending.get(preview);
-    if (!record || preview.expiresAt <= now()) { pending.delete(preview); throw new Error('OIDC login is expired, canceled or consumed.'); }
+    if (!preview || !store&&!pending.has(preview) || preview.expiresAt <= now()) {
+      if(preview)await cancel(preview);
+      throw new Error('OIDC login is expired, canceled or consumed.');
+    }
     let returned;
     try {
+      const expectedState=store?new URL(preview.authorizationUrl).searchParams.get('state'):pending.get(preview).state;
       returned = new URL(returnedUrl);
       if (returned.origin !== callback.origin || returned.pathname !== callback.pathname || returned.hash || returned.username || returned.password
-        || returned.searchParams.getAll('state').length !== 1 || returned.searchParams.get('state') !== record.state) throw new Error();
+        || returned.searchParams.getAll('state').length !== 1 || returned.searchParams.get('state') !== expectedState) throw new Error();
     } catch { throw new Error('OIDC callback does not match this login.'); }
     // Once a matching callback reaches code exchange, a failed/unknown exchange
     // requires a fresh login. Never retry a possibly consumed code implicitly.
-    pending.delete(preview);
+    const record=store?await store.take({providerKey,loginId:preview.loginId,state:returned.searchParams.get('state')}):pending.get(preview);
+    if(!store)pending.delete(preview);
+    if(!record)throw new Error('OIDC login is expired, canceled or consumed.');
     try {
       const tokens = await oidc.authorizationCodeGrant(configuration, returned, { pkceCodeVerifier: record.verifier,
         expectedState: record.state, expectedNonce: record.nonce, idTokenExpected: true });
@@ -105,9 +127,15 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
           email: text(claims.email, 320) ? claims.email : null,
           displayName: accountDisplayName(claims),
         })} : {}),
+        ...(includeOperatorRoles ? {operatorRoles:signedOperatorRoles(claims,clientId)} : {}),
         verifiedAt: now(), issuedAt: claims.iat, expiresAt: Math.min(claims.exp, preview.expiresAt),
         authentication: 'oidc-authorization-code-pkce-s256-id-token-signature', galaxyAuthorization: false });
     } catch { throw new Error('OIDC login verification failed.'); }
   }
-  return Object.freeze({ describe: () => description, begin, complete, cancel: preview => pending.delete(preview) });
+    function cancel(preview) {
+      return store?store.cancel({providerKey,loginId:preview.loginId}):pending.delete(preview);
+    }
+    return Object.freeze({describe:()=>description,begin,complete,cancel,withTransactionStore:next=>operations(next)});
+  }
+  return operations(transactionStore);
 }

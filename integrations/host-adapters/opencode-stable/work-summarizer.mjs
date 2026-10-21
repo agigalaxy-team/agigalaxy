@@ -1,3 +1,5 @@
+import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
+
 const outputSchema = {type: 'object', additionalProperties: false, required: ['title', 'summary', 'outcome'], properties: {
   title: {type: 'string', minLength: 1, maxLength: 180}, summary: {type: 'string', minLength: 1, maxLength: 12000},
   outcome: {type: 'string', enum: ['unknown', 'reported-success', 'reported-failure', 'partial', 'cancelled']}}};
@@ -5,14 +7,16 @@ const outputSchema = {type: 'object', additionalProperties: false, required: ['t
 /** Bounded calls through the public SDK's session.create/prompt APIs execute the
  * user's provider. The original foreground session stays untouched. */
 export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retryDelaysMs = [5000,15000,45000], now = Date.now} = {}) {
+  const diagnostics=nativeDiagnostics('host-client');
   let closed = false;
   const waiting = new Map(), running = new Map(), children = new Set(), executing = new Set(), tasks = new Set();
   const failures = new Map(), latestRequests = new Map(), changedDuringRun = new Set();
   const sdk = api.client?.session;
   const result = response => {if (!response || response.error || !response.data) throw Error('local_work_model_failed'); return response.data;};
-  async function execute(request) {
+  const execute=request=>diagnostics.scope(()=>executeSummary(request),{independent:true});
+  async function executeSummary(request) {
     const {galaxyId, workId, sessionId, model, agent} = request;
-    let child, controller, completed = false,attemptKey;
+    let child, controller, completed = false,attemptKey,startedAt;
     executing.add(workId);
     try {
       const pending = await history.pending({galaxyId, workId, limit: 20});
@@ -23,7 +27,10 @@ export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retry
         if(prior.attempts>retryDelaysMs.length)return;
         if(prior.nextAt>now()){queue(request,prior.nextAt-now());return;}
       }else failures.delete(workId);
+      startedAt=performance.now();
+      diagnostics.emit({event:'host_summary',stage:'summary',outcome:'started',host:'opencode',attempt:(prior?.key===attemptKey?prior.attempts:0)+1});
       if (!sdk?.create || !sdk?.prompt || !model?.providerID || !model?.modelID) {
+        diagnostics.emit({event:'host_summary',stage:'summary',outcome:'deferred',host:'opencode',durationMs:performance.now()-startedAt,error:Error('host_model_execution_unavailable')});
         if(pending.processing?.state!=='model-unavailable')await history.setSummaryState({galaxyId, workId, state: 'model-unavailable', code: 'host_model_execution_unavailable'}); return;
       }
       await history.setSummaryState({galaxyId, workId, state: 'running'});
@@ -68,8 +75,10 @@ export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retry
           execution: {host: 'opencode', sessionId: child, ...(response.info?.id ? {messageId: response.info.id} : {})}});
         completed = true;
         failures.delete(workId);
+        diagnostics.emit({event:'host_summary',stage:'summary',outcome:'succeeded',host:'opencode',durationMs:performance.now()-startedAt});
       } finally {clearTimeout(deadline);}
     } catch (error) {
+      diagnostics.emit({event:'host_summary',stage:'summary',outcome:closed?'cancelled':'failed',host:'opencode',...(startedAt===undefined?{}:{durationMs:performance.now()-startedAt}),error});
       const code = error?.code === 'local_work_summary_revision_conflict' ? 'local_work_summary_revision_conflict'
         : closed ? 'host_model_interrupted' : 'host_model_summary_failed';
       await history.setSummaryState({galaxyId, workId, state: closed ? 'pending' : 'failed', code}).catch(() => {});
@@ -81,9 +90,9 @@ export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retry
       }
     } finally {
       if(child){
-        if((!completed||controller?.signal.aborted)&&sdk?.abort)await sdk.abort({sessionID:child}).catch(()=>{});
+        if((!completed||controller?.signal.aborted)&&sdk?.abort)await sdk.abort({sessionID:child}).catch(error=>diagnostics.emit({event:'host_summary',stage:'shutdown',outcome:'failed',host:'opencode',error}));
         // Failed helper sessions should not clutter ordinary work either.
-        if(sdk?.update)await sdk.update({sessionID:child,time:{archived:now()}}).catch(()=>{});
+        if(sdk?.update)await sdk.update({sessionID:child,time:{archived:now()}}).catch(error=>diagnostics.emit({event:'host_summary',stage:'shutdown',outcome:'failed',host:'opencode',error}));
       }
       if (child) children.delete(child);
       running.delete(workId);
@@ -124,6 +133,7 @@ export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retry
     }
     await Promise.all(stops);
     await Promise.allSettled([...tasks]);
+    diagnostics.emit({event:'host_summary',stage:'shutdown',outcome:'stopped',host:'opencode'});
   }
   return {schedule, close, ownsSession: sessionId => children.has(sessionId)};
 }

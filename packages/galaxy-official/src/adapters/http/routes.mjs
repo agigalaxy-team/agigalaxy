@@ -1,4 +1,9 @@
 import {dispatchExternalCredentials} from './external-credentials-http.mjs';
+import {dispatchOperations} from './operations-http.mjs';
+import {dispatchBusinessAdmin} from './business-admin-http.mjs';
+import {dispatchOperationsBusiness} from './operations-business-http.mjs';
+import {dispatchOperationsProduct} from './operations-product-http.mjs';
+import {dispatchAccountChatGovernance} from './account-chat-governance-http.mjs';
 import {dispatchCommunityForum} from './community-forum-http.mjs';
 import {dispatchReadingBookmarks} from './reading-bookmarks-http.mjs';
 import {dispatchHubs} from './hub-http.mjs';
@@ -23,9 +28,14 @@ import { searchV2QuerySchema, searchV2ReferenceSchema, searchV2Scope } from '../
 import { taskOwnerReadPrepareV2Schema } from '../../shared/task-owner-read-v2-schema.mjs';
 import { taskOwnerControlPrepareV2Schema } from '../../shared/task-owner-control-v2-schema.mjs';
 
-export function createRoutes({ officialAccounts,externalCredentials,accountWork,communityAccounts,readingBookmarks,forum,forumAttachments,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
+export function createRoutes({ operations,businessAdmin,operationsJobs,operationsCommunity,operationsResources,operationsFiles,operationsRules,operationsNotices,operationsRetention,contentPublications,accountChatGovernance,searchIndex,officialAccounts,externalCredentials,accountWork,communityAccounts,readingBookmarks,forum,forumAttachments,forumGovernance,receiptStatus,taskOwnerControl,taskOwnerRead,watchControls,identityGroups,targetGovernance,information,informationWatches,packUses, hubs, peering, trustPackages, qualificationRequests, attachments, outcomeMaterials, configurations, choices, comments, commentGovernance, ciV2, contextV2, contributionSharing, requesterHistoryV2, recruitment, sharedSummaries, experienceReviews, qualificationCalculations, personalMcp, identity, identityControl, publicWrites, verificationRecords, chat, projects, contacts, inbox, summaries, bindings, access, consents, cases, evidence, proofs, history, search, profiles, discovery, assistance, context, notifications, qualification, moderation, honor, capsules, builders, audit, dataExport, deletion, manifest, keyring, docsMcp }) {
   return async function dispatch({ request, response, requestId, url, send,consumeSearchPage=()=>{},recordFailure=async()=>{} }) {
     const route = `${request.method} ${url.pathname}`;
+    if(await dispatchOperations({operations,businessAdmin,operationsJobs,contentPublications,searchIndex,request,response,requestId,url,send}))return;
+    if(await dispatchAccountChatGovernance({accountChatGovernance,officialAccounts,authorizeOperator:operations?.portal?.authorizeOperator,request,response,requestId,url,send}))return;
+    if(await dispatchBusinessAdmin({businessAdmin,authorizeOperator:operations?.portal?.authorizeOperator,request,requestId,url,send}))return;
+    if(await dispatchOperationsBusiness({operationsCommunity,operationsResources,operationsFiles,authorizeOperator:operations?.portal?.authorizeOperator,request,requestId,url,send}))return;
+    if(await dispatchOperationsProduct({rules:operationsRules,notices:operationsNotices,retention:operationsRetention,operations,officialAccounts,request,response,requestId,url,send}))return;
     if(dispatchIdentityReturn({request,response,url}))return;
     if(await dispatchReadingBookmarks({readingBookmarks,officialAccounts,access,request,requestId,url,send,consumeSearchPage}))return;
     if(await dispatchAccountWork({accountWork,officialAccounts,access,request,requestId,url,send}))return;
