@@ -1,9 +1,30 @@
-# Galaxy Official 服务实现
+# Galaxy Hub 业务服务
 
-现有服务承担主体、权限、内容、通信协调、真实工作事实、来源投影与开放接入。产品要求见[完整方案](../../../../../02-architecture/current/GALAXY_COMPLETE_PLAN.md)。
+本组件实现银河的 Hub 业务 API、Worker、持久数据和权限协调。产品关系见[项目概览](../../docs/project-overview.md)及[架构](../../docs/architecture.md)，具体业务接口见[开发 API 目录](../../docs/development-api-reference-v1.md)。
 
-后台自动完成权限检查、来源失效、稳定操作与恢复，消费者向用户提供自然内容与动作。接口字段不能机械转成表单或页面。后续按[重构准备](../../../../../02-architecture/current/RECONSTRUCTION_PLAN.md)核对能力的真实用途，保留有效语义并处理消费者差额。
+## 职责与边界
 
-实现、路由和数据规则以当前源码及匹配版本为事实，版本说明见[技术索引](../../docs/TECHNICAL_REFERENCE_INDEX.md)。EVIDENCE.md、PROOFS.md及IMPLEMENTATION_HISTORY_PRE_CURRENT_2026-09-13.md保留其原有时间与范围，不能据此宣称今天完整上线。
+服务处理主体和设备控制、内容与社区、账户参与、通信协调、工作事实、来源、资料许可及开放接入。程序完成签名、权限、当前来源检查、稳定操作和恢复；模型整理和参与者报告保留其来源，不自动成为独立验证或目标解决。
 
-部署使用目标服务配置、依赖、数据库版本及受限角色，秘密不进入文档和日志。开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。
+PostgreSQL 是业务持久化入口，迁移显式执行；运行 API 不自动修改 schema。API、Worker、migration 与 CMS 使用准确的角色、配置和数据边界。CMS 内容与业务事实分别保存。
+
+## 启动入口与配置
+
+| 入口 | 用途 |
+|---|---|
+| [server.mjs](src/server.mjs) | API 启动、实际配置加载、权限与路由 |
+| [worker.mjs](src/worker.mjs) | 后台持久任务与业务接续 |
+| [migrate.mjs](src/migrate.mjs) | 显式数据库迁移及所选角色配置 |
+| [database.mjs](src/database.mjs) | 连接、事务和迁移规则 |
+| [runtime-environment.mjs](src/runtime-environment.mjs) | 环境、数据库与签名材料路径约束 |
+| [deploy](deploy) / [scripts](scripts) | Linux、代理、消息、监控、备份及运行工具 |
+
+当前服务开发要求 Node.js 24.13+。根 setup 安装本组件锁定依赖。服务运行还需要 PostgreSQL、目标环境、受信签名材料、准确 HTTPS 地址及所用业务配置，不是仅运行 npm start 即可得到完整新实例。
+
+详见[部署指南](../../docs/deployment.md)、[运行环境](../../docs/runtime-environments.md)、[Linux 准备](../../docs/linux-deployment-v1.md)。认证、Prosody、文件存储、扫描器和管理 OIDC 按启用功能分别接线。
+
+## 验证与运行
+
+按受影响代码使用[开发检查](../../docs/development-checks.md)。隔离 PGlite、合成 OIDC 或测试消息传输只能证明对应范围；实际 PostgreSQL、邮件、Prosody、S3、ClamAV 与模型需相应环境。
+
+健康和就绪读取说明有限状态，不能代替业务流程。EVIDENCE.md、PROOFS.md 与早期实现历史保留其时间和范围，不用其中旧通过记录声明当前全站状态。当前版本差额见[项目状态](../../docs/project-status.md)。

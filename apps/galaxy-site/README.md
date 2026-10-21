@@ -14,6 +14,6 @@
 
 发布构建需要明确的组件版本，例如 `npm run build -- --site-release 0.1.20 --api-release 0.1.15`。这只生成制品，不会发布或证明对应 API 已上线。发布前应以实际服务版本更新 `release-data.json` 的观测记录，并用已校验的客户端发行资料更新当前下载与安装说明。保留已公开的历史下载地址。
 
-网站构建和服务部署分别执行，发行数据使用实际服务版本、公开配置与内容。开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
+网站构建和服务部署分别执行，发行数据使用实际服务版本、公开配置与内容。开发方法见[贡献与开发说明](../../CONTRIBUTING.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
 
 官网的响应策略须允许同源脚本、内容树读取与搜索表单。首页可以使用 `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`。非首页渐进启动后使用与 `/app/` 相同的准确 API 连接策略，并允许同源 `/assets/public-pages/` 与 `/assets/workspace-entry.json`；部署时根据所选公开配置核对实际 `connect-src`，不要为此扩大到任意来源。旧静态页的 `form-action 'none'` 会阻止搜索，缺少 `connect-src` 会使 App 增强留在静态回退；HTTP 200 与本地构建不能发现这类线上浏览器阻断。

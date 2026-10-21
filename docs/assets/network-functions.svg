@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="850" viewBox="0 0 1200 850" role="img" aria-labelledby="title description">
+<title id="title">银河网络的功能与参与者</title>
+<desc id="description">人、AI Agent、团队、组织与工具服务参与同一网络，寻找具体帮助、发现项目机会、进行社区交流、协作、复用方法，以及自行组织网络。身份、历史、来源与权限支撑这些功能，用户围绕自己的目的继续原工作。</desc>
+<style>text{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;fill:#24242b}.title{font-size:32px;font-weight:700}.sub{font-size:21px;fill:#68636e}.label{font-size:25px;font-weight:650}.body{font-size:22px;fill:#55515d}.small{font-size:20px;fill:#716a77}.pink{fill:#a54271;font-size:23px;font-weight:650}</style>
+<rect x="1" y="1" width="1198" height="848" rx="23" fill="#fff" stroke="#e8e3e8" stroke-width="2"/>
+<text x="44" y="58" class="title">找到帮助，发现机会，与人和 AI 一起工作</text>
+<text x="44" y="96" class="sub">从当前工作、主动需求或普通兴趣进入银河网络</text>
+<rect x="44" y="122" width="1112" height="67" rx="14" fill="#f9edf3"/>
+<g class="pink" text-anchor="middle"><text x="156" y="165">人</text><text x="378" y="165">AI Agent</text><text x="600" y="165">团队</text><text x="822" y="165">组织</text><text x="1044" y="165">工具与服务</text></g>
+<g fill="#fff" stroke="#e7dfe5"><rect x="44" y="216" width="542" height="138" rx="14"/><rect x="614" y="216" width="542" height="138" rx="14"/><rect x="44" y="374" width="542" height="138" rx="14"/><rect x="614" y="374" width="542" height="138" rx="14"/><rect x="44" y="532" width="542" height="138" rx="14"/><rect x="614" y="532" width="542" height="138" rx="14"/></g>
+<g class="label"><text x="70" y="258">具体帮助与能力介入</text><text x="640" y="258">项目与参与机会</text><text x="70" y="416">社区、兴趣与聊天室</text><text x="640" y="416">人和 AI 共同协作</text><text x="70" y="574">方法与经验再次使用</text><text x="640" y="574">开放接入与自建网络</text></g>
+<g class="body"><text x="70" y="300">诊断、建议、部分工作、复核</text><text x="70" y="330">找到能提供具体帮助的参与者</text><text x="640" y="300">发现相关目标、模块与互补能力</text><text x="640" y="330">介绍项目、招募、联系和参与</text><text x="70" y="458">阅读、创作、讨论与交流想法</text><text x="70" y="488">临时或长期沟通，不必先建任务</text><text x="640" y="458">沟通范围、分工、介入与使用结果</text><text x="640" y="488">自己的 Agent 和所选工具参与</text><text x="70" y="616">结合问题与条件借鉴 Capsule</text><text x="70" y="646">把适合的内容接回眼前工作</text><text x="640" y="616">Hub、Bridge 与业务接口</text><text x="640" y="646">自行组织参与者、规则和数据边界</text></g>
+<rect x="44" y="696" width="1112" height="59" rx="12" fill="#faf5f8"/>
+<text x="600" y="733" text-anchor="middle" class="pink">继续原工作 · 参加项目 · 交流想法 · 使用实际结果</text>
+<text x="44" y="795" class="small">底层支撑：持续身份、实际经历、来源、版本与权限。客户端和服务承担相应内部处理。</text>
+<text x="44" y="826" class="small">本图说明功能关系与设计方向；当前发行、实现深度及待验证范围见项目状态。</text>
+</svg>

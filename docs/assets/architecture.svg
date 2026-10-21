@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title description">
+<title id="title">银河五层职责与接入</title>
+<desc id="description">网页、自己的 AI 和本地客户端共享采集、解决、证据生产、核心及信息服务职责。五层是责任划分，不要求部署为五个独立服务。</desc>
+<style>text{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;fill:#24242b}.title{font-size:32px;font-weight:700}.sub{font-size:21px;fill:#676673}.label{font-size:25px;font-weight:650}.body{font-size:22px;fill:#53525e}.en{font-size:18px;fill:#817785}.number{font-size:22px;fill:#a74272;font-weight:650}.small{font-size:20px;fill:#676673}</style>
+<rect width="1200" height="900" rx="24" fill="#fff"/>
+<rect x="1" y="1" width="1198" height="898" rx="23" fill="none" stroke="#e8e3e8" stroke-width="2"/>
+<text x="44" y="59" class="title">同一网络，五类职责</text>
+<text x="44" y="96" class="sub">保留真实来源、当前权限与实际结果</text>
+<g fill="#faf5f8" stroke="#eddae4">
+<rect x="44" y="127" width="358" height="65" rx="12"/><rect x="421" y="127" width="358" height="65" rx="12"/><rect x="798" y="127" width="358" height="65" rx="12"/>
+</g>
+<g class="body" text-anchor="middle"><text x="223" y="169">网页与在线账户</text><text x="600" y="169">自己的 AI 与宿主</text><text x="977" y="169">本地银河客户端</text></g>
+<g stroke="#dbc6d3" stroke-width="2" fill="none"><path d="M223 192v20h754v-20M600 192v35"/></g>
+<g fill="#fff" stroke="#e4e0e5"><rect x="44" y="227" width="1112" height="96" rx="12"/><rect x="44" y="335" width="1112" height="96" rx="12"/><rect x="44" y="443" width="1112" height="96" rx="12"/><rect x="44" y="551" width="1112" height="96" rx="12"/><rect x="44" y="659" width="1112" height="96" rx="12"/></g>
+<g fill="#f8eaf1"><circle cx="85" cy="275" r="22"/><circle cx="85" cy="383" r="22"/><circle cx="85" cy="491" r="22"/><circle cx="85" cy="599" r="22"/><circle cx="85" cy="707" r="22"/></g>
+<g class="number" text-anchor="middle"><text x="85" y="283">1</text><text x="85" y="391">2</text><text x="85" y="499">3</text><text x="85" y="607">4</text><text x="85" y="715">5</text></g>
+<g class="label"><text x="124" y="269">采集</text><text x="124" y="377">解决</text><text x="124" y="485">证据生产</text><text x="124" y="593">核心</text><text x="124" y="701">信息服务</text></g>
+<g class="en"><text x="124" y="300">Acquisition / Capture</text><text x="124" y="408">Resolution</text><text x="124" y="516">Evidence Production</text><text x="124" y="624">Core</text><text x="124" y="732">Information Services</text></g>
+<g class="body"><text x="407" y="270">获准的工作事件、材料与主要环境</text><text x="407" y="300">实际观察和模型整理分别保留</text><text x="407" y="378">阅读背景、找方法、联系与协作</text><text x="407" y="408">人与自己的 AI 使用获准工具继续工作</text><text x="407" y="486">尝试、介入、输出、检查与实际结果</text><text x="407" y="516">有限交付与整体目标解决分别记录</text><text x="407" y="594">稳定身份、控制、历史与可复用方法</text><text x="407" y="624">保留出具者、来源、版本和使用范围</text><text x="407" y="702">发现、查询、阅读、比较与变化关注</text><text x="407" y="732">按当前权限取得信息</text></g>
+<rect x="44" y="783" width="1112" height="74" rx="12" fill="#f8f8fa"/>
+<text x="66" y="813" class="small">实现载体：Core / Node / Native · Web · Hub API / Worker · 协议与外部服务适配</text>
+<text x="66" y="842" class="small">职责图不等于部署清单；具体可用范围以组件、发行与实际验证为准。</text>
+</svg>

@@ -1,7 +1,13 @@
 # Official发布切换与恢复流程：资料入口
 
-相应版本的接口、配置及实现记录见[历史技术说明](../../../../02-architecture/archive-ui-20261009/implementation/repo--release-cutover-runbook.md)。
+相应版本的接口、配置及实现记录见历史技术说明（维护工作区资料，未随源码分发）。
 
-本主题现行要求：[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md)。相关界面与操作遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)。
+本主题现行要求：[部署与运行](deployment.md)、[开发与验证](development.md)。相关界面与操作遵循[产品原则与能力边界](project-overview.md)。
 
-开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](development-checks.md)。
+开发方法见[贡献与开发说明](../CONTRIBUTING.md)，工具入口见[开发检查参考](development-checks.md)。
+
+## 外置历史参考
+
+这些引用的正文保存在维护工作区，不在当前 Git 仓库内。当前可读入口：[文档目录](README.md)、[架构](architecture.md)、[项目状态](project-status.md)。旧运行记录不作为当前环境或功能验收依据。
+
+<!-- Workspace reference retained: 历史技术说明 | ../../../../02-architecture/archive-ui-20261009/implementation/repo-&#45;release-cutover-runbook.md -->

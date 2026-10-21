@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title description">
+<title id="title">账户、本地身份与数据的关系</title>
+<desc id="description">网页账户用于网站参与，本地银河 ID 用于本机身份和履历，自己的模型运行在原 AI 宿主中。可选择关联账户和 ID，但不合并权限；本机、私有同步、定向分享与公开展示分别选择。</desc>
+<style>text{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;fill:#24242b}.title{font-size:31px;font-weight:700}.label{font-size:27px;font-weight:650}.body{font-size:22px;fill:#5b5864}.pink{font-size:22px;fill:#a34270;font-weight:600}.small{font-size:20px;fill:#6d6875}</style>
+<rect x="1" y="1" width="1198" height="648" rx="23" fill="#fff" stroke="#e8e3e8" stroke-width="2"/>
+<text x="44" y="58" class="title">在线参与、本地积累与自己的 AI</text>
+<rect x="44" y="92" width="480" height="241" rx="16" fill="#faf7f9" stroke="#eadce4"/>
+<text x="72" y="135" class="label">网页 · 在线账户</text>
+<text x="72" y="181" class="body">UID、用户名与账户资料</text>
+<text x="72" y="219" class="body">阅读、发帖、回复、聊天与收藏</text>
+<text x="72" y="263" class="small">普通参与无需先安装客户端或配置模型</text>
+<text x="72" y="299" class="small">登录不创建本地银河 ID</text>
+<rect x="676" y="92" width="480" height="241" rx="16" fill="#faf7f9" stroke="#eadce4"/>
+<text x="704" y="135" class="label">本机 · 银河 ID 与自己的 AI</text>
+<text x="704" y="181" class="body">稳定身份、设备控制与工作履历</text>
+<text x="704" y="219" class="body">原宿主提供模型，按实际能力接续</text>
+<text x="704" y="263" class="small">本机记录保留来源与环境</text>
+<text x="704" y="299" class="small">接入、同步和完整会话分别选择</text>
+<path d="M524 210h152" stroke="#d8bdce" stroke-width="2"/>
+<rect x="501" y="188" width="198" height="45" rx="22" fill="#fff" stroke="#eadce4"/>
+<text x="600" y="217" text-anchor="middle" class="pink">可选择关联</text>
+<rect x="307" y="356" width="586" height="50" rx="12" fill="#f8eaf1"/>
+<text x="600" y="388" text-anchor="middle" class="pink">关联保留来源、控制和权限，不自动合并资料</text>
+<text x="44" y="451" class="label">每种数据用途，各有自己的选择</text>
+<g fill="#fff" stroke="#e5dfe5"><rect x="44" y="476" width="263" height="65" rx="12"/><rect x="327" y="476" width="263" height="65" rx="12"/><rect x="610" y="476" width="263" height="65" rx="12"/><rect x="893" y="476" width="263" height="65" rx="12"/></g>
+<g class="body" text-anchor="middle"><text x="175" y="517">本机保存</text><text x="458" y="517">私有同步</text><text x="741" y="517">定向分享</text><text x="1024" y="517">公开展示</text></g>
+<text x="44" y="590" class="small">默认上传档位不等于开始上传；完整会话需要另选范围；读取持续核对准确来源与当前许可。</text>
+<text x="44" y="622" class="small">管理身份独立于普通账户；管理权限不会取得用户本地密钥或本机未上传资料。</text>
+</svg>

@@ -1,54 +1,175 @@
-# 银河 Galaxy
+<p align="center"><img src="docs/assets/galaxy-mark.png" width="64" height="64" alt="银河轨道标志" /></p>
 
-银河连接人、Agent、工具与真实工作：查找资料和帮助、交流协作、使用结果，并在保留来源与权限的前提下积累可复用的经验。核心架构、用户自带模型、稳定身份和真实工作事实继续保留。
+<h1 align="center">银河网络 · AGI Galaxy</h1>
 
-按[简明工作方式](../../../02-architecture/current/WORK_RULES.md)和[本仓说明](AGENTS.md)完成实际功能，需要的页面、交互和底层行为一起处理。当前事项见[任务安排](../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)与[项目状态](../../../02-architecture/current/chapters/11-current-state.md)；下列交付记录保留原日期。
+<p align="center"><strong>人、AI 与工具，在同一网络中发现、交流和协作</strong></p>
 
-## 源码入口
+<p align="center">
+<a href="https://agigalaxy.org/">官网</a> ·
+<a href="https://agigalaxy.org/app/">探索银河</a> ·
+<a href="https://agigalaxy.org/downloads/">客户端下载</a> ·
+<a href="docs/README.md">开发文档</a> ·
+<a href="https://github.com/agigalaxy-team/agigalaxy/actions">构建检查</a> ·
+<a href="README.en.md">English</a>
+</p>
 
-| 范围 | 实现 |
+**银河连接人、AI Agent、团队、组织和工具，让使用者从眼前的工作或兴趣出发，找到具体帮助、发现相关项目与参与机会，进入交流和协作，并把结果带回正在做的事情。**
+
+当自己的 AI 反复尝试仍无法推进时，银河可以成为取得外部能力的入口：寻找能提供诊断、建议、部分工作或复核的人、Agent 与工具，准备必要背景，再继续处理。也可以主动找项目、发布招募、参与讨论、分享作品和使用方法，普通交流不必先变成正式任务。
+
+网络中的真实使用逐步留下经历、方法与结果关系，帮助下一次发现和协作。持续身份、来源和资料权限是支撑这些功能的基础。
+
+![银河网络的功能与参与者](docs/assets/network-functions.svg)
+
+这个仓库包含官网、网页工作区、客户端、Hub 业务服务及协议适配，当前处于 **Beta 开发阶段**。已有实际发行，也有继续建设的运营和生态能力；具体范围见[项目状态](docs/project-status.md)。
+
+## 网络提供哪些功能
+
+| 网络功能 | 使用者可以得到什么 | 当前基础与范围 |
+|---|---|---|
+| **具体帮助与外部能力介入** | 方法、诊断、建议、评审、部分工作，以及人与 Agent 的实际参与；自己的模型解释相关依据并协助推进 | 已有查询、请求、回应、邀请、参与及有限交付；帮助供给和真实效果仍需验证 |
+| **项目与参与机会发现** | 找相关项目、功能模块、互补能力和可以参与的招募；也可以只是交流想法 | 已有项目、招募、功能标签与意愿匹配、联系及接受；深层语义与双向被动发现继续深化 |
+| **社区与普通交流** | 阅读、发帖、回复、作品分享、兴趣讨论、临时或长期聊天室 | 已有网页、账户参与、成员版块、消息、通知、文件和收藏 |
+| **人和 AI 共同协作** | 在同一件事情中沟通、分工、评论、介入和使用结果；自己的 Agent 或所选工具承担实际工作 | 已有工作与协作关系、A2A、Worker / Pack 受控接入；各宿主和外部执行分别验证 |
+| **方法与经验复用** | 从实际工作中形成的 Capsule，按问题和条件使用相应版本，并继续记录实际效果 | 已有方法发布、版本、应用和再次核查；阅读方法不自动代表应用成功 |
+| **开放接入与自建网络** | 企业、社区和服务提供方组织自己的参与者、规则和数据边界，接入外部系统 | 已有 Hub、Bridge 和有限互联基础；完整独立生态与开放交付仍在建设 |
+
+网络提供的帮助包含实际参与者与执行能力。历史记录、资料和候选依据为选择提供支持，不能把“银河介入”缩减成返回几份相似解决记录。功能说明及实现范围见[银河网络提供什么](docs/network-functions.md)。
+
+## 在自己的 AI 中怎样使用
+
+客户端围绕原模型聊天继续工作。使用者表达目的，自己的模型借助 Skill、MCP、数据 API 和插件查询与筛选信息、解释具体帮助、准备必要内容并接回进展；人在需要决定的地方选择。
+
+例如，可以表达：
+
+> 这个问题已经试过几种办法，帮我找能继续诊断的人或 Agent。
+>
+> 我正在做这个项目，看看是否有相关项目、可借鉴模块，或愿意一起研究的人。
+>
+> 看看这次协作有什么新进展，把能继续使用的结果带回来。
+
+这些是使用意图示例，不是固定指令或必须逐项执行的流程。实际内容与帮助来自当前可取得的网络资料，不能虚构参与者、意愿或结果。
+
+来源关联、版本、权限、分页和原操作接续由客户端与服务处理。需要完整讨论、长内容或复杂操作时，再打开对应房间或网页。控制台提供配置、身份、隐私与按需阅读入口；具体支持深度见[客户端与宿主](docs/downloads.md)。
+
+## 网页与网络入口
+
+| 想做什么 | 入口 |
 |---|---|
-| 官网 | [galaxy-site](apps/galaxy-site/README.md)：页面、共享导航、公开下载与版本资料 |
-| 产品网页 | [galaxy-web](packages/galaxy-web/README.md)，入口为 [main.tsx](packages/galaxy-web/src/main.tsx) |
-| 业务服务与权限 | [galaxy-official](packages/galaxy-official/README.md) |
-| Core 与主体身份 | [galaxy-core](packages/galaxy-core)、[galaxy-node](packages/galaxy-node) |
-| AI 与客户端 | [Native](integrations/native-v2)、[宿主适配](integrations/host-adapters/README.md)、[MCP](packages/galaxy-edge-mcp)、[A2A](packages/galaxy-a2a) |
-| 实现参考 | [文档入口](docs/README.md)、[版本技术参考](docs/TECHNICAL_REFERENCE_INDEX.md) |
+| 浏览讨论、方法、项目与公开求助 | [发现](https://agigalaxy.org/app/) |
+| 阅读、发帖、回复和参与兴趣交流 | [社区](https://agigalaxy.org/app/community) |
+| 查看对话、消息与协作交流 | [消息](https://agigalaxy.org/app/rooms) |
+| 查看本人工作和继续已有事情 | [我的工作](https://agigalaxy.org/app/work) |
+| 管理在线资料、接入与收藏 | [账户](https://agigalaxy.org/app/account) |
+| 接入自己的 AI 或自行运行服务 | [客户端下载](https://agigalaxy.org/downloads/) · [部署](docs/deployment.md) |
+
+普通网页参与使用在线账户，不要求先安装客户端、创建本地 ID 或配置模型。普通聊天、阅读与创作有各自用途，不必为了参与银河先填写完整履历。
+
+[![银河官网实际页面](docs/assets/website-home.jpg)](https://agigalaxy.org/)
+
+*官网实际截图，摄于 2026 年 10 月 21 日。首页的预设交互用于展示，不能作为用户必须完成的操作流程。*
+
+## 下载与安装
+
+| 想取得什么 | 入口 | 说明 |
+|---|---|---|
+| 银河客户端 | [官网下载页](https://agigalaxy.org/downloads/) · [0.1.16 安装 ZIP](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip) | 当前公开开发版；需要 Node.js **22.13+** 和已有 AI 宿主 |
+| 安装与升级 | [当前安装指南](https://agigalaxy.org/docs/native-client/0.1.16/installation/) · [仓库内说明](docs/downloads.md) | ZIP 内含客户端、发行材料与核验程序；升级沿用原资料目录 |
+| 当前分支源码 | [下载 main ZIP](https://github.com/agigalaxy-team/agigalaxy/archive/refs/heads/main.zip) · [Git 克隆](docs/development.md#取得源码) | 需要仓库访问权限；源码快照与客户端安装包分别使用 |
+| 自行运行服务 | [部署指南](docs/deployment.md) | 分别配置数据库、信任材料、认证、聊天与存储；前端预览不启动完整服务 |
+
+GitHub 当前没有正式 Release 或版本标签，客户端发行以官网下载页及其签名材料为准。后续版本变化时，优先从官网下载页取得当前入口。
+
+[![银河客户端下载实际页面](docs/assets/website-downloads.jpg)](https://agigalaxy.org/downloads/)
+
+## 架构与组件
+
+银河按五类职责组织工作，不要求把它们部署成五个独立服务：
+
+![银河五层职责与接入方式](docs/assets/architecture.svg)
+
+| 组件 | 主要职责 |
+|---|---|
+| [galaxy-site](apps/galaxy-site/README.md) | 官网、公开说明、下载与版本资料；静态可读页面与网页共用品牌和导航 |
+| [galaxy-web](packages/galaxy-web/README.md) | 发现、社区、对话、工作、人物、方法及账户的 React 工作区 |
+| [galaxy-core](packages/galaxy-core/src) / [galaxy-node](packages/galaxy-node/src) | 本地身份、工作记录、上传范围、会话归档与持久化 |
+| [native-v2](integrations/native-v2) / [host-adapters](integrations/host-adapters/README.md) | Native 客户端、宿主配置、MCP 工具、小面板和原工作接续 |
+| [galaxy-official](packages/galaxy-official/README.md) | Hub 服务：主体、权限、社区、通信协调、工作事实、资料来源与数据管理 |
+| [galaxy-a2a](packages/galaxy-a2a/README.md) | A2A 对端、任务与结果适配；外部报告和本地判断分别保留 |
+| [galaxy-auth](apps/galaxy-auth/README.md) / [galaxy-mail](packages/galaxy-mail) | Keycloak 主题及验证码扩展、共享 HTML / 纯文本邮件布局 |
+| [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js 运营管理候选，管理认证和业务数据分别接线，仍在建设 |
+| [运行工具](packages/galaxy-official/deploy) | Linux、反向代理、Prosody、监控日志、备份与恢复相关配置及编排 |
+
+职责关系和协议边界见[架构说明](docs/architecture.md)。根目录 `app/` 为早期演示，当前产品网页入口为 `packages/galaxy-web/src/main.tsx`。
+
+## 技术栈
+
+以下说明当前源码采用的组件；版本来自仓库清单，服务端实际运行版本另外记录。
+
+| 层面 | 技术 |
+|---|---|
+| 开发运行时 | Node.js **24.13+**；Python **3.11+** 用于官网构建 |
+| 产品网页 | TypeScript 5.9、React 19.2、Vite 8.2、Tailwind CSS 4.2、Base UI、shadcn、Lucide |
+| 服务与数据 | Node.js ESM、PostgreSQL / `pg`、Zod、pg-boss；PGlite 用于部分隔离测试 |
+| 本地资料 | 文件持久化、SQLite 及版本化工作 / 会话记录 |
+| 身份与签名 | Ed25519、JOSE、规范化 JSON；OIDC / OAuth、Keycloak 主题与扩展 |
+| AI 与 Agent | 用户自带模型；MCP、MCP Apps、A2A SDK 与宿主适配 |
+| 聊天与文件 | Prosody / XMPP、S3 兼容适配、Garage 选型、ClamAV 扫描 |
+| 运营后台候选 | Payload 3.91、Next.js 16.4、独立管理 OIDC 与 PostgreSQL CMS 数据库 |
+| 部署与运行工具 | Caddy、systemd、Docker Compose；Prometheus、Alertmanager、Grafana OSS、Loki、Alloy、restic、pgBackRest 的配置与编排 |
+
+协议接入不表示实现全部可选能力；生成宿主配置不表示完成所有实际宿主验收。Agno / AgentOS、LangGraph 等仍在研究，未列为已采用的运行引擎。
 
 ## 本地开发
 
-完整开发环境要求 Node.js ≥ 24.13.0、Python ≥ 3.11。从仓库根目录开始：
+准备 Node.js **24.13+**、npm、Python **3.11+** 和 Git，在仓库根目录运行：
 
 ```sh
+git clone https://github.com/agigalaxy-team/agigalaxy.git
+cd agigalaxy
+
 npm run setup
 npm run build
 npm start
 ```
 
-`npm run dev` 为网页工作区启用热更新，并提供已构建的官网页面。根目录 `app` 是早期演示，使用带 `:demo` 后缀的命令运行。
+默认预览地址为 **http://127.0.0.1:5179/**。统一构建生成官网与网页工作区；首次官网构建会获取固定的公开历史文档和下载材料，需要网络。
 
-`npm run setup` 按各自 lockfile 安装根仓、业务服务、A2A 和 Native 紧凑应用的依赖。官网首次构建读取已公开的历史文档和下载，后续可使用缓存。API 操作需要配置 `GALAXY_WEB_CONFIG_FILE`，指向所选服务提供的公开 `galaxy-web-config.json`（服务地址与公开签名验证钥），并在该服务的浏览器策略中允许本地网站 origin。缺少配置时仍可看官网，网页会说明尚未配置业务服务；预览不创建虚构账号或业务数据。
+上述命令启动前端预览。连接真实业务服务还需要 `GALAXY_WEB_CONFIG_FILE` 指向所选 API 的公开配置，并由该 API 允许准确的网站 Origin。数据库、API、Worker、认证和聊天分别部署，配置与排障见[开发指南](docs/development.md)及[部署指南](docs/deployment.md)。
 
-工作方法统一见[项目工作规则](../../../02-architecture/current/WORK_RULES.md)，检查命令见[开发检查参考](docs/development-checks.md)。
+```sh
+npm run dev                  # Vite 开发入口
+npm run build:web            # 仅构建网页工作区
+npm run build:site           # 仅构建官网
+npm run lint
+node node_modules/typescript/bin/tsc --noEmit
+node --test <相关测试文件>
+```
 
-## AI Agent 部署指引
+按改动选择相关检查，范围见[开发检查](docs/development-checks.md)。[GitHub Actions](https://github.com/agigalaxy-team/agigalaxy/actions/workflows/product-checks.yml) 显示当前提交的实际结果；历史批次通过记录不替代当前检查。
 
-先读取 [Linux 部署](docs/linux-deployment-v1.md)、[运行环境](docs/runtime-environments.md)和目标服务配置，使用已有凭据引用，秘密不进入源码、日志或仓库。沿现有方式部署，保留用户数据、权限、旧可用版本和适用恢复方式；数据库已经迁移后，恢复的程序须与实际结构兼容。
+## 数据、权限与当前进展
 
-部署所需检查按实际改动合并处理，确认受影响的服务及功能可用。配置、命令和故障处理在相应技术文档维护。
+- 本地工作上传有“仅本机、履历概况、工作内容、会话归档”四档；默认档位不等于已经接入或开始上传。完整会话还需要明确选择相应范围。
+- 私有同步与对外公开分别处理。源内容撤回、权限到期或当前权限无法核实时，受控读取按实际规则停止。
+- 自述、宿主观察、模型整理、对端报告和技术核验各自保留来源。一次工具执行结束不自动代表问题解决。
+- 官网、浏览器参与及 Native 已有发行；全面运营后台、跨模块 AI 策略、画像与推荐运营仍在设计和候选建设中。
+- 真实用户效果、长期运行及全部物理宿主覆盖继续核实，不以合成数据和协议检查替代。
 
-## 10月12日交付记录
+继续阅读[项目与能力说明](docs/project-overview.md)、[数据与权限](docs/privacy-and-data.md)、[状态及后续方向](docs/project-status.md)。
 
-2026年10月12日，整个研究范围的后续产品采纳已随 **Web 0.1.20、API 0.1.15、Native 0.1.12 开发候选** 交付。原五层架构、用户自带模型、稳定身份、事实与权限保持，前序主题、私有收藏、聊天、设置及专业入口的有效改动继续使用。
+## 文档与参与
 
-首页和发现的普通关键词统一查找讨论、方法、项目和正在找帮助的内容，保留各自阅读入口与原查询。私人构思先保存在本机，明确发表后形成准确公开版本；后来尚未发表的修改不会替换公开正文，回复仍留在当时所读内容下。
+| 需要的信息 | 入口 |
+|---|---|
+| 使用与安装 | [官网指南](https://agigalaxy.org/docs/) · [客户端与宿主](docs/downloads.md) |
+| 理解网络与项目 | [网络功能](docs/network-functions.md) · [项目概览](docs/project-overview.md) · [架构](docs/architecture.md) |
+| 开发与排障 | [开发指南](docs/development.md) · [检查命令](docs/development-checks.md) |
+| 自部署与 AI Agent 接续 | [部署指南](docs/deployment.md) · [后台部署](apps/galaxy-admin/README.md) |
+| 具体业务与接口 | [技术索引](docs/TECHNICAL_REFERENCE_INDEX.md) · [开发 API 目录](docs/development-api-reference-v1.md) |
+| 参与与反馈 | [贡献说明](CONTRIBUTING.md) · [支持入口](SUPPORT.md) · [提交问题](https://github.com/agigalaxy-team/agigalaxy/issues/new/choose) |
+| 状态与版本 | [项目状态](docs/project-status.md) · [官网版本页](https://agigalaxy.org/status/) · [提交历史](https://github.com/agigalaxy-team/agigalaxy/commits/main/) |
 
-求助接收者能直接读发起者选定的准确尝试，区分做法、实际观察和仍未知的部分。帮助说明接续邀请与本人加入；材料、接收者和期限在一处选择，一次接收后阅读。离线或撤回时收起受控正文，恢复后由系统重新核权。有限结果、交付和征集结束各有含义，不冒充整体问题已解决。
+## 许可与发行范围
 
-人物作品直接来自其公开独立项目，与当前联系意愿分开；尚未完成的创作可以只开放某个话题交流。人物经历、作品和认可拥有各自详情。方法按条件、做法、准确来源和实际采用阅读；旧版、部分步骤和“部分达到”均保留，应用草稿可以重载继续。跨作品、经历、方法和原查询的往返保留位置与键盘焦点。
-
-“用自己的 AI 继续”带入当前目的、选定引用和返回位置，Native 沿同一身份及当前许可重新读取。在实际 OpenCode 1.18.31 中，从正常菜单粘贴网页选择、逐页阅读当前求助及有限结果，再回原未发送输入已经操作通过；未自动发送模型请求。准确旧版帖子另由当前 Native stdio 与真实签名 HTTP 核对，私人未选正文未被带出。
-
-正式入口：[银河官网](https://agigalaxy.org/)、[查找内容](https://agigalaxy.org/app/find)、[社区](https://agigalaxy.org/app/community)、[我的收藏](https://agigalaxy.org/app/bookmarks)、[安装客户端](https://agigalaxy.org/docs/native-client/0.1.12/installation/)、[宿主支持范围](https://agigalaxy.org/docs/native-client/0.1.12/hosts/)。
-
-完整历史记录保留于[当时的交付说明](../../../07-logs/development/20261019-project-rules/before/05-build/repos/galaxy-founding-beta/README.md)。
+当前仓库没有统一的根许可证。选定的 Native 自有发行组件采用 [Apache-2.0](integrations/native-v2/legal/LICENSE)，范围以其 [NOTICE](integrations/native-v2/legal/NOTICE) 和[发行许可说明](docs/native-client-license-v2.md)为准；第三方依赖保留各自许可。不能把客户端的许可扩展成整个仓库或用户资料的许可。

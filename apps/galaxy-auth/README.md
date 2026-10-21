@@ -90,6 +90,6 @@ Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'
 
 部署目标和凭据引用从实际配置及项目资产路由取得；原始秘密不进入 workspace、命令参数、输出或报告。生产写入和外部邮件使用实际获准的数据范围，调试记录不保存 Cookie、邮件 token、authorization code、state、nonce、verifier 或用户密码。
 
-开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
+开发方法见[贡献与开发说明](../../CONTRIBUTING.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
 
 上游主题使用方法见 [Keycloak themes](https://www.keycloak.org/ui-customization/themes)。本主题源头及改动说明见 `NOTICE`；上游许可副本见 `licenses/KEYCLOAK-APACHE-2.0.txt`。

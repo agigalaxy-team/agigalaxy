@@ -1,0 +1,99 @@
+# 开发与本地运行
+
+[文档目录](README.md) · [架构](architecture.md) · [部署](deployment.md) · [检查](development-checks.md)
+
+## 取得源码
+
+默认分支为 `main`。当前仓库为私有仓库，Git 克隆、源码 ZIP 和 Issues 需要对应访问权限。认证使用自己的 GitHub 凭据管理器或既有 HTTPS / SSH 机制，不把令牌写入克隆 URL。
+
+```sh
+git clone https://github.com/agigalaxy-team/agigalaxy.git
+cd agigalaxy
+```
+
+[main 源码 ZIP](https://github.com/agigalaxy-team/agigalaxy/archive/refs/heads/main.zip)用于阅读和开发；AI 宿主中的客户端安装使用[官网下载](downloads.md)，二者分别发行。
+
+## 环境与依赖
+
+| 范围 | 要求 |
+|---|---|
+| 完整仓库开发、API、A2A、管理端 | Node.js 24.13+，使用对应 package-lock.json |
+| 官网构建 | Python 3.11+；根构建脚本发现本机 Python |
+| 已发行 Native 客户端 | 随包要求为 Node.js 22.13+，不要与完整开发门槛混淆 |
+| 业务运行 | PostgreSQL、准确服务配置与信任材料；按功能增加认证、聊天、对象存储和扫描器 |
+| 浏览器观察 | 使用任务隔离的无头浏览器与合成资料，避免复用个人浏览器状态 |
+
+根目录 `npm run setup` 顺序安装根依赖、`packages/galaxy-official`、`packages/galaxy-a2a` 和 `integrations/native-v2/compact-app` 的锁定依赖。它不安装独立管理应用，也不启动服务器或创建数据库。
+
+## 官网与网页工作区
+
+```sh
+npm run setup
+npm run build
+npm start
+```
+
+打开 **http://127.0.0.1:5179/**。预览服务器只监听本机，默认端口可由 `GALAXY_PREVIEW_PORT` 选择。`npm run build` 先生成 Web，再把相应入口交给官网，输出分别位于：
+
+- `packages/galaxy-web/dist`
+- `apps/galaxy-site/dist`
+
+首次官网构建会获取固定的公开历史文档和下载文件，并使用被 Git 忽略的缓存。已有缓存可以使用官网构建参数 `--offline`；全新克隆没有缓存时不能宣称可完全离线构建。
+
+只处理某部分时使用：
+
+```sh
+npm run dev
+npm run build:web
+npm run build:site
+```
+
+统一构建入口是 [build-product.mjs](../scripts/build-product.mjs)，预览与公开配置入口是 [serve-product.mjs](../scripts/serve-product.mjs)。根 `app/` 与 `dev:demo`、`build:demo` 等脚本属于早期演示。
+
+## 连接实际 API
+
+前端预览不启动完整 Hub。需要业务数据时，让预览进程的 `GALAXY_WEB_CONFIG_FILE` 指向所选服务的公开 JSON 配置。字段以 [publicConfiguration()](../scripts/serve-product.mjs) 为准，至少包含：
+
+| 字段 | 含义 |
+|---|---|
+| `version` | 当前为 1 |
+| `endpoint` | 所选 API 地址，不含用户名或口令 |
+| `signingKeys` | 获准公钥、kid、有效期与撤销状态 |
+| `operator` | 可选的服务运营方说明 |
+
+公开配置只放公钥和服务元数据。API 的 browser policy 还必须允许准确的预览 Origin；允许读取静态文件不等于允许账户 Cookie、CSRF 或客户端签名操作。不要将生产私钥或数据库配置塞进 Web JSON。
+
+Windows PowerShell 示例：
+
+```powershell
+$env:GALAXY_WEB_CONFIG_FILE = 'C:/absolute/path/to/public-web-config.json'
+npm start
+```
+
+macOS / Linux 示例：
+
+```sh
+GALAXY_WEB_CONFIG_FILE=/absolute/path/to/public-web-config.json npm start
+```
+
+这里只设置预览进程读取的公开配置路径，不提供通用可用的生产账户或数据库。服务端配置见[部署指南](deployment.md)。
+
+## 管理应用与认证
+
+[运营后台](../apps/galaxy-admin/README.md)有独立 package-lock.json、CMS 数据库、环境与构建步骤。根 setup、产品 build 和当前 product CI 不包含它的全部检查。
+
+[认证应用](../apps/galaxy-auth/README.md)包含 Keycloak 主题、验证码 Provider 和 realm 配置工具。构建主题不会修改目标 realm，也不会部署认证服务；完整邮件扩展还需要 Java 构建与匹配的 Keycloak 版本。
+
+## 常见问题
+
+| 表现 | 先检查什么 |
+|---|---|
+| setup 拒绝 Node 版本 | 完整仓库需要 24.13+；客户端 22.13+ 不适用于根 setup |
+| 官网构建首次失败 | Python、网络与固定公开资源的获取；不要把旧 dist 当新构建 |
+| 静态页可看，业务页不可用 | Web 公开配置、API 可达性、browser Origin、Cookie / CSRF 和当前权限 |
+| 文档可以打开，搜索或增强页面失败 | 实际 CSP 的 form-action、script-src、connect-src 及相应 API |
+| 管理端不能登录 | 独立管理 realm、受控 BFF origin 与实际角色；普通账户 Cookie 不等于管理权限 |
+| 本地工作没有自动采集 | 实际宿主事件能力、所选配置和资料目录；其他宿主不能套用 OpenCode 覆盖 |
+| CI 在 lint 阶段结束 | 阅读第一处失败和完整诊断；后续跳过的构建与测试没有结果 |
+
+完成相关改动后集中运行必要检查，命令和范围见[开发检查](development-checks.md)。

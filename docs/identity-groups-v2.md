@@ -1,5 +1,11 @@
 # 多身份展示关系 v2：实施切片 72：资料入口
 
-相应版本的接口、配置及实现记录见[历史技术说明](../../../../02-architecture/archive-ui-20261009/implementation/repo--identity-groups-v2.md)。
+相应版本的接口、配置及实现记录见历史技术说明（维护工作区资料，未随源码分发）。
 
-本主题现行要求：[账号、身份与设备](../../../../02-architecture/current/chapters/04-identity-and-permissions.md)；全产品交互遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)。身份设备以可识别信息呈现，相关动作就近完成，控制细节按需。
+本主题现行要求：[身份与权限](privacy-and-data.md)；全产品交互遵循[产品原则与能力边界](project-overview.md)。身份设备以可识别信息呈现，相关动作就近完成，控制细节按需。
+
+## 外置历史参考
+
+这些引用的正文保存在维护工作区，不在当前 Git 仓库内。当前可读入口：[文档目录](README.md)、[架构](architecture.md)、[项目状态](project-status.md)。旧运行记录不作为当前环境或功能验收依据。
+
+<!-- Workspace reference retained: 历史技术说明 | ../../../../02-architecture/archive-ui-20261009/implementation/repo-&#45;identity-groups-v2.md -->

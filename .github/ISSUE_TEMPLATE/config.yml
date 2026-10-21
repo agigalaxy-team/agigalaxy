@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用、客户端与安装
+    url: https://agigalaxy.org/docs/
+    about: 查看网站与当前客户端说明
+  - name: 开发与自部署
+    url: https://github.com/agigalaxy-team/agigalaxy/blob/main/docs/development.md
+    about: 查看本地环境、服务配置与排障入口

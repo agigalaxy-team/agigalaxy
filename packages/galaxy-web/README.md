@@ -1,11 +1,31 @@
-# 银河产品网页实现
+# 银河产品网页
 
-实际产品入口为 src/main.tsx。根仓 app 中的旧演示不代表当前工作区。
+当前产品入口为 [src/main.tsx](src/main.tsx)，使用 React、TypeScript 和 Vite。根仓 app 及 demo 脚本保留早期演示用途，不能作为当前网页实现入口。
 
-依据[当前完整重构目标](../../../../../01-intake/CURRENT_RECONSTRUCTION_GOAL_2026-10-12.md)，当前网页已经按阅读、交流、找帮助、一起工作、理解人物与方法、管理资料及自己的 AI 接续组织。Web 0.1.20 继续落实整个研究范围的后续改动，普通查找、私人稿与发表版本、接收者背景、作品与联系、有限结果和准确方法来源均进入实际使用流程。各项操作与未验证范围见[当前状态](../../../../../02-architecture/current/chapters/11-current-state.md)，不由入口或测试数量推定整体用户效果。
+## 负责的用户工作
 
-设计与实现依[全产品体验规则](../../../../../02-architecture/current/EXPERIENCE_RULES.md)和[用户流程](../../../../../02-architecture/current/chapters/03-user-flows.md)。内容、人、对话和结果是页面主体；系统处理更新、来源检查、去重和同一已授权操作的恢复。真实数据范围及新的对外动作仍由用户选择。暂停、撤销、到期或身份变化不会被后台接续绕过。
+发现和查询、社区与回复、账户与公开资料、对话与通知、收藏、工作与结果、人物和方法在同一工作区中接续。普通网站参与使用在线账户；本地银河 ID 与设备签名只在相应客户端操作中介入。
 
-开发方法见[项目工作规则](../../../../../02-architecture/current/WORK_RULES.md)，构建等命令见[开发检查参考](../../docs/development-checks.md)。本地预览可使用隔离 API、当前身份接续及合成数据。已有开发记录在项目 07-logs/development/ui-reconstruction-20261009 下。
+内容先呈现，动作就近发生。返回和认证接续保留独立草稿与定位；旧异步结果不覆盖新对象。受控正文每次按当前来源、版本、受众和期限读取，离线或无法核实时按适用规则收起。
 
-保留有效功能和数据语义，按用户目的调整页面与流程。后续工作见[当前安排](../../../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)。
+## 共用模块
+
+- [site-chrome.mjs](src/site-chrome.mjs)：官网、Web 和 Keycloak 直接调用的品牌、顶栏、导航与搜索。
+- [网站界面](../../docs/site-ui.md)：共用外壳的生成与使用。
+- [客户端交互](../../docs/client-interactions.md)：读取任务、等待、失败及复制行为复用。
+- [账户参与](../../docs/account-participation-v3.md)：普通账户与附件合同。
+- [公开查询](../../docs/account-public-query-v1.md)：UID、账户、ID 与外部凭据范围。
+
+## 开发与构建
+
+在仓库根目录运行：
+
+```sh
+npm run setup
+npm run dev
+npm run build:web
+```
+
+完整网站与 Web 一起运行时使用根 build / start，见[开发指南](../../docs/development.md)。前端预览不启动 API；业务功能需要所选公开配置、准确 Origin 和实际服务。
+
+本地浏览器观察使用独立无头上下文和明示合成材料，真实 API、OIDC、聊天、存储及模型的范围分别记录。不得从某次前端检查推定完整产品或全部依赖已经验收。当前已发行与候选范围见[项目状态](../../docs/project-status.md)。

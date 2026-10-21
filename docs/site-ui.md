@@ -19,5 +19,5 @@
 
 认证构建按实际资源内容产生版本参数，同时用于入口 CSS、脚本、品牌图标及相对依赖，让已有浏览器缓存更新到同一批资源。共用搜索源保留为 ESM；认证制品发布为 `.js`，对应 Keycloak 26.7.3 的 JavaScript MIME 映射。
 
-开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，具体发行及支持范围见[当前状态](../../../../02-architecture/current/chapters/11-current-state.md)。
+开发方法见[贡献与开发说明](../CONTRIBUTING.md)，具体发行及支持范围见[项目状态](project-status.md)。
 

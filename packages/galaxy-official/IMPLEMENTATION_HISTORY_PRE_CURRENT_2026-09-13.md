@@ -1,5 +1,5 @@
 <!-- GALAXY-CURRENT-ENTRY v1 -->
-> **现有实现说明，运行与决策状态以当前入口为准。** 本页于2026-09-12迁移。当前完整规范入口为[银河产品方案](../../../../../02-architecture/redesign-v1/README.md)，其中候选和已确认方向分别标记。[迁移前原样快照](../../../../../01-intake/traceability/snapshots/91/91d5e1346b3bf6e0830a0efa625998c16ddd226c0590b8a82f9821922bd190a8.md)保留旧文字与定位。
+> **现有实现说明，运行与决策状态以当前入口为准。** 本页于2026-09-12迁移。当前完整规范入口为银河产品方案（维护工作区资料，未随源码分发），其中候选和已确认方向分别标记。迁移前原样快照（维护工作区资料，未随源码分发）保留旧文字与定位。
 > 本轮业务开发、部署与备份暂停。历史验证不代表当前完整动态业务上线；保留政策已确认但尚未实施。建议与用户决定以新方案逐项来源为准。
 <!-- END GALAXY-CURRENT-ENTRY -->
 
@@ -137,3 +137,10 @@ Schema14 persists inbox preferences/read markers; messages are derived from curr
 2026-09-10Profile宿主：Profile原生编辑、准确预览、本机签名及自述/事实分区展示已接通；默认私有，版本冲突不覆盖，取消与旧页面回调不继续发布。11项相关用例、严格tsc、lint及客户端离线安装通过。C10-03待复核；未全局安装或外部部署。见 `docs/profile-statements-v1.md`。
 
 2026-09-10履历视图与结果：履历新增三类独立字段规则、五类结果时间线及成功报告后的后续结果；读取重算状态/时间与空资料展示接通，Evidence源/Proof/授权/绑定撤销联动已验证，重建规则升级v3。13项不同相关用例、真实PG1项、严格tsc、lint及客户端离线安装通过。见 `docs/history-views-and-outcomes-v1.md`；C10-06直接操作入口仍待补齐，动态服务未部署。
+
+## 外置历史参考
+
+这些引用的正文保存在维护工作区，不在当前 Git 仓库内。当前可读入口：[文档目录](../../docs/README.md)、[架构](../../docs/architecture.md)、[项目状态](../../docs/project-status.md)。旧运行记录不作为当前环境或功能验收依据。
+
+<!-- Workspace reference retained: 银河产品方案 | ../../../../../02-architecture/redesign-v1/README.md -->
+<!-- Workspace reference retained: 迁移前原样快照 | ../../../../../01-intake/traceability/snapshots/91/91d5e1346b3bf6e0830a0efa625998c16ddd226c0590b8a82f9821922bd190a8.md -->

@@ -1,5 +1,11 @@
 # 银河数据保留策略 v0.1（用户已确认）：资料入口
 
-相应版本的接口、配置及实现记录见[历史技术说明](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-retention-policy-v0.1.md)。
+相应版本的接口、配置及实现记录见历史技术说明（维护工作区资料，未随源码分发）。
 
-本主题现行要求：[数据、隐私与资料选择](../../../../02-architecture/current/chapters/08-data-and-governance.md)；全产品交互遵循[体验规则](../../../../02-architecture/current/EXPERIENCE_RULES.md)。具体选择和真实状态清楚；完整记录在本人中心的相应详情。
+本主题现行要求：[数据与权限](privacy-and-data.md)；全产品交互遵循[产品原则与能力边界](project-overview.md)。具体选择和真实状态清楚；完整记录在本人中心的相应详情。
+
+## 外置历史参考
+
+这些引用的正文保存在维护工作区，不在当前 Git 仓库内。当前可读入口：[文档目录](README.md)、[架构](architecture.md)、[项目状态](project-status.md)。旧运行记录不作为当前环境或功能验收依据。
+
+<!-- Workspace reference retained: 历史技术说明 | ../../../../02-architecture/archive-ui-20261009/implementation/repo-&#45;data-retention-policy-v0.1.md -->

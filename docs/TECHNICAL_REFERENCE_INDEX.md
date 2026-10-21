@@ -1,197 +1,44 @@
 # 技术参考索引
 
-当前产品要求见[完整方案](../../../../02-architecture/current/GALAXY_COMPLETE_PLAN.md)。下表按现行主题查找相应版本的接口、数据、配置与实现记录。
+[文档目录](README.md) · [架构](architecture.md) · [当前状态](project-status.md)
 
-## 版本化实现资料
+优先从以下仓库内正文和源码进入。带版本的合同按该版本理解；接口、运行配置和最新实现继续以当前消费者源码为准。
 
-原路径保留短导航，历史正文保留原时点含义；按正在完成的功能取用相关资料。
+## 开发、运行与发行
 
-| 实现参考 | 现行主题 |
+| 内容 | 入口 |
 |---|---|
-| [GALAXY_DATA_AND_CAPABILITY_CONSENT_v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--GALAXY_DATA_AND_CAPABILITY_CONSENT_v0.1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [OPENCLAW_ADAPTER_BOUNDARY.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--OPENCLAW_ADAPTER_BOUNDARY.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [adr-008-authentication-and-protocol-profiles.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--adr-008-authentication-and-protocol-profiles.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [alerting-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--alerting-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [api-behavior-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--api-behavior-v0.1.md) | [技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [artifact-retention-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--artifact-retention-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [assistance-event-drafts-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--assistance-event-drafts-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [assistance-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--assistance-recovery-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [audit-access-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--audit-access-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [audit-context-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--audit-context-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [audit-coverage-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--audit-coverage-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [backup-cleanup-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--backup-cleanup-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [backup-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--backup-recovery-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [binding-management-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--binding-management-v1.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [binding-status-client.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--binding-status-client.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [bounty-web-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--bounty-web-v2.md) | [当前决定与采用边界](../../../../02-architecture/current/DECISIONS.md) |
-| [browser-demo-boundary.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--browser-demo-boundary.md) | [当前状态与证据](../../../../02-architecture/current/chapters/11-current-state.md) |
-| [builder-endpoint-observation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builder-endpoint-observation-v1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [builder-recovery-and-retry-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builder-recovery-and-retry-v1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [builder-source-search-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builder-source-search-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [builder-work-evidence-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builder-work-evidence-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [builders-registry-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builders-registry-v1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [builders-support-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--builders-support-v2.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [capsule-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--capsule-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [capsule-web-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--capsule-web-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [case-facts-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--case-facts-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [case-moderation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--case-moderation-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [case-review-host-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--case-review-host-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [case-review-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--case-review-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [chat-attachments-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--chat-attachments-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [chat-shared-summaries-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--chat-shared-summaries-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [chat-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--chat-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [choice-snapshots-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--choice-snapshots-v2.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [client-artifact.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--client-artifact.md) | [当前状态与证据](../../../../02-architecture/current/chapters/11-current-state.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [client-release-pipeline-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--client-release-pipeline-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [client-release-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--client-release-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [cloud-cost-and-host-network-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--cloud-cost-and-host-network-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [community-forum-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--community-forum-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [community-quotas-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--community-quotas-v2.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [configuration-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--configuration-v2.md) | [客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [configured-native-adapter.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--configured-native-adapter.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [confirmed-connection-client.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--confirmed-connection-client.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [confirmed-consent-client.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--confirmed-consent-client.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [connection-contract-v0.2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--connection-contract-v0.2.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [context-file-selection-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--context-file-selection-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [context-grants-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--context-grants-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [context-grants-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--context-grants-v2.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [context-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--context-recovery-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [contribution-risk-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--contribution-risk-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [contribution-risk-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--contribution-risk-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [core-spec-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--core-spec-v0.1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [data-export-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-export-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [data-lifecycle-product-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-lifecycle-product-v2.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [data-lifecycle-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-lifecycle-v0.1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [data-retention-policy-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-retention-policy-v0.1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [data-retention-proposal-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--data-retention-proposal-v0.1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [database-migrations-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--database-migrations-v1.md) | [技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [deletion-minimization-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--deletion-minimization-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [deletion-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--deletion-recovery-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [deletion-requests-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--deletion-requests-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [development-checks.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--development-checks.md) | [后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [evidence-revalidation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--evidence-revalidation-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [evidence-verification-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--evidence-verification-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [failure-audit-delivery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--failure-audit-delivery-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [github-bridge-provenance-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--github-bridge-provenance-v1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md) |
-| [governance-review-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--governance-review-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [help-view-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--help-view-v2.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [history-query-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-query-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [history-rebuild-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-rebuild-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [history-rule-search-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-rule-search-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [history-search-web-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-search-web-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [history-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [history-views-and-outcomes-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--history-views-and-outcomes-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [honor-contribution-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--honor-contribution-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [honor-correction-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--honor-correction-recovery-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [honor-pagination-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--honor-pagination-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [honor-rule-history-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--honor-rule-history-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [hub-manifest-profile-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--hub-manifest-profile-v1.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md) |
-| [hubs-direct-peering-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--hubs-direct-peering-v2.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md) |
-| [identity-browser-continuity-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--identity-browser-continuity-v2.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [identity-groups-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--identity-groups-v2.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [identity-login-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--identity-login-v1.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [identity-recovery-and-accounts-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--identity-recovery-and-accounts-v1.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [incident-notifications-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--incident-notifications-v1.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [incident-response-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--incident-response-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [incident-trust-recovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--incident-trust-recovery-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [independent-monitoring-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--independent-monitoring-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [integration-cost-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--integration-cost-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [integration-operations-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--integration-operations-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [isolated-environment-operations-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--isolated-environment-operations-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [layered-verification.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--layered-verification.md) | [后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [linux-deployment-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--linux-deployment-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [local-binding-receipts.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--local-binding-receipts.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [local-case-publication.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--local-case-publication.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md)、[用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [local-host-runtime.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--local-host-runtime.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [moderation-statements-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--moderation-statements-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [native-binding-host-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-binding-host-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-configuration-switch-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-configuration-switch-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-connection-wiring.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-connection-wiring.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-host-acceptance.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-host-acceptance.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-host-lifecycle-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-host-lifecycle-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-host-package-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-host-package-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-host-release-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-host-release-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-initialization-layout-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--native-initialization-layout-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [node-control-portable-proof-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--node-control-portable-proof-v1.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md) |
-| [notifications-requester-history-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--notifications-requester-history-v1.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [object-mapping-v0.2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--object-mapping-v0.2.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [official-cloud-progress.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--official-cloud-progress.md) | [当前状态与证据](../../../../02-architecture/current/chapters/11-current-state.md) |
-| [official-proxy-isolation.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--official-proxy-isolation.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [open-assistance-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--open-assistance-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [operational-metrics-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--operational-metrics-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [operations-readiness-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--operations-readiness-v2.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [personal-mcp-oauth-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--personal-mcp-oauth-v1.md) | [身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md)、[客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [personal-summary-notifications-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--personal-summary-notifications-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [pilot-proxy-candidate-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--pilot-proxy-candidate-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [pilot-scope-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--pilot-scope-v0.1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [pilot-slo-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--pilot-slo-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [profile-statements-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--profile-statements-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [project-contact-client-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--project-contact-client-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [project-discovery-native-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--project-discovery-native-v1.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [project-discovery-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--project-discovery-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [project-discovery-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--project-discovery-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [projects-contacts-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--projects-contacts-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [protocol-support-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--protocol-support-v1.md) | [技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [public-contribution-sharing-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--public-contribution-sharing-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [public-release-preparation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--public-release-preparation-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [public-search-index-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--public-search-index-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [qualification-moderation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--qualification-moderation-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [qualification-permission-requests-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--qualification-permission-requests-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md)、[身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [real-tls-checks.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--real-tls-checks.md) | [后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [recruitment-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--recruitment-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [release-cutover-runbook.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--release-cutover-runbook.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [release-identifiers-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--release-identifiers-v2.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [remote-mcp-tools.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--remote-mcp-tools.md) | [客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [request-quotas-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--request-quotas-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [resource-budgets-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--resource-budgets-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [revocation-observability-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--revocation-observability-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [room-agent-scope-stop-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--room-agent-scope-stop-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [round2-release-and-rollback.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--round2-release-and-rollback.md) | [后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [runtime-configuration-audit-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--runtime-configuration-audit-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [runtime-environments.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--runtime-environments.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [runtime-health-and-limits.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--runtime-health-and-limits.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [runtime-logging-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--runtime-logging-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [runtime-template-settings-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--runtime-template-settings-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md) |
-| [search-feedback-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--search-feedback-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [search-pagination-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--search-pagination-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [search-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--search-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [service-access-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--service-access-v2.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [service-release-rollback-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--service-release-rollback-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [service-retirement-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--service-retirement-v1.md) | [服务运行与开放交付](../../../../02-architecture/current/chapters/10-operations-and-business.md)、[数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [session-memory.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--session-memory.md) | [客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [source-adapter-acceptance.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--source-adapter-acceptance.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md)、[后续开发与验收](../../../../02-architecture/current/chapters/12-development-and-acceptance.md) |
-| [task-comments-governance-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--task-comments-governance-v2.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [task-fact-client-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--task-fact-client-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [task-participation-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--task-participation-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [task-room-governance-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--task-room-governance-v2.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [threat-model-v0.1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--threat-model-v0.1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md)、[身份、账号与权限](../../../../02-architecture/current/chapters/04-identity-and-permissions.md)、[技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [trust-package-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--trust-package-v1.md) | [数据、隐私与服务治理](../../../../02-architecture/current/chapters/08-data-and-governance.md) |
-| [typed-source-search-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--typed-source-search-v1.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [verifier-participation-v1.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--verifier-participation-v1.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [version-compatibility.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--version-compatibility.md) | [技术栈、协议与实现复用](../../../../02-architecture/current/chapters/09-technology-and-protocols.md) |
-| [watch-control-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--watch-control-v2.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [worker-pack-use-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/repo--worker-pack-use-v2.md) | [客户端、AI与原工作环境](../../../../02-architecture/current/chapters/07-client-and-agent.md) |
-| [README.md](../../../../02-architecture/archive-ui-20261009/implementation/host--README.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [README.md](../../../../02-architecture/archive-ui-20261009/implementation/host-opencode2--README.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [README.md](../../../../02-architecture/archive-ui-20261009/implementation/a2a--README.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [native-v2-python.md](../../../../02-architecture/archive-ui-20261009/implementation/a2a--native-v2-python.md) | [客户端与AI宿主交互规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md) |
-| [capsules-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--capsules-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [ci-observation-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--ci-observation-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [honor-requester-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--honor-requester-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [information-service-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--information-service-v2.md) | [项目架构](../../../../02-architecture/current/chapters/02-architecture.md) |
-| [qualification-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--qualification-v2.md) | [协作、事实与可复用经验](../../../../02-architecture/current/chapters/05-collaboration-and-facts.md) |
-| [search-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--search-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [task-contacts-web-v2.md](../../../../02-architecture/archive-ui-20261009/implementation/official--task-contacts-web-v2.md) | [发现、社区与长期参与](../../../../02-architecture/current/chapters/06-discovery-and-community.md) |
-| [GALAXY_CHAT_ENHANCEMENT_SPEC.md](../../../../02-architecture/archive-ui-20261009/implementation/index--GALAXY_CHAT_ENHANCEMENT_SPEC.md) | [用户流程与信息组织](../../../../02-architecture/current/chapters/03-user-flows.md) |
-| [GALAXY_PARTNER_PROJECT_GUIDE.md](../../../../02-architecture/archive-ui-20261009/implementation/index--GALAXY_PARTNER_PROJECT_GUIDE.md) | [银河完整项目方案](../../../../02-architecture/current/GALAXY_COMPLETE_PLAN.md) |
+| 环境、预览、依赖与排障 | [开发指南](development.md) |
+| 自部署与 AI Agent 接续 | [部署指南](deployment.md) |
+| 独立运行环境约束 | [运行环境](runtime-environments.md)、[约束源码](../packages/galaxy-official/src/runtime-environment.mjs) |
+| Linux 部署材料 | [Linux 准备](linux-deployment-v1.md)、[部署生成器](../packages/galaxy-official/scripts/prepare-linux.mjs) |
+| 检查与实际 CI 范围 | [开发检查](development-checks.md)、[工作流](../.github/workflows/product-checks.yml) |
+| Native 安装及兼容 | [下载](downloads.md)、[Native 工具说明](native-client-v2.md)、[宿主资料](native-client-hosts-v2.md) |
+| Native 许可及打包范围 | [许可说明](native-client-license-v2.md)、[实际 LICENSE](../integrations/native-v2/legal/LICENSE)、[NOTICE](../integrations/native-v2/legal/NOTICE) |
+| 官网构建 | [官网 README](../apps/galaxy-site/README.md) |
+| 认证、注册与邮件 | [认证 README](../apps/galaxy-auth/README.md)、[验证码 Provider](../apps/galaxy-auth/providers/email-code/README.md)、[共享邮件](../packages/galaxy-mail) |
+| 管理应用 | [后台 README](../apps/galaxy-admin/README.md)、[环境示例](../apps/galaxy-admin/.env.example) |
+| 监控、日志与恢复编排 | [运行工具源码](../packages/galaxy-official/deploy/operations-stack)、[配置示例](../packages/galaxy-official/deploy/operations-stack/configuration.example.json) |
 
-## 保持原文的发行绑定资料
+## 产品业务与接口
 
-以下材料关联具体打包、许可证或生成接口。保留当前版本事实，新的交互目标不反向写成已经实现；未来恢复实现时同步准确版本。
+| 内容 | 入口 |
+|---|---|
+| 业务 API 与工具 | [开发 API 目录](development-api-reference-v1.md)、[生成源](../packages/galaxy-official/api-reference.mjs) |
+| 在线账户参与、对话与附件 | [账户参与 v3](account-participation-v3.md) |
+| UID、账户与 ID 的公开查询 | [公开查询合同](account-public-query-v1.md) |
+| 外部凭据及状态来源 | [外部凭据](external-credentials.md) |
+| 本机、上传与来源 | [数据与权限](privacy-and-data.md)、[上传范围](../packages/galaxy-core/src/upload-privacy.mjs) |
+| 工作事实与摘要 | [本地工作源码](../packages/galaxy-core/src/work-history)、[Native 说明](native-client-v2.md) |
+| 私有原会话 | [会话归档源码](../packages/galaxy-core/src/conversation-archive) |
+| 客户端读取、加载与复制 | [交互模块](client-interactions.md) |
+| 官网、Web 与认证共用外壳 | [网站界面模块](site-ui.md) |
+| MCP 与宿主 | [适配器 README](../integrations/host-adapters/README.md)、[Native 源码](../integrations/native-v2) |
+| A2A | [适配器 README](../packages/galaxy-a2a/README.md)、[源码导出](../packages/galaxy-a2a/package.json) |
+| 数据库和迁移 | [数据库实现](../packages/galaxy-official/src/database.mjs)、[迁移列表](../packages/galaxy-official/src/infrastructure/migrations.mjs) |
 
-- [development-api-reference-v1.md](development-api-reference-v1.md)。
-- [native-client-hosts-v2.md](native-client-hosts-v2.md)。
-- [native-client-license-v2.md](native-client-license-v2.md)。
-- [native-client-v2.md](native-client-v2.md)。
+## 版本与旧导航
 
-已发布public-docs版本、运行时Skill及安装包说明保持发行原件；新的目标见[客户端规范](../../../../02-architecture/current/CLIENT_EXPERIENCE.md)与[官网内容](../../../../02-architecture/current/PUBLIC_CONTENT.md)。
+旧技术入口有一部分只保留了指向维护工作区归档的跳转，正文不在此仓库中。不能把这些外置正文写成 GitHub 读者可以取得的资料，也不能把旧服务器路径与运行记录当作新环境配置。
+
+目前可独立阅读的总览已经放在本仓库。历史导航中的外置引用应明确标注为未分发资料；原始路径可以保留在源码注释供维护者追溯。旧证据、演示和版本说明仍只证明各自范围，不替代当前产品状态或实际验收。

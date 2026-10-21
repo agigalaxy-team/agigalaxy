@@ -1,0 +1,28 @@
+name: 功能建议
+description: 描述使用目的、现有困难与期望结果
+title: "[Idea] "
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 你想完成什么
+      description: 说明实际场景、谁会使用以及希望得到的结果
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 目前遇到的困难
+      description: 已有入口或替代做法，哪里不够用
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议的方式与取舍
+      description: 可提出不同方案；不确定的细节可以保持待讨论
+  - type: textarea
+    id: references
+    attributes:
+      label: 参考项目或资料
+      description: 可选；说明想借鉴的部分，引用不等于已经采用

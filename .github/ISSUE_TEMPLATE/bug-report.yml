@@ -1,0 +1,42 @@
+name: 故障反馈
+description: 说明实际问题、复现过程与环境
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先查看使用与开发文档。不要附带令牌、密码、Cookie、私钥、恢复码、私人消息或完整运行配置。
+        涉及安全或个人资料时，先提供不含利用细节及私人数据的影响摘要。
+  - type: input
+    id: component
+    attributes:
+      label: 组件与版本
+      description: 例如网站 / API / Native / AI 宿主；版本未知可以说明
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 使用环境
+      description: 系统、浏览器或宿主版本，使用官网还是自部署
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 你要完成什么，从哪个入口开始，怎样出现问题
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 预期与实际结果
+      description: 分别说明，结果未知也请保留
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏材料
+      description: 可选的截图、最小日志或相关链接；请先检查敏感资料

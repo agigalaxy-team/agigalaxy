@@ -183,4 +183,4 @@ macOS `UNUserNotificationCenter.add` 成功仅表示系统受理，仍返回未�
 
 本机审阅页只接受准确的 loopback Host 与 Origin。实际浏览器表单使用同源 referrer 策略；Origin 为 `null` 或来自另一来源时仍拒绝，不能为绕开 403 放宽校验。退出时停止接收新调用、使设备预览失效、等待在途回执和本机保存完成，随后关闭协议；未知操作保留在原 journal。
 
-开发方法见[项目工作规则](../../../../02-architecture/current/WORK_RULES.md)，工具入口见[开发检查参考](development-checks.md)。
+开发方法见[贡献与开发说明](../CONTRIBUTING.md)，工具入口见[开发检查参考](development-checks.md)。
