@@ -10,6 +10,8 @@
 
 品牌与署名采用 `AGI Galaxy`。发件人显示名由发件配置决定，正文品牌由 Provider 的 `brand` 提供，模板不自行修改发件配置。
 
+2026-10-22 正式身份按用途区分为账户 account@、通知 notice@、社区 community@、更新 updates@、团队 team@，域名均为 agigalaxy.org，统一 Reply-To 为 team@。共享元数据在 `packages/galaxy-mail/src/identities.mjs`。自动邮件的“系统邮件，请勿直接回复。”及团队联系方式位于正文后、品牌分隔线之前；最底部只放 AGI Galaxy、官网与隐私链接。团队人工邮件设置 `automated: false`，使用可直接回复的说明。布局分区参考已核查的 Postmark／React Email 实际模板，来源及界限见[共享包说明](../../../packages/galaxy-mail/README.md)。
+
 ## 预览调用
 
 `render-email.mjs` 为浏览器和 Node 都可直接导入的纯模块：
@@ -60,6 +62,7 @@ const email = renderGalaxyEmail({
   language: 'zh-CN', // 或 en，正文由调用方提供对应语言
   preheader: '',
   note: '',
+  automated: true, // 团队人工联系邮件使用 false；From／Reply-To 仍由发送服务设置
 });
 // {subject, html, text}；全部正文文本经过 HTML 转义，无发送器或队列
 ```

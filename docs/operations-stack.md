@@ -70,9 +70,9 @@ Grafana 显式验证 ID Token、issuer/JWKS，并以有界的专用 Viewer/Edito
 
 ## 管理告警邮件
 
-`prepare-alertmanager.py --recipient <管理收件人>` 只在授权主机进程内读取既有 `galaxy` realm 的 SMTP 连接，写入 root 私有 receiver，不改变普通账户或原 SMTP 设置。若 Admin API 返回 mask，按明确授权精确读取该 realm 的 SMTP map；mask 不能充当密码。配置保留原连接的 STARTTLS 或 implicit TLS，并使用 Alertmanager 对应 TLS 选项；不禁用证书核验。[Alertmanager 邮件配置](https://prometheus.io/docs/alerting/latest/configuration/#email_config)。
+`prepare-alertmanager.py --recipient <管理收件人>` 只在授权主机进程内读取既有 `galaxy` realm 的 SMTP 连接，写入 root 私有 receiver，不改变普通账户或原 SMTP 设置。发件身份另取共享包生成的 `monitoring/mail-identity.json`：`AGI Galaxy 通知 <notice@agigalaxy.org>`，Reply-To为`AGI Galaxy 团队 <team@agigalaxy.org>`，不沿用账户发件人。模板／身份文件须先随本批配置生成和部署；对应SMTP供应商必须已允许notice@发件。若 Admin API 返回 mask，按明确授权精确读取该 realm 的 SMTP map；mask 不能充当密码。配置保留原连接的 STARTTLS 或 implicit TLS，并使用 Alertmanager 对应 TLS 选项；不禁用证书核验。[Alertmanager 邮件配置](https://prometheus.io/docs/alerting/latest/configuration/#email_config)。
 
-告警与测试邮件都通过 `galaxy-mail` 的同一品牌信笺生成头尾。`--send-test` 仅向显式指定的管理收件人发送一封清楚标注的测试，并保存无地址、无秘密的结果；已有发送请求记录不会自动重发。SMTP 接受只说明服务器收下该邮件，不表示已核实收件箱，也不等同完整 Alertmanager 调度链已经运行。
+告警与测试邮件都通过 `galaxy-mail` 的同一品牌信笺生成头尾。系统邮件／团队联系说明在正文后、品牌分隔线之前，最底部保留银河品牌与官网／隐私。`--send-test` 仅向显式指定的管理收件人发送一封清楚标注的测试，并保存无地址、无秘密的结果；已有发送请求记录不会自动重发。SMTP 接受只说明服务器收下该邮件，不表示已核实收件箱，也不等同完整 Alertmanager 调度链已经运行。
 
 ## 日志范围
 

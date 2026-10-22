@@ -72,7 +72,7 @@ Windows classpath 分隔符使用 `;`。8 个行为情境包含普通即时缓�
 
 `EmailTemplateProvider.send(subjectKey, "galaxy-email-code.ftl", attrs)` 读取 realm 实际选择的 email theme。需要 `email/html/galaxy-email-code.ftl` 与 `email/text/galaxy-email-code.ftl`；subject key 为 `galaxyEmailCodeSubjectRegister` / `galaxyEmailCodeSubjectReset`。attrs 为 `code`、`purpose`、`brand="AGI Galaxy"`、`expiresInSeconds`、`expiresInMinutes`。验证码只出现在邮件正文，不放邮件标题。中文与英文按 Keycloak 标准 `messages_zh_CN.properties`、`messages_en.properties`。
 
-已选主题是第二款“精细账笺” `galaxy-mail-editorial`，发件显示名与署名为 AGI Galaxy。邮件唯一布局源是 [`packages/galaxy-mail/src/layout.mjs`](../../../../packages/galaxy-mail/src/layout.mjs)，共用头尾供注册、重置、系统和服务邮件复用；旧 `email-designs/common/email-layout.mjs` 只是 re-export bridge。JAR 提供实际验证码数据，邮件主题与 SMTP 显示名由发布配置选择，不在 JAR 中维护另一套布局。
+已选主题是“品牌信笺” `galaxy-mail-editorial`，正文品牌为 AGI Galaxy；账户发件身份为 `AGI Galaxy 账户 <account@agigalaxy.org>`，Reply-To 为 `team@agigalaxy.org`。邮件唯一布局源是 [`packages/galaxy-mail/src/layout.mjs`](../../../../packages/galaxy-mail/src/layout.mjs)，共用头尾供注册、重置、系统和服务邮件复用；正文后的系统邮件／联系说明在分隔线和末尾品牌区之前。旧 `email-designs/common/email-layout.mjs` 只是 re-export bridge。JAR 提供实际验证码数据，邮件主题与 SMTP 显示名由发布配置选择，不在 JAR 中维护另一套布局。
 
 注册 required action 的取消使用 `context.failure()`，由 Keycloak 原 LoginProtocol 返回原应用的拒绝结果；`context.cancel()` 仅适用于 AIA，不能用它取消普通注册，否则未完成的邮箱动作会再次打开。取消不完成邮箱验证或密码设置，也不拼接返回网址。
 

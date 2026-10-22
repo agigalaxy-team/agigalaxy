@@ -55,7 +55,9 @@ Keycloak 在邮箱验证和密码设置前就创建账户记录，因此中断�
 
 扩展默认不启用注册验证码：只有 `galaxy` realm 的 `VERIFY_EMAIL.config` 中 `email-code-enabled` 精确为字符串 `true` 时才启用，缺失、关闭或其他值沿用原 Keycloak 实现。新流程需要同时安装扩展、提供登录与邮件模板，并为目标 realm 选择相应流程及邮件主题；仅部署 CSS 或静态页面不会启用它。正常密码登录的 browser flow 不属于本次替换范围。邮箱变更等其他事件的模板预览不代表其后端已接入数字验证码。
 
-用户最新选择“品牌信笺”，继续使用 `galaxy-mail-editorial` 与 AGI Galaxy 发件人/署名。邮件Logo是原轨道图形的PNG版本，由认证站公开静态资源提供；图片被邮箱阻止时仍有相邻品牌文字和完整正文。页尾包含真实官网和隐私链接。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
+用户最新选择“品牌信笺”，继续使用 `galaxy-mail-editorial` 与 AGI Galaxy 正文品牌。账户发件身份为 `AGI Galaxy 账户 <account@agigalaxy.org>`，Reply-To 为 `AGI Galaxy 团队 <team@agigalaxy.org>`。邮件Logo是原轨道图形的PNG版本，由认证站公开静态资源提供；图片被邮箱阻止时仍有相邻品牌文字和完整正文。正文后安排“系统邮件，请勿直接回复。”及团队联系入口；分隔线后的最底部只保留品牌、官网和隐私链接。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
+
+2026-10-22 已将线上 `galaxy` realm 的账户邮件从旧阿里身份切换到 Oracle Email Delivery 的银河账户身份，真实注册与找回邮件均到达本人授权测试 Gmail 的 INBOX，SPF／DKIM／DMARC pass。最终布局发行是 `official-mail-layout-20261022`；注册／找回流程、Provider、密码规则及验证码策略沿用原配置。五类身份的公开元数据由共享邮件包统一维护，其他业务不能直接沿用账户发件人。供应商会自动增加 List-Unsubscribe 头，系统邮件抑制影响仍需后续核对，不能以一次入箱保证长期送达或声称完全无服务商技术头。
 
 原 `galaxy-official` 客户端和身份签名关联接口继续处理既有事务。账户登录成功后，关联仍需当前设备的插件完成本机确认；官方账户 Cookie 不代替 subject Bearer、设备授权或签名。
 
@@ -89,6 +91,8 @@ Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'
 ## AI-agent 操作说明
 
 部署目标和凭据引用从实际配置及项目资产路由取得；原始秘密不进入 workspace、命令参数、输出或报告。生产写入和外部邮件使用实际获准的数据范围，调试记录不保存 Cookie、邮件 token、authorization code、state、nonce、verifier 或用户密码。
+
+仅改邮件连接时，通过 Admin API 合并目标 realm 的 `smtpServer`，先在服务器 root 私密目录保存可恢复的旧设置；管理员返回的掩码密码不能作为回滚凭据。保留真实 From／Reply-To 的职责，认证邮件仍走 Keycloak，不接入运营 AI 生成验证码。仅改模板时，从当前主题复制新发行、替换邮件文件并保留 Provider 挂载与所有 flow；确认服务就绪后再以合成、获准邮箱触发实际邮件。临时 Gmail 加号地址只是测试别名，不是正式用户邮箱转换规则；本次未完成测试账户已删除，没有修改真实用户密码。
 
 开发方法见[贡献与开发说明](../../CONTRIBUTING.md)，工具入口见[开发检查参考](../../docs/development-checks.md)。
 

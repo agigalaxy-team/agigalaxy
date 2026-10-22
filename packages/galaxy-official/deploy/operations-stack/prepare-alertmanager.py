@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy only the existing Galaxy realm SMTP connection to a protected receiver.
+"""Reuse the Galaxy realm SMTP connection with the official notice identity.
 
 No source realm/user or SMTP setting is changed. A single explicitly requested
 test message may be sent; its receipt contains no addresses or credentials.
@@ -52,6 +52,12 @@ def read_smtp():
         raise RuntimeError('operations_smtp_authentication_not_supported')
     if not smtp.get('host') or not smtp.get('from') or '@' not in smtp['from']:
         raise RuntimeError('operations_smtp_connection_incomplete')
+    identity = json.loads(Path('/etc/galaxy/operations/monitoring/mail-identity.json').read_text())
+    if identity.get('address') != 'notice@agigalaxy.org' or identity.get('replyTo') != 'team@agigalaxy.org' or identity.get('automated') is not True:
+        raise RuntimeError('operations_mail_identity_invalid')
+    smtp.update({'from': identity['address'], 'fromDisplayName': identity['name'],
+                 'replyTo': identity['replyTo'], 'replyToDisplayName': 'AGI Galaxy 团队',
+                 'envelopeFrom': identity['address']})
     return smtp
 
 
@@ -62,7 +68,9 @@ def configure(recipient, smtp):
     implicit = smtp.get('ssl') == 'true'
     if not implicit and smtp.get('starttls') != 'true':
         raise RuntimeError('operations_smtp_starttls_required')
-    email = {'to': address, 'from': formataddr(('AGI Galaxy', smtp['from'])), 'smarthost': smtp['host'] + ':' + str(int(smtp.get('port', '465' if implicit else '587'))), 'require_tls': True, 'force_implicit_tls': implicit, 'send_resolved': True}
+    email = {'to': address, 'from': formataddr((smtp['fromDisplayName'], smtp['from'])),
+             'headers': {'Reply-To': formataddr((smtp['replyToDisplayName'], smtp['replyTo']))},
+             'smarthost': smtp['host'] + ':' + str(int(smtp.get('port', '465' if implicit else '587'))), 'require_tls': True, 'force_implicit_tls': implicit, 'send_resolved': True}
     templates = Path('/etc/galaxy/operations/monitoring')
     email['html'] = (templates / 'galaxy-email.html').read_text()
     email['text'] = (templates / 'galaxy-email.txt').read_text()
@@ -81,7 +89,8 @@ def send_test(recipient, smtp):
     at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     support.private_file(receipt, json.dumps({'state': 'requested', 'requestedAt': at}) + '\n')
     message = EmailMessage()
-    message['From'] = formataddr(('AGI Galaxy', smtp['from']))
+    message['From'] = formataddr((smtp['fromDisplayName'], smtp['from']))
+    message['Reply-To'] = formataddr((smtp['replyToDisplayName'], smtp['replyTo']))
     message['To'] = recipient
     message['Subject'] = '[AGI Galaxy] 运行告警投递测试 / Monitoring delivery test'
     message['Date'] = formatdate(localtime=False)

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { posix } from 'node:path';
-import { renderEmailLayout, renderGalaxyEmail } from '../../../galaxy-mail/src/layout.mjs';
+import { renderEmailLayout, renderGalaxyEmail, officialMailIdentity } from '../../../galaxy-mail/src/layout.mjs';
 import { alloyConfiguration, logFileSources, loggingDashboard } from './log-pipeline.mjs';
 
 const json = value => JSON.stringify(value, null, 2) + '\n';
@@ -319,6 +319,7 @@ export async function renderOperationsFiles(config) {
     'monitoring/prometheus.json': json(prometheus), 'monitoring/blackbox.json': json(blackbox),
     'monitoring/galaxy.rules.json': json(rules), 'monitoring/external.rules.json': json(externalRules),
     'monitoring/galaxy-email.html': notification.html, 'monitoring/galaxy-email.txt': notification.text,
+    'monitoring/mail-identity.json': json(officialMailIdentity('notice')),
     'monitoring/galaxy-test-email.html': deliveryTest.html, 'monitoring/galaxy-test-email.txt': deliveryTest.text,
     'monitoring/alertmanager.unconfigured.example.json': json(alertmanagerExample),
     'caddy-monitoring.fragment': `# Include inside the existing admin.agigalaxy.org site block. No path stripping.\nredir /monitoring /monitoring/ 308\nhandle /monitoring/* {\n  reverse_proxy 127.0.0.1:${config.grafana.port}\n}\n`,

@@ -1,5 +1,7 @@
 // The selected brand letterhead is shared by previews, ordinary message renderers and
 // the generated Keycloak templates. This module has no transport or storage.
+import {EMAIL_TEAM_ADDRESS} from './identities.mjs';
+export {EMAIL_TEAM_ADDRESS, OFFICIAL_MAIL_IDENTITIES, officialMailIdentity} from './identities.mjs';
 export const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif";
 export const EMAIL_MONO = "'SFMono-Regular',Consolas,'Liberation Mono',monospace";
 export const EMAIL_LOGO_URL = 'https://auth.agigalaxy.org/assets/img/galaxy-mail-logo.png?v=mail-letterhead-20261020';
@@ -9,8 +11,10 @@ const row = (content, style = '', attributes = '') => `<tr><td${attributes} styl
 const paragraph = (html, style = '') => `<p style="margin:0;font-family:${EMAIL_FONT};font-size:15px;line-height:25px;color:#495363;${style}">${html}</p>`;
 const heading = html => `<h1 class="galaxy-mail-title" style="margin:0;font-family:Georgia,'Songti SC','SimSun',serif;font-size:27px;line-height:39px;font-weight:500;letter-spacing:-.4px;color:#202735;">${html}</h1>`;
 const emailLabels = language => String(language).toLowerCase().startsWith('en')
-  ? {category: 'Notification', accountCategory: 'Account services', code: 'Verification code', privacy: 'Privacy and data'}
-  : {category: '通知', accountCategory: '账户服务', code: '验证码', privacy: '隐私与数据'};
+  ? {category: 'Notification', accountCategory: 'Account services', code: 'Verification code', privacy: 'Privacy and data',
+    automatedNotice: 'This is an automated system email. Please do not reply directly.', contactTeam: 'Contact the Galaxy team', teamReply: 'You can reply to this email to continue the conversation.'}
+  : {category: '通知', accountCategory: '账户服务', code: '验证码', privacy: '隐私与数据',
+    automatedNotice: '系统邮件，请勿直接回复。', contactTeam: '联系银河团队', teamReply: '如需继续沟通，可直接回复本邮件。'};
 const responsiveStyles = `@media only screen and (max-width:480px){
   .galaxy-mail-outer{padding:20px 8px 32px!important}
   .galaxy-mail-paper{padding:26px 22px!important}
@@ -23,13 +27,18 @@ const responsiveStyles = `@media only screen and (max-width:480px){
 
 // All values here are escaped by the public renderer or are controlled FTL
 // expressions produced below. The content slot is not an untrusted HTML input.
-function htmlLayout({language, direction, brand, category, title, preheader, body, privacyLabel}) {
+function htmlLayout({language, direction, brand, category, title, preheader, body, privacyLabel, replyNotice, contactLabel}) {
   const wordmark = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td class="galaxy-mail-mark" width="32" style="padding-right:11px;vertical-align:middle;"><img src="${EMAIL_LOGO_URL}" width="32" height="32" alt="" style="display:block;width:32px;height:32px;border:0;outline:none;text-decoration:none;"></td><td class="galaxy-mail-brand" style="font-family:${EMAIL_FONT};font-size:18px;line-height:28px;font-weight:600;letter-spacing:-.3px;color:#202735;white-space:nowrap;vertical-align:middle;">${brand}</td></tr></table>`;
   const header = table(`<tr><td style="padding-bottom:21px;vertical-align:middle;">${wordmark}</td><td class="galaxy-mail-category" align="right" style="padding:0 0 21px 12px;vertical-align:middle;font-family:${EMAIL_FONT};font-size:12px;line-height:20px;color:#68717f;">${category}</td></tr>`);
   const footerLinks = `<a href="https://agigalaxy.org/" style="color:#8f4363;text-decoration:underline;">agigalaxy.org</a><span style="padding:0 9px;color:#68717f;">·</span><a href="https://agigalaxy.org/privacy/" style="color:#8f4363;text-decoration:underline;">${privacyLabel}</a>`;
-  const footer = paragraph(brand, 'font-size:13px;line-height:20px;font-weight:600;color:#495363;') + paragraph(footerLinks, 'padding-top:7px;font-size:12px;line-height:20px;color:#68717f;');
+  const contact = `${contactLabel}：<a href="mailto:${EMAIL_TEAM_ADDRESS}" style="color:#8f4363;text-decoration:underline;">${EMAIL_TEAM_ADDRESS}</a>`;
+  const contactDetails = paragraph(replyNotice, 'font-size:12px;line-height:20px;color:#68717f;') +
+    paragraph(contact, 'padding-top:3px;font-size:12px;line-height:20px;color:#68717f;');
+  const footer = paragraph(brand, 'font-size:13px;line-height:20px;font-weight:600;color:#495363;') +
+    paragraph(footerLinks, 'padding-top:7px;font-size:12px;line-height:20px;color:#68717f;');
   const inner = table(row(header, 'border-bottom:2px solid #eccfdc;') +
     row(body, `padding:28px 0;font-family:${EMAIL_FONT};font-size:15px;line-height:25px;color:#495363;overflow-wrap:anywhere;`) +
+    row(contactDetails, 'padding-bottom:22px;', ' class="galaxy-mail-contact"') +
     row(footer, 'padding-top:20px;border-top:1px solid #e9ecf0;'));
   const frame = table(row(inner, 'padding:30px 32px;', ' class="galaxy-mail-paper"'), 'max-width:600px;margin:0 auto;background-color:#ffffff;border:1px solid #e4e7eb;border-radius:4px;border-collapse:separate;border-spacing:0;');
   const shell = table(row('<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->\n' + frame + '\n<!--[if mso]></td></tr></table><![endif]-->', 'padding:24px 12px 32px;', ' class="galaxy-mail-outer" align="center"'), 'background-color:#f7f8fa;');
@@ -43,27 +52,29 @@ ${shell}
 </html>`;
 }
 
-function textLayout({brand, category, body, privacyLabel}) {
-  return [brand, category, body, brand + '\nhttps://agigalaxy.org/\n' + privacyLabel + ': https://agigalaxy.org/privacy/'].filter(Boolean).join('\n\n') + '\n';
+function textLayout({brand, category, body, privacyLabel, replyNotice, contactLabel}) {
+  return [brand, category, body, replyNotice + '\n' + contactLabel + ': ' + EMAIL_TEAM_ADDRESS,
+    brand + '\nhttps://agigalaxy.org/\n' + privacyLabel + ': https://agigalaxy.org/privacy/'].filter(Boolean).join('\n\n') + '\n';
 }
 
 /** Trusted body slot; ordinary user text should use renderGalaxyEmail instead. */
-export function renderEmailLayout({bodyHtml, bodyText, brand = 'AGI Galaxy', language = 'zh-CN', category = emailLabels(language).category, title = '', preheader = ''}) {
+export function renderEmailLayout({bodyHtml, bodyText, brand = 'AGI Galaxy', language = 'zh-CN', category = emailLabels(language).category, title = '', preheader = '', automated = true}) {
   const labels = emailLabels(language);
+  const replyNotice = automated ? labels.automatedNotice : labels.teamReply;
   return {
     html: htmlLayout({language: escapeEmailText(language), direction: 'ltr', brand: escapeEmailText(brand),
-      category: escapeEmailText(category), title: escapeEmailText(title || brand), preheader: escapeEmailText(preheader), body: bodyHtml, privacyLabel: escapeEmailText(labels.privacy)}),
-    text: textLayout({brand, category, body: bodyText, privacyLabel: labels.privacy}),
+      category: escapeEmailText(category), title: escapeEmailText(title || brand), preheader: escapeEmailText(preheader), body: bodyHtml, privacyLabel: escapeEmailText(labels.privacy), replyNotice: escapeEmailText(replyNotice), contactLabel: escapeEmailText(labels.contactTeam)}),
+    text: textLayout({brand, category, body: bodyText, privacyLabel: labels.privacy, replyNotice, contactLabel: labels.contactTeam}),
   };
 }
 
 /** Render plain content with the selected header/footer. Does not send mail. */
-export function renderGalaxyEmail({subject, title, paragraphs, note = '', brand = 'AGI Galaxy', language = 'zh-CN', category = emailLabels(language).category, preheader = ''}) {
+export function renderGalaxyEmail({subject, title, paragraphs, note = '', brand = 'AGI Galaxy', language = 'zh-CN', category = emailLabels(language).category, preheader = '', automated = true}) {
   const body = table(row(heading(escapeEmailText(title)), 'padding-bottom:18px;') +
     paragraphs.map(value => row(paragraph(escapeEmailText(value)), 'padding-bottom:12px;')).join('') +
     (note ? row(paragraph(escapeEmailText(note), 'font-size:12px;line-height:22px;color:#68717f;'), 'padding-top:13px;') : ''));
   const plain = [title, ...paragraphs, note].filter(Boolean).join('\n\n');
-  return {subject: subject.replaceAll('\r', ' ').replaceAll('\n', ' '), ...renderEmailLayout({bodyHtml: body, bodyText: plain, brand, category, title, preheader, language})};
+  return {subject: subject.replaceAll('\r', ' ').replaceAll('\n', ' '), ...renderEmailLayout({bodyHtml: body, bodyText: plain, brand, category, title, preheader, language, automated})};
 }
 
 function codeBody({title, eyebrow, introduction, instruction, code, expiry, continuation = '', safety}) {
@@ -99,9 +110,10 @@ export function keycloakEmailLayoutTemplates() {
       language: expression('(locale.language)!msg("galaxyMailLanguage")'), direction: expression('(ltr!true)?then("ltr", "rtl")'),
       brand: expression('brandName'), category, title: expression('title?has_content?then(title, brandName)'),
       preheader: expression('preheader'), body: '<#nested>', privacyLabel: message('galaxyMailPrivacy'),
+      replyNotice: message('galaxyMailAutomatedNotice'), contactLabel: message('galaxyMailContactTeam'),
     }) + '\n</#macro>\n',
     text: '<#ftl output_format="plainText">\n' + macro + textLayout({brand: expression('brandName'), category,
-      body: '<#nested>', privacyLabel: message('galaxyMailPrivacy')}) + '</#macro>\n',
+      body: '<#nested>', privacyLabel: message('galaxyMailPrivacy'), replyNotice: message('galaxyMailAutomatedNotice'), contactLabel: message('galaxyMailContactTeam')}) + '</#macro>\n',
   };
 }
 
