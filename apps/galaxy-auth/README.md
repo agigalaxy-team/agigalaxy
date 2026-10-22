@@ -12,7 +12,7 @@
 - `shared/`：认证表单布局与提交等待的渐进增强。字体、主题、顶栏与响应式导航直接取共用 `site-foundation.css` 和 `selected-shell.css`；品牌与等待图标从共用 `GalaxyMark` 输出，不维护第二套 SVG。
 - `theme/galaxy/login/`：主题继承、中文与英文文案。
 - `providers/email-code/`：Keycloak 26.7.3 邮件验证码扩展及保留原密码动作的找回流程规划器；包含显式重填邮箱时的账户选择适配。
-- `theme/galaxy-mail-editorial/email/`：用户最新选定的“品牌信笺”中文、英文邮件主题，HTML 与纯文本共用品牌头尾，沿用既有主题名称。其余候选仅保留设计参考。
+- `theme/galaxy-mail-editorial/email/`：用户选定的“清晰标准整体＋居中官方落款”中文、英文邮件主题，HTML 与纯文本共用品牌头尾，沿用既有主题名称。其余候选仅保留设计参考。
 - `email-designs/`：三款邮件的静态设计预览；其中固定示例码不用于正式模板。
 - `client-contract.json`：独立官方账户登录的公开客户端契约，不含凭据。
 
@@ -55,7 +55,7 @@ Keycloak 在邮箱验证和密码设置前就创建账户记录，因此中断�
 
 扩展默认不启用注册验证码：只有 `galaxy` realm 的 `VERIFY_EMAIL.config` 中 `email-code-enabled` 精确为字符串 `true` 时才启用，缺失、关闭或其他值沿用原 Keycloak 实现。新流程需要同时安装扩展、提供登录与邮件模板，并为目标 realm 选择相应流程及邮件主题；仅部署 CSS 或静态页面不会启用它。正常密码登录的 browser flow 不属于本次替换范围。邮箱变更等其他事件的模板预览不代表其后端已接入数字验证码。
 
-用户最新选择“品牌信笺”，继续使用 `galaxy-mail-editorial` 与 AGI Galaxy 正文品牌。账户发件身份为 `AGI Galaxy 账户 <account@agigalaxy.org>`，Reply-To 为 `AGI Galaxy 团队 <team@agigalaxy.org>`。邮件Logo是原轨道图形的PNG版本，由认证站公开静态资源提供；图片被邮箱阻止时仍有相邻品牌文字和完整正文。正文后安排“系统邮件，请勿直接回复。”及团队联系入口；分隔线后的最底部只保留品牌、官网和隐私链接。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
+用户选定“清晰标准整体＋居中官方落款”，继续使用 `galaxy-mail-editorial` 与 AGI Galaxy 正文品牌。账户发件身份为 `AGI Galaxy 账户 <account@agigalaxy.org>`，Reply-To 为 `AGI Galaxy 团队 <team@agigalaxy.org>`。邮件Logo是原轨道图形的PNG版本，由认证站公开静态资源提供；图片被邮箱阻止时仍有相邻品牌文字和完整正文。标题与正文使用左对齐无衬线排版，正文后安排“系统邮件，请勿直接回复。”及团队联系入口；分隔线后的第一行居中排列关于银河、隐私、使用说明，第二行居中显示当年版权。三项分别连接现有说明页面，不新增无效条款链接。部署者按下述顺序安装、验证和回退；具体服务器状态与观察范围保留在项目发行指针及运行记录中。
 
 2026-10-22 已将线上 `galaxy` realm 的账户邮件从旧阿里身份切换到 Oracle Email Delivery 的银河账户身份，真实注册与找回邮件均到达本人授权测试 Gmail 的 INBOX，SPF／DKIM／DMARC pass。最终布局发行是 `official-mail-layout-20261022`；注册／找回流程、Provider、密码规则及验证码策略沿用原配置。五类身份的公开元数据由共享邮件包统一维护，其他业务不能直接沿用账户发件人。供应商会自动增加 List-Unsubscribe 头，系统邮件抑制影响仍需后续核对，不能以一次入箱保证长期送达或声称完全无服务商技术头。
 

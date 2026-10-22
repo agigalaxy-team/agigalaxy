@@ -304,7 +304,7 @@ export async function renderOperationsFiles(config) {
     { name: 'Galaxy alerts', uid: 'galaxy-alertmanager', type: 'alertmanager', access: 'proxy', url: m.alertmanagerUrl, editable: false, jsonData: { implementation: 'prometheus', handleGrafanaManagedAlerts: false } }
   ] };
   const notification = renderEmailLayout({ category: '运行通知', title: '运行告警',
-    bodyHtml: '<h1 style="margin:0 0 18px;font-size:24px;line-height:34px;font-weight:500;">运行告警</h1><p>{{ .CommonAnnotations.summary }}</p><p>{{ .CommonAnnotations.description }}</p><p><a href="https://admin.agigalaxy.org/monitoring/">查看运行情况</a></p>',
+    bodyHtml: '<h1 class="galaxy-mail-title" style="margin:0 0 21px;font-size:24px;line-height:35px;font-weight:600;letter-spacing:-.45px;color:#282a34;">运行告警</h1><p style="margin:0 0 13px;">{{ .CommonAnnotations.summary }}</p><p style="margin:0 0 13px;">{{ .CommonAnnotations.description }}</p><p style="margin:0;"><a href="https://admin.agigalaxy.org/monitoring/" style="color:#84516b;">查看运行情况</a></p>',
     bodyText: '运行告警\n\n{{ .CommonAnnotations.summary }}\n\n{{ .CommonAnnotations.description }}\n\nhttps://admin.agigalaxy.org/monitoring/' });
   const deliveryTest = renderGalaxyEmail({ subject: '[AGI Galaxy] 运行告警投递测试 / Monitoring delivery test', title: '运行告警投递测试', category: '运行通知',
     paragraphs: ['这是一封已获授权的运行告警投递测试邮件，无需处理。', '此邮件不报告生产故障。实际告警将通过同一管理通知连接发送。'], note: 'This is an authorized monitoring email delivery test, not a production incident.' });

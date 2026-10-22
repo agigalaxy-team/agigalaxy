@@ -9,7 +9,8 @@ ${category?has_content?then(category, msg("galaxyMailDefaultCategory"))}
 ${msg("galaxyMailAutomatedNotice")}
 ${msg("galaxyMailContactTeam")}: team@agigalaxy.org
 
-${brandName}
-https://agigalaxy.org/
+${msg("galaxyMailAbout")}: https://agigalaxy.org/how-it-works/
 ${msg("galaxyMailPrivacy")}: https://agigalaxy.org/privacy/
+${msg("galaxyMailGuide")}: https://agigalaxy.org/docs/
+© ${.now?string("yyyy")} ${brandName}
 </#macro>
