@@ -26,9 +26,12 @@ const originated=jar=>request(jar,{origin:adminOrigin});
 // transactions: the two orderings below are not multi-connection lock evidence.
 test('fixed-root authentication, lifecycle fences and invalidated role reads stay closed across callback/revocation orderings',
  {timeout:90000},async t=>{
-  assert.deepEqual(migrations.map(x=>x.version),[...Array.from({length:119},(_,i)=>i+1),121,122],
-   'run this new group on the explicit released 119→121→122 source composition, never held120');
+  // Current security regression: follow this source composition's complete
+  // migration contract. Historical 122 compatibility needs a frozen fixture.
+  assert.equal(migrations.some(x=>x.version===120),false,'held120 remains excluded');
   const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api','worker']});
+  assert.deepEqual((await db.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(x=>Number(x.version)),
+   migrations.map(x=>x.version),'the complete current migration set was actually applied');
   assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE column_name='ai_domains'")).rows[0].n,0);
   const now=()=>Math.floor(Date.now()/1000),at=()=>new Date(now()*1000).toISOString();
   const publicAccount=randomUUID(),publicScope=hash('public-scope'),publicToken=hash('public-token');

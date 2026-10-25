@@ -16,6 +16,7 @@ from galaxy_agentos.app import create_app
 from galaxy_agentos.config import Settings
 from galaxy_agentos.gateway import AuthorityDenied
 from galaxy_agentos.read_model import run_detail
+from database_contract import test_database_target, verify_test_database_target
 
 
 class SyntheticAuthority:
@@ -87,10 +88,8 @@ class ScriptedModel(Model):
 class NativeRuntimeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        dsn = environ.get("GALAXY_AGENTOS_TEST_DATABASE_URL") or environ.get("GALAXY_AGENTOS_DATABASE_URL")
-        if not dsn:
-            raise RuntimeError("Native durable checks require the explicitly injected PostgreSQL DSN")
-        cls.settings = Settings(database_url=dsn, database_schema=environ.get("GALAXY_AGENTOS_TEST_SCHEMA", "galaxy_agentos_native_check"),
+        target = verify_test_database_target(test_database_target(environ))
+        cls.settings = Settings(database_url=target.url, database_schema=target.schema,
             authority_url="http://127.0.0.1:1/v1/internal/agentos/",
             service_key="synthetic-service-key-not-a-production-secret",
             verification_key="synthetic-signing-key-not-a-production-secret")
@@ -124,7 +123,11 @@ class NativeRuntimeTest(unittest.TestCase):
     def test_01_model_empty_and_native_auth_boundary(self):
         row = self.gateway.add()
         app = self.app()
-        self.assertEqual(app.state.galaxy_runtime["agents"], [])
+        # Current AgentOS registers a claim-time duty factory even when no
+        # model is configured. Registration grants neither a model nor access.
+        self.assertFalse(app.state.galaxy_runtime["modelConfigured"])
+        self.assertEqual(app.state.galaxy_runtime["configuredDomains"], set())
+        self.assertEqual([agent.id for agent in app.state.galaxy_runtime["agents"]], ["galaxy-duty"])
         with TestClient(app) as client:
             state = client.get("/health").json()
             self.assertEqual(state["model"], "not-configured")
