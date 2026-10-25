@@ -223,7 +223,8 @@ class FeedbackUpdate(ClosedArguments):
     category: Literal["problem", "suggestion"] | None = None
     module: Literal["account", "community", "chat", "work", "discovery", "other"] | None = None
     state: Literal["pending", "processing", "closed"] | None = None
-    note: Annotated[str, Field(min_length=1, max_length=2000)] | None = None
+    note: Annotated[str, Field(min_length=1, max_length=2000,
+        description="Adds an internal note as a separate business change. Omit unless the user explicitly requests that note. Restoring category/module/state does not authorize adding a reason or note; omission keeps existing notes unchanged.")] | None = None
 
     @model_validator(mode="after")
     def changed_field(self):
@@ -458,6 +459,60 @@ _FEEDBACK_FILTER_ENUMS = {
 }
 
 
+# Exact F14 agentOsQueryArgumentsSchema routes that actually accept days.
+# Requiring a choice here prevents provider-generated omissions from silently
+# selecting different Node defaults. It never infers a window from prose.
+_WINDOW_DAYS = {
+    ("accounts", "summary"): [7, 28],
+    ("content", "list"): [7, 28, "all"],
+    ("feedback", "list"): [7, 28, "all"],
+    ("recommendations", "overview"): [7, 30, 90],
+    ("search", "overview"): [7, 30, 90],
+    **{("analytics", view): list(range(1, 91))
+        for view in ("overview", "business", "retention", "paths", "account")},
+}
+
+# Derived from F14 agentOsQueryArgumentsSchema.parse(...).filters.days;
+# the exact defaults are checked against the actual Node schemas locally.
+_WINDOW_DEFAULT_DAYS = {
+    ("accounts", "summary"): 7, ("content", "list"): 7, ("feedback", "list"): 7,
+    ("recommendations", "overview"): 30, ("search", "overview"): 7,
+    ("analytics", "overview"): 7, ("analytics", "business"): 7,
+    ("analytics", "retention"): 7, ("analytics", "paths"): 7, ("analytics", "account"): 7,
+}
+
+
+def _window_filter_feedback(module, view, values):
+    allowed = _WINDOW_DAYS.get((module, view))
+    if allowed is None:
+        return None
+    supplied = values.get("days")
+    if "days" in values and type(supplied) in {int, str} and supplied in allowed:
+        return None
+    return {"state": "invalid-request", "reason": "agentos_query_window_required" if "days" not in values else "agentos_query_window_invalid",
+        "module": module, "view": view, "requiredFilterKeys": ["days"], "allowedDays": list(allowed),
+        "defaultDays": _WINDOW_DEFAULT_DAYS[(module, view)],
+        "windowRequired": True, "dataRead": False, "effectExecuted": False,
+        "nextStep": "supply-explicit-supported-days-matching-user-request",
+        "explanation": "该视图必须显式传days。用户指定范围时逐项匹配；未指定时间时可显式采用本视图已发布defaultDays并在答复标注，无需追问。本工具不自动填入范围，也不推断用户意图。"}
+
+
+def _analysis_constraints(result, *, module=None, view=None, filters=None):
+    """Add fixed interpretation limits; preserve every original source value."""
+    constraints = {"requestedDays": (filters or {}).get("days") if (module, view) in _WINDOW_DAYS else None,
+        "rules": [
+            "逐项核对原返回period/basis/coverage；请求days不证明每个指标都采用同一窗口，固定周留存、终身值和当前存量必须分别标明。",
+            "统计0只表示该返回口径观察到0；不能据此排除采集故障、漏报、覆盖不足，或断言确实没有人使用。",
+            "null/unknown不是0；有样本也可能unknown。原因只按来源明确reason/status说明，不猜没样本、未到期、未运行或未定型。",
+            "比例须同时核分子、分母、时间和覆盖范围；高CTR或小样本不能推出用户意愿、兴趣或需求极高。",
+            "feedback业务状态与共同task状态、model状态、人工决定状态分别说明；task/model completed不能证明feedback已关闭或业务处理完成。",
+        ]}
+    if module == "maintenance" and view == "logs":
+        constraints["runtimeEventMeanings"] = {"runtime_event_rejected":
+            "Node runtimeLogEvent对非事件名allowlist输入的安全归一化名称；该名称本身不表示反向代理、访问拦截或非法访问。具体HTTP/安全原因仅认来源明确字段。"}
+    return {**result, "analysisConstraints": constraints}
+
+
 def _feedback_filter_feedback(values):
     try:
         FeedbackMetadataFilters.model_validate(values)
@@ -478,6 +533,9 @@ def _feedback_filter_feedback(values):
 
 
 def _query_filter_feedback(module, view, values):
+    window_feedback = _window_filter_feedback(module, view, values)
+    if window_feedback is not None:
+        return window_feedback
     if (module, view) == ("feedback", "list"):
         return _feedback_filter_feedback(values)
     contract = _QUERY_FILTER_CONTRACTS.get((module, view))
@@ -549,6 +607,9 @@ def conversation_tools(gateway, *, domain=None):
         result = gateway.conversation_tool(context.user_id, name, arguments, **binding)
         if name == "prepare-operation":
             result = _preparation_feedback(result)
+        elif name in {"query-operations", "read-operation-object"}:
+            result = _analysis_constraints(result, module=arguments.get("module"),
+                view=arguments.get("view"), filters=arguments.get("filters"))
         return json.dumps(result, ensure_ascii=False, allow_nan=False)
 
     def query_operations(run_context: RunContext, fc: FunctionCall,
@@ -563,7 +624,22 @@ def conversation_tools(gateway, *, domain=None):
         service-authorized public-case-review material. An unavailable module
         is not an empty or zero result.
 
-        Windowed reads: explicitly pass the user's supported days for each
+        Windowed reads: days is mandatory for each supported window view:
+        accounts/summary 7 or 28; content/list and feedback/list 7,28,all;
+        analytics overview/business/retention/paths/account integers 1..90;
+        recommendations/overview and search/overview 7,30,90. Missing days is
+        rejected locally without a query. Never infer or silently fill the
+        user's choice. If no time range was requested, explicitly use this
+        view's published defaultDays and disclose that window in the answer;
+        no follow-up question is needed. The tool never fills days itself.
+        An explicitly requested range must still match. Do not send days to
+        views that do not support it.
+        Read analysisConstraints with the unchanged original response: zero
+        is not a collection-health diagnosis; null/unknown reasons require an
+        explicit source explanation; ratios need counts and cannot prove user
+        intent. runtime_event_rejected in maintenance logs only normalizes an
+        event name outside the Node allowlist, not a proxy/security finding.
+        Explicitly pass the user's supported days for each
         requested view; do not rely on another module's default. recommendations
         overview supports days=7/30/90 and defaults to 30; search overview also
         supports 7/30/90 but defaults to 7. Their returned period is the event
@@ -751,6 +827,12 @@ def conversation_tools(gateway, *, domain=None):
         operation identifiers. Use genuine object IDs from query tools. Do not
         invent deadlines; ask the manager when an exact hide time is missing.
         A human card's actual result is required before reporting completion.
+        Keep every unrequested field unchanged. feedback-update note is a
+        separate internal-note mutation: omit it unless explicitly requested,
+        including when restoring category/module/state. Never invent an audit
+        reason or note. The existing null/omission contract is unchanged.
+        A feedback pending/processing/closed status is a business value, distinct
+        from common-task/model/human-decision state; report their actual source.
         For AI-only management first read current_summary and the current
         read_ai_delegation directory. ai-work-prompt-save accepts only the
         actual allowed aiAccountId and intended ordinary prompt text (up to
