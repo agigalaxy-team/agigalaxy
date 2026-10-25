@@ -42,7 +42,8 @@ def test_database_target(environ):
     if runtime:
         try:
             live = urlsplit(runtime)
-            if (live.hostname, live.port, live.path) == (parsed.hostname, parsed.port, parsed.path):
+            host = lambda value: "loopback" if value in {"127.0.0.1", "localhost", "::1"} else value
+            if (host(live.hostname), live.port or 5432, unquote(live.path)) == (host(parsed.hostname), parsed.port, unquote(parsed.path)):
                 raise TestDatabaseConfigurationError("agentos_test_database_runtime_target_forbidden")
         except ValueError:
             pass

@@ -27,6 +27,13 @@ class DatabaseContractTest(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(TestDatabaseConfigurationError):test_database_target(env)
         env=configured();env["GALAXY_AGENTOS_DATABASE_URL"]=env["GALAXY_AGENTOS_TEST_DATABASE_URL"]
         with self.assertRaisesRegex(TestDatabaseConfigurationError,"runtime_target_forbidden"):test_database_target(env)
+        for host in ("localhost", "[::1]"):
+            env=configured();env["GALAXY_AGENTOS_DATABASE_URL"]=env["GALAXY_AGENTOS_TEST_DATABASE_URL"].replace("127.0.0.1",host)
+            with self.subTest(alias=host), self.assertRaisesRegex(TestDatabaseConfigurationError,"runtime_target_forbidden"):
+                test_database_target(env)
+        env=configured();env["GALAXY_AGENTOS_TEST_DATABASE_URL"]=env["GALAXY_AGENTOS_TEST_DATABASE_URL"].replace(":55439",":5432")
+        env["GALAXY_AGENTOS_DATABASE_URL"]=env["GALAXY_AGENTOS_TEST_DATABASE_URL"].replace(":5432","")
+        with self.assertRaisesRegex(TestDatabaseConfigurationError,"runtime_target_forbidden"):test_database_target(env)
 
     def test_actual_identity_or_superuser_is_rejected_read_only(self):
         target=test_database_target(configured())
