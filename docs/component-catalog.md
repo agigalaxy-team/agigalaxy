@@ -45,3 +45,7 @@ CI 先按真实 Git base 计算 matrix，再调用相同的 `check`/`build`。�
 `imports` 产生的 `additionalSourceCoupling` 记录当前仍在组件目录外的源码引用，例如 Native 的 A2A/Web 工具与 Official 客户端模块、Admin 的 Web 头像和共用邮件。这些是真实耦合。远端拆仓前需要先给相应模块建立版本化导出、锁定依赖及兼容测试，保留原提交、许可与来源；当前目录安排不宣称已经可以逐仓独立发布。远端创建、默认分支、保护规则、仓库公开性和正式 push 由维护者另行决定。
 
 `shared` 目录中两份仅用于 Hub 私有 AgentOS 协议的 `operations-agentos-schema.mjs` 与 `operations-tool-call-id.mjs` 在目录中明确归属 Hub。目录位置不把服务私有请求 schema 变成公共客户端合同；公开 Task 合同、邮件及跨包导入仍沿真实消费者传播。
+
+## 可独立运行的读取续期 QA
+
+[tools/qa/operations-read-renewal](../tools/qa/operations-read-renewal/README.md) 归属 Admin，包含当前实际hook的React/DOM驱动、受控读取替身及三份F13前像。默认只从本仓库读取产品源与前像；Playwright安装和headless浏览器是测试工具链，不提供产品源。它不进入Next产品TS编译，bundle/报告只写新outputs目录。七阶段的合成延时/权限/触发替身边界及运行方法见其README，不能把它当真实后端或生产不中断验收。
