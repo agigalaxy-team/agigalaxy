@@ -5,7 +5,7 @@ import {taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2S
 const clients=new WeakMap(),copy=value=>structuredClone(value),equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
 const uuid=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value??'');
-const legacyKinds=new Set(['suggest-contacts','invite','invitation-reply','revoke-invitation','apply','withdraw-application','cancel','close','extend-enrollment',
+const legacyKinds=new Set(['suggest-contacts','invite','invitation-reply','revoke-invitation','apply','withdraw-application','cancel','close','stop-enrollment','extend-enrollment',
  'propose','requester-feedback','confirm','decline','withdraw','propose-scope','confirm-scope','decline-scope','deliver','accept','dispute','propose-resolution','confirm-resolution']);
 const changed=()=>fail('task_owner_control_connection_changed','身份或连接已变化，原操作已保留，请重新核对原回执。');
 const invalid=()=>fail('task_owner_control_record_invalid','原任务操作或准确授权范围不一致，请保留原记录并核对。');
@@ -35,14 +35,14 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
   const metadataKeys=new Set(['taskId','eventId','payloadHash','operationId','kind','expectedTaskVersion','state','receiptState','localRetryStopped',
    'serverCancellationConfirmed','stoppedAt','version','checkedAt','currentAccessGranted']);
   for(const item of [...value.stopped,...value.receipts])if(!item||Object.keys(item).some(k=>!metadataKeys.has(k))
-   ||item.taskId!==taskId||!uuid(item.operationId)||item.eventId!==item.operationId||!['cancel','close'].includes(item.kind)
+   ||item.taskId!==taskId||!uuid(item.operationId)||item.eventId!==item.operationId||!['cancel','close','stop-enrollment'].includes(item.kind)
    ||!Number.isSafeInteger(item.expectedTaskVersion)||item.expectedTaskVersion<1||!/^[a-f0-9]{64}$/.test(item.payloadHash))invalid();
   return value;};
  const save=(lease,value)=>wait(lease,()=>runtime.putLocal(key,value));
  const ref=record=>({taskId,eventId:record.operationId,payloadHash:record.payloadHash});
  const locator=record=>({...ref(record),operationId:record.operationId,kind:record.kind,expectedTaskVersion:record.expectedTaskVersion});
  async function validateRecord(lease,record){
-  if(!record||!uuid(record.operationId)||!['cancel','close'].includes(record.kind)||typeof record.payloadJson!=='string')invalid();
+  if(!record||!uuid(record.operationId)||!['cancel','close','stop-enrollment'].includes(record.kind)||typeof record.payloadJson!=='string')invalid();
   let parsed;try{parsed=taskOwnerControlEnvelopeV2Schema.parse(JSON.parse(record.payloadJson));}catch{invalid();}
   if(parsed.taskId!==taskId||parsed.event.eventId!==record.operationId||parsed.event.kind!==record.kind||parsed.event.expectedTaskVersion!==record.expectedTaskVersion
    ||await wait(lease,()=>sha256Hex(record.payloadJson))!==record.payloadHash)invalid();return parsed;
@@ -62,7 +62,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
    ||receipt.state==='acknowledged'&&(!Number.isSafeInteger(receipt.version)||receipt.version<1
     ||exactVersion&&receipt.version!==record.expectedTaskVersion+1)
    ||receipt.kind!==undefined&&receipt.kind!==record.kind
-   ||receipt.participationId!==undefined&&receipt.participationId!==null&&(!uuid(receipt.participationId)||['cancel','close'].includes(record.kind))
+   ||receipt.participationId!==undefined&&receipt.participationId!==null&&(!uuid(receipt.participationId)||['cancel','close','stop-enrollment'].includes(record.kind))
    ||receipt.participationVersion!==undefined&&receipt.participationVersion!==null&&(!Number.isSafeInteger(receipt.participationVersion)||receipt.participationVersion<1))invalid();return receipt;
  }
  const query=async(lease,record)=>validateReceipt(record,await wait(lease,()=>runtime.api.call('/v2/tasks/receipt',ref(record))));
@@ -106,7 +106,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
    // An original local stop can be between its archive write and queue release.
    // Do not resume that intent or clear either legacy store in this client.
    if(rows.some(other=>other.source==='legacy-task-stopped'&&other.eventId===row.eventId))legacyBlocked();
-   if(!['cancel','close'].includes(row.kind)||row.kind!==input.kind||row.event.reason!==input.reason)legacyBlocked();
+   if(!['cancel','close','stop-enrollment'].includes(row.kind)||row.kind!==input.kind||row.event.reason!==input.reason)legacyBlocked();
    if(record&&(record.operationId!==row.operationId||record.payloadHash!==row.payloadHash||record.payloadJson!==row.payloadJson))legacyBlocked();
    candidate=row;
   }
@@ -126,7 +126,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
   if(receipt.state==='acknowledged')return complete(lease,state,record,receipt);
   if(receipt.state==='conflict'){record.state='conflict';state.pending=record;await save(lease,state);blocked();}return receipt;}
  async function prepareWithin(lease,{kind,reason}){
-  if(!['cancel','close'].includes(kind)||typeof reason!=='string'||!reason.trim()||reason.trim().length>1500)invalid();
+  if(!['cancel','close','stop-enrollment'].includes(kind)||typeof reason!=='string'||!reason.trim()||reason.trim().length>1500)invalid();
   const state=await load(lease);let record=await original(lease,state);
   if(record){const receipt=await receiptFirst(lease,state,record);if(receipt.state==='acknowledged')return receipt;
    const event=JSON.parse(record.payloadJson).event;if(event.kind!==kind||event.reason!==reason.trim())blocked();
@@ -137,7 +137,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
     payloadJson:candidate.payloadJson,payloadHash:candidate.payloadHash,state:'absent'};
   }
   const operationId=record?.operationId??crypto.randomUUID();
-  const preview=await wait(lease,()=>runtime.api.call(`/v2/tasks/${taskId}/owner-control/prepare`,{operationId,kind,reason:reason.trim()}));
+  const preview=await wait(lease,()=>runtime.api.call(`/v2/tasks/${taskId}/owner-control/prepare`,{operationId,kind,reason:reason.trim(),...(kind==='close'?{terminationIntent:'terminate-task'}:{})}));
   await validatePreview(lease,preview);
   if(record&&(preview.payloadHash!==record.payloadHash||preview.payloadJson!==record.payloadJson)){
    if(legacy.candidate)fail('task_owner_control_legacy_preview_changed','当前预览无法保留原队列的准确字节或版本。请在原流程独立停止本机重试并核对原回执，再明确审阅新操作；原队列保持不变。');
@@ -158,6 +158,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
    if(!record||record.operationId!==selected.operationId||record.payloadHash!==selected.payloadHash||record.payloadJson!==selected.payloadJson)invalid();
    const receipt=await receiptFirst(lease,state,record);if(receipt.state==='acknowledged')return receipt;
    const legacyInput=JSON.parse(record.payloadJson).event;
+   if(legacyInput.kind==='close'&&legacyInput.terminationIntent!=='terminate-task')fail('task_termination_intent_required','原关闭操作只可查询回执；终止整项求助需要新的明确意图。');
    const checkLegacy=async()=>{const legacy=await legacyGate(lease,record,legacyInput);
     if(legacy.ack){if(legacy.ack.eventId!==record.operationId||legacy.ack.payloadHash!==record.payloadHash)legacyBlocked();
      return complete(lease,state,record,legacy.ack);}return null;};
@@ -181,7 +182,7 @@ export function createTaskOwnerControlClient(runtime,taskId,{now=()=>Math.floor(
    const accepted=await checkLegacy();if(accepted)return accepted;
    const result=await wait(lease,()=>runtime.api.call(`/v2/tasks/${taskId}/owner-control`,record.submission));
    if(!taskOwnerControlResultV2Schema.safeParse(result).success||result.taskId!==taskId||result.eventId!==record.operationId||result.payloadHash!==record.payloadHash
-    ||result.version!==record.expectedTaskVersion+1||result.state!==(record.kind==='cancel'?'canceled':'closed'))invalid();
+    ||result.version!==record.expectedTaskVersion+1||result.state!==(record.kind==='stop-enrollment'?'enrollment-stopped':record.kind==='cancel'?'canceled':'closed'))invalid();
    await complete(lease,state,record,{...ref(record),state:'acknowledged',version:result.version,checkedAt:now()});return copy(result);
   });},
   reconcile:({operationId}={})=>serial(async lease=>{const state=await load(lease),record=state.pending&&(!operationId||state.pending.operationId===operationId)

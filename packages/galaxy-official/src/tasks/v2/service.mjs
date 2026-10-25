@@ -56,11 +56,11 @@ export class TaskServiceV2 extends TaskReadModelV2{
   async submitTaskEvent(actor, id, { consentId, payloadJson }) {
     const input = parse(payloadJson, taskEnvelopeV2Schema), event = input.event;
     if (input.taskId !== id) throw new ServiceError('task_target_mismatch');
-    return this.access.runResourceWrite(actor, 'assistance', { control: ['cancel', 'close', 'withdraw-application', 'revoke-invitation'].includes(event.kind) }, async (db, authorization) => {
+    return this.access.runResourceWrite(actor, 'assistance', { control: ['cancel', 'close', 'stop-enrollment', 'withdraw-application', 'revoke-invitation'].includes(event.kind) }, async (db, authorization) => {
       const { row, paused, governance } = await this.requireTaskWithin(db, actor, id, { write: true });
       const replay = await this.taskReplay(db, actor, id, event.eventId, consentId, payloadJson); if (replay) return replay;
       if(['invite','apply','extend-enrollment'].includes(event.kind))assertTargetOperation(governance,'new-participation-paused');
-      if (paused && !['cancel', 'withdraw-application', 'revoke-invitation'].includes(event.kind)) throw new ServiceError('task_paused', 403);
+      if (paused && !['cancel', 'stop-enrollment', 'withdraw-application', 'revoke-invitation'].includes(event.kind)) throw new ServiceError('task_paused', 403);
       const state = row.snapshot, next = applyTaskV2(state, actor.subjectId, event, this.access.now());
       const recipientIds = [row.requester_id];
       if (event.kind === 'invite') recipientIds.push(event.recipientId);

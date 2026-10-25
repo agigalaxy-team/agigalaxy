@@ -7,7 +7,7 @@ import {join,resolve,dirname,basename} from 'node:path';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
+import {createNativeRecoveryWebFixture as createExistingWebRuntime} from './native-recovery-web-fixture.mjs';
 import {createTaskOwnerReadClient} from '../../galaxy-web/src/task-owner-read-client.mjs';
 import {createTaskOwnerControlClient} from '../../galaxy-web/src/task-owner-control-client.mjs';
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
@@ -77,6 +77,16 @@ async function fixture({legacyFault=null,legacyKind='cancel',legacySpaced=false}
   if(dirname(resolve(directory))===resolve(tmpdir())&&basename(directory).startsWith('galaxy-owner-control-journal-'))await rm(directory,{recursive:true,force:true});throw error;}
 }
 const input={kind:'cancel',reason:'Explicit synthetic original work cancellation'};
+
+test('an absent legacy close remains exact and cannot obtain a fresh Consent or silently become enrollment stop',async()=>{
+ const h=await fixture();try{
+  const event={kind:'close',eventId:randomUUID(),expectedTaskVersion:1,reason:'Historical ambiguous close'},payloadJson=JSON.stringify({taskId:h.task.taskId,event});
+  const original={taskId:h.task.taskId,eventId:event.eventId,payloadJson,payloadHash:createHash('sha256').update(payloadJson).digest('hex'),viewers:[],state:'result-unknown',authorizationExpiresAt:h.f.now+3600};
+  await h.runtime.putLocal('task-event:'+h.task.taskId,original);const writes=h.writes.length;
+  await assert.rejects(h.runtime.resumeTaskEvent(h.task.taskId),error=>error.code==='task_termination_intent_required');
+  assert.deepEqual(await h.runtime.getLocal('task-event:'+h.task.taskId),original);assert.equal(h.writes.length,writes);assert.equal(await h.count(),0);
+ }finally{await h.close();}
+});
 
 test('receipt kind/participation metadata and unknown fields cannot falsely acknowledge the retained original control',async()=>{
  const h=await fixture();try{

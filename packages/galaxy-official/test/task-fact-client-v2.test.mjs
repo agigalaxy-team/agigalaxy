@@ -131,7 +131,7 @@ test('client links actual work without failed attempts, keeps multiple authors a
       who,
       path,
       await who.authorize(payload, 'assistance.publish', {
-        objectId: payload.operationId ?? payload.eventId,
+        objectId: payload.operationId ?? payload.eventId ?? payload.event?.eventId,
         viewers: recipients.filter((id) => id !== who.actor.subjectId),
       }),
     );
@@ -221,6 +221,17 @@ test('client links actual work without failed attempts, keeps multiple authors a
     const pp = await participate(p, 'diagnosis'),
       qp = await participate(q, 'review');
     task = await getTask(f);
+    const stop={kind:'stop-enrollment',eventId:randomUUID(),expectedTaskVersion:task.version,reason:'Enough participants; finish existing work'};
+    const stopEnvelope={taskId,event:stop},stopGrant=await f.authorize(stopEnvelope,'assistance.publish',{objectId:stop.eventId});
+    // The response can be lost after commit: only this exact receipt/payload is retried.
+    const stopped=await request(f,`/v2/tasks/${taskId}/events`,stopGrant);
+    assert.deepEqual(await request(f,`/v2/tasks/${taskId}/events`,stopGrant),{taskId,eventId:stop.eventId,version:stopped.version});
+    const stopReceipt=await request(f,'/v2/tasks/receipt',{taskId,eventId:stop.eventId,payloadHash:digest(stopGrant.payloadJson)});
+    assert.equal(stopReceipt.state,'acknowledged');
+    task=await getTask(f);assert.equal(task.state,'open');assert.equal(task.enrollmentOpen,false);
+    assert.equal(task.enrollmentState,'stopped');
+    await assert.rejects(taskWrite(q,`/v2/tasks/${taskId}/events`,{taskId,event:{kind:'apply',eventId:randomUUID(),expectedTaskVersion:task.version,proposal:'Late application'}}),{code:'task_transition_denied'});
+
     const work = async (who, part, fields) =>
       client(who).submitFact(
         task,

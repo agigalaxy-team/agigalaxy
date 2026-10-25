@@ -1,7 +1,7 @@
 import {transaction} from "../../database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {taskReceiptV2Schema,taskQueryV2Schema} from "../../shared/task-schema-v2.mjs";
-import {legacyAssistanceTaskV2} from "../../domain/task-v2.mjs";
+import {legacyAssistanceTaskV2,taskEnrollmentOpen} from "../../domain/task-v2.mjs";
 import {hasTaskMaterials,hasTaskText} from "../../shared/task-material-v1-schema.mjs";
 import {uuid,absent} from './helpers.mjs';
 import {TaskAuthorityV2} from './authority.mjs';
@@ -24,7 +24,8 @@ export class TaskReadModelV2 extends TaskAuthorityV2{
     const { row, paused, governance } = await this.requireTaskWithin(db, actor, id);
     const state = row.snapshot, requester = actor?.subjectId === row.requester_id;
     const result = { schemaVersion: 2, taskId: id, caseId: row.case_id, request: state.request, requesterId: row.requester_id,
-      version: state.version, state: state.state, enrollmentOpen: state.state === 'open' && state.request.enrollmentExpiresAt > this.access.now()&&!governance.scopes.includes('new-participation-paused'),
+      version: state.version, state: state.state, enrollmentState: state.enrollment?.state ?? 'open',
+      enrollmentOpen: taskEnrollmentOpen(state,this.access.now())&&!governance.scopes.includes('new-participation-paused'),
       paused, governance, paymentExecuted: false, contextAccessGranted: false, roomMembershipGranted: false,
       compatibility: { writableApiVersion: 2, legacyWrites: false }, view: requester ? 'requester' : actor ? 'participant-or-reader' : 'public' };
     if(hasTaskMaterials(state.request)||hasTaskText(state.request)){
@@ -77,7 +78,7 @@ export class TaskReadModelV2 extends TaskAuthorityV2{
     for (;;) {
     const candidates = (await db.query(`SELECT id FROM task_requests
       WHERE ($1::uuid IS NULL OR id>$1)
-      AND ($2='open' AND snapshot->>'state'='open' AND (snapshot->'request'->>'enrollmentExpiresAt')::bigint>$3
+      AND ($2='open' AND snapshot->>'state'='open' AND COALESCE(snapshot->'enrollment'->>'state','open')='open' AND (snapshot->'request'->>'enrollmentExpiresAt')::bigint>$3
         OR $2='requested' AND requester_id=$4
         OR $2='participating' AND EXISTS(SELECT 1 FROM task_participations p WHERE p.task_id=task_requests.id AND p.subject_id=$4)
         OR $2='participating' AND snapshot->'invitations' @> jsonb_build_array(jsonb_build_object('recipientId',$4::text))

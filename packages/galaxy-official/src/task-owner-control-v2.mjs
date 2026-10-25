@@ -25,6 +25,8 @@ export class TaskOwnerControlServiceV2 {
   }
   prepare(actor,input){
     const request=parse(taskOwnerControlPrepareV2Schema,input);
+    if(request.kind==='close'&&request.terminationIntent!=='terminate-task')
+      throw new ServiceError('task_termination_intent_required',409);
     return this.access.runAuthorized(actor,'assistance',async(db,authorization)=>{
       const {task,events}=await this.sourceWithin(db,actor,request.taskId,authorization),root=events[0];
       const existing=(await db.query('SELECT task_id,subject_id FROM task_events WHERE id=$1',[request.operationId])).rows[0];
@@ -33,7 +35,8 @@ export class TaskOwnerControlServiceV2 {
       const row=(await db.query("SELECT snapshot->>'state' AS state FROM task_requests WHERE id=$1",[task.id])).rows[0];
       if(['canceled','closed'].includes(row?.state))throw new ServiceError('task_transition_denied',409);
       await this.pausedWithin(db,task,request.kind);
-      const envelope={taskId:task.id,event:{kind:request.kind,eventId:request.operationId,expectedTaskVersion:task.version,reason:request.reason}};
+      const envelope={taskId:task.id,event:{kind:request.kind,eventId:request.operationId,expectedTaskVersion:task.version,reason:request.reason,
+        ...(request.kind==='close'?{terminationIntent:request.terminationIntent}:{})}};
       const payloadJson=JSON.stringify(parse(taskOwnerControlEnvelopeV2Schema,envelope));
       return taskOwnerControlPreviewV2Schema.parse({taskId:task.id,operationId:request.operationId,kind:request.kind,expectedTaskVersion:task.version,
         payloadJson,payloadHash:digest(payloadJson),expiresAt:Math.min(Math.floor(this.access.now())+this.maxControlSeconds,root.readExpiresAt),
@@ -67,14 +70,14 @@ export class TaskOwnerControlServiceV2 {
       // Replay retains the original Consent ID and literal payload hash. A new
       // Consent after a lost ACK cannot disguise the already accepted intent.
       const replay=await this.tasks.taskReplay(db,actor,taskId,event.eventId,request.consentId,request.payloadJson);
-      if(replay)return taskOwnerControlResultV2Schema.parse({...replay,state:event.kind==='cancel'?'canceled':'closed',
+      if(replay)return taskOwnerControlResultV2Schema.parse({...replay,state:event.kind==='stop-enrollment'?'enrollment-stopped':event.kind==='cancel'?'canceled':'closed',
         payloadHash:digest(request.payloadJson),authority:'accepted-operation-only',currentAccessGranted:false,...effects});
       await this.pausedWithin(db,row,event.kind);
       const next=applyTaskV2(row.snapshot,actor.subjectId,event,this.access.now());
       await this.tasks.taskRepository.save(db,next);
       const receipt=await this.tasks.recordTaskEvent(db,actor,authorization,next,{eventId:event.eventId,kind:event.kind,
         consentId:request.consentId,payloadJson:request.payloadJson});
-      return taskOwnerControlResultV2Schema.parse({...receipt,payloadHash:digest(request.payloadJson),authority:'accepted-operation-only',
+      return taskOwnerControlResultV2Schema.parse({...receipt,...(event.kind==='stop-enrollment'?{state:'enrollment-stopped'}:{}),payloadHash:digest(request.payloadJson),authority:'accepted-operation-only',
         currentAccessGranted:false,...effects});
     });}catch(error){if(error.code==='23505')throw new ServiceError('task_event_conflict',409);throw error;}
   }

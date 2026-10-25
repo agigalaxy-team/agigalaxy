@@ -2,7 +2,8 @@ import { ServiceError } from '../shared/service-error.mjs';
 import { taskRequestV2Schema, taskEventV2Schema, participationProposalV2Schema, participationEventV2Schema } from '../shared/task-schema-v2.mjs';
 
 function rule(value, code = 'task_transition_denied') { if (!value) throw new ServiceError(code, 409); }
-function enrollment(state, now) { return state.state === 'open' && state.request.enrollmentExpiresAt > now; }
+export function taskEnrollmentOpen(state, now) { return state.state === 'open' && state.enrollment?.state !== 'stopped' && state.request.enrollmentExpiresAt > now; }
+const enrollment = taskEnrollmentOpen;
 function nextTask(state, actorId, event, now) {
   rule(Number.isSafeInteger(now) && now >= state.lastEventAt, 'task_time_conflict');
   rule(state.events.length < 10000, 'task_event_limit');
@@ -16,7 +17,7 @@ export function createTaskV2(requesterId, input, now) {
   rule(!request.parentTaskId || request.parentTaskId !== request.taskId, 'task_parent_cycle');
   return { schemaVersion: 2, requesterId, request, version: 1, scopeVersion: 1, state: 'open',
     suggestions: { state: 'not-requested', items: [], eventId: null }, invitations: [], applications: [],
-    participationIds: [], selected: null, events: [], createdAt: now, lastEventAt: now,
+    participationIds: [], selected: null, enrollment: {state: 'open'}, events: [], createdAt: now, lastEventAt: now,
     paymentExecuted: false, contextAccessGranted: false, roomMembershipGranted: false };
 }
 export function applyTaskV2(state, actorId, input, now) {
@@ -61,9 +62,16 @@ export function applyTaskV2(state, actorId, input, now) {
     case 'cancel':
       rule(requester && !['canceled', 'closed'].includes(state.state)); next.state = 'canceled'; break;
     case 'close':
+      // Legacy pages called close while promising to stop enrollment. Decode
+      // their old records for receipt lookup, but never infer termination.
+      rule(event.terminationIntent === 'terminate-task', 'task_termination_intent_required');
       rule(requester && !['canceled', 'closed'].includes(state.state)); next.state = 'closed'; break;
+    case 'stop-enrollment':
+      rule(requester && state.state === 'open');
+      next.enrollment = state.enrollment?.state === 'stopped' ? state.enrollment
+        : {state: 'stopped', eventId: event.eventId, stoppedAt: now, actorId}; break;
     case 'extend-enrollment':
-      rule(requester && state.state === 'open' && event.enrollmentExpiresAt > now
+      rule(requester && state.state === 'open' && state.enrollment?.state !== 'stopped' && event.enrollmentExpiresAt > now
         && event.enrollmentExpiresAt > state.request.enrollmentExpiresAt);
       next.request.enrollmentExpiresAt = event.enrollmentExpiresAt; break;
   }

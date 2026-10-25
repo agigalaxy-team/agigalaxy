@@ -43,7 +43,10 @@ export const taskEventV2Schema = z.discriminatedUnion('kind', [
   z.strictObject({ ...taskCommon, kind: z.literal('apply'), proposal: note, scope: note.optional(), quote: budget.optional(), qualificationEvidence: z.union([qualificationEvidenceSchema,qualificationEvidenceV2Schema]).optional() }),
   z.strictObject({ ...taskCommon, kind: z.literal('withdraw-application'), applicationId: z.uuid(), reason: note }),
   z.strictObject({ ...taskCommon, kind: z.literal('cancel'), reason: note }),
-  z.strictObject({ ...taskCommon, kind: z.literal('close'), reason: note }),
+  // Optional only for decoding historical payloads and querying their receipts;
+  // new close writes require the explicit intent in the domain authority.
+  z.strictObject({ ...taskCommon, kind: z.literal('close'), reason: note, terminationIntent: z.literal('terminate-task').optional() }),
+  z.strictObject({ ...taskCommon, kind: z.literal('stop-enrollment'), reason: note }),
   z.strictObject({ ...taskCommon, kind: z.literal('extend-enrollment'), enrollmentExpiresAt: positive }),
 ]);
 export const taskEnvelopeV2Schema = z.strictObject({ taskId: z.uuid(), event: taskEventV2Schema });

@@ -509,6 +509,7 @@ export function createWebTaskOperations({api,prefix,store,captureTaskDraftLease,
   /** @param {string} taskId @param {object} event @param {{viewers?:string[],confirmed?:boolean}} options */
   async function taskEvent(taskId, event, { viewers = [], confirmed = false } = {}) {
     if (!confirmed || !api.snapshot()) throw new Error('请连接当前身份并确认这次操作。');
+    if(event.kind==='close'&&event.terminationIntent!=='terminate-task')throw Object.assign(Error('请明确选择结束征集或终止整项求助。'),{code:'task_termination_intent_required'});
     const lease = taskLease(), selectedEvent = structuredClone(event), selectedViewers = [...viewers];
     const key = localKey(`task-event:${taskId}`);
     if (await taskAwait(lease, () => store.get(key))) throw new Error('请先查询这项任务上一次操作的结果。');
@@ -530,6 +531,7 @@ export function createWebTaskOperations({api,prefix,store,captureTaskDraftLease,
   async function dispatchTaskEvent(record, lease, { explicitRetry = false } = {}) {
     checkTaskLease(lease);
     const payload = JSON.parse(record.payloadJson), kind = payload.event?.kind ?? payload.kind;
+    if(kind==='close'&&payload.event?.terminationIntent!=='terminate-task')throw Object.assign(Error('旧关闭操作只能核对原回执；请重新明确处理方式。'),{code:'task_termination_intent_required'});
     if (kind === 'apply' || kind === 'confirm') await taskAwait(lease, () => agentContinuity.requireCurrent());
     const key = localKey(`task-event:${record.taskId}`);
     if (!record.submission) {
@@ -579,6 +581,7 @@ export function createWebTaskOperations({api,prefix,store,captureTaskDraftLease,
       checkedParticipationReceipt(record,receipt);
       if(receipt.state==='acknowledged')return acknowledgeTaskEvent(key,record,receipt,lease);
       if(receipt.state!=='absent')return receipt;
+      if(payload.event?.kind==='close'&&payload.event.terminationIntent!=='terminate-task')throw Object.assign(Error('旧关闭操作未被接受；请明确选择结束征集或终止整项求助。'),{code:'task_termination_intent_required'});
       if((await taskAwait(lease,()=>stoppedTaskOperations(taskId))).some(item=>item.eventId===record.eventId))return{...receipt,reason:'stopped-local'};
       if(record.automaticRetryBlock&&!explicitRetry)throw taskBusinessRejected(record);
       const deadline=record.authorizationExpiresAt??record.preparedConsent?.intent?.expiresAt;

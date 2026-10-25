@@ -7,7 +7,7 @@ import type {createWebRuntime} from './runtime.mjs';
 import {useGovernanceDraft} from './governance-presentation';
 import './task-owner-reading.css';
 
-type Kind = 'cancel' | 'close';
+type Kind = 'cancel' | 'close' | 'stop-enrollment';
 type Locator = { taskId: string; operationId: string; eventId: string; payloadHash: string; kind: Kind;
   expectedTaskVersion: number; state: string; receiptState?: string; version?: number };
 type Preview = Locator & { payloadJson: string; expiresAt: number; authorization: { recipient: string;
@@ -26,7 +26,7 @@ type Client = { pending(): Promise<Directory>; prepare(input: { kind: Kind; reas
   stopRetry(input: { taskId: string; operationId: string; payloadHash: string }, options: { confirmed: boolean }): Promise<Outcome>;
   close(): void };
 const empty: Directory = { pending: null, stopped: [], receipts: [], legacy: [] };
-const names = { cancel: '取消请求', close: '结束征集' };
+const names = { cancel: '取消请求', close: '终止整项请求', 'stop-enrollment': '结束征集' };
 const states: Record<string, string> = { prepared: '已准备，尚未确认提交', unknown: '结果未知', absent: '本次核对未找到原操作',
   conflict: '原操作存在冲突', acknowledged: '原操作已被服务接受', 'stopped-local': '已停止本机重试' };
 const messages: Record<string, string> = {
@@ -61,7 +61,7 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
   const client = useRef<Client | null>(null), live = useRef(0), working = useRef(false);
   const [directory, setDirectory] = useState<Directory>(empty), [preview, setPreview] = useState<Preview | null>(null);
   const subjectId=runtime.api.snapshot()?.subjectId;
-  const draft=useGovernanceDraft<{kind:Kind;reason:string},{operationId:string;payloadHash:string;taskId:string;kind:Kind}>(runtime,subjectId,true,'owner-control-input:v1:'+taskId,{kind:'close',reason:''}),kind=draft.value.kind as Kind,reason=draft.value.reason as string;
+  const draft=useGovernanceDraft<{kind:Kind;reason:string},{operationId:string;payloadHash:string;taskId:string;kind:Kind}>(runtime,subjectId,true,'owner-control-input:v1:'+taskId,{kind:'stop-enrollment',reason:''}),kind=draft.value.kind as Kind,reason=draft.value.reason as string;
   const [message, setMessage] = useState(''), [busy, setBusy] = useState(true), [status, setStatus] = useState<Status | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null), [stopping, setStopping] = useState<Locator | null>(null);
   const [legacyStop, setLegacyStop] = useState<LegacyStop | null>(null);
@@ -112,13 +112,13 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
     const value = await current.reconcile({ operationId }); if (valid()) setOutcome({ ...value, localRetryStopped: stopped });
   });
   const submit=()=>run(async(current,valid)=>{
-    const saved=await draft.snapshot();if(!valid())return;const selected=saved.value.kind as Kind,explanation=saved.value.reason.trim()||(selected==='close'?'结束这次请求的征集。':'取消这次请求。');
+    const saved=await draft.snapshot();if(!valid())return;const selected=saved.value.kind as Kind,explanation=saved.value.reason.trim()||(selected==='stop-enrollment'?'结束这次请求的征集。':'取消这次请求。');
     setPreview(null);setOutcome(null);setStopping(null);setLegacyStop(null);await requireWritable(valid);
     const prepared=await current.prepare({kind:selected,reason:explanation});if(!valid())return;
     if(!('payloadJson' in prepared)){setOutcome(prepared);return;}
     await draft.attach({operationId:prepared.operationId,payloadHash:prepared.payloadHash,taskId,kind:selected},saved.revision);if(!valid())return;
     await requireWritable(valid);const result=await current.confirm(prepared,{confirmed:true});if(!valid())return;setOutcome(result);
-    if(['acknowledged','canceled','closed'].includes(result.state))await draft.settle(async locator=>{const receipt=await current.reconcile({operationId:locator.operationId});return{state:['acknowledged','canceled','closed'].includes(receipt.state)?'acknowledged':receipt.state};});
+    if(['acknowledged','canceled','closed','enrollment-stopped'].includes(result.state))await draft.settle(async locator=>{const receipt=await current.reconcile({operationId:locator.operationId});return{state:['acknowledged','canceled','closed','enrollment-stopped'].includes(receipt.state)?'acknowledged':receipt.state};});
   });
   return <section className="task-owner-control task-card" aria-busy={busy}>
     <h3>处理原请求</h3>
@@ -128,8 +128,8 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
       <Button variant="outline" disabled={busy} onClick={() => run(async (_current, valid) => { await requireWritable(valid); })}>重新核对服务状态</Button>
     </div>}
     {outcome && <div className="message" aria-label="原操作核对结果">
-      <h3>{outcome.state === 'canceled' ? '已取消这项请求' : outcome.state === 'closed' ? '已结束征集' : states[outcome.state] ?? '本次没有待核对操作'}</h3>
-      {['acknowledged', 'canceled', 'closed'].includes(outcome.state)
+      <h3>{outcome.state === 'canceled' ? '已取消这项请求' : outcome.state === 'enrollment-stopped' ? '已结束征集' : outcome.state === 'closed' ? '已终止整项请求' : states[outcome.state] ?? '本次没有待核对操作'}</h3>
+      {['acknowledged', 'canceled', 'closed', 'enrollment-stopped'].includes(outcome.state)
         ? <p>已有工作记录继续保留。需要继续查看时，可使用上方的本人记录。</p>
         : <p>{outcome.state === 'absent' ? (outcome.localRetryStopped ? '这次查询没有找到已停止的原操作。该定位只能用于查询，不会重新签署或发送；另起操作需要独立审阅。' : '这次查询没有找到原操作，未重新签署或发送。若继续，需要重新核对同一操作的当前范围。') : outcome.state === 'conflict' ? '原操作存在冲突，不能自动换一个标识重试。请保留原记录。' : outcome.state === 'none' ? '本次没有找到对应的本机待处理操作。不能据此推断服务端状态。' : '本机不再重试这项操作，服务是否接受过它仍以原回执为准。'}</p>}
     </div>}
@@ -179,7 +179,7 @@ function OwnerControl({ runtime, taskId }: { runtime: Runtime; taskId: string })
       })}>确认只停止本机重试</Button><Button variant="ghost" disabled={busy} onClick={() => setStopping(null)}>保留原操作</Button></div>
     </div>}
     {!pending&&!preview&&directory.receipts.length===0&&<form className="owner-request-action" onSubmit={event=>{event.preventDefault();void submit();}}>
-      <fieldset disabled={busy||!writable||!draft.ready}><legend>现在怎样处理</legend><label className="owner-control-choice" aria-label="结束征集"><input type="radio" name={'owner-action-'+taskId} checked={kind==='close'} onChange={()=>draft.change({kind:'close'})}/><span><strong>结束征集</strong><small>不再征集新的参与，已有协作记录保留。</small></span></label><label className="owner-control-choice" aria-label="取消请求"><input type="radio" name={'owner-action-'+taskId} checked={kind==='cancel'} onChange={()=>draft.change({kind:'cancel'})}/><span><strong>取消请求</strong><small>不再按这项请求继续；已经发生的记录继续保留。</small></span></label></fieldset>
+      <fieldset disabled={busy||!writable||!draft.ready}><legend>现在怎样处理</legend><label className="owner-control-choice" aria-label="结束征集"><input type="radio" name={'owner-action-'+taskId} checked={kind==='stop-enrollment'} onChange={()=>draft.change({kind:'stop-enrollment'})}/><span><strong>结束征集</strong><small>停止新参与，已经建立的合作可继续交付与验收。</small></span></label><label className="owner-control-choice" aria-label="取消请求"><input type="radio" name={'owner-action-'+taskId} checked={kind==='cancel'} onChange={()=>draft.change({kind:'cancel'})}/><span><strong>取消请求</strong><small>不再按这项请求继续；已经发生的记录继续保留。</small></span></label><label className="owner-control-choice" aria-label="终止整项请求"><input type="radio" name={'owner-action-'+taskId} checked={kind==='close'} onChange={()=>draft.change({kind:'close'})}/><span><strong>终止整项请求</strong><small>停止整项工作，已有参与也不能继续交付或验收。</small></span></label></fieldset>
       <label htmlFor={'owner-reason-'+taskId}>补充说明（可选）</label><Textarea id={'owner-reason-'+taskId} value={reason} maxLength={1500} disabled={busy||!writable||!draft.ready} onChange={event=>draft.change({reason:event.target.value})}/>
       <p className="record-meta">这项操作不会标记问题已解决，也不会自动验收或结算。</p>
       {draft.status&&!['草稿已保存在本机。','已恢复本机草稿。','正在保存…'].includes(draft.status)&&<p className="message error" role="alert">{draft.status}</p>}

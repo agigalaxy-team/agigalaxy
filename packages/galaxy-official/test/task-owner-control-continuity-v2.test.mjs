@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
+import {createNativeRecoveryWebFixture as createExistingWebRuntime} from './native-recovery-web-fixture.mjs';
 import {createRecoveryMaterial,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {TaskOwnerControlServiceV2} from '../src/task-owner-control-v2.mjs';
 import {digest} from '../src/shared/digest.mjs';
@@ -51,7 +51,7 @@ async function fixture({retiring=false}={}){
    await runtime.confirmRecoveredCode({operationId:recoveredMaterial.operationId,confirmed:true});await runtime.connect({confirmed:true});const after=(await runtime.status()).identity;
    assert.equal(after.subjectId,before.subjectId);assert.notEqual(after.deviceId,before.deviceId);};
   const preview=(task,kind='cancel',operationId=randomUUID())=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-control/prepare`,
-   {operationId,kind,reason:'Explicit synthetic original Task control'});
+   {operationId,kind,...(kind==='close'?{terminationIntent:'terminate-task'}:{}),reason:'Explicit synthetic original Task control'});
   const permit=p=>sign(p.payloadJson,p.authorization.action,p.operationId,{expiresAt:p.expiresAt});
   const execute=(task,request)=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-control`,request);
   const receipt=(task,p)=>runtime.api.call('/v2/tasks/receipt',{taskId:task.taskId,eventId:p.operationId,payloadHash:p.payloadHash});
@@ -72,8 +72,8 @@ async function fixture({retiring=false}={}){
 }
 const code=value=>error=>error.code===value;
 
-test('recovered owner separately confirms cancel and close without changing original facts or counterpart participation',async()=>{
- for(const kind of ['cancel','close']){
+test('recovered owner separately confirms cancel, whole-task close and stop-enrollment without changing original facts',async()=>{
+ for(const kind of ['cancel','close','stop-enrollment']){
   const h=await fixture();
   try{const {f,runtime}=h,other=await serviceFixture(browserScopes,f.db,{migrateDatabase:false,now:f.now});
    const task=await h.publish({viewers:[other.actor.subjectId]}),owner=(await runtime.status()).identity.subjectId;
@@ -92,7 +92,8 @@ test('recovered owner separately confirms cancel and close without changing orig
    const p=await h.preview(task,kind),request=await h.permit(p);
    assert.equal(p.expectedTaskVersion,3);assert.equal(p.payloadHash,digest(p.payloadJson));assert.deepEqual(p.authorization.viewers,[]);
    assert.equal(JSON.stringify(p).includes(task.summary),false);assert.equal(p.historyRetained,true);
-   const result=await h.execute(task,request);assert.equal(result.state,kind==='cancel'?'canceled':'closed');assert.equal(result.version,4);
+   const result=await h.execute(task,request);assert.equal(result.state,kind==='stop-enrollment'?'enrollment-stopped':kind==='cancel'?'canceled':'closed');assert.equal(result.version,4);
+   if(kind==='stop-enrollment'){const snapshot=(await f.db.query('SELECT snapshot FROM task_requests WHERE id=$1',[task.taskId])).rows[0].snapshot;assert.equal(snapshot.state,'open');assert.equal(snapshot.enrollment.state,'stopped');}
    assert.equal(result.completeTaskAccessGranted,false);assert.equal(result.settlementExecuted,false);assert.equal(result.currentAccessGranted,false);
    assert.deepEqual((await h.original(task)).slice(0,-1),retained);assert.deepEqual((await f.db.query('SELECT * FROM task_participations WHERE task_id=$1',[task.taskId])).rows,participations);
    assert.equal((await h.original(task)).at(-1).payload_text,p.payloadJson);assert.equal((await h.receipt(task,p)).state,'acknowledged');

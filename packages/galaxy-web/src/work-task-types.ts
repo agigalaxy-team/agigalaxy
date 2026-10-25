@@ -22,5 +22,5 @@ export type WorkParticipation=FeedbackParticipant&{
  dispute?:{eventId:string;reason:string}|null;
  disputeResolution?:{eventId:string;actorId:string;summary:string;outcome:'close'|'resume-work'}|null;
 };
-export type WorkTask={schemaVersion:number;taskId:string;caseId:string|null;requesterId:string;version:number;state:string;enrollmentOpen?:boolean;request:WorkRequest;participations?:WorkParticipation[];contacts?:{suggestions:{items:Extract<TaskEvent,{kind:'suggest-contacts'}>['items']};responses:{applications:WorkApplication[];invitations:WorkInvitation[]}}};
+export type WorkTask={schemaVersion:number;taskId:string;caseId:string|null;requesterId:string;version:number;state:string;enrollmentOpen?:boolean;enrollmentState?:string;request:WorkRequest;participations?:WorkParticipation[];contacts?:{suggestions:{items:Extract<TaskEvent,{kind:'suggest-contacts'}>['items']};responses:{applications:WorkApplication[];invitations:WorkInvitation[]}}};
 export type WorkProps={task:WorkTask;runtime:WorkRuntime;subjectId?:string;connected:boolean;navigate:(path:string)=>void;refresh:()=>Promise<unknown>};
