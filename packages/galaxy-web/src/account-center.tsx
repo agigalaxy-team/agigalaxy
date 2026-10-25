@@ -1,4 +1,5 @@
-import React,{useCallback,useEffect,useLayoutEffect,useMemo,useState,useSyncExternalStore} from 'react';
+import {forumBodyExcerpt} from './community-forum-browse.mjs';
+import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Bookmark,BriefcaseBusiness,FileText,Home,Laptop,MessageSquare,Pencil,Settings,UserRound} from 'lucide-react';
 import {OfficialAccountStatus,type OfficialAccountModel,type OfficialSession} from './official-account-panel';
 import {AccountSessionScope,useAccountSessionModel} from './account-session-scope';
@@ -6,6 +7,7 @@ import {AccountWorkHistory,type AccountWorkCall} from './account-work-history';
 import {availableForumContent,type ForumCardView} from './community-forum-view-types';
 import {LoadingFeedback,ReadFailure} from './interaction-feedback';
 import {useReadTasks} from './use-read-task';
+import {AccountProfileAvatar} from './account-profile-avatar';
 import './profile-settings.css';
 import './selected-account.css';
 
@@ -48,12 +50,25 @@ export function SettingsLayout(props:LayoutProps){return <AccountSessionScope en
 function AccountLayout({path,search,endpoint,navigate,children}:LayoutProps){
  const model=useAccountSessionModel(),connection=useAccountConnection(endpoint,model),parameters=new URLSearchParams(search),view=parameters.get('view'),section=parameters.get('section');
  const signedIn=model.phase==='signed-in'&&!!model.session?.account.id;
+ const directory=useRef<HTMLElement|null>(null);
+ useLayoutEffect(()=>{
+  const rail=directory.current;if(!rail)return;
+  const reveal=()=>{
+   if(rail.scrollWidth<=rail.clientWidth)return;
+   const current=rail.querySelector<HTMLElement>('[aria-current="page"]');if(!current)return;
+   const bounds=rail.getBoundingClientRect(),selected=current.getBoundingClientRect();
+   if(selected.left<bounds.left)rail.scrollLeft+=selected.left-bounds.left;
+   else if(selected.right>bounds.right)rail.scrollLeft+=selected.right-bounds.right;
+  };
+  reveal();const observer=new ResizeObserver(reveal);observer.observe(rail);
+  return()=>observer.disconnect();
+ },[path,search,signedIn]);
  const preserveDraft=!!connection.session?.account.id&&['offline','unavailable'].includes(model.phase);
  if(!signedIn&&!preserveDraft)return <AccountEntryPage navigate={navigate} returnTo={path+search+location.hash}/>;
- const current=path==='/app/community'&&section==='owned'?'posts':path==='/app/bookmarks'?'bookmarks':path==='/app/settings/identity'||section==='access'?'local':path==='/app/account'&&section==='settings'&&!['work','archives'].includes(view??'')?'settings':'overview';
- const links=[{key:'overview',to:'/app/account',label:'概览',icon:Home},{key:'posts',to:'/app/community?section=owned',label:'我的帖子',icon:MessageSquare},{key:'bookmarks',to:'/app/bookmarks',label:'收藏',icon:Bookmark},{key:'settings',to:'/app/account?section=settings',label:'设置',icon:Settings},{key:'local',to:'/app/account?section=access',label:'本机银河',icon:Laptop}];
+ const current=path==='/app/account'&&section==='following'?'following':path==='/app/feedback'?'feedback':path==='/app/community'&&section==='owned'?'posts':path==='/app/bookmarks'?'bookmarks':path==='/app/settings/identity'||section==='access'?'local':path==='/app/account'&&section==='settings'&&!['work','archives'].includes(view??'')?'settings':'overview';
+ const links=[{key:'overview',to:'/app/account',label:'概览',icon:Home},{key:'posts',to:'/app/community?section=owned',label:'我的帖子',icon:MessageSquare},{key:'bookmarks',to:'/app/bookmarks',label:'收藏',icon:Bookmark},{key:'following',to:'/app/account?section=following',label:'关注',icon:UserRound},{key:'settings',to:'/app/account?section=settings',label:'设置',icon:Settings},{key:'local',to:'/app/account?section=access',label:'本机银河',icon:Laptop},{key:'feedback',to:'/app/feedback',label:'使用反馈',icon:MessageSquare}];
  return <div className={'settings-layout selected-account-layout'+(!signedIn?' account-without-directory':'')}>
-  {signedIn&&<aside className="settings-sidebar selected-account-sidebar"><h2>账户</h2><nav aria-label="账户栏目">{links.map(({key,to,label,icon:Icon})=><NavLink key={key} to={to} navigate={navigate} aria-current={current===key?'page':undefined}><Icon size={19}/>{label}</NavLink>)}</nav></aside>}
+  {signedIn&&<aside className="settings-sidebar selected-account-sidebar"><h2>账户</h2><nav ref={directory} aria-label="账户栏目">{links.map(({key,to,label,icon:Icon})=><NavLink key={key} to={to} navigate={navigate} aria-current={current===key?'page':undefined}><Icon size={19}/>{label}</NavLink>)}</nav></aside>}
   <div className="settings-content selected-account-content">{children}</div>
  </div>;
 }
@@ -65,27 +80,29 @@ function AccountOverviewContent({navigate}:{navigate:Go}){
  if(model.phase!=='signed-in'||!model.session?.account.id)return <AccountEntryPage navigate={navigate}/>;
  const account=model.session.account,label=account.displayName||account.email||'我的账户';
  return <section className="profile-overview selected-account"><header className="profile-heading"><h1 className="small">我的内容</h1></header>
-  <section className="account-person"><span className="account-person-avatar" aria-hidden="true">{account.displayName?Array.from(account.displayName)[0]:<UserRound size={30}/>}</span><div><h2>{label}</h2>{account.uid&&<p className="account-uid"><span>UID</span> <code>{account.uid}</code></p>}{account.displayName&&account.email&&<p>{account.email}</p>}<div className="account-person-actions"><NavLink to="/app/account?section=settings" navigate={navigate}>编辑资料</NavLink><button type="button" disabled={model.busy} onClick={()=>void model.logout()}>退出账户</button></div></div></section>
-  <div className="account-overview-grid"><AccountRecentPosts key={account.id} model={model} navigate={navigate}/><section className="account-content-index"><h2>继续阅读</h2><nav aria-label="我的内容"><NavLink to="/app/bookmarks" navigate={navigate}><Bookmark size={21}/><span>我的收藏</span></NavLink><NavLink to="/app/work" navigate={navigate}><BriefcaseBusiness size={21}/><span>我的工作</span></NavLink><NavLink to="/app/account?section=settings&view=archives" navigate={navigate}><FileText size={21}/><span>私有会话</span></NavLink></nav></section></div>
+  <section className="account-person"><AccountProfileAvatar className="account-person-avatar" name={account.displayName} avatarKey={account.avatarKey} subjectType={account.subjectType} seed={account.id} size={64}/><div><h2>{label}</h2>{account.uid&&<p className="account-uid"><span>UID</span> <code>{account.uid}</code></p>}{account.displayName&&account.email&&<p>{account.email}</p>}<div className="account-person-actions"><NavLink to="/app/account?section=settings" navigate={navigate}>编辑资料</NavLink><button type="button" disabled={model.busy} onClick={()=>void model.logout()}>退出账户</button></div></div></section>
+  <div className="account-overview-grid"><AccountRecentPosts key={account.id} model={model} navigate={navigate}/><section className="account-content-index"><h2>继续阅读</h2><nav aria-label="我的内容"><NavLink to="/app/bookmarks" navigate={navigate}><Bookmark size={21}/><span>我的收藏</span></NavLink><NavLink to="/app/account?section=following" navigate={navigate}><UserRound size={21}/><span>我的关注</span></NavLink><NavLink to="/app/work" navigate={navigate}><BriefcaseBusiness size={21}/><span>我的工作</span></NavLink><NavLink to="/app/account?section=settings&view=archives" navigate={navigate}><FileText size={21}/><span>私有会话</span></NavLink></nav></section></div>
  </section>;
 }
 function AccountRecentPosts({model,navigate}:{model:OfficialAccountModel;navigate:Go}){
  const [posts,setPosts]=useState<ForumCardView[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[now,setNow]=useState(()=>Math.floor(Date.now()/1000));
  const session=model.session,client=model.client,phase=model.phase,accountId=session?.account.id,csrfToken=session?.csrfToken,tasks=useReadTasks(accountId+':'+csrfToken);
+ const latest=useRef(model);latest.current=model;
  useEffect(()=>{
   let active=true;
-  const read=async()=>{
+  const read=async(quiet=false)=>{
    await Promise.resolve();if(!active)return;
-   if(phase!=='signed-in'||!session?.account.id||!client){tasks.cancel();setPosts([]);setLoading(false);return;}
-   await tasks.run({lane:'posts',key:String(revision)},({signal})=>client.call('/v2/community/posts/owned',{}, {session,signal}) as Promise<{items:ForumCardView[]}>,{onStart:()=>setLoading(true),onSuccess:value=>{setPosts(value.items??[]);setError('');setNow(Math.floor(Date.now()/1000));},onError:()=>{setPosts([]);setError('帖子暂时无法加载。');},onSettled:()=>setLoading(false)});
+   const current=latest.current,live=current.session;
+   if(current.phase!=='signed-in'||!live||!accountId||live.account.id!==accountId||live.csrfToken!==csrfToken||!client){tasks.cancel();setPosts([]);setLoading(false);return;}
+   await tasks.run({lane:'posts',key:String(revision)},async({signal})=>{const result=await client.call('/v2/community/posts/owned',{}, {session:live,signal}) as {items:ForumCardView[]};const checked=latest.current;if(checked.phase!=='signed-in'||!checked.session||checked.session.account.id!==accountId||checked.session.csrfToken!==csrfToken||checked.session.expiresAt*1000<=Date.now())throw Error('official_account_changed');return result;},{onStart:()=>{if(!quiet)setLoading(true);},onSuccess:value=>{setPosts(value.items??[]);setError('');setNow(Math.floor(Date.now()/1000));},onError:()=>{setPosts([]);setError('帖子暂时无法加载。');},onSettled:()=>setLoading(false)});
   };
-  void read();return()=>{active=false;tasks.cancel('posts');};
- },[client,phase,session,revision,tasks]);
- useEffect(()=>{const refresh=()=>{if(!document.hidden&&navigator.onLine!==false){setNow(Math.floor(Date.now()/1000));setRevision(value=>value+1);}};window.addEventListener('online',refresh);window.addEventListener('focus',refresh);return()=>{window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh);};},[]);
+  const refresh=()=>{if(!document.hidden&&navigator.onLine!==false){setNow(Math.floor(Date.now()/1000));void read(true);}};
+  void read();const timer=setInterval(refresh,30000);window.addEventListener('online',refresh);window.addEventListener('focus',refresh);return()=>{active=false;clearInterval(timer);window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh);tasks.cancel('posts');};
+ },[client,phase,accountId,csrfToken,revision,tasks]);
  const expiry=Math.min(...posts.flatMap(value=>value.availability==='available'&&typeof value.publishedUntil==='number'?[value.publishedUntil]:[]));
  useEffect(()=>{if(!Number.isFinite(expiry))return;const timer=setTimeout(()=>{const current=Math.floor(Date.now()/1000);setNow(current);setPosts(old=>old.map(value=>typeof value.publishedUntil==='number'&&value.publishedUntil<=current?{...value,payload:undefined,availability:'expired'}:value));setRevision(value=>value+1);},Math.min(2147483647,Math.max(0,expiry*1000-Date.now()+1)));return()=>clearTimeout(timer);},[expiry]);
  return <section className="account-recent-posts" aria-busy={loading}><header><h2>我的帖子</h2><NavLink to="/app/community?compose=post" navigate={navigate} className="primary-action"><Pencil size={15}/>写帖子</NavLink></header>
-  <LoadingFeedback active={loading} label="正在加载帖子…" scopeKey={accountId??''}/>{error?<ReadFailure message={error} onRetry={()=>setRevision(value=>value+1)} retrying={loading}/>:posts.length?<ul>{posts.slice(0,4).map(value=>{const readable=availableForumContent(value,now);return <li key={value.locator.postId}><NavLink to={'/app/community/posts/'+value.locator.postId+'?manage=1'} navigate={navigate}><strong>{readable?value.payload.title:'state'in value&&value.state==='withdrawn'?'已撤回的帖子':'当前不可读取的帖子'}</strong>{readable&&<p>{value.payload.body.replace(/\s+/g,' ').slice(0,180)}</p>}</NavLink>{value.updatedAt&&<time>{new Date(value.updatedAt*1000).toLocaleDateString('zh-CN')}</time>}</li>;})}</ul>:!loading&&<p className="account-content-empty">还没有帖子，写下想分享的内容吧。</p>}
+  <LoadingFeedback active={loading} label="正在加载帖子…" scopeKey={accountId??''}/>{error?<ReadFailure message={error} onRetry={()=>setRevision(value=>value+1)} retrying={loading}/>:posts.length?<ul>{posts.slice(0,4).map(value=>{const readable=availableForumContent(value,now);return <li key={value.locator.postId}><NavLink to={'/app/community/posts/'+value.locator.postId+'?manage=1'} navigate={navigate}><strong>{readable?value.payload.title:'state'in value&&value.state==='withdrawn'?'已撤回的帖子':'当前不可读取的帖子'}</strong>{readable&&<p>{forumBodyExcerpt(value.payload.body).slice(0,180)}</p>}</NavLink>{value.updatedAt&&<time>{new Date(value.updatedAt*1000).toLocaleDateString('zh-CN')}</time>}</li>;})}</ul>:!loading&&<p className="account-content-empty">还没有帖子，写下想分享的内容吧。</p>}
   {posts.length>0&&<NavLink to="/app/community?section=owned" navigate={navigate} className="text-link">全部帖子</NavLink>}
  </section>;
 }

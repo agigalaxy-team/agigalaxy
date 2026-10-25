@@ -20,7 +20,7 @@ export function createAttachmentsClient({api,getLocal,putLocal}){
  const validRecord=(lease,record,roomId)=>{owner(lease);if(record&&(record.subjectId!==subjectId||record.input.roomId!==roomId))throw new Error('请先连接原来选择文件的身份。');return record;};
  async function receipt(lease,record,value){
   if(value.attachmentId!==record.input.attachmentId||value.roomId!==record.input.roomId||value.sha256!==record.input.sha256||value.size!==record.input.size)throw new Error('附件回执不匹配，请保留原操作。');
-  if(storedStates.has(value.state))await save(lease,record.input.roomId,null);
+  if(storedStates.has(value.processingState??value.state))await save(lease,record.input.roomId,null);
   return value;
  }
  async function upload(lease,record,file,{signal,onStage=()=>{}}={}){
@@ -28,7 +28,7 @@ export function createAttachmentsClient({api,getLocal,putLocal}){
   const bytes=new Uint8Array(await guard(lease,()=>file.arrayBuffer()));
   if(bytes.length!==record.input.size||await guard(lease,()=>sha(bytes))!==record.input.sha256)throw new Error('所选文件与原操作不一致。');
   signal?.throwIfAborted();onStage('确认上传记录');const prepared=await receipt(lease,record,await call(lease,'prepare',record.input));
-  if(storedStates.has(prepared.state))return prepared;
+  if(storedStates.has(prepared.processingState??prepared.state)||prepared.access?.stopped)return prepared;
   signal?.throwIfAborted();onStage('正在上传');const result=await receipt(lease,record,await guard(lease,()=>api.attachmentTransfer(path+record.input.attachmentId+'/upload',{bytes,signal})));
   onStage('等待扫描');return result;
  }

@@ -8,6 +8,7 @@ import json
 
 from home_page import render_homepage
 from cms_content import content_slot
+from release_status import release_status_body
 
 
 def icon(name):
@@ -104,14 +105,8 @@ def render_product_pages(site):
         + section("开发与开放接入", '<p>协议与字段为实际接入提供参考。当前产品入口、版本化接口和旧发行说明各有自己的适用范围。</p>', "/app/builders", "打开建设者入口")
         + '<div class="reading-resources"><a href="/docs/builders-support-v2.md">接口说明</a><a href="/llms.txt">Agent 文档索引</a><a href="/docs/v0.4/overview.md">历史 v0.4 概览</a><a href="/changelog.md">发行记录</a></div>')
 
-    api_version = escape(str(metadata.get("backendRelease", "未提供")))
-    site_version = escape(str(metadata.get("releaseId", metadata.get("version", "未提供"))))
     page("/status/", "版本信息", "银河网站、服务与客户端的发行版本。",
-        intro("版本信息", "当前发行版本与使用入口。")
-        + section("网站", f'<p>{site_version}</p>', "/app/", "打开银河")
-        + section("API", f'<p>{api_version}</p>', "/docs/builders-support-v2.md", "接口文档")
-        + section("客户端", '<p>' + escape(str(package.get("version", "未提供"))) + '</p>', "/downloads/", "下载客户端")
-        + section("历史发行记录", '<p>查阅此前版本的发行说明。</p>', "/changelog.md", "查看历史记录"))
+         release_status_body(metadata, content_slot))
 
     page("/404/", "页面未找到", "返回银河，继续浏览或查找内容。",
         '<section class="missing-page"><span aria-hidden="true">404</span><h1>这里没有找到内容。</h1><p>地址可能已经改变，可以继续浏览或搜索。</p><a class="button" href="/app/">回到发现 ' + '</a><a class="text-link" href="/app/community">看看社区</a></section>')

@@ -1,4 +1,9 @@
 import {createChatClient} from './chat-client.mjs';
+import {readWithTransientRecovery} from '../../../integrations/shared/read-task.mjs';
+
+const readPost = path => ['/v2/chat/rooms/directory','/v2/chat/invitations/query'].includes(path)
+  || /^\/v2\/chat\/rooms\/[0-9a-f-]{36}\/(?:read|decisions|history|receipt|operation-receipt)$/.test(path)
+  || /^\/v2\/chat\/rooms\/[0-9a-f-]{36}\/messages\/[0-9a-f-]{36}\/context$/.test(path);
 
 let generation=0;
 // Adapt the real website account session to the existing chat journal and local
@@ -21,7 +26,11 @@ export function createOfficialChatRuntime({base,endpoint,client,getSession,getNe
   const getLocal=(key,selected)=>{owner(selected);return guard(()=>base.getLocal(key,subjectId));};
   const putLocal=(key,value,selected)=>{owner(selected);return guard(()=>base.putLocal(key,value,subjectId));};
   const updateLocal=(key,update,selected)=>{owner(selected);return guard(()=>base.updateLocal(key,current=>{assertCurrent();return update(current);},subjectId));};
-  const api={endpoint,snapshot,call:(path,input,options={})=>networkGuard(session=>client.call(path,input,{...options,session})),
+  const api={endpoint,snapshot,call:(path,input,options={})=>{
+    const action=()=>networkGuard(session=>client.call(path,input,{...options,session}));
+    return (options.method??'POST')==='POST'&&readPost(path)
+      ?readWithTransientRecovery(action,{signal:options.signal,check:()=>{assertCurrent();networkSession();}}):action();
+  },
     attachmentTransfer:(path,{bytes,signal}={})=>networkGuard(async session=>{
       const response=await client.transfer(path,bytes??{},{method:bytes?'PUT':'POST',session,signal});
       if(bytes)return response.json();

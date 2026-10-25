@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {getFactClient,exactFactRef} from '../src/fact-client.mjs';
+import {privacyConsumerFixture} from "../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs";
+import {getFactClient,exactFactRef} from "../src/features/work-records/client.mjs";
 
 // Actual signed HTTP, current Task/Case permissions and PGlite. The local Map
 // journal controls await boundaries; these checks do not replace browser IDB.

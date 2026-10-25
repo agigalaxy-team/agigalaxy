@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {Compass,Search} from 'lucide-react';
-import {ContentCard,type BrowsePage,type TaskBrowseItem} from './public-browse-workspace';
+import {ContentCard} from './features/discovery/content-card';
+import type {BrowsePage,TaskBrowseItem} from './features/discovery/contracts';
 import type {createWebRuntime} from './runtime.mjs';
 
 type View='open'|'requested'|'participating';

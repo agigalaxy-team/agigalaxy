@@ -77,9 +77,7 @@ export function saveForumBrowsePosition({ storage, scope, route, pages, y, ancho
   return position;
 }
 
-export function forumBodyParagraphs(body) {
-  return body.replace(/\r\n?/g, '\n').split(/\n[\t ]*\n+/).map(value => value.trim()).filter(Boolean);
-}
+export {forumBodyParagraphs,forumBodyBlocks,forumBodyExcerpt} from '../../galaxy-official/src/shared/community-forum-body-text.mjs';
 
 export function forumLinkLabel(value) {
   try {

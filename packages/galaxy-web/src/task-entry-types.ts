@@ -1,12 +1,12 @@
-import type {z} from 'zod/v4';
-import type {taskEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
-import type {WorkRuntime,WorkSignedRequest,WorkTask} from './work-task-types';
-import type {WorkAttempt,WorkFacts} from './work-fact-types';
-import type {ContactCandidate,SearchRequest,SearchItem,SearchType} from './help-contact-view-types';
-import {object,projectErrorText} from './project-workspace-types';
-import {taskDraft} from './task-bounty-client.mjs';
-import {isDraftTaskText,isDraftMaterials,isDraftMaterialBodies} from './task-material-types';
-import type {TaskText,TaskMaterial,TaskMaterialBody} from './task-material-types';
+import type {z} from "zod/v4";
+import type {taskEventV2Schema} from "../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {WorkRuntime,WorkSignedRequest,WorkTask} from "./work-task-types";
+import type {WorkAttempt,WorkFacts} from "./features/work-records/contracts";
+import type {ContactCandidate,SearchRequest,SearchItem,SearchType} from "./help-contact-view-types";
+import {object,projectErrorText} from "./features/projects/contracts";
+import {taskDraft} from "./task-bounty-client.mjs";
+import {isDraftTaskText,isDraftMaterials,isDraftMaterialBodies} from "./task-material-types";
+import type {TaskText,TaskMaterial,TaskMaterialBody} from "./task-material-types";
 
 export type TaskEntryRuntime=WorkRuntime;
 export type TaskPublication=Omit<WorkSignedRequest,'operationId'|'taskId'>;

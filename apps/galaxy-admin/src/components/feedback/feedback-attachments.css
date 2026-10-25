@@ -1,0 +1,6 @@
+.galaxy-operations .galaxy-feedback-attachment-list>li{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:14px;min-width:0}
+.galaxy-operations .galaxy-feedback-attachment-meta{display:grid;gap:4px;min-width:0}
+.galaxy-operations .galaxy-feedback-attachment-meta strong{font-weight:500;font-size:12px;overflow-wrap:anywhere}
+.galaxy-operations .galaxy-feedback-attachment-meta>span{font-size:11px;line-height:1.7;color:var(--admin-muted)}
+.galaxy-operations .galaxy-feedback-attachment-list button{flex:none;min-height:32px;font-size:11px;padding:5px 10px}
+@media(max-width:600px){.galaxy-operations .galaxy-feedback-attachment-list>li{align-items:flex-start;flex-direction:column;gap:8px}.galaxy-operations .galaxy-feedback-attachment-list button{align-self:flex-end}}

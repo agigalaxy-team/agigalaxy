@@ -1,0 +1,13 @@
+export type AiRunDomain='overview'|'governance'|'messaging'|'discovery'|'maintenance';
+export type AiRunState='PENDING'|'RUNNING'|'COMPLETED'|'PAUSED'|'CANCELLED'|'ERROR'|'REGENERATED';
+export type AiRecordedTime=number|string|null;
+export type AiTokens={input:number|null;output:number|null;total:number|null};
+export type AiRunLease={checkedAt:number;readExpiresAt:number};
+export type AiRunMetadata={runId:string;executionId:string|null;conversationId?:string|null;conversation?:null|{id:string;operatorDisplayName:string|null};sessionId:string|null;componentId:string|null;componentType:string|null;domain:AiRunDomain|null;state:AiRunState|null;errorCode?:string|null;createdAt:AiRecordedTime;updatedAt:AiRecordedTime;promptVersion:string|null;tokens:AiTokens;durationMs:number|null;retryCount:null;retryState:'not-recorded';metadataOnly:true;executor:null|{kind:'program'|'ai';mode:'assisted'|'automatic';onBehalfOf:string|null;onBehalfOfDisplayName?:string|null;grantId:string}};
+export type AiRunPage=AiRunLease&{items:AiRunMetadata[];total:number;page:number;nextPage:number|null;metadataOnly:true;scope:'all-runtime-run-metadata'};
+export type AiRunSpan={spanId:string;traceId:string;parentSpanId:string|null;name:string;kind?:'AGENT'|'CHAIN'|'LLM'|'TOOL'|'RETRIEVER'|'EMBEDDING'|'RERANKER'|'GUARDRAIL'|'EVALUATOR'|null;state:string|null;startTime:AiRecordedTime;endTime:AiRecordedTime;durationMs:number|null;tokens:AiTokens;input:{state:'not-recorded';value:null};output:{state:'not-recorded';value:null}};
+export type AiRunEvent={event:string;eventIndex:number|null;createdAt:AiRecordedTime};
+export type AiRunWorkflow={runId:string|null;status:string;awaitingHuman:boolean;pauseKind?:'input'|'confirmation'|null;workflowId:string;workflowVersion:number;currentStep?:string|null;steps?:{name:string;success:boolean}[]};
+export type AiRunDetail=AiRunLease&{workflow?:AiRunWorkflow|null;run:AiRunMetadata;spans:AiRunSpan[];events:AiRunEvent[];traceCount:number|null;input:{state:'withheld';value:null};output:{state:'withheld';value:null};metadataOnly:true};
+export type AiRunLocation={run:string;span:string;trace:string;page:number;domain:AiRunDomain|'';state:AiRunState|'';view:'process'|'io'|'feedback';task?:string;source?:'workbench'|'routine'|'event'|'recovery'|'';mode?:'code'|'ai'|'ai-human'|'human-ai'|'';taskState?:string;archive?:boolean};
+export type AiSpanRow={key:string;span:AiRunSpan;depth:number;orphan:boolean};

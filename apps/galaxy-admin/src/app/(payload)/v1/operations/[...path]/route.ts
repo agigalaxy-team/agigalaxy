@@ -1,5 +1,5 @@
 import {adminEnvironment,operatorCookies,operatorForwardedAddress} from '../../../../../lib/environment.mjs';
-import {operationsProxyRequestPolicy} from '../../../../../lib/proxy-policy.mjs';
+import {operationsProxyRequestPolicy,operationsRequestBodyLimit,isAgentOsConversationEventsPath} from '../../../../../lib/proxy-policy.mjs';
 import {adminLog,requestCorrelation} from '../../../../../lib/runtime-log.mjs';
 
 export const runtime='nodejs';
@@ -24,7 +24,8 @@ async function proxy(request:Request){
   const environment=adminEnvironment();
   const policy=operationsProxyRequestPolicy({url:request.url,method:request.method,headers:request.headers,publicOrigin:environment.publicOrigin});
   if(!policy.allowed)return finish(Response.json({error:'operations_request_denied'},{status:policy.status,headers:noStore}),'policy');
-  const forwarded=new Headers({Accept:'application/json'}),cookie=operatorCookies(request.headers,environment.fixtureCookies);
+  const observing=request.method==='GET'&&isAgentOsConversationEventsPath(new URL(request.url).pathname);
+  const forwarded=new Headers({Accept:observing?'text/event-stream':'application/json'}),cookie=operatorCookies(request.headers,environment.fixtureCookies);
   try{forwarded.set('X-Forwarded-For',operatorForwardedAddress(request.headers,environment.fixtureCookies));}
   catch(error){return finish(Response.json({error:'operations_forwarded_address_unavailable'},{status:503,headers:noStore}),'forwarded-address',error);}
   if(cookie)forwarded.set('Cookie',cookie);
@@ -33,7 +34,7 @@ async function proxy(request:Request){
   let body:ArrayBuffer|undefined;
   if(request.method==='POST'){
     const pathname=new URL(request.url).pathname;
-    const limit=pathname==='/v1/operations/content/publications'?1048576:pathname.startsWith('/v1/operations/notices')?65536:32768;
+    const limit=operationsRequestBodyLimit(pathname);
     try{body=await boundedBody(request,limit);}catch(error){return finish(Response.json({error:'operations_request_too_large'},{status:413,headers:noStore}),'request-body',error);}
     if(body.byteLength&&request.headers.get('content-type')?.split(';')[0].trim()!=='application/json')return finish(Response.json({error:'operations_json_required'},{status:415,headers:noStore}),'content-type');
     if(body.byteLength)forwarded.set('Content-Type','application/json');
@@ -41,6 +42,7 @@ async function proxy(request:Request){
   try{
     const response=await fetch(environment.bffOrigin+policy.path,{method:request.method,headers:forwarded,body,redirect:'manual',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(20000)])});
     const responseHeaders=new Headers(noStore);
+    if(observing){responseHeaders.set('Cache-Control','no-store, no-transform');responseHeaders.set('X-Accel-Buffering','no');}
     for(const name of ['content-type','content-disposition','location','retry-after','x-request-id']){const value=response.headers.get(name);if(value)responseHeaders.set(name,value);}
     for(const cookie of response.headers.getSetCookie())responseHeaders.append('Set-Cookie',cookie);
     return finish(new Response(response.body,{status:response.status,headers:responseHeaders}),'upstream');

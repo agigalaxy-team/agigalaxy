@@ -1,11 +1,11 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
 import React,{useCallback,useEffect,useId,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
-import {HistoryFields} from './history-facts';
-import {identityGroupIntentSchema} from '../../galaxy-official/src/shared/identity-group-v2-schema.mjs';
-import type {IdentityGroupCandidateRef,IdentityGroupClient,IdentityGroupIntent as GroupIntent,IdentityGroupLease,IdentityGroupProposal,IdentityGroupRecord,IdentityGroupRuntime,IdentityGroupSourceView} from './identity-group-types';
+import {MemberAvatar,memberName,useMemberNames} from "./conversation-ui";
+import {HistoryFields} from "./features/work-records/history";
+import {identityGroupIntentSchema} from "../../galaxy-official/src/shared/identity-group-v2-schema.mjs";
+import type {IdentityGroupCandidateRef,IdentityGroupClient,IdentityGroupIntent as GroupIntent,IdentityGroupLease,IdentityGroupProposal,IdentityGroupRecord,IdentityGroupRuntime,IdentityGroupSourceView} from "./identity-group-types";
 
 export const identityGroupStates:Record<string,string>={pending:'等待其他身份同意',committed:'这次变更已生效',active:'共同展示中',revoked:'分组已撤销',declined:'这次邀请已拒绝',cancelled:'这次邀请已取消',expired:'这次邀请已到期',conflict:'原分组已经变化',absent:'暂未查到这次变更','source-deletion-pending':'相关身份正在申请删除，展示已暂停','source-deleted':'相关来源已删除','control-evidence-unavailable':'身份控制证明当前不可用'};
 export function identityGroupError(error:unknown){const value=typeof error==='object'&&error!==null?error:null,message=value&&'message' in value&&typeof value.message==='string'?value.message:'',code=value&&'code' in value&&typeof value.code==='string'?value.code:message;return({
@@ -16,7 +16,7 @@ export function identityGroupError(error:unknown){const value=typeof error==='ob
  } as Record<string,string>)[code]??(/[\u3400-\u9fff]/.test(message)?message:'暂时无法完成，已输入的内容仍保留。');}
 export const groupTime=(value:string|number|null|undefined)=>value?new Date(typeof value==='number'&&value<1e12?value*1000:value).toLocaleString('zh-CN'):'';
 export const groupRefKey=(ref:IdentityGroupCandidateRef)=>JSON.stringify([ref.kind,ref.id,ref.version,ref.caseId??null]);
-export {identityGroupDraftKey} from './identity-group-draft.mjs';
+export {identityGroupDraftKey} from "./identity-group-draft.mjs";
 export function identityGroupPayload(value:Pick<IdentityGroupProposal,'payloadJson'>|null):GroupIntent|null{try{if(!value?.payloadJson)return null;const parsed=identityGroupIntentSchema.safeParse(JSON.parse(value.payloadJson));return parsed.success?parsed.data:null;}catch{return null;}}
 const eventNames:Record<string,string>={'case-created':'工作说明','case':'工作说明','attempt-start':'开始尝试','attempt-end':'尝试结果','attempt-correct':'更正尝试结果',intervention:'协作帮助','intervention-response':'回应协作','result-recorded':'工作成果','resolution-recorded':'问题解决情况','case-scope-revised':'调整工作范围','case-withdrawn':'撤回工作',record:'配置记录',revoke:'撤回配置'};
 const outcomes:Record<string,string>={succeeded:'成功',partial:'部分完成',failed:'失败',inconclusive:'尚无结论',conflicting:'存在分歧',completed:'完成',abandoned:'放弃',canceled:'取消',resolved:'已解决','partially-resolved':'部分解决',unresolved:'未解决',regressed:'再次出现'};

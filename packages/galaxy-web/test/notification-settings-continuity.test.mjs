@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyNotificationChanges,saveNotificationSelection,notificationSettingsSatisfied} from '../src/notification-settings-model.mjs';
-import {createNotificationLoader} from '../src/notification-loader.mjs';
+import {applyNotificationChanges,saveNotificationSelection,notificationSettingsSatisfied} from '../src/features/notifications/settings-model.mjs';
+import {createNotificationLoader} from '../src/features/notifications/loader.mjs';
 const roomA='00000000-0000-4000-8000-000000000001',roomB='00000000-0000-4000-8000-000000000002';
 const personA='GUID'+'A'.repeat(28),personB='GUID'+'B'.repeat(28);
 const options={rooms:true,tasks:true,mutedRoomIds:[roomA],blockedSubjectIds:[personA],roomBlocks:[{roomId:roomB,subjectId:personB}]};

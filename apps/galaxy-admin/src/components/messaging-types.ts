@@ -1,0 +1,41 @@
+export type MessageChannel='announcement'|'inapp'|'email';
+export type MessagePurpose='maintenance'|'service-update'|'community-update';
+export type MessageSubjectType='person'|'agent'|'organization';
+export type MessageSenderKey='account'|'notice'|'community'|'updates'|'team';
+export type MessageAudience={kind:'all-accounts'}|{kind:'accounts';accountIds:string[]}|{kind:'attributes';subjectTypes:MessageSubjectType[]};
+export type MessageSchedule={kind:'immediate'}|{kind:'once';at:string}|{kind:'recurring';cron:string;timezone:string};
+export type MessagingConfig={channels:MessageChannel[];content:{purpose:MessagePurpose;title:string;body:string;href:string|null;expiresAt:string};audience:MessageAudience;senderKey:MessageSenderKey;schedule:MessageSchedule;automation?:{kind:'human-required'|'ordinary';factsConfirmed:boolean}};
+export type MessageApproval={kind:'business-operator'|'operations-ai-service';operatorId:string;role:'administrator'|'reader'|null;aiAccountId?:string;domain?:string;taskId?:string;operationId?:string|null};
+export type MessagePlanState='draft'|'active'|'paused'|'stopped';
+export type MessageRunState='running'|'paused'|'blocked'|'completed'|'cancelled'|'expired';
+export type MessageRecipientState='pending'|'submitting'|'submitted'|'delivered'|'skipped'|'failed'|'unknown'|'blocked';
+export type MessageLease={checkedAt:number;readExpiresAt:number};
+export type MessageAudienceAccount={accountId:string;uid:string|null;displayName:string|null;state:'available'|'unavailable'};
+export type MessageAudienceAccounts={state:'available'|'not-applicable';items:MessageAudienceAccount[]};
+export type MessageAudienceAvailability={source:'configured-business-database';availableAttributes:['subject-type'];unavailableAttributes:('level'|'honor')[];organizationScope:'account-only';upstreamDirectoryAudience:'not-connected'};
+export type MessageSenderStatus={state:'configured'|'not-configured';enabled:boolean;configVersion:string|null;receipts:'not-connected'};
+export type MessagePlan={id:string;sequence:string;version:number;revision:number;state:MessagePlanState;effectiveState:MessagePlanState|'expired';config:MessagingConfig;audienceAvailability:MessageAudienceAvailability;createdBy:string;updatedBy:string;createdAt:string;updatedAt:string;approval:(MessageApproval&{at:string})|null;scheduling:{engine:'pg-boss';missed:'skip';scheduledAt:string|null;occurrenceTimeRecorded:false};capabilities:{canSave:boolean;canActivate:boolean;canPause:boolean;canResume:boolean;canStop:boolean;canWithdraw:boolean};jobId:string|null};
+export type MessageDeliveryTotals={total:number;pending:number;submitting:number;submitted:number;delivered:number|null;skipped:number;failed:number;unknown:number;blocked:number};
+export type MessageDelivery={inapp:MessageDeliveryTotals;email:MessageDeliveryTotals&{bounced:null;opened:null;clicked:null;receipts:'not-connected'}};
+export type MessageRun={id:string;sequence:string;planId:string;planVersion:number;revision:number;state:MessageRunState;occurrenceId:string;scheduledAt:null;createdAt:string;updatedAt:string;completedAt:string|null;audience:{accountCount:number;frozenAt:string|null;additionalTargetsAllowed:false};approval:MessageApproval;delivery:MessageDelivery;errorCode:string|null;jobId:string|null;announcement:{id:string|null;state:'not-published'|'published'|'withdrawn'|'expired';audience:'public';publishedAt:string|null;expiresAt:string|null;withdrawnAt:string|null}};
+export type MessageHistoryItem={id:string;sequence:string;operatorId:string;operatorDisplayName:string|null;operatorRole:'administrator'|'reader'|null;actorKind?:'business-operator'|'operations-ai-service';aiAccountId?:string|null;taskId?:string|null;kind:'create'|'save'|'activate'|'pause'|'resume'|'stop'|'withdraw';version:number;revision:number;createdAt:string};
+export type MessageHistoryPage={items:MessageHistoryItem[];nextAfter:string|null};
+export type MessagePlanDetail=MessageLease&{plan:MessagePlan;audienceAccounts?:MessageAudienceAccounts;history:MessageHistoryPage;recentRuns:MessageRun[];sender:MessageSenderStatus};
+export type MessagePlansPage=MessageLease&{items:MessagePlan[];nextAfter:string|null;capabilities:{canCreate:boolean};audienceAvailability:MessageAudienceAvailability;summary:{scope:'matching-plans-all-runs';plans:Record<MessagePlanState|'total',number>;runs:Record<MessageRunState|'total',number>;delivery:MessageDelivery};sender:MessageSenderStatus;legacy:{source:'operations-notices';count:number;historyPreserved:true};metadataOnly:false};
+export type MessageRunsPage=MessageLease&{items:MessageRun[];nextAfter:string|null;metadataOnly:true};
+export type MessageRunDetail=MessageLease&{run:MessageRun;config:MessagingConfig;audienceAvailability:MessageAudienceAvailability;capabilities:{canRetry:boolean};retryPolicy:{maxSubmitAttempts:number;retryDelaySeconds:number;retryDelayMaxSeconds:number;submissionLeaseSeconds:number;pageSize:number;unknownResultsRetryable:false}};
+export type MessageRecipient={id:string;sequence:string;account:{accountId:string;uid:string|null;displayName:string|null;subjectType:MessageSubjectType|null;state:'available'|'unavailable'};channel:'inapp'|'email';state:MessageRecipientState;attemptCount:number;deferred:boolean;errorCode:string|null;retryable:boolean;messageId:string|null;leaseUntil:string|null;retryAt:string|null;submittedAt:string|null;completedAt:string|null;attempts:{id:string;number:number;state:string;networkAttempt:boolean;errorCode:string|null;startedAt:string|null;finishedAt:string|null}[]};
+export type MessageRecipientsPage=MessageLease&{items:MessageRecipient[];nextAfter:string|null;metadataOnly:true};
+export type MessageHistoryReply=MessageLease&MessageHistoryPage&{metadataOnly:true};
+export type MessageCommandEffects={futureExecutionStopped:boolean;alreadySubmittedEmailRetracted:false;existingPublicationsWithdrawn:boolean};
+export type MessageCommandReply={replayed:boolean;plan?:MessagePlan;run?:MessageRun;retriedRecipients?:number;effects?:MessageCommandEffects};
+export type MessageOperationKind='create'|'save'|'activate'|'pause'|'resume'|'stop'|'withdraw'|'retry';
+export type MessageOriginalReceipt=MessageLease&{operationId:string;metadataOnly:true}&(
+ {kind:Exclude<MessageOperationKind,'retry'>;result:{planId:string;version:number;revision:number;state:MessagePlanState;effects?:MessageCommandEffects}}|
+ {kind:'retry';result:{planId:string;runId:string;version:number;revision:number;state:MessageRunState}}
+);
+export type MessageCommandOutcome=MessageCommandReply|{source:'original-receipt';receipt:MessageOriginalReceipt};
+export type MessagingCapabilities={canCreate:boolean;canUpdate:boolean;canPublish:boolean;canWithdraw:boolean;canReadIdentity:boolean};
+export type MessagingLocation={id:string;run:string;creating:boolean;state:MessagePlanState|'';channel:MessageChannel;view:'runs'|'recipients'|'history';after:string;trail:string[];runAfter:string;runTrail:string[];historyAfter:string;historyTrail:string[];recipientAfter:string;recipientTrail:string[];recipientChannel:'inapp'|'email'|'';recipientState:MessageRecipientState|''};
+export type MessageRecurrence={pattern:'daily'|'weekly'|'saved';time:string;weekday:string};
+export type MessageDraft={baseVersion:number;baseRevision:number;config:MessagingConfig;audienceChosen:boolean;expiresLocal:string;onceLocal:string;recurrence:MessageRecurrence;dirty:boolean};

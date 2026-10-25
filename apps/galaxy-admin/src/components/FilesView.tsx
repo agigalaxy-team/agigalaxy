@@ -1,9 +1,13 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
-import {Files} from './Files';
-import {uuidPattern} from './operations-task-types';
+import {filesLocation} from '../lib/files-view-model';
+import {Files} from './BusinessViewClients';
+import {hasOperatorPermission} from '../lib/access';
+import {OperationsPermissionNotice} from './OperationsPermissionNotice';
+
 export async function FilesView(props:AdminViewServerProps){
-  const {session,searchParams}=await operationsPageContext(props,'/admin/operations/files'),text=(key:string)=>operationsSearch(searchParams,key);
-  const id=text('id'),kind=text('kind'),state=text('state'),processing=text('processing');
-  return <OperationsPage page={props}><Files key={session.operator.id+':'+id} selected={uuidPattern.test(id)?id:''} kind={['chat','forum'].includes(kind)?kind:''} state={['prepared','uploading','scan-pending','scanning','available','blocked','erased','expired','revoked'].includes(state)?state:''} processing={['scan','cleanup'].includes(processing)?processing:''} after={text('after')} csrfToken={session.csrfToken} canManage={session.operator.role==='administrator'}/></OperationsPage>;
+ const {session,searchParams}=await operationsPageContext(props,'/admin/operations/files');
+ if(!hasOperatorPermission(session.operator,'files.read'))return <OperationsPage page={props}><OperationsPermissionNotice permission="files.read"/></OperationsPage>;
+ const input=Object.fromEntries(['id','fileKind','kind','state','processing','issue','after','trail','view','plan'].map(key=>[key,operationsSearch(searchParams,key)]));
+ return <OperationsPage page={props}><Files key={session.operator.id} location={filesLocation(input)} csrfToken={session.csrfToken} canManage={hasOperatorPermission(session.operator,'files.scan.retry')}/></OperationsPage>;
 }

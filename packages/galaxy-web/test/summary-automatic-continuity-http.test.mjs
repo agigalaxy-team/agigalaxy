@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {getSummaryRuntime,closeSummaryRuntime} from '../src/summary-runtime.mjs';
+import {privacyConsumerFixture} from "../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs";
+import {getSummaryRuntime,closeSummaryRuntime} from "../src/features/conversation-notes/native/runtime.mjs";
 
 async function fixture(t){
  const f=await privacyConsumerFixture();t.after(()=>f.close());const bodies=new Map();

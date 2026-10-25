@@ -1,0 +1,13 @@
+.account-follow-control{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
+.account-follow-message{font-size:.875rem;color:var(--muted-foreground);line-height:1.6}
+.account-follows-page{min-width:0}
+.account-follows-list{list-style:none;padding:0;margin:1.5rem 0}
+.account-follows-list>li{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;padding:1.25rem 0;border-bottom:1px solid var(--border)}
+.account-follow-person{display:flex;align-items:center;gap:.85rem;min-width:0}
+.account-follow-person>div{min-width:0;overflow-wrap:anywhere}
+.account-follow-person>svg{flex-shrink:0;color:var(--muted-foreground)}
+.galaxy-site .account-follows-page .account-follow-person h2{font-size:1rem;margin:0;font-weight:600;line-height:1.6}
+.account-follow-person p{margin:.25rem 0 0}
+.account-follows-pagination{display:flex;gap:1.25rem;align-items:center;margin-top:1.5rem;font-size:.9375rem}
+.public-online-account .account-follow-control{margin:.85rem 0 1.5rem}
+@media(max-width:640px){.account-follows-list>li{align-items:flex-start;flex-direction:column;gap:.9rem}}

@@ -1,10 +1,11 @@
-import React,{useEffect,useState} from 'react';
+import React,{createContext,useContext,useEffect,useState} from 'react';
 import { Bell, MessageCircle, UserRound } from 'lucide-react';
 import type {createWebRuntime} from './runtime.mjs';
 import {createProfileClient} from './profile-client.mjs';
 import {profilePath} from './profile-navigation.mjs';
 import './person-profile.css';
 import './conversation-visuals.css';
+import {AccountProfileAvatar} from './account-profile-avatar';
 
 type MemberRuntime={
  api:Pick<Awaited<ReturnType<typeof createWebRuntime>>['api'],'endpoint'|'snapshot'|'call'>;
@@ -45,10 +46,19 @@ export function memberName(subjectId?: string, ownId?: string, name?: string) {
   return name?.trim() || (subjectId ? `成员 ${subjectId.slice(-6)}` : '银河成员');
 }
 
-export function MemberAvatar({ subjectId, own = false, name }: { subjectId?: string; own?: boolean; name?:string }) {
-  const hue = Array.from(subjectId ?? '').reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-  const initial=name?.trim()&&!/^(我|成员 |银河成员)/.test(name.trim())?Array.from(name.trim())[0]:null;
-  return <span className={'member-avatar' + (own ? ' is-own' : '')} style={{ '--member-hue': hue } as React.CSSProperties} aria-hidden="true">{initial?<span className="member-initial">{initial}</span>:<UserRound size={19}/>}</span>;
+export type MemberAvatarProfile={accountId:string;avatarKey:string|null;subjectType:'person'|'organization'|'agent'|null};
+const MemberAvatarProfiles=createContext<Record<string,MemberAvatarProfile>>({});
+export function MemberAvatarProvider({profiles,children}:{profiles:Record<string,MemberAvatarProfile>;children:React.ReactNode}){
+ return <MemberAvatarProfiles.Provider value={profiles}>{children}</MemberAvatarProfiles.Provider>;
+}
+export function MemberAvatar({subjectId,own=false,name,profile}:{subjectId?:string;own?:boolean;name?:string;profile?:MemberAvatarProfile}){
+ const profiles=useContext(MemberAvatarProfiles),account=/^account:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/.exec(subjectId??'');
+ if(account){const current=profile??profiles['account:'+account[1]],available=current?.accountId===account[1]?current:null;
+  return <AccountProfileAvatar seed={account[1]} avatarKey={available?.avatarKey} subjectType={available?.subjectType} className={'member-avatar'+(own?' is-own':'')}/>;
+ }
+ const hue=Array.from(subjectId??'').reduce((sum,char)=>sum+char.charCodeAt(0),0)%360;
+ const initial=name?.trim()&&!/^(我|成员 |银河成员)/.test(name.trim())?Array.from(name.trim())[0]:null;
+ return <span className={'member-avatar'+(own?' is-own':'')} style={{'--member-hue':hue} as React.CSSProperties} aria-hidden="true">{initial?<span className="member-initial">{initial}</span>:<UserRound size={19}/>}</span>;
 }
 
 export function MemberLink({subjectId,name,ownId,navigate,avatar=false}: {subjectId?:string;name?:string;ownId?:string;navigate:(path:string)=>void;avatar?:boolean}) {
@@ -63,7 +73,7 @@ export function MemberLink({subjectId,name,ownId,navigate,avatar=false}: {subjec
 export function MessageNavigation({ active, navigate }: { active: 'rooms' | 'notifications'; navigate: (path: string) => void }) {
   return <nav className="message-navigation" aria-label="消息分类">
     <a href="/app/community?section=notifications" onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate('/app/community?section=notifications');}}}><MessageCircle size={17}/>社区回复</a>
-    {([['rooms', '对话', MessageCircle], ['notifications', '通知', Bell]] as const).map(([id, label, Icon]) => <a key={id} href={'/app/' + id} aria-current={active === id ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('/app/' + id); }}><Icon size={17} />{label}</a>)}
+    {([['rooms', '对话', MessageCircle], ['notifications', '通知', Bell]] as const).map(([id, label, Icon]) => <a key={id} href={'/app/' + id} aria-current={active === id ? 'page' : undefined} onClick={event => { if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return; event.preventDefault(); navigate('/app/' + id); }}><Icon size={17} />{label}</a>)}
   </nav>;
 }
 

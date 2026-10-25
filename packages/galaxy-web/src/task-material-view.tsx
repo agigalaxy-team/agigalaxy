@@ -1,9 +1,9 @@
-import React,{useEffect,useMemo,useSyncExternalStore} from 'react';
-import {withholdTaskMaterialProjection,withholdTaskMaterialTree,taskMaterialProjectionNodes,taskMaterialProjectionId,taskMaterialProjectionKey} from './task-material-client.mjs';
-import type {WorkRuntime} from './work-task-types';
-import type {z} from 'zod/v4';
-import type {contributionProjectionReadSchema} from '../../galaxy-official/src/shared/contribution-sharing-v2-schema.mjs';
-import {object} from './project-workspace-types';
+import React,{useEffect,useMemo,useSyncExternalStore} from "react";
+import {withholdTaskMaterialProjection,withholdTaskMaterialTree,taskMaterialProjectionNodes,taskMaterialProjectionId,taskMaterialProjectionKey} from "./task-material-client.mjs";
+import type {WorkRuntime} from "./work-task-types";
+import type {z} from "zod/v4";
+import type {contributionProjectionReadSchema} from "../../galaxy-official/src/shared/contribution-sharing-v2-schema.mjs";
+import {object} from "./features/projects/contracts";
 
 type Runtime={api:Pick<WorkRuntime['api'],'call'|'snapshot'>}&Partial<Pick<WorkRuntime,'taskDraftScope'>>;
 type TaskProjection={taskId?:string;_webTaskScope?:string;_webTaskRead?:z.infer<typeof contributionProjectionReadSchema>;request?:{title?:unknown};textView?:{fields?:Record<string,{state?:string}>;title?:{state?:string}}};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readTaskResult,taskResultPath,taskResultReturn,exactReadableResult} from '../src/task-result-navigation.mjs';
+import {readTaskResult,taskResultPath,taskResultReturn,exactReadableResult} from "../src/features/work-records/result-navigation.mjs";
 const taskId='651b3db6-0037-4c03-a2df-5a78fa99b78f',id='ee286cb2-6de1-4b3f-96bd-d72b209f92ce',delivery='253a3b24-6ce1-428f-8fa3-bc3c23479719';
 test('a delivery keeps its exact result version and returns to that delivery after refresh',()=>{
  const path=taskResultPath(taskId,{id,version:2},delivery),selection=readTaskResult(new URL(path,'https://example.test').search);

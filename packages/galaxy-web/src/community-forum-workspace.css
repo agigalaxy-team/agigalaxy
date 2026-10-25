@@ -39,11 +39,19 @@
 .galaxy-site .forum-workspace .back-link { display: inline-flex; align-items: center; gap: 7px; padding: 8px 0; font-size: 14px; }
 .galaxy-site .forum-workspace .forum-post { padding-top: 16px; }
 .galaxy-site .forum-workspace .forum-post > .forum-meta { font-size: 13px; gap: 8px 14px; }
+.galaxy-site .forum-workspace :is(.forum-post,.forum-reply) > .forum-meta > .member-profile-link { color: var(--g-ink); font-weight: 500; }
+.galaxy-site .forum-workspace :is(.forum-post,.forum-reply) > .forum-meta > a.member-profile-link:hover { color: var(--g-accent); }
 .galaxy-site .forum-workspace .forum-post h1 { margin: 21px 0 24px; }
 .galaxy-site .forum-workspace .forum-prose { overflow-wrap: anywhere; }
 .galaxy-site .forum-workspace .forum-post .forum-prose { margin:0 0 24px; font-size:16px; line-height:1.95; color:var(--g-ink); }
 .galaxy-site .forum-workspace .forum-prose > p { margin: 0 0 1.2em; white-space: pre-wrap; }
 .galaxy-site .forum-workspace .forum-prose > p:last-child { margin-bottom: 0; }
+.galaxy-site .forum-workspace .forum-prose--content { color:var(--g-ink); }
+.galaxy-site .forum-workspace .forum-prose--content > p { color:inherit; }
+.galaxy-site .forum-workspace .forum-prose--content > pre { max-width:100%; min-width:0; margin:0 0 1.2em; padding:16px 18px; overflow-x:auto; white-space:pre; overflow-wrap:normal; word-break:normal; background:var(--g-soft); border:1px solid var(--g-line); border-radius:7px; color:var(--g-ink); font:14px/1.65 ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace; tab-size:4; }
+.galaxy-site .forum-workspace .forum-prose--content > pre:last-child { margin-bottom:0; }
+.galaxy-site .forum-workspace .forum-prose--content > pre > code { padding:0; background:transparent; color:inherit; font:inherit; white-space:inherit; }
+.galaxy-site .forum-workspace .forum-prose--content > pre:focus-visible { outline:2px solid var(--g-accent); outline-offset:3px; }
 .galaxy-site .forum-workspace .forum-related { margin: 30px 0 10px; padding-top: 18px; border-top: 1px solid var(--g-line); }
 .galaxy-site .forum-workspace .forum-related h2 { margin: 0 0 8px; font-size: 15px; }
 .galaxy-site .forum-workspace .forum-links { margin: 0; padding: 0; border: 0; }
@@ -56,9 +64,13 @@
 .galaxy-site .forum-workspace .forum-post-actions { flex-wrap: wrap; }
 .galaxy-site .forum-workspace .forum-options-toggle { font-size: 13px; color: var(--g-muted); min-height: 38px; }
 .galaxy-site .forum-workspace .forum-reply .forum-meta { font-size: 13px; }
+.galaxy-site .forum-workspace .forum-reply .forum-meta > .member-profile-link { margin-left: 0; }
 .galaxy-site .forum-workspace .forum-reply .forum-meta > a { font-size: 13px; }
-.galaxy-site .forum-workspace .forum-reply .forum-prose { margin: 13px 0 10px 48px; font-size: 15px; }
+.galaxy-site .forum-workspace .forum-reply .forum-prose { margin: 13px 0 10px 48px; max-width: 760px; font-size: 15px; }
 .galaxy-site .forum-workspace .forum-reply .button-row button { min-height: 34px; font-size: 12px; color: var(--g-muted); }
+.galaxy-site .forum-workspace .forum-discussion-reply { padding: 16px 0; }
+.galaxy-site .forum-workspace .forum-discussion-reply > .forum-meta > .forum-audience-summary { margin: 0; font-size: inherit; color: inherit; }
+.galaxy-site .forum-workspace .forum-discussion-reply > .button-row { margin-top: 8px; margin-bottom: 0; }
 .forum-reading-return { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--g-line); }
 .galaxy-site .forum-reading-return a { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; font-size: 14px; color: var(--g-accent); text-decoration: none; }
 .galaxy-site .forum-reading-return a:hover { text-decoration: underline; }

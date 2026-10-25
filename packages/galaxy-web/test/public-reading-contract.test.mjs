@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {isPublicReadingRoute,loadPublicReadingPage,publicReadingDataUrl,validatePublicReadingPage} from '../src/public-reading-contract.mjs';
+import {isPublicReadingRoute,loadPublicReadingPage,publicReadingDataUrl,validatePublicReadingPage} from '../src/features/public-reading/contract.mjs';
 
 const page=(path,body=[])=>({version:1,path,title:'说明 · 银河',description:'说明',location:'文档',behaviors:[],sidebar:[],body,footer:[]});
 const node=(tag,attrs={},children=[])=>({tag,attrs,children});

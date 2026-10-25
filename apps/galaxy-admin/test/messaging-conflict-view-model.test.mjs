@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {createMessageDraft,messageMerge,messageMergeChangedKeys,messageMergeValue} from '../src/lib/messaging-view-model.ts';
+
+test('message drafts retain independent current changes and resolve complete audience and schedule groups without inventing missing data',()=>{
+ const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');
+ const plan={version:2,revision:2,config:{channels:['inapp'],content:{purpose:'service-update',title:'原标题',body:'原正文',href:null,expiresAt:'2030-01-20T10:00:00Z'},audience:{kind:'accounts',accountIds:[id(1),id(2)]},senderKey:'notice',schedule:{kind:'recurring',cron:'30 10 * * 1',timezone:'Asia/Shanghai'}}};
+ const base=createMessageDraft(plan),mine=structuredClone(base),current=createMessageDraft({...structuredClone(plan),version:3,revision:4});
+ mine.config.content.title='本人标题';mine.dirty=true;current.config.content.body='当前独立更新正文';current.config.audience.accountIds=[id(1)];
+ const independent=messageMerge(base,mine,current);assert.equal(independent.unresolved,0);assert.equal(independent.draft.config.content.title,'本人标题');assert.equal(independent.draft.config.content.body,'当前独立更新正文');assert.deepEqual(independent.draft.config.audience,current.config.audience);assert.equal(independent.draft.baseVersion,3);assert.equal(independent.draft.baseRevision,4);
+ mine.config.content.body='本人正文';current.config.content.title='当前标题';
+ const conflicts=messageMerge(base,mine,current);assert.deepEqual(conflicts.conflicts.map(row=>row.key),['title','body']);assert.equal(conflicts.unresolved,2);assert.equal(messageMerge(base,mine,current,{title:'mine'}).unresolved,1);
+ const resolved=messageMerge(base,mine,current,{title:'mine',body:'current'});assert.equal(resolved.unresolved,0);assert.equal(resolved.draft.config.content.title,'本人标题');assert.equal(resolved.draft.config.content.body,'当前独立更新正文');
+ const localScope=structuredClone(base),remoteScope=structuredClone(current);localScope.config.audience={kind:'accounts',accountIds:[id(1),id(3)]};remoteScope.config.content={...base.config.content};remoteScope.config.audience={kind:'attributes',subjectTypes:['organization']};
+ assert.deepEqual(messageMerge(base,localScope,remoteScope).conflicts.map(row=>row.key),['audience']);assert.deepEqual(messageMerge(base,localScope,remoteScope,{audience:'mine'}).draft.config.audience,localScope.config.audience);assert.deepEqual(messageMerge(base,localScope,remoteScope,{audience:'current'}).draft.config.audience,remoteScope.config.audience);
+ const localSchedule=structuredClone(base),remoteSchedule=structuredClone(current);remoteSchedule.config.content={...base.config.content};remoteSchedule.config.audience=structuredClone(base.config.audience);localSchedule.config.schedule={kind:'once',at:'2030-01-10T10:00:00Z'};localSchedule.onceLocal='2030-01-10T18:00';remoteSchedule.config.schedule={kind:'recurring',cron:'0 9 * * *',timezone:'UTC'};remoteSchedule.recurrence={pattern:'daily',time:'09:00',weekday:'1'};remoteSchedule.expiresLocal='2030-01-18T12:00';
+ assert.deepEqual(messageMerge(base,localSchedule,remoteSchedule).conflicts.map(row=>row.key),['schedule']);const chosenSchedule=messageMerge(base,localSchedule,remoteSchedule,{schedule:'mine'}).draft;assert.deepEqual(chosenSchedule.config.schedule,localSchedule.config.schedule);assert.equal(chosenSchedule.onceLocal,localSchedule.onceLocal);assert.equal(chosenSchedule.expiresLocal,localSchedule.expiresLocal);assert.equal(messageMerge(base,localSchedule,remoteSchedule,{schedule:'current'}).draft.expiresLocal,remoteSchedule.expiresLocal);
+ for(const missing of [undefined,['********']]){const unknown=structuredClone(current);unknown.config.audience={kind:'accounts',accountIds:missing};assert.equal(messageMerge(base,mine,unknown).draft,null);}
+ const earlier=structuredClone(base);earlier.baseRevision=1;assert.equal(messageMerge(base,mine,earlier).draft,null);
+ const reordered=structuredClone(base);reordered.config.audience.accountIds.reverse();assert.deepEqual(messageMergeChangedKeys(base,reordered),[]);assert.equal(messageMergeValue(mine,'body'),'本人正文');assert.equal(messageMergeValue(mine,'sender',{notice:'AGI Galaxy 通知'}),'AGI Galaxy 通知');assert.ok(!messageMergeValue(mine,'audience').includes(id(1)));
+ assert.equal(base.config.content.title,'原标题');assert.deepEqual(base.config.audience.accountIds,[id(1),id(2)]);assert.equal(current.config.content.body,'当前独立更新正文');
+});

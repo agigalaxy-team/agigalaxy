@@ -1,0 +1,23 @@
+export type SmtpSenderKey='account'|'notice'|'community'|'updates'|'team';
+export type SmtpConfiguration={enabled:boolean;host:string|null;port:number|null;tls:'implicit'|'starttls'|null;credentialRef:string|null;connectionTimeoutMs:number|null;greetingTimeoutMs:number|null;socketTimeoutMs:number|null;maxConnections:number|null;rateLimit:number|null;rateWindowSeconds:number|null;dkimSelector:string|null};
+export type SmtpCredential={ref:string;label:string;host:string;port:number;tls:'implicit'|'starttls';purposes:SmtpSenderKey[];available:boolean};
+export type SmtpIdentity={key:SmtpSenderKey;name:string;address:string;replyTo:string;automated:boolean;receiving:'team-only'|'send-only'};
+export type SmtpSettings={version:number;configuration:SmtpConfiguration;updatedAt:string|null;updatedBy:string|null;status:{state:'configured'|'not-configured';enabled:boolean;configVersion:string|null;receipts:'not-connected';credentialAvailable:boolean};credentials:SmtpCredential[];identities:SmtpIdentity[];capabilities:{configure:boolean;'test.connection':boolean;'test.delivery':boolean;canChooseRecipient:boolean};limitsScope:'per-worker-process';checkedAt:number};
+export type SmtpSaved=Pick<SmtpSettings,'version'|'configuration'|'updatedAt'|'updatedBy'>&{replayed:boolean};
+export type SmtpTestState='testing'|'connected'|'submitted'|'not-configured'|'ineligible'|'failed'|'unknown';
+export type SmtpTest={id:string;sequence:string;kind:'connection'|'delivery';configurationVersion:number;accountId:string|null;senderKey:SmtpSenderKey|null;state:SmtpTestState;code:string|null;startedAt:string;finishedAt:string|null;delivery:'unknown';receiptSource:'not-connected'};
+export type SmtpTests={items:SmtpTest[];nextAfter:string|null;checkedAt:number};
+export type SmtpTestReply={test:SmtpTest;replayed:boolean};
+export type SmtpHistory={items:{id:string;sequence:string;operatorId:string;version:number;changedFields:string[];createdAt:string}[];nextAfter:string|null;checkedAt:number};
+export type SmtpQueueState='pending'|'submitting'|'submitted'|'delivered'|'skipped'|'failed'|'unknown'|'blocked';
+export type SmtpQueue={items:{id:string;sequence:string;accountId:string;uid:string|null;runId:string;planId:string;state:SmtpQueueState;attemptCount:number;code:string|null;submittedAt:string|null;completedAt:string|null;updatedAt:string}[];counts:Partial<Record<SmtpQueueState,number>>;nextAfter:string|null;scope:'configured-business-database';checkedAt:number};
+export type SmtpBounces={state:'not-connected';items:never[];count:null;source:null;checkedAt:number};
+export type SmtpDnsRecord={state:'record-found'|'not-found'|'unavailable';records:string[]};
+export type SmtpDomains={domain:string;spf:SmtpDnsRecord;dmarc:SmtpDnsRecord;dkim:SmtpDnsRecord&{selector:string}|{selector:null;state:'selector-not-configured';records:[]};alignment:'unknown';checkedAt:number};
+
+export type SmtpReceiptLease={operationId:string;checkedAt:number;readExpiresAt:number;metadataOnly:true};
+export type SmtpSaveReceipt=SmtpReceiptLease&{kind:'settings';result:{version:number}};
+export type SmtpTestReceipt=SmtpReceiptLease&{kind:'test.connection'|'test.delivery';result:{version:number;testId:string;state:Exclude<SmtpTestState,'testing'>;code:string|null}};
+export type SmtpOriginalReceipt=SmtpSaveReceipt|SmtpTestReceipt;
+export type SmtpSaveOutcome=SmtpSaved|{source:'original-receipt';receipt:SmtpSaveReceipt};
+export type SmtpTestOutcome=SmtpTestReply|{source:'original-receipt';receipt:SmtpTestReceipt};

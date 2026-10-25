@@ -2,7 +2,7 @@ import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-prima
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
-import {notificationTarget} from '../src/notification-target.mjs';
+import {notificationTarget} from '../src/features/notifications/target.mjs';
 const origin='http://127.0.0.1:5190',out=resolve('../../../07-logs/development/ui-resume-20261002/notification-follow-through'),events=[],calls=[];
 const watchId='00000000-0000-4000-8000-000000000081',reportId='00000000-0000-4000-8000-000000000082',eventId='00000000-0000-4000-8000-000000000083';
 assert.equal(notificationTarget({object:{type:'task',id:'../../settings'}}),null);

@@ -1,11 +1,11 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {useMemberNames} from './conversation-ui';
-import {HistoryFields} from './history-facts';
-import {groupRefKey,identityGroupError,IdentityGroupIntent} from './identity-group-presentation';
-import {identityGroupSourceSelection} from './identity-group-sources';
-import type {IdentityGroup,IdentityGroupClient,IdentityGroupLease,IdentityGroupLocator,IdentityGroupPending,IdentityGroupPreview,IdentityGroupResult,IdentityGroupRuntime,IdentityGroupSourceView} from './identity-group-types';
+import {useMemberNames} from "./conversation-ui";
+import {HistoryFields} from "./features/work-records/history";
+import {groupRefKey,identityGroupError,IdentityGroupIntent} from "./identity-group-presentation";
+import {identityGroupSourceSelection} from "./identity-group-sources";
+import type {IdentityGroup,IdentityGroupClient,IdentityGroupLease,IdentityGroupLocator,IdentityGroupPending,IdentityGroupPreview,IdentityGroupResult,IdentityGroupRuntime,IdentityGroupSourceView} from "./identity-group-types";
 
 const explanations:Record<string,string>={'business-declined':'原操作未被接受，系统已停止自动发送。','proposal-expired':'原邀请已经到期，不能继续发送。','binding-changed':'连接已变化，需要查看原内容后继续。','control-changed':'设备控制已变化，需要查看原内容后继续。','explicit-approval-required':'原内容尚未签署，需要你查看后继续。','original-binding-unavailable':'原连接信息不可用，需要查看原内容后继续。','stopped-local':'本机已停止发送。服务已经收到的邀请仍按原状态处理。','read-or-send-unavailable':'正在核对原操作是否收到。原输入和操作编号保留。'};
 const reviewReasons=new Set(['binding-changed','control-changed','explicit-approval-required','original-binding-unavailable']);

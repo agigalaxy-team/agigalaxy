@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {notificationTarget} from '../src/notification-target.mjs';
-import {notificationRows} from '../src/notification-merge.mjs';
+import {notificationTarget} from '../src/features/notifications/target.mjs';
+import {notificationRows} from '../src/features/notifications/merge.mjs';
 
 const room='64d57991-4c2d-46b9-81f8-2aed60668901',first='22e2f4e8-358d-4a57-8098-6c8e451d89df',last='35f51c70-1f7d-4eb0-8d77-ebef94a968cf';
 test('grouped conversation notices open the latest actual message and retain original read identities',()=>{

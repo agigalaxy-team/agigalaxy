@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mergeNotificationItems,notificationRows,markNotificationRowRead} from '../src/notification-merge.mjs';
+import {mergeNotificationItems,notificationRows,markNotificationRowRead} from '../src/features/notifications/merge.mjs';
 
 test('preserves page order and removes duplicate notification IDs', () => {
   const a = [{id:'n1', title:'first'}, {id:'n2', title:'second'}];

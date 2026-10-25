@@ -1,6 +1,6 @@
-export const operationQueues=['information-watch','search-recovery','content-publication','account-notice','retention-cleanup'] as const;
+export const operationQueues=['information-watch','search-recovery','content-publication','account-notice','retention-cleanup','messaging-run','messaging-delivery','autonomy-task','autonomy-tick'] as const;
 export type OperationQueue=typeof operationQueues[number];
-export const queueLabels:Record<OperationQueue,string>={'information-watch':'持续关注','search-recovery':'检索自动恢复','content-publication':'官网发布','account-notice':'站内通知投递','retention-cleanup':'到期清理'};
+export const queueLabels:Record<OperationQueue,string>={'information-watch':'持续关注','search-recovery':'检索自动恢复','content-publication':'官网发布','account-notice':'站内通知投递','retention-cleanup':'到期清理','messaging-run':'消息计划执行','messaging-delivery':'消息投递','autonomy-task':'自动运行任务','autonomy-tick':'值守调度检查'};
 export type OperationJob={id:string;queue:OperationQueue;state:string;createdAt:string|null;startedAt:string|null;completedAt:string|null;availableAt:string|null;retryCount:number;retryLimit:number;subjectId:string|null;resourceId:string|null;error:string|null};
 export type OperationJobPage={queue:OperationQueue;items:OperationJob[];nextAfter:string|null};
 export type SearchFailure={jobId:string;sourceType:string;sourceId:string;subjectId:string;generation:number;attempts:number;recoveryAttempts:number;automaticRecoveryPending:boolean;automaticRecoveryExhausted:boolean;recoveryAt:string|null};

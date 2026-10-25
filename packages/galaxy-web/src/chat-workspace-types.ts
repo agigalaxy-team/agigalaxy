@@ -1,3 +1,4 @@
+import {chatMessageEditWindowMs} from "../../galaxy-official/src/shared/chat-message-edit-policy.mjs";
 import type {z} from 'zod/v4';
 import type {createWebRuntime} from './runtime.mjs';
 import type {chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema} from '../../galaxy-official/src/shared/chat-schema.mjs';
@@ -54,4 +55,14 @@ export function availableChatMessages(messages:ChatMessage[],now:number):ChatMes
 export function nextChatMessageExpiry(messages:(ChatMessage|null|undefined)[],now:number):number|null{
  const deadlines=messages.flatMap(message=>{const expiresAt=message?Date.parse(message.expiresAt):NaN;return Number.isFinite(expiresAt)&&expiresAt>now?[expiresAt]:[];});
  return deadlines.length?Math.min(...deadlines):null;
+}
+
+/** The original message time fixes the edit window; editing never extends it. */
+export function chatMessageEditDeadline(message:ChatMessage|null|undefined):number|null{
+ const sentAt=message?Date.parse(message.sentAt):NaN;
+ return Number.isFinite(sentAt)?sentAt+chatMessageEditWindowMs:null;
+}
+export function chatMessageEditOpen(message:ChatMessage|null|undefined,now:number):boolean{
+ const deadline=chatMessageEditDeadline(message);
+ return deadline!==null&&Number.isFinite(now)&&now<=deadline;
 }

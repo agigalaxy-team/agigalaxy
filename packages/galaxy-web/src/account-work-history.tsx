@@ -1,14 +1,14 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {ReadingDetails,ReadingSummary,ReadingSurface} from './reading-details';
-import {HistoryFields} from './history-facts';
-import {LocalGalaxyPanelEntry} from './local-galaxy-entry';
-import {useReadTasks} from './use-read-task';
-import {LoadingFeedback,ReadFailure} from './interaction-feedback';
+import {ReadingDetails,ReadingSummary,ReadingSurface} from "./reading-details";
+import {HistoryFields} from "./features/work-records/history";
+import {LocalGalaxyPanelEntry} from "./local-galaxy-entry";
+import {useReadTasks} from "./use-read-task";
+import {LoadingFeedback,ReadFailure} from "./interaction-feedback";
 import type {z} from 'zod/v4';
-import type {accountWorkProjectionSchema} from '../../galaxy-official/src/shared/account-work-schema.mjs';
-import './account-work-history.css';
-import './account-reading.css';
+import type {accountWorkProjectionSchema} from "../../galaxy-official/src/shared/account-work-schema.mjs";
+import "./account-work-history.css";
+import "./account-reading.css";
 
 export type AccountWorkCall=(path:string,input:unknown,method?:'POST',options?:{signal?:AbortSignal})=>Promise<unknown>;
 type WorkData=z.infer<typeof accountWorkProjectionSchema>;

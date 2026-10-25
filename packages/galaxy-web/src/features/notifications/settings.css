@@ -1,0 +1,24 @@
+.galaxy-site .notification-settings-form{display:grid;gap:28px;padding:6px 0 4px}
+.galaxy-site .notification-settings-form fieldset{padding:0;margin:0;border:0;min-width:0}
+.galaxy-site .notification-settings-form legend{font-size:15px;font-weight:600;margin-bottom:12px}
+.galaxy-site .notification-settings-form .notification-setting-toggle{display:flex;align-items:flex-start;gap:12px;margin:12px 0;font-size:14px;cursor:pointer}
+.notification-setting-toggle input{margin-top:4px;accent-color:var(--g-accent)}
+.notification-setting-toggle strong{display:block;font-weight:500}
+.notification-setting-toggle small,.notification-selection-list small{display:block;color:var(--g-muted);margin-top:4px;font-size:12px}
+.galaxy-site .notification-selection-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:0}
+.notification-selection-list li{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--g-line);padding:12px 0;font-size:14px;min-width:0}
+.notification-selection-list li>span{min-width:0;overflow-wrap:anywhere}
+.notification-selection-list .text-link{white-space:nowrap;flex-shrink:0;font-size:13px}
+.notification-person{display:flex;align-items:center;gap:10px}
+.notification-person .member-avatar{width:30px;height:30px;flex-shrink:0}
+.galaxy-site .notification-search,.galaxy-site .notification-manual label{display:grid;gap:9px;font-size:13px;margin:14px 0}
+.notification-manual{margin-top:18px;font-size:12px;color:var(--g-muted)}
+.notification-manual .reading-section-title{padding:6px 0}
+.notification-settings-footer{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 2px}
+.galaxy-site .notification-draft-note{font-size:12px;color:var(--g-muted);margin:0}
+.notification-settings-dialog h2:focus{outline:none}
+.galaxy-site .notification-settings output{display:block}
+@media(max-width:600px){.notification-selection-list li{font-size:13px;gap:10px}.notification-settings-footer>button{flex:1}.notification-settings-form{gap:24px}}
+.galaxy-site .notification-settings-dialog{width:min(660px,calc(100vw - 32px));max-height:88dvh;background:var(--g-paper,#fffdf8);border-radius:18px;border:1px solid var(--g-line,#dddeda);padding:26px}.notification-settings-dialog>header{display:flex;align-items:center;gap:14px;margin-bottom:22px}.notification-settings-dialog>header>div{flex:1;min-width:0}.notification-settings-symbol{display:grid;place-items:center;flex:none;width:50px;height:50px;border-radius:14px;background:#e8f0f7;color:var(--g-accent,#2476b5)}.galaxy-site .notification-settings-eyebrow{font-size:11px;color:var(--g-muted,#63747c);margin:0 0 5px}.notification-settings-dialog>header h2{font-size:24px;margin:0}.notification-settings-dialog::backdrop{background:#18283277;backdrop-filter:blur(3px)}
+.galaxy-site .notification-settings-form .notification-setting-toggle{padding:17px 16px;background:#f0f4f5;border:1px solid var(--g-line,#dddeda);border-radius:12px;gap:14px;align-items:center;margin:10px 0}.notification-toggle-icon{flex:none;color:var(--g-accent,#2476b5)}.notification-setting-toggle>span{flex:1}.notification-setting-toggle>input{appearance:none;-webkit-appearance:none;flex:none;position:relative;width:44px;height:26px;border-radius:14px;background:#b1bbbd;margin:0;border:1px solid #9ca9ae;cursor:pointer}.notification-setting-toggle>input::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;left:3px;top:3px;transition:transform .15s}.notification-setting-toggle>input:checked{background:var(--g-accent,#2476b5);border-color:var(--g-accent,#2476b5)}.notification-setting-toggle>input:checked::after{transform:translateX(18px)}.notification-setting-toggle>input:focus-visible{outline:3px solid var(--g-accent,#2476b5);outline-offset:3px}.notification-settings-form>fieldset+fieldset{border-top:1px solid var(--g-line,#dddeda);padding-top:22px}.notification-settings-form .notification-settings-footer{position:sticky;bottom:-26px;background:var(--g-paper,#fffdf8);padding:18px 0 10px;border-top:1px solid var(--g-line,#dddeda);z-index:1}.notification-settings-dialog .notification-settings>p{font-size:13px;line-height:1.7}
+@media(max-width:600px){.galaxy-site .notification-settings-dialog{padding:20px}.notification-settings-dialog>header h2{font-size:22px}.notification-settings-symbol{width:44px;height:44px}.galaxy-site .notification-settings-form .notification-setting-toggle{padding:15px 12px;gap:10px}.notification-settings-form .notification-settings-footer{bottom:-20px}}

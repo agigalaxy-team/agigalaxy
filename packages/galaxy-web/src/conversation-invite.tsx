@@ -20,7 +20,7 @@ const initial={person:'',query:''};
 export function ConversationInvite({runtime,subjectId,room,decisions,disabled,externalError,onInvite}:Props){
  const [lease]=useState(()=>runtime.receiptStatus.captureLease()),fieldId=useId();
  const directory=useMemo(()=>createConversationDirectory(runtime,subjectId),[runtime,subjectId]);
- const {people,names:accountNames,cursors,loading,loaded,error:readError}=useSyncExternalStore(directory.subscribe,directory.read,directory.read);
+ const {people,names:accountNames,profiles,cursors,loading,loaded,error:readError}=useSyncExternalStore(directory.subscribe,directory.read,directory.read);
  useEffect(()=>{directory.start();return directory.close;},[directory]);
  const draft=useGovernanceDraft<typeof initial,InviteAttempt>(runtime,subjectId,true,'chat-invite-input:v1:'+JSON.stringify([runtime.api.endpoint,subjectId,room.roomId]),initial);
  const form={...initial,...draft.value},{ready:draftReady,attempt:draftAttempt,settle:settleDraft}=draft;
@@ -66,7 +66,7 @@ export function ConversationInvite({runtime,subjectId,room,decisions,disabled,ex
    <ReadingSummary><UserRoundPlus size={16}/>邀请成员</ReadingSummary>
    {open&&<form className="conversation-invite-form" onSubmit={event=>void invite(event)}>
     <label htmlFor={fieldId+"-query"}>查找联系人<Input id={fieldId+"-query"} value={form.query} maxLength={120} disabled={!draft.ready||sending} onChange={event=>draft.change({query:event.target.value})} placeholder="按姓名查找"/></label>
-    <div className="invite-person-list" role="radiogroup" aria-label="选择要邀请的人">{shown.map(id=><label className={'invite-person'+(form.person===id?' selected':'')} key={id}><input type="radio" name={'invite-'+room.roomId} value={id} checked={form.person===id} disabled={sending||!draft.ready} onChange={()=>choose(id)}/><MemberAvatar subjectId={id}/><span><strong>{name(id)}</strong><small>{people[id]}</small></span></label>)}</div>
+    <div className="invite-person-list" role="radiogroup" aria-label="选择要邀请的人">{shown.map(id=><label className={'invite-person'+(form.person===id?' selected':'')} key={id}><input type="radio" name={'invite-'+room.roomId} value={id} checked={form.person===id} disabled={sending||!draft.ready} onChange={()=>choose(id)}/><MemberAvatar subjectId={id} profile={profiles[id]}/><span><strong>{name(id)}</strong><small>{people[id]}</small></span></label>)}</div>
     {loading&&<output>正在读取联系人…</output>}
     {loaded&&!shown.length&&!loading&&<p className="muted">{form.query?'当前列表中没有匹配的姓名。':'还没有其他可邀请的联系人。'}</p>}
     {readError&&<output>{readError}<button type="button" className="text-link" disabled={loading} onClick={()=>void directory.loadInitial()}>重新读取</button></output>}

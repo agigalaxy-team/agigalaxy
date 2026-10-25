@@ -1,9 +1,9 @@
-import {ReadingDetails,ReadingSummary} from './reading-details';
+import {ReadingDetails,ReadingSummary} from "./reading-details";
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {getFactClient} from './fact-client.mjs';
-import {MemberLink,useMemberNames} from './conversation-ui';
-import type {WorkFactClient,WorkFacts,WorkAttempt} from './work-fact-types';
-import type {WorkRuntime,WorkTask} from './work-task-types';
+import {getFactClient} from "./features/work-records/client.mjs";
+import {MemberLink,useMemberNames} from "./conversation-ui";
+import type {WorkFactClient,WorkFacts,WorkAttempt} from "./features/work-records/contracts";
+import type {WorkRuntime,WorkTask} from "./work-task-types";
 
 type Reference={id:string;version:number};
 type SelectedAttempt={reference:Reference;attempt:WorkAttempt|null};

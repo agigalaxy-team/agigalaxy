@@ -1,13 +1,13 @@
-import type * as z from 'zod/v4';
-import type {discoveryQueryV2Schema} from '../../galaxy-official/src/shared/discovery-schema-v2.mjs';
-import type {GovernanceDraftRuntime} from './governance-draft-state';
-import type {capsuleVersionSchema} from '../../galaxy-official/src/shared/capsule-schema.mjs';
-import type {taskEventV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
-import type {createTaskContactClient} from './task-contact-client.mjs';
-import type {ProjectRuntime,ProjectViewClient,ContactView,Opportunity,VisibleOpportunity,ProjectOperationReview,ProjectContinuation,ContactWriteReceipt,RecruitmentView,DiscoveryQuery,DiscoveryPurpose,OpportunityRef} from './project-workspace-types';
-import {object,projectErrorText} from './project-workspace-types';
-import type {HistoryRecord} from './record-workspace-types';
-import type {WorkRequest} from './work-task-types';
+import type * as z from "zod/v4";
+import type {discoveryQueryV2Schema} from "../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import type {GovernanceDraftRuntime} from "./governance-draft-state";
+import type {capsuleVersionSchema} from "../../galaxy-official/src/shared/capsule-schema.mjs";
+import type {taskEventV2Schema} from "../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {createTaskContactClient} from "./task-contact-client.mjs";
+import type {ProjectRuntime,ProjectViewClient,ContactView,Opportunity,VisibleOpportunity,ProjectOperationReview,ProjectContinuation,ContactWriteReceipt,RecruitmentView,DiscoveryQuery,DiscoveryPurpose,OpportunityRef} from "./features/projects/contracts";
+import {object,projectErrorText} from "./features/projects/contracts";
+import type {HistoryRecord} from "./record-workspace-types";
+import type {WorkRequest} from "./work-task-types";
 
 export type SearchType='history'|'case'|'capsule'|'task'|'opportunity'|'proof'|'worker'|'hub';
 export type SearchRequest={type:Exclude<SearchType,'opportunity'>;query:{query?:string;limit?:number;after?:string;capabilityId?:string;[key:string]:unknown}}|{type:'opportunity';query:z.input<typeof discoveryQueryV2Schema>};

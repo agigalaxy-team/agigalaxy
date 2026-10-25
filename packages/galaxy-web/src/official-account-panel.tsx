@@ -7,9 +7,10 @@ import './official-account.css';
 import {rememberOfficialAccountReturn} from './official-account-return.mjs';
 import {useReadTasks} from './use-read-task';
 import {LoadingFeedback,ReadFailure} from './interaction-feedback';
+import {sameOfficialSession} from './official-account-reading.mjs';
 
 type Client=ReturnType<typeof createOfficialAccountClient>;
-export type OfficialSession={state:'signed-in';account:{id:string|null;uid?:string|null;displayName:string|null;email:string|null;emailVerified:boolean};linkedIds:{subjectId:string;linkedAt:string}[];nextAfter:string|null;expiresAt:number;csrfToken:string;galaxyAuthorization:false};
+export type OfficialSession={state:'signed-in';account:{id:string|null;uid?:string|null;displayName:string|null;avatarKey?:string|null;subjectType?:'person'|'organization'|'agent'|null;email:string|null;emailVerified:boolean};linkedIds:{subjectId:string;linkedAt:string}[];nextAfter:string|null;expiresAt:number;csrfToken:string;galaxyAuthorization:false};
 type Model={phase:'loading'|'signed-in'|'signed-out'|'unavailable'|'offline';session:OfficialSession|null;client:Client|null;busy:boolean;error:string;refresh:()=>Promise<void>;more:()=>Promise<void>;logout:()=>Promise<void>};
 export type OfficialAccountModel=Model;
 const isOnline=()=>navigator.onLine!==false;
@@ -24,11 +25,12 @@ export function useOfficialAccountSession(endpoint?:string):Model{
  const tasks=useReadTasks(endpoint??'configured-official-account');
  const [phase,setPhase]=useState<Model['phase']>('loading'),[session,setSession]=useState<OfficialSession|null>(null),[client,setClient]=useState<Client|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
-  const lifecycle=useRef({generation:0,request:0,active:false,requestedEndpoint:endpoint,client:null as Client|null,endpoint:null as string|null,session:null as OfficialSession|null,busy:false});
- const read=useCallback(async(after?:string)=>{
-  const current=lifecycle.current;if(!current.active||!current.client||current.busy)return;
+  const lifecycle=useRef({generation:0,request:0,active:false,requestedEndpoint:endpoint,client:null as Client|null,endpoint:null as string|null,session:null as OfficialSession|null,busy:false,quiet:false});
+ const read=useCallback(async(after?:string,quiet=false)=>{
+  const current=lifecycle.current;if(!current.active||!current.client)return;
+  if(current.busy){if(quiet||!current.quiet)return;tasks.cancel('session');current.request++;current.busy=false;}
   if(!isOnline()){tasks.cancel('session');current.request++;current.busy=false;current.session=null;setBusy(false);setSession(null);setPhase('offline');return;}
-  const generation=current.generation,ticket=++current.request,original=current.session;current.busy=true;setBusy(true);setError('');
+  const generation=current.generation,ticket=++current.request,original=current.session;current.busy=true;current.quiet=quiet;if(!quiet){setBusy(true);setError('');}
   const valid=()=>current.active&&current.generation===generation&&current.request===ticket;
   const selectedClient=current.client;
   await tasks.run({lane:'session',key:after??'head'},({signal})=>selectedClient.session({...(after?{after}:{}),signal}),{onSuccess:value=>{
@@ -39,7 +41,8 @@ export function useOfficialAccountSession(endpoint?:string):Model{
     if(!original||next.csrfToken!==original.csrfToken){current.session=null;setSession(null);setPhase('unavailable');setError('账户会话已经变化，请重新读取当前账户。');return;}
     next.linkedIds=[...new Map([...original.linkedIds,...next.linkedIds].map(item=>[item.subjectId,item])).values()];
    }
-   current.session=next;setSession(next);setPhase('signed-in');
+   const checked=sameOfficialSession(original,next)?original!:next;
+   current.session=checked;setSession(checked);setPhase('signed-in');setError('');
   },onError:()=>{
    if(valid()){current.session=null;setSession(null);setPhase(isOnline()?'unavailable':'offline');setError('暂时无法核对官方账户，请重新读取。');}
   },onSettled:()=>{if(current.active&&current.generation===generation){current.busy=false;setBusy(false);}}});
@@ -51,7 +54,7 @@ export function useOfficialAccountSession(endpoint?:string):Model{
   void (async()=>{await Promise.resolve();try{const deployedEndpoint=endpoint??(await loadWebConfiguration()).endpoint;if(!current.active||generation!==current.generation)return;
    const next=createOfficialAccountClient({endpoint:deployedEndpoint});current.client=next;current.endpoint=deployedEndpoint;setClient(next);await read();
   }catch{if(current.active&&generation===current.generation){setPhase(isOnline()?'unavailable':'offline');setError('账户服务配置暂不可用。');}}})();
-  const refreshVisible=()=>{if(document.visibilityState==='visible')void read();};
+  const refreshVisible=()=>{if(document.visibilityState==='visible')void read(undefined,true);};
   const offline=()=>{tasks.cancel('session');current.request++;current.busy=false;current.session=null;setBusy(false);setSession(null);setPhase('offline');setError('');};
   const accountReturn=(event:MessageEvent)=>{if(current.endpoint&&event.origin===current.endpoint&&event.data&&typeof event.data==='object'&&!Array.isArray(event.data)&&event.data.type==='galaxy:identity-account-return')void read();};
   window.addEventListener('focus',refreshVisible);window.addEventListener('online',refreshVisible);window.addEventListener('offline',offline);document.addEventListener('visibilitychange',refreshVisible);
@@ -60,12 +63,13 @@ export function useOfficialAccountSession(endpoint?:string):Model{
   return()=>{tasks.cancel();current.active=false;current.generation++;current.request++;current.session=null;current.endpoint=null;window.clearInterval(timer);window.removeEventListener('focus',refreshVisible);window.removeEventListener('online',refreshVisible);window.removeEventListener('offline',offline);window.removeEventListener('message',accountReturn);document.removeEventListener('visibilitychange',refreshVisible);};
  },[endpoint,read,tasks]);
  useEffect(()=>{if(!session)return;const delay=session.expiresAt*1000-Date.now();const timer=window.setTimeout(()=>{const current=lifecycle.current;if(current.session!==session)return;tasks.cancel('session');current.session=null;current.request++;current.busy=false;setBusy(false);setSession(null);setPhase('signed-out');void read();},Math.max(0,delay));return()=>window.clearTimeout(timer);},[session,read,tasks]);
- const logout=useCallback(async()=>{const current=lifecycle.current,selected=current.session;if(!current.active||!current.client||!selected||current.busy)return;
+  const logout=useCallback(async()=>{const current=lifecycle.current,selected=current.session;if(!current.active||!current.client||!selected||current.busy&&!current.quiet)return;
+  tasks.cancel('session');current.quiet=false;
   const generation=current.generation,ticket=++current.request;current.busy=true;current.session=null;setSession(null);setPhase('loading');setBusy(true);setError('');
   try{await current.client.logout(selected);if(!current.active||current.generation!==generation||current.request!==ticket)return;current.session=null;setSession(null);setPhase('signed-out');}
   catch{if(current.active&&current.generation===generation&&current.request===ticket){setPhase('unavailable');setError('暂时没有确认退出，请重新读取账户。');}}
   finally{if(current.active&&current.generation===generation){current.busy=false;setBusy(false);}}
- },[]);
+ },[tasks]);
  const more=useCallback(()=>read(lifecycle.current.session?.nextAfter??undefined),[read]);
   const sameEndpoint=lifecycle.current.requestedEndpoint===endpoint;
   return{phase:sameEndpoint?phase:isOnline()?'loading':'offline',session:sameEndpoint?session:null,client:sameEndpoint?client:null,busy:sameEndpoint&&busy,error:sameEndpoint?error:'',refresh,more,logout};

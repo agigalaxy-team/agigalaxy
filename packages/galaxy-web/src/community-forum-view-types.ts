@@ -29,7 +29,7 @@ export type ForumVersionLocator={kind:'post-version';postId:string;versionId:str
 export type ForumReplyLocator={kind:'reply';replyId:string;contentRevision:1;postId:string;postVersionId:string};
 export type ForumPostPayload=Pick<z.infer<typeof forumCreatePostSchema>,'title'|'body'|'links'|'topic'|'attachments'>;
 export type ForumContentPayload=Pick<z.infer<typeof forumCreateReplySchema>,'body'|'replyTo'|'attachments'>|ForumPostPayload;
-export type ForumAuthorFields={authorId?:string|null;authorAccountId?:string|null;author?:{kind:'account'|'identity'|'business-operator';accountId?:string|null;subjectId?:string|null;operatorId?:string;displayName?:string|null}};
+export type ForumAuthorFields={authorId?:string|null;authorAccountId?:string|null;author?:{kind:'account'|'identity'|'business-operator';accountId?:string|null;subjectId?:string|null;operatorId?:string;displayName?:string|null;uid?:string|null;avatarKey?:string|null;subjectType?:'person'|'organization'|'agent'|null}};
 export type ForumContentView={
  locator:ForumPostLocation|ForumReplyLocator;availability:string;checkedAt:number;headVersion?:number;currentVersionId?:string|null;
   payload?:ForumContentPayload;attachments?:ForumAttachmentView[];publishedUntil?:number;permissionId?:string;topic?:ForumTopic;createdAt?:number;versionCreatedAt?:number;updatedAt?:number;audience?:ForumAudience;sectionId?:string|null;canParticipate?:boolean;audienceInherited?:boolean;

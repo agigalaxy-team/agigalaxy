@@ -92,7 +92,7 @@ function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refre
   </fieldset>
   {connected&&<TaskAgentIdentityPrompt {...{runtime,subjectId,connected,navigate}} onReady={setAgentReady}/>}
   <footer className="request-form-footer"><span aria-live="polite">{saveState}</span>
-   {!connected?<Button type="button" disabled={busy||!open||!!pending} onClick={()=>void run(async valid=>{await saves.current;if(valid()){if(onNeedIdentity)onNeedIdentity();else navigate('/app/settings/identity');}})}>登录并继续</Button>:agentReady&&<Button type="submit" disabled={busy||!open||!!pending}>{busy?'正在发送…':'发送帮助意向'}</Button>}
+   {!connected?<Button type="button" disabled={busy||!open||!!pending} onClick={()=>void run(async valid=>{await saves.current;if(valid()){if(onNeedIdentity)onNeedIdentity();else navigate('/app/settings/identity');}})}>接续已有身份</Button>:agentReady&&<Button type="submit" disabled={busy||!open||!!pending}>{busy?'正在发送…':'发送帮助意向'}</Button>}
   </footer>
  </form>}
  <div className="application-discussion"><MessageCircle size={18}/><p>也可以直接在这件事下面交流。</p><Button variant="ghost" disabled={busy} onClick={()=>void run(async valid=>{await saves.current;if(valid())navigate(`/app/tasks/${task.taskId}?section=comments`);})}>参与讨论</Button></div>

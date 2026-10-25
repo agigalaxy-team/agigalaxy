@@ -1,8 +1,8 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
 import React,{useEffect,useMemo,useRef,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
-import {HistoryFields} from './history-facts';
-import {memberName} from './conversation-ui';
+import {HistoryFields} from "./features/work-records/history";
+import {memberName} from "./conversation-ui";
 
 type Pending={operationId:string;state:string};
 type Receipt={state:string;reason?:string};

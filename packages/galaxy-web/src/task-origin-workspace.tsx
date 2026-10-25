@@ -1,14 +1,14 @@
-import {ReadingDetails,ReadingSummary} from './reading-details';
+import {ReadingDetails,ReadingSummary} from "./reading-details";
 import React,{useEffect,useId,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
-import {createHelpOriginClient,selectHelpOrigin,taskOriginReturn} from './help-origin-client.mjs';
-import {createTaskPreparationClient} from './task-preparation-client.mjs';
-import './task-help-continuation.css';
-import type {TaskEntryRuntime,AttemptRef,HelpOriginClient,HelpOriginView,HelpOriginSelection,HelpOriginLocator,TaskEntryPreparationClient} from './task-entry-types';
-import type {WorkTask} from './work-task-types';
-import type {WorkAttempt} from './work-fact-types';
-import {taskEntryScope} from './task-entry-types';
+import {MemberAvatar,memberName,useMemberNames} from "./conversation-ui";
+import {createHelpOriginClient,selectHelpOrigin,taskOriginReturn} from "./help-origin-client.mjs";
+import {createTaskPreparationClient} from "./task-preparation-client.mjs";
+import "./task-help-continuation.css";
+import type {TaskEntryRuntime,AttemptRef,HelpOriginClient,HelpOriginView,HelpOriginSelection,HelpOriginLocator,TaskEntryPreparationClient} from "./task-entry-types";
+import type {WorkTask} from "./work-task-types";
+import type {WorkAttempt} from "./features/work-records/contracts";
+import {taskEntryScope} from "./task-entry-types";
 
 const refKey=(value:AttemptRef)=>value.id+':'+value.version;
 const attemptOutcome=(item:WorkAttempt)=>({failed:'报告未达到目标',succeeded:'报告达到目标',partial:'报告部分达到目标',inconclusive:'尚无定论',conflicting:'报告结果存在冲突',unrecorded:'尚未记录结果'} as Record<string,string>)[item.reportedOutcome??'']??({running:'进行中',completed:'已结束',abandoned:'已放下',canceled:'已取消',inconclusive:'尚无定论'} as Record<string,string>)[item.status]??'保留原记录状态';

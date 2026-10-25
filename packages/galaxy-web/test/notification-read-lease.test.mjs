@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {leaseNotificationItems,currentNotificationItems} from '../src/notification-read-lease.mjs';
-import {mergeNotificationItems} from '../src/notification-merge.mjs';
+import {leaseNotificationItems,currentNotificationItems} from '../src/features/notifications/read-lease.mjs';
+import {mergeNotificationItems} from '../src/features/notifications/merge.mjs';
 
 test('source expiry and read expiry bound each notification independently',()=>{
  const now=Date.parse('2026-10-12T00:00:00Z'),end=now+1000;

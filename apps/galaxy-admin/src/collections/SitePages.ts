@@ -3,6 +3,7 @@ import {canEdit,canRead} from '../lib/access';
 import {safePagePath} from '../lib/content-model.mjs';
 import {siteBlocks} from '../blocks/siteBlocks';
 import {mediaPublication} from './Media';
+import {enforceCmsPublication,enforcePublishedPageDeletion} from '../lib/cms-access';
 
 function imageIds(page:unknown):string[]{
   if(!page||typeof page!=='object'||!('blocks'in page)||!Array.isArray(page.blocks))return [];
@@ -25,7 +26,7 @@ async function updateMediaVisibility(req:PayloadRequest,affected:string[]){
 export const SitePages:CollectionConfig={
   slug:'site-pages',labels:{singular:'官网页面',plural:'官网页面'},
   admin:{useAsTitle:'title',defaultColumns:['title','path','_status','updatedAt'],preview:document=>'/preview/pages/'+encodeURIComponent(String(document.id))},
-  access:{read:canRead,create:canEdit,update:canEdit,delete:canEdit,readVersions:canRead},
+  access:{admin:canRead,read:canRead,create:canEdit,update:canEdit,delete:canEdit,readVersions:canRead},
   // Keep the native explicit draft save. Autosaving a new document navigates
   // create -> edit and can replace fields the editor is still entering.
   versions:{drafts:true,maxPerDoc:50},
@@ -33,9 +34,11 @@ export const SitePages:CollectionConfig={
     {name:'title',label:'页面名称',type:'text',required:true,maxLength:200},
     {name:'path',label:'网址路径',type:'text',required:true,unique:true,index:true,validate:(value:unknown)=>safePagePath(value)||'使用小写站内路径，例如 /about/；不能占用账户或服务地址。'},
     {name:'description',label:'简介',type:'textarea',maxLength:600},
-    {name:'blocks',label:'页面内容',type:'blocks',blocks:siteBlocks,maxRows:80},
+    {name:'blocks',label:'页面内容',labels:{singular:'内容块',plural:'内容块'},type:'blocks',blocks:siteBlocks,maxRows:80},
   ],
   hooks:{
+    beforeChange:[enforceCmsPublication],
+    beforeDelete:[enforcePublishedPageDeletion],
     afterChange:[async({doc,previousDoc,req})=>{if(doc._status==='published'||previousDoc?._status==='published')await updateMediaVisibility(req,[...imageIds(doc),...imageIds(previousDoc??{})]);return doc;}],
     afterDelete:[async({doc,req})=>{await updateMediaVisibility(req,imageIds(doc));return doc;}],
   },

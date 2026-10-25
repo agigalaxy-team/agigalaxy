@@ -1,19 +1,19 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
-import {TaskCurrentSourceItem,TaskDerivedTitle} from './task-material-view';
-import {independentMaterialLabel} from './task-material-client.mjs';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
+import {TaskCurrentSourceItem,TaskDerivedTitle} from "./task-material-view";
+import {independentMaterialLabel} from "./task-material-client.mjs";
 import React, { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {Search, Bell, X, Plus} from 'lucide-react';
-import { createInformationClientV2 } from './information-client-v2.mjs';
-import { memberName, useMemberNames } from './conversation-ui';
-import { PageLoading } from './site-shell';
-import { HistoryFacts } from './history-facts';
-import {useChoiceViewLease} from './choice-retained-operations';
-import {informationField,informationText as readable,informationError as errorText,informationLocalTime as localTime,restoredInformationSearch,informationOperationActive,informationSelections} from './information-workspace-state';
-import type {InformationRuntime,InformationQuery,InformationSelection,InformationScope,InformationItem,InformationPage,InformationWatch,InformationEvents,InformationOperation,InformationPrepared,InformationCommand,InformationDetail,InformationEditing,InformationClient,HonorRule,ComposerKind,ComposerValues,ComposerDraft,QueryComposer,WatchComposer} from './information-workspace-state';
-import './profile-settings.css';
-import './information-workspace.css';
+import { createInformationClientV2 } from "./information-client-v2.mjs";
+import { memberName, useMemberNames } from "./conversation-ui";
+import { PageLoading } from "./site-shell";
+import { HistoryFacts } from "./features/work-records/history";
+import {useChoiceViewLease} from "./choice-retained-operations";
+import {informationField,informationText as readable,informationError as errorText,informationLocalTime as localTime,restoredInformationSearch,informationOperationActive,informationSelections} from "./information-workspace-state";
+import type {InformationRuntime,InformationQuery,InformationSelection,InformationScope,InformationItem,InformationPage,InformationWatch,InformationEvents,InformationOperation,InformationPrepared,InformationCommand,InformationDetail,InformationEditing,InformationClient,HonorRule,ComposerKind,ComposerValues,ComposerDraft,QueryComposer,WatchComposer} from "./information-workspace-state";
+import "./profile-settings.css";
+import "./information-workspace.css";
 
 type Props = {
   runtime: InformationRuntime|null;

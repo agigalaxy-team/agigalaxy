@@ -16,7 +16,8 @@ export function safeDiagnostic(error){
 export function routeTemplate(value){
   let path;try{path=new URL(value,'http://localhost').pathname;}catch{return '/invalid';}
   const parts=path.split('/').filter(Boolean);
-  const fixed=new Set(['v1','operations','users','content','publications','chat-reports','jobs','information-watch','search-recovery','content-publication','search','failures','session','login','logout','callback','retry','cancel','status','api','site','export','operators','site-pages','media','globals','site-settings','versions','access','me','preferences']);
+  const fixed=new Set(['v1','operations','users','content','publications','chat-reports','jobs','information-watch','search-recovery','content-publication','search','failures','session','login','logout','callback','retry','cancel','status','api','site','export','operators','site-pages','media','globals','site-settings','versions','access','me','preferences',
+    'audit','community','feedback','attachments','config','prepare','read','revoke','upload','events','tags','curation','visibility','preview','batch','reports','resolve','sections','posts','post','reply']);
   return '/'+parts.slice(0,12).map(part=>fixed.has(part)?part:':id').join('/');
 }
 export function requestCorrelation(headers){

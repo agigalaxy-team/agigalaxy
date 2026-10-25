@@ -8,8 +8,8 @@ export const Operators:CollectionConfig={
   admin:{hidden:true,useAsTitle:'displayName'},
   access:{admin:({req})=>isOperator(req.user),read:canReadOwnOperator,create:internalOperatorSync,update:internalOperatorSync,delete:()=>false},
   fields:[
-    {name:'externalId',type:'text',required:true,unique:true,index:true,admin:{readOnly:true}},
+    {name:'externalId',label:'管理身份编号',type:'text',required:true,unique:true,index:true,admin:{readOnly:true}},
     {name:'displayName',label:'名称',type:'text',required:true,admin:{readOnly:true}},
-    {name:'role',label:'权限',type:'select',required:true,options:[{label:'管理员',value:'administrator'},{label:'只读成员',value:'reader'}],admin:{readOnly:true}},
+    {name:'role',label:'登录资格',type:'select',required:true,options:[{label:'管理员资格',value:'administrator'},{label:'后台成员资格',value:'reader'}],admin:{readOnly:true}},
   ],
 };

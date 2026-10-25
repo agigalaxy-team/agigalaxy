@@ -11,7 +11,7 @@ const sections = new Map([
   ['/app/builders', '建设者与接入'], ['/app/worker-packs', '工具与使用'],
   ['/app/hubs', 'Hub 社区'], ['/app/information', '资料与关注'],
   ['/app/reviews', '内容复核'], ['/app/governance', '举报与处理'],
-  ['/app/history', '账户'], ['/app/bookmarks', '账户'],
+  ['/app/history', '账户'], ['/app/bookmarks', '账户'], ['/app/feedback', '账户'],
 ]);
 
 /** The shell identifies the current section; the content names the actual page. */

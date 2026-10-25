@@ -1,0 +1,40 @@
+'use client';
+
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import {useId} from 'react';
+import type {ReactNode} from 'react';
+import {AdminChartLoading,AdminChartSurface} from './AdminChartSurface';
+import {AdminIcon} from './AdminIcons';
+import type {AutonomyChartSeries} from './AutonomyTrendPlot';
+import type {AutonomyAccount,AutonomyOverview,AutonomyTask} from './autonomy-types';
+import {autonomyAccountHref,autonomyAccountState,autonomyBusinessStates,autonomyDate,autonomyDomains,autonomyHealthNames,autonomyModes,autonomyNumber,autonomyRoute,autonomySchedule,autonomySources,autonomyStates,autonomyTaskHref,autonomyTaskTitle,autonomyTaskTone,autonomyWait} from '../lib/autonomy-view-model';
+import './autonomy.css';
+
+const AutonomyTrendPlot=dynamic(()=>import('./AutonomyTrendPlot').then(module=>module.AutonomyTrendPlot),{ssr:true,loading:AdminChartLoading});
+export function AutonomyEmpty({children}:{children:ReactNode}){return <div className="auto-empty">{children}</div>;}
+export function AutonomyState({children,tone='neutral'}:{children:ReactNode;tone?:string}){return <span className="auto-state" data-tone={tone}>{children}</span>;}
+export function AutonomyMetric({label,value,unit,href}:{label:string;value:ReactNode;unit?:string;href?:string}){return <div className="auto-metric"><dt>{label}</dt><dd>{href?<Link href={href} prefetch={false}>{value}</Link>:value}{unit&&<small>{unit}</small>}</dd></div>;}
+
+export function AutonomyTrend({points,series,title,unit='项',empty='尚无处理记录',compact=false}:{points:Record<string,string|number|null>[];series:AutonomyChartSeries[];title:string;unit?:string;empty?:string;compact?:boolean}){
+ const titleId=useId(),hasData=points.some(point=>series.some(row=>typeof point[row.key]==='number'));
+ return <section className={'auto-trend'+(compact?' auto-trend--compact':'')} aria-labelledby={titleId}><header className="auto-section-head"><h3 id={titleId}>{title}</h3><span className="auto-muted">{unit}</span></header><div className="auto-legend">{series.map(row=><span key={row.key}><i style={{background:row.color}}/>{row.label}</span>)}</div>{hasData?<><div className="auto-chart" role="img" aria-label={title+'，完整数值见数据表'}><AdminChartSurface><AutonomyTrendPlot points={points} series={series}/></AdminChartSurface></div><div className="auto-chart-values" tabIndex={0} role="region" aria-label={title+'数据表'}><table><thead><tr><th>时间</th>{points.map((point,index)=><th key={String(point.at)+':'+index}>{autonomyDate(String(point.at),true)}</th>)}</tr></thead><tbody>{series.map(row=><tr key={row.key}><th scope="row">{row.label}</th>{points.map((point,index)=><td key={String(point.at)+':'+index}>{autonomyNumber(typeof point[row.key]==='number'?point[row.key] as number:null)}</td>)}</tr>)}</tbody></table></div></>:<AutonomyEmpty>{empty}</AutonomyEmpty>}</section>;
+}
+
+export function AutonomySummary({value,loading=false,error=''}:{value:AutonomyOverview|null;loading?:boolean;error?:string}){
+ const summary=value?.summary;
+ return <section className="auto-summary" aria-label="后台自动运行摘要"><header className="auto-section-head"><h2><AdminIcon name="strategy" size={18}/>自动运行</h2><Link href={autonomyRoute} prefetch={false}>完整运行概览</Link></header>{value?<><dl className="auto-metrics auto-metrics--summary"><AutonomyMetric label="正常值守 / 已启用" value={autonomyNumber(summary?.healthyAccounts)+' / '+autonomyNumber(summary?.enabledAccounts)}/><AutonomyMetric label="实际处理" value={autonomyNumber(summary?.businessCompleted)} unit="项" href="/admin/operations/ai-runs"/><AutonomyMetric label="等待人工" value={autonomyNumber(summary?.waitingHuman)} unit="项" href="/admin/operations/ai-runs?state=waiting-human"/><AutonomyMetric label="迟到 / 失败 / 待核对" value={[summary?.late,summary?.failed,summary?.unknown].map(autonomyNumber).join(' / ')} href={autonomyRoute+'?tab=attention'}/></dl><div className="auto-summary-accounts">{value.accounts.map(account=><Link href={autonomyAccountHref(account.domain)} prefetch={false} key={account.domain}><strong>{account.name||autonomyDomains[account.domain]}</strong><AutonomyState tone={account.config.enabled?(account.health==='healthy'?'active':'attention'):'neutral'}>{autonomyAccountState(account)}</AutonomyState><small>{account.config.enabled?'下次 '+autonomyDate(account.nextDueAt,true):autonomySchedule(account.config)}</small></Link>)}</div><AutonomyTrend compact title="处理趋势" points={value.timeline} series={[{key:'completed',label:'完成巡检',color:'#da4f8b'},{key:'late',label:'迟到巡检',color:'#b38a43'}]} empty={summary?.enabledAccounts===0?'岗位待启用，尚无值守记录。':'尚无已记录的处理趋势。'}/></>:<AutonomyEmpty>{loading?'正在读取自动运行…':error||'自动运行暂时无法读取。'}</AutonomyEmpty>}</section>;
+}
+
+export function AutonomyAccountsTable({accounts,selected=[],onSelect,disabled=false}:{accounts:AutonomyAccount[];selected?:string[];onSelect?:(domain:AutonomyAccount['domain'])=>void;disabled?:boolean}){
+ return <div className="auto-table-scroll"><table className="auto-table"><thead><tr>{onSelect&&<th>选择</th>}<th>岗位</th><th>运行健康</th><th>计划</th><th>有效巡检</th><th>下次计划</th><th>应完成 / 已完成</th><th>迟到 / 积压</th><th>等待人工</th></tr></thead><tbody>{accounts.map(account=><tr key={account.domain}>{onSelect&&<td><input type="checkbox" aria-label={'启用'+autonomyDomains[account.domain]} checked={selected.includes(account.domain)} disabled={disabled||account.config.enabled} onChange={()=>onSelect(account.domain)}/></td>}<th><Link href={autonomyAccountHref(account.domain)} prefetch={false}>{account.name||autonomyDomains[account.domain]}</Link></th><td><AutonomyState tone={!account.config.enabled?'neutral':account.health==='healthy'?'active':'attention'}>{autonomyAccountState(account)}</AutonomyState>{account.readiness.reasons.length>0&&<small>{account.readiness.reasons.map(reason=>reason.message).join('；')}</small>}</td><td>{autonomySchedule(account.config)}<small>{autonomyModes[account.config.mode]}</small></td><td>{autonomyDate(account.lastValidAt,true)}</td><td>{account.config.enabled?autonomyDate(account.nextDueAt,true):'待启用'}</td><td>{autonomyNumber(account.expected)} / {autonomyNumber(account.completed)}</td><td>{autonomyNumber(account.late)} / {autonomyNumber(account.backlog)}</td><td><Link href={'/admin/operations/ai-runs?'+new URLSearchParams({domain:account.domain,state:'waiting-human'})} prefetch={false}>{autonomyNumber(account.waitingHuman)}</Link></td></tr>)}</tbody></table></div>;
+}
+
+export function AutonomyTaskList({items,empty='当前没有待处理事项',showWait=false}:{items:AutonomyTask[];empty?:string;showWait?:boolean}){
+ return items.length?<ol className="auto-task-list">{items.map(task=><li key={task.id}><div><Link href={autonomyTaskHref(task)} prefetch={false}>{autonomyTaskTitle(task)}</Link><p>{autonomyDomains[task.domain]} · {autonomySources[task.source]} · {autonomyModes[task.mode]}</p>{task.summary&&<p className="auto-task-summary">{task.summary}</p>}</div><div><AutonomyState tone={autonomyTaskTone(task)}>{autonomyStates[task.state]??'状态未确认'}</AutonomyState><small>{showWait?'已等待 '+autonomyWait(task):autonomyDate(task.updatedAt,true)}</small>{task.businessState&&<small>{autonomyBusinessStates[task.businessState]??'业务结果未确认'}</small>}</div></li>)}</ol>:<AutonomyEmpty>{empty}</AutonomyEmpty>;
+}
+
+export function AutonomyDistribution({title,items,names}:{title:string;items:{key:string;count:number|null}[];names:Record<string,string>}){
+ const total=items.every(item=>item.count!==null)?items.reduce((sum,item)=>sum+Number(item.count),0):null;
+ return <section className="auto-distribution"><header className="auto-section-head"><h3>{title}</h3>{total!==null&&<small>{autonomyNumber(total)} 项</small>}</header>{items.length?<ul>{items.map((item,index)=><li key={item.key}><span>{names[item.key]??'未归类'}</span><div className="auto-distribution-track"><i style={{width:total&&item.count!==null?item.count/total*100+'%':'0%',background:['#d65b93','#708cc1','#8d83be','#63a49a','#bb9b5f'][index%5]}}/></div><b>{autonomyNumber(item.count)}</b></li>)}</ul>:<AutonomyEmpty>尚无处理分布</AutonomyEmpty>}</section>;
+}

@@ -1,0 +1,34 @@
+export type PublicContentKind='post'|'reply';
+export type PublicContentTopic='technology'|'arts'|'learning'|'life'|'galaxy'|'unclassified';
+export type PublicContentTab='content'|'curation'|'history';
+export type PublicContentTag={id:string;name:string;version:number;enabled:boolean;createdAt:string;updatedAt:string};
+export type PublicContentVisibility={version:number;hidden:boolean;ownHidden:boolean;inheritedHidden:boolean;caseHidden:boolean;until:string|null;operationId:string|null};
+export type PublicContentItem={
+  kind:PublicContentKind;id:string;postId:string;versionId:string|null;version:number;
+  author:{accountId:string|null;uid:string|null;displayName:string|null;subjectId:string|null};
+  title:string|null;excerpt:string|null;topic:PublicContentTopic|null;originalTopic:PublicContentTopic|null;
+  state:'published'|'withdrawn';sourceState:'available'|'unavailable';createdAt:string;updatedAt:string;
+  visibility:PublicContentVisibility;
+  curation:{revision:number;sourceVersion:number|null;appliesToCurrent:boolean;topic:PublicContentTopic|null;pinned:boolean;featured:boolean;tagIds:string[];tags:PublicContentTag[];publicPlacement:'not-connected'};
+  capabilities:{canHide:boolean;canRestore:boolean;canCurate:boolean;canBatchHide:boolean;canBatchRestore:boolean};maxHideSeconds:number;
+};
+export type PublicContentEvent={id:string;sequence:string;kind:'visibility'|'curation';operatorId:string;operatorDisplayName?:string|null;operationId:string;sourceVersion:number;revision:number;reason:string;changes:Record<string,unknown>;createdAt:string};
+export type PublicContentAttachment={id:string;name:string|null;mediaType:string|null;byteSize:number|null;state:string;availability:'available'|'unavailable';contentPath:string|null};
+export type PublicContentDetail={content:PublicContentItem&{body:string|null;links:string[];attachments:PublicContentAttachment[];publishedUntil:number|null};history:{items:PublicContentEvent[];nextAfter:string|null};checkedAt:number;permissions:{canManage:boolean}};
+export type PublicContentSummary={available:boolean;state:'available'|'unavailable';reason:string|null;total:number|null;visible:number|null;hidden:number|null;unavailable:number|null;posts:number|null;replies:number|null;pendingReview:null;trendDays:7|28;daily:{date:string;posts:number|null;replies:number|null}[]};
+export type PublicContentPage={items:PublicContentItem[];nextAfter:string|null;scanTruncated:boolean;summary:PublicContentSummary;topics:{id:PublicContentTopic;label:string}[];tags:PublicContentTag[];permissions:{canManage:boolean};checkedAt:number};
+export type PublicContentSaved=PublicContentDetail&{operationId:string;replayed:boolean};
+export type PublicContentTagPage={items:PublicContentTag[];checkedAt:number;permissions:{canManage:boolean}};
+export type PublicContentTagSaved={tag:PublicContentTag;operationId:string;replayed:boolean};
+export type PublicContentTarget={kind:PublicContentKind;id:string;expectedVersion:number;expectedRevision:number};
+export type PublicContentPreview={items:(PublicContentTarget&{eligible:boolean;reason:string|null;title:string|null})[];checkedAt:number;maximumItems:number};
+export type PublicContentBatch={operationId:string;replayed:boolean;recordedAt:string;items:{kind:PublicContentKind;id:string;status:'applied'|'rejected';code:string|null;visibility?:PublicContentVisibility}[];counts:{applied:number;rejected:number}};
+export type PublicContentFilters={query:string;kind:''|PublicContentKind;topic:''|PublicContentTopic;visibility:''|'visible'|'hidden'|'unavailable';pinned:''|'true'|'false';featured:''|'true'|'false';days:'7'|'28'|'all';after:string};
+export type PublicContentProps={selected:string;selectedKind:PublicContentKind;contentTab:PublicContentTab;filters:PublicContentFilters;csrfToken:string;canManage:boolean};
+
+export const publicContentTopics:Record<PublicContentTopic,string>={technology:'技术与工具',arts:'艺术与创作',learning:'阅读与学习',life:'生活与兴趣',galaxy:'银河使用与反馈',unclassified:'未分类'};
+export const publicContentTabs=[{id:'content',label:'正文'},{id:'curation',label:'编排与处理'},{id:'history',label:'处理记录'}] as const;
+export const publicContentKey=(item:Pick<PublicContentItem,'kind'|'id'>)=>item.kind+':'+item.id;
+export const publicContentReference=(item:Pick<PublicContentItem,'kind'|'id'>)=>(item.kind==='reply'?'回复':'帖子')+' · '+item.id;
+export const publicContentTitle=(item:Pick<PublicContentItem,'title'|'kind'|'id'|'sourceState'>)=>item.sourceState==='available'&&item.title?item.title:publicContentReference(item);
+export const publicContentTopicLabel=(topic:PublicContentTopic|null)=>topic===null?'未知':publicContentTopics[topic];

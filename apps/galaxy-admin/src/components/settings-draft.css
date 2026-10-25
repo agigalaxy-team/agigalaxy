@@ -1,0 +1,4 @@
+.settings-draft-boundary,.settings-draft-content{display:contents}
+.settings-draft-wait{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:8px 12px;color:var(--admin-text,#25324b);background:var(--admin-panel,#fff);border:1px solid var(--admin-border,#e6eaf1);border-radius:8px;font-size:12px}
+.settings-merge-choices fieldset{margin:10px 0;border:1px solid var(--admin-border,#e6eaf1);padding:8px;border-radius:6px}
+.settings-merge-choices label{display:flex;align-items:flex-start;gap:8px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}

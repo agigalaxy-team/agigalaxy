@@ -1,8 +1,8 @@
 import type {z} from 'zod/v4';
-import {informationQuerySchema,informationSelectionSchema} from '../../galaxy-official/src/shared/information-v2-schema.mjs';
-import type {informationWatchCommandSchema,informationWatchPlanSchema} from '../../galaxy-official/src/shared/information-v2-schema.mjs';
-import type {createWebRuntime} from './runtime.mjs';
-import type {HistoryFactsRecord} from './history-fact-view-types';
+import {informationQuerySchema,informationSelectionSchema} from "../../galaxy-official/src/shared/information-v2-schema.mjs";
+import type {informationWatchCommandSchema,informationWatchPlanSchema} from "../../galaxy-official/src/shared/information-v2-schema.mjs";
+import type {createWebRuntime} from "./runtime.mjs";
+import type {HistoryFactsRecord} from "./features/work-records/history-types";
 
 export type InformationRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,'api'|'status'|'receiptStatus'|'getLocal'|'putLocal'|'updateLocal'|'taskDraftScope'>;
 export type InformationQuery=z.input<typeof informationQuerySchema>;

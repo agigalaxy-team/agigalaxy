@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {UserRound} from 'lucide-react';
+import {AccountProfileAvatar} from './account-profile-avatar';
 import {Button} from '@/components/ui/button';
 import {createOfficialAccountClient} from './official-account-client.mjs';
 import {loadWebConfiguration} from './runtime.mjs';
@@ -8,14 +8,15 @@ import {forumVersionPath} from './community-forum-origin.mjs';
 import {PublicLinkedIds,PublicExternalCredentials} from './public-account-relations';
 import {publicAccountReturn,profileReturnLabel} from './profile-navigation.mjs';
 import './online-account-settings.css';
+import {AccountFollowControl} from './features/account-follows/controls';
 
 type PublicPosts={items:ForumPostView[];nextAfter?:string|null;scanTruncated:boolean;checkedAt:number};
-type PublicAccount={accountId:string;uid?:string|null;displayName:string|null;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement'|'operator-recorded-statement';publicQuery?:{showLinkedIds:boolean;showExternalCredentials:boolean};posts?:PublicPosts};
+type PublicAccount={accountId:string;uid?:string|null;displayName:string|null;avatarKey?:string|null;bio?:string;subjectType:'person'|'organization'|'agent'|null;typeSource:'account-owner-statement'|'operator-recorded-statement';publicQuery?:{showLinkedIds:boolean;showExternalCredentials:boolean};posts?:PublicPosts};
 export function PublicAccountWorkspace({accountId,endpoint,navigate,onReturn}:{accountId:string;endpoint?:string;navigate:(path:string)=>void;onReturn?:(path:string)=>void}){
  const [value,setValue]=useState<PublicAccount|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[attempt,setAttempt]=useState(0),[now,setNow]=useState(()=>Math.floor(Date.now()/1000));
  const loadedPages=useRef(1),snapshot=useRef(value),more=useRef<HTMLDivElement>(null),request=useRef<((append?:boolean)=>Promise<void>)|null>(null);
  snapshot.current=value;
- const back=publicAccountReturn(history.state);
+ const back=publicAccountReturn(history.state),backUrl=new URL(back,location.origin),backLabel=backUrl.pathname==='/app/account'&&backUrl.searchParams.get('section')==='following'?'返回我的关注':profileReturnLabel(back);
  useEffect(()=>{
   let active=true,working=false,serial=0;loadedPages.current=1;setValue(null);setError('');setLoading(true);
   const read=async(append=false)=>{
@@ -58,11 +59,12 @@ export function PublicAccountWorkspace({accountId,endpoint,navigate,onReturn}:{a
  const deadline=Math.min(...(value?.posts?.items??[]).flatMap(item=>typeof item.publishedUntil==='number'&&item.publishedUntil>now?[item.publishedUntil]:[]));
  useEffect(()=>{if(!Number.isFinite(deadline))return;const timer=window.setTimeout(()=>setNow(Math.floor(Date.now()/1000)),Math.min(2147483647,Math.max(0,deadline*1000-Date.now()+1)));return()=>window.clearTimeout(timer);},[deadline]);
  return <section className="public-online-account" aria-busy={busy}>
-  <a className="back-link" href={back} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();(onReturn??navigate)(back);}}}>{profileReturnLabel(back)}</a>
+  <a className="back-link" href={back} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();(onReturn??navigate)(back);}}}>{backLabel}</a>
   {loading&&<output>正在加载账户资料…</output>}
   {error&&<div className="message"><h1>账户资料暂不可读</h1><p>{error}</p><Button variant="outline" onClick={()=>setAttempt(value=>value+1)}>重试</Button></div>}
   {value&&<>
-   <header className="public-online-account-heading"><UserRound size={28}/><div><h1>{value.displayName||'银河账户'}</h1>{value.uid&&<p className="account-uid"><span>UID</span> <code>{value.uid}</code></p>}<p>{({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']??'主体类型尚未记录'} · {value.typeSource==='operator-recorded-statement'?'运营更正记录':'账户持有者声明'}</p></div></header>
+   <header className="public-online-account-heading"><AccountProfileAvatar name={value.displayName} avatarKey={value.avatarKey} subjectType={value.subjectType} seed={value.accountId} size={60}/><div><h1>{value.displayName||'银河账户'}</h1>{value.uid&&<p className="account-uid"><span>UID</span> <code>{value.uid}</code></p>}<p>{({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']??'主体类型尚未记录'} · {value.typeSource==='operator-recorded-statement'?'运营更正记录':'账户持有者声明'}</p></div></header>
+   <AccountFollowControl endpoint={endpoint} targetAccountId={value.accountId}/>{value.bio&&<p className="galaxy-profile-bio">{value.bio}</p>}
    {value.publicQuery?.showLinkedIds&&<PublicLinkedIds key={'ids:'+accountId} accountId={accountId} endpoint={endpoint} navigate={navigate}/>}
    {value.publicQuery?.showExternalCredentials&&<PublicExternalCredentials key={'credentials:'+accountId} accountId={accountId} endpoint={endpoint}/>}
    {value.posts&&<section><h2>公开发表的内容</h2>{value.posts.items.filter(item=>availableForumContent(item,now)).map(item=>{const path=forumVersionPath(item.locator.postId,item.locator.versionId??item.currentVersionId)??'/app/community';return <article key={item.locator.postId} className="public-account-post"><h3><a href={path} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(path);}}}>{item.payload?.title}</a></h3><p>{item.payload?.body.slice(0,220)}</p></article>;})}{!value.posts.items.some(item=>availableForumContent(item,now))&&(value.posts.nextAfter?<output>正在加载可公开的帖子…</output>:<p>当前没有可展示的公开帖子。</p>)}<div ref={more}>{value.posts.nextAfter&&<Button variant="ghost" disabled={busy} onClick={()=>void request.current?.(true)}>{busy?'正在加载…':'更多帖子'}</Button>}</div></section>}

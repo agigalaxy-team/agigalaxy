@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {getFactClient} from '../src/fact-client.mjs';
-import {createCapsuleWebClient} from '../src/capsule-workspace-client.mjs';
-import {taskCaseContainerSummary} from '../../galaxy-official/src/shared/cases-schema.mjs';
+import {privacyConsumerFixture} from "../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs";
+import {getFactClient} from "../src/features/work-records/client.mjs";
+import {createCapsuleWebClient} from "../src/capsule-workspace-client.mjs";
+import {taskCaseContainerSummary} from "../../galaxy-official/src/shared/cases-schema.mjs";
 
 async function fixture(t){const f=await privacyConsumerFixture();t.after(()=>f.close());return f;}
 const fields=()=>({kind:'intervention',types:['diagnosis'],affectsAttemptIds:[],description:'本地合成参与者的本人诊断',sourceRefs:[],observedEffect:'只有合成范围观察，没有请求者尝试'});

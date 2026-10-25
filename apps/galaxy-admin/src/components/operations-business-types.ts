@@ -3,9 +3,20 @@ export type Visibility={version:number;hidden:boolean;until:string|null;operatio
 export type ResourceKind='projects'|'methods';
 export type ManagedResource={id:string;kind:'project'|'method';version:number;ownerId:string;creatorId:string;state:string;createdAt:string;updatedAt:string|null;title:string|null;sourceState:'available'|'unavailable';visibility:Visibility;canManage:boolean;canHide:boolean;canRestore:boolean;deprecated:boolean|null;securityIssue:boolean|null;maxHideSeconds:number;checkedAt:number;publicContent?:{document?:{title:string;summary:string;functions:string[];technologies:string[];sourceUrl?:string};title?:string;problemPattern?:string;environment?:{name:string;version:string};solutionStrategy?:string;tools?:string[];skills?:string[];mcpRefs?:string[];verificationMethod?:string;limitations?:string[];applicableScope?:string;license?:string;deprecated?:boolean;securityIssue?:boolean}|null};
 export type FileKind='chat'|'forum';
-export type ManagedFile={id:string;kind:FileKind;state:string;processingState:string;version:string;size:number;ownerAccountId:string|null;originSubjectId:string|null;createdAt:string;uploadedAt:string|null;expiresAt:string|null;scanAttempts:number;scanState:'clean'|'blocked'|null;cleanupPending:boolean;removedAt:string|null;revokedAt:string|null;retryAfter:string|null;lastError:string|null;activeLease:boolean;retriesRemaining:number;canRetryScan:boolean;canRetryCleanup:boolean;processingAvailable:boolean;contentAvailable:false;checkedAt:number};
+export type FileAccess={revision:number;stopped:boolean;until:number|null;operationId:string|null;operatorId:string|null;operatorDisplayName:string|null;reason:string|null;changedAt:string|null;canStop:boolean;canRestore:boolean;restoreBlockedReason:null|'file-unavailable'|'source-unavailable'};
+export type ManagedFile={
+ id:string;kind:FileKind;name:string|null;scope:'existing-managed-file';state:string;processingState:string;version:string;processingVersion:string;size:number|null;
+ ownerAccountId:string|null;originSubjectId:string|null;createdAt:string;uploadedAt:string|null;expiresAt:string|null;
+ scanAttempts:number;scanState:'clean'|'blocked'|null;cleanupPending:boolean;removedAt:string|null;revokedAt:string|null;retryAfter:string|null;lastError:string|null;
+ activeLease:boolean;retriesRemaining:number;canRetryScan:boolean;canRetryCleanup:boolean;processingAvailable:boolean;contentAvailable:false;checkedAt:number;readExpiresAt:number;
+ access:FileAccess;
+ accounting:{reservedBytes:number|null;actualStoredBytes:null};
+ scan:{state:'not-started'|'pending'|'running'|'failed'|'clean'|'blocked'|'unavailable';checkedAt:string|null};
+ cleanup:{state:'not-requested'|'pending'|'result-unknown'|'removed';executionObserved:false;failureObserved:null;objectRemoved:boolean;physicalBlocksReleased:null;authorization:'legacy-plan-required';retryBlockedReason:'plan-authorization-required'|null};
+ history:{items:Array<{kind:'prepared'|'upload-started'|'scan-result'|'revoked'|'object-removal-recorded'|'scan-retry'|'cleanup-retry'|'access-stop'|'access-restore';at:string|null;operationId?:string;operatorId?:string;operatorDisplayName?:string|null;scanState?:'clean'|'blocked';until?:number|null;reason?:string|null}>;truncated:boolean;fullProcessingHistoryAvailable:false};
+};
 export const fileStateLabels:Record<string,string>={prepared:'等待上传',uploading:'正在上传','scan-pending':'等待扫描',scanning:'正在扫描',available:'可用',blocked:'扫描阻止',erased:'已清除',expired:'已到期',revoked:'已撤回'};
 export const resourceLabels:Record<ResourceKind,string>={projects:'项目',methods:'方法'};
 export const fileKindLabels:Record<FileKind,string>={chat:'私聊附件',forum:'社区附件'};
 export const bytesLabel=(value:number)=>value>=1048576?(value/1048576).toLocaleString('zh-CN',{maximumFractionDigits:2})+' MiB':value>=1024?(value/1024).toLocaleString('zh-CN',{maximumFractionDigits:1})+' KiB':value+' B';
-export const untilLabel=(value:number|string|null)=>value?new Date(typeof value==='number'?value*1000:value).toLocaleString('zh-CN'):'未设置';
+export const untilLabel=(value:number|string|null)=>value?new Date(typeof value==='number'?value*1000:value).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'未设置';

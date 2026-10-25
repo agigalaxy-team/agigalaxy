@@ -1,17 +1,17 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {MemberAvatar,memberName,useMemberNames} from './conversation-ui';
-import {HistoryFields} from './history-facts';
-import {useChoiceViewLease} from './choice-retained-operations';
-import {createIdentityGroupsWebClient} from './identity-group-client.mjs';
-import {IdentityGroupEditor} from './identity-group-editor';
-import {IdentityGroupOperations} from './identity-group-operations';
-import {rebindIdentityGroupDrafts,settleIdentityGroupDrafts} from './identity-group-draft.mjs';
-import {groupTime,identityGroupError,identityGroupPayload,identityGroupStates,IdentityGroupIntent,IdentityGroupPeople,IdentityGroupSource} from './identity-group-presentation';
-import type {IdentityGroup,IdentityGroupClient,IdentityGroupDecision,IdentityGroupDirection,IdentityGroupDisplayIntent,IdentityGroupDraftRef,IdentityGroupEditorKind,IdentityGroupLease,IdentityGroupLocator,IdentityGroupProposal,IdentityGroupResult,IdentityGroupRuntime} from './identity-group-types';
-import './identity-group-workspace.css';
+import {MemberAvatar,memberName,useMemberNames} from "./conversation-ui";
+import {HistoryFields} from "./features/work-records/history";
+import {useChoiceViewLease} from "./choice-retained-operations";
+import {createIdentityGroupsWebClient} from "./identity-group-client.mjs";
+import {IdentityGroupEditor} from "./identity-group-editor";
+import {IdentityGroupOperations} from "./identity-group-operations";
+import {rebindIdentityGroupDrafts,settleIdentityGroupDrafts} from "./identity-group-draft.mjs";
+import {groupTime,identityGroupError,identityGroupPayload,identityGroupStates,IdentityGroupIntent,IdentityGroupPeople,IdentityGroupSource} from "./identity-group-presentation";
+import type {IdentityGroup,IdentityGroupClient,IdentityGroupDecision,IdentityGroupDirection,IdentityGroupDisplayIntent,IdentityGroupDraftRef,IdentityGroupEditorKind,IdentityGroupLease,IdentityGroupLocator,IdentityGroupProposal,IdentityGroupResult,IdentityGroupRuntime} from "./identity-group-types";
+import "./identity-group-workspace.css";
 
 type Props={runtime:IdentityGroupRuntime|null;subjectId?:string;connected?:boolean;navigate:(path:string)=>void;initialOperationId?:string};
 type Route={view:'groups'|'detail'|'operation'|'invitations'|IdentityGroupEditorKind;groupId:string|null;operationId:string|null};

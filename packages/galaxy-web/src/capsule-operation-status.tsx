@@ -1,11 +1,11 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
+import { ReadingDetails, ReadingSummary } from "./reading-details";
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {HistoryFields} from './history-facts';
-import {memberName,useMemberNames,readableTime} from './conversation-ui';
-import {CapsuleAuthorPreview} from './capsule-author-preview';
-import {useChoiceViewLease} from './choice-retained-operations';
-import type {CapsuleAuthorClient,CapsuleAuthorLease,CapsuleAuthorRuntime,CapsuleAuthorizationReview,CapsulePending,CapsulePreview,CapsuleReceipt} from './capsule-authoring-types';
+import {HistoryFields} from "./features/work-records/history";
+import {memberName,useMemberNames,readableTime} from "./conversation-ui";
+import {CapsuleAuthorPreview} from "./capsule-author-preview";
+import {useChoiceViewLease} from "./choice-retained-operations";
+import type {CapsuleAuthorClient,CapsuleAuthorLease,CapsuleAuthorRuntime,CapsuleAuthorizationReview,CapsulePending,CapsulePreview,CapsuleReceipt} from "./capsule-authoring-types";
 const explanation=(reason:string)=>({
  'authorization-expired':'上次授权已到期，核对原内容和本次期限后可以继续。',
  'authorization-deadline-invalid':'原授权期限暂不能使用，核对原内容和本次期限后可以继续。',

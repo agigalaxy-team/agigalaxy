@@ -1,0 +1,16 @@
+/* Account forms are rendered by ReadingSurface directly under document.body. */
+.account-settings-dialog .account-archive-import{margin:0;padding:0;border:0}
+.account-settings-dialog .workspace-form{display:flex;flex-direction:column;gap:20px;max-width:none;min-width:0;margin:20px 0 0;padding:0;border:0;background:transparent}
+.account-settings-dialog .workspace-form>label{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;color:var(--g-text);font-size:13px;line-height:1.7}
+.account-settings-dialog .workspace-form input:not([type=checkbox],[type=radio],[type=file]),.account-settings-dialog .workspace-form textarea{display:block;width:100%;min-width:0;max-width:100%;margin:0;border:1px solid var(--g-line);border-radius:7px;padding:10px 12px;background:#fff;color:var(--g-text);font:inherit;line-height:1.7}
+.account-settings-dialog .workspace-form fieldset{display:grid;gap:12px;min-width:0;margin:0;padding:0;border:0;border-radius:0}
+.account-settings-dialog .workspace-form legend{margin:0 0 12px;padding:0;color:var(--g-text);font-size:13px;line-height:1.7}
+.account-settings-dialog .workspace-form fieldset>label{display:flex;align-items:flex-start;gap:10px;min-width:0;margin:0;font-size:13px;line-height:1.8}
+.account-settings-dialog .workspace-form fieldset>label>span{min-width:0;overflow-wrap:anywhere}
+.account-settings-dialog .workspace-form input[type=checkbox],.account-settings-dialog .workspace-form input[type=radio]{flex:none;width:16px;height:16px;margin:4px 0 0;accent-color:var(--g-accent)}
+.account-settings-dialog .account-archive-import input[type=file]{display:block;max-width:100%;margin-top:14px;color:var(--g-muted);font-size:13px;line-height:1.8}
+.account-settings-dialog .account-archive-import input[type=file]::file-selector-button{min-height:36px;margin-right:12px;border:1px solid var(--g-line);border-radius:7px;padding:6px 12px;background:#fff;color:var(--g-text);font:inherit;cursor:pointer}
+.account-settings-dialog .workspace-form>button,.account-settings-dialog .button-row>button,.account-settings-dialog .account-archive-import>button{min-height:40px;border-radius:8px;padding:9px 14px;font-size:13px;line-height:20px}
+.account-settings-dialog .workspace-form>button{align-self:flex-start}
+.account-settings-dialog .workspace-form .muted,.account-settings-dialog .archive-source-coverage{color:var(--g-muted);font-size:12px;line-height:1.8}
+.account-settings-dialog .reading-detail-body>.button-row{margin-bottom:0}

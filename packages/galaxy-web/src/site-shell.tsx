@@ -1,18 +1,20 @@
-import React,{lazy,Suspense,useEffect} from 'react';
+import React,{lazy,Suspense,useEffect,useRef} from 'react';
 import {GlobalRail,SiteHeader,ShellSearch,StandardHeaderActions} from './site-chrome.mjs';
 import {siteSearchTarget} from './site-search.mjs';
 import {CommunityLayout} from './community-navigation';
-import {PublicBrowseWorkspace} from './public-browse-workspace';
+import {PublicBrowseWorkspace} from './features/discovery/browse';
 import {ReadingDetails,ReadingSummary} from './reading-details';
 const SettingsLayout=lazy(()=>import('./account-center').then(module=>({default:module.SettingsLayout})));
 import {carryHelpOrigin} from './help-origin-client.mjs';
 import {workspaceLocation} from './workspace-location.mjs';
-import {isPublicReadingRoute} from './public-reading-contract.mjs';
+import {isPublicReadingRoute} from './features/public-reading/contract.mjs';
 import {readAgentIdentityEntry} from './agent-identity-handoff.mjs';
 import {AccountSessionScope,useAccountSessionModel} from './account-session-scope';
-import {ReadingBookmarksAccountProvider} from './reading-bookmarks-workspace';
+import {ReadingBookmarksAccountProvider} from "./features/bookmarks/controls";
 import type {createWebRuntime} from './runtime.mjs';
 import './selected-shell.css';
+import {SiteContentTransitionContext,useSiteContentTransition} from './use-site-content-transition';
+import './site-content-transition.css';
 import {PageLoading} from './interaction-feedback';
 export {GalaxyMark} from './galaxy-mark';
 export {PageLoading} from './interaction-feedback';
@@ -34,11 +36,13 @@ export function SiteShell(props:Props){
  return <AccountSessionScope endpoint={props.endpoint}><AccountShell {...props}/></AccountSessionScope>;
 }
 function AccountShell({path,search='',endpoint,navigate,children}:Props){
- const account=useAccountSessionModel();
+ const account=useAccountSessionModel(),content=useRef<HTMLElement>(null);
+ const deferPrimary=/^\/app\/community\/(?:posts\/[0-9a-f-]{36}(?:\/versions\/[0-9a-f-]{36})?|replies\/[0-9a-f-]{36})$/.test(path)||/^\/app\/rooms\/[0-9a-f-]{36}$/.test(path);
+ const contentTransition=useSiteContentTransition(content,path+search,{deferPrimary});
  const community=path==='/app/community'||path.startsWith('/app/community/');
  const ownedPosts=path==='/app/community'&&new URLSearchParams(search).get('section')==='owned';
  const nativeHandoff=path==='/app/settings/identity'&&!!readAgentIdentityEntry({pathname:path,search,origin:location.origin});
- const settings=!nativeHandoff&&(path==='/app/account'||path==='/app/bookmarks'||path==='/app/history'||path.startsWith('/app/settings/')||ownedPosts);
+ const settings=!nativeHandoff&&(path==='/app/account'||path==='/app/bookmarks'||path==='/app/feedback'||path==='/app/history'||path.startsWith('/app/settings/')||ownedPosts);
  const publicPage=isPublicReadingRoute(path);
  const messages=path==='/app/rooms'||path.startsWith('/app/rooms/')||path==='/app/notifications';
  const go=(target:string)=>navigate(target);
@@ -63,7 +67,7 @@ function AccountShell({path,search='',endpoint,navigate,children}:Props){
   :path===target||path.startsWith(target+'/');
  const link=(target:string,label:string)=>{const url=new URL(target,location.origin),parameters=new URLSearchParams(search),active=path===url.pathname&&[...url.searchParams].every(([key,value])=>parameters.get(key)===value)&&!(url.pathname==='/app/account'&&!url.search&&parameters.has('section'));return <a key={target} href={target} aria-current={active?'page':undefined} onClick={event=>follow(event,target)}>{label}</a>;};
  const signedIn=account.phase==='signed-in'&&!!account.session?.account.id;
- const accountLinks=[['/app/account','概览'],['/app/community?section=owned','我的帖子'],['/app/bookmarks','收藏'],['/app/account?section=settings','设置'],['/app/account?section=access','本机银河']];
+ const accountLinks=[['/app/account','概览'],['/app/community?section=owned','我的帖子'],['/app/bookmarks','收藏'],['/app/account?section=following','关注'],['/app/account?section=settings','设置'],['/app/account?section=access','本机银河'],['/app/feedback','使用反馈']];
  const searchContents=(event:React.SubmitEvent<HTMLFormElement>)=>{
   event.preventDefault();const value=new FormData(event.currentTarget).get('q'),query=typeof value==='string'?value.trim():'';
   if(community){const params=new URLSearchParams(search);for(const key of ['compose','manage','section','before','cursor'])params.delete(key);if(query)params.set('q',query);else params.delete('q');const encoded=params.toString();go('/app/community'+(encoded?'?'+encoded:''));}
@@ -84,7 +88,7 @@ function AccountShell({path,search='',endpoint,navigate,children}:Props){
     </ReadingDetails>
    }/>}/>
 
-  <main id="main-content" className={'workspace-main site-content'+(settings?' settings-page':'')+(community?' community-page':'')+(messages?' messages-shell-page':'')+(publicPage?' public-content':'')} tabIndex={-1}>{settings?<Suspense fallback={<PageLoading label="正在打开账户…"/>}><SettingsLayout path={path} search={search} endpoint={endpoint} navigate={navigate}>{children}</SettingsLayout></Suspense>:community?<CommunityLayout path={path} search={search} navigate={navigate}>{children}</CommunityLayout>:children}</main>
+  <main id="main-content" ref={content} data-site-content-transition="" className={'workspace-main site-content'+(settings?' settings-page':'')+(community?' community-page':'')+(messages?' messages-shell-page':'')+(publicPage?' public-content':'')} tabIndex={-1}><SiteContentTransitionContext.Provider value={contentTransition}>{settings?<Suspense fallback={<PageLoading label="正在打开账户…"/>}><SettingsLayout path={path} search={search} endpoint={endpoint} navigate={navigate}>{children}</SettingsLayout></Suspense>:community?<CommunityLayout path={path} search={search} navigate={navigate}>{children}</CommunityLayout>:children}</SiteContentTransitionContext.Provider></main>
  </div></ReadingBookmarksAccountProvider>;
 }
 export function StartPage({runtime,navigate}:{runtime:Awaited<ReturnType<typeof createWebRuntime>>|null;navigate:(path:string)=>void}){return <PublicBrowseWorkspace runtime={runtime} navigate={navigate}/>;}

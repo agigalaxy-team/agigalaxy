@@ -1,19 +1,19 @@
-import {ReadingDetails,ReadingSummary} from './reading-details';
-import {TaskCurrentSourceItem} from './task-material-view';
-import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {createTaskPreparationClient} from './task-preparation-client.mjs';
-import { MemberAvatar, memberName, readableTime, useMemberNames } from './conversation-ui';
+import {ReadingDetails,ReadingSummary} from "./reading-details";
+import {TaskCurrentSourceItem} from "./task-material-view";
+import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {createTaskPreparationClient} from "./task-preparation-client.mjs";
+import { MemberAvatar, memberName, readableTime, useMemberNames } from "./conversation-ui";
 import {
   createTaskContactClient,
   contactCandidates,
-} from './task-contact-client.mjs';
+} from "./task-contact-client.mjs";
 
-import type {ProjectRuntime} from './project-workspace-types';
-import type {TaskContactTask,TaskContactClient,ContactCandidate,ContactSearchPage,InvitationBatch,RoomBatch,TaskRoom,RoomProgress,TaskPreparation,SearchType} from './help-contact-view-types';
-import {contactMessage} from './help-contact-view-types';
+import type {ProjectRuntime} from "./features/projects/contracts";
+import type {TaskContactTask,TaskContactClient,ContactCandidate,ContactSearchPage,InvitationBatch,RoomBatch,TaskRoom,RoomProgress,TaskPreparation,SearchType} from "./help-contact-view-types";
+import {contactMessage} from "./help-contact-view-types";
 type Props = {
   task: TaskContactTask;
   runtime: ProjectRuntime;

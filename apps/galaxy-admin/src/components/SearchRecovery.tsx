@@ -8,13 +8,18 @@ import {operationsFailure,operationsRequest,OperationsRequestError} from '../lib
 import {useOperationsRead} from '../lib/use-operations-read';
 
 const recoveryLabel=(job:SearchFailure)=>job.automaticRecoveryPending?'已安排自动恢复':job.automaticRecoveryExhausted?'本代自动恢复已用尽':job.recoveryAttempts?'本代已安排 '+job.recoveryAttempts+' 次':'尚未安排自动恢复';
-export function SearchRecovery({initial,initialError,path,after,csrfToken,canManage}:{initial:SearchFailurePage|null;initialError:string;path:string;after:string;csrfToken:string;canManage:boolean}){
-  const page=useOperationsRead<SearchFailurePage>({path,initial,initialError,failureMessage:'检索失败记录暂时无法取得。'});
-  const [selectedId,setSelectedId]=useState<string|null>(null),[busy,setBusy]=useState(false),[pending,setPending]=useState<SearchRecoveryJob|null>(null),[message,setMessage]=useState(''),[actionError,setActionError]=useState('');
-  const current=useOperationsRead<{job:SearchRecoveryJob|null}>({path:selectedId?'/v1/operations/search/failures/'+selectedId:null,failureMessage:'这条来源的检索状态暂时无法取得。'});
+type Selection={jobId:string;path:string};
+type ListLocation={path:string;after:string};
+export function SearchRecovery({initial,initialError,path:requestedPath,after:requestedAfter,csrfToken,canManage}:{initial:SearchFailurePage|null;initialError:string;path:string;after:string;csrfToken:string;canManage:boolean}){
+  const [selection,setSelection]=useState<Selection|null>(null),[busy,setBusy]=useState(false),[pending,setPending]=useState<SearchRecoveryJob|null>(null),[heldLocation,setHeldLocation]=useState<ListLocation|null>(null),[message,setMessage]=useState(''),[actionError,setActionError]=useState('');
+  const locked=busy||pending!==null,{path,after}=locked&&heldLocation?heldLocation:{path:requestedPath,after:requestedAfter};
+  const page=useOperationsRead<SearchFailurePage>({path,initial:path===requestedPath?initial:null,initialError:path===requestedPath?initialError:'',failureMessage:'检索失败记录暂时无法取得。'});
+  const target=selection?.path===path?selection:null;
+  const current=useOperationsRead<{job:SearchRecoveryJob|null}>({path:target?'/v1/operations/search/failures/'+target.jobId:null,failureMessage:'这条来源的检索状态暂时无法取得。'});
   const inFlight=useRef(false),mutation=useRef<AbortController|null>(null),alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;mutation.current?.abort();};},[]);
-  const job=current.value?.job??null;
+  const result=current.value?.job,job=result&&target&&result.jobId===target.jobId?result:null;
+  useEffect(()=>{if(!locked){setHeldLocation(null);setSelection(previous=>previous?.path===requestedPath?previous:null);}},[locked,requestedPath]);
   useEffect(()=>{
     if(!pending||busy||!current.verified||!current.value)return;
     const latest=current.value.job;
@@ -42,6 +47,7 @@ export function SearchRecovery({initial,initialError,path,after,csrfToken,canMan
   async function retry(){
     if(!canManage||!job||job.state!=='failed'||job.automaticRecoveryPending||inFlight.current||pending||!current.verified||current.loading)return;
     const selected=job,controller=new AbortController();mutation.current=controller;inFlight.current=true;setBusy(true);setMessage('');setActionError('');
+    setHeldLocation({path,after});
     try{
       const result=await operationsRequest<SearchRetryResult>('/v1/operations/search/failures/'+selected.jobId+'/retry',{csrfToken,body:{expectedGeneration:selected.generation},signal:controller.signal});
       if(!alive.current)return;
@@ -56,12 +62,11 @@ export function SearchRecovery({initial,initialError,path,after,csrfToken,canMan
       await current.read();
     }finally{inFlight.current=false;if(alive.current)setBusy(false);if(mutation.current===controller)mutation.current=null;}
   }
-  const locked=busy||pending!==null;
-  return <section className="galaxy-business-users galaxy-search-recovery"><header><h1>检索恢复</h1><button type="button" disabled={page.loading} onClick={()=>{void page.read();if(selectedId)void current.read();}}>{page.loading?'正在读取…':'刷新失败记录'}</button></header>
+  return <section className="galaxy-business-users galaxy-search-recovery"><header><h1>检索恢复</h1><button type="button" disabled={page.loading} onClick={()=>{void page.read();if(target)void current.read();}}>{page.loading?'正在读取…':'刷新失败记录'}</button></header>
     {page.error&&<p className="galaxy-error" role="alert">{page.error}<button type="button" disabled={page.loading} onClick={()=>void page.read()}>重新读取</button></p>}
     {page.loading&&!page.value&&<p role="status">正在读取失败记录…</p>}
-    {page.value&&<><div className="galaxy-table-scroll"><table><thead><tr><th>来源</th><th>来源代次</th><th>执行尝试</th><th>自动恢复</th><th>计划恢复时间</th></tr></thead><tbody>{page.value.items.map(item=><tr key={item.jobId}><th><button type="button" disabled={locked} aria-label={'查看检索任务 '+item.jobId} onClick={()=>{setSelectedId(item.jobId);setMessage('');setActionError('');}}>{sourceTypes[item.sourceType]??'来源记录'}</button><p><code>{item.sourceId}</code></p></th><td>第 {item.generation} 代</td><td>{item.attempts} 次</td><td>{recoveryLabel(item)}</td><td>{timeLabel(item.recoveryAt)}</td></tr>)}</tbody></table></div>{!page.value.items.length&&<p>当前没有待处理的检索失败记录。</p>}<nav aria-label="检索失败分页">{after&&<Link href="/admin/operations/search-recovery">返回首批记录</Link>}{page.value.nextAfter&&<Link href={'/admin/operations/search-recovery?after='+encodeURIComponent(page.value.nextAfter)}>下一页</Link>}</nav></>}
-    {selectedId&&<section aria-label="当前检索任务"><header><h2>来源检索状态</h2><button type="button" disabled={current.loading||busy} onClick={()=>void current.read()}>{current.loading?'正在读取…':'读取当前状态'}</button></header>
+    {page.value&&<><div className="galaxy-table-scroll"><table><thead><tr><th>来源</th><th>来源代次</th><th>执行尝试</th><th>自动恢复</th><th>计划恢复时间</th></tr></thead><tbody>{page.value.items.map(item=><tr key={item.jobId}><th><button type="button" disabled={locked} aria-label={'查看检索任务 '+item.jobId} onClick={()=>{setSelection({jobId:item.jobId,path});setMessage('');setActionError('');}}>{sourceTypes[item.sourceType]??'来源记录'}</button><p><code>{item.sourceId}</code></p></th><td>第 {item.generation} 代</td><td>{item.attempts} 次</td><td>{recoveryLabel(item)}</td><td>{timeLabel(item.recoveryAt)}</td></tr>)}</tbody></table></div>{!page.value.items.length&&<p>当前没有待处理的检索失败记录。</p>}<nav aria-label="检索失败分页">{after&&<Link href="/admin/operations/search-recovery" aria-disabled={locked||undefined} tabIndex={locked?-1:undefined} onClick={event=>{if(locked)event.preventDefault();}}>返回首批记录</Link>}{page.value.nextAfter&&<Link href={'/admin/operations/search-recovery?after='+encodeURIComponent(page.value.nextAfter)} aria-disabled={locked||undefined} tabIndex={locked?-1:undefined} onClick={event=>{if(locked)event.preventDefault();}}>下一页</Link>}</nav></>}
+    {target&&<section aria-label="当前检索任务"><header><h2>来源检索状态</h2><button type="button" disabled={current.loading||busy} onClick={()=>void current.read()}>{current.loading?'正在读取…':'读取当前状态'}</button></header>
       {current.error&&<p className="galaxy-error" role="alert">{current.error}</p>}
       {actionError&&<p className="galaxy-error" role="alert">{actionError}{pending&&<button type="button" disabled={current.loading||busy} onClick={()=>void current.read()}>查询原任务</button>}</p>}
       {message&&<output role="status">{message}</output>}

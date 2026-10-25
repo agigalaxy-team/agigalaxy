@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {createHomeContinuityClient} from './home-continuity-client.mjs';
-import {notificationTarget} from './notification-target.mjs';
+import {notificationTarget} from './features/notifications/target.mjs';
 import {useCurrentTaskMaterialTree,taskViewTitle,TaskMaterialNotice} from './task-material-view';
 import './profile-settings.css';
 import type {AccountRuntime,HomeContinuity} from './account-workspace-types';

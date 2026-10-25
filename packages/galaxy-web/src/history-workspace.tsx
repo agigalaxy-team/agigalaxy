@@ -2,12 +2,12 @@ import React,{useEffect,useEffectEvent,useId,useMemo,useRef,useState} from 'reac
 import {BookOpen, Search} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {createHistoryClient,prepareHistoryQuery} from './history-client.mjs';
-import {HistoryFacts,historyRoleLabel} from './history-facts';
-import {useCurrentTaskMaterialTree} from './task-material-view';
-import {recordErrorField} from './record-workspace-types';
-import type {HistoryClient,HistoryPage,HistoryQuery,HistoryRecord,RecordRuntime} from './record-workspace-types';
-import './profile-settings.css';
+import {createHistoryClient,prepareHistoryQuery} from "./history-client.mjs";
+import {HistoryFacts,historyRoleLabel} from "./features/work-records/history";
+import {useCurrentTaskMaterialTree} from "./task-material-view";
+import {recordErrorField} from "./record-workspace-types";
+import type {HistoryClient,HistoryPage,HistoryQuery,HistoryRecord,RecordRuntime} from "./record-workspace-types";
+import "./profile-settings.css";
 export type HistoryForm={query:string;timeWindow:string;from:string;before:string};
 type Props={runtime:RecordRuntime|null;connected:boolean;subjectId?:string;targetSubjectId?:string;navigate:(path:string)=>void;recordKey?:string;onRecordChange?:(key:string|null)=>void;searchForm?:HistoryForm;onSearchFormChange?:(form:HistoryForm)=>void;appliedSearch?:HistoryForm;onSearch?:(form:HistoryForm)=>void};
 type SessionProps=Props&{form:HistoryForm;setForm:(update:(old:HistoryForm)=>HistoryForm)=>void};

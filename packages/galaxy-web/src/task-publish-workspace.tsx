@@ -1,33 +1,33 @@
-import {ReadingDetails,ReadingSummary} from './reading-details';
-import React,{useEffect,useEffectEvent,useId,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Textarea} from '@/components/ui/textarea';
-import {TaskOperationRecovery} from './task-operation-recovery';
-import {TaskPublishDraftComparison} from './task-publish-draft-recovery';
-import {ordinaryPublicationFromDraft,taskWriteError,taskFieldPresent} from './task-bounty-client.mjs';
-import {BookOpen,Eye,Globe,Lock} from 'lucide-react';
-import {createTaskPreparationClient} from './task-preparation-client.mjs';
-import {TaskPreparationWorkspace} from './task-preparation-workspace';
-import {contactCandidates} from './task-contact-client.mjs';
-import './task-help-continuation.css';
-import {AccountVerificationPrompt,needsAccountVerification} from './account-verification-prompt';
-import {createHelpOriginClient,helpOriginLocator,helpOriginPayload} from './help-origin-client.mjs';
-import {TaskOriginPicker} from './task-origin-workspace';
-import {TaskAgentIdentityPrompt} from './task-agent-identity-prompt';
-import {createCommunityForumClient} from './community-forum-client.mjs';
-import {forumTaskLocator,forumTaskMaterialSelection} from './community-forum-origin.mjs';
-import {createTaskMaterialClient,draftMaterialIds,hasMaterialText,literalTaskText,localTaskTextView,replaceLiteralTaskText,removeMaterialTaskText,adoptPreparedTaskMaterials} from './task-material-client.mjs';
-import {TaskForumMaterialWorkspace,TaskMaterialDraftField} from './task-forum-material-workspace';
-import {availableForumContent,type ForumClient,type ForumPostView} from './community-forum-view-types';
-import type {TaskText,TaskTextField,TaskMaterialBody,TaskMaterialStates,TaskMaterialInput,TaskMaterialOptions} from './task-material-types';
-import {searchV2QuerySchema} from '../../galaxy-official/src/shared/search-v2-schema.mjs';
-import {object} from './project-workspace-types';
-import {readOperationReceipt} from './task-operation-state';
-import type {OperationReceipt} from './task-operation-state';
-import {readPublishDraft,taskEntryError} from './task-entry-types';
-import type {TaskEntryRuntime,PublishDraft,TaskDraftHead,TaskPublication,HelpOriginSelection,HelpOriginView,HelpOriginClient,PreparationInput,PreparationChoice,PreparationSource,PreparationView,TaskEntryPreparationClient} from './task-entry-types';
-import type {SearchReference} from './help-contact-view-types';
+import {ReadingDetails,ReadingSummary} from "./reading-details";
+import React,{useEffect,useEffectEvent,useId,useLayoutEffect,useMemo,useRef,useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Textarea} from "@/components/ui/textarea";
+import {TaskOperationRecovery} from "./task-operation-recovery";
+import {TaskPublishDraftComparison} from "./task-publish-draft-recovery";
+import {ordinaryPublicationFromDraft,taskWriteError,taskFieldPresent} from "./task-bounty-client.mjs";
+import {BookOpen,Eye,Globe,Lock} from "lucide-react";
+import {createTaskPreparationClient} from "./task-preparation-client.mjs";
+import {TaskPreparationWorkspace} from "./task-preparation-workspace";
+import {contactCandidates} from "./task-contact-client.mjs";
+import "./task-help-continuation.css";
+import {AccountVerificationPrompt,needsAccountVerification} from "./account-verification-prompt";
+import {createHelpOriginClient,helpOriginLocator,helpOriginPayload} from "./help-origin-client.mjs";
+import {TaskOriginPicker} from "./task-origin-workspace";
+import {TaskAgentIdentityPrompt} from "./task-agent-identity-prompt";
+import {createCommunityForumClient} from "./community-forum-client.mjs";
+import {forumTaskLocator,forumTaskMaterialSelection} from "./community-forum-origin.mjs";
+import {createTaskMaterialClient,draftMaterialIds,hasMaterialText,literalTaskText,localTaskTextView,replaceLiteralTaskText,removeMaterialTaskText,adoptPreparedTaskMaterials} from "./task-material-client.mjs";
+import {TaskForumMaterialWorkspace,TaskMaterialDraftField} from "./task-forum-material-workspace";
+import {availableForumContent,type ForumClient,type ForumPostView} from "./community-forum-view-types";
+import type {TaskText,TaskTextField,TaskMaterialBody,TaskMaterialStates,TaskMaterialInput,TaskMaterialOptions} from "./task-material-types";
+import {searchV2QuerySchema} from "../../galaxy-official/src/shared/search-v2-schema.mjs";
+import {object} from "./features/projects/contracts";
+import {readOperationReceipt} from "./task-operation-state";
+import type {OperationReceipt} from "./task-operation-state";
+import {readPublishDraft,taskEntryError} from "./task-entry-types";
+import type {TaskEntryRuntime,PublishDraft,TaskDraftHead,TaskPublication,HelpOriginSelection,HelpOriginView,HelpOriginClient,PreparationInput,PreparationChoice,PreparationSource,PreparationView,TaskEntryPreparationClient} from "./task-entry-types";
+import type {SearchReference} from "./help-contact-view-types";
 
 
 const preparationSubject=(value:unknown):value is string=>typeof value==='string'&&/^GUID[A-Z0-9]{28}$/.test(value);
@@ -363,13 +363,13 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
    {connected&&<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>}
    <footer className="request-form-footer"><div><span aria-live="polite" aria-label="本机稿状态">{readingDraft?'正在读取草稿…':saveMessage}</span><button type="button" className="text-action" disabled={busy} onClick={()=>navigateWithSavedDraft(forumLocator?.returnTo??originLocator?.returnTo??'/app/')}>保存并离开</button></div><div className="button-row">
     <Button type="button" variant="ghost" disabled={busy||!!pending||!taskFieldPresent(draft.title)||!taskFieldPresent(draft.summary)} onClick={()=>void run(preparePreview)}><Eye size={16}/>预览</Button>
-    {!connected?<Button type="button" disabled={busy||!!pending} onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>登录并继续</Button>:agentReady&&<Button type="submit" disabled={busy||!!pending}>{busy?'正在发布…':draft.visibility==='Public'?'发布求助':'保存这项工作'}</Button>}
+    {!connected?<Button type="button" disabled={busy||!!pending} onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>接续已有身份</Button>:agentReady&&<Button type="submit" disabled={busy||!!pending}>{busy?'正在发布…':draft.visibility==='Public'?'发布求助':'保存这项工作'}</Button>}
    </div></footer>
   </form>}
 
   {preview&&<article className="request-publication-preview"><div className="request-preview-meta">{preview.visibility==='Public'?<><Globe size={16}/>公开求助</>:<><Lock size={16}/>仅自己</>}<span>接受新回应至 {new Date(preview.enrollmentExpiresAt*1000).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div><h2>{displayPreview(preview.title,true)}</h2><p className="request-main-text">{displayPreview(preview.summary)}</p>{displayPreview(preview.workContext.goal)&&displayPreview(preview.workContext.goal)!==displayPreview(preview.title)&&<section><h3>具体目标</h3><p>{displayPreview(preview.workContext.goal)}</p></section>}{displayPreview(preview.workContext.currentSituation)!=='未另行提供当前情况。'&&displayPreview(preview.workContext.currentSituation)!==displayPreview(preview.summary)&&<section><h3>背景</h3><p>{displayPreview(preview.workContext.currentSituation)}</p></section>}{preview.expectedOutcome&&<section><h3>预期结果</h3><p>{displayPreview(preview.expectedOutcome)}</p></section>}{originPreview&&<div className="request-origin"><BookOpen size={17}/><span>关联：{originReview?.task.request.title??'原工作'}{originPreview.attemptRefs.length>0?` · ${originPreview.attemptRefs.length} 条已有尝试`:''}</span></div>}
    {!!preview.materials?.length&&<div className="message"><p>其中 {preview.materials.length} 段使用了你选定的帖子材料，撤回或到期后会停止展示相应文字。</p>{previewBlocked&&<p><output>部分材料正在核对或当前不可用，请核对来源后继续。</output></p>}<Button variant="ghost" disabled={busy} onClick={()=>void refreshMaterials()}>核对材料当前状态</Button></div>}
-   {connected?<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>:<div className="request-login"><p>登录后发布，当前草稿会保留。</p><Button onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>登录并继续</Button></div>}
+   {connected?<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>:<div className="request-login"><p>接续已有身份后发布，当前草稿会保留。</p><Button onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>接续已有身份</Button></div>}
    <footer className="request-form-footer"><Button type="button" variant="ghost" disabled={busy} onClick={()=>setPreview(null)}>继续修改</Button>{connected&&agentReady&&<Button type="button" disabled={busy||!!pending||previewBlocked} onClick={()=>void run(submit)}>{busy?'正在发布…':preview.visibility==='Public'?'发布求助':'保存这项工作'}</Button>}</footer>
   </article>}
   </>}

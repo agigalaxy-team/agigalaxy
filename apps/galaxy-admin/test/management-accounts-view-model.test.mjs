@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {managementAccountQualification,managementAccountsHref,managementAccountsLocation,managementAccountsQuery,managementDirectoryStatus,managementProfileMerge,managementProfileRefresh,managementReceiptMatches,managementAiSources,managementCanCommand} from '../src/lib/management-accounts-view-model.ts';
+
+test('management account context is closed and profile conflicts preserve authored values without granting administrator full permissions',()=>{
+ const person='a'.repeat(64),role='11111111-1111-4111-8111-111111111111';
+ const location=managementAccountsLocation({page:'4',pageSize:'50',query:'成员',enabled:'false',roleId:role,aiDomain:'governance',sort:'created-asc',operator:person,tab:'roles',historyAfter:'12',temporaryPassword:'not-a-real-password',authority:'administrator'});
+ assert.deepEqual([...managementAccountsQuery(location).keys()],['page','pageSize','sort','query','enabled','roleId','aiDomain']);
+ const href=new URL(managementAccountsHref(location,{tab:'ai'}),'https://example.invalid');
+ assert.equal(href.pathname,'/admin/operations/management-accounts');assert.equal(href.searchParams.get('operator'),person);assert.equal(href.searchParams.get('query'),'成员');assert.equal(href.searchParams.get('tab'),'ai');assert.equal(href.searchParams.has('temporaryPassword'),false);assert.equal(href.searchParams.has('authority'),false);
+ assert.equal(managementAccountsLocation({operator:'not-a-principal',historyAfter:'9999999999999999999',aiDomain:'other',page:'0'}).operator,'');
+ assert.equal(managementAccountsLocation({historyAfter:'9999999999999999999'}).historyAfter,'');
+ assert.equal(managementAccountQualification({admission:'administrator',rootAdministrator:false}),'管理员');
+ assert.equal(managementAccountQualification({admission:'reader',rootAdministrator:false}),'成员');
+ assert.equal(managementAccountQualification({admission:'reader',rootAdministrator:true}),'根管理员');
+ const draft={firstName:'原名',lastName:'原姓',note:'本次备注',reason:'',targetVersion:'old',baseFirstName:'原名',baseLastName:'原姓',baseNote:'旧备注'};
+ const merged=managementProfileMerge(draft,{firstName:'更新的名',lastName:'原姓',note:'旧备注',targetVersion:'fresh'});
+ assert.equal(merged.firstName,'更新的名');assert.equal(merged.note,'本次备注');assert.equal(merged.ready,true);assert.equal(draft.targetVersion,'old');
+ const refreshed=managementProfileRefresh(draft,{firstName:'更新的名',lastName:'原姓',note:'旧备注'});assert.equal(refreshed.firstName,'更新的名');assert.equal(refreshed.baseFirstName,'更新的名');assert.equal(refreshed.note,'本次备注');assert.equal(refreshed.targetVersion,'old');
+ const conflicting=managementProfileMerge({...draft,firstName:'我的名'},{firstName:'另一位修改',lastName:'原姓',note:'旧备注',targetVersion:'newer'});
+ assert.equal(conflicting.ready,false);assert.equal(conflicting.conflicts[0].field,'firstName');assert.equal(conflicting.firstName,'我的名');
+ const resolved=managementProfileMerge({...draft,firstName:'我的名'},{firstName:'另一位修改',lastName:'原姓',note:'旧备注',targetVersion:'newer'},{firstName:'current'});
+ assert.equal(resolved.ready,true);assert.equal(resolved.firstName,'另一位修改');assert.equal(resolved.note,'本次备注');
+ assert.match(managementDirectoryStatus({source:{state:'unavailable',coverage:'not-ready',asOf:null}}),/暂时无法读取/);
+ assert.match(managementDirectoryStatus({source:{state:'unavailable',coverage:'complete-generation',asOf:'2026-10-24T00:00:00Z'}}),/上次完整目录/);
+ const operationId='22222222-2222-4222-8222-222222222222',receipt={state:'completed',operationId,kind:'profile-update',targetOperatorId:person};
+ assert.equal(managementReceiptMatches(receipt,{operationId,kind:'profile-update',targetOperatorId:person}),true);
+ assert.equal(managementReceiptMatches({...receipt,targetOperatorId:'b'.repeat(64)},{operationId,kind:'profile-update',targetOperatorId:person}),false);
+ assert.equal(managementReceiptMatches({...receipt,kind:'login-disable'},{operationId,kind:'profile-update',targetOperatorId:person}),false);
+ assert.equal(managementReceiptMatches({...receipt,kind:'create',targetOperatorId:null},{operationId,kind:'create',targetOperatorId:null}),false);
+ const sources=managementAiSources({effective:{permissions:['ai.use.governance'],sources:[{kind:'business-role',label:'治理运营',permissions:['ai.use.governance']},{kind:'business-role',label:'值班',permissions:['ai.use.governance']}]}});
+ assert.deepEqual(sources.governance,['治理运营','值班']);assert.deepEqual(sources.overview,[]);
+ assert.equal(managementCanCommand({capabilities:{canDelete:false},item:{admission:'administrator'}},'delete'),false);
+});

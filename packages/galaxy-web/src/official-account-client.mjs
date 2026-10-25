@@ -1,4 +1,6 @@
 import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath} from '../../galaxy-official/src/shared/account-resource-routes.mjs';
+import {accountAvatarKey} from '../../galaxy-official/src/shared/account-profile-presentation.mjs';
+import {accountFollowMethod} from '../../galaxy-official/src/shared/account-follows-schema.mjs';
 const guid=value=>typeof value==='string'&&/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(value);
 const accountId=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const accountUid=value=>typeof value==='string'&&/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,16}$/.test(value);
@@ -32,12 +34,13 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    ||!Array.isArray(value.linkedIds)||value.linkedIds.length>100||value.nextAfter!==null&&!guid(value.nextAfter))fail('official_account_response_invalid');
   const account=value.account;
   if(![account.displayName,account.email].every(item=>item===null||typeof item==='string'&&item.length<=512)||typeof account.emailVerified!=='boolean')fail('official_account_response_invalid');
+  if(account.avatarKey!==undefined&&account.avatarKey!==null&&accountAvatarKey(account.avatarKey)!==account.avatarKey)fail('official_account_response_invalid');
   const seen=new Set();
   const linkedIds=value.linkedIds.map(item=>{if(!guid(item?.subjectId)||seen.has(item.subjectId)||typeof item.linkedAt!=='string'||!Number.isFinite(Date.parse(item.linkedAt)))fail('official_account_response_invalid');
    seen.add(item.subjectId);return{subjectId:item.subjectId,linkedAt:item.linkedAt};});
   if(account.id!==undefined&&!accountId(account.id))fail('official_account_response_invalid');
   if(account.uid!==undefined&&account.uid!==null&&!accountUid(account.uid))fail('official_account_response_invalid');
-  return{state:'signed-in',account:{id:account.id??null,uid:account.uid??null,displayName:account.displayName,email:account.email,emailVerified:account.emailVerified},linkedIds,nextAfter:value.nextAfter,
+  return{state:'signed-in',account:{id:account.id??null,uid:account.uid??null,displayName:account.displayName,avatarKey:account.avatarKey??null,email:account.email,emailVerified:account.emailVerified},linkedIds,nextAfter:value.nextAfter,
    expiresAt:value.expiresAt,csrfToken:value.csrfToken,galaxyAuthorization:false};
  }
  return Object.freeze({
@@ -62,9 +65,13 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    if(typeof path!=='string'||!path.startsWith('/')||path.startsWith('//')||path.includes('\\')||path.includes('#')||!['GET','POST','DELETE'].includes(method))fail('official_account_request_invalid');
    const parsed=new URL(path,endpoint),route=parsed.pathname;
    const noticeList=route==='/v1/account/notifications/notices',noticeRead=/^\/v1\/account\/notifications\/notices\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/read$/i.test(route);
-   const allowed=/^\/v1\/account\/chat-reports\/(?:config|source|query|report|event|receipt|get)$/.test(route)||isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
-    ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route)||noticeList&&method==='GET'||noticeRead&&method==='POST';
-   const queryKeys=noticeList?['after','limit','unreadOnly']:route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
+   const feedbackDataWrite=/^\/v1\/account\/data\/feedback\/(?:export|delete)$/.test(route)&&method==='POST',
+    feedbackDataOperation=/^\/v1\/account\/data\/feedback\/operations\/[0-9a-f-]{36}$/.test(route)&&method==='GET',
+    feedbackDataExport=/^\/v1\/account\/data\/feedback\/exports\/[0-9a-f-]{36}$/.test(route)&&method==='GET';
+   const allowed=method==='POST'&&path===route&&!!accountFollowMethod(route)||feedbackDataWrite||feedbackDataOperation||feedbackDataExport||/^\/v1\/account\/chat-reports\/(?:config|source|query|report|event|receipt|get)$/.test(route)||isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
+    ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route)||noticeList&&method==='GET'||noticeRead&&method==='POST'||path==='/v1/account/feedback'&&method==='POST'
+    ||path===route&&/^\/v1\/account\/feedback\/attachments\/(?:config|prepare|read|revoke)$/.test(route)&&method==='POST';
+   const queryKeys=noticeList?['after','limit','unreadOnly']:feedbackDataExport||route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
    if(parsed.origin!==endpoint||!allowed||[...parsed.searchParams.keys()].some(key=>!queryKeys.includes(key)||parsed.searchParams.getAll(key).length!==1)||parsed.search&&method!=='GET'
     ||method==='DELETE'&&!/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(route))fail('official_account_request_invalid');
    if(noticeList){
@@ -72,6 +79,8 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
     if(after!==null&&(!/^[1-9][0-9]{0,18}$/.test(after)||BigInt(after)>9223372036854775807n)
       ||limit!==null&&!/^(?:[1-9]|[1-9][0-9]|100)$/.test(limit)||unreadOnly!==null&&!['true','false'].includes(unreadOnly))fail('official_account_request_invalid');
    }
+   if(feedbackDataExport){const after=parsed.searchParams.get('after'),limit=parsed.searchParams.get('limit');
+    if(after!==null&&(!/^(0|[1-9][0-9]{0,18})$/.test(after)||BigInt(after)>9223372036854775807n)||limit!==null&&!/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit))fail('official_account_request_invalid');}
     return request(path,{method,signal,headers:{'Content-Type':'application/json','X-Galaxy-Account-ID':session.account.id,'X-Galaxy-Account-CSRF':session.csrfToken},...(['GET','DELETE'].includes(method)?{}:{body:JSON.stringify(input??{})})});
   },
   /** @param {string} path @param {unknown} input @param {{method?:string,signal?:AbortSignal,session?:{state:string,account:{id:string|null},csrfToken:string,expiresAt:number}}} [options] @returns {Promise<Response>} */

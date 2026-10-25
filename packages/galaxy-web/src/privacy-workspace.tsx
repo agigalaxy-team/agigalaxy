@@ -8,7 +8,7 @@ import {Input} from '@/components/ui/input';
 import {LocalGalaxyPanelEntry} from './local-galaxy-entry';
 import './profile-settings.css';
 import './settings-visual.css';
-import type {TaskBrowseItem} from './public-browse-workspace';
+import type {TaskBrowseItem} from './features/discovery/browse';
 import {deletionEventText,type PrivacyRuntime,type ExportView,type ExportSpecification,type ExportTicket,type ExportState,type ExportProgress,type ExportDownload,type DeletionReceipt,type SavedDeletionReceipt,type DeletionOperation,type DeletionRenewal,type DeletionStore} from './privacy-workspace-types';
 type Props={runtime:PrivacyRuntime|null;connected:boolean;subjectId?:string|null;navigate:(path:string)=>void};
 

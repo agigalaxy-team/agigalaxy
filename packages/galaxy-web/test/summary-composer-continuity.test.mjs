@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {getSummaryRuntime,closeSummaryRuntime} from '../src/summary-runtime.mjs';
+import {getSummaryRuntime,closeSummaryRuntime} from "../src/features/conversation-notes/native/runtime.mjs";
 
 // Local storage is an explicit atomic in-memory double. The unchanged sharing
 // protocol has separate real signed HTTP/PGlite regressions.

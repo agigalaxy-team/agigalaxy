@@ -1,11 +1,11 @@
 import type {AuthStrategy,Payload} from 'payload';
 import {readOperatorSession} from './operations.mjs';
-import {operatorSync,type OperatorUser} from './access';
+import {operatorBusinessAuthorization,operatorSync,type OperatorUser,type OperatorBusinessAuthorization} from './access';
 
 // The mapping is a CMS identity projection. Authority comes from the live BFF
 // session on every request, never from a stored role or a Payload password.
-async function projection(payload:Payload,operator:{id:string;displayName:string;role:'administrator'|'reader'}){
-  const principal:OperatorUser={id:operator.id,collection:'operators',externalId:operator.id,displayName:operator.displayName,role:operator.role,verifiedOperator:true};
+async function projection(payload:Payload,operator:{id:string;displayName:string;role:'administrator'|'reader';businessAuthorization?:OperatorBusinessAuthorization}){
+  const principal:OperatorUser={id:operator.id,collection:'operators',externalId:operator.id,displayName:operator.displayName,role:operator.role,verifiedOperator:true,businessAuthorization:operatorBusinessAuthorization(operator)};
   const find=()=>payload.find({collection:'operators',where:{externalId:{equals:operator.id}},limit:1,depth:0,overrideAccess:false,user:principal});
   let document=(await find()).docs[0];
   if(!document){
@@ -16,11 +16,14 @@ async function projection(payload:Payload,operator:{id:string;displayName:string
   }
   return {...document,...principal,id:String(document.id)};
 }
+const operatorStrategyName='galaxy-operations-session';
 export const operatorStrategy:AuthStrategy={
-  name:'galaxy-operations-session',
+  name:operatorStrategyName,
   authenticate:async({headers,payload})=>{
     const session=await readOperatorSession(headers);
     if(session.state!=='signed-in')return {user:null};
-    return {user:await projection(payload,session.operator)};
+    // Payload's me endpoint reloads stored fields, then preserves _strategy.
+    // Keep the real authentication provenance across that public projection.
+    return {user:{...await projection(payload,session.operator),_strategy:operatorStrategyName}};
   },
 };

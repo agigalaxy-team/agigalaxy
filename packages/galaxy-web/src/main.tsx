@@ -1,71 +1,75 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
-import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createRoot } from 'react-dom/client';
-import { Button } from '@/components/ui/button';
-import { createWebRuntime, loadWebConfiguration } from './runtime.mjs';
-import {restoredOfficialAccountReturn} from './official-account-return.mjs';
-import {requesterFeedbackAvailable} from './requester-feedback-client.mjs';
-import type {ChoiceViewLease} from './choice-retained-operations';
-const ChatWorkspace = lazy(() => import('./chat-workspace').then(module => ({default: module.ChatWorkspace})));
-const ContactOriginWorkspace = lazy(() => import('./contact-origin-workspace').then(module => ({default: module.ContactOriginWorkspace})));
-const ReceivedPackageReader = lazy(() => import('./received-package-reader').then(module => ({default: module.ReceivedPackageReader})));
-const OnlineAccountSettings = lazy(() => import('./online-account-settings').then(module => ({default: module.OnlineAccountSettings})));
-const PublicAccountWorkspace = lazy(() => import('./public-account-workspace').then(module => ({default: module.PublicAccountWorkspace})));
-const DiscoveryWorkspace = lazy(() => import('./discovery-workspace').then(module => ({default: module.DiscoveryWorkspace})));
-const ContentSearchWorkspace = lazy(() => import('./content-search-workspace').then(module => ({default: module.ContentSearchWorkspace})));
-const TaskCollaboration = lazy(() => import('./task-collaboration').then(module => ({default: module.TaskCollaboration})));
-const FactReceiptRecovery = lazy(() => import('./fact-workspace').then(module => ({default: module.FactReceiptRecovery})));
-const TaskOperationRecovery = lazy(() => import('./task-operation-recovery').then(module => ({default: module.TaskOperationRecovery})));
-const TaskOwnerReadWorkspace = lazy(() => import('./task-owner-read-workspace').then(module => ({default: module.TaskOwnerReadWorkspace})));
-const NotificationWorkspace = lazy(() => import('./notification-workspace').then(module => ({default: module.NotificationWorkspace})));
-const ProjectContactWorkspace = lazy(() => import('./project-contact-workspace').then(module => ({default: module.ProjectContactWorkspace})));
-const ProjectDetailWorkspace = lazy(() => import('./project-detail-workspace').then(module => ({default: module.ProjectDetailWorkspace})));
-const ConfigurationWorkspace = lazy(() => import('./configuration-workspace').then(module => ({default: module.ConfigurationWorkspace})));
-const BuildersWorkspace = lazy(() => import('./builders-workspace').then(module => ({default: module.BuildersWorkspace})));
-const ContributionWorkspace = lazy(() => import('./contribution-workspace').then(module => ({default: module.ContributionWorkspace})));
-const AgentIdentityWorkspace = lazy(() => import('./agent-identity-workspace').then(module => ({default: module.AgentIdentityWorkspace})));
-import {readAgentIdentityEntry} from './agent-identity-handoff.mjs';
-import {createTaskPageView,type TaskPageTask} from './task-page-view';
-import {useCurrentTaskProjection,taskViewTitle,TaskMaterialNotice} from './task-material-view';
-import {TaskRequestReading,taskReadingSection} from './task-request-reading';
-import {AgentWorkContinuation} from './agent-work-continuation';
-import './task-help-continuation.css';
-import {readTaskResult} from './task-result-navigation.mjs';
-import {MemberLink,useMemberNames} from './conversation-ui';
-const PrivacyWorkspace = lazy(() => import('./privacy-workspace').then(module => ({default: module.PrivacyWorkspace})));
-const HelpSearchWorkspace = lazy(() => import('./help-search-workspace').then(module => ({default: module.HelpSearchWorkspace})));
-const TaskCommentsWorkspace = lazy(() => import('./task-comments-workspace').then(module => ({default: module.TaskCommentsWorkspace})));
-const CapsuleWorkspace = lazy(() => import('./capsule-workspace').then(module => ({default: module.CapsuleWorkspace})));
-const TaskDirectoryWorkspace = lazy(() => import('./task-directory-workspace').then(module => ({default: module.TaskDirectoryWorkspace})));
-const TaskPublishWorkspace = lazy(() => import('./task-publish-workspace').then(module => ({default: module.TaskPublishWorkspace})));
-import { carryHelpOrigin } from './help-origin-client.mjs';
-const TaskOriginReturn = lazy(() => import('./task-origin-workspace').then(module => ({default: module.TaskOriginReturn})));
-const TaskApplication = lazy(() => import('./task-application').then(module => ({default: module.TaskApplication})));
-const QualificationPermissionWorkspace = lazy(() => import('./qualification-permission-workspace').then(module => ({default: module.QualificationPermissionWorkspace})));
-const HubsWorkspace = lazy(() => import('./hubs-workspace').then(module => ({default: module.HubsWorkspace})));
-const WorkerPackUseWorkspace = lazy(() => import('./worker-pack-use-workspace').then(module => ({default: module.WorkerPackUseWorkspace})));
-const InformationWorkspace = lazy(() => import('./information-workspace').then(module => ({default: module.InformationWorkspace})));
-const TargetGovernanceWorkspace = lazy(() => import('./target-governance-workspace').then(module => ({default: module.TargetGovernanceWorkspace})));
-const ModerationReviewWorkspace = lazy(() => import('./moderation-review-workspace').then(module => ({default: module.ModerationReviewWorkspace})));
-import { closeSummaryRuntime } from './summary-runtime.mjs';
-import {createDraftHistoryNavigation,draftNavigationBrowser} from './draft-history-navigation.mjs';
-import '@/app/globals.css';
-import './workspace.css';
-import './porcelain-theme.css';
-import './full-width-layout.css';
-import { SiteShell, StartPage, PageLoading } from './site-shell';
-import {LoadingFeedback} from './interaction-feedback';
-import {isPublicReadingRoute,PublicReadingWorkspace} from './public-reading-workspace';
-const AccountOverview = lazy(() => import('./account-center').then(module => ({default: module.AccountOverview})));
-const AccountAccessWorkspace = lazy(() => import('./account-access').then(module => ({default: module.AccountAccessWorkspace})));
-const PersonProfile = lazy(() => import('./person-profile').then(module => ({default: module.PersonProfile})));
-import {profileSubject,profileNavigationState,profileReturnNavigationState} from './profile-navigation.mjs';
-const WorkOverview = lazy(() => import('./account-center').then(module => ({default: module.WorkOverview})));
-import {ProjectDirectoryWorkspace,browseReturnPath,browseReturnLabel} from './public-browse-workspace';
-import {TaskTerms} from './task-budget-fields';
-const CommunityForumWorkspace = lazy(() => import('./community-forum-workspace').then(module => ({default: module.CommunityForumWorkspace})));
-const ReadingBookmarksWorkspace = lazy(() => import('./reading-bookmarks-workspace').then(module => ({default: module.ReadingBookmarksWorkspace})));
-const CommunityTaskReturn = lazy(() => import('./community-forum-workspace').then(module => ({default: module.CommunityTaskReturn})));
+import { ReadingDetails, ReadingSummary } from "./reading-details";
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createRoot } from "react-dom/client";
+import { Button } from "@/components/ui/button";
+import { createWebRuntime, loadWebConfiguration } from "./runtime.mjs";
+import {restoredOfficialAccountReturn} from "./official-account-return.mjs";
+import {requesterFeedbackAvailable} from "./requester-feedback-client.mjs";
+import {useDiscoveryUsage} from "./features/discovery/usage";
+import type {ChoiceViewLease} from "./choice-retained-operations";
+const ChatWorkspace = lazy(() => import("./chat-workspace").then(module => ({default: module.ChatWorkspace})));
+const ContactOriginWorkspace = lazy(() => import("./features/projects/contacts/origin").then(module => ({default: module.ContactOriginWorkspace})));
+const ReceivedPackageReader = lazy(() => import("./received-package-reader").then(module => ({default: module.ReceivedPackageReader})));
+const OnlineAccountSettings = lazy(() => import("./online-account-settings").then(module => ({default: module.OnlineAccountSettings})));
+const PublicAccountWorkspace = lazy(() => import("./public-account-workspace").then(module => ({default: module.PublicAccountWorkspace})));
+const AccountFollowsWorkspace = lazy(() => import("./features/account-follows/workspace").then(module => ({default: module.AccountFollowsWorkspace})));
+const DiscoveryWorkspace = lazy(() => import("./features/projects/discovery").then(module => ({default: module.DiscoveryWorkspace})));
+const ContentSearchWorkspace = lazy(() => import("./features/discovery/content-search").then(module => ({default: module.ContentSearchWorkspace})));
+const TaskCollaboration = lazy(() => import("./task-collaboration").then(module => ({default: module.TaskCollaboration})));
+const FactReceiptRecovery = lazy(() => import("./features/work-records/workspace").then(module => ({default: module.FactReceiptRecovery})));
+const TaskOperationRecovery = lazy(() => import("./task-operation-recovery").then(module => ({default: module.TaskOperationRecovery})));
+const TaskOwnerReadWorkspace = lazy(() => import("./task-owner-read-workspace").then(module => ({default: module.TaskOwnerReadWorkspace})));
+const NotificationWorkspace = lazy(() => import("./features/notifications/workspace").then(module => ({default: module.NotificationWorkspace})));
+const ProjectContactWorkspace = lazy(() => import("./features/projects/management/workspace").then(module => ({default: module.ProjectContactWorkspace})));
+const ProjectDetailWorkspace = lazy(() => import("./features/projects/detail").then(module => ({default: module.ProjectDetailWorkspace})));
+const ConfigurationWorkspace = lazy(() => import("./configuration-workspace").then(module => ({default: module.ConfigurationWorkspace})));
+const BuildersWorkspace = lazy(() => import("./builders-workspace").then(module => ({default: module.BuildersWorkspace})));
+const ContributionWorkspace = lazy(() => import("./contribution-workspace").then(module => ({default: module.ContributionWorkspace})));
+const AgentIdentityWorkspace = lazy(() => import("./agent-identity-workspace").then(module => ({default: module.AgentIdentityWorkspace})));
+import {readAgentIdentityEntry} from "./agent-identity-handoff.mjs";
+import {createTaskPageView,type TaskPageTask} from "./task-page-view";
+import {useCurrentTaskProjection,taskViewTitle,TaskMaterialNotice} from "./task-material-view";
+import {TaskRequestReading,taskReadingSection} from "./task-request-reading";
+import {AgentWorkContinuation} from "./agent-work-continuation";
+import "./task-help-continuation.css";
+import {readTaskResult} from "./features/work-records/result-navigation.mjs";
+import {MemberLink,useMemberNames} from "./conversation-ui";
+const PrivacyWorkspace = lazy(() => import("./privacy-workspace").then(module => ({default: module.PrivacyWorkspace})));
+const HelpSearchWorkspace = lazy(() => import("./help-search-workspace").then(module => ({default: module.HelpSearchWorkspace})));
+const TaskCommentsWorkspace = lazy(() => import("./task-comments-workspace").then(module => ({default: module.TaskCommentsWorkspace})));
+const CapsuleWorkspace = lazy(() => import("./capsule-workspace").then(module => ({default: module.CapsuleWorkspace})));
+const TaskDirectoryWorkspace = lazy(() => import("./task-directory-workspace").then(module => ({default: module.TaskDirectoryWorkspace})));
+const TaskPublishWorkspace = lazy(() => import("./task-publish-workspace").then(module => ({default: module.TaskPublishWorkspace})));
+import { carryHelpOrigin } from "./help-origin-client.mjs";
+const TaskOriginReturn = lazy(() => import("./task-origin-workspace").then(module => ({default: module.TaskOriginReturn})));
+const TaskApplication = lazy(() => import("./task-application").then(module => ({default: module.TaskApplication})));
+const QualificationPermissionWorkspace = lazy(() => import("./qualification-permission-workspace").then(module => ({default: module.QualificationPermissionWorkspace})));
+const HubsWorkspace = lazy(() => import("./hubs-workspace").then(module => ({default: module.HubsWorkspace})));
+const WorkerPackUseWorkspace = lazy(() => import("./worker-pack-use-workspace").then(module => ({default: module.WorkerPackUseWorkspace})));
+const InformationWorkspace = lazy(() => import("./information-workspace").then(module => ({default: module.InformationWorkspace})));
+const TargetGovernanceWorkspace = lazy(() => import("./target-governance-workspace").then(module => ({default: module.TargetGovernanceWorkspace})));
+const ModerationReviewWorkspace = lazy(() => import("./moderation-review-workspace").then(module => ({default: module.ModerationReviewWorkspace})));
+import { closeSummaryRuntime } from "./features/conversation-notes/native/runtime.mjs";
+import {createDraftHistoryNavigation,draftNavigationBrowser} from "./draft-history-navigation.mjs";
+import "@/app/globals.css";
+import "./workspace.css";
+import "./porcelain-theme.css";
+import "./full-width-layout.css";
+import { SiteShell, StartPage, PageLoading } from "./site-shell";
+import {LoadingFeedback} from "./interaction-feedback";
+import {isPublicReadingRoute,PublicReadingWorkspace} from "./features/public-reading/workspace";
+const AccountOverview = lazy(() => import("./account-center").then(module => ({default: module.AccountOverview})));
+const FeedbackForm = lazy(() => import("./features/feedback/form").then(module => ({default: module.FeedbackForm})));
+const AccountAccessWorkspace = lazy(() => import("./account-access").then(module => ({default: module.AccountAccessWorkspace})));
+const PersonProfile = lazy(() => import("./person-profile").then(module => ({default: module.PersonProfile})));
+import {profileSubject,profileNavigationState,profileReturnNavigationState} from "./profile-navigation.mjs";
+const WorkOverview = lazy(() => import("./account-center").then(module => ({default: module.WorkOverview})));
+import {ProjectDirectoryWorkspace} from "./features/projects/directory";
+import {browseReturnPath,browseReturnLabel} from "./features/discovery/return-navigation";
+import {TaskTerms} from "./task-budget-fields";
+const CommunityForumWorkspace = lazy(() => import("./community-forum-workspace").then(module => ({default: module.CommunityForumWorkspace})));
+const ReadingBookmarksWorkspace = lazy(() => import("./features/bookmarks/workspace").then(module => ({default: module.ReadingBookmarksWorkspace})));
+const CommunityTaskReturn = lazy(() => import("./community-forum-workspace").then(module => ({default: module.CommunityTaskReturn})));
 
 type Runtime = Awaited<ReturnType<typeof createWebRuntime>>;
 type RuntimeStatus = Awaited<ReturnType<Runtime['status']>>;
@@ -111,7 +115,7 @@ function retiredWorkspaceTarget(url:URL) {
 }
 function replaceRetiredLocation(){const target=retiredWorkspaceTarget(new URL(location.href));if(target)history.replaceState(history.state,'',target);}
 function accountSettingsPath(pathname: string) {
-  return pathname === '/app/account' || pathname.startsWith('/app/settings/');
+  return pathname === '/app/account' || pathname === '/app/feedback' || pathname.startsWith('/app/settings/');
 }
 function readTaskSection(search: string) {
   const section=new URLSearchParams(search).get('section');return ['collaboration','comments','apply'].includes(section??'')?section!:'overview';
@@ -126,6 +130,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const accountRuntime=useMemo(()=>endpoint?{api:{endpoint}}:null,[endpoint]);
   const [routeSearch, setRouteSearch] = useState(location.search);
   const [routeHash, setRouteHash] = useState(location.hash);
+  useDiscoveryUsage({endpoint,path,search:routeSearch});
   const publicReadingPage = isPublicReadingRoute(path);
   const agentIdentityEntry=useMemo(()=>readAgentIdentityEntry({pathname:path,search:routeSearch,origin:location.origin}),[path,routeSearch]);
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [configError, setConfigError] = useState('');
@@ -358,12 +363,12 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
   const accountReturn=identityReturnTarget(projectParameters.get('returnTo'))??returnPath;
   const nativeIdentity=status?.identity?.source==='native-handoff'?status.identity:null;
   const nativeControls=runtime&&nativeIdentity?<section className="account-native-current"><h2>当前网页连接</h2><code>{nativeIdentity.subjectId}</code><p>{connected?'已连接':'尚未连接'}</p><div className="button-row">{connected?<Button variant="outline" disabled={busy} onClick={disconnectNative}>断开网页连接</Button>:<Button disabled={busy} onClick={()=>void run(async()=>{await runtime.connect({confirmed:true});})}>连接网页</Button>}</div></section>:undefined;
-  const accountPage=path==='/app/account'||path==='/app/bookmarks'||path==='/app/work'||!!publicAccountRoute||path==='/app/settings/trust-package';
+  const accountPage=path==='/app/account'||path==='/app/bookmarks'||path==='/app/feedback'||path==='/app/work'||!!publicAccountRoute||path==='/app/settings/trust-package';
   const readingTaskResult=taskSection==='collaboration'&&projectParameters.get('view')==='work'&&projectParameters.get('record')==='results'&&readTaskResult(routeSearch).selected;
   const governanceTargetType = projectParameters.get('targetType'), governanceTargetId = projectParameters.get('targetId');
   const governanceTarget = (governanceTargetType === 'task' || governanceTargetType === 'room') && /^[0-9a-f-]{36}$/.test(governanceTargetId ?? '')
     ? { type: governanceTargetType as 'task' | 'room', id: governanceTargetId! } : undefined;
-  const knownPath = publicReadingPage || path === '/app' || path === '/app/' || path === '/app/find' || path === '/app/account' || path === '/app/work' || workspaceRoutes.includes(path)
+  const knownPath = publicReadingPage || path === '/app' || path === '/app/' || path === '/app/find' || path === '/app/account' || path === '/app/feedback' || path === '/app/work' || workspaceRoutes.includes(path)
     || /^\/app\/(?:tasks|rooms)\/[0-9a-f-]{36}$/.test(path) || !!capsuleRoute || !!projectRoute || !!personSubject || !!qualificationPermissionRoute || !!packUseRoute || !!informationRoute || !!governanceRoute || !!reviewRoute || forumPage || !!publicAccountRoute;
   return <SiteShell path={path} search={routeSearch} endpoint={endpoint} navigate={navigateFromShell}>
         {!publicReadingPage&&<LoadingFeedback active={busy&&actionOrigin===path+routeSearch} scopeKey={actionOrigin??''} className="workspace-operation-feedback" label="正在完成当前操作…" detail="处理仍在继续，请保留当前页面。"/>}
@@ -377,9 +382,11 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
         {forumPage && runtime && <CommunityForumWorkspace key={`forum:${path}:${routeSearch}`} runtime={runtime} subjectId={status?.identity?.subjectId} connected={connected} navigate={navigate} postId={forumPostRoute?.[1]} versionId={forumPostRoute?.[2]} replyId={forumReplyRoute?.[1]} reportId={forumReportRoute?.[1]} memberSectionId={forumSectionRoute?.[1]} section={projectParameters.get('section') ?? 'all'} compose={projectParameters.get('compose') === 'post'} manage={projectParameters.get('manage') === '1'} routeSearch={routeSearch} browseReturn={browseReturnPath('/app/community')} browseReturnLabel={browseReturnLabel('/app/community')} registerShellNavigation={registerForumShellNavigation}/>}
         {!publicReadingPage&&!accountPage&&!agentIdentityEntry&&!runtime&&!configError&&path!=='/app/'&&path!=='/app'&&<PageLoading label="正在打开页面…"/>}
         {path==='/app/bookmarks'&&<ReadingBookmarksWorkspace runtime={accountRuntime} connected={false} navigate={navigate} search={routeSearch}/>}
-        {path==='/app/account'&&!['access','settings'].includes(projectParameters.get('section')??'')&&<AccountOverview endpoint={endpoint} navigate={navigate}/>}
+        {path==='/app/feedback'&&<FeedbackForm endpoint={endpoint} navigate={navigate}/>}
+        {path==='/app/account'&&!['access','settings','following'].includes(projectParameters.get('section')??'')&&<AccountOverview endpoint={endpoint} navigate={navigate}/>}
         {path==='/app/account'&&projectParameters.get('section')==='access'&&<AccountAccessWorkspace endpoint={endpoint} navigate={navigate} section={accessSection} returnTo={accountReturn} identityControls={nativeControls}/>}
         {path==='/app/account'&&projectParameters.get('section')==='settings'&&<OnlineAccountSettings endpoint={endpoint} navigate={navigate} view={projectParameters.get('view')??'profile'}/>}
+        {path==='/app/account'&&projectParameters.get('section')==='following'&&<AccountFollowsWorkspace endpoint={endpoint} navigate={navigate} search={routeSearch}/>}
         {publicAccountRoute&&<PublicAccountWorkspace key={publicAccountRoute[1]} accountId={publicAccountRoute[1]} endpoint={endpoint} navigate={navigate} onReturn={target=>navigate(target,{profileReturn:true})}/>}
         {path==='/app/work'&&<WorkOverview endpoint={endpoint} navigate={navigate}/>}
         {path==='/app/settings/trust-package'&&<ReceivedPackageReader runtime={runtime} subjectId={nativeIdentity?.subjectId} connected={!!nativeIdentity&&connected} navigate={navigate} returnTo={accountReturn}/>}
@@ -390,7 +397,7 @@ function GalaxySession({retryConfiguration}:{retryConfiguration:()=>void}) {
           {connected&&recoverTaskRecords?<><button className="back-link" onClick={()=>setRecoverTaskRecords(false)}> 返回原请求入口</button>
             <TaskOwnerReadWorkspace key={`${path}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}:${status?.connection?.generation??''}`} runtime={runtime} taskId={path.split('/').at(-1)!} connected={connected}/>
             <ReadingDetails className="technical-details"><ReadingSummary>原请求的完整页面暂不可读</ReadingSummary><p>{error||'当前未取得完整页面，可以重新读取或返回任务目录。'}</p><div className="button-row"><Button variant="outline" disabled={busy} onClick={()=>run(()=>taskDetails(path.split('/').at(-1)!))}>重新读取完整页面</Button><button className="text-link" onClick={()=>navigate('/app/participate')}>返回任务目录</button></div></ReadingDetails>
-          </>:<><h1 className="small">暂时无法打开这项求助</h1><p>{connected?'可以重试，或返回任务目录。':'如果这项求助分享给了你，请先登录。'}</p><div className="button-row"><Button disabled={busy} onClick={()=>run(()=>taskDetails(path.split('/').at(-1)!))}>重新读取</Button>{!connected&&<Button variant="outline" onClick={needIdentity}>登录并继续</Button>}<button className="text-link" onClick={()=>navigate('/app/participate')}>返回任务目录</button></div>{error&&<ReadingDetails className="technical-details"><ReadingSummary>读取问题详情</ReadingSummary><p>{error}</p></ReadingDetails>}{connected&&<button className="text-link" onClick={()=>setRecoverTaskRecords(true)}>查看我在这里留下的记录</button>}</>}
+          </>:<><h1 className="small">暂时无法打开这项求助</h1><p>{connected?'可以重试，或返回任务目录。':'如果这项求助分享给了你，请接续获准的银河身份。'}</p><div className="button-row"><Button disabled={busy} onClick={()=>run(()=>taskDetails(path.split('/').at(-1)!))}>重新读取</Button>{!connected&&<Button variant="outline" onClick={needIdentity}>接续已有身份</Button>}<button className="text-link" onClick={()=>navigate('/app/participate')}>返回任务目录</button></div>{error&&<ReadingDetails className="technical-details"><ReadingSummary>读取问题详情</ReadingSummary><p>{error}</p></ReadingDetails>}{connected&&<button className="text-link" onClick={()=>setRecoverTaskRecords(true)}>查看我在这里留下的记录</button>}</>}
           <FactReceiptRecovery key={`fact-receipt:${path}:${status?.identity?.subjectId??'visitor'}:${status?.connection?.bindingId??''}:${status?.connection?.generation??''}`} runtime={runtime} subjectId={status?.identity?.subjectId} taskId={path.split('/').at(-1)!} connected={connected}/>
         </section>}
         {path === '/app/match' && <DiscoveryWorkspace key={routeSearch} runtime={runtime} connected={connected} navigate={navigate}/>}

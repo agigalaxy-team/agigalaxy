@@ -1,4 +1,5 @@
 import * as z from 'zod/v4';
+import {readWithTransientRecovery} from '../../../integrations/shared/read-task.mjs';
 import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 import { forumWriteSpec } from '../../galaxy-official/src/shared/community-forum-v1-schema.mjs';
 import { bindForumIds } from '../../galaxy-official/src/shared/community-forum-ids-v1.mjs';
@@ -81,6 +82,9 @@ export function forumError(reason) {
     connection_required: '请登录银河账户后继续，草稿保留。', account_verification_required: '请登录银河账户后继续，草稿保留。',
     verified_account_required: '请登录银河账户后继续，草稿保留。', invalid_forum_payload: '请检查必填内容、字数和链接后再发表。',
     forum_payload_too_large: '这次内容超出可提交大小，请缩短文字或链接。', forum_quota_exceeded: '今天的此类发表额度已用完，本机稿可以保留。',
+    operations_feature_disabled: '这类新操作目前已暂停，本机稿仍保留。',
+    operations_rule_rejected: '这次内容不符合当前规则，本机稿仍保留，请调整后继续。',
+    operations_rule_facts_unavailable: '暂时无法核对本次操作条件，本机稿仍保留，请稍后继续。',
     forum_version_conflict: '这条记录已更新，请保留本机稿并重新核对当前版本。', forum_operation_conflict: '同一原操作出现不同内容，请保留原记录核对。',
     forum_head_conflict: '帖子已经有新的变化，请保留本机稿并重新核对当前版本。',
     forum_locator_mismatch: '原操作的内容与准确定位不一致，请保留本机稿并重新核对原操作。',
@@ -117,8 +121,8 @@ export function forumError(reason) {
 // Draft heads and the original-operation journal share one IDB transaction.
 // A second tab can retire an operation without allowing an old queued save,
 // signing completion, or HTTP completion to resurrect its retry body.
-/** @param {any} runtime @param {{subjectId?: string|null, context?: string, browserDrafts?:boolean, account?:{id:string,assertCurrent:()=>void,call:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<any>,transfer?:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<Response>}|null, targetAccountId?:string|null, now?:()=>number}} [options] */
-export function createCommunityForumClient(runtime, { subjectId = null, context = 'community', browserDrafts = false, account = null, targetAccountId = null, now=()=>Math.floor(Date.now()/1000) } = {}) {
+/** @param {any} runtime @param {{subjectId?: string|null, context?: string, browserDrafts?:boolean, account?:{id:string,assertCurrent:()=>void,call:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<any>,transfer?:(path:string,input:unknown,options?:{method?:string,signal?:AbortSignal})=>Promise<Response>}|null, targetAccountId?:string|null, now?:()=>number,onAcknowledged?:(value:{kind:string,receipt:{status:string,operationId:string,locator:unknown}})=>unknown}} [options] */
+export function createCommunityForumClient(runtime, { subjectId = null, context = 'community', browserDrafts = false, account = null, targetAccountId = null, now=()=>Math.floor(Date.now()/1000),onAcknowledged } = {}) {
   const api = runtime.api, endpoint = api.endpoint, original = api.snapshot();
   const lease = subjectId && !account ? runtime.receiptStatus.captureLease() : null;
   const ownerId=account?`account:${account.id}`:subjectId??'visitor';
@@ -127,6 +131,7 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   const accountActor=account?`account:${account.id}`:null;
   const previews = new WeakMap(), observed = new Set();
   let closed = false, loaded = false, head = null, lastSave = null, operationTail = Promise.resolve();
+  const readAbort = new AbortController();
   if (!queues.has(api)) queues.set(api, new Map());
   const localQueues = queues.get(api);
   function check() {
@@ -156,10 +161,12 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
     check();
     try { const value = await action(); check(); return value; } catch (error) { check(); throw error; }
   }
-  const publicCall = (path, input, method = 'POST') => wait(() => api.call(path, input, { method, authenticated: false }));
-  const privateCall = async (path, input, method = 'POST', accountId = targetAccountId) => { writeCheck(); return wait(() => account?account.call(path,input,{method}):api.call(path, input, { method, authenticated: true, ...(accountId?{accountId}:{}) })); };
-  const readerCall = (path,input,method='POST',accountId=targetAccountId) => account ? wait(()=>account.call(path,input,{method}))
-    : subjectId&&api.snapshot() ? wait(()=>api.call(path,input,{method,authenticated:true,...(accountId?{accountId}:{})})) : publicCall(path,input,method);
+  const publicCall = (path, input, method = 'POST', signal) => wait(() => api.call(path, input, { method, authenticated: false, ...(signal?{signal}:{}) }));
+  const privateCall = async (path, input, method = 'POST', accountId = targetAccountId, signal) => { writeCheck(); return wait(() => account?account.call(path,input,{method,...(signal?{signal}:{})}):api.call(path, input, { method, authenticated: true, ...(accountId?{accountId}:{}), ...(signal?{signal}:{}) })); };
+  const recoverRead = action => readWithTransientRecovery(action,{signal:readAbort.signal,check:()=>{check();account?.assertCurrent();}});
+  const readerCall = (path,input,method='POST',accountId=targetAccountId) => recoverRead(()=>account ? wait(()=>account.call(path,input,{method,signal:readAbort.signal}))
+    : subjectId&&api.snapshot() ? wait(()=>api.call(path,input,{method,authenticated:true,...(accountId?{accountId}:{}),signal:readAbort.signal})) : publicCall(path,input,method,readAbort.signal));
+  const privateRead = (path,input,method='POST',accountId=targetAccountId) => recoverRead(()=>privateCall(path,input,method,accountId,readAbort.signal));
   const attachments=createForumAttachmentsClient({endpoint,publicCall,account});
   function rowValue(value) {
     const row = value ?? { version: 1, endpoint, subjectId, ...(account||browserDrafts&&!subjectId?{ownerId}:{}), drafts: {}, active: null, completed: [] };
@@ -296,6 +303,9 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
       row.completed = [...row.completed.filter(item => item.operationId !== operation.operationId), item];
       retireDrafts(row, operation); return row;
     });
+    if(account&&needsPublication(operation.kind)&&receipt.status==='acknowledged'&&onAcknowledged){
+      try{void Promise.resolve(onAcknowledged({kind:operation.kind,receipt:{status:'acknowledged',operationId:operation.operationId,locator:clone(receipt.locator)}})).catch(()=>{});}catch{}
+    }
     // Do not advance this instance's observed draft head after an old request.
     // Only a fresh explicit load can adopt another tab's newer head.
     return receipt;
@@ -386,8 +396,8 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
   }
 
   return Object.freeze({
-    check, draft, attachments, close() { closed = true; },
-    topics: () => publicCall('/v2/community/topics', null, 'GET'),
+    check, draft, attachments, close() { closed = true; readAbort.abort(); },
+    topics: () => recoverRead(()=>publicCall('/v2/community/topics', null, 'GET',readAbort.signal)),
     posts: input => readerCall('/v2/community/posts/query', input ?? {}),
     post: postId => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}`, null, 'GET'),
     version: (postId, versionId) => readerCall(`/v2/community/posts/${z.uuid().parse(postId)}/versions/${z.uuid().parse(versionId)}`, null, 'GET'),
@@ -398,16 +408,16 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
     accounts: (input={}) => readerCall('/v2/community/accounts/query',input),
     sections: (input={}) => readerCall('/v2/community/sections/query',input),
     section: sectionId => readerCall(`/v2/community/sections/${z.uuid().parse(sectionId)}`,null,'GET',null),
-    notifications: (input={}) => privateCall('/v2/community/notifications/query',input),
+    notifications: (input={}) => privateRead('/v2/community/notifications/query',input),
     readNotification: replyId => privateCall('/v2/community/notifications/read',{replyId:z.uuid().parse(replyId)}),
-    owned: (input = {}) => privateCall('/v2/community/posts/owned', input),
-    ownPost: postId => privateCall(`/v2/community/posts/${z.uuid().parse(postId)}/owned`, null, 'GET',null),
-    ownReply: replyId => privateCall(`/v2/community/replies/${z.uuid().parse(replyId)}/owned`, null, 'GET',null),
-    quotas: (input={}) => {const query=new URLSearchParams();for(const name of ['postId','replyId','sectionId'])if(input[name])query.set(name,z.uuid().parse(input[name]));return privateCall('/v2/community/quotas'+(query.size?'?'+query:''),null,'GET',query.size?null:targetAccountId);},
-    permission: permissionId => privateCall(`/v2/community/permissions/${z.uuid().parse(permissionId)}`, null, 'GET'),
-    reportConfig: (input = {}) => privateCall('/v2/community/reports/config', input),
-    reports: (input = {}) => privateCall('/v2/community/reports/query', input),
-    report: reportId => privateCall(`/v2/community/reports/${z.uuid().parse(reportId)}`, null, 'GET',null),
+    owned: (input = {}) => privateRead('/v2/community/posts/owned', input),
+    ownPost: postId => privateRead(`/v2/community/posts/${z.uuid().parse(postId)}/owned`, null, 'GET',null),
+    ownReply: replyId => privateRead(`/v2/community/replies/${z.uuid().parse(replyId)}/owned`, null, 'GET',null),
+    quotas: (input={}) => {const query=new URLSearchParams();for(const name of ['postId','replyId','sectionId'])if(input[name])query.set(name,z.uuid().parse(input[name]));return privateRead('/v2/community/quotas'+(query.size?'?'+query:''),null,'GET',query.size?null:targetAccountId);},
+    permission: permissionId => privateRead(`/v2/community/permissions/${z.uuid().parse(permissionId)}`, null, 'GET'),
+    reportConfig: (input = {}) => privateRead('/v2/community/reports/config', input),
+    reports: (input = {}) => privateRead('/v2/community/reports/query', input),
+    report: reportId => privateRead(`/v2/community/reports/${z.uuid().parse(reportId)}`, null, 'GET',null),
     /** @param {string} kind @param {unknown} input @param {{viewers?: string[], draftRef?: {id: string, revision: number}|null, authorizationExpiresAt?: number}} [options] */
     async prepare(kind, input, { viewers = [], draftRef = null, authorizationExpiresAt = now() + 3600 } = {}) {
       writeCheck(kind === 'resolve' ? 'moderation' : 'assistance');

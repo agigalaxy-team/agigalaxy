@@ -1,6 +1,6 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {saveProjectContactPreferences,sameProjectContactPreferences} from '../src/project-contact-preferences-client.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import {saveProjectContactPreferences,sameProjectContactPreferences} from "../src/features/projects/clients/preferences.mjs";
 
 const initial={enabled:true,purposes:['conversation','collaboration'],functions:[],temporary:null};
 const limited={enabled:true,purposes:['conversation'],functions:['手机文字排版'],temporary:null};

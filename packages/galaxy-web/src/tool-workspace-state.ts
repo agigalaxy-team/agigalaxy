@@ -1,15 +1,15 @@
 import type {z} from 'zod/v4';
-import type {createWebRuntime} from './runtime.mjs';
-import {configurationEventV2Schema} from '../../galaxy-official/src/shared/configuration-v2-schema.mjs';
-import type {configurationConditionsSchema} from '../../galaxy-official/src/shared/configuration-v2-schema.mjs';
-import {packUseEventSchema} from '../../galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs';
-import {createConfigurationClient} from './configuration-client.mjs';
-import {createWorkerPackUseClient} from './worker-pack-use-client.mjs';
-import type {caseEventV2Schema} from '../../galaxy-official/src/shared/cases-schema.mjs';
-import type {evidenceReferenceRecordSchema,verificationRecordSchema} from '../../galaxy-official/src/shared/verification-record-schema.mjs';
-import type {WorkerPack} from './builder-authoring-state';
-import type {BuilderDirectoryRow} from './builder-workspace-state';
-import type {InterventionOpinionsView,ResolutionDecision} from './work-fact-presentation-types';
+import type {createWebRuntime} from "./runtime.mjs";
+import {configurationEventV2Schema} from "../../galaxy-official/src/shared/configuration-v2-schema.mjs";
+import type {configurationConditionsSchema} from "../../galaxy-official/src/shared/configuration-v2-schema.mjs";
+import {packUseEventSchema} from "../../galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs";
+import {createConfigurationClient} from "./configuration-client.mjs";
+import {createWorkerPackUseClient} from "./worker-pack-use-client.mjs";
+import type {caseEventV2Schema} from "../../galaxy-official/src/shared/cases-schema.mjs";
+import type {evidenceReferenceRecordSchema,verificationRecordSchema} from "../../galaxy-official/src/shared/verification-record-schema.mjs";
+import type {WorkerPack} from "./builder-authoring-state";
+import type {BuilderDirectoryRow} from "./builder-workspace-state";
+import type {InterventionOpinionsView,ResolutionDecision} from "./features/work-records/presentation-types";
 
 export type ToolRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,'api'|'status'|'receiptStatus'|'getLocal'|'putLocal'|'updateLocal'>;
 export type ConfigurationEvent=z.infer<typeof configurationEventV2Schema>;
