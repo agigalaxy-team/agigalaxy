@@ -18,6 +18,8 @@ function runMetadata(value){
  return {runId,executionId:uuid(value.executionId),conversationId:uuid(value.conversationId),sessionId:id(value.sessionId),componentId:id(value.componentId),componentType:['agent','team','workflow'].includes(value.componentType)?value.componentType:null,
   domain:domains.includes(value.domain)?value.domain:null,state:states.includes(value.state)?value.state:null,errorCode:value.state==='ERROR'&&['operations_agentos_run_failed','operations_authorization_unavailable','operations_agentos_authority_changed'].includes(value.errorCode)?value.errorCode:null,createdAt:time(value.createdAt),updatedAt:time(value.updatedAt),
   promptVersion:['galaxy-operations-v1','galaxy-prepared-review-v1','galaxy-conversation-v1','galaxy-conversation-v2','galaxy-p13-selected-content-v1'].includes(value.promptVersion)?value.promptVersion:null,
+  rolePromptVersion:Number.isSafeInteger(value.rolePromptVersion)&&value.rolePromptVersion>0?value.rolePromptVersion:null,
+  boundaryVersion:value.boundaryVersion==='galaxy-conversation-boundary-v3'?value.boundaryVersion:null,
   tokens:tokens(value.tokens),durationMs:number(value.durationMs),retryCount:null,retryState:'not-recorded',metadataOnly:true,executor:null,conversation:null};
 }
 function spanMetadata(value){
@@ -39,6 +41,7 @@ export class OperationsAiRunsService{
    // A native reference cannot grant access to a foreign endpoint's identity.
    if(!run.conversation)run.conversationId=null;
   }
+  if(!run.conversation||run.componentId!=='galaxy-conversation-'+run.domain){run.rolePromptVersion=null;run.boundaryVersion=null;}
   if(run.executionId){
    const row=(await this.db.query(`SELECT e.executor_kind,e.mode,e.operator_id,e.grant_id,p.display_name FROM operations_agentos_executions_v1 e
     LEFT JOIN operations_operator_principals_v1 p ON p.operator_id=e.operator_id AND p.endpoint=e.endpoint

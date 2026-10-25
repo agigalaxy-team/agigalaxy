@@ -46,6 +46,21 @@ export class OperationsFeedbackService extends OperationsFeedbackReadModel {
    return {feedbackId:id,operationId:x.operationId,submittedAt:at,replayed:false};
   },{control:true});
  }
+ async submissionOperation(actor,operationId){
+  parseFeedback(z.uuid(),operationId);
+  if(actor?.kind!=='official-account'||actor.endpoint!==this.endpoint||!z.uuid().safeParse(actor.accountId).success)
+   throw new ServiceError('official_account_login_required',401);
+  if(!this.accounts)throw new ServiceError('official_account_unavailable',503);
+  // Recover only this currently authenticated owner's original submission.
+  // A missing row is not permission to resend a possibly in-flight POST.
+  return this.accounts.runAuthorized(actor,'binding',async(db,_authorization,current)=>{
+   const account=await this.accounts.resolveWithin(db,current,{accountId:actor.accountId,requireExplicit:true});
+   const row=(await db.query(`SELECT id,created_at,owner_deleted_at FROM operations_feedback_v1
+    WHERE endpoint=$1 AND account_id=$2 AND submission_operation_id=$3`,[this.endpoint,account.id,operationId])).rows[0];
+   return row?{state:'recorded',operationId,feedbackId:row.id,submittedAt:operationsIso(row.created_at),deleted:!!row.owner_deleted_at}
+    :{state:'not-recorded',operationId};
+  },{control:true});
+ }
  async event(operator,id,input){
   const x=parseFeedback(feedbackEventSchema,input);parseFeedback(z.uuid(),id);
   const {note,...metadata}=x,selection={id,...metadata,noteHash:note?digest(note):null};

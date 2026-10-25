@@ -9,14 +9,14 @@ import {OperationsAgentOsActionTools} from './operations-agentos-action-tools.mj
 import {agentOsQueryInvalidFeedback} from './shared/operations-agentos-query-schema.mjs';
 import {conversationReadRoute,conversationPriorActionTarget,conversationPriorActionReference,conversationAccountRestrictionReference} from './operations-agentos-tool-evidence.mjs';
 import {operationsAiWorkScope} from './shared/operations-ai-use.mjs';
-import {workbenchActionCatalog} from './operations-agentos-action-catalog.mjs';
+import {workbenchActionCatalog,workbenchAiPromptReviewSchema} from './operations-agentos-action-catalog.mjs';
 import {conversationPublicReferenceSchema,checkConversationPublicReference} from './operations-agentos-public-reference.mjs';
 
 const fail=(code,status=403)=>{throw new ServiceError(code,status);};
 const parse=(schema,value)=>{const result=schema.safeParse(value);if(!result.success)fail('invalid_operations_agentos_request',400);return result.data;};
 const digest=value=>createHash('sha256').update(canonicalize(value)).digest('hex');
 const envelope=z.strictObject({conversationId:z.uuid(),sessionId:z.uuid(),turnId:z.uuid(),runId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),callId:z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/),
- tool:z.enum(['workbench-summary','query-operations','read-operation-object','list-authorized-work','run-authorized-work','prepare-operation']),arguments:z.record(z.string(),z.unknown()),publicReference:conversationPublicReferenceSchema.optional()});
+ tool:z.enum(['workbench-summary','query-operations','read-operation-object','read-ai-delegation','list-authorized-work','run-authorized-work','prepare-operation']),arguments:z.record(z.string(),z.unknown()),publicReference:conversationPublicReferenceSchema.optional()});
 const confirmSchema=z.strictObject({cardId:z.uuid(),operationId:z.uuid()});
 const code=error=>error?.code==='invalid_operations_agentos_query'||/^(?:operations|business_admin|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$/.test(error?.code??'')?error.code:'operations_agentos_tool_unavailable';
 const same=(left,right)=>left?.operatorId===right?.operatorId&&left?.endpoint===right?.endpoint;
@@ -133,7 +133,7 @@ export class AgentOsConversationTools{
   const {row,actor,x,call}=await this.bind(input);let result;
   try{
    if(x.tool==='workbench-summary')result=await this.conversations.summaryFor(actor,row.domain,x.arguments,{conversationId:row.id,turnId:x.turnId});
-   else if(['query-operations','read-operation-object'].includes(x.tool)){
+   else if(['query-operations','read-operation-object','read-ai-delegation'].includes(x.tool)){
     result=await this.query.execute({actor,domain:row.domain,tool:x.tool,arguments:x.arguments});
     if(x.publicReference!==undefined)checkConversationPublicReference(x.publicReference,x.arguments.kind,x.arguments.id,result.data);
     await this.rememberSources(row,result.evidenceRefs);
@@ -193,28 +193,40 @@ export class AgentOsConversationTools{
  }
  async cardView(operator,row){
   operator=await this.cardActor(operator,row);const item=projection(row);
+  const promptCard=row.proposal.kind==='ai-work-prompt-save';
   if(row.state==='prepared'){
    try{
     const current=await this.actions.prepareFor(operator,row.domain,row.proposal.request,{publicReference:row.proposal.publicReference,operationId:row.operation_id});
     if(isDeepStrictEqual(current.command,row.proposal.command))item.capability.canConfirm=true;
     else{item.state='not-available';item.capability.reason='operations_agentos_proposal_changed';}
     item.target=current.target;item.title=current.title;item.impact=current.impact;item.basis=current.basis;item.readExpiresAt=current.readExpiresAt;
+    if(promptCard){const review=workbenchAiPromptReviewSchema.safeParse(current.review);if(review.success)item.review=review.data;else{item.capability.canConfirm=false;item.state='not-available';item.capability.reason='operations_agentos_prompt_review_unavailable';}}
    }catch(error){
     if(error.status===403)throw error;
     item.state='not-available';item.capability.reason=code(error);
-    item.target={kind:row.proposal.target.kind,id:row.proposal.target.id,label:item.capability.reason==='operations_agentos_restriction_deadline'?'方案已过期':'原处理对象当前不可用',href:null};item.impact=[];item.basis=[];
+    item.target={kind:row.proposal.target.kind,id:row.proposal.target.id,label:item.capability.reason==='operations_agentos_restriction_deadline'?'方案已过期':'原处理对象当前不可用',href:null};item.impact=[];item.basis=[];delete item.review;
    }
+  }else if(promptCard){
+   // Old prompt bodies are private materials. A historical card/receipt is
+   // not permission to reveal them after target delegation was withdrawn.
+   try{
+    const review=workbenchAiPromptReviewSchema.safeParse(row.proposal.review);
+    if(!review.success)throw new Error('operations_agentos_prompt_review_unavailable');
+    const current=await this.query.execute({actor:operator,domain:row.domain,tool:'read-ai-delegation',arguments:{aiAccountId:review.data.aiAccountId}});
+    if(current.availability!=='available')throw new Error('operations_agentos_prompt_review_unavailable');
+    item.review=review.data;item.readExpiresAt=current.readExpiresAt;
+   }catch(error){if(error.status===403)throw error;item.impact=[];item.basis=[];delete item.review;}
   }else if(['post','reply'].includes(row.proposal.target.kind)){
    try{const value=await this.query.execute({actor:operator,domain:row.domain,tool:'read-operation-object',arguments:{kind:row.proposal.target.kind,id:row.proposal.target.id,filters:{}}});
     const readable=value.data?.publiclyReadable===true;
     item.target={...item.target,label:readable&&value.data?.title?value.data.title:'该条公开内容'};
     item.readExpiresAt=value.readExpiresAt;
-    if(!readable){item.impact=[];item.basis=[];}
-   }catch(error){if(error.status===403)throw error;item.target={...item.target,label:'原处理对象当前不可用',href:null};item.impact=[];item.basis=[];}
+    if(!readable){item.impact=[];item.basis=[];delete item.review;}
+   }catch(error){if(error.status===403)throw error;item.target={...item.target,label:'原处理对象当前不可用',href:null};item.impact=[];item.basis=[];delete item.review;}
   }
   if(row.state==='prepared'&&item.capability.canConfirm){
    try{await this.conversations.assertBoundedProposal(row.conversation_id,row.turn_id,row.proposal);}
-   catch(error){item.capability.canConfirm=false;item.capability.reason=code(error);}
+   catch(error){item.capability.canConfirm=false;item.capability.reason=code(error);delete item.review;}
   }
   // Old prepared rows may have been re-armed by older receipt recovery. Only
   // newly created, never-claimed proposals can be described as unexecuted.

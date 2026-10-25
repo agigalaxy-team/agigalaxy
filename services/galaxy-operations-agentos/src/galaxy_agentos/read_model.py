@@ -52,12 +52,18 @@ def metadata(row):
     if not (type(duty_prompt) is int and duty_prompt > 0 or isinstance(duty_prompt, str)
             and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", duty_prompt)):
         duty_prompt = None
+    role_prompt = context.get("rolePromptVersion") if conversation_id(user_id, component_id, domain) else None
+    if type(role_prompt) is not int or role_prompt < 1:
+        role_prompt = None
     return {"runId": row["run_id"], "executionId": user_id[10:] if user_id.startswith("execution:") else None,
         "taskId": task_id, "aiAccountId": context.get("aiAccountId") if task_id else None,
         "planVersion": context.get("planVersion") if task_id else None,
         "modelSettingsVersion": context.get("modelSettingsVersion") if task_id else None,
         "modelSettingsVersions": context.get("modelSettingsVersions") if task_id else None,
         "conversationId": conversation_id(user_id, component_id, domain),
+        "rolePromptVersion": role_prompt,
+        "boundaryVersion": context.get("boundaryVersion") if conversation_id(user_id, component_id, domain)
+            and context.get("boundaryVersion") == "galaxy-conversation-boundary-v3" else None,
         "sessionId": row.get("session_id"), "componentId": component_id,
         "componentType": row.get("run_type"), "domain": domain,
         "state": row.get("status"), "errorCode": error_code, "createdAt": row.get("created_at"), "updatedAt": row.get("updated_at"),

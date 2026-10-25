@@ -4,6 +4,8 @@ import {agentOsQueryArgumentsSchema,agentOsReadArgumentsSchema,agentOsQueryDomai
 import {agentOsQueryReadAction} from './shared/operations-agentos-query-access.mjs';
 import {project,text,number,accountItem,contentItem,sectionItem,caseItem,caseDetail,caseMaterialVersion,chatCaseItem,chatCaseDetail,chatCaseMaterialVersion,feedbackItem,feedbackDetail,fileItem,cleanupCandidateItem,cleanupPlanItem,cleanupOperation,resourceItem,messagePlan,messageDraft,messageRun,recipientItem,historyItem,auditItem,analyticsData,analyticsBasis,queryProjection as view,ruleDetail,strategyDetail,searchDetail,spanItem} from './operations-agentos-query-view.mjs';
 import {registeredDirectoryItem,registeredDirectoryPage,systemGeneralQuery,systemMailQuery,systemConnectionsQuery,systemAdvancedQuery,combinedQueryLease} from './operations-agentos-query-extensions-view.mjs';
+import {z} from 'zod';
+import {delegatedAiManagementReadSchema} from './operations/permissions/ai-delegation-schema.mjs';
 
 const fail=(code,status=400)=>{throw new ServiceError(code,status);};
 const parse=(schema,value)=>{let result;try{result=schema.safeParse(value);}catch{fail('invalid_operations_agentos_query');}if(!result.success)fail('invalid_operations_agentos_query');return result.data;};
@@ -43,6 +45,7 @@ export class OperationsAgentOsQueryTools{
   return {kind,id,version:versionOf(kind,row),label:text(draftSource?row?.config?.content?.title:feedbackSource?row.title:readable?row.title:row?.displayName??row?.name)??kindLabel[kind],href:objectHref(kind,id,row),purpose:feedbackSource?'feedback-processing':caseSource?'public-case-review':privateCaseSource?'private-case-review':draftSource?'message-draft-editing':publicSource?'public-content':'operations',controlledSource:readable||feedbackSource||caseSource||privateCaseSource||draftSource,checkedAt:lease.checkedAt,readExpiresAt:deadline,read:{...read,arguments:valid.data}};
  }
  async execute({actor,domain,tool,arguments:input}){
+  if(tool==='read-ai-delegation')return this.readAiManagement({actor,domain,input});
   if(!agentOsQueryDomains.includes(domain)||!['query-operations','read-operation-object'].includes(tool))fail('invalid_operations_agentos_query');
   const parsed=parse(tool==='query-operations'?agentOsQueryArgumentsSchema:agentOsReadArgumentsSchema,input),contentPage=tool==='query-operations'&&parsed.module==='content'&&parsed.view==='list',requestedLimit=contentPage?parsed.filters.limit:null,
    args=contentPage?{...parsed,filters:{...parsed.filters,limit:Math.min(requestedLimit,20)}}:parsed,queryModule=tool==='query-operations'?args.module:kindModule[args.kind];
@@ -67,6 +70,24 @@ export class OperationsAgentOsQueryTools{
   if(contentPage)value.pagination={...value.pagination,requestedLimit,appliedLimit:args.filters.limit};
   if(Buffer.byteLength(JSON.stringify(value))>180000)fail('operations_query_result_too_large',413);
   return value;
+ }
+ async readAiManagement({actor,domain,input}){
+  if(!agentOsQueryDomains.includes(domain))fail('invalid_operations_agentos_query');
+  const args=parse(delegatedAiManagementReadSchema,input),fresh=await this.authority.human(actor,{domain,action:'workbench.read',purpose:'query'});let source,data;
+  if(args.aiAccountId){
+   source=await this.method('permissions','delegatedPrompt')(fresh,args);
+   const schema=z.strictObject({aiAccountId:z.uuid(),domain:z.enum(['governance','messaging','discovery','maintenance']),name:z.string().max(100),configId:z.uuid(),revision:z.number().int().positive(),promptVersion:z.number().int().positive(),updatedAt:z.iso.datetime({offset:true}),text:z.string().max(16000)});
+   const parsed=schema.safeParse(source.prompt);if(!parsed.success)fail('operations_query_response_invalid',503);
+   data={prompt:parsed.data,delegationVersion:source.delegationVersion,scope:'role-work-requirements',instructionAuthority:'role-work-requirements-with-fixed-code-boundaries'};
+  }else{
+   source=await this.method('permissions','delegatedDirectory')(fresh);
+   data=project(source,{delegation:{id:'s',sourceAiAccountId:'s',version:'n',enabled:'b',targetAiAccountIds:['s'],grantablePermissions:['s'],allowedManagementActions:['s'],updatedAt:'s'},targetAiAccounts:[{id:'s',domain:'s',name:'s',enabled:'b'}],
+    roles:[{id:'s',name:'s',description:'s',subjectScope:'s',managedAiAccountIds:['s'],permissions:['s'],enabled:'b',version:'n',usage:{humanAssignments:'n',aiAssignments:'n',aiAccounts:[{id:'s',domain:'s',name:'s',enabled:'b'}]},impact:{affectsPeople:'b',affectsAi:'b',assignmentCount:'n'}}],
+    assignments:[{id:'s',aiAccountId:'s',roleId:'s',enabled:'b',version:'n'}],availability:{canReadRoles:'b',canReadPrompts:'b',managementActions:['s'],promptActions:['s'],delegationId:'s',version:'n',targetAiAccountIds:['s']}});
+  }
+  await this.authority.human(fresh,{domain,action:args.aiAccountId?'ai.prompts.read':source.availability?.canReadRoles?'ai.roles.read':'ai.prompts.read',purpose:'query'});
+  const checkedAt=this.now(),readExpiresAt=Math.min(checkedAt+30,source.readExpiresAt);if(!Number.isSafeInteger(readExpiresAt)||readExpiresAt<=checkedAt)fail('operations_query_expired',410);
+  return{tool:'read-ai-delegation',module:'ai-management',view:args.aiAccountId?'role-work-requirements':'delegation',availability:'available',data,evidenceRefs:[],pagination:{next:null,complete:true},checkedAt,readExpiresAt,purpose:'ai-management',excludedFromProfile:true};
  }
  async query(actor,{module,view:which,filters:q}){
   const call=(name,method,...args)=>this.method(name,method)(actor,...args),refs=[];

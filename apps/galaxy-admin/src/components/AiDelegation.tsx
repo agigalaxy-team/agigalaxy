@@ -9,12 +9,12 @@ import {emptyPermissionFilter,permissionSelectScope,permissionTime} from '../lib
 import {operatorPermissionLabel} from '../lib/access';
 import type {PermissionFilter} from '../lib/permissions-view-model';
 import type {AiDelegationAction,AiDelegationCatalog,AiDelegationDraft,AiDelegationFields,AiDelegationOperation,AiDelegationRead,AiDelegationSave} from './ai-delegation-types';
+import {aiDelegationActionLabels as actions} from './ai-delegation-types';
 import type {SettingsPendingReceipt} from '../lib/settings-draft-memory';
 import './autonomy.css';
 import './permissions.css';
 
 const base='/v1/operations/permissions/ai-delegation';
-const actions:Record<AiDelegationAction,string>={read:'读取AI专用角色',create:'创建AI专用角色',update:'修改AI专用角色',assign:'分配给获准岗位',revoke:'撤回岗位分配'};
 const fields=(value:AiDelegationFields):AiDelegationFields=>({enabled:value.enabled,targetAiAccountIds:[...value.targetAiAccountIds],grantablePermissions:[...value.grantablePermissions],allowedManagementActions:[...value.allowedManagementActions]});
 const empty:AiDelegationFields={enabled:false,targetAiAccountIds:[],grantablePermissions:[],allowedManagementActions:[]};
 type Props={csrfToken:string;canConfigure:boolean;ownPermissions:readonly string[];draft:AiDelegationDraft|null;onDraft:(value:AiDelegationDraft|null)=>void;restored:SettingsPendingReceipt|null;onRestored:()=>void;onStatus:(value:{dirty:boolean;pending:boolean;operationId:string|null})=>void};
@@ -31,7 +31,7 @@ export function AiDelegation({csrfToken,canConfigure,ownPermissions,draft,onDraf
  const locked=command.locked||!!restored;
  useLayoutEffect(()=>{callbacks.current.onStatus({dirty:!!draft,pending:locked,operationId:restored?.operationId??(command.pending?String(command.pending.body.operationId):null)});},[!!draft,locked,restored?.operationId,command.pending]);
  useLayoutEffect(()=>()=>callbacks.current.onStatus({dirty:!!draft,pending:false,operationId:null}),[]);
- const grantable=new Set(ownPermissions),available=(catalog?.items??[]).filter(action=>!action.humanOnly&&!/^(?:ai\.(?:roles|delegation)\.|permissions\.|models\.|management\.)/.test(action.code));
+ const grantable=new Set(ownPermissions),available=(catalog?.items??[]).filter(action=>!action.humanOnly&&!/^(?:ai\.(?:roles|prompts|delegation)\.|permissions\.|models\.|management\.)/.test(action.code));
  const merged=fields(input),conflicts:{key:keyof AiDelegationFields;label:string;mine:string;current:string}[]=[];
  const labels={enabled:'总控管理授权',targetAiAccountIds:'管理岗位',grantablePermissions:'可授予权限上限',allowedManagementActions:'允许管理动作'};
  const present=(key:keyof AiDelegationFields,value:unknown)=>key==='enabled'?value?'启用':'停用':Array.isArray(value)?value.map(id=>key==='grantablePermissions'?operatorPermissionLabel(id):key==='allowedManagementActions'?actions[id as AiDelegationAction]:read.value?.targetAiAccounts.find(account=>account.id===id)?.name||'工作岗位').join('、')||'未选择':'未选择';

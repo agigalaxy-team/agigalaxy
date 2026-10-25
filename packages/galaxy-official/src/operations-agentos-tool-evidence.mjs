@@ -1,8 +1,10 @@
 import {isDeepStrictEqual} from 'node:util';
+import {z} from 'zod';
 import {agentOsQueryArgumentsSchema,agentOsReadArgumentsSchema,agentOsQueryViews} from './shared/operations-agentos-query-schema.mjs';
 
 const readModules={account:'accounts','account-summary':'accounts','registered-user':'registered-users',post:'content',reply:'content',section:'content',case:'cases','chat-report':'chat-reports',feedback:'feedback','chat-file':'files','forum-file':'files','file-cleanup-plan':'files','file-cleanup-operation':'files',project:'resources',method:'resources','message-plan':'messaging','message-run':'messaging',rule:'rules','strategy-run':'strategies','ai-run':'runs','backup-point':'maintenance','restore-plan':'maintenance',role:'permissions'};
-const reads=new Set(['workbench-summary','query-operations','read-operation-object']);
+const reads=new Set(['workbench-summary','query-operations','read-operation-object','read-ai-delegation']);
+const aiManagementReadSchema=z.strictObject({aiAccountId:z.uuid().optional()});
 const states=new Set(['started','completed','unavailable']);
 const resultStates=new Set(['available','unavailable','not-configured','not-connected','read','invalid-request','unknown']);
 const errorCode=value=>typeof value==='string'&&/^(?:operations|business_admin|invalid_operations|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$/.test(value)?value:null;
@@ -10,6 +12,7 @@ const errorCode=value=>typeof value==='string'&&/^(?:operations|business_admin|i
 // Routes are projected only after the same typed schema used by the read tool.
 // No submitted value, ID, filter, query term or unknown key becomes evidence.
 export function conversationReadRoute(tool,input){
+ if(tool==='read-ai-delegation'){const parsed=aiManagementReadSchema.safeParse(input);return parsed.success?{module:'permissions',view:parsed.data.aiAccountId?'ai-work-prompt':'ai-delegation'}:{module:null,view:null};}
  const schema=tool==='query-operations'?agentOsQueryArgumentsSchema:tool==='read-operation-object'?agentOsReadArgumentsSchema:null;
  if(!schema)return {module:null,view:null};
  let parsed;try{parsed=schema.safeParse(input);}catch{return {module:null,view:null};}
@@ -20,7 +23,7 @@ export function conversationPriorReadReceipt(row){
  if(!reads.has(row?.tool)||!states.has(row?.state))return null;
  const metadata=row.metadata&&typeof row.metadata==='object'&&!Array.isArray(row.metadata)?row.metadata:{};
  const module=Object.hasOwn(agentOsQueryViews,metadata.module)?metadata.module:null;
- const view=module&&((row.tool==='query-operations'&&agentOsQueryViews[module].includes(metadata.view))||(row.tool==='read-operation-object'&&readModules[metadata.view]===module))?metadata.view:null;
+ const view=module&&((row.tool==='query-operations'&&agentOsQueryViews[module].includes(metadata.view))||(row.tool==='read-operation-object'&&readModules[metadata.view]===module)||(row.tool==='read-ai-delegation'&&module==='permissions'&&['ai-work-prompt','ai-delegation'].includes(metadata.view)))?metadata.view:null;
  const timestamp=row.updated_at??row.created_at,date=timestamp instanceof Date?timestamp:new Date(timestamp);
  return {tool:row.tool,module,view,state:row.state,resultState:resultStates.has(metadata.state)?metadata.state:null,code:errorCode(metadata.code),observedAt:Number.isFinite(date.getTime())?date.toISOString():null};
 }

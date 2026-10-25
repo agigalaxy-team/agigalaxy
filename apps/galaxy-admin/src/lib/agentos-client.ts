@@ -1,3 +1,5 @@
+import type {AiManagementCapabilities} from './ai-management-capabilities';
+
 export type AgentOsDomain='overview'|'governance'|'messaging'|'discovery'|'maintenance';
 export type AgentOsStatus={state:'connected'|'not-configured'|'unavailable';modelState:'configured'|'not-configured'|'unknown';framework:'agno';version:string;checkedAt:number;readExpiresAt:number};
 export type AgentOsExecution={id:string;domain:AgentOsDomain;grantId:string;grantVersion:number;executorKind:'ai'|'program';mode:'assisted'|'automatic';operatorId:string|null;createdBy:string;actions:string[];resourceIds:string[];state:'active'|'paused'|'stopped';revision:number;sessionId:string;hasPreparedCommand:boolean;createdAt:string;updatedAt:string};
@@ -8,7 +10,7 @@ export type AgentOsNativeRun={runId:string;operationId:string|null;status:string
 export type AgentOsPreparedAction={tool:'content-visibility';targetKind:'post'|'reply';targetId:string;input:{kind:'hide'|'restore';until?:number;reason:string;expectedVersion:number;expectedRevision:number}};
 export type AgentOsDetail={execution:AgentOsExecution;preparedAction:AgentOsPreparedAction|null;native:{executionId:string;runs:AgentOsNativeRun[];traces:{traceId:string;status:string;durationMs:number;runId:string|null}[];traceCount:number;modelState:string}|null;runtimeState:string;modelState:string;checkedAt:number;readExpiresAt:number};
 export type AgentOsCommand={execution?:AgentOsExecution;executionId?:string;kind?:string|null;preparedAction?:AgentOsPreparedAction|null;operationId?:string;runId?:string|null;state?:string;native?:AgentOsNativeRun|null;replayed?:boolean;cancelledOperationId?:string};
-export type AgentOsConversation={domain:AgentOsDomain;runs:AgentOsNativeRun[];runtimeState:'connected'|'unavailable'|'not-configured';modelState:'configured'|'not-configured'|'unknown';capabilities:{canSend:boolean;canStream?:boolean;canCancel?:boolean};blockedReason:null|'runtime-unavailable'|'runtime-not-ready'|'model-not-configured';checkedAt:number;readExpiresAt:number};
+export type AgentOsConversation={domain:AgentOsDomain;runs:AgentOsNativeRun[];runtimeState:'connected'|'unavailable'|'not-configured';modelState:'configured'|'not-configured'|'unknown';capabilities:{canSend:boolean;canStream?:boolean;canCancel?:boolean};managementCapabilities?:AiManagementCapabilities|null;blockedReason:null|'runtime-unavailable'|'runtime-not-ready'|'model-not-configured';checkedAt:number;readExpiresAt:number};
 export const agentOsConversationPath=(domain:AgentOsDomain)=>'/v1/operations/agentos/conversations/'+domain;
 export const agentOsConversationOperationPath=(domain:AgentOsDomain,operationId:string)=>agentOsConversationPath(domain)+'/operations/'+encodeURIComponent(operationId);
 export const agentOsConversationCancelPath=(domain:AgentOsDomain,operationId:string)=>agentOsConversationOperationPath(domain,operationId)+'/cancel';
@@ -19,6 +21,7 @@ export function agentOsCanUseDomain(session:AgentOsSession|null|undefined,domain
  return permissions?.includes('workbench.read')===true&&operationsAiUseAllowed(permissions,domain);
 }
 export const agentOsErrors:Record<string,string>={
+ operations_ai_prompt_version_changed:'岗位工作要求已有更新，请按当前版本重新准备。',operations_ai_prompt_no_change:'岗位工作要求与当前内容相同，无需保存。',operations_ai_delegation_version_changed:'总控管理范围已有更新，请按当前范围重新准备。',operations_ai_delegation_denied:'当前未获准执行这项总控管理动作。',operations_ai_delegation_target_denied:'这个岗位当前不在获准管理范围内。',operations_agentos_prompt_review_unavailable:'岗位工作要求的完整变更暂时无法取得，尚未执行。',
  operations_agentos_ai_use_denied:'当前未获准使用本领域 AI。',
  operations_agentos_not_configured:'运行服务尚未配置。',operations_agentos_model_not_configured:'模型尚未配置，请先保留问题。',operations_agentos_conversation_not_ready:'沟通服务尚未就绪，输入已保留。',
  operations_agentos_execution_inactive:'这个任务已暂停或结束。',operations_agentos_execution_changed:'任务状态已有变化，已读取当前记录。',

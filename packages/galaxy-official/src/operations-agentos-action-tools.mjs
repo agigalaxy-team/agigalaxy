@@ -6,7 +6,7 @@ import {aiWorkCapabilities} from './shared/operations-ai-work-capabilities.mjs';
 import {checkConversationPublicReference} from './operations-agentos-public-reference.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
-import {workbenchActionCatalog,workbenchPrepareSchemas,workbenchCommandSchemas,workbenchActionToolSchema,workbenchEmptyArgumentsSchema,workbenchRunArgumentsSchema} from './operations-agentos-action-catalog.mjs';
+import {workbenchActionCatalog,workbenchPrepareSchemas,workbenchCommandSchemas,workbenchActionToolSchema,workbenchEmptyArgumentsSchema,workbenchRunArgumentsSchema,workbenchAiPromptReviewSchema} from './operations-agentos-action-catalog.mjs';
 import {p14ControlsSchema} from './shared/p14-rules-schema.mjs';
 import {operationsPolicySchemas} from './shared/operations-product-schema.mjs';
 import {aiActionDefinition} from './shared/operations-ai-action-registry.mjs';
@@ -29,7 +29,7 @@ const safeReceipt=(value)=>({operationId:typeof value?.operationId==='string'?va
  state:['scheduled','active','paused','stopped','draft','resolved','prepared','running','awaiting-human','completed','blocked','no-action','unknown','active-for-new-matters'].includes(value?.state??value?.plan?.state??value?.run?.state)?(value.state??value.plan?.state??value.run?.state):null,
  phase:['prepared','submitting','task-pending','applied','failed','result-unknown'].includes(value?.phase)?value.phase:null,replayed:value?.replayed===true});
 const requestSchema=value=>workbenchPrepareSchemas[value?.kind];
-const requiredActionFor=x=>x.kind==='public-content-batch'?'content.batch.'+x.action:x.kind==='private-case-message'?'chat-messages.'+x.action:x.kind==='ordinary-strategy-draft'?'strategies.ordinary.configure':x.kind==='ordinary-strategy-publish'?'strategies.ordinary.publish':x.kind==='recommendation-direction'?'recommendations.configure':x.kind==='content-visibility'?'content.'+x.action:x.kind==='content-curation'?'content.curate':x.kind==='section-classification'?'sections.classify':x.kind==='section-visibility'?'sections.'+x.action:x.kind==='resource-visibility'?'resources.'+x.action:x.kind==='account-restriction'?'accounts.restriction.'+x.action:x.kind==='feedback-update'?'feedback.update':x.kind==='file-scan-retry'?'files.scan.retry':x.kind==='file-access'?'files.access.'+x.action:x.kind==='file-cleanup-approve'?'files.cleanup.approve':x.kind==='case-resolve'?'cases.resolve':x.kind==='message-draft-create'?'notices.create':x.kind==='message-draft-save'?'notices.update':x.kind==='messaging-state'?(['activate','resume'].includes(x.action)?'notices.publish':'notices.withdraw'):x.kind==='strategy-control'?'strategies.control':x.kind==='strategy-continue'?'strategies.run':['rule-publish','rule-restore'].includes(x.kind)?'rules.write':x.kind==='search-apply'?'search-quality.publish':'search-quality.restore';
+const requiredActionFor=x=>x.kind==='ai-work-prompt-save'?'ai.prompts.update':x.kind==='ai-role-command'?'ai.roles.'+(x.command.kind==='role-create'?'create':x.command.kind==='role-update'?'update':x.command.enabled?'assign':'revoke'):x.kind==='public-content-batch'?'content.batch.'+x.action:x.kind==='private-case-message'?'chat-messages.'+x.action:x.kind==='ordinary-strategy-draft'?'strategies.ordinary.configure':x.kind==='ordinary-strategy-publish'?'strategies.ordinary.publish':x.kind==='recommendation-direction'?'recommendations.configure':x.kind==='content-visibility'?'content.'+x.action:x.kind==='content-curation'?'content.curate':x.kind==='section-classification'?'sections.classify':x.kind==='section-visibility'?'sections.'+x.action:x.kind==='resource-visibility'?'resources.'+x.action:x.kind==='account-restriction'?'accounts.restriction.'+x.action:x.kind==='feedback-update'?'feedback.update':x.kind==='file-scan-retry'?'files.scan.retry':x.kind==='file-access'?'files.access.'+x.action:x.kind==='file-cleanup-approve'?'files.cleanup.approve':x.kind==='case-resolve'?'cases.resolve':x.kind==='message-draft-create'?'notices.create':x.kind==='message-draft-save'?'notices.update':x.kind==='messaging-state'?(['activate','resume'].includes(x.action)?'notices.publish':'notices.withdraw'):x.kind==='strategy-control'?'strategies.control':x.kind==='strategy-continue'?'strategies.run':['rule-publish','rule-restore'].includes(x.kind)?'rules.write':x.kind==='search-apply'?'search-quality.publish':'search-quality.restore';
 const humanDraftConfig=config=>({...config,automation:{kind:'human-required',factsConfirmed:false}});
 const unknownFeedbackResult=operationId=>({operationId,state:'unknown',summary:'本次反馈处理结果尚未核实，系统会继续查询原结果。',receipt:null});
 const unknownRecommendationResult=operationId=>({operationId,state:'unknown',summary:'推荐方向保存结果暂未核实，正在查询原结果。',receipt:null});
@@ -46,6 +46,15 @@ function recommendationResult(result,operationId,input,resultSource){
   receipt:{operationId,version:policy.version,themeKey:input.themeKey,direction:input.direction,enabled:policy.enabled,replayed:result.replayed===true}};
 }
 function actionResult(kind,result,operationId,request,command=null,resultSource='ack'){
+ if(kind==='ai-work-prompt-save'){
+  const prompt=result?.prompt;if(result?.operationId!==operationId||prompt?.aiAccountId!==request.aiAccountId||prompt.revision!==command.expectedRevision+1||prompt.promptVersion!==command.expectedPromptVersion+1||result.delegationVersion!==command.delegationVersion)fail('operations_agentos_operation_conflict');
+  return{operationId,state:'completed',summary:'岗位工作要求已保存，新轮次采用新版本。',receipt:{operationId,aiAccountId:prompt.aiAccountId,configId:prompt.configId,revision:prompt.revision,promptVersion:prompt.promptVersion,delegationVersion:result.delegationVersion,replayed:result.replayed===true}};
+ }
+ if(kind==='ai-role-command'){
+  const input=command.command,assignment=input.kind==='assignment-save',value=assignment?result?.assignment:result?.role;
+  if(result?.operationId!==operationId||!z.uuid().safeParse(value?.id).success||value.version!==input.expectedVersion+1||result.delegationVersion!==command.delegationVersion||assignment&&(value.aiAccountId!==input.aiAccountId||value.roleId!==input.roleId||value.enabled!==input.enabled)||!assignment&&(value.subjectScope!=='ai-only'||value.name!==input.name||value.enabled!==input.enabled||!isDeepStrictEqual(value.permissions,input.permissions)))fail('operations_agentos_operation_conflict');
+  return{operationId,state:'completed',summary:assignment?'获准 AI 的专用角色分配已保存。':'获准 AI 的专用角色已保存。',receipt:{operationId,delegationVersion:result.delegationVersion,...(assignment?{assignmentId:value.id,aiAccountId:value.aiAccountId,roleId:value.roleId}:{roleId:value.id}),version:value.version,enabled:value.enabled,replayed:result.replayed===true}};
+ }
  if(kind==='recommendation-direction')return recommendationResult(result,operationId,command,resultSource);
  if(kind==='message-draft-create'||kind==='message-draft-save'){
   const plan=result?.plan,create=kind==='message-draft-create',planId=create?command.planId:request.targetId;
@@ -165,7 +174,7 @@ export class OperationsAgentOsActionTools{
  dutyActionReady(permission){
   const definition=aiActionDefinition(permission);if(definition?.query)return true;
   if(definition?.purposeBoundRead)return definition.handler.methods.every(method=>typeof this.services[definition.handler.service]?.[method]==='function');
-  if(definition?.kind==='ai-role-delegation')return definition.handler.methods.every(method=>typeof this.services.permissions?.[method]==='function');
+  if(['ai-role-delegation','ai-prompt-delegation'].includes(definition?.kind))return definition.handler.methods.every(method=>typeof this.services.permissions?.[method]==='function');
   if(!definition?.autonomous||!this.dutyKinds.has(definition.kind))return false;
   return definition.handler?.methods.every(method=>typeof this.services[definition.handler.service]?.[method]==='function')===true;
  }
@@ -180,11 +189,31 @@ export class OperationsAgentOsActionTools{
   if(!entry)fail('operations_agentos_action_unavailable',403);
   operator=await this.authority.human(operator,{domain,purpose:'prepare'});
   const actor=await this.human(operator,entry.read),x=request;
-  let target,title,requiredAction,command,impact=[],basis=[],readExpiresAt=this.now()+30;
+  let target,title,requiredAction,command,review,impact=[],basis=[],readExpiresAt=this.now()+30;
   const deadline=(until,maximum,sourceUntil=null)=>{if(!Number.isSafeInteger(maximum)||until<=this.now()||until>this.now()+maximum||sourceUntil!==null&&until>sourceUntil)fail('operations_hide_expiry');return new Date(until*1000).toISOString();};
   const expiry=value=>{if(Number.isSafeInteger(value))readExpiresAt=Math.min(readExpiresAt,value);};
   const visibilityCommand=(view,sourceVersion,action)=>({kind:action,expectedVersion:sourceVersion,expectedVisibilityVersion:view.visibility.version,...(x.until===undefined?{}:{until:x.until}),reason:x.reason});
-  if(x.kind==='account-restriction'){
+  if(x.kind==='ai-work-prompt-save'){
+   if(this.authority.acceptsDuty?.(actor))fail('operations_agentos_management_card_requires_human',403);
+   const item=await this.service('permissions','delegatedPrompt').delegatedPrompt(actor,{aiAccountId:x.aiAccountId}),prompt=item.prompt;expiry(item.readExpiresAt);
+   if(prompt.text===x.prompt)fail('operations_ai_prompt_no_change');
+   command={aiAccountId:x.aiAccountId,expectedRevision:prompt.revision,expectedPromptVersion:prompt.promptVersion,prompt:x.prompt,delegationVersion:item.delegationVersion};
+   target={kind:'ai-work-prompt',id:x.aiAccountId,label:label(prompt.name,'获准 AI')+'的岗位工作要求',href:'/admin/operations/ai-work-accounts?domain='+prompt.domain+'&tab=duty'};
+   title='修改「'+label(prompt.name,'获准 AI')+'」的岗位工作要求';requiredAction='ai.prompts.update';
+   review=workbenchAiPromptReviewSchema.parse({kind:'ai-work-prompt',aiAccountId:x.aiAccountId,domain:prompt.domain,name:prompt.name,configId:prompt.configId,expectedRevision:prompt.revision,promptVersion:prompt.promptVersion,nextPromptVersion:prompt.promptVersion+1,scope:'role-work-requirements',source:prompt.text?'saved-configuration':'empty-default',before:prompt.text,after:x.prompt,effect:'new-rounds-only'});
+   basis=[{label:'当前岗位要求',value:'版本 '+prompt.promptVersion+'；配置修订 '+prompt.revision},{label:'人工管理范围',value:'委派版本 '+item.delegationVersion}];
+   impact=['仅更新这个岗位的工作要求，新轮次采用新版本。','模型、固定代码边界、目标、角色权限、自动授权、开关和运行频率保持原配置。'];
+  }else if(x.kind==='ai-role-command'){
+   if(this.authority.acceptsDuty?.(actor))fail('operations_agentos_management_card_requires_human',403);
+   const permissions=this.service('permissions','delegatedRolePreparation'),directory=await permissions.delegatedDirectory(actor),item=await permissions.delegatedRolePreparation(actor,x.command),role=x.command;
+   expiry(directory.readExpiresAt);expiry(item.readExpiresAt);if(directory.delegation?.version!==item.delegationVersion)fail('operations_ai_delegation_version_changed');
+   command={command:item.command,delegationVersion:item.delegationVersion};requiredAction=requiredActionFor(x);
+   const assignment=role.kind==='assignment-save',selectedId=assignment?role.id??parse(z.uuid(),operationId):role.kind==='role-update'?role.id:parse(z.uuid(),operationId),name=assignment?directory.targetAiAccounts.find(row=>row.id===role.aiAccountId)?.name:role.name;
+   target={kind:assignment?'ai-role-assignment':'ai-role',id:selectedId,label:label(name,'获准 AI 专用角色'),href:'/admin/operations/permissions?tab=roles'};title=assignment?(role.enabled?'分配':'撤回')+'获准 AI 的专用角色':role.kind==='role-create'?'创建获准 AI 专用角色':'修改获准 AI 专用角色';
+   basis=[{label:'人工管理范围',value:'委派版本 '+item.delegationVersion},{label:'原对象版本',value:String(role.expectedVersion)}];
+   impact=assignment?['只'+(role.enabled?'分配':'撤回')+'这个获准其他 AI 的指定专用角色。','目标 AI：'+label(name,'获准 AI')+'；角色：'+label(directory.roles.find(row=>row.id===role.roleId)?.name,'当前专用角色')]:['角色名称：'+role.name,'角色说明：'+role.description,'角色状态：'+(role.enabled?'启用':'停用'),'角色权限：'+(role.permissions.join('、')||'无'),'管理目标：'+role.targetAiAccountIds.map(id=>label(directory.targetAiAccounts.find(row=>row.id===id)?.name,'获准 AI')).join('、')];
+   impact.push('只影响人工委派内其他 AI 的专用角色；共享角色、人员角色、总控自身与管理范围保持原边界。');
+  }else if(x.kind==='account-restriction'){
    const item=await this.service('accounts','get').get(actor,x.targetId),account=item.account,restriction=account?.restriction;
    if(account?.accountId!==x.targetId||restriction?.scope!=='community-participation'||count(restriction.revision)===null||typeof restriction.active!=='boolean')fail('operations_agentos_operation_unavailable');
    expiry(item.readExpiresAt??(Number.isSafeInteger(item.checkedAt)?item.checkedAt+30:null));
@@ -382,7 +411,7 @@ export class OperationsAgentOsActionTools{
    basis=[{label:'可见范围',value:'已下架、到期、非公开或无权阅读的内容仍不进入搜索结果'}];impact=[x.kind==='search-apply'?'将这份草稿的同义词和排序设置用于后续搜索。':'将后续搜索恢复为所选历史版本的设置。','设置完成后才会显示为已生效；结果暂未取得时，系统会继续查询。','需要回退时，可在版本记录中恢复曾生效的配置。'];
   }
   await this.human(actor,requiredAction);if(readExpiresAt<=this.now())fail('operations_source_unavailable');
-  return{schemaVersion:1,kind:x.kind,domain,request,command,target,title,impact,basis,requiredAction,checkedAt:this.now(),readExpiresAt,decisionSource:'human-required',...(publicReference===undefined?{}:{publicReference:{...publicReference}})};
+  return{schemaVersion:1,kind:x.kind,domain,request,command,target,title,impact,basis,requiredAction,checkedAt:this.now(),readExpiresAt,decisionSource:'human-required',...(review?{review}:{}),...(publicReference===undefined?{}:{publicReference:{...publicReference}})};
  }
  async executePrepared(operator,proposal,{authorize,operationId}={}){
   const x=parse(requestSchema(proposal?.request),proposal?.request);if(proposal?.schemaVersion!==1||proposal.kind!==x.kind)fail('invalid_operations_agentos_action',400);
@@ -401,7 +430,13 @@ export class OperationsAgentOsActionTools{
    // An identity callback must not start a second PG lease inside that check.
    fresh=()=>this.authority.acceptsDuty?.(actor)?actor:this.human(actor,'workbench.read',{authorize});
   let result;
-  if(x.kind==='public-content-batch')result=await this.service('content','batch').batch(actor,input);
+  if(x.kind==='ai-work-prompt-save'){
+   if(this.authority.acceptsDuty?.(actor)||input.aiAccountId!==x.aiAccountId||input.prompt!==x.prompt||proposal.target?.kind!=='ai-work-prompt'||proposal.target.id!==x.aiAccountId)fail('invalid_operations_agentos_action',400);
+   const {delegationVersion,...body}=input;result=await this.service('permissions','delegatedPromptSave').delegatedPromptSave(actor,body,{expectedDelegationVersion:delegationVersion});
+  }else if(x.kind==='ai-role-command'){
+   if(this.authority.acceptsDuty?.(actor)||!isDeepStrictEqual(input.command,x.command))fail('invalid_operations_agentos_action',400);
+   result=await this.service('permissions','delegatedRoleSave').delegatedRoleSave(actor,{...input.command,operationId},{expectedDelegationVersion:input.delegationVersion});
+  }else if(x.kind==='public-content-batch')result=await this.service('content','batch').batch(actor,input);
   else if(x.kind==='private-case-message')result=await this.service('chatReports','operatorMessageVisibility').operatorMessageVisibility(actor,{reportId:x.reportId,messageId:x.messageId},input,{authorize:fresh});
   else if(x.kind==='content-visibility')result=await this.service('content','visibility').visibility(actor,x.targetKind,x.targetId,input);
   else if(x.kind==='content-curation')result=await this.service('content','curate').curate(actor,x.targetKind,x.targetId,input);
@@ -527,6 +562,7 @@ export class OperationsAgentOsActionTools{
  async executeDutyOperation({actor,operationId,arguments:input,authorizeOperation,reconcile=false}={}){
   if(!this.authority.acceptsDuty(actor)||typeof authorizeOperation!=='function')fail('operations_ai_duty_operation_denied',403);
   parse(z.uuid(),operationId);const request=parse(requestSchema(input),input),permission=requiredActionFor(request),definition=aiActionDefinition(permission);
+  if(!this.dutyKinds.has(request.kind))fail('operations_agentos_action_not_connected',503);
   if(!definition?.autonomous||definition.humanOnly)return{operationId,state:'waiting-human',effectState:'not-started',code:'operations_agentos_human_review_required',basis:'fixed-human-condition'};
   if(!this.dutyActionReady(permission))return{operationId,state:'waiting-human',effectState:'not-started',code:'operations_agentos_action_not_connected',basis:'handler-not-connected'};
   const prior=(await this.db.query('SELECT * FROM operations_ai_duty_operations_v1 WHERE endpoint=$1 AND operation_id=$2',[this.endpoint,operationId])).rows[0];
@@ -567,7 +603,11 @@ export class OperationsAgentOsActionTools{
   // new write must not hide an owned receipt from a currently qualified reader.
   const currentRead=actor=>this.authority.human(actor,{domain:proposal.domain,action:entry.read,purpose:x.kind==='private-case-message'?'prepare':'query'});
   const actor=await currentRead(operator),missing={operationId,state:'not-recorded',summary:'尚未记录本次处理。',receipt:null};let result;
-  if(x.kind==='public-content-batch'){
+  if(x.kind==='ai-work-prompt-save'||x.kind==='ai-role-command'){
+   const input=parse(workbenchCommandSchemas[x.kind],{...proposal.command,operationId}),body=x.kind==='ai-work-prompt-save'?pick(input,['operationId','aiAccountId','expectedRevision','expectedPromptVersion','prompt']):{...input.command,operationId},kind=x.kind==='ai-work-prompt-save'?'prompt-save':x.command.kind;
+   if(x.kind==='ai-work-prompt-save'&&(body.aiAccountId!==x.aiAccountId||body.prompt!==x.prompt)||x.kind==='ai-role-command'&&!isDeepStrictEqual(input.command,x.command))fail('operations_agentos_operation_conflict');
+   const saved=await this.service('permissions','delegatedManagementOperation').delegatedManagementOperation(actor,operationId,{kind,input:body});if(saved.state==='not-recorded')return missing;result=saved.result;
+  }else if(x.kind==='public-content-batch'){
    const input=parse(workbenchCommandSchemas[x.kind],{...proposal.command,operationId}),{reason,...metadata}=input,row=(await this.db.query('SELECT operator_id,action,selection,result FROM business_admin_audit_v1 WHERE endpoint=$1 AND operation_id=$2',[this.endpoint,operationId])).rows[0];if(!row)return missing;
    if(row.operator_id!==actor.operatorId||row.action!=='community-content-batch-visibility'||!isDeepStrictEqual(row.selection,{...metadata,reasonDigest:createHash('sha256').update(reason).digest('hex')}))fail('operations_agentos_operation_conflict');result=row.result;
   }else if(x.kind==='private-case-message'){

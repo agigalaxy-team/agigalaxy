@@ -12,6 +12,7 @@ import {useOperationsRead} from '../../lib/use-operations-read';
 import {ReadStatus} from '../OperationControls';
 import {WorkbenchMarkdown} from './WorkbenchMarkdown';
 import {WorkbenchModelNotice} from './WorkbenchModelNotice';
+import {WorkbenchManagementCapabilities} from './WorkbenchManagementCapabilities';
 import {WorkbenchActionHistory} from './WorkbenchActionHistory';
 import {useWorkbenchInteraction} from './WorkbenchInteraction';
 import {WorkbenchActionCards} from './WorkbenchActionCards';
@@ -204,6 +205,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     {signedOut&&<a className="wb-text-link" href="/admin/login?redirect=%2Fadmin">重新登录</a>}
     <div ref={conversationElement} id={panelId+'-conversation'} className="wb-conversation" hidden={!focused} onScroll={event=>{if(!conversation.verified||!verifiedSession||!currentConversation)return;const element=event.currentTarget;scrollPositions.current[domain]={top:element.scrollTop,follow:element.scrollHeight-element.clientHeight-element.scrollTop<24};}}>
       <ReadStatus loading={conversation.loading} error={''} retry={async()=>{await conversation.read();await session.read();await runtime.read();}}/>
+      {domain==='overview'&&conversation.verified&&currentConversation&&<WorkbenchManagementCapabilities value={currentConversation.managementCapabilities??null}/>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
       <div>{currentConversation?.runs.map(run=>{

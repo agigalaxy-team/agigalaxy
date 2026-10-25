@@ -49,7 +49,8 @@ test('workbench reader without automation can converse, receives only permitted 
  await assert.rejects(gateway.authorize({...authorize,resourceId:'galaxy-governance'}),{code:'operations_agentos_domain_mismatch'});
  await assert.rejects(gateway.authorize({...authorize,resourceType:'workflows',resourceId:'galaxy-prepared-review'}),{code:'operations_agentos_domain_mismatch'});
  const summary=await gateway.execute({conversationId:row.id,sessionId:row.session_id,turnId:input.operationId,tool:'workbench-summary',arguments:{},runId:'native-original-run',callId:'summary'});
- assert.equal(summary.counts.communityReports.pending,0);assert.equal(summary.counts.chatReports,null);assert.equal(summary.availability.chatReports,'not-authorized');assert.equal(JSON.stringify(summary).includes('PRIVATE_MUST_NOT_FLOW'),false);assert.equal(JSON.stringify(summary).includes('not-connected'),false);
+ assert.equal(summary.counts.communityReports.pending,0);assert.equal(summary.counts.chatReports,null);assert.equal(summary.availability.chatReports,'not-authorized');assert.equal(JSON.stringify(summary).includes('PRIVATE_MUST_NOT_FLOW'),false);assert.equal(Object.hasOwn(summary,'ai'),false);
+ assert.equal(summary.managementCapabilities.schemaVersion,1);assert.equal(summary.managementCapabilities.prompt.update.available,false);assert.equal(summary.managementCapabilities.modelConfiguration.systemSupport,'human-only');
  await assert.rejects(gateway.execute({conversationId:row.id,tool:'execute-prepared-command',arguments:{},runId:'x',callId:'x'}),{code:'invalid_operations_agentos_request'});
  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM operations_automation_grants_v1')).rows[0].n,0);
  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM operations_agentos_executions_v1')).rows[0].n,0);

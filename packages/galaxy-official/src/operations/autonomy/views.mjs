@@ -4,7 +4,7 @@ import {taskQuerySchema,parse,iso,fail,domainNames,autonomyModes,autonomyBusines
 import {taskSourceRefsSql,taskSourceRefsWithin} from './sources.mjs';
 const permitted=(actor,action)=>actor?.businessAuthorization?.permissions?.includes(action)===true;
 const taskReadMap={'content-post':'post','content-reply':'reply','content-section':'section','business-account':'account',account:'account',section:'section','community-report':'case',case:'case','chat-report':'chat-report',feedback:'feedback',project:'project',method:'method','file-chat':'chat-file','file-forum':'forum-file','file-cleanup-plan':'file-cleanup-plan','messaging-plan':'message-plan','rule-key':'rule','strategy-run':'strategy-run'};
-const modulePermission={'recommendation-policy':'recommendations.read','search-quality':'search-quality.read',maintenance:'maintenance.read','ai-role':'permissions.read','ai-role-assignment':'ai.accounts.read',strategy:'strategies.read','strategy-configuration':'strategies.read'};
+const modulePermission={'recommendation-policy':'recommendations.read','search-quality':'search-quality.read',maintenance:'maintenance.read','ai-role':'permissions.read','ai-role-assignment':'ai.accounts.read','ai-work-account':'ai.accounts.read',strategy:'strategies.read','strategy-configuration':'strategies.read'};
 const kindPermission={post:'content.read',reply:'content.read',section:'sections.read',account:'accounts.read',case:'cases.read','chat-report':'chat-reports.read',feedback:'feedback.read',project:'resources.read',method:'resources.read','chat-file':'files.read','forum-file':'files.read','file-cleanup-plan':'files.read','message-plan':'notices.read',rule:'rules.read','strategy-run':'strategies.read'};
 const n=value=>Number.isFinite(value)&&value>=0?value:null;
 

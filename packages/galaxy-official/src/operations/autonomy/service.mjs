@@ -15,6 +15,7 @@ import {operationsPermissionCatalog} from '../../operations-permission-catalog.m
 import {aiWorkCapabilities} from '../accounts/ai-work-schema.mjs';
 import {taskContinuationWithin,recordTaskDecision,bindWorkbenchTaskWithin,workbenchHrefWithin} from './continuation.mjs';
 import {updateWorkbenchTaskWithin} from './workbench.mjs';
+import {taskSummaryWithin} from './task-summary.mjs';
 import {autonomyDomains,autonomyDefaults,terminalStates,domainNames,defaultConfiguration,nextDue,parse,fail,iso,configSchema,controlSchema,enableSchema,authorizeSchema,reportSchema,toolSchema,boundaryPrompt,targetTypes} from './contract.mjs';
 
 const errorCode=error=>/^[a-z][a-z0-9_.:-]{0,119}$/.test(error?.code??'')?error.code:'operations_autonomy_unavailable';
@@ -69,7 +70,7 @@ export class OperationsAutonomy extends AutonomyReadModel{
   try{role=await this.aiWorkAccounts.authorizationWithin(db,row.domain);account=(await db.query('SELECT id,name,enabled FROM operations_ai_work_accounts_v1 WHERE endpoint=$1 AND domain=$2',[this.endpoint,row.domain])).rows[0];if(!role.enabled)add('ai-disabled','AI 工作账户已停用');if(!role.permissions.length)add('no-role','尚未分配业务权限');}
   catch{add('ai-unavailable','AI 工作账户暂不可用');}
   const cfg=row.configuration;
-  const ordinaryActions=cfg.plan.actions.filter(code=>!aiActionDefinition(code)?.query&&aiActionDefinition(code)?.kind!=='ai-role-delegation');
+  const ordinaryActions=cfg.plan.actions.filter(code=>!aiActionDefinition(code)?.query&&!['ai-role-delegation','ai-prompt-delegation'].includes(aiActionDefinition(code)?.kind));
   if(cfg.schedule.kind==='daily'&&!cfg.schedule.at)add('daily-time-required','请先选择每日运行时刻');
   if(cfg.schedule.kind==='interval'&&!Number.isInteger(cfg.schedule.minutes))add('interval-required','请选择巡检频率');
   if(cfg.mode!=='code'){
@@ -84,6 +85,11 @@ export class OperationsAutonomy extends AutonomyReadModel{
   }
   if(cfg.mode==='ai'&&ordinaryActions.length&&!cfg.plan.grantIds.length)add('authorization-required','自主动作尚未选择自动执行授权');
   if(cfg.plan.actions.some(action=>!role?.permissions.includes(action)))add('role-scope-missing','当前角色未包含计划中的业务动作');
+  const management=cfg.plan.actions.filter(action=>action.startsWith('ai.roles.')||action.startsWith('ai.prompts.'));
+  if(management.length){
+   const delegation=role?.accountId?(await db.query('SELECT enabled,allowed_management_actions,target_ai_account_ids FROM operations_ai_role_delegations_v1 WHERE endpoint=$1 AND source_ai_account_id=$2',[this.endpoint,role.accountId])).rows[0]:null;
+   if(!delegation?.enabled||!delegation.target_ai_account_ids?.length||management.some(action=>!delegation.allowed_management_actions.includes(action.startsWith('ai.prompts.')?'prompt-'+action.slice(11):action.slice(9))))add('management-delegation-required','所选AI管理动作尚未获得明确的目标和管理授权');
+  }
   if(cfg.mode==='ai'&&ordinaryActions.length){
    const grants=(await db.query('SELECT * FROM operations_automation_grants_v1 WHERE endpoint=$1 AND id=ANY($2::uuid[])',[this.endpoint,cfg.plan.grantIds])).rows;
    if(ordinaryActions.some(action=>!grants.some(g=>g.enabled&&g.executor_kind==='ai'&&g.mode==='automatic'&&g.ai_account_id===role?.accountId&&g.permissions.includes(action)&&automationResourceScope(g).kind!=='unresolved')))add('authorization-inactive','所选自动授权尚未覆盖当前岗位与动作');
@@ -117,7 +123,7 @@ export class OperationsAutonomy extends AutonomyReadModel{
    if(x.enabled){const ready=await this.readinessWithin(db,candidate,runtime);if(!ready.ready)fail('operations_autonomy_not_ready');}
    const at=this.at(),next=x.enabled?(old.enabled&&isDeepStrictEqual(old.configuration.schedule,cfg.schedule)?old.next_due_at:nextDue(cfg.schedule,at)):null;
    const row=(await db.query(`UPDATE operations_autonomy_configs_v1 SET revision=revision+1,enabled=$3,configuration=$4,prompt_version=prompt_version+$5,plan_version=plan_version+$6,next_due_at=$7,
-    enabled_at=CASE WHEN $3 AND NOT enabled THEN $8 ELSE enabled_at END,updated_by=$9,updated_at=$8 WHERE endpoint=$1 AND id=$2 RETURNING *`,[this.endpoint,old.id,x.enabled,JSON.stringify(cfg),old.configuration.prompt===cfg.prompt?0:1,isDeepStrictEqual(old.configuration.plan,cfg.plan)&&old.configuration.purpose===cfg.purpose&&old.configuration.mode===cfg.mode&&old.configuration.goal===cfg.goal?0:1,next,at,actor.operatorId])).rows[0];
+    enabled_at=CASE WHEN $3 AND NOT enabled THEN $8 ELSE enabled_at END,updated_by=$9,updated_by_ai_account_id=NULL,updated_at=$8 WHERE endpoint=$1 AND id=$2 RETURNING *`,[this.endpoint,old.id,x.enabled,JSON.stringify(cfg),old.configuration.prompt===cfg.prompt?0:1,isDeepStrictEqual(old.configuration.plan,cfg.plan)&&old.configuration.purpose===cfg.purpose&&old.configuration.mode===cfg.mode&&old.configuration.goal===cfg.goal?0:1,next,at,actor.operatorId])).rows[0];
    await this.versionWithin(db,row,actor.operatorId);if(!x.enabled)await this.pauseForConfigWithin(db,row.id);
    return this.recordWithin(db,actor,operationId,'config',{domain,...x},{operationId,config:present(row),replayed:false});
   });
@@ -256,9 +262,14 @@ export class OperationsAutonomy extends AutonomyReadModel{
  }
  async toolsWithin(db,row,actor){
   const role=await this.aiWorkAccounts.authorizationWithin(db,row.domain,{accountId:row.ai_account_id}),capabilities=aiWorkCapabilities(row.domain,role.permissions),tools=[];
-  if(capabilities.queryPermissions.length){if(this.summaryForTask)tools.push('current-summary');if(this.queryTools)tools.push('query-operations','read-operation-object');}
+  if(capabilities.queryPermissions.length){tools.push('current-summary');if(this.queryTools)tools.push('query-operations','read-operation-object');}
   if(this.dutyTools&&['ai','code'].includes(row.mode)&&row.configuration.plan.actions.some(code=>role.permissions.includes(code)&&aiActionDefinition(code)?.autonomous&&!aiActionDefinition(code)?.query&&this.actionTools?.dutyActionReady?.(code)===true))tools.push('execute-operation');
-  if(this.dutyTools&&typeof this.authority.permissions?.delegationAvailabilityWithin==='function'){const delegation=await this.authority.permissions.delegationAvailabilityWithin(db,{actor});if(delegation.canRead)tools.push('read-ai-delegation');if(['ai','code'].includes(row.mode)&&delegation.managementActions.some(action=>row.configuration.plan.actions.includes('ai.roles.'+action)))tools.push('manage-ai-role');}
+  if(this.dutyTools&&typeof this.authority.permissions?.delegationAvailabilityWithin==='function'){
+   const delegation=await this.authority.permissions.delegationAvailabilityWithin(db,{actor});
+   if(delegation.canReadRoles||delegation.canReadPrompts||delegation.canRead)tools.push('read-ai-delegation');
+   if(['ai','code'].includes(row.mode)&&delegation.managementActions.some(action=>row.configuration.plan.actions.includes('ai.roles.'+action)))tools.push('manage-ai-role');
+   if(['ai','code'].includes(row.mode)&&delegation.promptActions?.includes('update')&&row.configuration.plan.actions.includes('ai.prompts.update'))tools.push('manage-ai-prompt');
+  }
   return tools;
  }
  async authorize(input){const x=parse(authorizeSchema,input);return transaction(this.db,async db=>{
@@ -302,10 +313,11 @@ export class OperationsAutonomy extends AutonomyReadModel{
     result=await this.queryTools.execute({actor,domain:row.domain,tool:x.tool,arguments:x.arguments});
    }else if(x.tool==='current-summary'){
     if(Object.keys(x.arguments).length)fail('invalid_operations_autonomy_request',400);
-    if(!this.summaryForTask)fail('operations_autonomy_tool_not_configured',503);result=await this.summaryForTask(actor,row);
+    result=this.summaryForTask?await this.summaryForTask(actor,row):await transaction(this.db,db=>taskSummaryWithin(this,db,row));
    }else{
-    if(!['ai','code'].includes(row.mode)&&['execute-operation','manage-ai-role'].includes(x.tool))fail('operations_autonomy_human_required');
+    if(!['ai','code'].includes(row.mode)&&['execute-operation','manage-ai-role','manage-ai-prompt'].includes(x.tool))fail('operations_autonomy_human_required');
     if(x.tool==='manage-ai-role'){const action=x.arguments.kind==='role-create'?'create':x.arguments.kind==='role-update'?'update':x.arguments.enabled===true?'assign':'revoke';if(!row.configuration.plan.actions.includes('ai.roles.'+action))fail('operations_autonomy_scope_denied',403);}
+    if(x.tool==='manage-ai-prompt'&&!row.configuration.plan.actions.includes('ai.prompts.update'))fail('operations_autonomy_scope_denied',403);
     if(!this.dutyTools)fail('operations_autonomy_tool_not_configured',503);
     // Repeated writes must be resolved by the original domain operation. The
     // callback is never allowed to replace this server-owned operationId.
@@ -314,7 +326,7 @@ export class OperationsAutonomy extends AutonomyReadModel{
    await transaction(this.db,async db=>{const current=await this.taskWithin(db,x.taskId);
     if(['current-summary','query-operations','read-operation-object'].includes(x.tool))await this.authorizeTaskWithin(db,current);
     await db.query(`UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`,[this.endpoint,x.taskId,x.callId,this.at(),result?.state==='waiting-human'?'waiting-human':'completed',result?.state==='waiting-human'?result.reason??result.code??'operations_autonomy_human_required':null]);
-    if(['current-summary','query-operations','read-operation-object'].includes(x.tool)&&result?.availability==='available')await db.query('UPDATE operations_autonomy_tasks_v1 SET effective_check=true,updated_at=$3 WHERE endpoint=$1 AND id=$2',[this.endpoint,x.taskId,this.at()]);
+    if(result?.availability==='available'&&(['query-operations','read-operation-object'].includes(x.tool)||x.tool==='current-summary'&&result.inspectionChecked===true))await db.query('UPDATE operations_autonomy_tasks_v1 SET effective_check=true,updated_at=$3 WHERE endpoint=$1 AND id=$2',[this.endpoint,x.taskId,this.at()]);
     if(result?.businessReceipt){if(result.operationId!==operationId)fail('operations_autonomy_operation_conflict');await this.recordBusinessReceiptWithin(db,{taskId:x.taskId,operationId,...result.businessReceipt});}
     if(result?.state==='waiting-human')await this.waitForHumanWithin(db,{taskId:x.taskId,operationId,code:result.reason??'operations_autonomy_human_required'});
    });return result;

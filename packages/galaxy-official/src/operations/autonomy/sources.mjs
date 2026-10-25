@@ -6,6 +6,7 @@ export const proposalTargetTypeSql=proposal=>`CASE ${proposal}->'target'->>'kind
  WHEN 'projects' THEN 'project' WHEN 'methods' THEN 'method' WHEN 'rule' THEN 'rule-key'
  WHEN 'file' THEN CASE ${proposal}->'request'->>'targetKind' WHEN 'chat' THEN 'file-chat' WHEN 'forum' THEN 'file-forum' END
  WHEN 'search-configuration' THEN 'search-quality' WHEN 'recommendation-theme' THEN 'recommendation-policy'
+ WHEN 'ai-work-prompt' THEN 'ai-work-account'
  WHEN 'public-content-batch' THEN NULL ELSE ${proposal}->'target'->>'kind' END`;
 
 export const taskSourceRefsSql=(endpoint,task)=>{

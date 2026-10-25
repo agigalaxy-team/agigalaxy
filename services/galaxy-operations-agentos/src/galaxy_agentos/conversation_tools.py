@@ -371,13 +371,16 @@ class RuleRestore(ClosedArguments):
 
 
 from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave
+from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 
 
-PreparedOperation = Annotated[Union[ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
+_BusinessOperation = Union[ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish,
-    SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection], Field(discriminator="kind")]
+    SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
+DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
+PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
 
 
 def _preparation_type(domain):
@@ -404,6 +407,9 @@ def _prepared_arguments(operation):
     for name in optional_only.get(value["kind"], ()):
         if value.get(name) is None:
             value.pop(name, None)
+    if value["kind"] == "ai-role-command" and value["command"]["kind"] == "assignment-save":
+        if value["command"].get("id") is None:
+            value["command"].pop("id", None)
     # topic=null and category=null remain explicit business clearing intents.
     return value
 
@@ -608,6 +614,22 @@ def conversation_tools(gateway, *, domain=None):
         """
         return send(run_context, fc, "run-authorized-work", {"executionId": str(execution_id)})
 
+    def read_ai_delegation(run_context: RunContext, fc: FunctionCall,
+            ai_account_id: UUID | None = None) -> str:
+        """Read current human-approved AI-only management scope or one prompt.
+
+        With no ID, return only the actual delegation, target AI IDs and role
+        metadata. For one genuine target ai_account_id, Node returns its role
+        prompt/current revision/version only when current prompt-read and
+        ai.prompts.read permit that exact target. A missing scope or denied
+        prompt is not permission to inspect other accounts or infer text.
+        This tool never changes roles, assignments, prompts or model settings.
+        To request a change in this conversation, prepare_operation a concrete
+        ai-work-prompt-save or ai-role-command card; the person must confirm.
+        """
+        arguments = {} if ai_account_id is None else {"aiAccountId": str(ai_account_id)}
+        return send(run_context, fc, "read-ai-delegation", arguments)
+
     def prepare_operation(run_context: RunContext, fc: FunctionCall,
             operation: preparation_type) -> str:
         """Prepare one concrete operations action for the manager to review.
@@ -626,6 +648,16 @@ def conversation_tools(gateway, *, domain=None):
         operation identifiers. Use genuine object IDs from query tools. Do not
         invent deadlines; ask the manager when an exact hide time is missing.
         A human card's actual result is required before reporting completion.
+        For AI-only management first read current_summary and the current
+        read_ai_delegation directory. ai-work-prompt-save accepts only the
+        actual allowed aiAccountId and intended ordinary prompt text (up to
+        16000 characters); Node freezes its current revision/prompt/delegation
+        versions. It cannot edit a model, code boundary, goal or running plan.
+        ai-role-command wraps one real role-create/role-update/assignment-save
+        command and its current expectedVersion from that directory. Neither
+        card grants execution or expands the human-approved delegation ceiling,
+        edits personnel/shared roles or gives the controlling AI more power.
+        Workbench preparation never invokes the background management writer.
         In the overview domain, rule-publish prepares an existing real draft;
         rule-restore selects a real published version from rule history.
         Both require the manager's concrete card confirmation, never accept
@@ -662,4 +694,4 @@ def conversation_tools(gateway, *, domain=None):
     query_operations.__doc__ += "\nExact module views: " + "; ".join(
         name + " " + "/".join(sorted(views)) for name, views in VIEWS.items()) + "."
     return [query_operations, read_operation_object, list_authorized_work,
-        run_authorized_work, prepare_operation]
+        run_authorized_work, read_ai_delegation, prepare_operation]

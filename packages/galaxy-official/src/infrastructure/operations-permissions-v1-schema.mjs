@@ -1,5 +1,5 @@
 import {operationsPermissionCodes} from '../operations-permission-catalog.mjs';
-const allowed="ARRAY["+operationsPermissionCodes.map(code=>"'"+code+"'").join(',')+"]::text[]";
+const allowed="ARRAY["+operationsPermissionCodes.filter(code=>!code.startsWith('ai.prompts.')).map(code=>"'"+code+"'").join(',')+"]::text[]";
 export const operationsPermissionsV1MigrationSql=`
 CREATE TABLE operations_permission_authority_v1(endpoint text PRIMARY KEY,version bigint NOT NULL DEFAULT 0 CHECK(version>=0));
 CREATE TABLE operations_business_roles_v1(

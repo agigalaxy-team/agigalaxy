@@ -14,7 +14,7 @@ from agno.run.agent import RunEvent
 
 TOOL_NAMES = frozenset({"current_summary", "query_operations", "read_operation_object",
     "list_authorized_work", "run_authorized_work", "prepare_operation", "execute_operation",
-    "manage_ai_role", "read_ai_delegation"})
+    "manage_ai_role", "manage_ai_prompt", "read_ai_delegation"})
 EVENT_NAMES = frozenset(event.value for event in RunEvent)
 ERROR_TYPES = frozenset({"AuthorityDenied", "AuthorityUnavailable"})
 

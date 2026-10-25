@@ -60,7 +60,7 @@ class GalaxyGateway:
         self.client = httpx.Client(
             base_url=settings.authority_url.rstrip("/") + "/",
             headers=headers,
-            timeout=15.0, follow_redirects=False, transport=transport,
+            timeout=15.0, follow_redirects=False, transport=transport, trust_env=False,
         )
 
     def request(self, path: str, data: dict, *, tool_feedback: bool = False) -> dict:
@@ -137,7 +137,7 @@ class GalaxyGateway:
     def conversation_tool(self, user_id, tool: str, arguments: dict, *, run_id: str,
             call_id: str, session_id: str, turn_id: str, public_reference: dict | None = None):
         if (tool not in {"workbench-summary", "query-operations", "read-operation-object", "list-authorized-work",
-                "run-authorized-work", "prepare-operation"}
+                "run-authorized-work", "prepare-operation", "read-ai-delegation"}
                 or not isinstance(arguments, dict)
                 or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)
                 or not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", call_id)):

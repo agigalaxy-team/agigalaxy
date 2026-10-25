@@ -5,6 +5,7 @@ const id='[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12
 const detail=new RegExp('^/v1/operations/feedback/('+id+')(?:/(events))?$','i');
 const attachment=new RegExp('^/v1/operations/feedback/('+id+')/attachments/('+id+')/content$','i');
 const operation=new RegExp('^/v1/operations/feedback/('+id+')/operations/('+id+')$','i');
+const submissionOperation=new RegExp('^/v1/account/feedback/operations/('+id+')$','i');
 function query(url,allowed){const result={};for(const[key,value]of url.searchParams){
  if(!allowed.includes(key)||url.searchParams.getAll(key).length!==1)throw new ServiceError('invalid_feedback_request',400);
  result[key]=key==='limit'||key==='days'&&value!=='all'?Number(value):value;
@@ -24,10 +25,16 @@ export async function dispatchOperationsFeedback({operationsFeedback,officialAcc
   response.setHeader('Cache-Control','private, no-store');response.setHeader('X-Content-Type-Options','nosniff');response.setHeader('X-Galaxy-Content-Sha256',file.sha256);response.end(file.bytes);return true;
  }
  const intake=url.pathname==='/v1/account/feedback',list=url.pathname==='/v1/operations/feedback',target=detail.exec(url.pathname),receipt=operation.exec(url.pathname);
- if(!intake&&!list&&!target&&!receipt)return false;
+ const original=submissionOperation.exec(url.pathname);
+ if(!intake&&!list&&!target&&!receipt&&!original)return false;
  const write=intake||!!target?.[2];
- if(request.method!==(write?'POST':'GET')||(write||receipt)&&url.search)throw new ServiceError('not_found',404);
+ if(request.method!==(write?'POST':'GET')||(write||receipt||original)&&url.search)throw new ServiceError('not_found',404);
  if(!operationsFeedback)throw new ServiceError('feedback_service_unavailable',503);
+ if(original){
+  if(!officialAccounts)throw new ServiceError('official_account_unavailable',503);
+  const actor=await officialAccounts.actionActor(request,{write:false});
+  send(200,await operationsFeedback.submissionOperation(actor,original[1].toLowerCase()));return true;
+ }
  if(intake){
   if(!officialAccounts)throw new ServiceError('official_account_unavailable',503);
   const actor={...await officialAccounts.actionActor(request,{write:true}),httpRequestId:requestId};

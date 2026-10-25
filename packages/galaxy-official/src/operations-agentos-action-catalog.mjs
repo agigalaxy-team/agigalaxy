@@ -11,6 +11,7 @@ import {recommendationDirectionSchema,recommendationThemeKeySchema,recommendatio
 import {aiWorkPreparationRegistry} from './shared/operations-ai-action-registry.mjs';
 import {p13OrdinaryDraftSchema,p13OrdinaryPublishSchema} from './shared/p13-strategies-schema.mjs';
 import {operationsChatMessageVisibilitySchema} from './shared/operations-chat-message-schema.mjs';
+import {delegatedAiRolePreparationSchema,delegatedAiPromptSaveSchema} from './operations/permissions/ai-delegation-schema.mjs';
 
 const id=z.uuid(),reason=z.string().trim().min(3).max(1600),targetKind=z.enum(['post','reply']);
 const fields=(schema,excluded)=>Object.fromEntries(Object.entries(schema.shape).filter(([key])=>!excluded.includes(key)));
@@ -32,7 +33,11 @@ const fileAccess=z.strictObject({kind:z.literal('file-access'),targetKind:z.enum
  });
 export const workbenchMessageDraftConfigSchema=messagingConfigSchema.omit({automation:true});
 const humanReviewDraftConfig=messagingConfigSchema.refine(value=>value.automation?.kind==='human-required'&&value.automation.factsConfirmed===false);
+export const workbenchAiPromptReviewSchema=z.strictObject({kind:z.literal('ai-work-prompt'),aiAccountId:id,domain:z.enum(['governance','messaging','discovery','maintenance']),name:z.string().max(100),configId:id,
+ expectedRevision:z.number().int().positive(),promptVersion:z.number().int().positive(),nextPromptVersion:z.number().int().positive(),scope:z.literal('role-work-requirements'),source:z.enum(['saved-configuration','empty-default']),before:z.string().max(16000),after:z.string().max(16000),effect:z.literal('new-rounds-only')});
 export const workbenchPrepareSchemas=Object.freeze({
+ 'ai-work-prompt-save':z.strictObject({kind:z.literal('ai-work-prompt-save'),aiAccountId:id,prompt:z.string().max(16000)}),
+ 'ai-role-command':z.strictObject({kind:z.literal('ai-role-command'),command:delegatedAiRolePreparationSchema}),
  'content-visibility':z.strictObject({kind:z.literal('content-visibility'),targetKind,targetId:id,...visibility}).superRefine(visibilityValid),
  'content-curation':contentChanges.safeExtend({kind:z.literal('content-curation'),targetKind,targetId:id}),
  'public-content-batch':z.strictObject({kind:z.literal('public-content-batch'),items:z.array(z.strictObject({kind:targetKind,id})).min(1).max(25).refine(items=>new Set(items.map(item=>item.kind+':'+item.id)).size===items.length),...visibility}).superRefine(visibilityValid),
@@ -61,6 +66,8 @@ export const workbenchPrepareSchemas=Object.freeze({
 });
 export const workbenchActionCatalog=aiWorkPreparationRegistry;
 export const workbenchCommandSchemas=Object.freeze({
+ 'ai-work-prompt-save':delegatedAiPromptSaveSchema.safeExtend({delegationVersion:z.number().int().positive()}),
+ 'ai-role-command':z.strictObject({operationId:id,command:delegatedAiRolePreparationSchema,delegationVersion:z.number().int().positive()}),
  'content-visibility':operationsContentVisibilitySchema,'content-curation':operationsContentCurationSchema,
  'public-content-batch':operationsContentBatchSchema,'private-case-message':operationsChatMessageVisibilitySchema,
  'section-classification':operationsSectionClassificationSchema,'section-visibility':operationsVisibilitySchema,'resource-visibility':operationsVisibilitySchema,

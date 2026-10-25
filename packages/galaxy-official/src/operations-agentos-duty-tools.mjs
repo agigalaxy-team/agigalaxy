@@ -24,6 +24,10 @@ export function createOperationsAgentOsDutyTools({authority,actions,permissions,
   if(Object.hasOwn(args,'operationId')||Object.hasOwn(args,'actor')||Object.hasOwn(args,'role'))fail('invalid_operations_autonomy_request',400);
   try{
    if(tool==='read-ai-delegation'){
+    if(Object.keys(args).length===1&&typeof args.aiAccountId==='string'){
+     if(typeof permissions?.delegatedPrompt!=='function')fail('operations_autonomy_tool_not_configured',503);
+     return permissions.delegatedPrompt(actor,args);
+    }
     if(Object.keys(args).length)fail('invalid_operations_autonomy_request',400);
     if(typeof permissions?.delegatedDirectory!=='function')fail('operations_autonomy_tool_not_configured',503);
     return permissions.delegatedDirectory(actor);
@@ -32,7 +36,13 @@ export function createOperationsAgentOsDutyTools({authority,actions,permissions,
     if(typeof permissions?.delegatedRoleSave!=='function')fail('operations_autonomy_tool_not_configured',503);
     // The service rechecks target, AI-only scope, delegated ceiling, version
     // and the controlling AI's current task in its original transaction.
-    const result=await permissions.delegatedRoleSave(actor,{...args,operationId});
+    let result;
+    if(reconcile){
+     if(typeof permissions?.delegatedManagementOperation!=='function')fail('operations_autonomy_original_receipt_unknown',503);
+     const original=await permissions.delegatedManagementOperation(actor,operationId,{kind:args.kind,input:{...args,operationId}});
+     if(original.state!=='recorded')return{operationId,state:'unknown',effectState:'unknown',basis:'original-operation-query',businessReceipt:{operationId,action:'ai-role-management',targetType:args.kind==='assignment-save'?'ai-role-assignment':'ai-role',targetId:args.id??operationId,state:'unknown',basis:'original-ai-management-operation-query'}};
+     result=original.result;
+    }else result=await permissions.delegatedRoleSave(actor,{...args,operationId});
     // This service returns only after its immutable delegation event commits.
     // A name, acceptance or model report is never used as a receipt.
     if(result?.operationId!==operationId||!result.recordedAt||!Number.isSafeInteger(result.delegationVersion)
@@ -41,6 +51,24 @@ export function createOperationsAgentOsDutyTools({authority,actions,permissions,
      ...(result.role?{roleId:result.role.id,version:result.role.version}:{assignmentId:result.assignment.id,aiAccountId:result.assignment.aiAccountId,version:result.assignment.version})};
     const value={...result,state:'completed',effectState:'completed',receipt,businessReceipt:{operationId,action:'ai-role-management',targetType:result.role?'ai-role':'ai-role-assignment',targetId:result.role?.id??result.assignment.id,state:'completed',basis:'persisted-ai-role-delegation-event'}};
     await project(onBusinessReceipt,{taskId:task.id,operationId,action:'ai-role-management',result:value,reconcile});
+    return value;
+   }
+   if(tool==='manage-ai-prompt'){
+    if(typeof permissions?.delegatedPromptSave!=='function')fail('operations_autonomy_tool_not_configured',503);
+    let result;
+    if(reconcile){
+     if(typeof permissions?.delegatedManagementOperation!=='function')fail('operations_autonomy_original_receipt_unknown',503);
+     const original=await permissions.delegatedManagementOperation(actor,operationId,{kind:'prompt-save',input:{...args,operationId}});
+     if(original.state!=='recorded')return{operationId,state:'unknown',effectState:'unknown',basis:'original-operation-query',businessReceipt:{operationId,action:'ai-prompt-management',targetType:'ai-work-account',targetId:args.aiAccountId,state:'unknown',basis:'original-ai-management-operation-query'}};
+     result=original.result;
+    }else result=await permissions.delegatedPromptSave(actor,{...args,operationId});
+    const saved=result?.prompt;
+    if(result?.operationId!==operationId||!result.recordedAt||!Number.isSafeInteger(result.delegationVersion)
+      ||saved?.aiAccountId!==args.aiAccountId||typeof saved?.configId!=='string'
+      ||saved.revision!==args.expectedRevision+1||saved.promptVersion!==args.expectedPromptVersion+1)fail('operations_autonomy_original_receipt_unknown',503);
+    const receipt={operationId,aiAccountId:saved.aiAccountId,configId:saved.configId,revision:saved.revision,promptVersion:saved.promptVersion,delegationVersion:result.delegationVersion,recordedAt:result.recordedAt};
+    const value={operationId,state:'completed',effectState:'completed',receipt,businessReceipt:{operationId,action:'ai-prompt-management',targetType:'ai-work-account',targetId:saved.aiAccountId,state:'completed',basis:'persisted-domain-operation-receipt'}};
+    await project(onBusinessReceipt,{taskId:task.id,operationId,action:'ai-prompt-management',result:value,reconcile});
     return value;
    }
    if(tool!=='execute-operation')fail('operations_autonomy_tool_not_configured',503);

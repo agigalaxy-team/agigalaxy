@@ -8,6 +8,7 @@ import {conversationPriorReadReceipt} from './operations-agentos-tool-evidence.m
 import {coalescedConversationEvents} from './operations-agentos-conversation-stream.mjs';
 import {agentOsQueryAccess} from './shared/operations-agentos-query-access.mjs';
 import {workbenchRunFact,workbenchCardFact} from './operations-agentos-duty-workbench.mjs';
+import {conversationOperationReceipts} from './operations-agentos-operation-receipts.mjs';
 
 const fail=(code,status=403)=>{throw new ServiceError(code,status);};
 const parse=(schema,input)=>{const value=schema.safeParse(input);if(!value.success)fail('invalid_operations_agentos_request',400);return value.data;};
@@ -16,6 +17,7 @@ const permissionKey=actor=>hash(JSON.stringify([actor.businessAuthorization.vers
 const nativeSchema=z.strictObject({conversationId:z.uuid(),operation:z.enum(['read','run']),resourceType:z.enum(['agents','workflows']).nullable().optional(),resourceId:z.string().min(1).max(100).nullable().optional()});
 const conversationRunSchema=agentOsRunSchema.extend({taskId:z.uuid().optional()});
 const turnDigest=x=>hash(x.taskId?JSON.stringify([x.message,x.taskId]):x.message);
+const rolePromptSchema=z.strictObject({version:z.number().int().positive().max(Number.MAX_SAFE_INTEGER),text:z.string().max(16000)});
 const blocks={overview:['communityReports','chatReports','sections','resources','files','jobs','feedback','search'],governance:['communityReports','chatReports','sections','resources','files','feedback'],messaging:['jobs'],discovery:['sections','search'],maintenance:['files','jobs','search']};
 const countFields={communityReports:['pending','total'],chatReports:['pending','total'],sections:['active','archived'],resources:['projects','methods'],files:['scanPending','scanFailed','cleanupPending','cleanupFailed','cleanupResultUnknown'],jobs:['failed'],feedback:['total','pending','processing','unclassified'],search:['failed']};
 const numeric=value=>Number.isSafeInteger(value)&&value>=0?value:null;
@@ -189,7 +191,13 @@ export class AgentOsConversations{
  }
  async authorizeNative(input){const x=parse(nativeSchema,input),{row}=await this.current(x.conversationId),component='galaxy-conversation-'+row.domain;
   if(x.resourceType&&x.resourceType!=='agents'||x.resourceId&&x.resourceId!==component)fail('operations_agentos_domain_mismatch');
-  return {allowed:true,resourceIds:[component],execution:this.view(row),readExpiresAt:this.now()+30};
+  // This private, current-AI instruction source is not an operator query and
+  // never enters a public conversation view, signed token or client metadata.
+  const configuration=(await this.db.query('SELECT configuration,prompt_version FROM operations_autonomy_configs_v1 WHERE endpoint=$1 AND domain=$2',[this.endpoint,row.domain])).rows[0];
+  let rolePrompt=null;
+  if(configuration){const selected=rolePromptSchema.safeParse({version:configuration.prompt_version,text:configuration.configuration?.prompt});if(!selected.success)fail('operations_agentos_role_prompt_unavailable',503);rolePrompt=selected.data;}
+  await this.current(row.id);
+  return {allowed:true,resourceIds:[component],execution:{...this.view(row),rolePrompt},readExpiresAt:this.now()+30};
  }
  async priorReadReceipts(actor,domain,context){
   const empty={basis:'current-conversation-prior-read-ledger',valuesCurrent:false,items:[]};
@@ -205,7 +213,7 @@ export class AgentOsConversations{
    ORDER BY created_at DESC,id DESC LIMIT 10)
    SELECT t.tool,t.state,t.metadata,t.created_at,t.updated_at
    FROM operations_agentos_conversation_tool_calls_v1 t JOIN previous_turns p ON p.id=t.turn_id
-   WHERE t.endpoint=$1 AND t.conversation_id=$2 AND t.tool IN ('workbench-summary','query-operations','read-operation-object')
+   WHERE t.endpoint=$1 AND t.conversation_id=$2 AND t.tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation')
    ORDER BY t.created_at DESC,t.id DESC LIMIT 80`,[this.endpoint,conversationId,actor.operatorId,command.created_at])).rows;
   await this.current(conversationId,{operator:actor});
   return {...empty,items:rows.map(conversationPriorReadReceipt).filter(Boolean).reverse()};
@@ -215,14 +223,19 @@ export class AgentOsConversations{
   const priorReadReceipts=await this.priorReadReceipts(actor,domain,context);
   const boundedTask=await this.boundedTaskFor(actor,context);
   const priorActionReceipts=this.tools?await this.tools.priorActionReferences(actor,domain,context):{basis:'same-owner-current-fixed-ai-completed-action-ledger',scope:'latest-20-completed-content-visibility-cards',valuesCurrent:false,availability:'unavailable',items:[]};
-  const priorOperationReceipts=this.tools?await (await import('./operations-agentos-operation-receipts.mjs')).conversationOperationReceipts(this.tools,actor,domain,context):{availability:'unavailable',items:[]};
+  const priorOperationReceipts=this.tools?await conversationOperationReceipts(this.tools,actor,domain,context):{availability:'unavailable',items:[]};
   let value,result;
   if(typeof this.summaryForConversation!=='function')result={domain,availability:'unavailable',reason:'summary-not-connected'};
   else try{value=await this.summaryForConversation(actor);}catch(error){if(error.status===403)throw error;result={domain,availability:'unavailable',reason:'summary-unavailable'};}
   const current=await this.authority.human(actor,{domain,purpose:'query'});
   if(current.businessAuthorization.version!==actor.businessAuthorization.version)fail('operations_agentos_authority_changed');
   if(context)await this.current(context.conversationId,{operator:current});
-  return {...(result??conversationSummary(value,domain,current.businessAuthorization.permissions)),queryAccess:agentOsQueryAccess(current.businessAuthorization.permissions),priorReadReceipts,priorActionReceipts,priorOperationReceipts,boundedTask};
+  const managementCapabilities=typeof this.authority.permissions?.managementCapabilitiesWithin==='function'
+   ?await transaction(this.db,db=>this.authority.permissions.managementCapabilitiesWithin(db,{actor:current})):null;
+  // Recheck after capability/configuration reads; a stale role snapshot cannot
+  // turn the advertised directory into an execution permission.
+  await this.authority.human(current,{domain,purpose:'query'});
+  return {...(result??conversationSummary(value,domain,current.businessAuthorization.permissions)),queryAccess:agentOsQueryAccess(current.businessAuthorization.permissions),managementCapabilities,priorReadReceipts,priorActionReceipts,priorOperationReceipts,boundedTask};
  }
  executeTool(input){if(!this.tools)fail('operations_agentos_conversation_not_ready',503);return this.tools.execute(input);}
  async read(operator,domain){const {row,contextChanged=false}=await this.session(operator,domain),status=await this.client.status();let native=null;const runtimeState=status.state;
@@ -239,7 +252,11 @@ export class AgentOsConversations{
   const toolCards=this.tools?await this.tools.cards(operator,domain):[];
   const configured=status.modelState==='configured'&&(!Array.isArray(status.configuredDomains)||status.configuredDomains.includes(domain));
   const runs=row?await this.cancellationActivities(row,await this.failureActivities(row,await this.bindRunOperations(row,native?.runs??[]))):[];if(row){await this.current(row.id,{operator});await this.syncWorkbenchRuns(row,runs);}
-  return {domain,runs,toolCards,contextChanged,runtimeState,modelState:status.modelState==='unknown'?'unknown':configured?'configured':'not-configured',capabilities:{canSend:runtimeState==='connected'&&configured&&ready,canStream:runtimeState==='connected'&&ready&&status.conversationTransport?.events===true&&status.conversationTransport?.originalRunLookup===true,canCancel:runtimeState==='connected'&&ready&&status.conversationTransport?.cancel===true&&status.conversationTransport?.originalRunLookup===true},blockedReason:runtimeState!=='connected'?'runtime-unavailable':!configured?'model-not-configured':!ready?'runtime-not-ready':null,checkedAt:this.now(),readExpiresAt:Math.min(this.now()+30,native?.readExpiresAt??this.now()+30,...toolCards.map(card=>card.readExpiresAt))};
+  const currentActor=await this.authority.human(operator,{domain,purpose:'query'});
+  const managementCapabilities=typeof this.authority.permissions?.managementCapabilitiesWithin==='function'
+   ?await transaction(this.db,db=>this.authority.permissions.managementCapabilitiesWithin(db,{actor:currentActor})):null;
+  await this.authority.human(currentActor,{domain,purpose:'query'});
+  return {domain,runs,toolCards,contextChanged,runtimeState,managementCapabilities,modelState:status.modelState==='unknown'?'unknown':configured?'configured':'not-configured',capabilities:{canSend:runtimeState==='connected'&&configured&&ready,canStream:runtimeState==='connected'&&ready&&status.conversationTransport?.events===true&&status.conversationTransport?.originalRunLookup===true,canCancel:runtimeState==='connected'&&ready&&status.conversationTransport?.cancel===true&&status.conversationTransport?.originalRunLookup===true},blockedReason:runtimeState!=='connected'?'runtime-unavailable':!configured?'model-not-configured':!ready?'runtime-not-ready':null,checkedAt:this.now(),readExpiresAt:Math.min(this.now()+30,native?.readExpiresAt??this.now()+30,...toolCards.map(card=>card.readExpiresAt))};
  }
  async nativeOperation(row,saved){
   let current;try{current=await this.client.readConversation(this.view(row));}catch(error){if(error.status===403)throw error;}

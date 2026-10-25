@@ -2,18 +2,24 @@ import {z} from 'zod';
 import {operationsPermissionCodes} from '../../operations-permission-catalog.mjs';
 import {operationsPermissionListSchema} from '../../shared/operations-permissions-schema.mjs';
 
-export const aiRoleManagementActions=Object.freeze(['read','create','update','assign','revoke']);
+export const aiRoleManagementActions=Object.freeze(['read','create','update','assign','revoke','prompt-read','prompt-update']);
 const ids=z.array(z.uuid()).max(4).refine(items=>new Set(items).size===items.length);
 export const aiRoleDelegationSaveSchema=z.strictObject({operationId:z.uuid(),expectedVersion:z.number().int().nonnegative(),enabled:z.boolean(),
  targetAiAccountIds:ids,grantablePermissions:operationsPermissionListSchema,
- allowedManagementActions:z.array(z.enum(aiRoleManagementActions)).max(5).refine(items=>new Set(items).size===items.length)});
+ allowedManagementActions:z.array(z.enum(aiRoleManagementActions)).max(7).refine(items=>new Set(items).size===items.length)});
 const roleFields={operationId:z.uuid(),expectedVersion:z.number().int().nonnegative(),name:z.string().trim().min(1).max(120).refine(value=>!/[\p{Cc}]/u.test(value)),description:z.string().trim().max(1000),enabled:z.boolean(),permissions:operationsPermissionListSchema};
 export const delegatedAiRoleCommandSchema=z.discriminatedUnion('kind',[
  z.strictObject({kind:z.literal('role-create'),...roleFields,targetAiAccountIds:ids.refine(items=>items.length>0)}),
  z.strictObject({kind:z.literal('role-update'),...roleFields,id:z.uuid(),targetAiAccountIds:ids.refine(items=>items.length>0)}),
  z.strictObject({kind:z.literal('assignment-save'),operationId:z.uuid(),expectedVersion:z.number().int().nonnegative(),id:z.uuid().optional(),aiAccountId:z.uuid(),roleId:z.uuid(),enabled:z.boolean()}),
 ]);
-const allowed='ARRAY['+operationsPermissionCodes.map(code=>"'"+code+"'").join(',')+']::text[]';
+export const delegatedAiRolePreparationSchema=z.discriminatedUnion('kind',delegatedAiRoleCommandSchema.options.map(schema=>schema.omit({operationId:true})));
+export const delegatedAiPromptReadSchema=z.strictObject({aiAccountId:z.uuid()});
+export const delegatedAiPromptSaveSchema=z.strictObject({operationId:z.uuid(),aiAccountId:z.uuid(),expectedRevision:z.number().int().positive(),expectedPromptVersion:z.number().int().positive(),prompt:z.string().max(16000)});
+export const delegatedAiManagementReadSchema=z.strictObject({aiAccountId:z.uuid().optional()});
+// Migration129 is already deployed. New prompt permissions are introduced by
+// the additive131 migration, never by changing the historical129 SQL.
+const allowed='ARRAY['+operationsPermissionCodes.filter(code=>!code.startsWith('ai.prompts.')).map(code=>"'"+code+"'").join(',')+']::text[]';
 export const operationsAiDelegationMigrationSql=`
 ALTER TABLE operations_business_roles_v1 ADD COLUMN subject_scope text NOT NULL DEFAULT 'shared' CHECK(subject_scope IN ('shared','ai-only'));
 ALTER TABLE operations_business_roles_v1 ALTER COLUMN created_by DROP NOT NULL;

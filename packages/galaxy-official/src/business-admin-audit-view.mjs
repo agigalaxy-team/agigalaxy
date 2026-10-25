@@ -52,6 +52,9 @@ for(const aiWorkKind of ['profile-save','state-save','assignment-save'])register
 register('ai-delegation-save ai-role-create ai-role-update ai-role-assignment-save',
  {delegationId:uuid,delegationVersion:integer,sourceAiAccountId:uuid,roleId:nullable(uuid),aiAccountId:nullable(uuid)},
  {enabled:bool,version:integer,permissionCount:integer,targetCount:integer});
+register('ai-prompt-read ai-prompt-save',
+ {delegationId:uuid,delegationVersion:integer,sourceAiAccountId:uuid,aiAccountId:uuid},
+ {revision:integer,promptVersion:integer});
 register('autonomy-config autonomy-enable autonomy-control autonomy-run autonomy-settings autonomy-strategy-task autonomy-decision',
  {id:nullable(uuid)}, {kind:enumeration('config','enable','control','run','settings','strategy-task','decision'),revision:nullable(integer)});
 register('system-settings-save system-settings-test system-settings-apply system-settings-credential-provision',

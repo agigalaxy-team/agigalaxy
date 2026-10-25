@@ -11,6 +11,8 @@ import {safeDelta,changedFieldNames} from './history-delta.mjs';
 import {automationScopeForSave,automationScopeDelta} from '../../shared/operations-automation-scope.mjs';
 import {automationAiIdForSaveWithin,automationAiBindingWithin} from './ai-binding.mjs';
 import {OperationsAiRoleDelegation} from './ai-delegation.mjs';
+import {OperationsAiWorkPrompts} from './ai-work-prompts.mjs';
+import {managementCapabilitiesWithin} from './ai-management-capabilities.mjs';
 
 const receiptUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function operationReceipt(row){
@@ -47,14 +49,19 @@ function operationReceipt(row){
 
 // Versioned role, assignment and automation commands with fresh authority before original-intent replay.
 export class OperationsPermissionsService extends OperationsPermissionsReadModel{
- constructor(options){super(options);this.aiRoleDelegation=new OperationsAiRoleDelegation(this);}
+ constructor(options){super(options);this.aiRoleDelegation=new OperationsAiRoleDelegation(this);this.aiWorkPrompts=new OperationsAiWorkPrompts(this);}
  delegation(operator){return this.aiRoleDelegation.read(operator);}
  saveDelegation(operator,input,options){return this.aiRoleDelegation.save(operator,input,options);}
  delegationOperation(operator,operationId){return this.aiRoleDelegation.operation(operator,operationId);}
  delegationAvailabilityWithin(db,options){return this.aiRoleDelegation.availabilityWithin(db,options);}
  delegatedDirectory(actor){return this.aiRoleDelegation.directory(actor);}
- delegatedRoleSave(actor,input){return this.aiRoleDelegation.command(actor,input);}
- delegatedAssignment(actor,input){return this.aiRoleDelegation.command(actor,input);}
+ delegatedRoleSave(actor,input,options){return this.aiRoleDelegation.command(actor,input,options);}
+ delegatedAssignment(actor,input,options){return this.aiRoleDelegation.command(actor,input,options);}
+ delegatedRolePreparation(actor,input){return this.aiRoleDelegation.prepareRole(actor,input);}
+ delegatedManagementOperation(actor,id,options){return this.aiRoleDelegation.managementOperation(actor,id,options);}
+ delegatedPrompt(actor,input){return this.aiWorkPrompts.read(actor,input);}
+ delegatedPromptSave(actor,input,options){return this.aiWorkPrompts.save(actor,input,options);}
+ managementCapabilitiesWithin(db,options){return managementCapabilitiesWithin(this,db,options);}
  history(operator,input={}){
   const x=parse(operationsPermissionsHistorySchema,input);if(!x.targetOperatorId)return super.history(operator,x);
   return this.read(operator,async db=>{
