@@ -2,7 +2,7 @@
 
 | 边界 | 真实接口与配置入口 | 必须保留的含义 |
 | --- | --- | --- |
-| Hub 业务服务族 | `packages/galaxy-official/src/config.mjs`、deploy/runtime-settings、`release-resources.json` | API/worker/migration/publisher 按同一发行完整迁移列表运行；业务库与角色分别配置 |
+| Hub 业务服务族 | `packages/galaxy-official/src/operations-config.mjs`、deploy/runtime-settings、`release-resources.json` | API/worker/migration/publisher 按同一发行完整迁移列表运行；业务库与角色分别配置 |
 | Web | browser-client 与 `src/shared` schemas，Native handoff | 网页不创建或恢复本地 ID；账户登录不代替本机控制或同步许可 |
 | Admin/BFF | apps/galaxy-admin/.env.example、lib/access、Node 内部运营路由 | 独立管理登录；当前人权与 AI 角色相交；后端事务内核权 |
 | Native AgentOS | runtime.env.example、config.py、tool_schemas.py | 私有服务 key/JWT；Node 签发控制与原操作归因，Native 不自选权限或改模型配置 |

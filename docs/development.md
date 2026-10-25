@@ -13,12 +13,15 @@ cd agigalaxy
 
 [main 源码 ZIP](https://github.com/agigalaxy-team/agigalaxy/archive/refs/heads/main.zip)用于阅读和开发；AI 宿主中的客户端安装使用[官网下载](downloads.md)，二者分别发行。
 
+实际开发或复现时选定明确提交。远端默认 main、本地审阅候选和已部署源可能处于不同提交；未推送的本地成果应从其审阅工作区或源码归档取得，不能用远端 main 代替。组件、依赖、配置入口和局部命令见[组件目录](component-catalog.md)。
+
 ## 环境与依赖
 
 | 范围 | 要求 |
 |---|---|
 | 完整仓库开发、API、A2A、管理端 | Node.js 24.13+，使用对应 package-lock.json |
 | 官网构建 | Python 3.11+；根构建脚本发现本机 Python |
+| AgentOS/Gateway 服务工具链 | Python 3.12；AgentOS 使用独立虚拟环境及 requirements.lock，Gateway 使用固定上游源码/锁文件 |
 | 已发行 Native 客户端 | 随包要求为 Node.js 22.13+，不要与完整开发门槛混淆 |
 | 业务运行 | PostgreSQL、准确服务配置与信任材料；按功能增加认证、聊天、对象存储和扫描器 |
 | 浏览器观察 | 使用任务隔离的无头浏览器与合成资料，避免复用个人浏览器状态 |
@@ -80,7 +83,7 @@ GALAXY_WEB_CONFIG_FILE=/absolute/path/to/public-web-config.json npm start
 
 ## 管理应用与认证
 
-[运营后台](../apps/galaxy-admin/README.md)有独立 package-lock.json、CMS 数据库、环境与构建步骤。根 setup、产品 build 和当前 product CI 不包含它的全部检查。
+[运营后台](../apps/galaxy-admin/README.md)有独立 package-lock.json、CMS 数据库、环境与构建步骤。根 setup 和产品 build 不安装或构建它；组件 CI 根据影响范围单独选择 Admin，并按它自己的锁文件安装和构建。CI 构建不能替代真实管理认证、CMS 与业务 BFF 的操作验证。
 
 [认证应用](../apps/galaxy-auth/README.md)包含 Keycloak 主题、验证码 Provider 和 realm 配置工具。构建主题不会修改目标 realm，也不会部署认证服务；完整邮件扩展还需要 Java 构建与匹配的 Keycloak 版本。
 

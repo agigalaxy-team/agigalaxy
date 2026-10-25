@@ -19,6 +19,16 @@
           "--test",
           "packages/galaxy-official/test/task-enrollment-v2.test.mjs"
         ]
+      ],
+      "sourceEntries": [
+        "packages/galaxy-official/src/shared/task-schema-v2.mjs",
+        "packages/galaxy-official/src/shared/task-owner-control-v2-schema.mjs"
+      ],
+      "configurationInputs": [],
+      "artifact": "source-contracts",
+      "dataOwner": "No persistence; each caller retains its own current authority.",
+      "interfaces": [
+        "Shared schema and explicit browser-client source exports"
       ]
     },
     {
@@ -35,6 +45,18 @@
           "scripts/check.mjs",
           "core"
         ]
+      ],
+      "sourceEntries": [
+        "packages/galaxy-core/src/galaxy-guid.mjs",
+        "packages/galaxy-core/src/local-store.mjs"
+      ],
+      "configurationInputs": [
+        "packages/galaxy-core/src/connection-profile.mjs"
+      ],
+      "artifact": "source-library",
+      "dataOwner": "Local identity, device and work data remain owned by the selected local ID.",
+      "interfaces": [
+        "Source modules used by Native/A2A; no standalone npm package is declared"
       ]
     },
     {
@@ -45,7 +67,17 @@
       ],
       "dependsOn": [],
       "build": [],
-      "checks": []
+      "checks": [],
+      "sourceEntries": [
+        "packages/galaxy-mail/src/layout.mjs",
+        "packages/galaxy-mail/src/identities.mjs"
+      ],
+      "configurationInputs": [],
+      "artifact": "shared-renderer",
+      "dataOwner": "No mailbox or SMTP credentials; consuming services own delivery ledgers.",
+      "interfaces": [
+        "HTML/plain-text rendering and official sender identity definitions"
+      ]
     },
     {
       "id": "hub",
@@ -82,6 +114,21 @@
           "packages/galaxy-official/test/operations-auth-root-lifecycle.test.mjs",
           "packages/galaxy-official/test/task-fact-client-v2.test.mjs"
         ]
+      ],
+      "sourceEntries": [
+        "packages/galaxy-official/src/server.mjs",
+        "packages/galaxy-official/src/worker.mjs",
+        "packages/galaxy-official/src/migrate.mjs",
+        "packages/galaxy-official/src/content-publisher.mjs"
+      ],
+      "configurationInputs": [
+        "packages/galaxy-official/src/operations-config.mjs",
+        "packages/galaxy-official/deploy/runtime-settings.example.json"
+      ],
+      "artifact": "node-service-family-source",
+      "dataOwner": "API, worker and publisher share the Hub business database and exact migration set.",
+      "interfaces": [
+        "Authorized HTTP APIs, public schemas and private AgentOS authority protocol"
       ]
     },
     {
@@ -116,7 +163,21 @@
           "integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs"
         ]
       ],
-      "buildLimit": "Unsigned local source candidate. Dependency installation, license inventory and physical host acceptance remain separate."
+      "buildLimit": "Unsigned local source candidate. Dependency installation, license inventory and physical host acceptance remain separate.",
+      "sourceEntries": [
+        "packages/galaxy-edge-mcp/src/native-v2-entry.mjs",
+        "packages/galaxy-edge-mcp/src/native-v2/runtime.mjs",
+        "packages/galaxy-edge-mcp/src/native-v2/server.mjs"
+      ],
+      "configurationInputs": [
+        "integrations/native-v2/prepare-service-config.mjs",
+        "integrations/native-v2/host-capabilities.json"
+      ],
+      "artifact": "unsigned-native-candidate",
+      "dataOwner": "Local ID controls local identity, history, work files and upload scope; account grants remain separate.",
+      "interfaces": [
+        "Native runtime/server exports, MCP, host adapters and signed browser handoff"
+      ]
     },
     {
       "id": "a2a",
@@ -136,6 +197,18 @@
           "scripts/check.mjs",
           "a2a"
         ]
+      ],
+      "sourceEntries": [
+        "packages/galaxy-a2a/src/protocol/bridge.mjs",
+        "packages/galaxy-a2a/src/hosts/host-flow-v2.mjs"
+      ],
+      "configurationInputs": [
+        "packages/galaxy-a2a/package.json"
+      ],
+      "artifact": "source-protocol-adapter",
+      "dataOwner": "Peer reports preserve their issuer and scope; local decision and account authorization remain separate.",
+      "interfaces": [
+        "Package exports: root, host, host-v2, facts-v2 and discovery"
       ]
     },
     {
@@ -171,6 +244,17 @@
           "--test",
           "packages/galaxy-official/test/task-owner-control-client-continuity.test.mjs"
         ]
+      ],
+      "sourceEntries": [
+        "packages/galaxy-web/src/main.tsx"
+      ],
+      "configurationInputs": [
+        "scripts/serve-product.mjs"
+      ],
+      "artifact": "static-web-assets",
+      "dataOwner": "Browser drafts and account context; local ID creation/control remains Native-owned.",
+      "interfaces": [
+        "Authorized account HTTP APIs, shared schemas and current Native handoff"
       ]
     },
     {
@@ -196,7 +280,19 @@
           "{output}"
         ]
       ],
-      "checks": []
+      "checks": [],
+      "sourceEntries": [
+        "apps/galaxy-site/build.py"
+      ],
+      "configurationInputs": [
+        "apps/galaxy-site/release-data.json",
+        "apps/galaxy-site/public-archive.json"
+      ],
+      "artifact": "static-site-with-web-assets",
+      "dataOwner": "Public documents and assets; original download bytes and CMS publication identity remain distinct.",
+      "interfaces": [
+        "Public routes, shared Web shell and fixed historical public asset catalog"
+      ]
     },
     {
       "id": "auth",
@@ -222,6 +318,18 @@
           "--test",
           "apps/galaxy-auth/shared/galaxy-auth.test.mjs"
         ]
+      ],
+      "sourceEntries": [
+        "apps/galaxy-auth/build.mjs"
+      ],
+      "configurationInputs": [
+        "apps/galaxy-auth/client-contract.json",
+        "apps/galaxy-auth/realm-profile.mjs"
+      ],
+      "artifact": "keycloak-theme-and-separate-provider",
+      "dataOwner": "Keycloak retains authentication state; normal and management identity domains remain distinct.",
+      "interfaces": [
+        "OIDC/Keycloak native forms; shared Web and Mail renderers"
       ]
     },
     {
@@ -241,7 +349,18 @@
           "build"
         ]
       ],
-      "checks": []
+      "checks": [],
+      "sourceEntries": [
+        "apps/galaxy-admin/src/payload.config.ts"
+      ],
+      "configurationInputs": [
+        "apps/galaxy-admin/.env.example"
+      ],
+      "artifact": "next-admin-and-cms",
+      "dataOwner": "CMS stores its own content; Hub-authorized HTTP owns business writes; management sessions are separate.",
+      "interfaces": [
+        "Independent management OIDC, CMS and authorized Node BFF"
+      ]
     },
     {
       "id": "agentos",
@@ -251,8 +370,7 @@
       ],
       "dependsOn": [],
       "interfaces": [
-        "Node authority HTTP/service-key + JWT",
-        "Native AgentOS private HTTP/SSE"
+        "Versioned private authority HTTP, service key/JWT and Native AgentOS HTTP/SSE"
       ],
       "build": [
         [
@@ -275,7 +393,16 @@
           "test_database_contract.py",
           "-v"
         ]
-      ]
+      ],
+      "sourceEntries": [
+        "services/galaxy-operations-agentos/src/galaxy_agentos/app.py"
+      ],
+      "configurationInputs": [
+        "services/galaxy-operations-agentos/runtime.env.example",
+        "services/galaxy-operations-agentos/src/galaxy_agentos/config.py"
+      ],
+      "artifact": "python-source-compilation-or-separate-docker-image",
+      "dataOwner": "Native run/session tables are separate from Node business facts and command receipts."
     },
     {
       "id": "model-gateway",
@@ -285,8 +412,7 @@
       ],
       "dependsOn": [],
       "interfaces": [
-        "OpenAI/Anthropic/Ollama compatible private HTTP",
-        "Node model-setting apply/readback"
+        "Private model settings apply/readback and supported provider-compatible HTTP"
       ],
       "build": [
         [
@@ -297,7 +423,16 @@
         ]
       ],
       "buildLimit": "Python source compilation; pinned upstream download and Docker build are separate.",
-      "checks": []
+      "checks": [],
+      "sourceEntries": [
+        "services/galaxy-model-gateway/src/galaxy_model_gateway/app.py"
+      ],
+      "configurationInputs": [
+        "services/galaxy-model-gateway/SOURCE.json",
+        "services/galaxy-model-gateway/config/models.empty.yaml"
+      ],
+      "artifact": "python-source-compilation-or-fixed-upstream-image",
+      "dataOwner": "Human-managed provider configuration and gateway usage; no authority to grant Hub actions."
     },
     {
       "id": "discovery",
@@ -313,6 +448,17 @@
           "--test",
           "services/galaxy-discovery/test/gorse-gateway-pagination.test.mjs"
         ]
+      ],
+      "sourceEntries": [
+        "services/galaxy-discovery/gorse-gateway.mjs"
+      ],
+      "configurationInputs": [
+        "services/galaxy-discovery/Dockerfile.gorse-gateway"
+      ],
+      "artifact": "separate-gorse-gateway-image",
+      "dataOwner": "Gateway adds no business database; source eligibility is owned by the Hub and the engine owns its derived index.",
+      "interfaces": [
+        "Closed authenticated Gorse proxy paths and bounded pagination"
       ]
     }
   ],
@@ -467,7 +613,8 @@
     "services/galaxy-model-gateway/SOURCE.json",
     "services/galaxy-model-gateway/config/models.empty.yaml",
     "docs/component-catalog.md",
-    "docs/licensing-and-source.md"
+    "docs/licensing-and-source.md",
+    "services/galaxy-model-gateway/SOURCE_PROVENANCE.json"
   ],
   "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog."
 }
