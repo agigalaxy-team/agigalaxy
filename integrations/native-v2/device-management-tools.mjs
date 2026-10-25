@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import * as z from 'zod/v4';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 
 export const nativeDeviceManagementReadSchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.enum(['current','list','pending'])}),

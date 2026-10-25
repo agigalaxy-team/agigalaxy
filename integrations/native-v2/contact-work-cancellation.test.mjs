@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createNativeChoice} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {createNativeChoice} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 import {createNativeContactWork,registerNativeContactWorkTools} from './contact-work-tools.mjs';
 import {createContactPurposeFixture,purposeData} from '../host-adapters/opencode-stable/contact-purpose-fixture.mjs';
 

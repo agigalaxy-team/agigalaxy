@@ -13,7 +13,7 @@ import {serviceFixture} from '../../packages/galaxy-official/test/service-fixtur
 import {createApi} from '../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../packages/galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import {createNativeChoice} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {createNativeChoice} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 import {registerNativeDeviceManagementTools} from './device-management-tools.mjs';
 
 const require=createRequire(new URL('../../packages/galaxy-official/package.json',import.meta.url));

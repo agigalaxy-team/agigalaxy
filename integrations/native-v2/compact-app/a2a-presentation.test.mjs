@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {a2aParticipantContent,describeNativeChoice} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {a2aParticipantContent,describeNativeChoice} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 import {workerPanelText} from './worker-result.mjs';
 test('A2A separates only the exact matching system source prefix and retains authored limits and protocol bytes',()=>{
  const associationId='a3d7f7e1-4765-4262-9b99-71a549b78f69',responseHash='b'.repeat(64),prefix=`External A2A participant report; no independent Verification, acceptance or Resolution. Association ${associationId}; response SHA256 ${responseHash}; artifacts remain selected summaries/hashes in the private local journal.`;

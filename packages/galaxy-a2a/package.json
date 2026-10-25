@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/bridge.mjs",
-    "./host": "./src/host-flow.mjs",
-    "./host-v2": "./src/host-flow-v2.mjs",
-    "./facts-v2": "./src/facts-v2.mjs",
-    "./discovery": "./src/card-discovery.mjs"
+    ".": "./src/protocol/bridge.mjs",
+    "./host": "./src/hosts/host-flow.mjs",
+    "./host-v2": "./src/hosts/host-flow-v2.mjs",
+    "./facts-v2": "./src/facts/facts-v2.mjs",
+    "./discovery": "./src/protocol/card-discovery.mjs"
   },
   "engines": { "node": ">=24.13.0" },
   "scripts": { "test": "node --test test/*.test.mjs" },

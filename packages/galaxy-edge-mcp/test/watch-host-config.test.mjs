@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createConfiguredWatchHost,nativeWatchHostConfigSchema} from '../src/native-v2/watch-host-config.mjs';
+import {createConfiguredWatchHost,nativeWatchHostConfigSchema} from '../src/native-v2/watch/host-config.mjs';
 import {createClaudeCodeDriver} from '../src/native-v2/host-adapters/claude-code.mjs';
 
 const config={kind:'claude-code',command:process.execPath,cwd:process.cwd()};

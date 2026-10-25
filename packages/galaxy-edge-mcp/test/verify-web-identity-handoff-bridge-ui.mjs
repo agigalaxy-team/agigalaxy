@@ -15,13 +15,13 @@ import {createIdentityDeviceHandoff} from '../../galaxy-core/src/domain/identity
 import {identityKeyId,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {createNativeRuntime} from '../src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {webIdentityProofType,webIdentityProtocol} from '../src/native-v2/web-identity-handoff.mjs';
+import {webIdentityProofType,webIdentityProtocol} from '../src/native-v2/identity/web-handoff.mjs';
 import {webIdentityDefaultScopes} from '../../../integrations/native-v2/identity-web-connect-tools.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const out=resolve(root,process.env.GALAXY_IDENTITY_BRIDGE_UI_REPORT_DIR??'../../../07-logs/development/goal-20261008-current-plan/sol-1/identity-bridge-ui');
-const sourcePaths=['packages/galaxy-edge-mcp/src/native-v2/web-identity-handoff.mjs','packages/galaxy-edge-mcp/src/native-v2/runtime.mjs',
- 'packages/galaxy-edge-mcp/src/native-v2/navigation.mjs','packages/galaxy-edge-mcp/src/native-v2/server.mjs',
+const sourcePaths=['packages/galaxy-edge-mcp/src/native-v2/identity/web-handoff.mjs','packages/galaxy-edge-mcp/src/native-v2/runtime.mjs',
+ 'packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs','packages/galaxy-edge-mcp/src/native-v2/server.mjs',
  'integrations/native-v2/identity-web-connect-tools.mjs','packages/galaxy-edge-mcp/test/verify-web-identity-handoff-bridge-ui.mjs'];
 const hashes=()=>Promise.all(sourcePaths.map(async path=>[path,createHash('sha256').update(await readFile(resolve(root,path))).digest('hex')])).then(Object.fromEntries);
 await mkdir(out,{recursive:true});const beforeHashes=await hashes(),directory=await mkdtemp(join(tmpdir(),'galaxy-native-web-popup-'));

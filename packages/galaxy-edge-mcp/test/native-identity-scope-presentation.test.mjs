@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
-import {nativeIdentityScopeGroups} from '../src/native-v2/identity-scope-presentation.mjs';
+import {nativeIdentityScopeGroups} from '../src/native-v2/identity/scope-presentation.mjs';
 
 test('Native device approval groups every selected permission without changing the exact scope set',()=>{
  const scopes=[...browserScopes],before=structuredClone(scopes),groups=nativeIdentityScopeGroups(scopes),items=groups.flatMap(group=>group.items);

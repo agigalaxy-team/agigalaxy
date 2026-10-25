@@ -1,4 +1,4 @@
-import {nativeStateLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {nativeStateLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 
 // These are current reads through the same configured controller. A selected
 // locator never adds read rights; the original consumer validates it again.

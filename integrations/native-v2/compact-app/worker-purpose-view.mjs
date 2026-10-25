@@ -1,6 +1,6 @@
 import {workerComponentResult} from './worker-result.mjs';
 import {nativeChoiceUrl} from './browser-choice.mjs';
-import {authoredRows,nativeAudienceLabel,nativeStateLabel,a2aParticipantContent} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {authoredRows,nativeAudienceLabel,nativeStateLabel,a2aParticipantContent} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 
 const workerTools={read:'galaxy_worker_host_read',prepare:'galaxy_worker_host_prepare',execute:'galaxy_worker_host_execute',abort:'galaxy_worker_host_abort_local'};
 const terminal=new Set(['completed','failed','canceled','rejected']);

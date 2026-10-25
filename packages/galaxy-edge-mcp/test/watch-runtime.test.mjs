@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createNativeWatchRuntime } from '../src/native-v2/watch-runtime.mjs';
+import { createNativeWatchRuntime } from '../src/native-v2/watch/runtime.mjs';
 
 test('stopping during a source read suppresses later host work and leaves no timer', async () => {
   let release; const timers = [], works = [];

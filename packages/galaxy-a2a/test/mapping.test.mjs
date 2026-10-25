@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import { Task } from '@a2a-js/sdk';
-import { snapshot } from '../src/mapping.mjs';
+import { snapshot } from '../src/facts/mapping.mjs';
 
 test('foreign IDs, terminal regression and unspecified state cannot overwrite a known Task', () => {
   const task = Task.fromJSON({ id: randomUUID(), contextId: randomUUID(), status: { state: 'TASK_STATE_COMPLETED' } });

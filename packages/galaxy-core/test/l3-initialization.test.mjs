@@ -24,7 +24,9 @@ test('L3 contract and read-only connect preserve legacy initialization without u
     assert.equal(contract.currentStage.capabilityProfile, 'l3-foundation');
     assert.equal(contract.currentStage.defaultSelected, true);
     assert.match(renderGalaxyNumberedList(contract), /L3/);
-    assert.equal(contract.stages[2].id, 'connection-visibility');
+    assert.equal(contract.stages[2].id, 'upload-privacy');
+    assert.equal(contract.stages[2].uploadPrivacy.level, 'history-overview');
+    assert.equal(contract.stages[2].fullConversationSelectionRequired, true);
   }
   await initializeGalaxyIntegration(dir, { profile: 'coding-case', source: 'test' });
   const before = await readFile(join(dir, 'galaxy-local-state.json'), 'utf8');
@@ -82,9 +84,9 @@ test('native purpose entry opens without identity creation and prepares the devi
     ui:{dialog:{setSize(){},clear(){page=null;},replace(fn){page=fn();}},DialogSelect:props=>({type:'select',...props}),DialogAlert:props=>({type:'alert',...props}),DialogPrompt:props=>({type:'prompt',...props})}});
   async function transition(fn){const old=page;fn();for(let i=0;i<100&&page===old;i++)await delay(10);assert.notEqual(page,old);}
   const choose=n=>transition(()=>n==='0'?commands.get('galaxy.zero').run():page.options.find(o=>o.value===n).onSelect());
-  await transition(open); assert.match(page.title,/银河/);assert.deepEqual(page.options.map(o=>o.title),['[1] 找帮助','[2] 发起求助','[3] 消息','[4] 我的与设置','[5] 回到原工作']);
+  await transition(open); assert.match(page.title,/银河/);assert.deepEqual(page.options.map(o=>o.title),['[1] 找帮助','[2] 发起求助','[3] 消息','[8] 本地工作履历','[4] 我的与设置','[5] 回到原工作']);
   assert.deepEqual(await readdir(dir),[]);
-  await choose('4');await choose('5');assert.match(page.title,/在本机准备身份/);assert.deepEqual(await readdir(dir),[]);
+  await choose('4');await choose('5');assert.match(page.title,/开始使用银河/);assert.deepEqual(await readdir(dir),[]);
   await choose('0');assert.deepEqual(await readdir(dir),[]);
   await choose('4');await choose('5');await choose('1');const status=await getGalaxyConnectionStatus(dir);
   assert.equal(status.appliedCapabilityProfile,'l3-foundation');assert.equal(status.enabledModuleIds.length,5);assert.equal(status.state,'not-connected');

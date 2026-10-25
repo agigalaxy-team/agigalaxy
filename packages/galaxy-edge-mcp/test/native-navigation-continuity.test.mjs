@@ -12,7 +12,7 @@ import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {createNativeNavigation} from '../src/native-v2/navigation.mjs';
+import {createNativeNavigation} from '../src/native-v2/interaction/navigation.mjs';
 
 test('direct MCP return preserves original work through real source503/Task403 and refuses a held old connection',{timeout:60000},async()=>{
  const f=await serviceFixture(browserScopes),directory=await mkdtemp(join(tmpdir(),'galaxy-direct-return-')),calls=[];

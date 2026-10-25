@@ -7,22 +7,22 @@ import {createIdentityDeviceHandoff} from '../../../galaxy-core/src/domain/ident
 import {createIdentityDeviceManagement} from '../../../galaxy-core/src/domain/identity-device-management.mjs';
 import {signIdentityPayload,identityKeyId} from '../../../galaxy-core/src/domain/identity-material.mjs';
 import {getLocalSnapshot,initializeGalaxyIntegration,getGalaxyCommandSurface,getLocalUploadPrivacy,assertNativeUploadAllowed} from '../../../galaxy-core/src/local-store.mjs';
-import {resolveGalaxyInitialization} from '../../../galaxy-core/src/integration-modules.mjs';
+import {resolveGalaxyInitialization} from '../../../galaxy-core/src/initialization/selection.mjs';
 import {localPaths,readJson} from '../../../galaxy-core/src/storage/files.mjs';
 import {createHelpRuntimeV2} from '../../../galaxy-official/src/help-runtime-v2.mjs';
 import {verifyGalaxyGenesis} from '../../../galaxy-core/src/galaxy-guid.mjs';
 import {createNativeStore} from './store.mjs';
-import {createNativeNavigation} from './navigation.mjs';
+import {createNativeNavigation} from './interaction/navigation.mjs';
 import {createConfiguredHelpEndpointValidator} from './configured-help-endpoint.mjs';
-import {isWebIdentityTargetPath,webIdentityProtocol,webIdentityProofType,webIdentityTtlSeconds} from './web-identity-handoff.mjs';
+import {isWebIdentityTargetPath,webIdentityProtocol,webIdentityProofType,webIdentityTtlSeconds} from './identity/web-handoff.mjs';
 import {createTrustPackageClient} from '../../../galaxy-official/src/trust-package-client.mjs';
 import {createTrustPackageDeviceAdapter} from '../../../galaxy-official/src/trust-package-device-adapter.mjs';
 import {createReceiptStatusClient,createReceiptStatusDeviceSigner} from '../../../galaxy-official/src/receipt-status-client.mjs';
 import {createIdentityGroupClientV2} from '../../../galaxy-official/src/identity-group-client-v2.mjs';
 import {createIdentityGroupDeviceSignerV2} from '../../../galaxy-official/src/identity-group-device-signer-v2.mjs';
-import {createNativeIdentityAccountClient} from './identity-account-client.mjs';
-import {createNativeArchiveSync} from './archive-sync.mjs';
-import {createNativeWorkSync} from './work-sync.mjs';
+import {createNativeIdentityAccountClient} from './identity/account-client.mjs';
+import {createNativeArchiveSync} from './work/archive-sync.mjs';
+import {createNativeWorkSync} from './work/sync.mjs';
 import {nativeDiagnostics} from './diagnostics.mjs';
 
 // Same pinned current-control browser protocol, with a native local signer.

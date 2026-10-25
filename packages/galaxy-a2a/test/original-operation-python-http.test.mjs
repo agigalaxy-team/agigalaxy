@@ -6,13 +6,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
-import { createNativeA2aHostV2 } from '../src/host-flow-v2.mjs';
-import { hash } from '../src/journal.mjs';
+import { createNativeA2aHostV2 } from '../src/hosts/host-flow-v2.mjs';
+import { hash } from '../src/storage/journal.mjs';
 import { pythonPeer } from './python-peer.mjs';
 
 test('actual v2 Official HTTP and independent Python SDK recover only proven original unknown Task after restart',
   { skip: !process.env.GALAXY_A2A_PYTHON, timeout: 120000 }, async t => {
-  const sources = ['packages/galaxy-a2a/src/bridge.mjs', 'packages/galaxy-a2a/src/host-flow-v2.mjs', 'integrations/native-v2/a2a-tools.mjs'];
+  const sources = ['packages/galaxy-a2a/src/protocol/bridge.mjs', 'packages/galaxy-a2a/src/hosts/host-flow-v2.mjs', 'integrations/native-v2/a2a-tools.mjs'];
   const sourceHashes = Object.fromEntries(await Promise.all(sources.map(async path => [path, hash(await readFile(path))])));
   const peer = await pythonPeer(process.env.GALAXY_A2A_PYTHON); t.after(() => peer.close());
   const f = await serviceFixture(); t.after(() => f.db.close());

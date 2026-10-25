@@ -1,6 +1,6 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomUUID} from 'node:crypto';
-import {consoleRuntimeLogger,createRuntimeLogger,runtimeLogConfiguration} from '../../../galaxy-official/src/operations/runtime-log.mjs';
+import {consoleRuntimeLogger,createRuntimeLogger,runtimeLogConfiguration} from '../../../galaxy-official/src/shared/runtime-logger.mjs';
 
 const context=new AsyncLocalStorage(),registeredTools=new Set(),defaults=new Map();
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;

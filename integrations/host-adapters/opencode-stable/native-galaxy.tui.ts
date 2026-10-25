@@ -29,7 +29,7 @@ export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDire
       dataDirectory=config.dataDirectory;
       identityEndpoint=config.endpoint;
       onWorkSessionComplete=async({host,sessionId})=>{
-        const {syncSelectedArchivesForSession}=await import('../../../packages/galaxy-edge-mcp/src/native-v2/archive-sync-bridge.mjs');
+        const {syncSelectedArchivesForSession}=await import('../../../packages/galaxy-edge-mcp/src/native-v2/work/archive-sync-bridge.mjs');
         return syncSelectedArchivesForSession({dataDirectory:config.dataDirectory,nativeConfiguration:{endpoint:config.endpoint,website:config.website,trustedKeys:config.trustedKeys},host,sessionId});
       };
     }catch(error){diagnostics.emit({event:'host_bridge',stage:'configuration',outcome:'failed',host:'opencode',error});connectionUnavailable=true;}

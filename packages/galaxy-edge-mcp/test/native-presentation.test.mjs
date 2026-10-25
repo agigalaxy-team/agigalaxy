@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createNativeReview} from '../src/native-v2/review.mjs';
-import {nativeResult} from '../src/native-v2/choice.mjs';
-import {presentNativeResult,nativeChoiceText,authoredRows,nativeConnectionMessage} from '../src/native-v2/presentation.mjs';
+import {createNativeReview} from '../src/native-v2/interaction/review.mjs';
+import {nativeResult} from '../src/native-v2/interaction/choice.mjs';
+import {presentNativeResult,nativeChoiceText,authoredRows,nativeConnectionMessage} from '../src/native-v2/interaction/presentation.mjs';
 
 test('connection restoration failures describe the actual recoverable state without exposing transport codes',()=>{
  const unavailable={identity:'existing-identity',connected:false,connectionError:'native_connection_unavailable'};

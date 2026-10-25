@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { registerNativeA2aTools } from '../../../integrations/native-v2/a2a-tools.mjs';
-import { createNativeChoice } from '../../galaxy-edge-mcp/src/native-v2/choice.mjs';
+import { createNativeChoice } from '../../galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 
 for (const scope of [
   { visibility: 'Public', viewers: [], label: '所有人' },

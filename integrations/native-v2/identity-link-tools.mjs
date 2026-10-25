@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import * as z from 'zod/v4';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 
 const id=z.uuid(),providerId=z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
 export const nativeIdentityAccountReadSchema=z.discriminatedUnion('action',[

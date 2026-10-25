@@ -1,3 +1,32 @@
+/** Only explicitly read-only callers opt in. Commands and the lane controller never retry implicitly. */
+export function isTransientReadFailure(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (typeof error.status === 'number') return [500,502,503,504].includes(error.status);
+  return error.name === 'TimeoutError' || error.code === 'request_timeout'
+    || error.name === 'TypeError' && ['Failed to fetch','fetch failed','Load failed','NetworkError when attempting to fetch resource.'].includes(error.message);
+}
+
+/** One short recovery under the original signal, current scope and caller-owned data deadline. */
+export async function readWithTransientRecovery(read, {signal,check=()=>{}} = {}) {
+  signal?.throwIfAborted(); check();
+  try { const value = await read(); signal?.throwIfAborted(); check(); return value; }
+  catch (error) {
+    signal?.throwIfAborted(); check();
+    const seconds = error?.retryAfterSeconds;
+    if (!isTransientReadFailure(error) || globalThis.navigator?.onLine === false
+      || seconds !== undefined && (!Number.isFinite(seconds) || seconds < 0 || seconds > 2)) throw error;
+    await new Promise((resolve,reject) => {
+      const cancel = () => { clearTimeout(timer); signal?.removeEventListener('abort',cancel); reject(signal.reason); };
+      const timer = setTimeout(() => { signal?.removeEventListener('abort',cancel); resolve(); }, Math.max(300,(seconds??0)*1000));
+      signal?.addEventListener('abort',cancel,{once:true});
+      if (signal?.aborted) cancel();
+    });
+    signal?.throwIfAborted(); check();
+    if (globalThis.navigator?.onLine === false) throw error;
+    const value = await read(); signal?.throwIfAborted(); check(); return value;
+  }
+}
+
 /** A scope owns independent read lanes. Replacing a lane invalidates all old callbacks. */
 export function createReadTaskController(scopeKey) {
   const lanes = new Map();

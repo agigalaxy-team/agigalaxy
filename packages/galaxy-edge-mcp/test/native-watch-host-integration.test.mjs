@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {createNativeWatch} from '../src/native-v2/watch.mjs';
-import {nativeWatchHostConfigSchema} from '../src/native-v2/watch-host-config.mjs';
+import {createNativeWatch} from '../src/native-v2/watch/index.mjs';
+import {nativeWatchHostConfigSchema} from '../src/native-v2/watch/host-config.mjs';
 import {createClaudeCodeDriver} from '../src/native-v2/host-adapters/claude-code.mjs';
 
 function wire(){

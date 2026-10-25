@@ -5,8 +5,8 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { spawn } from 'node:child_process';
 import { createClaudeCodeDriver } from '../src/native-v2/host-adapters/claude-code.mjs';
-import { createNativeWatch } from '../src/native-v2/watch.mjs';
-import { createNativeWatchRuntime } from '../src/native-v2/watch-runtime.mjs';
+import { createNativeWatch } from '../src/native-v2/watch/index.mjs';
+import { createNativeWatchRuntime } from '../src/native-v2/watch/runtime.mjs';
 
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const help=' --bare --restricted --safe-mode --tools --disallowedTools --strict-mcp-config --mcp-config --setting-sources --settings --disable-slash-commands --no-chrome --permission-mode --permission-prompts --no-session-persistence --session-id --replay-user-messages ';

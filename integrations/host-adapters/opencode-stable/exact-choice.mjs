@@ -1,4 +1,4 @@
-import {authoredRows,nativeAudienceLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {authoredRows,nativeAudienceLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 
 const plain=value=>String(value??'').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ');
 const parsed=value=>{try{return typeof value==='string'?JSON.parse(value):value;}catch{return null;}};

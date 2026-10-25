@@ -1,4 +1,4 @@
-import {authoredRows} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {authoredRows} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 
 export const searchSourceName=(type,label)=>({case:label('工作','Work'),history:label('事实履历','Work history'),proof:label('CI 来源','CI source'),capsule:label('方法','Method'),worker:label('处理服务','Worker service'),hub:label('开放空间','Open hub')}[type]??type);
 export const workOutcomeName=(value,label)=>({succeeded:label('完成','Completed'),partial:label('部分完成','Partial'),failed:label('未完成','Failed'),inconclusive:label('暂不能得出结论','Inconclusive'),conflicting:label('观察有冲突','Conflicting')}[value]??value);

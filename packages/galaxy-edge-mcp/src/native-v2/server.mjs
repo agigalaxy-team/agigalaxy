@@ -1,13 +1,13 @@
 import {McpServer} from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import {nativeHttpDefinitions} from './http-tools.mjs';
-import {createNativeChoice,nativeResult} from './choice.mjs';
-import {navigationSchema} from './navigation.mjs';
-import {nativeWatchStartSchema,nativeWatchResumeSchema,createNativeWatch} from './watch.mjs';
-import {createNativeWatchRuntime} from './watch-runtime.mjs';
-import {createConfiguredWatchHost} from './watch-host-config.mjs';
-import {registerNativeWatchControlTools} from './watch-control-tools.mjs';
-import {registerNativeNotificationTools} from './native-notification-tools.mjs';
+import {nativeHttpDefinitions} from './tools/http.mjs';
+import {createNativeChoice,nativeResult} from './interaction/choice.mjs';
+import {navigationSchema} from './interaction/navigation.mjs';
+import {nativeWatchStartSchema,nativeWatchResumeSchema,createNativeWatch} from './watch/index.mjs';
+import {createNativeWatchRuntime} from './watch/runtime.mjs';
+import {createConfiguredWatchHost} from './watch/host-config.mjs';
+import {registerNativeWatchControlTools} from './watch/control-tools.mjs';
+import {registerNativeNotificationTools} from './tools/notifications.mjs';
 import {consentSchema} from '../../../galaxy-official/src/shared/consents-schema.mjs';
 import {receiptStatusOperationSchema} from '../../../galaxy-official/src/shared/receipt-status-schema.mjs';
 import {createPersonalSummaryLocal} from '../../../galaxy-official/src/personal-summary-local.mjs';
@@ -28,11 +28,11 @@ import {registerNativeWorkSelectionTools} from '../../../../integrations/native-
 import {registerNativeContactWorkTools} from '../../../../integrations/native-v2/contact-work-tools.mjs';
 import {registerNativeA2aWorkTools} from '../../../../integrations/native-v2/a2a-work-tools.mjs';
 import {workerPanelResult} from '../../../../integrations/native-v2/compact-app/worker-result.mjs';
-import {presentNativeResult} from './presentation.mjs';
-import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './reading-bookmarks.mjs';
+import {presentNativeResult} from './interaction/presentation.mjs';
+import {createNativeBookmarkSetter,nativeBookmarkSetSchema} from './interaction/bookmarks.mjs';
 import {readProfileDisplayNames} from '../../../galaxy-official/src/profile-display-names.mjs';
-import {registerWorkContinuationTools} from './work-continuation.mjs';
-import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './local-work-tools.mjs';
+import {registerWorkContinuationTools} from './work/continuation.mjs';
+import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './work/local-tools.mjs';
 import {nativeDiagnostics,registerDiagnosticTool} from './diagnostics.mjs';
 
 export function createNativeToolServer(runtime,{a2aHost,workerHost,compactArtifact,watchHost,watchHostDriverFactory,notificationOptions}={}){

@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {randomUUID,generateKeyPairSync} from 'node:crypto';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
 import {startNativeStdio} from '../src/native-v2/stdio.mjs';
-import {createNativeWatch} from '../src/native-v2/watch.mjs';
+import {createNativeWatch} from '../src/native-v2/watch/index.mjs';
 
 const turn=()=>new Promise(resolve=>setImmediate(resolve));
 const publicConfiguration=directory=>{const now=Math.floor(Date.now()/1000),key=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'pem'});return{version:2,endpoint:'https://not-connected.example',website:'https://example.org',dataDirectory:join(directory,'data'),trustedKeys:{isolated:{publicKeyPem:key,notBefore:now-10,notAfter:now+1000,revoked:false}}};};

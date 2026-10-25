@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod/v4';
-import { nativeResult } from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import { nativeResult } from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 import { consentSchema } from '../../packages/galaxy-official/src/shared/consents-schema.mjs';
 
 const peerId = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/), id = z.uuid();

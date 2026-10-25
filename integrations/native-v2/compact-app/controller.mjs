@@ -1,6 +1,6 @@
 import {randomUUID,createHash} from 'node:crypto';
 import * as z from 'zod/v4';
-import {navigationSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/navigation.mjs';
+import {navigationSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';
 import {helpPaths,helpActionPrepareSchema,helpActionExecuteSchema} from '../../../packages/galaxy-official/src/shared/help-schema-v2.mjs';
 import {hostViewOwnerScope} from './host-view-state.mjs';
 import {chatSendSchema} from '../../../packages/galaxy-official/src/shared/chat-schema.mjs';

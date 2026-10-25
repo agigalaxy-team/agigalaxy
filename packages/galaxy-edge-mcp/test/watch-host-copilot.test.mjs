@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createNativeStore } from '../src/native-v2/store.mjs';
 import { createCopilotSdkDriver } from '../src/native-v2/host-adapters/copilot-sdk.mjs';
-import { createNativeWatch } from '../src/native-v2/watch.mjs';
-import { createNativeWatchRuntime } from '../src/native-v2/watch-runtime.mjs';
+import { createNativeWatch } from '../src/native-v2/watch/index.mjs';
+import { createNativeWatchRuntime } from '../src/native-v2/watch/runtime.mjs';
 import { createCopilotProtocolFixture } from './watch-host-copilot-process-fixture.mjs';
 
 const tick = () => new Promise(done => setImmediate(done));

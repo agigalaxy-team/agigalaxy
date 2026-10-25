@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeA2aSchema,createConfiguredNativeA2a} from '../src/native-v2/a2a.mjs';
+import {nativeA2aSchema,createConfiguredNativeA2a} from '../src/native-v2/adapters/a2a.mjs';
 
 test('peer configuration keeps credential selection explicit and startup reads no environment or identity',()=>{
  const peer={id:'reviewed',endpoint:'https://peer.example/a2a',peerPrincipal:'selected-agent',agentCard:{},cardHash:'a'.repeat(64),trustExpiresAt:Date.now()+60000};

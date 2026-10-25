@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {digest} from '../../galaxy-official/src/shared/digest.mjs';
-import {nativeHttpDefinitions} from '../src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../src/native-v2/tools/http.mjs';
 
 test('native fact receipt adapters invoke the real authenticated HTTP routes after source withdrawal',async()=>{
  const f=await serviceFixture(['binding','consent','case-teaser','assistance','context']);const api=createApi(f);await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));

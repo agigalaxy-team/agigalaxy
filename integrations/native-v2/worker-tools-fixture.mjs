@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/server';
-import { createNativeChoice, nativeResult } from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import { createNativeChoice, nativeResult } from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 import { referenceWorkerProcessFixture } from '../../packages/galaxy-official/test/worker-pack-process-v2-workflow.mjs';
 import { registerNativeWorkerTools } from './worker-tools.mjs';
 import { workerComponentResult } from './compact-app/worker-result.mjs';

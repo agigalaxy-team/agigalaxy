@@ -10,7 +10,7 @@ import {communityForumFixture} from '../../galaxy-official/test/community-forum-
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {createNativeBookmarkSetter} from '../src/native-v2/reading-bookmarks.mjs';
+import {createNativeBookmarkSetter} from '../src/native-v2/interaction/bookmarks.mjs';
 import {nativeData} from './native-result.mjs';
 
 test('Native saves a private reference with one user choice, recovers lost delivery, and respects a later removal and source withdrawal',{timeout:60000},async()=>{

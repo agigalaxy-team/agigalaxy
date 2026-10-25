@@ -8,7 +8,7 @@ import {serviceFixture} from '../../../packages/galaxy-official/test/service-fix
 import {createApi} from '../../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../../packages/galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import {createNativeNavigation} from '../../../packages/galaxy-edge-mcp/src/native-v2/navigation.mjs';
+import {createNativeNavigation} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';
 import {createCompactController} from './controller.mjs';
 import {panelResult} from './result.mjs';
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod/v4';
 import { resolveDataDir, getGalaxyIntegrationStatus } from './local-store.mjs';
-import { DEFAULT_MODULE_IDS } from './integration-modules.mjs';
+import { DEFAULT_MODULE_IDS } from './initialization/catalog.mjs';
 
 export const CONNECTION_PROFILE_FILE = 'galaxy-connection-profile.json';
 const text = z.string().trim().min(1).max(240);

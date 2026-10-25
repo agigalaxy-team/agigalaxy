@@ -1,4 +1,5 @@
-import {getGalaxyInitializationContract,getGalaxyInitializationPresentation,listGalaxyInitializationPaths} from '../integration-modules.mjs';
+import {getGalaxyInitializationContract,getGalaxyInitializationPresentation} from '../initialization/contract.mjs';
+import {listGalaxyInitializationPaths} from '../initialization/catalog.mjs';
 import {getGalaxyIntegrationStatus,getLocalUploadPrivacy} from '../application/local-operations.mjs';
 import {createLocalWorkHistory} from '../work-history/index.mjs';
 

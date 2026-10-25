@@ -1,10 +1,10 @@
 import * as z from 'zod/v4';
 import {registerAppTool} from '@modelcontextprotocol/ext-apps/server';
-import {nativeUploadPrivacyInputSchema,nativeLocalSettingsInputSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/local-work-tools.mjs';
+import {nativeUploadPrivacyInputSchema,nativeLocalSettingsInputSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/work/local-tools.mjs';
 import {archiveSettingsInputSchema,archiveDeleteInputSchema} from '../../../packages/galaxy-core/src/conversation-archive/index.mjs';
 import {workDeleteInputSchema} from '../../../packages/galaxy-core/src/work-history/index.mjs';
-import {archiveSyncChoiceSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/archive-sync.mjs';
-import {workSyncChoiceSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/work-sync.mjs';
+import {archiveSyncChoiceSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/work/archive-sync.mjs';
+import {workSyncChoiceSchema} from '../../../packages/galaxy-edge-mcp/src/native-v2/work/sync.mjs';
 
 const inputSchema=z.strictObject({view:z.enum(['history','privacy','archive']).default('history'),galaxyId:z.string().optional(),workId:z.string().optional(),
    archiveSessionId:z.uuid().optional(),afterSequence:z.number().int().nonnegative().optional(),after:z.string().max(200).optional()});

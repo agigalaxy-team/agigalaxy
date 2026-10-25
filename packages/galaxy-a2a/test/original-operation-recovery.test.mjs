@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createA2aBridge } from '../src/bridge.mjs';
+import { createA2aBridge } from '../src/protocol/bridge.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 import { registerNativeA2aTools } from '../../../integrations/native-v2/a2a-tools.mjs';
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {nativeHttpDefinitions} from '../src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../src/native-v2/tools/http.mjs';
 
 test('Native retains published task material schemas and maps exact prepare/status without leaking body in status',async()=>{
  const calls=[],definitions=nativeHttpDefinitions({call:async(path,input,options)=>{calls.push({path,input,options});return {available:false,materials:[]};}});

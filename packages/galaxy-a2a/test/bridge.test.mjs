@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createA2aBridge } from '../src/bridge.mjs';
+import { createA2aBridge } from '../src/protocol/bridge.mjs';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 

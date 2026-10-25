@@ -11,8 +11,8 @@ import {seedReadingBookmarkSources} from '../../galaxy-official/test/reading-boo
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {createWorkContinuationLink,readWorkContinuationLink,workContinuationLinkFromText,workContinuationPrompt} from '../src/native-v2/work-continuation-link.mjs';
-import {createWorkContinuationReader} from '../src/native-v2/work-continuation.mjs';
+import {createWorkContinuationLink,readWorkContinuationLink,workContinuationLinkFromText,workContinuationPrompt} from '../src/native-v2/work/continuation-link.mjs';
+import {createWorkContinuationReader} from '../src/native-v2/work/continuation.mjs';
 import {nativeData} from './native-result.mjs';
 
 const endpoint='https://official.example.org',website='https://selected.example',subjectId='GUID'+'A'.repeat(28);

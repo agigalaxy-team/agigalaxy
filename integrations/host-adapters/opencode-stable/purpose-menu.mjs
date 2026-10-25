@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {authoredRows,nativeConnectionMessage} from '../../../packages/galaxy-edge-mcp/src/native-v2/presentation.mjs';
+import {authoredRows,nativeConnectionMessage} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 import {chatSendRequestHash} from '../../../packages/galaxy-official/src/shared/chat-message-request-hash.mjs';
 import {createNativeCapsuleMenu} from './capsule-native-menu.mjs';
 import {createNativeA2aMenu} from './a2a-native-menu.mjs';
@@ -7,8 +7,8 @@ import {createNativeTaskMenu} from './task-native-menu.mjs';
 import {createProjectDiscoveryMenu} from './project-discovery-menu.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 import {nativeConfigurationMessage} from '../../../packages/galaxy-edge-mcp/src/native-v2/configuration.mjs';
-import {workContinuationLinkFromText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work-continuation-link.mjs';
-import {continuationResultText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work-continuation.mjs';
+import {workContinuationLinkFromText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work/continuation-link.mjs';
+import {continuationResultText} from '../../../packages/galaxy-edge-mcp/src/native-v2/work/continuation.mjs';
 
  const unwrap=result=>{if(result?.isError)throw new Error(result.structuredContent?.error??'current_content_unavailable');if(result?.structuredContent)return result.structuredContent;try{return JSON.parse(result.content[0].text);}catch{return result;}};
 const plain=value=>String(value??'').replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu,' ').slice(0,16000);

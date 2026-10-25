@@ -5,8 +5,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
-import { createNativeA2aHostV2 } from '../src/host-flow-v2.mjs';
-import { hash } from '../src/journal.mjs';
+import { createNativeA2aHostV2 } from '../src/hosts/host-flow-v2.mjs';
+import { hash } from '../src/storage/journal.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 
 test('actual Participation/Intervention uses exact Result receipts; revoked source stops future work without erasing acceptance', async t => {

@@ -2,6 +2,8 @@
 
 银河邮件的唯一共享展示源 [`src/layout.mjs`](src/layout.mjs)，采用用户选定的“清晰标准整体＋居中官方落款”和 AGI Galaxy 品牌。对应 Keycloak email theme 仍为 `galaxy-mail-editorial`。注册、重置密码、系统通知和服务邮件复用同一品牌头尾与排版，各自提供正文；模块同时供 HTML / 纯文本预览、普通通知渲染和 Keycloak 邮件主题生成使用，不发送邮件，也不保存内容。
 
+`src/layout.mjs` 是稳定的公共导出，实际实现按用途分开：[`rendering/common.mjs`](src/rendering/common.mjs) 定义转义、字体、标签和正文构件；[`rendering/frame.mjs`](src/rendering/frame.mjs) 生成唯一 HTML／纯文本信笺框架；[`rendering/messages.mjs`](src/rendering/messages.mjs) 接收普通通知与验证码内容；[`keycloak/templates.mjs`](src/keycloak/templates.mjs) 将同一框架生成为 Keycloak FTL。模板生成器不维护第二份头尾，业务渲染器也不依赖认证主题。构建或发布邮件包时须包括这些被公共导出引用的实现文件。
+
 布局使用白底细框、原轨道Logo与品牌横排、淡粉分隔线和左对齐无衬线标题；标题桌面24px、手机22px，正文15px，辅助说明12px，官方落款11.5px。验证码在浅粉横带中保持单个连续文本节点，有效期排在其下方；邮件不包含脚本或复制按钮。普通通知复用头尾，不附带验证码专属提醒。图片未加载时，可见文字品牌、正文和官方链接仍保留。
 
 正文之后是左对齐的回复／联系说明，随后以细线分隔官方落款；底部第一行居中“关于银河 · 隐私 · 使用说明”，第二行居中“© 当年 AGI Galaxy”。年份由渲染时取得，Keycloak宏使用实际渲染年份。三项分别指向现有的`/how-it-works/`、`/privacy/`、`/docs/`，不把未设立的条款页或空链接放进正式邮件。自动邮件说明“系统邮件，请勿直接回复。”并给出 `team@agigalaxy.org`；人工团队邮件使用 `automated: false`，改为“如需继续沟通，可直接回复本邮件。”。HTML、纯文本及生成的 Keycloak 宏使用同一信息顺序，不把联系说明追加到官方落款之后。

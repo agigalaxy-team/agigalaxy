@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {mkdir,lstat,realpath,writeFile,readFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import * as z from 'zod/v4';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 import {withLocalWrite} from '../../packages/galaxy-core/src/storage/write-lock.mjs';
 import {trustAudienceSchema,trustClaimSchema,trustSourceRefSchema,trustContainerSchema} from '../../packages/galaxy-official/src/shared/trust-package-schema.mjs';
 import {trustPermissionPreviewSchema,trustPermissionRevokeSchema,trustPermissionQuerySchema} from '../../packages/galaxy-official/src/trust-package-permissions.mjs';

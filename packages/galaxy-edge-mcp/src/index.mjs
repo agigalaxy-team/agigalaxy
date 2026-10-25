@@ -21,8 +21,8 @@ import {
 import { isGalaxyGuid, parseGalaxyGuid } from '../../galaxy-core/src/galaxy-guid.mjs';
 import { registerConnectionTools } from './connection-tools.mjs';
 import {resolveDataDir,localPaths,readJson} from '../../galaxy-core/src/storage/files.mjs';
-import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './native-v2/local-work-tools.mjs';
-import {createNativeChoice,nativeResult} from './native-v2/choice.mjs';
+import {registerNativeLocalWorkTools,nativeUploadPrivacyInputSchema} from './native-v2/work/local-tools.mjs';
+import {createNativeChoice,nativeResult} from './native-v2/interaction/choice.mjs';
 import {createNativeStore} from './native-v2/store.mjs';
 import {nativeDiagnostics} from './native-v2/diagnostics.mjs';
 import {installRuntimeFailureHandlers} from '../../galaxy-official/src/operations/runtime-log.mjs';

@@ -16,7 +16,7 @@ import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-
 import {registerNativeCompactApps} from './server.mjs';
 import {registerNativeWorkerTools} from '../worker-tools.mjs';
 import {workerPanelResult} from './worker-result.mjs';
-import {createNativeWorkerPackAdapter} from '../../../packages/galaxy-edge-mcp/src/native-v2/worker-pack-adapter.mjs';
+import {createNativeWorkerPackAdapter} from '../../../packages/galaxy-edge-mcp/src/native-v2/adapters/worker-pack.mjs';
 import {createWorkerPackHostFlowV2} from '../../../packages/galaxy-a2a/src/worker-pack-flow-v2.mjs';
 
 const compact=fileURLToPath(new URL('.',import.meta.url)),root=resolve(compact,'../../..'),out=resolve(root,'../../../07-logs/development/ui-resume-20261002/host-view-state');await mkdir(out,{recursive:true});

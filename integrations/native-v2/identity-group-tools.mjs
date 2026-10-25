@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import * as z from 'zod/v4';
 import {identityGroupIntentSchema} from '../../packages/galaxy-official/src/shared/identity-group-v2-schema.mjs';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 export const nativeIdentityGroupPrepareSchema=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('intent'),input:identityGroupIntentSchema}),
  z.strictObject({action:z.literal('response'),operationId:z.uuid(),decision:z.enum(['approve','decline','cancel']).default('approve')}),

@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 
 const latest=rows=>[...new Map((rows??[]).filter(row=>!row.supersededInVisibleHistory).sort((a,b)=>a.version-b.version).map(row=>[row.id,row])).values()];
 const attempts=(view,subjectId)=>latest(view.attempts).filter(a=>a.provenance==='native-v2'&&a.actorId===subjectId&&(view.scopeVersion===undefined||a.scopeVersion===view.scopeVersion));

@@ -9,8 +9,8 @@ import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.m
 import { createConnectionProfile, saveConnectionProfile, revokeConnectionScope } from '../../galaxy-core/src/connection-profile.mjs';
 import { createLocalHostRuntime } from '../../galaxy-official/src/local-host-runtime.mjs';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
-import { a2aHostFactory } from '../src/host-flow.mjs';
-import { hash } from '../src/journal.mjs';
+import { a2aHostFactory } from '../src/hosts/host-flow.mjs';
+import { hash } from '../src/storage/journal.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 const { CompactSign } = createRequire(new URL('../../galaxy-official/package.json', import.meta.url))('jose');
 

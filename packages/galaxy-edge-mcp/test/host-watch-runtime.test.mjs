@@ -4,8 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createNativeWatch } from '../src/native-v2/watch.mjs';
-import { createNativeWatchRuntime } from '../src/native-v2/watch-runtime.mjs';
+import { createNativeWatch } from '../src/native-v2/watch/index.mjs';
+import { createNativeWatchRuntime } from '../src/native-v2/watch/runtime.mjs';
 import { createCodexAppServerDriver } from '../src/native-v2/host-adapters/codex-app-server.mjs';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));

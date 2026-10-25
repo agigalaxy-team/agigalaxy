@@ -1,9 +1,9 @@
 import {readFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import * as z from 'zod/v4';
-import {nativeA2aSchema} from './a2a.mjs';
-import {nativeWatchHostConfigSchema} from './watch-host-config.mjs';
-import {nativeWorkerPacksSchema} from './worker-pack-host.mjs';
+import {nativeA2aSchema} from './adapters/a2a.mjs';
+import {nativeWatchHostConfigSchema} from './watch/host-config.mjs';
+import {nativeWorkerPacksSchema} from './adapters/worker-pack-host.mjs';
 import {nativeNotificationConfigSchema} from './notifications/config.mjs';
 
 const pin=z.strictObject({publicKeyPem:z.string().min(1).max(4096),notBefore:z.number().int(),notAfter:z.number().int(),revoked:z.boolean()});

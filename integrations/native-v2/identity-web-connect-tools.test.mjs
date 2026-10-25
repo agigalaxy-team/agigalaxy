@@ -16,7 +16,7 @@ import {createIdentityControlClient} from '../../packages/galaxy-core/src/domain
 import {identityKeyId,signIdentityPayload} from '../../packages/galaxy-core/src/domain/identity-material.mjs';
 import {createNativeRuntime} from '../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../../packages/galaxy-edge-mcp/src/native-v2/server.mjs';
-import {webIdentityProofType,webIdentityProtocol,isWebIdentityTargetPath} from '../../packages/galaxy-edge-mcp/src/native-v2/web-identity-handoff.mjs';
+import {webIdentityProofType,webIdentityProtocol,isWebIdentityTargetPath} from '../../packages/galaxy-edge-mcp/src/native-v2/identity/web-handoff.mjs';
 import {webIdentityDefaultScopes} from './identity-web-connect-tools.mjs';
 
 const connectName='galaxy_identity_web_connect',statusName='galaxy_identity_web_connect_status';

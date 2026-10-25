@@ -9,7 +9,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {communityForumFixture} from '../../galaxy-official/test/community-forum-fixture.mjs';
 import {createNativeRuntime} from '../src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../src/native-v2/server.mjs';
-import {isWebIdentityTargetPath} from '../src/native-v2/web-identity-handoff.mjs';
+import {isWebIdentityTargetPath} from '../src/native-v2/identity/web-handoff.mjs';
 import {nativeData} from './native-result.mjs';
 
 test('anonymous Native community reading opens the exact discussion and returns without restoring withdrawn content',{timeout:60000},async()=>{

@@ -28,7 +28,7 @@ test('initialization presentation preserves the host-native Galaxy first-screen 
   assert.equal(presentation.header.placement, 'top-center');
   assert.equal(presentation.footer.placement, 'bottom-center');
   assert.equal(presentation.footer.navigationPlacement, 'footer-sides');
-  assert.equal(presentation.footer.progressText, '阶段 1 / 5　← → 切换　Enter 确认　Esc 返回');
+  assert.equal(presentation.footer.progressText, '阶段 1 / 5　Enter 确认　Esc 返回');
   assert.equal(presentation.firstScreen.title, '欢迎加入银河');
   assert.match(presentation.firstScreen.functionalVision, /记录难点/);
   assert.deepEqual(
@@ -69,7 +69,9 @@ test('portable initialization contract selects a host renderer without changing 
   assert.equal(fallback.stages[1].selection, 'summary');
   assert.equal(fallback.stages[1].options.find((option) => option.id === 'agent-mcp').required, true);
   assert.equal(fallback.stages[2].options.find((option) => option.id === 'local-only').availability, 'available');
-  assert.equal(fallback.stages[2].options.find((option) => option.id === 'controlled-share').availability, 'planned');
+  assert.deepEqual(fallback.stages[2].options.map(option => option.id), ['local-only', 'history-overview', 'work-content', 'conversation-archive']);
+  assert.equal(fallback.stages[2].options.find((option) => option.id === 'history-overview').selected, true);
+  assert.equal(fallback.stages[2].uploadPrivacy.includeFullConversations, false);
   assert.equal(fallback.stages[3].options.find((option) => option.id === 'bind-existing-id').selectable, false);
   assert.match(renderGalaxyNumberedList(fallback), /\[1\] ● 个人银河/);
 
@@ -79,9 +81,9 @@ test('portable initialization contract selects a host renderer without changing 
     hostCapabilities: { richDialog: true, nativeSingleSelect: true, nativeConfirm: true },
   });
   assert.equal(rich.interaction.id, 'rich-dialog');
-  assert.equal(rich.currentStage.id, 'connection-visibility');
+  assert.equal(rich.currentStage.id, 'upload-privacy');
   assert.equal(rich.language, 'en-US');
-  assert.equal(rich.currentStage.title, 'Connection and visibility');
+  assert.equal(rich.currentStage.title, 'Allowed upload data types');
   assert.equal(rich.richLayoutHint.characterLogo, false);
 
   const confirmation = getGalaxyInitializationContract({ stage: 5, language: 'zh-CN' });
@@ -107,7 +109,7 @@ test('Galaxy Integration Pack previews, resolves dependencies, and initializes o
     ['personal-galaxy', 'galaxy-worker', 'galaxy-hub'],
   );
   assert.equal(firstCommand.initializationPresentation.header.title, 'Galaxy / 初始化');
-  assert.equal(firstCommand.initializationPresentation.footer.progressText, '阶段 1 / 5　← → 切换　Enter 确认　Esc 返回');
+  assert.equal(firstCommand.initializationPresentation.footer.progressText, '阶段 1 / 5　Enter 确认　Esc 返回');
   assert.equal(firstCommand.initializationContract.phase, 'language-selection');
 
   const uninitializedStatus = await getGalaxyCommandSurface(dataDir, 'status');
@@ -159,14 +161,17 @@ test('Galaxy Integration Pack previews, resolves dependencies, and initializes o
   assert.equal(consoleCommand.console.type, 'galaxy-console');
   assert.equal(consoleCommand.console.welcome.title, '欢迎回到银河');
   assert.equal(consoleCommand.console.localStatus.localOnly, true);
-  assert.deepEqual(consoleCommand.console.sections[0].actions.map((action) => action.command), ['status', 'connect', 'case', 'privacy']);
+  assert.deepEqual(consoleCommand.console.sections[0].actions.map((action) => action.command), ['status', 'connect', 'history', 'case', 'privacy', 'worker']);
   assert.deepEqual(consoleCommand.console.interactionGuide.routes.map((route) => route.command), [
-    'status', 'case', 'privacy', 'setup', 'language', 'website', 'help', 'connect',
+    'status', 'history', 'case', 'privacy', 'setup', 'language', 'website', 'help', 'connect',
   ]);
 
   const workerCommand = await getGalaxyCommandSurface(dataDir, 'worker');
-  assert.equal(workerCommand.state, 'planned-service');
-  assert.equal(workerCommand.requestedInitializationPath.id, 'galaxy-worker');
+  assert.equal(workerCommand.state, 'identity-setup-available');
+  assert.equal(workerCommand.route, 'galaxy-worker-identity');
+  assert.equal(workerCommand.runtimeStarted, false);
+  assert.deepEqual(workerCommand.nextTools, ['galaxy_local_worker_identity_create']);
+  assert.equal((await getGalaxyIntegrationStatus(dataDir)).galaxyId.id, initialized.galaxyId.id);
 
   const after = await assertGalaxyModulesEnabled(dataDir, ['case-workspace', 'consent-controls']);
   assert.equal(after.initialized, true);

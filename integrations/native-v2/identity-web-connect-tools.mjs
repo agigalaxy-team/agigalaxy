@@ -1,9 +1,9 @@
 import {createHash} from 'node:crypto';
 import * as z from 'zod/v4';
 import {browserScopes} from '../../packages/galaxy-official/src/browser-client.mjs';
-import {navigationSchema} from '../../packages/galaxy-edge-mcp/src/native-v2/navigation.mjs';
-import {createWebIdentityHandoff,isWebIdentityTargetPath} from '../../packages/galaxy-edge-mcp/src/native-v2/web-identity-handoff.mjs';
-import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/choice.mjs';
+import {navigationSchema} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';
+import {createWebIdentityHandoff,isWebIdentityTargetPath} from '../../packages/galaxy-edge-mcp/src/native-v2/identity/web-handoff.mjs';
+import {nativeResult} from '../../packages/galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
 
 export const webIdentityDefaultScopes=Object.freeze(['binding','consent','case-teaser','history','assistance','context']);
 export const webIdentityConnectSchema=z.strictObject({...navigationSchema.shape,requestId:z.uuid(),
