@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
 import inspect
+import re
 
 from agno.run.concurrency import get_worker_ownership
 from agno.run.status_persist import RunPersistOutcome
@@ -13,6 +14,35 @@ from .gateway import AuthorityDenied, AuthorityUnavailable
 
 _RUN = ContextVar("galaxy_model_usage_run", default=None)
 _ACTIVE = ContextVar("galaxy_model_usage_active", default=frozenset())
+_SETTINGS_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+
+
+def _valid_settings_version(value):
+    return isinstance(value, str) and _SETTINGS_VERSION.fullmatch(value) is not None
+
+
+def _record_settings_version(metadata, model):
+    # This is the exact model instance about to be invoked. Reading the
+    # current global configuration here would relabel a previously selected
+    # model (or an old run) with a configuration it did not use.
+    previous = metadata.get("modelSettingsVersions")
+    versions = []
+    for value in [*(previous if isinstance(previous, list) else []), metadata.get("modelSettingsVersion")]:
+        if _valid_settings_version(value) and value not in versions:
+            versions.append(value)
+    selected = getattr(model, "_galaxy_settings_version", None)
+    if _valid_settings_version(selected):
+        metadata["modelSettingsVersion"] = selected
+        if selected not in versions:
+            versions.append(selected)
+    else:
+        # A versionless invocation is unknown, even after a known version.
+        # Keep only previously recorded known versions, with no fake default.
+        metadata.pop("modelSettingsVersion", None)
+    if versions:
+        metadata["modelSettingsVersions"] = versions
+    else:
+        metadata.pop("modelSettingsVersions", None)
 
 
 @contextmanager
@@ -81,6 +111,7 @@ def _begin(model):
     previous = (before or {}).get("modelCalls")
     count = previous if type(previous) is int and previous >= 0 else 0
     run.metadata = {**(before or {}), "modelCalls": count + 1}
+    _record_settings_version(run.metadata, model)
     db = getattr(model, "_galaxy_usage_database", None)
     method = getattr(db, "update_run_in_session", None)
     if not callable(method):

@@ -55,11 +55,22 @@ def metadata(row):
     role_prompt = context.get("rolePromptVersion") if conversation_id(user_id, component_id, domain) else None
     if type(role_prompt) is not int or role_prompt < 1:
         role_prompt = None
+    model_version = None
+    model_versions = None
+    if task_id or conversation_id(user_id, component_id, domain):
+        def valid_version(value):
+            return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value) is not None
+        recorded_version = context.get("modelSettingsVersion")
+        if valid_version(recorded_version):
+            model_version = recorded_version
+        recorded_versions = context.get("modelSettingsVersions")
+        if isinstance(recorded_versions, list) and recorded_versions and all(valid_version(value) for value in recorded_versions):
+            model_versions = list(recorded_versions)
     return {"runId": row["run_id"], "executionId": user_id[10:] if user_id.startswith("execution:") else None,
         "taskId": task_id, "aiAccountId": context.get("aiAccountId") if task_id else None,
         "planVersion": context.get("planVersion") if task_id else None,
-        "modelSettingsVersion": context.get("modelSettingsVersion") if task_id else None,
-        "modelSettingsVersions": context.get("modelSettingsVersions") if task_id else None,
+        "modelSettingsVersion": model_version,
+        "modelSettingsVersions": model_versions,
         "conversationId": conversation_id(user_id, component_id, domain),
         "rolePromptVersion": role_prompt,
         "boundaryVersion": context.get("boundaryVersion") if conversation_id(user_id, component_id, domain)
