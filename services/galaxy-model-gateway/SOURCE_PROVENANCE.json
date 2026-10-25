@@ -1,0 +1,155 @@
+{
+  "recoveredAt": "2026-10-25T20:49:13.388746+00:00",
+  "image": "galaxy-model-gateway:connection-robustness-20261026-r1",
+  "imageId": "sha256:4d4874b2930c2bc4a1eea9a0c5ac0b53116166e8b2ec082a754889d9b6894655",
+  "sourceOverlayChanges": [],
+  "sourceFiles": [
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/__init__.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/__init__.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "2772f91f3260b5ee9266ccf61a2bbd8bae2841704fe6c038cb20770f6964cde7",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/app.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/app.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "bd60cf74486eb1cc74edebf99af3ee44594fcf5d669811b4482d55f7e099aa3d",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/auth.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/auth.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "34d8e8dba4452f8f95bac0a9e3d367210a34660158ec41b3b8b4573974791d52",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/endpoints.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/endpoints.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "e4a72543ba3c6ee2280a62b8ec6b0c429f6c9952a3b8ceb1bb7082e06dae2a81",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/metadata.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/metadata.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "a248cf87bb578204c546a0350d340358a00cdce6e49cdcd1a15d51b3ea2434af",
+      "alreadyPresent": true
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/output.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/output.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "7521ceab7fc729013680468b7fc2e79c0a3fa12bfa30d96852941f679f06cb0a",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/policy.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/policy.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "be939ceabc8088d599d84c8f368fa697501af184fff11463212dc5e725823260",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/profiles.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/profiles.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "023295f330737cebd4af2df1d2ca3b699a608d7b58dfe095bbc44a843f8ff39d",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/response_guard.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/response_guard.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "5c09183dc237afb9ccb735f6a8715695f3175cf4c882d255e946a617eba1ab07",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/surface.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/surface.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "fa9a60552fdc175bb97f2c5baaf6e9ac0a954b6a56197be3dd81702d037ad72f",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/src/galaxy_model_gateway/usage.py",
+      "sourcePath": "/app/src/galaxy_model_gateway/usage.py",
+      "source": "verified-running-container-static-source",
+      "sha256": "b3991a67a4078aeeb528fc8e1f6bf35fb9ad66f40a5ff2890b69e65d8f39c7b9",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/SOURCE.json",
+      "sourcePath": "/app/provenance/SOURCE.json",
+      "source": "verified-running-container-static-source",
+      "sha256": "6a5ff42881d42a6cf1eed74dc3ff5bc9fdead9a95a8e931ac601808eaeee2a81",
+      "alreadyPresent": true
+    },
+    {
+      "path": "services/galaxy-model-gateway/upstream-reference/uv.lock",
+      "sourcePath": "/app/provenance/upstream-uv.lock",
+      "source": "verified-running-container-static-source",
+      "sha256": "15d3f72a054655b6e47eea5b154a0a4c409a61a4e970bac16a7704589343d9f4",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/upstream-reference/pyproject.toml",
+      "sourcePath": "/app/provenance/upstream-pyproject.toml",
+      "source": "verified-running-container-static-source",
+      "sha256": "9c6f9980e5cd1a5184ab1389de161178c7817fb27daac2bf4e2d01520cfc6ee8",
+      "alreadyPresent": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/upstream-reference/LICENSE",
+      "sourcePath": "/app/licenses/litellm-LICENSE",
+      "source": "verified-running-container-static-source",
+      "sha256": "b170d6bf8e8835dd357e011681db028f4d51e2fb0ea892058f56e01fb39b8273",
+      "alreadyPresent": true
+    },
+    {
+      "path": "services/galaxy-model-gateway/upstream-reference/litellm-proxy-extras/LICENSE",
+      "sourcePath": "/app/licenses/litellm-proxy-extras-LICENSE",
+      "source": "verified-running-container-static-source",
+      "sha256": "b170d6bf8e8835dd357e011681db028f4d51e2fb0ea892058f56e01fb39b8273",
+      "alreadyPresent": true
+    },
+    {
+      "path": "services/galaxy-model-gateway/tests/test_connection_robustness.py",
+      "source": "preserved-shared-delta-initial-read-only-capture",
+      "sha256": "24c17c010dc83bb72ea73d93b2a94e8f87654fd6caed3b670c9ffc664bf6e323",
+      "runtimeTestExecutionClaim": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/tests/test_failure_status_surface.py",
+      "source": "preserved-shared-delta-initial-read-only-capture",
+      "sha256": "38d7230e382988f1faf92133bf6437226d518aa2c1ad0d429902fba8dd98a999",
+      "runtimeTestExecutionClaim": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/tests/test_gateway.py",
+      "source": "preserved-shared-delta-initial-read-only-capture",
+      "sha256": "fce038d4716b2ba571b1e5e65de85834315503ea380be74593aac87d64f99929",
+      "runtimeTestExecutionClaim": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/tests/test_model_failure_metadata.py",
+      "source": "preserved-shared-delta-initial-read-only-capture",
+      "sha256": "1878035e03a7a2df9db7275dac045d480d0caa9e7de177bfd2b827c9a8fe7359",
+      "runtimeTestExecutionClaim": false
+    },
+    {
+      "path": "services/galaxy-model-gateway/tests/test_model_profiles.py",
+      "source": "preserved-shared-delta-initial-read-only-capture",
+      "sha256": "89fbc5500919a8e0cc67526064cbf072e986cb5ff1bf71a562461eee615941a8",
+      "runtimeTestExecutionClaim": false
+    }
+  ],
+  "runtimeConfigurationIncluded": false,
+  "runtimeDataIncluded": false,
+  "buildRecipe": "Dockerfile retained from the initial captured source; exact image Dockerfile bytes were not exported",
+  "fullUpstreamSource": "Prepare exact SOURCE.json commit using prepare-source-context.py; original exported lock and licenses are retained",
+  "publishedByThisTask": false
+}

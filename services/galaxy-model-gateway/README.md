@@ -9,12 +9,14 @@ including the native Rust extension and proxy extras. The commercial
 its optional routes, UI, license checks and enterprise features are not used.
 The native root and proxy-extras MIT licenses remain in `/app/licenses`.
 
+`SOURCE_PROVENANCE.json` identifies the recovered Python source, original upstream lock and license files from the observed `connection-robustness-20261026-r1` image. The source was not bind mounted and had no container overlay changes. Test files retain their separate initial source-capture attribution. The Dockerfile is retained build source, rather than a claim that exact Dockerfile bytes were recovered from the image. Historical `SOURCE.json` fields describe that original source capture; current model bindings and activation are separate observations.
+
 ## Source-only build preparation
 
 From a checkout, prepare a new context with `python services/galaxy-model-gateway/prepare-source-context.py --output <new-context> --archive <fixed-commit.tar.gz>`; `--download` instead reads only the exact public commit in `SOURCE.json`. The preparer includes original upstream licenses/lock and Galaxy Python source/tests plus the empty model example, excluding protected runtime configuration. Build with `docker build -f <new-context>/services/galaxy-model-gateway/Dockerfile <new-context>`. Preparation does not install, start, call a provider or deploy. Docker execution and native protocol tests remain separate results.
 
 The supplied `config/models.empty.yaml` contains only `model_list: []`.
-In that shipped empty example no provider, credential, model or fallback is configured. Human-managed deployed bindings are separate: the current server has previously completed real model calls; read its protected runtime metadata for current state. Remote logging callbacks, a native Proxy billing database, Redis, virtual-key and budget products are not enabled by this example.
+In that shipped empty example no provider, credential, model or fallback is configured. Human-managed deployed bindings and actual call results are separate protected runtime records. Remote logging callbacks, a native Proxy billing database, Redis, virtual-key and budget products are not enabled by this example.
 Model requests fail with `model_gateway_model_not_configured` before reading
 the prompt. An empty service key prevents startup; the native Proxy's
 development no-auth behavior is not exposed.
