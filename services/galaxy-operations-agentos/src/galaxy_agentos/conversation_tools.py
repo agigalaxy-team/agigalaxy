@@ -493,6 +493,43 @@ def _query_filter_feedback(module, view, values):
         "module": module, "view": view, **contract, "effectExecuted": False}
 
 
+def _preparation_feedback(result):
+    """Explain the original receipt without changing it or inferring effects."""
+    card = result.get("card")
+    state = result.get("state")
+    card_id = card.get("cardId") if isinstance(card, dict) else None
+    try:
+        valid_card = isinstance(card_id, str) and str(UUID(card_id)) == card_id
+    except (ValueError, TypeError, AttributeError):
+        valid_card = False
+    if state in {"unknown", "processing"}:
+        feedback = {"state": state, "cardPrepared": None,
+            "nextStep": "query-original-operation", "mayClaimPrepared": False,
+            "report": "结果仍未知或处理中；只能核对原operation，不得重发prepare或声称已制卡、已执行。"}
+    elif state == "prepared" and isinstance(card, dict) and card.get("state") == "prepared" and valid_card:
+        feedback = {"state": "prepared", "cardPrepared": True,
+            "nextStep": "review-returned-card", "mayClaimPrepared": True,
+            "report": "原Node回执已返回prepared卡及card.cardId；可说明卡已准备，仍须人工确认，不能声称业务已执行。"}
+    elif state == "prepared":
+        feedback = {"state": "unknown", "cardPrepared": None,
+            "nextStep": "query-original-operation", "mayClaimPrepared": False,
+            "report": "prepared回执缺少可核对的card.state/card.cardId；不能声称制卡成功，只查原operation，不重发。"}
+    elif result.get("code") == "operations_ai_prompt_no_change" or result.get("reason") == "operations_ai_prompt_no_change":
+        feedback = {"state": "not-prepared", "cardPrepared": False,
+            "nextStep": "explain-no-change-needed", "mayClaimPrepared": False,
+            "report": "原回执明确无变化，无新卡且没有本次变更效果；说明无需变更，不得称准备成功或自动重试。"}
+    elif state == "completed" or isinstance(card, dict) and card.get("state") == "completed":
+        feedback = {"state": "original-receipt-required", "cardPrepared": False,
+            "nextStep": "read-original-card-receipt", "mayClaimPrepared": False,
+            "report": "这是原卡/原处理结果；只能依据原业务回执说明结果，不得把本次prepare当新卡或新执行。"}
+    else:
+        feedback = {"state": "not-prepared", "cardPrepared": False,
+            "nextStep": "explain-original-refusal", "mayClaimPrepared": False,
+            "report": "本次未返回已准备的真实卡；如实说明原拒绝或限制，不得声称制卡成功，也不猜被隐去的具体原因。"}
+    return {**result, "preparationFeedback": {**feedback,
+        "businessEffect": "not-proven-by-preparation", "automaticRetry": False}}
+
+
 def conversation_tools(gateway, *, domain=None):
     preparation_type = _preparation_type(domain)
 
@@ -502,12 +539,16 @@ def conversation_tools(gateway, *, domain=None):
         reference, feedback = tool_public_reference(name, arguments, context.metadata,
             selected=selected_reference)
         if feedback is not None:
+            if name == "prepare-operation":
+                feedback = _preparation_feedback(feedback)
             return json.dumps(feedback, ensure_ascii=False, allow_nan=False)
         binding = {"run_id": context.run_id, "call_id": call.call_id,
             "session_id": context.session_id, "turn_id": (context.metadata or {}).get("operationId")}
         if reference is not None:
             binding["public_reference"] = reference
         result = gateway.conversation_tool(context.user_id, name, arguments, **binding)
+        if name == "prepare-operation":
+            result = _preparation_feedback(result)
         return json.dumps(result, ensure_ascii=False, allow_nan=False)
 
     def query_operations(run_context: RunContext, fc: FunctionCall,
@@ -686,6 +727,15 @@ def conversation_tools(gateway, *, domain=None):
     def prepare_operation(run_context: RunContext, fc: FunctionCall,
             operation: preparation_type) -> str:
         """Prepare one concrete operations action for the manager to review.
+
+        Report a prepared card only when the actual response has state=prepared,
+        card.state=prepared and a genuine card.cardId. Read preparationFeedback:
+        a returned tool response or completed model run is not card success.
+        not-prepared means no prepared card was returned; explain the original
+        refusal, and never invent a hidden reason. Unknown/processing or a
+        prepared response missing its card ID requires the original operation
+        lookup, never another prepare POST. Preparation itself proves no
+        business effect; actual completion requires the original card receipt.
 
         It freezes the actual object, current permissions and versions in
         Node. It performs no business mutation and grants no AI authority.
