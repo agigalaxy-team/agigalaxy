@@ -129,6 +129,10 @@
       "dataOwner": "API, worker and publisher share the Hub business database and exact migration set.",
       "interfaces": [
         "Authorized HTTP APIs, public schemas and private AgentOS authority protocol"
+      ],
+      "files": [
+        "packages/galaxy-official/src/shared/operations-agentos-schema.mjs",
+        "packages/galaxy-official/src/shared/operations-tool-call-id.mjs"
       ]
     },
     {
