@@ -1,4 +1,4 @@
-import {proposalTargetTypeSql} from './sources.mjs';
+import {proposalTargetTypeSql} from '../../infrastructure/autonomy-target-type-v1.mjs';
 export const operationsAutonomyMigrationSql=`
 CREATE TABLE operations_autonomy_runtime_v1(endpoint text PRIMARY KEY,revision integer NOT NULL,configuration jsonb NOT NULL,updated_by text,updated_at timestamptz NOT NULL);
 CREATE TABLE operations_autonomy_runtime_versions_v1(endpoint text NOT NULL,revision integer NOT NULL,configuration jsonb NOT NULL,operator_id text,created_at timestamptz NOT NULL,PRIMARY KEY(endpoint,revision));

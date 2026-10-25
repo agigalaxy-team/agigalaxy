@@ -37,4 +37,26 @@ DO $ai_management_tool$ DECLARE item record; BEGIN
  END LOOP;
 END $ai_management_tool$;
 ALTER TABLE operations_agentos_conversation_tool_calls_v1 ADD CONSTRAINT operations_conversation_tool_v2 CHECK(tool IN ('workbench-summary','query-operations','read-operation-object','list-authorized-work','run-authorized-work','prepare-operation','read-ai-delegation'));
+CREATE OR REPLACE FUNCTION public.galaxy_autonomy_workbench_receipts_v1(wanted_endpoint text,wanted_task uuid)
+ RETURNS TABLE(operation_id uuid,action text,target_type text,target_id text,state text,details jsonb) LANGUAGE sql SECURITY DEFINER SET search_path=public,pg_temp AS $receipts$
+ SELECT c.operation_id,COALESCE(c.proposal->>'kind','workbench-action'),
+ CASE c.proposal->'target'->>'kind'
+ WHEN 'post' THEN 'content-post' WHEN 'reply' THEN 'content-reply' WHEN 'section' THEN 'content-section' WHEN 'account' THEN 'account'
+ WHEN 'case' THEN 'community-report' WHEN 'public-case' THEN 'community-report' WHEN 'chat-report' THEN 'chat-report'
+ WHEN 'chat-file' THEN 'file-chat' WHEN 'forum-file' THEN 'file-forum' WHEN 'message-plan' THEN 'messaging-plan'
+ WHEN 'projects' THEN 'project' WHEN 'methods' THEN 'method' WHEN 'rule' THEN 'rule-key'
+ WHEN 'file' THEN CASE c.proposal->'request'->>'targetKind' WHEN 'chat' THEN 'file-chat' WHEN 'forum' THEN 'file-forum' END
+ WHEN 'search-configuration' THEN 'search-quality' WHEN 'recommendation-theme' THEN 'recommendation-policy'
+ WHEN 'ai-work-prompt' THEN 'ai-work-account'
+ WHEN 'public-content-batch' THEN NULL ELSE c.proposal->'target'->>'kind' END,
+ CASE WHEN c.proposal->>'kind'='public-content-batch' THEN NULL ELSE c.proposal->'target'->>'id' END,
+ CASE WHEN c.state='completed' AND c.result->'receipt' IS NOT NULL AND c.result->'receipt'<>'null'::jsonb THEN 'completed' ELSE 'unknown' END,
+ CASE WHEN c.proposal->>'kind'='public-content-batch' AND jsonb_typeof(c.result#>'{receipt,counts}')='object' AND jsonb_typeof(c.result#>'{receipt,items}')='array'
+ THEN jsonb_build_object('counts',jsonb_build_object('applied',c.result#>'{receipt,counts,applied}','rejected',c.result#>'{receipt,counts,rejected}'),
+  'items',(SELECT jsonb_agg(jsonb_build_object('kind',i->>'kind','id',i->>'id','status',i->>'status','code',i->'code','revision',i->'revision')) FROM jsonb_array_elements(c.result#>'{receipt,items}') i)) ELSE NULL END
+ FROM operations_agentos_conversation_cards_v1 c JOIN operations_autonomy_tasks_v1 t ON t.endpoint=c.endpoint
+ AND (t.id=c.turn_id OR EXISTS(SELECT 1 FROM operations_autonomy_workbench_runs_v1 r WHERE r.endpoint=t.endpoint AND r.task_id=t.id AND r.turn_operation_id=c.turn_id))
+ WHERE t.endpoint=wanted_endpoint AND t.id=wanted_task AND c.state IN ('completed','unknown')
+ $receipts$;
+REVOKE ALL ON FUNCTION public.galaxy_autonomy_workbench_receipts_v1(text,uuid) FROM PUBLIC;
 `;
