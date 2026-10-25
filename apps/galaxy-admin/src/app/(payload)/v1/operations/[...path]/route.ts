@@ -40,7 +40,7 @@ async function proxy(request:Request){
     if(body.byteLength)forwarded.set('Content-Type','application/json');
   }
   try{
-    const response=await fetch(environment.bffOrigin+policy.path,{method:request.method,headers:forwarded,body,redirect:'manual',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(20000)])});
+    const response=await fetch(environment.bffOrigin+policy.path,{method:request.method,headers:forwarded,body,redirect:'manual',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(observing?35000:20000)])});
     const responseHeaders=new Headers(noStore);
     if(observing){responseHeaders.set('Cache-Control','no-store, no-transform');responseHeaders.set('X-Accel-Buffering','no');}
     for(const name of ['content-type','content-disposition','location','retry-after','x-request-id']){const value=response.headers.get(name);if(value)responseHeaders.set(name,value);}

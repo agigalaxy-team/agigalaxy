@@ -38,6 +38,7 @@ export class AutonomyReadModel{
   return{id:row.id,taskId:row.id,operationId:row.id,title:row.title,domain:row.domain,source:row.source,mode:row.mode,state:row.state,modelState:row.model_state,businessState:row.business_state,revision:row.revision,
    aiAccountId:row.ai_account_id,planId:row.config_id,configRevision:row.config_revision,promptVersion:row.prompt_version,planVersion:row.plan_version,delegationVersion:row.delegation_version,
    nativeRunId:row.native_run_id,strategyVersionId:row.configuration.versionBindings?.strategyVersionId??null,targetType:row.target_type,targetId:row.target_id,summary:row.summary??null,code:row.code??null,effects:receipts,businessReceipts:receipts,humanDecision:row.human_decision,pendingCalls,continuation,workbenchHref,
+   calls:n(row.model_usage?.calls),tokens:{input:n(row.model_usage?.inputTokens),output:n(row.model_usage?.outputTokens),total:n(row.model_usage?.totalTokens)},durationMs:n(row.model_usage?.durationMs),
    createdAt:iso(row.created_at),updatedAt:iso(row.updated_at),dueAt:iso(row.due_at),startedAt:iso(row.started_at),completedAt:iso(row.completed_at),lastValidAt:row.effective_check?iso(row.completed_at):null,availableControls:controls};
  }
  async tasks(operator,input={}){
