@@ -13,6 +13,8 @@ const number=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0?va
 const time=value=>typeof value==='number'?number(value):typeof value==='string'&&Number.isFinite(Date.parse(value))?value:null;
 const label=value=>typeof value==='string'&&value.trim()?value.trim().slice(0,200):null;
 const tokens=value=>({input:number(value?.input),output:number(value?.output),total:number(value?.total)});
+const modelSettingsVersion=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value)?value:null;
+const modelSettingsVersions=value=>Array.isArray(value)&&value.length>0&&value.every(item=>modelSettingsVersion(item)!==null)?[...value]:null;
 function runMetadata(value){
  const runId=id(value?.runId);if(!runId)fail('operations_agentos_response_invalid',503);
  return {runId,executionId:uuid(value.executionId),conversationId:uuid(value.conversationId),sessionId:id(value.sessionId),componentId:id(value.componentId),componentType:['agent','team','workflow'].includes(value.componentType)?value.componentType:null,
@@ -20,6 +22,7 @@ function runMetadata(value){
   promptVersion:['galaxy-operations-v1','galaxy-prepared-review-v1','galaxy-conversation-v1','galaxy-conversation-v2','galaxy-p13-selected-content-v1'].includes(value.promptVersion)?value.promptVersion:null,
   rolePromptVersion:Number.isSafeInteger(value.rolePromptVersion)&&value.rolePromptVersion>0?value.rolePromptVersion:null,
   boundaryVersion:value.boundaryVersion==='galaxy-conversation-boundary-v3'?value.boundaryVersion:null,
+  modelSettingsVersion:modelSettingsVersion(value.modelSettingsVersion),modelSettingsVersions:modelSettingsVersions(value.modelSettingsVersions),
   tokens:tokens(value.tokens),durationMs:number(value.durationMs),retryCount:null,retryState:'not-recorded',metadataOnly:true,executor:null,conversation:null};
 }
 function spanMetadata(value){
