@@ -7,10 +7,10 @@ import {tmpdir} from 'node:os';
 import {initializeLocalGalaxyId,setLocalUploadPrivacy,getLocalUploadPrivacy} from '../packages/galaxy-core/src/local-store.mjs';
 import {createLocalWorkHistory} from '../packages/galaxy-core/src/work-history/index.mjs';
 import {createLocalConversationArchive} from '../packages/galaxy-core/src/conversation-archive/index.mjs';
-import {createNativeWorkSync} from '../packages/galaxy-edge-mcp/src/native-v2/work-sync.mjs';
-import {createNativeArchiveSync} from '../packages/galaxy-edge-mcp/src/native-v2/archive-sync.mjs';
+import {createNativeWorkSync} from '../packages/galaxy-edge-mcp/src/native-v2/work/sync.mjs';
+import {createNativeArchiveSync} from '../packages/galaxy-edge-mcp/src/native-v2/work/archive-sync.mjs';
 import {createNativeStore} from '../packages/galaxy-edge-mcp/src/native-v2/store.mjs';
-import {createNativeLocalWorkServices} from '../packages/galaxy-edge-mcp/src/native-v2/local-work-tools.mjs';
+import {createNativeLocalWorkServices} from '../packages/galaxy-edge-mcp/src/native-v2/work/local-tools.mjs';
 import {createLocalChoiceResume} from '../integrations/native-v2/compact-app/local-work-view.mjs';
 import {accountWorkPutSchema} from '../packages/galaxy-official/src/shared/account-work-schema.mjs';
 

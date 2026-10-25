@@ -9,10 +9,12 @@ test('combined runner includes service and client failures and rejects an empty 
   const prefix = join(tmpdir(), 'galaxy-check-runner-');
   const root = await mkdtemp(prefix);
   try {
-    for (const path of ['scripts/test', 'packages/galaxy-core/test', 'packages/galaxy-official/test', 'packages/galaxy-a2a/test', 'packages/galaxy-web/test', 'packages/galaxy-edge-mcp/test']) {
+    for (const path of ['scripts/test', 'scripts/checks', 'packages/galaxy-core/test', 'packages/galaxy-official/test', 'packages/galaxy-a2a/test', 'packages/galaxy-web/test', 'packages/galaxy-edge-mcp/test']) {
       await mkdir(join(root, path), { recursive: true });
     }
     await copyFile(new URL('../check.mjs', import.meta.url), join(root, 'scripts/check.mjs'));
+    for (const name of ['runner.mjs', 'test-discovery.mjs'])
+      await copyFile(new URL('../checks/' + name, import.meta.url), join(root, 'scripts/checks', name));
     await writeFile(join(root, 'packages/galaxy-core/test/pass.test.mjs'), "import test from 'node:test'; test('core passes', () => {});\n");
     await writeFile(join(root, 'packages/galaxy-a2a/test/pass.test.mjs'), "import test from 'node:test'; test('a2a passes', () => {});\n");
     for (const name of ['galaxy-web', 'galaxy-edge-mcp']) {

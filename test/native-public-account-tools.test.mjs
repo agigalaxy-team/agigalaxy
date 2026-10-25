@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBrowserClient} from '../packages/galaxy-official/src/browser-client.mjs';
-import {nativeHttpDefinitions} from '../packages/galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../packages/galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 
 const endpoint='https://official.example.test',accountId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',afterAccount='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',subjectId='GUID10'+'A'.repeat(26),afterSubject='GUID11'+'B'.repeat(26);
 function fixture(){const requests=[],result={items:[{source:'external-issuer-statement',issuer:'https://issuer.example.test',status:'as-returned'}],nextAfter:null,checkedAt:2000000000};let signatures=0;

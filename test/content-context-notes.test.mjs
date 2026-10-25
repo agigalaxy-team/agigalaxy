@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createAccountConversationNotes} from '../packages/galaxy-web/src/account-conversation-notes.mjs';
+import {createAccountConversationNotes} from '../packages/galaxy-web/src/features/conversation-notes/account/store.mjs';
 
 function localAuthority(){
   const records=new Map();let active=true;

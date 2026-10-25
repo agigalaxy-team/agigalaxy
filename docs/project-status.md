@@ -36,15 +36,13 @@
 
 ## GitHub 与检查状态
 
-默认分支为 **main**，已包含产品源码。整理前的基线提交为 `fffa520`。GitHub 仓库当前为 private，没有版本标签或正式 Releases，外部使用者不能因此默认拥有仓库访问权限。
+默认分支为main，包含产品源码；本次核对引用为5c8305e。核心仓库private，GitHub尚无正式版本标签或Releases，访问权限与公开资料分别处理。
 
-该提交的两次 product 检查在 `npm run lint` 失败：共 194 条诊断；后续类型、构建和测试步骤跳过。这表示检查链未完成，不能写成构建和测试都已失败，也不能沿用早期批次的通过记录宣布当前提交全绿。
+10月21日18:32（北京时间）结束的[main运行39585259386](https://github.com/agigalaxy-team/agigalaxy/actions/runs/39585259386)与5c8305e对应。product在npm run lint失败，失败日志为194 errors、0 warnings、退出码1；后续TypeScript、构建、Core测试及任务材料/浏览器、普通客户端/Native专项步骤跳过。不能写成这些跳过步骤也执行失败，更不能用文档检查通过宣布产品检查全绿。
 
-- [push 运行 39558043977](https://github.com/agigalaxy-team/agigalaxy/actions/runs/39558043977)
-- [pull request 运行 39558049938](https://github.com/agigalaxy-team/agigalaxy/actions/runs/39558049938)
-- [当前检查入口](https://github.com/agigalaxy-team/agigalaxy/actions)
+此前fffa520的[push运行39558043977](https://github.com/agigalaxy-team/agigalaxy/actions/runs/39558043977)和[PR运行39558049938](https://github.com/agigalaxy-team/agigalaxy/actions/runs/39558049938)保留为历史。当前结果从[Actions入口](https://github.com/agigalaxy-team/agigalaxy/actions)核对，本次最新观察不再只引用这两次旧运行。
 
-本次 GitHub 文档改进不降低检查规则，不将静态文档核对写成产品 lint、类型、构建或业务验收。
+本轮补充只修正文档与阅读包，没有修产品源代码诊断、降低检查规则或重新执行Actions。API健康、旧专项记录和本地文档验证都不替代当前产品CI。
 
 ## 文档可移植性
 

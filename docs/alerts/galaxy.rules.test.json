@@ -690,7 +690,7 @@
       "input_series": [
         {
           "series": "galaxy_backup_last_success_timestamp_seconds{job=\"galaxy-api\",instance=\"127.0.0.1:9464\",component=\"api\",action=\"create\"}",
-          "values": "-90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 -90000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
+          "values": "-700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 -700000 780 840 900 960 1020 1080 1140 1200 1260 1320 1380 1440 1500 1560 1620 1680 1740 1800 1860 1920 1980 2040 2100 2160 2220 2280 2340 2400"
         }
       ],
       "alert_rule_test": [
@@ -1077,6 +1077,145 @@
         {
           "eval_time": "15m",
           "alertname": "GalaxyRevocationSearchResidue",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyAutonomyCollectionFailed fires and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_autonomy_collection_success{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "1 0 0 0 0 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyAutonomyCollectionFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "GalaxyAutonomyCollectionFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "component": "api",
+                "job": "galaxy-api",
+                "instance": "loopback",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Independent duty metadata collection is unavailable",
+                "runbook_ref": "docs/ai-autonomy-runtime.md"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "GalaxyAutonomyCollectionFailed",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyAutonomyWorkerStale fires and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_autonomy_worker_tick_age_seconds{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "0 180 240 300 360 0 0"
+        },
+        {
+          "series": "galaxy_autonomy_worker_tick_limit_seconds{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "150 150 150 150 150 150 150"
+        },
+        {
+          "series": "galaxy_autonomy_worker_health_available{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "1 1 1 1 1 1 1"
+        },
+        {
+          "series": "galaxy_autonomy_enabled_accounts{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "1 1 1 1 1 1 1"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyAutonomyWorkerStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "GalaxyAutonomyWorkerStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "component": "api",
+                "job": "galaxy-api",
+                "instance": "loopback",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Enabled duty scheduler has no current independent heartbeat",
+                "runbook_ref": "docs/ai-autonomy-runtime.md"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "GalaxyAutonomyWorkerStale",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "GalaxyAutonomyTasksOverdue fires and recovers",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "galaxy_autonomy_overdue_start_tasks{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "0 1 1 1 1 0 0"
+        },
+        {
+          "series": "galaxy_autonomy_overdue_round_tasks{component=\"api\",job=\"galaxy-api\",instance=\"loopback\"}",
+          "values": "0 0 0 0 0 0 0"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "0m",
+          "alertname": "GalaxyAutonomyTasksOverdue",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "GalaxyAutonomyTasksOverdue",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "component": "api",
+                "job": "galaxy-api",
+                "instance": "loopback",
+                "severity": "warning",
+                "owner_role": "operations"
+              },
+              "exp_annotations": {
+                "summary": "Persisted duty work exceeded its start or round allowance",
+                "runbook_ref": "docs/ai-autonomy-runtime.md"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "GalaxyAutonomyTasksOverdue",
           "exp_alerts": []
         }
       ]

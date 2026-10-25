@@ -7,8 +7,8 @@ import {tmpdir} from 'node:os';
 import {initializeLocalGalaxyId,setLocalUploadPrivacy} from '../packages/galaxy-core/src/local-store.mjs';
 import {createLocalConversationArchive} from '../packages/galaxy-core/src/conversation-archive/index.mjs';
 import {createLocalWorkHistory} from '../packages/galaxy-core/src/work-history/index.mjs';
-import {createNativeArchiveSync} from '../packages/galaxy-edge-mcp/src/native-v2/archive-sync.mjs';
-import {createNativeWorkSync} from '../packages/galaxy-edge-mcp/src/native-v2/work-sync.mjs';
+import {createNativeArchiveSync} from '../packages/galaxy-edge-mcp/src/native-v2/work/archive-sync.mjs';
+import {createNativeWorkSync} from '../packages/galaxy-edge-mcp/src/native-v2/work/sync.mjs';
 import {accountWorkPutSchema} from '../packages/galaxy-official/src/shared/account-work-schema.mjs';
 
 const endpoint='https://service.example.test',accountId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

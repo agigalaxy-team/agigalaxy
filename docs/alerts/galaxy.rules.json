@@ -214,7 +214,7 @@
         },
         {
           "alert": "GalaxyBackupStale",
-          "expr": "(time() - galaxy_backup_last_success_timestamp_seconds{action=~\"create|copy\"} > 86400) or (time() - galaxy_backup_last_success_timestamp_seconds{action=\"check\"} > 604800)",
+          "expr": "(time() - galaxy_backup_last_success_timestamp_seconds{action=\"create\"} > 691200) or (time() - galaxy_backup_last_success_timestamp_seconds{action=\"copy\"} > 86400) or (time() - galaxy_backup_last_success_timestamp_seconds{action=\"check\"} > 604800)",
           "for": "10m",
           "labels": {
             "severity": "warning",
@@ -288,6 +288,45 @@
           "annotations": {
             "summary": "Search candidates still reference revoked authorization",
             "runbook_ref": "docs/alerting-v1.md#identity"
+          }
+        },
+        {
+          "alert": "GalaxyAutonomyCollectionFailed",
+          "expr": "galaxy_autonomy_collection_success{component=\"api\"} == 0",
+          "for": "1m",
+          "labels": {
+            "severity": "warning",
+            "owner_role": "operations"
+          },
+          "annotations": {
+            "summary": "Independent duty metadata collection is unavailable",
+            "runbook_ref": "docs/ai-autonomy-runtime.md"
+          }
+        },
+        {
+          "alert": "GalaxyAutonomyWorkerStale",
+          "expr": "((galaxy_autonomy_worker_tick_age_seconds{component=\"api\"} > galaxy_autonomy_worker_tick_limit_seconds{component=\"api\"}) or (galaxy_autonomy_worker_health_available{component=\"api\"} == 0)) and (galaxy_autonomy_enabled_accounts{component=\"api\"} > 0)",
+          "for": "1m",
+          "labels": {
+            "severity": "warning",
+            "owner_role": "operations"
+          },
+          "annotations": {
+            "summary": "Enabled duty scheduler has no current independent heartbeat",
+            "runbook_ref": "docs/ai-autonomy-runtime.md"
+          }
+        },
+        {
+          "alert": "GalaxyAutonomyTasksOverdue",
+          "expr": "(galaxy_autonomy_overdue_start_tasks{component=\"api\"} > 0) or (galaxy_autonomy_overdue_round_tasks{component=\"api\"} > 0)",
+          "for": "1m",
+          "labels": {
+            "severity": "warning",
+            "owner_role": "operations"
+          },
+          "annotations": {
+            "summary": "Persisted duty work exceeded its start or round allowance",
+            "runbook_ref": "docs/ai-autonomy-runtime.md"
           }
         }
       ]
