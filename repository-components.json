@@ -360,7 +360,9 @@
       "dataOwner": "CMS stores its own content; Hub-authorized HTTP owns business writes; management sessions are separate.",
       "interfaces": [
         "Independent management OIDC, CMS and authorized Node BFF"
-      ]
+      ],
+      "buildOutput": "apps/galaxy-admin/.next",
+      "buildLimit": "Next writes its own .next output. Include standalone, public and .next/static when assembling a deployment."
     },
     {
       "id": "agentos",

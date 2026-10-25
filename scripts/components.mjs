@@ -30,7 +30,7 @@ export function affectedComponents(catalog,files,imports=[]){
   impactedFiles:[...impactedFiles],unclassified:changed.filter(name=>!ownerOf(catalog,name)&&!catalog.globalInputs.includes(name))};
 }
 const run=(args,cwd)=>{const r=spawnSync(args[0],args.slice(1),{cwd,stdio:'inherit',windowsHide:true});if(r.error)throw r.error;if(r.status!==0)throw Error('Component command failed: '+r.status);};
-function gitFiles(base){const result=spawnSync('git',['diff','--name-only','-z',`${base}...HEAD`],{cwd:repositoryRoot,encoding:'utf8',windowsHide:true});if(result.status!==0)throw Error('Cannot resolve explicit comparison base.');return result.stdout.split('\0').filter(Boolean);}
+function gitFiles(base){const result=spawnSync('git',['diff','--no-renames','--name-only','-z',`${base}...HEAD`],{cwd:repositoryRoot,encoding:'utf8',windowsHide:true});if(result.status!==0)throw Error('Cannot resolve explicit comparison base.');return result.stdout.split('\0').filter(Boolean);}
 function ordered(catalog,ids){const result=[],visiting=new Set(),done=new Set();function visit(id){if(done.has(id))return;if(visiting.has(id))throw Error('Component build dependency cycle.');visiting.add(id);const c=catalog.components.find(c=>c.id===id);if(!c)throw Error('Unknown component '+id);for(const dep of c.buildDependsOn??[])visit(dep);visiting.delete(id);done.add(id);result.push(c);}for(const id of ids)visit(id);return result;}
 
 // Static relative imports document real source coupling. This is deliberately
@@ -81,7 +81,8 @@ async function cli(){
   const commands=component[action==='build'?'build':'checks'];
   try{for(const command of commands){const argv=command.map(part=>tokens[part]??part);run(argv,resolve(repositoryRoot,component.cwd??'.'));}}
   catch(error){records.push({component:component.id,action,state:'failed',commands:commands.length});await writeFile(join(outputRoot,'result.json'),JSON.stringify({records,deployed:false},null,2)+'\n');throw error;}
-  records.push({component:component.id,action,commands:commands.length,state:commands.length?'passed':'no-command',output:commands.length?destination:null,limit:component.buildLimit??null});
+  const actualOutput=action==='build'&&component.buildOutput?resolve(repositoryRoot,component.buildOutput):destination;
+  records.push({component:component.id,action,commands:commands.length,state:commands.length?'passed':'no-command',output:commands.length?actualOutput:null,limit:component.buildLimit??null});
  }
  await writeFile(join(outputRoot,'result.json'),JSON.stringify({records,deployed:false},null,2)+'\n');console.log(JSON.stringify({outputRoot,records,deployed:false}));
 }
