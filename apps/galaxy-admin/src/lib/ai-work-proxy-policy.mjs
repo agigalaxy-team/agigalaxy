@@ -1,7 +1,7 @@
 const root='/v1/operations/ai-work-accounts';
 const domain='(?:overview|governance|messaging|discovery|maintenance)';
 const uuid='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}';
-export const aiWorkReadPath=new RegExp('^'+root+'(?:/'+domain+'(?:/history)?|/operations/'+uuid+')?$');
+export const aiWorkReadPath=new RegExp('^'+root+'(?:/'+domain+'(?:/(?:history|runtime))?|/operations/'+uuid+')?$');
 export const aiWorkWritePath=new RegExp('^'+root+'/'+domain+'/(?:commands|assignments)$');
 /** The new account family has no arbitrary domain, method, query or target. */
 export function aiWorkQueryAllowed(pathname,search){
