@@ -1,9 +1,14 @@
 from uuid import UUID
 from urllib.parse import urlparse
+import json
+import logging
 import re
 
 import httpx
-from .tool_call_ids import valid_tool_call_id
+from .tool_call_ids import rejected_tool_call_shape, valid_tool_call_id
+
+
+_LOGGER = logging.getLogger("galaxy_agentos.gateway")
 
 
 class AuthorityDenied(PermissionError):
@@ -143,6 +148,12 @@ class GalaxyGateway:
                 or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)):
             raise AuthorityDenied("agentos_tool_arguments_invalid")
         if not valid_tool_call_id(call_id):
+            # run_id and tool have passed the fixed native context checks
+            # above. Never include call_id, arguments, body or exception text.
+            diagnostic = {"code": "agentos_tool_call_id_invalid", "runId": run_id,
+                "tool": tool, **rejected_tool_call_shape(call_id)}
+            _LOGGER.warning("agentos_tool_call_id_invalid %s", json.dumps(diagnostic,
+                ensure_ascii=True, sort_keys=True, separators=(",", ":")))
             raise AuthorityDenied("agentos_tool_call_id_invalid")
         try:
             if str(UUID(session_id)) != session_id or str(UUID(turn_id)) != turn_id:
