@@ -1,6 +1,7 @@
 import {ServiceError} from './shared/service-error.mjs';
 import {forumStamp} from './community-forum-permissions-v1.mjs';
 import {communityAccountView} from './community-accounts.mjs';
+import {p14QuotaCounts} from './operations/rules/quota.mjs';
 
 export const forumBudgetTables=['forum_posts_v1','forum_versions_v1','forum_replies_v1','forum_events_v1','forum_permissions_v1','forum_reports_v1','forum_governance_events_v1','forum_write_receipts_v1'];
 // Once-stored signed Consent evidence is charged once per actual Account group.
@@ -23,7 +24,7 @@ export class CommunityForumBudgetV1 {
  async quotaWithin(db,account,category){
   const now=this.access.now(),tier=await this.publicWrites.tierWithin(db,account,now),day=forumStamp(now).slice(0,10);
   const used=Number((await db.query('SELECT used FROM forum_daily_usage_v1 WHERE account_id=$1 AND day=$2 AND category=$3',[account.id,day,category])).rows[0]?.used??0),limit=this.policy[tier][category];
-  return {category,used,limit,remaining:Math.max(0,limit-used),tier,resetAt:forumStamp((Math.floor(now/86400)+1)*86400),policyVersion:this.policy.version};
+  return {category,...p14QuotaCounts(limit,used),tier,resetAt:forumStamp((Math.floor(now/86400)+1)*86400),policyVersion:this.policy.version};
  }
  async startWithin(db,actor,category){
   const account=await this.accounts.resolveWithin(db,actor,{lock:true}),now=this.access.now();

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {getSummaryRuntime,closeSummaryRuntime} from '../../galaxy-web/src/summary-runtime.mjs';
-import {sharedSummaryRequestHash} from '../src/chat-shared-summary-client.mjs';
+import {getSummaryRuntime,closeSummaryRuntime} from "../../galaxy-web/src/features/conversation-notes/native/runtime.mjs";
+import {sharedSummaryRequestHash} from "../src/chat-shared-summary-client.mjs";
 
 // Browser coordination doubles only. Authenticated HTTP, database, room exit,
 // and external archive cleanup have separate service/HTTP evidence.

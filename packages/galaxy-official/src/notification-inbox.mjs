@@ -5,6 +5,7 @@ import {recordNotificationAudit} from './infrastructure/notification-audit.mjs';
 import {inboxIdSchema,inboxOptionsSchema,inboxQuerySchema,inboxClaimSchema} from './shared/notification-inbox-schema.mjs';
 import {commentNotificationView} from './task-comment-notifications.mjs';
 import {targetGovernanceNoticeWithin} from './target-governance-notifications-v2.mjs';
+import {chatMessageOperationsBlockedWithin} from './chat-message-operations-gate.mjs';
 const day=86400,stamp=n=>new Date(n*1000).toISOString();
 const fail=(c,s=409)=>{throw new ServiceError(c,s);};
 function parse(schema,x){const p=schema.safeParse(x);if(!p.success)fail('invalid_inbox_request',400);return p.data;}
@@ -87,6 +88,7 @@ export class NotificationInboxService {
    const r=(await db.query(`SELECT m.*,EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id AND d.state IN ('requested','review-needed','approved','partial','primary-erased')) author_pending
     FROM chat_message_refs m WHERE m.message_id=$1 AND m.room_id=$2 FOR SHARE OF m`,[c.event_id,c.room_id])).rows[0];
    if(!r||r.state!=='accepted'||Date.parse(r.expires_at)<=this.access.now()*1000||r.author_pending)return null;
+    if(await chatMessageOperationsBlockedWithin(db,{messageId:r.message_id}))return null;
    return{title:ctx.room.title,eventKind:'room-message',actorId:r.subject_id,object:{type:'room',id:c.room_id,messageId:r.message_id},sourceExpiresAt:new Date(r.expires_at).toISOString()};
   }
   if(c.kind==='room-invite'){

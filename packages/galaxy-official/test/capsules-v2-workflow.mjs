@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {CapsuleServiceV2} from '../src/capsules-v2.mjs';
-import {capsuleToolDefinitions} from '../src/personal-mcp-capsules-v2.mjs';
+import {capsuleToolDefinitions} from '../src/adapters/mcp/personal/tools/capsules-v2.mjs';
 import {createApi} from '../src/http.mjs';
 import {checkChoiceSource} from './choice-source-check.mjs';
 const scopes=['binding','consent','case-teaser','assistance','evidence','proof','capsules','history','data-delete','data-export'];

@@ -64,7 +64,7 @@ export async function inspectServiceRelease(directory, expectedManifestSha256) {
   const manifest = JSON.parse(bytes);
   if (manifest.version !== 1 || manifest.kind !== 'galaxy-official-service-release' || !label(manifest.releaseId)
     || !label(manifest.configurationVersion) || !Array.isArray(manifest.migrations) || !manifest.migrations.length
-    || manifest.migrations.some((item, i) => item.version !== i + 1 || !/^[a-f0-9]{64}$/.test(item.sha256))) throw new Error('Invalid service release manifest.');
+    || manifest.migrations.some((item, i) => item.version !== migrations[i]?.version || !/^[a-f0-9]{64}$/.test(item.sha256))) throw new Error('Invalid service release manifest.');
   const files = Object.entries(manifest.files);
   if (files.length < 4 || files.length > 2000 || Object.values(manifest.entries).some(name => !manifest.files[name])) throw new Error('Invalid service release files.');
   for (const [name, expected] of files) {

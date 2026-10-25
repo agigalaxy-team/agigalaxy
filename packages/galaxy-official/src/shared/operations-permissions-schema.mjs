@@ -1,0 +1,10 @@
+import {z} from 'zod';
+import {operationsPermissionCodes} from '../operations-permission-catalog.mjs';
+import {automationResourceIdsSchema,automationResourceScopeSchema} from './operations-automation-scope.mjs';
+const label=z.string().trim().min(1).max(120).refine(value=>!/[\p{Cc}]/u.test(value));
+export const operationsPermissionListSchema=z.array(z.enum(operationsPermissionCodes)).max(operationsPermissionCodes.length).refine(value=>new Set(value).size===value.length);
+const command={operationId:z.uuid(),id:z.uuid().optional(),expectedVersion:z.number().int().nonnegative()};
+export const operationsRoleSaveSchema=z.strictObject({...command,name:label,description:z.string().trim().max(1000).refine(value=>!/[\p{Cc}]/u.test(value)),enabled:z.boolean(),permissions:operationsPermissionListSchema,subjectScope:z.enum(['shared','ai-only']).optional()});
+export const operationsAssignmentSaveSchema=z.strictObject({...command,operatorId:z.string().min(1).max(1024),roleId:z.uuid(),enabled:z.boolean()});
+export const operationsAutomationSaveSchema=z.strictObject({...command,name:label,executorKind:z.enum(['program','ai']),mode:z.enum(['assisted','automatic']),enabled:z.boolean(),permissions:operationsPermissionListSchema,resourceIds:automationResourceIdsSchema,resourceScope:automationResourceScopeSchema.optional(),aiAccountId:z.uuid().nullable().optional()});
+export const operationsPermissionsHistorySchema=z.strictObject({after:z.string().regex(/^[1-9][0-9]{0,18}$/).refine(value=>BigInt(value)<=9223372036854775807n).optional(),resourceId:z.uuid().optional(),targetOperatorId:z.string().min(1).max(1024).optional(),limit:z.number().int().min(1).max(100).default(30)});

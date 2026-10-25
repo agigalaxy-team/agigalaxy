@@ -1,13 +1,13 @@
-import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
-import {createServer} from 'node:http';
-import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
-import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
-import {verifyContactsV2} from './contacts-v2-workflow.mjs';
-import {createPersonalMcp} from '../src/personal-mcp.mjs';
-import {getProjectContactClient} from '../../galaxy-web/src/project-contact-client.mjs';
-import {digest} from '../src/shared/digest.mjs';
-import {recruitmentOperationReceiptResultSchema} from '../src/shared/recruitment-schema-v2.mjs';
+import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
+import {createServer} from "node:http";
+import {Client,StreamableHTTPClientTransport} from "@modelcontextprotocol/client";
+import {NodeStreamableHTTPServerTransport} from "@modelcontextprotocol/node";
+import {verifyContactsV2} from "./contacts-v2-workflow.mjs";
+import {createPersonalMcp} from "../src/adapters/mcp/personal/handler.mjs";
+import {getProjectContactClient} from "../../galaxy-web/src/features/projects/clients/operations.mjs";
+import {digest} from "../src/shared/digest.mjs";
+import {recruitmentOperationReceiptResultSchema} from "../src/shared/recruitment-schema-v2.mjs";
 
 // Real local OIDC, JWS, HTTP, Account/quota and PGlite. Caller journals and
 // exposed connection tags are declared Map/lease contract fixtures, not IDB

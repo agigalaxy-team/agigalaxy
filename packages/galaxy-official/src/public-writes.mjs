@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { readFile, lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from './shared/service-error.mjs';
+import {p14QuotaCounts} from './operations/rules/quota.mjs';
 
 const DAY = 86400;
 const iso = seconds => new Date(seconds * 1000).toISOString();
@@ -40,7 +41,7 @@ export class PublicWriteService {
     const used = Number((await db.query('SELECT used FROM community_daily_usage WHERE account_id=$1 AND day=$2 AND category=$3',
       [account.id, day, kind])).rows[0]?.used ?? 0);
     const limit = this.policy[tier][kind];
-    return { category: kind, ...(kind==='task'?{covers:['task-publication','recruitment-publication']}:{}), used, limit, remaining: Math.max(0, limit - used), tier,
+    return { category: kind, ...(kind==='task'?{covers:['task-publication','recruitment-publication']}:{}), ...p14QuotaCounts(limit,used), tier,
       resetAt: iso((Math.floor(now / DAY) + 1) * DAY), policyVersion: this.policy.version };
   }
   async status(actor) {

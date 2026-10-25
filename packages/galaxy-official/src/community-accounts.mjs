@@ -6,7 +6,7 @@ import {ensureOfficialAccountProfileWithin,upsertOfficialAccountWithin} from './
 
 const iso = seconds => new Date(seconds * 1000).toISOString();
 export const communityAccountView = (row, currentAccountId = null) => ({
-  id:row.id,accountId:row.id,uid:row.uid,displayName:row.display_name??null,subjectType:row.subject_type??null,
+  id:row.id,accountId:row.id,uid:row.uid,displayName:row.display_name??null,avatarKey:row.avatar_key??null,subjectType:row.subject_type??null,
   endpoint:row.endpoint,current:row.id===currentAccountId
 });
 const linkInput = z.strictObject({ subjectId: z.string().min(1).max(128), linkId: z.uuid(),
@@ -46,13 +46,13 @@ export class CommunityAccountRegistry {
   async availableWithin(db, actor) {
     if(actor.kind==='official-account'){
       if(actor.endpoint!==this.access.endpoint||!z.uuid().safeParse(actor.accountId).success)throw new ServiceError('access_denied',401);
-      return (await db.query(`SELECT a.*,p.display_name,p.subject_type FROM community_accounts a
+      return (await db.query(`SELECT a.*,p.display_name,p.avatar_key,p.subject_type FROM community_accounts a
         LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.id WHERE a.id=$1 AND a.endpoint=$2`,[actor.accountId,this.access.endpoint])).rows;
     }
     // An active association identifies a possible target. It does not choose
     // between multiple accounts or confer any unrelated account capability.
     await lockControllerMappingsWithin(db,this.access.endpoint,[actor.subjectId]);
-    const rows = (await db.query(`SELECT a.*,p.display_name,p.subject_type,l.client_id FROM community_accounts a
+    const rows = (await db.query(`SELECT a.*,p.display_name,p.avatar_key,p.subject_type,l.client_id FROM community_accounts a
       JOIN community_account_links g ON g.account_id=a.id JOIN external_identity_links l ON l.id=g.identity_link_id
       LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.id
       WHERE g.subject_id=$1 AND l.revoked_at IS NULL AND a.endpoint=$2 ORDER BY a.created_at,a.id`,
@@ -73,7 +73,7 @@ export class CommunityAccountRegistry {
     return {...found,...current};
   }
   async publicChoicesWithin(db,{query='',after=null,limit=20}={}){
-    const rows=(await db.query(`SELECT a.id,a.uid,a.endpoint,p.display_name,p.subject_type FROM community_accounts a
+    const rows=(await db.query(`SELECT a.id,a.uid,a.endpoint,p.display_name,p.avatar_key,p.subject_type FROM community_accounts a
       JOIN official_account_profiles_v1 p ON p.account_id=a.id AND p.query_enabled=true
       WHERE a.endpoint=$1 AND ($2::uuid IS NULL OR a.id>$2) AND
       ($3::text='' OR position(lower($3::text) in lower(coalesce(p.display_name,'')))>0 OR a.id::text=$3::text OR a.uid=upper($3::text))

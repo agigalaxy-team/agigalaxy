@@ -66,7 +66,7 @@ export async function verifyAttachments({database=null,runtimeDb=null,workerDb=n
   assert.equal((await files.get(a,{attachmentId:bad.attachmentId})).state,'blocked');await jobs.purgeExpired();assert.equal((await files.get(a,{attachmentId:bad.attachmentId})).objectRemoved,true);
   const truncated=input();await files.prepare(a,truncated);await assert.rejects(files.upload(a,truncated.attachmentId,Readable.from([Buffer.alloc(bytes.length)]),{contentLength:bytes.length}),/digest_mismatch/);await jobs.purgeExpired();
   await f.db.query('UPDATE chat_attachments SET expires_at=$2 WHERE id=$1',[retry.attachmentId,new Date((f.now()-1)*1000).toISOString()]);
-  await jobs.purgeExpired();assert.equal((await files.get(a,{attachmentId:retry.attachmentId})).objectRemoved,true);
+  await jobs.purgeExpired();assert.equal((await files.get(a,{attachmentId:retry.attachmentId})).objectRemoved,false,'A clean legacy file expiry waits for a concrete manually approved cleanup plan');
   const preflight=await fetch(url+root+randomUUID()+'/upload',{method:'OPTIONS',headers:{Origin:'https://galaxy.example.org','Access-Control-Request-Method':'PUT','Access-Control-Request-Headers':'authorization,content-type'}});
   assert.equal(preflight.status,204);
   return {http:true,bindings:'real-signed-fixture',accountRegistry:'explicit-isolated-contract',legacyMessageHash:true,currentRoomACL:true,pendingDeletionReversible:true,fixedTTL:true,workerScope:!!workerDb,storage:store?'real-adapter':'contract-fixture',scanner:scanner?'real-daemon':'contract-fixture'};

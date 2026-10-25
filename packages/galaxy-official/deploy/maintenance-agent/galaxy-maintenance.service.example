@@ -1,0 +1,30 @@
+[Unit]
+Description=Galaxy private maintenance control
+After=docker.service network-online.target galaxy-api@pilot.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=/etc/galaxy/maintenance/service.env
+ExecStart=/opt/galaxy/runtime/node-v24.19.0-linux-x64/bin/node ${GALAXY_MAINTENANCE_RELEASE}/packages/galaxy-official/deploy/maintenance-agent/server.mjs --config /etc/galaxy/maintenance/agent.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=infinity
+KillMode=mixed
+RuntimeDirectory=galaxy-maintenance
+RuntimeDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths=/run/galaxy-maintenance /var/lib/galaxy/maintenance /var/lib/galaxy/backups /var/lib/galaxy/restores /var/lib/galaxy/backup-status
+# Deliberately backup/read-only initial deployment. Do not enable a production
+# restore adapter under this unit until its exact writable footprint and native
+# recovery contributions have been separately installed and checked.
+
+[Install]
+WantedBy=multi-user.target

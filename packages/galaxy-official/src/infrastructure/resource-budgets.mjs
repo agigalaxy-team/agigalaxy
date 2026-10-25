@@ -1,13 +1,10 @@
-import { z } from 'zod';
+import {resourceBudgetPolicySchema,defaultResourceBudgetPolicy} from '../shared/policies/resource-budget.mjs';
+export {resourceBudgetPolicySchema,defaultResourceBudgetPolicy} from '../shared/policies/resource-budget.mjs';
 import { lstat,readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../shared/service-error.mjs';
 import {forumSubjectBytesSql} from '../community-forum-budget-v1.mjs';
 
-export const resourceBudgetPolicySchema=z.object({version:z.literal(1),maxPayloadBytesPerSubject:z.number().int().min(0).max(1099511627776),
-  maxQueuedJobsPerSubject:z.number().int().min(1).max(100000),maxActiveExportsPerSubject:z.number().int().min(1).max(1000),
-  maxActiveJobsGlobal:z.number().int().min(1).max(1000),maxActiveJobsPerSubject:z.number().int().min(1).max(1000)}).strict();
-export const defaultResourceBudgetPolicy=resourceBudgetPolicySchema.parse({version:1,maxPayloadBytesPerSubject:1048576,maxQueuedJobsPerSubject:32,maxActiveExportsPerSubject:3,maxActiveJobsGlobal:4,maxActiveJobsPerSubject:1});
 export async function loadResourceBudgetPolicy(path){
   if(!path)return structuredClone(defaultResourceBudgetPolicy);
   if(!isAbsolute(path))throw new Error('Absolute resource budget policy path required');

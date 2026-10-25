@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { verifyTaskCommentsV2 } from './task-comments-v2-workflow.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';
 import { createTaskCommentClient } from '../../galaxy-web/src/task-comment-client.mjs';
-import { commentToolDefinitions } from '../src/personal-mcp-comments-v2.mjs';
+import { commentToolDefinitions } from '../src/adapters/mcp/personal/tools/comments-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
 
 test(

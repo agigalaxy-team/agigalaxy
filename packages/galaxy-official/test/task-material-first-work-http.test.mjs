@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {communityForumFixture} from './community-forum-fixture.mjs';
-import {materialTask} from './task-material-fixture.mjs';
-import {createBrowserClient} from '../src/browser-client.mjs';
-import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
-import {taskCaseContainerSummary,taskMaterialCaseContainerTitle} from '../src/shared/cases-schema.mjs';
-import {digest} from '../src/shared/digest.mjs';
+import {communityForumFixture} from "./community-forum-fixture.mjs";
+import {materialTask} from "./task-material-fixture.mjs";
+import {createBrowserClient} from "../src/browser-client.mjs";
+import {getFactClient} from "../../galaxy-web/src/features/work-records/client.mjs";
+import {taskCaseContainerSummary,taskMaterialCaseContainerTitle} from "../src/shared/cases-schema.mjs";
+import {digest} from "../src/shared/digest.mjs";
 
 // Real browser protocol/signatures and HTTP/PGlite. The local journal is an
 // explicit Map double; this is not a browser UI or production-host observation.

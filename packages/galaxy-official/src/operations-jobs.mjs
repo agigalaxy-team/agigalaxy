@@ -4,7 +4,7 @@ import { transaction } from './database.mjs';
 import {withRuntimeDiagnosticContext} from './shared/runtime-diagnostics.mjs';
 
 export const operationsJobSchema = 'galaxy_jobs';
-export const operationsQueues = Object.freeze(['information-watch', 'search-recovery', 'content-publication', 'account-notice', 'retention-cleanup']);
+export const operationsQueues = Object.freeze(['information-watch', 'search-recovery', 'content-publication', 'account-notice', 'retention-cleanup','messaging-run','messaging-delivery','autonomy-task','autonomy-tick']);
 export const operationsAuditActions = Object.freeze(['job-cancel', 'job-retry', 'search-retry']);
 const queueName = name => {
   if (!operationsQueues.includes(name)) throw new ServiceError('operations_queue_unknown', 400);
@@ -37,11 +37,11 @@ export function operationJobView(job) {
 
 // Queue installation and fixed queue definitions belong to schema migration 93.
 // The API/worker use their existing pool and cannot create tables or load keys.
-export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {}, onEvent = () => {}, supervise = true } = {}) {
+export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {}, onEvent = () => {}, supervise = true,scheduling=false } = {}) {
   if (!db?.query) throw new Error('Operations jobs require the existing PostgreSQL pool');
   const boss = suppliedBoss ?? new PgBoss({
     db: operationsDatabase(db), schema: operationsJobSchema, migrate: false, createSchema: false,
-    schedule: false, supervise, reindex: false, persistQueueStats: false, persistWarnings: false,
+    schedule: scheduling, supervise, reindex: false, persistQueueStats: false, persistWarnings: false,
     registerInstance: false, openTelemetry: { enabled: false },
   });
   const consumers = new Map(), cancellations = new Map();
@@ -58,17 +58,30 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
     if (!data || typeof data !== 'object' || Array.isArray(data) || Buffer.byteLength(JSON.stringify(data)) > 65536)
       throw new ServiceError('operations_job_payload_invalid', 400);
     if (typeof key !== 'string' || !key.length || key.length > 300) throw new ServiceError('operations_job_key_required', 400);
-    return boss.send(name, data, {
-      singletonKey: key, ...(startAfter ? { startAfter: new Date(startAfter) } : {}),
-      ...(within ? { db: operationsDatabase(within) } : {}),
-    });
+    const options={singletonKey:key,...(within?{db:operationsDatabase(within)}:{})};
+    return startAfter?boss.sendAfter(name,data,options,new Date(startAfter)):boss.send(name,data,options);
+  }
+  function previewSchedule(cron,{timezone,from=new Date(),count=3}={}){
+    if(typeof cron!=='string'||!cron.trim()||cron.length>160||/^(?:DTSTART|RRULE):/i.test(cron)||typeof timezone!=='string'||!timezone)
+      throw new ServiceError('operations_messaging_schedule_invalid',400);
+    try{return boss.previewSchedule(cron,{tz:timezone,from:new Date(from),count}).map(value=>value.toISOString());}
+    catch{throw new ServiceError('operations_messaging_schedule_invalid',400);}
+  }
+  async function schedule(name,cron,data,{key,timezone,db:within,missed='skip'}={}){
+    if(!['messaging-run'].includes(queueName(name))||typeof key!=='string'||!key||key.length>300||!['skip','once'].includes(missed))throw new ServiceError('operations_messaging_schedule_invalid',400);
+    previewSchedule(cron,{timezone,count:1});
+    return boss.schedule(name,cron,data,{key,tz:timezone,missed,...(within?{db:operationsDatabase(within)}:{})});
+  }
+  async function unschedule(name,key,{db:within}={}){
+    if(queueName(name)!=='messaging-run'||typeof key!=='string'||!key||key.length>300)throw new ServiceError('operations_messaging_schedule_invalid',400);
+    return boss.unschedule(name,key,{...(within?{db:operationsDatabase(within)}:{})});
   }
   async function execute(job, handler) {
     const startedAt=performance.now(),fields={queue:job.name,jobId:job.id,attempt:job.retryCount??0,stage:'queue-execute'};
     return withRuntimeDiagnosticContext(fields,async()=>{
       try {
         job.signal?.throwIfAborted();
-        const result=await handler(job.data,{signal:job.signal,jobId:job.id,attempt:job.retryCount??0});
+        const result=await handler(job.data,{signal:job.signal,jobId:job.id,attempt:job.retryCount??0,createdAt:time(job.createdOn),availableAt:time(job.startAfter),startedAt:time(job.startedOn)});
         // This is the handler result; the queue still persists its own ACK.
         notify({event:'operations_job_finished',...fields,startedAt,outcome:'succeeded'});
         return result;
@@ -109,7 +122,7 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
     state:after.state,changed:before.state!==after.state,
     ...(Number.isSafeInteger(before.data?.generation)&&before.data.generation>0?{generation:before.data.generation}:{})});
   return {
-    start, enqueue, work, stopWork, get,
+    start, enqueue, work, stopWork, get,schedule,unschedule,previewSchedule,
     onCancel(name, handler) {
       queueName(name);
       if (cancellations.has(name)) throw new Error('Operations cancellation handler already registered');
@@ -121,13 +134,15 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
       const jobs = await boss.findJobs(queueName(name), { limit: limit + 1, ...(after ? { after } : {}) });
       return { items: jobs.slice(0, limit).map(operationJobView), nextAfter: jobs.length > limit ? jobs[limit - 1].id : null };
     },
-    async cancel(name, id, {audit,endpoint} = {}) {
+    async cancel(name, id, {audit,endpoint,authorize} = {}) {
       queueName(name);
+      if(name.startsWith('autonomy-'))throw new ServiceError('operations_autonomy_task_control_required',409);
       return transaction(db, async tx => {
+        await authorize?.(tx);
         const adapter = operationsDatabase(tx);
         const current = await lockedJob(tx,name,id);
         const cancellable=['created', 'retry', 'active'].includes(current.state);
-        const domainCancellation=['content-publication','account-notice','retention-cleanup'].includes(name);
+        const domainCancellation=['content-publication','account-notice','retention-cleanup','messaging-run','messaging-delivery'].includes(name);
         if(domainCancellation&&(cancellable||current.state==='cancelled')){
           if(!cancellations.has(name))throw new ServiceError(name==='content-publication'?'site_publication_unavailable':'operations_job_domain_unavailable',503);
           await cancellations.get(name)(tx,current.data,{jobId:id,endpoint});
@@ -143,9 +158,11 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
         return operationJobView(latest);
       });
     },
-    async retry(name, id, {audit} = {}) {
+    async retry(name, id, {audit,authorize} = {}) {
       queueName(name);
+      if(name.startsWith('autonomy-'))throw new ServiceError('operations_autonomy_task_control_required',409);
       return transaction(db,async tx=>{
+        await authorize?.(tx);
         const current=await lockedJob(tx,name,id),adapter=operationsDatabase(tx);
         // Cancellation is an owner's stop, not an automatic retry candidate.
         if(current.state!=='failed')throw new ServiceError('operations_job_not_failed',409);

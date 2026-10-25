@@ -10,6 +10,8 @@ import {CommunityForumSectionsV2} from './community-forum-sections-v2.mjs';
 import {legacyForumAudience,forumNotificationsQuerySchema,forumNotificationReadSchema} from './shared/community-forum-access-v2.mjs';
 import {forumTopics,forumUnclassifiedTopic} from './shared/community-forum-topics-v1.mjs';
 import {forumPageFor,forumPageAfter,forumMatchesQuery} from './community-forum-page-v1.mjs';
+import {forumOperationsHiddenWithin} from './operations-forum-visibility.mjs';
+import {forumCurationWithin} from './operations-forum-curation.mjs';
 import {defaultForumPolicy,forumPolicySchema,forumPolicyHash} from './community-forum-policy-v1.mjs';
 import {lockForumOperation,priorForumOperation,recordForumReceipt,recordForumAudit,forumReceiptWithin} from './community-forum-operations-v1.mjs';
 import {forumWriteSpec,parseForumPayload,forumCreatePostSchema,forumPublishVersionSchema,forumCreateReplySchema,
@@ -17,9 +19,21 @@ import {forumWriteSpec,parseForumPayload,forumCreatePostSchema,forumPublishVersi
 
 const validate=(schema,value)=>{const parsed=schema.safeParse(value);if(!parsed.success)throw new ServiceError('invalid_forum_request');return parsed.data;};
 const unavailable=(locator,availability,checkedAt)=>({locator,availability,checkedAt});
-const authorship=row=>({authorId:row.subject_id??null,authorAccountId:row.account_id??null,
- author:{kind:row.subject_id?'identity':'account',subjectId:row.subject_id??null,accountId:row.account_id??null}});
+// A readable contribution already identifies its author. Only the website's
+// chosen public username, local avatar and fixed, non-secret UID are attached here. The
+// separate profile/directory query opt-in remains authoritative for those
+// endpoints; this does not expose native names, emails or private profile data.
+
 export class CommunityForumV1 {
+ async authorWithin(db,row,{includeDisplay=true}={}){
+ const identity={authorId:row.subject_id??null,authorAccountId:row.account_id??null,author:{kind:row.subject_id?'identity':'account',subjectId:row.subject_id??null,accountId:row.account_id??null}};
+ if(!includeDisplay)return identity;
+ const account=row.account_id?(await db.query(`SELECT a.uid,p.display_name,p.avatar_key,p.subject_type FROM community_accounts a
+  LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.id WHERE a.id=$1 AND a.endpoint=$2`,[row.account_id,this.access.endpoint])).rows[0]:null;
+ return {authorId:row.subject_id??null,authorAccountId:row.account_id??null,
+  author:{kind:row.subject_id?'identity':'account',subjectId:row.subject_id??null,accountId:row.account_id??null,
+   uid:account?.uid??null,displayName:account?.display_name?.trim()||null,avatarKey:account?.avatar_key??null,subjectType:account?.subject_type??null}};
+ }
  constructor(access,consents,{accounts,publicWrites,policy=defaultForumPolicy}={}){
   Object.assign(this,{access,consents,accounts,publicWrites});this.policy=forumPolicySchema.parse(policy);this.policyHash=forumPolicyHash(this.policy);
   this.permissions=new CommunityForumPermissionsV1(access,consents,{policy:this.policy,policyHash:this.policyHash,accounts});
@@ -61,6 +75,16 @@ export class CommunityForumV1 {
  }
  async selectWriteAccountWithin(db,actor,p,{owner=null,control=false}={}){
   const ownerAccountId=owner?.account_id??owner?.maintainer_account_id;
+  if(owner?.account_id===null&&owner.subject_id){
+   // Only an existing identity author's control action may retain its original
+   // scope. New publication still requires an Account and does not convert a
+   // historical NULL-account head into a newly Account-authored object.
+   if(!control)throw new ServiceError('not_found',404);
+   if(actor.kind!=='official-account'&&actor.subjectId===owner.subject_id){
+    if(p.accountId)throw new ServiceError('forum_account_target_mismatch',409);
+    return actor;
+   }
+  }
   if(ownerAccountId){
    if(actor.accountId&&actor.accountId!==ownerAccountId)throw new ServiceError('not_found',404);
    const account=await this.accounts.resolveWithin(db,actor,{accountId:ownerAccountId,lock:true});
@@ -117,6 +141,7 @@ export class CommunityForumV1 {
     if(latest)previous=await this.version(db,p.postId,latest.id);
    }
    const publication=await this.accessRules.publicationWithin(db,actor,p,{previous});
+   if(this.businessRules)await this.businessRules.enforceWithin(db,{actor,account:state.account,target:'forum-post',operationRef:p.operationId,text:p.title+'\n'+p.body,links:p.links,attachmentCount:p.attachments?.length??0});
    const consentId=await this.consentWithin(db,actor,authorization,signedIntent),permit=await this.permissions.captureWithin(db,actor,{consentId,payloadJson,spec,eventId:p.operationId,accountId:state.account.id,publishedUntil:p.publishedUntil});
    const headVersion=kind==='create-post'?1:head.head_version+1,locator={kind:'post-version',postId:p.postId,versionId:p.versionId,versionNumber:number},
     result={acknowledged:true,postId:p.postId,versionId:p.versionId,versionNumber:number,headVersion,permissionId:permit.id,publishedUntil:p.publishedUntil,accountId:state.account.id,subjectId:actor.subjectId??null,authority:'accepted-operation-only'};
@@ -142,6 +167,7 @@ export class CommunityForumV1 {
    if(p.replyTo){const parent=await this.reply(db,p.replyTo.replyId,true);if(!parent||parent.post_id!==p.postId||parent.post_version_id!==p.postVersionId
     ||(await this.readReplyWithin(db,parent.id,{actor})).availability!=='available')throw new ServiceError('forum_reply_source_unavailable',403);
     parentAudience.push(...await this.accessRules.snapshotWithin(db,parent),...(parent.parent_audience??[]));}
+   if(this.businessRules)await this.businessRules.enforceWithin(db,{actor,account:state.account,target:'forum-reply',operationRef:p.operationId,text:p.body,attachmentCount:p.attachments?.length??0});
    const consentId=await this.consentWithin(db,actor,authorization,signedIntent),permit=await this.permissions.captureWithin(db,actor,{consentId,payloadJson,spec,eventId:p.operationId,accountId:state.account.id,publishedUntil:p.publishedUntil}),
     locator={kind:'reply',replyId:p.replyId,contentRevision:1,postId:p.postId,postVersionId:p.postVersionId},
     result={acknowledged:true,replyId:p.replyId,revision:1,permissionId:permit.id,publishedUntil:p.publishedUntil,accountId:state.account.id,subjectId:actor.subjectId??null,authority:'accepted-operation-only'};
@@ -191,7 +217,14 @@ export class CommunityForumV1 {
    return this.complete(db,actor,authorization,{p,consentId,payloadJson,kind:'forum.withdraw',accountId,locator,result});
   },{resourceWrite:true,control:true});
  }
- async hiddenWithin(db,target){return this.governance?this.governance.hiddenWithin(db,target):false;}
+ async hiddenWithin(db,target,{ignoreOperationsVisibility=false}={}){
+  let postId=target.postId;
+  if(target.kind==='reply'&&!postId)postId=(await this.reply(db,target.replyId))?.post_id;
+  if(!ignoreOperationsVisibility&&await forumOperationsHiddenWithin(db,{endpoint:this.access.endpoint,kind:target.kind==='reply'?'reply':'post',id:target.kind==='reply'?target.replyId:postId,postId,now:this.clock()}))return true;
+  if(this.governance&&await this.governance.hiddenWithin(db,target))return true;
+  if(target.kind==='reply'&&this.governance){const reply=await this.reply(db,target.replyId);if(reply&&await this.governance.hiddenWithin(db,{kind:'post-version',postId:reply.post_id,versionId:reply.post_version_id}))return true;}
+  return false;
+ }
  async readVersionWithin(db,postId,versionId,{actor=null}={}){
   const row=await this.version(db,postId,versionId);if(!row)throw new ServiceError('not_found',404);
   actor=await this.objectActorWithin(db,actor,row);
@@ -202,8 +235,9 @@ export class CommunityForumV1 {
   if(await this.hiddenWithin(db,{kind:'post-version',postId,versionId}))return unavailable(locator,'unavailable',now);
   const payload=JSON.parse(row.payload_text);
   if((row.topic??null)!==(payload.topic??null))return unavailable(locator,'unavailable',now);
-  return {locator,...authorship(row),headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],
-   topic:payload.topic??'unclassified',audience:row.audience??legacyForumAudience,sectionId:row.section_id??null,
+  const operatorCuration=await forumCurationWithin(db,{endpoint:this.access.endpoint,kind:'post',id:postId,version:row.id===row.current_version_id?row.head_version:null});
+  return {locator,...await this.authorWithin(db,row),headVersion:row.head_version,currentVersionId:row.current_version_id,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],
+   topic:operatorCuration.topic??payload.topic??'unclassified',originalTopic:payload.topic??'unclassified',operatorCuration,audience:row.audience??legacyForumAudience,sectionId:row.section_id??null,
    canParticipate:await this.canParticipateWithin(db,actor,row),createdAt:forumSeconds(row.post_created_at),versionCreatedAt:forumSeconds(row.created_at),updatedAt:forumSeconds(row.post_updated_at),
    permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),checkedAt:now,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
  }
@@ -216,10 +250,11 @@ export class CommunityForumV1 {
   const state=await this.permissions.statusWithin(db,row.permission_id,{visibility:'Public',payloadHash:row.payload_hash,action:'forum.reply.publish',objectId:id,viewerActor:actor});
   if(!state.allowed||!row.payload_text||row.erased_at||row.event_erased)return unavailable(locator,state.reasons.includes('content-expired')?'expired':'unavailable',now);
   if(await this.hiddenWithin(db,{kind:'reply',replyId:id,contentRevision:1}))return unavailable(locator,'unavailable',now);
-  let parentAvailability='unavailable';if(parent)try{parentAvailability=(await this.readVersionWithin(db,row.post_id,row.post_version_id,{actor})).availability;}catch(error){if(error.status!==404)throw error;}
+  let parentAvailability='unavailable',parentView=null;if(parent)try{parentView=await this.readVersionWithin(db,row.post_id,row.post_version_id,{actor});parentAvailability=parentView.availability;}catch(error){if(error.status!==404)throw error;}
   const payload=JSON.parse(row.payload_text);
-  return {locator,...authorship(row),revision:row.revision,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],permissionId:row.permission_id,
-   audience:row.audience??legacyForumAudience,audienceInherited:row.audience_inherited??false,sectionId:row.section_id??null,publishedUntil:forumSeconds(row.published_until),createdAt:forumSeconds(row.created_at),checkedAt:now,parentAvailability,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
+  const operatorCuration=await forumCurationWithin(db,{endpoint:this.access.endpoint,kind:'reply',id,version:row.revision});
+  return {locator,...await this.authorWithin(db,row),revision:row.revision,availability:'available',payload,attachments:await this.attachments?.metadataWithin(db,payload.attachments)??[],permissionId:row.permission_id,
+   topic:operatorCuration.topic??parentView?.topic??'unclassified',operatorCuration,audience:row.audience??legacyForumAudience,audienceInherited:row.audience_inherited??false,sectionId:row.section_id??null,publishedUntil:forumSeconds(row.published_until),createdAt:forumSeconds(row.created_at),checkedAt:now,parentAvailability,authorizationEvidence:await this.permissions.publicEvidenceWithin(db,state.row)};
  }
  async versionsWithin(db,id,input={},actor=null){
   const q=validate(forumVersionsQuerySchema,input),head=await this.head(db,id);if(!head)throw new ServiceError('not_found',404);
@@ -240,7 +275,7 @@ export class CommunityForumV1 {
  async ownedSummaryWithin(db,actor,id){
   const head=await this.head(db,id);actor=await this.objectActorWithin(db,actor,head,{required:true});if(!forumActorOwns(actor,head))throw new ServiceError('not_found',404);
   const current=head.current_version_id?await this.readVersionWithin(db,id,head.current_version_id,{actor}):null;
-  const base={locator:{kind:'post',postId:id},...authorship(head),headVersion:head.head_version,currentVersionId:head.current_version_id,
+  const base={locator:{kind:'post',postId:id},...await this.authorWithin(db,head),headVersion:head.head_version,currentVersionId:head.current_version_id,
    state:head.state,createdAt:forumSeconds(head.created_at),updatedAt:forumSeconds(head.updated_at),checkedAt:this.clock()};
   if(current?.availability!=='available')return {...base,availability:head.state==='withdrawn'?'withdrawn':current?.availability??'unavailable'};
   return {...current,...base};
@@ -253,12 +288,13 @@ export class CommunityForumV1 {
   const accountOwner=actor&&(actor.kind==='official-account'||actor.accountAuthorized),ownerColumn=accountOwner?'account_id':'subject_id',ownerId=actor?(accountOwner?actor.accountId:actor.subjectId):null;
   const rows=(await db.query(`SELECT p.id,p.created_at FROM forum_posts_v1 p
    LEFT JOIN forum_versions_v1 v ON v.id=p.current_version_id AND v.post_id=p.id
+   LEFT JOIN operations_forum_curation_v1 curated ON curated.endpoint=$9 AND curated.target_kind='post' AND curated.target_id=p.id AND curated.source_version=p.head_version
    WHERE (($7::uuid[] IS NOT NULL AND (p.account_id=ANY($7::uuid[]) OR p.account_id IS NULL AND p.subject_id=$8::text)) OR
     ($7::uuid[] IS NULL AND (($1::text IS NOT NULL AND p.${ownerColumn}::text=$1::text) OR
     ($1::text IS NULL AND p.state='published' AND v.state='published' AND v.erased_at IS NULL AND v.published_until>$5::timestamptz))))
-   AND ($2::text IS NULL OR COALESCE(v.topic,'unclassified')=$2::text) AND ($6::uuid IS NULL OR v.section_id=$6)
+   AND ($2::text IS NULL OR COALESCE(curated.topic,v.topic,'unclassified')=$2::text) AND ($6::uuid IS NULL OR v.section_id=$6)
    AND ($3::timestamptz IS NULL OR (p.created_at,p.id)<($3::timestamptz,$4::uuid))
-   ORDER BY p.created_at DESC,p.id DESC LIMIT 201`,[ownerId,q.topic??null,page.afterAt,page.afterId,forumStamp(this.clock()),q.sectionId??null,ownedAccounts,actor?.subjectId??null])).rows;
+   ORDER BY p.created_at DESC,p.id DESC LIMIT 201`,[ownerId,q.topic??null,page.afterAt,page.afterId,forumStamp(this.clock()),q.sectionId??null,ownedAccounts,actor?.subjectId??null,this.access.endpoint])).rows;
   const items=[];let scanned=null,processed=0;
   for(const row of rows.slice(0,200)){
    scanned=row;processed++;
@@ -305,12 +341,12 @@ export class CommunityForumV1 {
   const head=await this.head(db,id);actor=await this.objectActorWithin(db,actor,head,{required:true});if(!forumActorOwns(actor,head))throw new ServiceError('not_found',404);
   const rows=(await db.query('SELECT id,version_number,state,permission_id,published_until FROM forum_versions_v1 WHERE post_id=$1 ORDER BY version_number',[id])).rows,versionLocators=[];
   for(const row of rows){const view=await this.readVersionWithin(db,id,row.id,{actor});versionLocators.push({locator:view.locator,state:row.state,permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),availability:view.availability});}
-  return {locator:{kind:'post',postId:id},...authorship(head),headVersion:head.head_version,currentVersionId:head.current_version_id,state:head.state,versionLocators,checkedAt:this.clock()};
+  return {locator:{kind:'post',postId:id},...await this.authorWithin(db,head),headVersion:head.head_version,currentVersionId:head.current_version_id,state:head.state,versionLocators,checkedAt:this.clock()};
  }
  ownedPost(actor,id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return this.accounts.runAuthorized(actor,'assistance',(db,_authorization,currentActor)=>this.ownedWithin(db,currentActor,id));}
  ownedReply(actor,id){if(!z.uuid().safeParse(id).success)throw new ServiceError('not_found',404);return this.accounts.runAuthorized(actor,'assistance',async(db,_authorization,actor)=>{
   const row=await this.reply(db,id);actor=await this.objectActorWithin(db,actor,row,{required:true});if(!forumActorOwns(actor,row))throw new ServiceError('not_found',404);const view=await this.readReplyWithin(db,id,{actor});
-  return {locator:view.locator,...authorship(row),revision:row.revision,state:row.state,permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),availability:view.availability,checkedAt:this.clock()};
+  return {locator:view.locator,...await this.authorWithin(db,row),revision:row.revision,state:row.state,permissionId:row.permission_id,publishedUntil:forumSeconds(row.published_until),availability:view.availability,checkedAt:this.clock()};
  });}
  owned(actor,input={}){const q=validate(forumPostsQuerySchema,input);return this.accounts.runAuthorized(actor,'assistance',async(db,_authorization,actor)=>{
   const accountOwner=actor.kind==='official-account'||actor.accountAuthorized,ownerColumn=accountOwner?'account_id':'subject_id',ownerId=accountOwner?actor.accountId:actor.subjectId,
@@ -331,7 +367,7 @@ export class CommunityForumV1 {
   const view=await this.readReplyWithin(db,row.id,{actor});if(view.availability!=='available')return null;
   const post=await this.readVersionWithin(db,row.post_id,row.post_version_id,{actor});
   if(post.availability!=='available')return null;
-  return {replyId:row.id,postId:row.post_id,postVersionId:row.post_version_id,...authorship(row),title:post.payload.title,
+  return {replyId:row.id,postId:row.post_id,postVersionId:row.post_version_id,...await this.authorWithin(db,row),title:post.payload.title,
    preview:view.payload.body.slice(0,180),at:forumStamp(forumSeconds(row.created_at)),read:!!row.read_at,sourceExpiresAt:forumStamp(Math.min(view.publishedUntil,post.publishedUntil))};
  }
  notifications(actor,input={}){

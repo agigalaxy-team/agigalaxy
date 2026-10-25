@@ -1,3 +1,4 @@
+import {AccountFollowsV1} from '../src/account-follows-v1.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,generateKeyPairSync} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
@@ -29,7 +30,8 @@ export async function communityForumFixture({policy,resourceBudgetPolicy,officia
   owner.forum=forum;owner.forumGovernance=governance;owner.dataExport.viewServices.forum=forum;owner.dataExport.viewServices.forumGovernance=governance;
   const website='https://galaxy.example.org',entry=officialAccountPortal?await createOidcLoginProvider({id:'official-account-entry',name:'Isolated account entry',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/account/callback',includeAccountProfile:true,allowLoopbackHttp:true,now:()=>clock.now}):null,
    officialAccounts=entry?createOfficialAccountPortal({provider:entry,db:owner.db,endpoint,websiteOrigin:website,associationProviders:[provider],now:()=>clock.now}):null;
-  api=createApi({...owner,forum,forumGovernance:governance,officialAccounts,browserOrigins:entry?[website]:[],rateLimit:10000,failureAudit:async()=> 'fixture-error-recorded'});
+  const accountFollows=new AccountFollowsV1({accounts:owner.communityAccounts,endpoint,now:()=>clock.now});
+  api=createApi({...owner,accountFollows,forum,forumGovernance:governance,officialAccounts,browserOrigins:entry?[website]:[],rateLimit:10000,failureAudit:async()=> 'fixture-error-recorded'});
   await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+api.address().port;
   async function request(path,{who=owner,input,method=input===undefined?'GET':'POST',authorization=true}={}){
    const response=await fetch(origin+path,{method,headers:{...(input===undefined?{}:{'content-type':'application/json'}),...(authorization?{authorization:'Bearer '+who.credential}:{})},...(input===undefined?{}:{body:JSON.stringify(input)})});

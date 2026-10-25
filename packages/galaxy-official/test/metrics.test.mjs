@@ -38,17 +38,17 @@ test('real HTTP metrics count successful, failed and streamed responses with bou
 });
 
 test('cached collection coalesces scrapes, clears failed values and keeps unavailable measurements explicit',async()=>{
-  let reads=0,fail=false,now=2000000000000,release;
+  let reads=0,autonomyReads=0,fail=false,now=2000000000000,release;
   const gate=new Promise(resolve=>{release=resolve;});
   const row={database_bytes:'12000',pending:2,running:1,completed:4,failed:0,active:1,oldest:30,revoked_jobs:1,oldest_revocation:5,
     dependent_revoked_jobs:2,oldest_dependent_revocation:6,invalidated_search_documents:0,connected:2,evidence_bearing:1};
-  const metrics=createOperationalMetrics({component:'api',defaultMetrics:false,now:()=>now,db:{async query(){reads++;await gate;if(fail)throw new Error('Private backend value');return {rows:[row]};}}});
-  const a=metrics.render(),b=metrics.render();release();await Promise.all([a,b]);assert.equal(reads,1);
+  const metrics=createOperationalMetrics({component:'api',defaultMetrics:false,now:()=>now,db:{async query(sql){const autonomy=sql.includes('operations_autonomy_configs_v1');if(autonomy)autonomyReads++;else reads++;await gate;if(fail)throw new Error('Private backend value');return {rows:[autonomy?{enabled:1,health_available:true,tick_age:20,tick_limit:150,late:0,stalled:0}:row]};}}});
+  const a=metrics.render(),b=metrics.render();release();await Promise.all([a,b]);assert.equal(reads,1);assert.equal(autonomyReads,1);
   assert.equal((await values(metrics,'database_bytes'))[0].value,12000);
   assert.equal((await values(metrics,'revocation_dependent_open_jobs'))[0].value,2);
   assert.equal((await values(metrics,'revocation_oldest_dependent_job_age_seconds'))[0].value,6);
   fail=true;now+=16000;const failed=await metrics.render();
-  assert.equal(reads,2);assert.match(failed,/galaxy_database_collection_success\{component="api"\} 0/);
+  assert.equal(reads,2);assert.equal(autonomyReads,2);assert.match(failed,/galaxy_database_collection_success\{component="api"\} 0/);assert.match(failed,/galaxy_autonomy_collection_success\{component="api"\} 0/);
   assert.doesNotMatch(failed,/galaxy_database_bytes\{component="api"\}/);
   assert.equal((await values(metrics,'revocation_dependent_open_jobs')).length,0);
   assert.doesNotMatch(failed,/stage="connected"|Private backend value/);

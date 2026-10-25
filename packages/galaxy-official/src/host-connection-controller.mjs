@@ -1,5 +1,6 @@
-import { captureSearchFeedbackItem, legacyFeedbackItem } from './shared/search-feedback-schema.mjs';
-import { searchScope } from './shared/search-schema.mjs';
+import {createHostDomainAccess} from './host/connection/domain-access.mjs';
+import {createHostSearchFeedback} from './host/connection/search-feedback.mjs';
+import {createHostRecovery} from './host/connection/recovery.mjs';
 
 // Trusted composition only. No configuration discovery or implicit remote I/O.
 export function createHostConnectionController({ client, sessions, endpoint, readRequest, statusClient, bindingManagementClient, identityClient, historyClient, searchClient, projectDiscoveryClient, profileFlow, caseReviewFlow, caseClient, assistanceClient, assistanceFlow, contextClient, contextFlow, notificationsClient, honorClient, capsuleClient, capsuleFlow, builderClient, builderFlow, nodeControlProofFlow, auditClient, deletionClient, deletionStatusClient, dataExportClient, saveExportToDirectory, moderationClient, moderationFlow, publicationFlow, saveSearchFeedback, a2aFlow }) {
@@ -15,6 +16,14 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
   let active = null, activeCase = null, activeAssistance = null, activeCollaboration = null, activeContext = null, activeModeration = null, activeCapsule = null, activeBuilder = null, activePublication = null, generation = 0, preparing = false, checking = null;
   const busy = () => activeIdentity || activeBindingRevoke || active || activeNodeProof || activeCaseReview || activeProfile || activeCase || activeAssistance || activeCollaboration || activeContext || activeModeration || activeCapsule || activeBuilder || activePublication || activeA2a || activeAudit || activeDeletion || activeDeletionStatus || preparing || checking;
   let feedbackPage = null;
+  const controllerState = {
+    get generation(){return generation;},
+    get checking(){return checking;}, set checking(value){checking=value;},
+    get feedbackPage(){return feedbackPage;}, set feedbackPage(value){feedbackPage=value;},
+  };
+  const {getCase,getAssistance,queryAssistance,readContext,readModeration,readCapsule,readDataExport,saveDataExport,readDeletion,readAudit,readBuilder,honorOperation,notificationOperation,projectDiscoveryOperation,queryRequesterHistory,readA2a,readIdentity,queryBindings} = createHostDomainAccess({caseClient,busy,assistanceClient,contextClient,moderationClient,capsuleClient,dataExportClient,saveExportToDirectory,deletionClient,auditClient,builderClient,honorClient,notificationsClient,projectDiscoveryClient,a2aFlow,identityClient,bindingManagementClient,controllerState});
+  const {querySearch,queryHistory,recordSearchFeedback} = createHostSearchFeedback({searchClient,busy,saveSearchFeedback,sessions,endpoint,historyClient,controllerState});
+  const {contextOperation,readBuilderOperation,readCollaborationOperation,listPublicationDrafts,reconcilePublication} = createHostRecovery({contextFlow,busy,builderFlow,assistanceFlow,publicationFlow,controllerState});
   async function prepare() {
     if (busy()) throw new Error('Connection operation already active.');
     preparing = true;
@@ -96,44 +105,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
     activeA2a = null;
     active = null;
   }
-  async function querySearch(input){
-    if(!searchClient||busy())throw new Error('Search unavailable.');
-    feedbackPage=null;const operation=new AbortController(),version=generation;checking=operation;
-    try{
-      const identity=await feedbackIdentity();
-      const result=await searchClient.query(input,{signal:operation.signal});
-      if(saveSearchFeedback)await rememberFeedback(identity,input.type,input.query,result.items.map(item=>[item.id,captureSearchFeedbackItem(input.type,item)]),version,operation);
-      if(version!==generation||checking!==operation)throw new Error('Search canceled.');return result;
-    }
-    finally{if(checking===operation)checking=null;}
-  }
-  async function feedbackIdentity(){
-    if(!saveSearchFeedback)return null;
-    const lease=sessions.readAuthorization?await sessions.readAuthorization(endpoint):null;
-    const state=lease?{...lease,state:'session-local'}:await sessions.status(endpoint);
-    return {subjectId:state.subjectId,bindingId:state.bindingId,lease};
-  }
-  async function rememberFeedback(identity,type,query,items,version,operation){
-    if(!saveSearchFeedback)return;
-    const state=await sessions.status(endpoint);
-    if(version!==generation||checking!==operation||state.state!=='session-local'||!state.scopes?.includes(searchScope(type))
-      ||!identity.subjectId||identity.subjectId!==state.subjectId||identity.bindingId!==state.bindingId
-      ||identity.lease&&!sessions.matchesAuthorization(identity.lease))throw new Error('Current search session required.');
-    feedbackPage={...identity,type,query:structuredClone(query),items:new Map(items)};
-  }
-  async function queryHistory(input) {
-    if (!historyClient || busy()) throw new Error('History query unavailable.');
-    feedbackPage = null;
-    const operation = new AbortController(), version = generation;
-    checking = operation;
-    try {
-      const identity = await feedbackIdentity();
-      const result = await historyClient.query(input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('History query canceled.');
-      if (saveSearchFeedback) await rememberFeedback(identity,'history',input,result.items.map(item=>[item.caseId,legacyFeedbackItem(item)]),version,operation);
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareProfile(input){
     if(!profileFlow||busy())throw new Error('Profile preparation unavailable.');
     preparing=true;const version=generation;
@@ -188,16 +159,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return result;
     } finally { if (activeCase === preview) activeCase = null; }
   }
-  async function getCase(caseId) {
-    if (!caseClient || busy()) throw new Error('Case read unavailable.');
-    const operation = new AbortController(), version = generation;
-    checking = operation;
-    try {
-      const result = await caseClient.get(caseId, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Case read canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareAssistance(request) {
     if (!assistanceClient || busy()) throw new Error('Assistance preparation unavailable.');
     preparing = true;
@@ -219,25 +180,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return result;
     } finally { if (activeAssistance === preview) activeAssistance = null; }
   }
-  async function getAssistance(assistanceId) {
-    if (!assistanceClient || busy()) throw new Error('Assistance read unavailable.');
-    const operation = new AbortController(), version = generation;
-    checking = operation;
-    try {
-      const result = await assistanceClient.get(assistanceId, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Assistance read canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function queryAssistance(input) {
-    if (!assistanceClient || busy()) throw new Error('Assistance query unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await assistanceClient.query(input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Assistance query canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareCollaboration(input, retry = false, draftPreview = false) {
     if (!assistanceFlow || busy()) throw new Error('Collaboration preparation unavailable.');
     preparing = true; const version = generation;
@@ -256,14 +198,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return receipt;
     } finally { if (activeCollaboration === preview) activeCollaboration = null; }
   }
-  async function readContext(method, id) {
-    if (!contextClient || busy()) throw new Error('Context read unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await contextClient[method](id, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Context read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareContext(input, retry=false) {
     if (!contextFlow || busy()) throw new Error('Context preparation unavailable.');
     preparing = true; const version = generation;
@@ -280,14 +214,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       const result = await contextFlow.execute(preview, confirmation);
       if (version !== generation) throw new Error('Context canceled; check remote outcome.'); return result;
     } finally { if (activeContext === preview) activeContext = null; }
-  }
-  async function readModeration(method, id) {
-    if (!moderationClient || busy()) throw new Error('Moderation read unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await moderationClient[method](id, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Moderation read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
   }
   async function prepareModeration(input) {
     if (!moderationFlow || busy()) throw new Error('Moderation preparation unavailable.');
@@ -306,14 +232,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       if (version !== generation) throw new Error('Moderation canceled; check remote outcome.'); return result;
     } finally { if (activeModeration === preview) activeModeration = null; }
   }
-  async function readCapsule(method, id) {
-    if (!capsuleClient || busy()) throw new Error('Capsule read unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await capsuleClient[method](id, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Capsule read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareCapsule(input) {
     if (!capsuleFlow || busy()) throw new Error('Capsule preparation unavailable.');
     preparing = true; const version = generation;
@@ -330,30 +248,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       const result = await capsuleFlow.execute(preview, confirmation);
       if (version !== generation) throw new Error('Capsule canceled; check remote outcome.'); return result;
     } finally { if (activeCapsule === preview) activeCapsule = null; }
-  }
-  async function readDataExport(method, input = {}) {
-    if (!dataExportClient || busy() || !['specification', 'create', 'page', 'binary', 'revoke'].includes(method)) throw new Error('Data export operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await dataExportClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Data export canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function saveDataExport(id, directory) {
-    if (!saveExportToDirectory || busy()) throw new Error('Local export unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await saveExportToDirectory(id, directory, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Export canceled; inspect the selected local directory.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function readDeletion(method, input = {}) {
-    if (!deletionClient || busy() || !['config','query','read'].includes(method)) throw new Error('Deletion operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await deletionClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Deletion read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
   }
   async function prepareDeletion(input) {
     if (!deletionClient || busy()) throw new Error('Deletion request unavailable.');
@@ -385,14 +279,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       if (version !== generation) throw new Error('Deletion submission canceled; inspect current requests.'); return result;
     } finally { if (activeDeletionStatus === preview) activeDeletionStatus = null; }
   }
-  async function readAudit(method, input = {}) {
-    if (!auditClient || busy()) throw new Error('Audit operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await auditClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Audit read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   async function prepareAudit(input) {
     if (!auditClient || busy()) throw new Error('Audit approval unavailable.');
     preparing = true; const version = generation;
@@ -407,14 +293,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
     try { const result = await auditClient.execute(preview, confirmation);
       if (version !== generation) throw new Error('Audit approval canceled; inspect current grants.'); return result;
     } finally { if (activeAudit === preview) activeAudit = null; }
-  }
-  async function readBuilder(method, id) {
-    if (!builderClient || busy()) throw new Error('Builder read unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await builderClient[method](id, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Builder read canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
   }
   async function prepareBuilder(input,retry=false) {
     if (!builderFlow || busy()) throw new Error('Builder preparation unavailable.');
@@ -433,13 +311,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       if (version !== generation) throw new Error('Builder canceled; check remote outcome.'); return result;
     } finally { if (activeBuilder === preview) activeBuilder = null; }
   }
-  async function contextOperation(method,id){
-    if(!contextFlow?.[method]||busy())throw new Error('Context operation unavailable.');
-    const operation=new AbortController(),version=generation;checking=operation;
-    try{const result=await contextFlow[method](id,{signal:operation.signal});
-      if(version!==generation||checking!==operation)throw new Error('Context operation canceled.');return result;
-    }finally{if(checking===operation)checking=null;}
-  }
   async function prepareNodeControlProof(input){
     if(!nodeControlProofFlow||busy())throw new Error('Node proof preparation unavailable.');
     preparing=true;const version=generation;
@@ -448,61 +319,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
   async function executeNodeControlProof(preview,confirmation){
     if(activeNodeProof!==preview)throw new Error('Unknown Node proof preview.');const version=generation;
     try{const result=await nodeControlProofFlow.execute(preview,confirmation);if(version!==generation)throw new Error('Node proof export canceled.');return result;}finally{if(activeNodeProof===preview)activeNodeProof=null;}
-  }
-  async function readBuilderOperation(method,input){
-    if(!builderFlow?.[method]||busy())throw new Error('Builder operation unavailable.');
-    const operation=new AbortController(),version=generation;checking=operation;
-    try{const result=await builderFlow[method](input,{signal:operation.signal});
-      if(version!==generation||checking!==operation)throw new Error('Builder operation canceled.');return result;
-    }finally{if(checking===operation)checking=null;}
-  }
-  async function readCollaborationOperation(method,input) {
-    if (!assistanceFlow?.[method] || busy()) throw new Error('Collaboration operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await assistanceFlow[method](input, {signal:operation.signal});
-      if (version !== generation || checking !== operation) throw new Error('Collaboration operation canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function honorOperation(method, input) {
-    if (!honorClient || busy()) throw new Error('Honor operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await honorClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Honor operation canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function notificationOperation(method, input) {
-    if (!notificationsClient || busy()) throw new Error('Notifications operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await notificationsClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Notifications operation canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function projectDiscoveryOperation(method, input) {
-    if (!projectDiscoveryClient || busy()) throw new Error('Project discovery operation unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await projectDiscoveryClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Project discovery operation canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function queryRequesterHistory(input, method = 'requesterHistory') {
-    if (!assistanceClient || busy()) throw new Error('Requester history unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await assistanceClient[method](input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('Requester history canceled.'); return result;
-    } finally { if (checking === operation) checking = null; }
-  }
-  async function listPublicationDrafts() {
-    if (!publicationFlow || busy()) throw new Error('Draft list unavailable.');
-    const version = generation;
-    const items = await publicationFlow.list();
-    if (version !== generation) throw new Error('Draft list canceled.');
-    return items;
   }
   async function preparePublication(localCaseId, options) {
     if (!publicationFlow || busy()) throw new Error('Publication preparation unavailable.');
@@ -523,38 +339,9 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return receipt;
     } finally { if (activePublication === preview) activePublication = null; }
   }
-  async function reconcilePublication(localCaseId) {
-    if (!publicationFlow || busy()) throw new Error('Publication reconciliation unavailable.');
-    const operation = new AbortController(), version = generation;
-    checking = operation;
-    try {
-      const result = await publicationFlow.reconcile(localCaseId, { signal: operation.signal });
-      if (version !== generation) throw new Error('Publication reconciliation canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
-  }
   function cancelPublication(preview) {
     if (activePublication !== preview) return false;
     cancel(); return true;
-  }
-  async function recordSearchFeedback(caseId, verdict) {
-    const page = feedbackPage, version = generation;
-    if (!saveSearchFeedback || busy() || !page?.items.has(caseId)) throw new Error('Current search result required.');
-    const state = await sessions.status(endpoint);
-    const assertCurrent=()=>version===generation&&feedbackPage===page&&(!page.lease||sessions.matchesAuthorization(page.lease));
-    if (!assertCurrent() || state.state !== 'session-local' || !state.scopes?.includes(searchScope(page.type))
-      ||state.subjectId!==page.subjectId||state.bindingId!==page.bindingId)
-      throw new Error('Current search session required.');
-    return saveSearchFeedback({ endpoint, subjectId: page.subjectId, query: page.query, item: page.items.get(caseId), verdict, assertCurrent });
-  }
-  async function readA2a(method, input = {}) {
-    if (!a2aFlow || busy()) throw new Error('A2A read unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try {
-      const result = await a2aFlow.read(method, input, { signal: operation.signal });
-      if (version !== generation || checking !== operation) throw new Error('A2A read canceled.');
-      return result;
-    } finally { if (checking === operation) checking = null; }
   }
   async function prepareA2a(input) {
     if (!a2aFlow || busy()) throw new Error('A2A preparation unavailable.');
@@ -574,13 +361,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
       return result;
     } finally { if (activeA2a === preview) activeA2a = null; }
   }
-  async function readIdentity(method,input={}) {
-    if (!identityClient || busy()) throw new Error('Identity management unavailable.');
-    const operation = new AbortController(), version = generation; checking = operation;
-    try { const result = await identityClient.read(method,input,{signal:operation.signal});
-      if(version!==generation||checking!==operation)throw new Error('Identity operation canceled.');return result;
-    } finally { if(checking===operation)checking=null; }
-  }
   async function prepareIdentity(action,input) {
     if (!identityClient || busy()) throw new Error('Identity management unavailable.');
     const operation = new AbortController(), version = generation; checking = operation;
@@ -595,13 +375,6 @@ export function createHostConnectionController({ client, sessions, endpoint, rea
     try { const result=await identityClient.execute(preview,confirmation);
       if(version!==generation)throw new Error('Identity outcome requires refresh.');return result;
     } finally { if(activeIdentity===preview)activeIdentity=null; }
-  }
-  async function queryBindings(input={}){
-    if(!bindingManagementClient||busy())throw new Error('Binding management unavailable.');
-    const operation=new AbortController(),version=generation;checking=operation;
-    try{const result=await bindingManagementClient.query(input,{signal:operation.signal});
-      if(version!==generation||checking!==operation)throw new Error('Binding query canceled.');return result;
-    }finally{if(checking===operation)checking=null;}
   }
   async function prepareBindingRevoke(bindingId){
     if(!bindingManagementClient||busy())throw new Error('Binding revocation unavailable.');

@@ -31,7 +31,7 @@ const stages = new Set(['environment','runtime-log','endpoint','signing-key','tr
   'transport-reconnect','archive','account-reports','personal-expiry','personal-sources','shared-expiry',
   'shared-sources','choice-expiry','choice-sources','chat-maintenance','policy-refresh']);
 const outcomes = new Set(['started','succeeded','failed','cancelled','stopped','deferred','superseded','published','unknown']);
-const queues = new Set(['information-watch','search-recovery','content-publication','account-notice','retention-cleanup']);
+const queues = new Set(['information-watch','search-recovery','content-publication','account-notice','retention-cleanup','messaging-run','messaging-delivery']);
 const environments = new Set(['production','staging','development','test','local','integration','pilot','unknown']);
 const valueOf = (value, key) => { try { return value?.[key]; } catch { return undefined; } };
 

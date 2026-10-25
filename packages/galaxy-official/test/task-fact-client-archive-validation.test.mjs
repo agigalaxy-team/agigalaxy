@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { getFactClient } from '../../galaxy-web/src/fact-client.mjs';
+import { getFactClient } from "../../galaxy-web/src/features/work-records/client.mjs";
 
 const subjectId = 'GUID' + 'A'.repeat(28), endpoint = 'https://fictional.invalid';
 const payloadHash = 'a'.repeat(64), alternativeHash = 'b'.repeat(64);

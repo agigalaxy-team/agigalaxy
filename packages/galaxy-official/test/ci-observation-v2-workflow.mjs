@@ -6,7 +6,7 @@ import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
 import {inspectGithubRun} from '../src/github-evidence.mjs';
 import {createCiWorkerV2} from '../src/ci-worker-v2.mjs';
 import {createApi} from '../src/http.mjs';
-import {ciToolDefinitions} from '../src/personal-mcp-ci-v2.mjs';
+import {ciToolDefinitions} from '../src/adapters/mcp/personal/tools/ci-v2.mjs';
 import {HonorService} from '../src/honor.mjs';
 import {HonorV2Service} from '../src/honor-v2.mjs';
 import {deletionTargets} from '../src/operations/deletion-execute.mjs';

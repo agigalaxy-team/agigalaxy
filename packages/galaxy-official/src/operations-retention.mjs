@@ -54,7 +54,7 @@ export class OperationsRetention{
     Object.assign(this,{db,endpoint,businessAdmin,jobs,now});registerOperationsRetentionCancellation({jobs,endpoint,now});
   }
   async status(operator){
-    this.businessAdmin.require(operator);const items=[],at=new Date(this.now()*1000).toISOString();
+    await this.businessAdmin.authorizeAction(operator,'retention.read');const items=[],at=new Date(this.now()*1000).toISOString();
     for(const [key,target]of Object.entries(targets)){
       const observations=(await this.db.query('SELECT * FROM operations_retention_observations_v1 WHERE endpoint=$1 AND target=$2 ORDER BY component',[this.endpoint,key])).rows;
       items.push({key,label:target.label,backlog:await target.count(this.db,at),maximumRowsPerRun:target.maximumRowsPerRun,maximumRootsPerRun:target.maximumRootsPerRun??null,expiry:target.expiry,
@@ -63,7 +63,7 @@ export class OperationsRetention{
     return {policyVersion:lifecyclePolicyVersion,targets:items,checkedAt:this.now(),scope:'configured-business-database'};
   }
   async list(operator,input={}){
-    this.businessAdmin.require(operator);const page=parse(operationsPageSchema,input),rows=(await this.db.query(`SELECT * FROM operations_retention_runs_v1
+    await this.businessAdmin.authorizeAction(operator,'retention.read');const page=parse(operationsPageSchema,input),rows=(await this.db.query(`SELECT * FROM operations_retention_runs_v1
       WHERE endpoint=$1 AND ($2::bigint IS NULL OR sequence<$2) ORDER BY sequence DESC LIMIT $3`,[this.endpoint,page.after??null,page.limit+1])).rows;
     return {items:rows.slice(0,page.limit).map(view),nextAfter:rows.length>page.limit?String(rows[page.limit-1].sequence):null,checkedAt:this.now()};
   }
@@ -71,7 +71,7 @@ export class OperationsRetention{
     parse(z.uuid(),id);const row=(await db.query(`SELECT * FROM operations_retention_runs_v1 WHERE endpoint=$1 AND id=$2${lock?' FOR UPDATE':''}`,[this.endpoint,id])).rows[0];
     if(!row)throw new ServiceError('operations_retention_not_found',404);return row;
   }
-  async get(operator,id){this.businessAdmin.require(operator);return {run:view(await this.rowWithin(this.db,id))};}
+  async get(operator,id){await this.businessAdmin.authorizeAction(operator,'retention.read');return {run:view(await this.rowWithin(this.db,id))};}
   async request(operator,input){
     const data=parse(retentionRequestSchema,input);
     return operationsProductCommand(this,operator,'retention-request',data,async(db,actor)=>{
@@ -89,7 +89,7 @@ export class OperationsRetention{
   // or a claim that scheduled cleanup has never run.
   async recordMaintenance({target,component='worker',result=null,errorCode=null},db=this.db){
     parse(retentionTargetSchema,target);
-    if(component!=='worker'||errorCode!==null&&!['retention_cleanup_failed','business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(errorCode))throw new ServiceError('invalid_operations_product_request');
+    if(component!=='worker'||errorCode!==null&&!['retention_cleanup_failed','operations_permission_denied','business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(errorCode))throw new ServiceError('invalid_operations_product_request');
     const value=errorCode?null:parse(targets[target].result,result);
     await db.query(`INSERT INTO operations_retention_observations_v1(endpoint,target,component,result,error_code,checked_at)
       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(endpoint,target,component) DO UPDATE SET result=EXCLUDED.result,error_code=EXCLUDED.error_code,checked_at=EXCLUDED.checked_at`,
@@ -104,7 +104,7 @@ export function createOperationsRetentionWorker({retention,jobs=retention.jobs})
       return await transaction(retention.db,async db=>{
         const row=await retention.rowWithin(db,runId,{lock:true});
         if(['completed','cancelled'].includes(row.state))return {state:row.state};
-        const actor=await retention.businessAdmin.revalidate(row.request_actor,{write:true,db});
+        const actor=await retention.businessAdmin.revalidate(row.request_actor,{write:true,action:'retention.request',db});
         if(actor.operatorId!==row.requested_by)throw new ServiceError('operations_retention_authority_changed',403);
         const result=parse(targets[row.target].result,await targets[row.target].clean(db,retention.now())),at=new Date(retention.now()*1000).toISOString();
         await db.query("UPDATE operations_retention_runs_v1 SET state='completed',attempts=attempts+1,result=$2,error_code=NULL,updated_at=$3,finished_at=$3 WHERE id=$1",[runId,JSON.stringify(result),at]);
@@ -113,7 +113,7 @@ export function createOperationsRetentionWorker({retention,jobs=retention.jobs})
         return {state:'completed',result};
       });
     }catch(error){
-      const code=['business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(error?.code)?error.code:'retention_cleanup_failed';
+      const code=['operations_permission_denied','business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(error?.code)?error.code:'retention_cleanup_failed';
       await transaction(retention.db,async db=>{
         const row=await retention.rowWithin(db,runId,{lock:true});if(['completed','cancelled'].includes(row.state))return;
         const at=new Date(retention.now()*1000).toISOString();

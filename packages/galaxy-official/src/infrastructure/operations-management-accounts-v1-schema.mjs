@@ -1,0 +1,162 @@
+// Fixed released119+121 catalog plus the explicit management122 actions. No held120 dependency.
+export const managementAccountsPermissionCodes=Object.freeze([
+ "management.accounts.read",
+ "management.accounts.create",
+ "management.accounts.profile.write",
+ "management.accounts.login.disable",
+ "management.accounts.login.restore",
+ "management.accounts.password.reset",
+ "management.accounts.sessions.revoke",
+ "management.accounts.delete",
+ "ai.use.overview",
+ "ai.use.governance",
+ "ai.use.messaging",
+ "ai.use.discovery",
+ "ai.use.maintenance"
+]);
+export const managementAccountsCatalogCodes=Object.freeze([
+ "workbench.read",
+ "accounts.read",
+ "accounts.identity.read",
+ "accounts.type.change",
+ "accounts.restriction.apply",
+ "accounts.restriction.release",
+ "analytics.read",
+ "sections.read",
+ "sections.classify",
+ "sections.hide",
+ "sections.restore",
+ "content.read",
+ "content.hide",
+ "content.restore",
+ "content.curate",
+ "content.batch.hide",
+ "content.batch.restore",
+ "content.tags.read",
+ "content.tags.manage",
+ "recommendations.read",
+ "recommendations.configure",
+ "cases.read",
+ "cases.resolve",
+ "chat-reports.read",
+ "chat-reports.materials.read",
+ "chat-reports.attachments.read",
+ "chat-reports.moderate",
+ "chat-messages.hide",
+ "chat-messages.restore",
+ "chat-messages.keep",
+ "resources.read",
+ "resources.hide",
+ "resources.restore",
+ "files.read",
+ "files.scan.retry",
+ "files.access.stop",
+ "files.access.restore",
+ "files.cleanup.plan",
+ "files.cleanup.approve",
+ "feedback.read",
+ "feedback.attachments.read",
+ "feedback.update",
+ "notices.read",
+ "notices.create",
+ "notices.update",
+ "notices.publish",
+ "notices.withdraw",
+ "smtp.read",
+ "smtp.configure",
+ "smtp.test.connection",
+ "smtp.test.delivery",
+ "rules.read",
+ "rules.write",
+ "strategies.read",
+ "strategies.configure",
+ "strategies.publish",
+ "strategies.run",
+ "strategies.control",
+ "strategies.ordinary.configure",
+ "strategies.ordinary.publish",
+ "audit.read",
+ "jobs.read",
+ "jobs.cancel",
+ "jobs.retry",
+ "search.read",
+ "search.retry",
+ "search-quality.read",
+ "search-quality.configure",
+ "search-quality.publish",
+ "search-quality.restore",
+ "maintenance.read",
+ "maintenance.logs.read",
+ "maintenance.backups.create",
+ "maintenance.backups.verify",
+ "maintenance.restore.plan",
+ "maintenance.restore.approve",
+ "maintenance.restore.execute",
+ "models.read",
+ "models.configure",
+ "models.apply",
+ "retention.read",
+ "retention.request",
+ "cms.read",
+ "cms.edit",
+ "cms.publish",
+ "permissions.read",
+ "permissions.roles.write",
+ "permissions.assignments.write",
+ "permissions.automation.write",
+ "accounts.registered.read",
+ "accounts.password.reset",
+ "accounts.login.disable",
+ "accounts.login.restore",
+ "accounts.sessions.revoke",
+ "accounts.profile.correct",
+ "management.accounts.read",
+ "management.accounts.create",
+ "management.accounts.profile.write",
+ "management.accounts.login.disable",
+ "management.accounts.login.restore",
+ "management.accounts.password.reset",
+ "management.accounts.sessions.revoke",
+ "management.accounts.delete",
+ "ai.use.overview",
+ "ai.use.governance",
+ "ai.use.messaging",
+ "ai.use.discovery",
+ "ai.use.maintenance"
+]);
+const allowed="ARRAY["+managementAccountsCatalogCodes.map(code=>"'"+code+"'").join(',')+"]::text[]";
+export const operationsManagementAccountsV1MigrationSql=`
+CREATE TABLE operations_management_accounts_v1(
+ operator_id text PRIMARY KEY REFERENCES operations_operator_principals_v1(operator_id),endpoint text NOT NULL,issuer text NOT NULL,external_subject text NOT NULL,
+ version integer NOT NULL CHECK(version>0),note text NOT NULL DEFAULT '' CHECK(length(note)<=1000),login_blocked boolean NOT NULL DEFAULT false,deleted_at timestamptz,
+ created_by text NOT NULL REFERENCES operations_operator_principals_v1(operator_id),created_at timestamptz NOT NULL,updated_at timestamptz NOT NULL,
+ UNIQUE(endpoint,issuer,external_subject));
+CREATE TABLE operations_management_generations_v1(
+ id uuid PRIMARY KEY,endpoint text NOT NULL,issuer text NOT NULL,state text NOT NULL CHECK(state IN ('building','complete','failed')),
+ started_at timestamptz NOT NULL,completed_at timestamptz,observed_count bigint NOT NULL DEFAULT 0,source_count_before bigint,source_count_after bigint,code text);
+CREATE TABLE operations_management_entries_v1(
+ generation_id uuid NOT NULL REFERENCES operations_management_generations_v1(id) ON DELETE CASCADE,operator_id text NOT NULL,
+ issuer text NOT NULL,external_subject text NOT NULL,username text NOT NULL,first_name text NOT NULL,last_name text NOT NULL,email text,email_verified boolean NOT NULL,
+ enabled boolean NOT NULL,created_at timestamptz,admission text NOT NULL CHECK(admission IN ('administrator','reader','none')),required_actions text[] NOT NULL,
+ PRIMARY KEY(generation_id,operator_id));
+CREATE INDEX operations_management_entries_name_v1 ON operations_management_entries_v1(generation_id,lower(username),operator_id);
+CREATE TABLE operations_management_directory_v1(
+ endpoint text PRIMARY KEY,issuer text NOT NULL,generation_id uuid REFERENCES operations_management_generations_v1(id),sync_id uuid,lease_until timestamptz,
+ last_started_at timestamptz,last_completed_at timestamptz,last_error text);
+CREATE TABLE operations_management_commands_v1(
+ sequence bigserial PRIMARY KEY,operation_id uuid NOT NULL UNIQUE,endpoint text NOT NULL,operator_id text NOT NULL REFERENCES operations_operator_principals_v1(operator_id),
+ target_operator_id text,kind text NOT NULL CHECK(kind IN ('create','profile-update','login-disable','login-restore','password-reset','sessions-revoke','delete','admission-change','email-change')),
+ state text NOT NULL CHECK(state IN ('accepted','completed','partial','failed','unknown')),input jsonb NOT NULL,result jsonb NOT NULL,created_at timestamptz NOT NULL,updated_at timestamptz NOT NULL);
+CREATE INDEX operations_management_commands_target_v1 ON operations_management_commands_v1(endpoint,target_operator_id,sequence DESC);
+CREATE TABLE operations_management_login_fences_v1(
+ endpoint text NOT NULL,issuer text NOT NULL,external_subject text NOT NULL,revoked_before timestamptz NOT NULL,
+ PRIMARY KEY(endpoint,issuer,external_subject));
+ALTER TABLE operations_operator_logins_v1 ADD COLUMN started_at timestamptz;
+UPDATE operations_operator_logins_v1 SET started_at=created_at;
+ALTER TABLE operations_operator_logins_v1 ALTER COLUMN started_at SET DEFAULT clock_timestamp();
+ALTER TABLE operations_operator_logins_v1 ALTER COLUMN started_at SET NOT NULL;
+ALTER TABLE operations_business_roles_v1 DROP CONSTRAINT operations_business_roles_v1_permissions_check;
+ALTER TABLE operations_business_roles_v1 ADD CONSTRAINT operations_business_roles_v1_permissions_check CHECK(permissions<@${allowed});
+ALTER TABLE operations_automation_grants_v1 DROP CONSTRAINT operations_automation_grants_v1_permissions_check;
+ALTER TABLE operations_automation_grants_v1 ADD CONSTRAINT operations_automation_grants_v1_permissions_check CHECK(permissions<@${allowed});
+`;

@@ -1,0 +1,86 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID,createHash} from 'node:crypto';
+import {Readable} from 'node:stream';
+import {readFile} from 'node:fs/promises';
+import {accountChatFixture} from './account-chat-fixture.mjs';
+import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
+import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
+import {OperationsAgentOsClient} from '../src/operations-agentos-client.mjs';
+import {OperationsAgentOsGateway} from '../src/operations-agentos-gateway.mjs';
+import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';
+import {dispatchOperationsAgentOs} from '../src/adapters/http/operations-agentos-http.mjs';
+import {operationsProxyPolicy,operationsRequestBodyLimit} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
+
+test('workbench reader without automation can converse, receives only permitted summary, and retries never redispatch while owner/domain/current permission gates hold',{timeout:60000},async t=>{
+ const f=await accountChatFixture();t.after(f.close);
+ if(!(await f.db.query("SELECT to_regclass('operations_agentos_conversations_v1') AS name")).rows[0].name)await f.db.exec(operationsAgentOsConversationsMigrationSql);
+ const admin={kind:'business-operator',operatorId:'conversation-admin',role:'administrator',endpoint:f.endpoint},reader={...admin,operatorId:'conversation-reader',role:'reader'},other={...reader,operatorId:'another-reader'},roles=new Map([[admin.operatorId,'administrator'],[reader.operatorId,'reader'],[other.operatorId,'reader']]);
+ for(const person of [admin,reader,other])await f.db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://management.invalid',$1,'合成管理者',$3,$3)",[person.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ const permissions=new OperationsPermissionsService({db:f.db,endpoint:f.endpoint,now:f.now,operatorAuthorization:async actor=>roles.get(actor.operatorId)}),authority=new OperationsAgentOsAuthority({db:f.db,endpoint:f.endpoint,permissions,now:f.now});
+ const role=(await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name:'仅工作台读取',description:'',enabled:true,permissions:['workbench.read']},{authorize:async()=>admin})).role;
+ await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:reader.operatorId,roleId:role.id,enabled:true},{authorize:async()=>admin});
+ await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:other.operatorId,roleId:role.id,enabled:true},{authorize:async()=>admin});
+ let calls=0,connected=true,runs=[],receiptLost=true;
+ const client={async status(){return {state:connected?'connected':'unavailable',modelState:connected?'configured':'unknown',configuredDomains:['overview','governance'],conversationVersion:1,conversationDomains:['overview','governance']};},async readConversation(){return {runs,readExpiresAt:f.now()+30};},async runConversation(row,input){calls++;runs=[{runId:'native-original-run',operationId:input.runId,status:'COMPLETED',content:'合成原生回复',userInput:input.message,createdAt:f.now()}];if(receiptLost)throw Object.assign(Error('synthetic lost ACK'),{code:'operations_agentos_result_unknown'});return {run_id:'native-original-run'};}};
+ const service=new OperationsAgentOsService({authority,client,summaryForConversation:async()=>({checkedAt:f.now(),readExpiresAt:f.now()+30,availability:{communityReports:'available',chatReports:'not-authorized',jobs:'available',recentOperations:'available'},communityReports:{pending:0,total:2,body:'PRIVATE_MUST_NOT_FLOW'},jobs:{failed:0},chatReports:{pending:999},operator:{secret:'PRIVATE_MUST_NOT_FLOW'},ai:{state:'not-connected'},recentOperations:[{action:'community-reports-query',createdAt:new Date(f.now()*1000).toISOString(),summary:'PRIVATE_MUST_NOT_FLOW',operatorId:'PRIVATE_MUST_NOT_FLOW'}]})});
+ const gateway=new OperationsAgentOsGateway({authority,content:null,serviceKey:'explicit-synthetic-service-key-no-production'});
+ assert.equal((await service.conversation(reader,'overview')).capabilities.canSend,true);assert.equal(calls,0);
+ const input={operationId:randomUUID(),message:'今天有哪些变化？'};
+ assert.equal((await service.conversationRun(reader,'overview',input,{authorize:async()=>reader})).state,'unknown');assert.equal(calls,1);
+ connected=false;assert.equal((await service.conversationRun(reader,'overview',input,{authorize:async()=>reader})).state,'COMPLETED');assert.equal(calls,1);
+ await assert.rejects(service.conversationRun(reader,'overview',{...input,message:'不同内容'},{authorize:async()=>reader}),{code:'operations_agentos_operation_conflict'});
+ await assert.rejects(service.conversationOperation(other,'overview',input.operationId),{code:'operations_agentos_operation_not_found'});
+ await assert.rejects(service.conversationOperation(reader,'governance',input.operationId),{code:'operations_agentos_operation_not_found'});
+ const row=(await f.db.query('SELECT * FROM operations_agentos_conversations_v1 WHERE operator_id=$1',[reader.operatorId])).rows[0];
+ const authorize={conversationId:row.id,operation:'read',resourceType:'agents',resourceId:'galaxy-conversation-overview'};
+ const current=await gateway.authorize(authorize);assert.equal(current.execution.mode,'conversation');assert.deepEqual(current.execution.actions,[]);assert.deepEqual(current.execution.resourceIds,[]);
+ await assert.rejects(gateway.authorize({...authorize,resourceId:'galaxy-governance'}),{code:'operations_agentos_domain_mismatch'});
+ await assert.rejects(gateway.authorize({...authorize,resourceType:'workflows',resourceId:'galaxy-prepared-review'}),{code:'operations_agentos_domain_mismatch'});
+ const summary=await gateway.execute({conversationId:row.id,tool:'workbench-summary',arguments:{},runId:'native-original-run',callId:'summary'});
+ assert.equal(summary.counts.communityReports.pending,0);assert.equal(summary.counts.chatReports,null);assert.equal(summary.availability.chatReports,'not-authorized');assert.equal(JSON.stringify(summary).includes('PRIVATE_MUST_NOT_FLOW'),false);assert.equal(JSON.stringify(summary).includes('not-connected'),false);
+ await assert.rejects(gateway.execute({conversationId:row.id,tool:'execute-prepared-command',arguments:{},runId:'x',callId:'x'}),{code:'invalid_operations_agentos_request'});
+ assert.equal((await f.db.query('SELECT count(*)::int AS n FROM operations_automation_grants_v1')).rows[0].n,0);
+ assert.equal((await f.db.query('SELECT count(*)::int AS n FROM operations_agentos_executions_v1')).rows[0].n,0);
+ assert.equal((await f.db.query('SELECT message_digest FROM operations_agentos_conversation_commands_v1 WHERE id=$1',[input.operationId])).rows[0].message_digest.includes(input.message),false);
+ await f.db.exec(await readFile(new URL('../src/infrastructure/api-role.sql',import.meta.url),'utf8'));
+ await f.db.exec('SET ROLE galaxy_api');await service.conversationOperation(reader,'overview',input.operationId);await assert.rejects(f.db.query('DELETE FROM operations_agentos_conversations_v1 WHERE id=$1',[row.id]),/permission denied/);await f.db.exec('RESET ROLE');
+ roles.delete(reader.operatorId);await assert.rejects(gateway.authorize(authorize),{code:'business_admin_denied'});assert.equal(calls,1);
+});
+
+test('native conversation health acknowledgement gates the actual domain while legacy global engine health does not enable sending',async()=>{
+ let nativeHealth={framework:'agno',version:'3.1.7',state:'running',model:'configured',modelSettings:{scenarios:[{domain:'overview',state:'configured'}]}},dispatches=0,stored=null;
+ const client=new OperationsAgentOsClient({url:'http://127.0.0.1:1',signingKey:'explicit-synthetic-signing-key-not-production',fetchImpl:async url=>{if(!url.endsWith('/health')){dispatches++;throw Error('No native dispatch expected');}return new Response(JSON.stringify(nativeHealth),{status:200,headers:{'content-type':'application/json'}});}});
+ const tx={async query(sql){return {rows:stored&&sql.startsWith('SELECT * FROM operations_agentos_conversations_v1')?[stored]:[]};},release(){}},db={...tx,async connect(){return tx;}},actor={kind:'business-operator',operatorId:'reader',endpoint:'https://official.invalid',businessAuthorization:{version:'1',permissions:['workbench.read']}};
+ const authority={db,endpoint:actor.endpoint,now:()=>1000,async human(){return actor;}},service=new OperationsAgentOsService({authority,client});
+ assert.equal((await client.status()).state,'connected');assert.equal((await service.conversation(actor,'overview')).capabilities.canSend,false);assert.equal((await service.conversation(actor,'overview')).blockedReason,'runtime-not-ready');
+ await assert.rejects(service.conversationRun(actor,'overview',{operationId:randomUUID(),message:'不得派发给旧进程'},{authorize:async()=>actor}),{code:'operations_agentos_conversation_not_ready'});
+ nativeHealth={...nativeHealth,conversations:{version:1,agentIds:['galaxy-conversation-governance']}};
+ assert.equal((await service.conversation(actor,'overview')).capabilities.canSend,false);
+ nativeHealth.conversations.agentIds.push('galaxy-conversation-overview');
+ assert.equal((await service.conversation(actor,'overview')).capabilities.canSend,true);assert.equal(dispatches,0);
+ stored={id:randomUUID(),operator_id:actor.operatorId,domain:'overview',session_id:randomUUID(),permission_key:createHash('sha256').update(JSON.stringify(['1',['workbench.read']])).digest('hex')};
+ nativeHealth={...nativeHealth,model:'not-configured',modelSettings:{scenarios:[]}};
+ client.readConversation=async()=>({runs:[{runId:'prior-run',status:'COMPLETED',content:'先前真实记录'}],readExpiresAt:1020});
+ const history=await service.conversation(actor,'overview');assert.equal(history.runs.length,1);assert.equal(history.capabilities.canSend,false);assert.equal(history.readExpiresAt,1020);
+ client.readConversation=async()=>{throw Object.assign(Error('synthetic native read unavailable'),{code:'operations_agentos_unavailable',status:503});};
+ await assert.rejects(service.conversation(actor,'overview'),{code:'operations_agentos_unavailable'});
+});
+
+test('conversation HTTP and BFF expose only closed domain/read/send/receipt paths and keep POST CSRF without granting a write role',async()=>{
+ const domain='overview',id=randomUUID(),calls=[],actor={kind:'business-operator',operatorId:'reader',endpoint:'https://official.invalid'};
+ const service={async conversation(a,d){calls.push(['read',a,d]);return {domain:d,runs:[]};},async conversationRun(a,d,input,options){await options.authorize();calls.push(['send',a,d,input]);return {operationId:input.operationId,state:'accepted'};},async conversationOperation(a,d,op){return {operationId:op,state:'unknown'};}};
+ const route=async(method,path,input)=>{let result;const request=Readable.from(input?[Buffer.from(JSON.stringify(input))]:[]);request.method=method;request.headers={'content-type':'application/json'};
+  await dispatchOperationsAgentOs({operationsAgentOs:service,request,url:new URL(path,'https://admin.invalid'),requestId:'synthetic',authorizeOperator:async(_req,options)=>{assert.equal(options.action,'workbench.read');assert.equal(options.write,false);if(method==='POST')assert.equal(options.csrf,true);return actor;},send:(_status,value)=>{result=value;}});return result;};
+ const prefix='/v1/operations/agentos/conversations/'+domain;
+ assert.deepEqual((await route('GET',prefix)).runs,[]);await route('POST',prefix+'/runs',{operationId:id,message:'请说明现状'});assert.equal((await route('GET',prefix+'/operations/'+id)).operationId,id);
+ await assert.rejects(route('GET',prefix+'?grantId='+id),{code:'not_found'});await assert.rejects(route('POST',prefix+'/operations/'+id,{}),{code:'not_found'});
+ assert.equal(operationsRequestBodyLimit(prefix+'/runs'),65536);
+ // Signature of the existing BFF helper remains the actual source contract.
+ const proxy=(method,path)=>operationsProxyPolicy({method,url:'https://admin.invalid'+path,publicOrigin:'https://admin.invalid',headers:new Headers({origin:'https://admin.invalid'})}).allowed;
+ assert.equal(proxy('GET',prefix),true);
+ assert.equal(proxy('POST',prefix+'/runs'),true);
+ assert.equal(proxy('GET',prefix+'?scope=all'),false);
+ assert.equal(proxy('GET','/v1/internal/agentos/authorize'),false);
+});

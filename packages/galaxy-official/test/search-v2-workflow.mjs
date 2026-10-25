@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {searchToolDefinitions} from '../src/personal-mcp-search-v2.mjs';
+import {searchToolDefinitions} from '../src/adapters/mcp/personal/tools/search-v2.mjs';
 import {checkChoiceSource} from './choice-source-check.mjs';
 const scopes=['binding','consent','case-teaser','assistance','history','capsules','proof','evidence','builders','notifications'];
 export async function verifySearchV2(database=null,options={}) {

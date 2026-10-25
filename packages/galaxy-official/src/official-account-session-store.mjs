@@ -49,12 +49,23 @@ export class OfficialAccountSessionStore {
       await db.query('SELECT pg_advisory_xact_lock(734912339,hashtext($1))',[this.scope]);
       // Logout/replacement can revoke an exchanging login. Hold this row through
       // issuance, so a delayed token response cannot undo that decision.
-      const login=(await db.query('SELECT status,expires_at FROM official_account_logins_v1 WHERE scope_hash=$1 AND login_hash=$2 FOR UPDATE',
+      const login=(await db.query('SELECT status,expires_at,started_at FROM official_account_logins_v1 WHERE scope_hash=$1 AND login_hash=$2 FOR UPDATE',
         [this.scope,loginHash])).rows[0];
       if(!login||login.status!=='exchanging'||Number(login.expires_at)<=this.now())throw Error('Account login is no longer current.');
       const count=(await db.query('SELECT count(*)::int AS n FROM official_account_sessions_v1 WHERE scope_hash=$1 AND revoked_at IS NULL AND expires_at>$2',[this.scope,this.now()])).rows[0].n;
       if(count>=10000)throw Error('Account session capacity reached.');
       const value=await createSession(db),at=this.now();
+      // Identity is known only after OIDC verification. Compare inside the same
+      // transaction and advisory lock as revocation, before issuing any session.
+      // Database timestamps retain sub-millisecond precision; do not round this
+      // fence through the JavaScript clock. A rejected issuance also rolls back
+      // createSession's account/profile writes.
+      const fenced=(await db.query(`SELECT 1 FROM operations_registered_login_fences_v1 f
+        JOIN official_account_logins_v1 l ON l.scope_hash=f.scope_hash
+        WHERE f.scope_hash=$1 AND f.issuer=$2 AND f.external_subject=$3
+          AND l.login_hash=$4 AND l.started_at<=f.revoked_before LIMIT 1`,
+        [this.scope,value.issuer,value.externalSubject,loginHash])).rows.length>0;
+      if(fenced)throw Error('Account login was revoked before issuance.');
       if(priorSessionHash)await db.query('UPDATE official_account_sessions_v1 SET revoked_at=$3 WHERE scope_hash=$1 AND token_hash=$2 AND revoked_at IS NULL',
         [this.scope,priorSessionHash,at]);
       await db.query(`INSERT INTO official_account_sessions_v1(scope_hash,token_hash,login_hash,account_id,issuer,external_subject,email,email_verified,csrf_token,created_at,expires_at)
@@ -81,9 +92,25 @@ export class OfficialAccountSessionStore {
         WHERE scope_hash=$1 AND (token_hash=$2 OR login_hash=$3) AND revoked_at IS NULL`,[this.scope,tokenHash,loginHash,this.now()]);
     });
   }
-  async revokeAccount(accountId) {
-    const result=await this.db.query(`UPDATE official_account_sessions_v1 SET revoked_at=$3
-      WHERE scope_hash=$1 AND account_id=$2 AND revoked_at IS NULL AND expires_at>$3 RETURNING token_hash`,[this.scope,accountId,this.now()]);
-    return {revokedSessions:result.rows.length};
+  async sessionSummary({issuer,externalSubject}) {
+    const row=(await this.db.query(`SELECT count(*)::int AS n FROM official_account_sessions_v1
+      WHERE scope_hash=$1 AND issuer=$2 AND external_subject=$3
+        AND revoked_at IS NULL AND expires_at>$4`,[this.scope,issuer,externalSubject,this.now()])).rows[0];
+    return {activeCount:row.n,scope:'website-portal'};
+  }
+  async revokePrincipal({issuer,externalSubject}) {
+    return transaction(this.db,async db=>{
+      await db.query('SELECT pg_advisory_xact_lock(734912339,hashtext($1))',[this.scope]);
+      await db.query(`INSERT INTO operations_registered_login_fences_v1(scope_hash,issuer,external_subject,revoked_before)
+        VALUES($1,$2,$3,clock_timestamp())
+        ON CONFLICT(scope_hash,issuer,external_subject) DO UPDATE
+          SET revoked_before=GREATEST(operations_registered_login_fences_v1.revoked_before,clock_timestamp())`,
+        [this.scope,issuer,externalSubject]);
+      const result=await db.query(`UPDATE official_account_sessions_v1 SET revoked_at=$4
+        WHERE scope_hash=$1 AND issuer=$2 AND external_subject=$3
+          AND revoked_at IS NULL AND expires_at>$4 RETURNING token_hash`,
+        [this.scope,issuer,externalSubject,this.now()]);
+      return {revokedSessions:result.rows.length,inflightBlocked:true};
+    });
   }
 }

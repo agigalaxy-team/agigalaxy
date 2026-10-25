@@ -37,14 +37,14 @@ export class OperationsNotices{
         skippedCount:Math.max(0,row.audience_count-counts.targets),pendingCount:counts.targets-counts.delivered,errorCode:row.delivery_error_code,lastAttemptAt:stamp(row.last_attempt_at)}};
   }
   async list(operator,input={}){
-    this.businessAdmin.require(operator);const page=parse(operationsPageSchema,input);
+    await this.businessAdmin.authorizeAction(operator,'notices.read');const page=parse(operationsPageSchema,input);
     const rows=(await this.db.query(`SELECT * FROM operations_notices_v1 WHERE endpoint=$1 AND ($2::bigint IS NULL OR sequence<$2) ORDER BY sequence DESC LIMIT $3`,[this.endpoint,page.after??null,page.limit+1])).rows;
     const items=[];for(const row of rows.slice(0,page.limit))items.push(await this.viewWithin(this.db,row));
     return {items,nextAfter:rows.length>page.limit?String(rows[page.limit-1].sequence):null,checkedAt:this.now()};
   }
-  async get(operator,id){this.businessAdmin.require(operator);return {notice:await this.viewWithin(this.db,await this.rowWithin(this.db,id))};}
+  async get(operator,id){await this.businessAdmin.authorizeAction(operator,'notices.read');return {notice:await this.viewWithin(this.db,await this.rowWithin(this.db,id))};}
   async overview(operator){
-    this.businessAdmin.require(operator);
+    await this.businessAdmin.authorizeAction(operator,'notices.read');
     const rows=(await this.db.query(`SELECT state,count(*)::integer AS count FROM operations_notices_v1 WHERE endpoint=$1 AND expires_at>$2 GROUP BY state`,[this.endpoint,new Date(this.now()*1000).toISOString()])).rows;
     return {counts:Object.fromEntries(rows.map(row=>[row.state,row.count])),checkedAt:this.now()};
   }
@@ -131,7 +131,7 @@ export function createOperationsNoticeWorker({notices,jobs=notices.jobs}){
     try{return await transaction(notices.db,async db=>{
       const row=await notices.rowWithin(db,noticeId,{lock:true});
       if(!['queued','delivering'].includes(row.state))return {state:row.state};
-      const actor=await notices.businessAdmin.revalidate({kind:'business-operator',operatorId:row.published_by,role:'administrator',endpoint:notices.endpoint},{write:true,db});
+      const actor=await notices.businessAdmin.revalidate({kind:'business-operator',operatorId:row.published_by,role:'administrator',endpoint:notices.endpoint},{write:true,action:'notices.publish',db});
       const at=new Date(notices.now()*1000).toISOString();
       if(Date.parse(row.expires_at)<=notices.now()*1000){
         await db.query("UPDATE operations_notices_v1 SET state='expired',updated_at=$2,last_attempt_at=$2 WHERE id=$1",[noticeId,at]);
@@ -149,16 +149,19 @@ export function createOperationsNoticeWorker({notices,jobs=notices.jobs}){
         selection:{noticeId,execution:'worker'},result:{state,deliveredCount:selected.length}});
       return {state,deliveredCount:selected.length};
     });}catch(error){
-      const code=['business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(error?.code)?error.code:'operations_notice_delivery_failed';
+      const code=['operations_permission_denied','business_admin_denied','identity_directory_unavailable','operations_authorization_unavailable'].includes(error?.code)?error.code:'operations_notice_delivery_failed';
       await transaction(notices.db,async db=>{
         const row=await notices.rowWithin(db,noticeId,{lock:true});if(!['queued','delivering'].includes(row.state))return;
         await db.query('UPDATE operations_notices_v1 SET delivery_error_code=$2,last_attempt_at=$3 WHERE id=$1',[noticeId,code,new Date(notices.now()*1000).toISOString()]);
         // Attribution is the original delegated operator, not an assertion that
         // they still have permission. No recipient delivery committed on error.
-        await notices.businessAdmin.recordWithin(db,{kind:'business-operator',operatorId:row.published_by,role:'administrator',endpoint:notices.endpoint},'notice-delivery',{
-          selection:{noticeId,execution:'worker',reason:code==='business_admin_denied'?'authority_changed':'execution_failed'},result:{state:'failed',code,deliveredCount:0}});
+        // The worker cannot read arbitrary historical audit JSON. This narrow
+        // definer function returns only the recorded role for this notice.
+        const original=(await db.query(`SELECT galaxy_notice_original_operator_role($1,$2::uuid,$3) AS operator_role`,[notices.endpoint,noticeId,row.published_by])).rows[0];
+        if(original&&['administrator','reader'].includes(original.operator_role))await notices.businessAdmin.recordWithin(db,{kind:'business-operator',operatorId:row.published_by,role:original.operator_role,endpoint:notices.endpoint},'notice-delivery',{
+          selection:{noticeId,execution:'worker',reason:['business_admin_denied','operations_permission_denied'].includes(code)?'authority_changed':'execution_failed'},result:{state:'failed',code,deliveredCount:0}});
       });
-      throw new ServiceError(code,code==='business_admin_denied'?403:503);
+      throw new ServiceError(code,['business_admin_denied','operations_permission_denied'].includes(code)?403:503);
     }
   }
   return {execute,start:()=>jobs.work('account-notice',execute),stop:()=>jobs.stopWork('account-notice')};

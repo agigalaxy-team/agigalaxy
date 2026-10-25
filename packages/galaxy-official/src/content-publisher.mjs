@@ -1,6 +1,9 @@
 import {openDatabase} from './database.mjs';
 import {createOperationsJobs} from './operations-jobs.mjs';
 import {createContentPublicationWorker} from './content-publications.mjs';
+import {BusinessAdminService} from './business-admin.mjs';
+import {OperationsPermissionsService} from './operations-permissions.mjs';
+import {loadOperationsWorkerAuthorization} from './operations-config.mjs';
 import {createFilesystemContentPublisher,loadContentPublisherConfiguration} from './content-publisher-files.mjs';
 import {assertSupportedSchema} from './infrastructure/migrations.mjs';
 import {createRuntimeLogger,consoleRuntimeLogger,runtimeLogConfiguration,installRuntimeFailureHandlers} from './operations/runtime-log.mjs';
@@ -48,7 +51,11 @@ try{
       catch(error){runtimeLog.error({event:'content_publication_step_failed',stage:current,startedAt,error});throw error;}
     };
   }
-  worker=createContentPublicationWorker({db,endpoint:config.endpoint,publicOrigin:config.publicOrigin,jobs,publisher});
+  stage='publisher-authorization';
+  const operatorAuthorization=await loadOperationsWorkerAuthorization(process.env.GALAXY_OPERATIONS_CONFIG_FILE,{db,endpoint:config.endpoint});
+  const permissions=new OperationsPermissionsService({db,endpoint:config.endpoint,operatorAuthorization});
+  const businessAdmin=new BusinessAdminService({db,endpoint:config.endpoint,operatorAuthorization,permissions});
+  worker=createContentPublicationWorker({db,endpoint:config.endpoint,publicOrigin:config.publicOrigin,jobs,publisher,businessAdmin});
   stage='publisher-start';await worker.start();
   runtimeLog.write({event:'content_publication_worker_started',stage,startedAt:runtimeStartedAt});
   installRuntimeFailureHandlers({logger:runtimeLog.error,onFatal:()=>stop()});

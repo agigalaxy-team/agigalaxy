@@ -12,7 +12,7 @@ export class AttachmentS3Store {
   this.client=new S3Client({endpoint:url.origin,region,forcePathStyle:true,credentials,maxAttempts:1,
    requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED'});
  }
- key(key){if(!/^(attachments|outcome-materials)\/[0-9a-f-]{36}$/.test(key))throw new ServiceError('attachment_storage_key_invalid',500);return key;}
+ key(key){if(!/^(attachments|forum-attachments|outcome-materials|feedback-attachments)\/[0-9a-f-]{36}$/.test(key))throw new ServiceError('attachment_storage_key_invalid',500);return key;}
  async request(Command,input){try{return await this.client.send(new Command({Bucket:this.bucket,...input}),{abortSignal:AbortSignal.timeout(this.timeoutMs)});}
   catch(e){if(e?.name==='NoSuchKey'||e?.$metadata?.httpStatusCode===404)return null;throw new ServiceError('attachment_storage_unavailable',503);}}
  async put({key,bytes,sha256}){if(bytes.length>this.maxBytes)throw new ServiceError('attachment_too_large',413);

@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 import {createOidcLoginProvider} from '../src/oidc-login.mjs';
 import {createApi} from '../src/http.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 
 // Real independent OIDC/PKCE/JWS, signed Galaxy association, bearer HTTP and
 // PostgreSQL-compatible transactions. Synthetic people; no MAM body is used.

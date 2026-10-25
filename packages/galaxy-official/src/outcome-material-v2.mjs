@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod/v4';
 import { transaction } from './database.mjs';
 import { ServiceError } from './shared/service-error.mjs';
+import {chatMessageOperationsBlockedWithin} from './chat-message-operations-gate.mjs';
 import { outcomeMaterialEventSchema, outcomeMaterialQuerySchema, outcomeMaterialReadSchema,
   outcomeMaterialSelectionSchema, outcomeMaterialReceiptSchema } from './shared/outcome-material-v2-schema.mjs';
 import { cleanupOutcomeMaterialsWithin } from './operations/outcome-material-retention-v2.mjs';
@@ -250,8 +251,9 @@ export class OutcomeMaterialServiceV2 {
       // Permit the owner to reconcile even after a consent expires; other
       // authors only see the proposal while its exact request is authorised.
       if (actor.subjectId !== row.subject_id) await this.requireConsent(db, request);
-      let sourceContent=null,sourceContentReason=null,sourceName=null,sourceMediaType=null,sourceReadExpiresAt=null;
-      if(row.source.kind==='message'){
+       let sourceContent=null,sourceContentReason=null,sourceName=null,sourceMediaType=null,sourceReadExpiresAt=null,sourceMessageId=null;
+       if(row.source.kind==='message'){
+         sourceMessageId=row.source.id;
         try{
           const selected=await this.exactSource(db,actor,row.source);
           // Fetching the exact archive body may yield to the transport. Recheck
@@ -276,6 +278,7 @@ export class OutcomeMaterialServiceV2 {
           const expiresAt=Date.parse(attachment.expires_at??attachment.prepare_expires_at);
           if(Number.isFinite(expiresAt))sourceReadExpiresAt=Math.floor(expiresAt/1000);
           if(attachment.message_id){
+             sourceMessageId=attachment.message_id;
             const message=(await db.query('SELECT expires_at FROM chat_message_refs WHERE message_id=$1 FOR SHARE',[attachment.message_id])).rows[0],
               messageExpiry=Date.parse(message?.expires_at);
             if(Number.isFinite(messageExpiry))sourceReadExpiresAt=sourceReadExpiresAt===null?Math.floor(messageExpiry/1000):Math.min(sourceReadExpiresAt,Math.floor(messageExpiry/1000));
@@ -283,6 +286,9 @@ export class OutcomeMaterialServiceV2 {
         }catch(error){if(!(error instanceof ServiceError))throw error;sourceContentReason=error.code;}
       }
       if(actor.subjectId!==row.subject_id)await this.requireConsent(db,request);
+       if(sourceMessageId&&(sourceContent||sourceName!==null||sourceMediaType!==null)&&await chatMessageOperationsBlockedWithin(db,{messageId:sourceMessageId})){
+         sourceContent=null;sourceName=null;sourceMediaType=null;sourceReadExpiresAt=null;sourceContentReason='chat_message_version_unavailable';
+       }
       if(sourceContent&&sourceContent.readExpiresAt<=this.now()){
         sourceContent=null;sourceContentReason='chat_message_version_unavailable';
       }

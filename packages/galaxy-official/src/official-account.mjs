@@ -71,6 +71,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
   return Object.freeze({
     data,
     configurationHash,
+    identityIssuer:description.issuer,
     async login(request, response, url) {
       if ([...url.searchParams.keys()].some(key => !['mode','returnTo'].includes(key)) || ['mode','returnTo'].some(key => url.searchParams.getAll(key).length > 1)) throw new ServiceError('invalid_account_login');
       const mode = url.searchParams.get('mode') ?? 'login';
@@ -123,7 +124,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
             verificationMethod:account.accountVerification?.verified===true?'email':'external-account',verifiedAt:now()});
           const profile=await data.ensureWithin(connection,accountRow.id,{subjectType:accountRow.created?'person':null});
           return {accountId:accountRow.id,issuer:account.issuer,externalSubject:account.externalSubject,
-            account:{id:accountRow.id,uid:accountRow.uid,displayName:profile.display_name,email:account.accountProfile?.email??null,emailVerified:account.accountVerification?.verified===true},
+            account:{id:accountRow.id,uid:accountRow.uid,displayName:profile.display_name,avatarKey:profile.avatar_key??null,subjectType:profile.subject_type??null,email:account.accountProfile?.email??null,emailVerified:account.accountVerification?.verified===true},
             csrfToken:opaque(),expiresAt:now()+3600};
         });
         cookies.push(cookie(sessionCookie, token, 3600));
@@ -147,7 +148,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
         GROUP BY l.subject_id ORDER BY l.subject_id LIMIT 101`, [endpoint, session.issuer, session.externalSubject, clients, after ?? null])).rows;
       const linkedIds = rows.slice(0,100).map(row => ({subjectId:row.subject_id, linkedAt:new Date(row.linked_at).toISOString()}));
       const profile=await data.ensureWithin(db,session.accountId);
-      return {state:'signed-in', account:{...session.account,uid:profile.uid,displayName:profile.display_name}, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
+      return {state:'signed-in', account:{...session.account,uid:profile.uid,displayName:profile.display_name,avatarKey:profile.avatar_key??null,subjectType:profile.subject_type??null}, linkedIds, nextAfter:rows.length > 100 ? linkedIds.at(-1).subjectId : null,
         expiresAt:session.expiresAt, csrfToken:session.csrfToken, galaxyAuthorization:false};
     },
     async actionActor(request, {write = request.method !== 'GET'} = {}) {
@@ -170,9 +171,22 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
       const session=await readSession(request);
       return session?{accountId:session.accountId,issuer:session.issuer,externalSubject:session.externalSubject,expiresAt:session.expiresAt}:null;
     },
-    async revokeSessions({accountId}) {
-      if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId??''))throw new ServiceError('invalid_account');
-      return sessions.revokeAccount(accountId);
+    async sessionSummary({issuer,externalSubject}) {
+      if(issuer!==description.issuer||typeof externalSubject!=='string'||!externalSubject.length||externalSubject.length>255||/[\p{Cc}]/u.test(externalSubject))
+        throw new ServiceError('invalid_account');
+      return sessions.sessionSummary({issuer,externalSubject});
+    },
+    async revokeSessions({accountId=null,issuer=null,externalSubject=null}) {
+      if(accountId!==null&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId))throw new ServiceError('invalid_account');
+      let principal={issuer,externalSubject};
+      if(accountId!==null){
+        const account=(await db.query('SELECT issuer,external_subject FROM community_accounts WHERE id=$1 AND endpoint=$2',[accountId,endpoint])).rows[0];
+        if(!account||issuer!==null&&account.issuer!==issuer||externalSubject!==null&&account.external_subject!==externalSubject)throw new ServiceError('invalid_account');
+        principal={issuer:account.issuer,externalSubject:account.external_subject};
+      }
+      if(principal.issuer!==description.issuer||typeof principal.externalSubject!=='string'||!principal.externalSubject.length||principal.externalSubject.length>255||/[\p{Cc}]/u.test(principal.externalSubject))
+        throw new ServiceError('invalid_account');
+      return sessions.revokePrincipal(principal);
     },
     async logout(request, response) {
       if(request.headers.authorization!==undefined)throw new ServiceError('access_denied',401);

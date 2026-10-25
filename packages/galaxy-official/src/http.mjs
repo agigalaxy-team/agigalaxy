@@ -1,6 +1,6 @@
 import { failureRoute } from './adapters/http/failure-audit.mjs';
 import { authenticatedRequestActor,bindRequestQuota,beginBodyMeasurement,consumedBodyBytes } from './adapters/http/request.mjs';
-import { createRequestQuotas } from './adapters/http/request-quotas.mjs';
+import { createRequestQuotas,defaultRequestQuotaPolicy,hasRequestCredential,websiteQuotaCredential } from './adapters/http/request-quotas.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { ServiceError } from './shared/service-error.mjs';
@@ -10,6 +10,16 @@ import { boundedReadiness } from './adapters/http/readiness.mjs';
 import { validateBrowserOrigins, applyBrowserPolicy } from './adapters/http/browser-policy.mjs';
 import {withRuntimeDiagnosticContext} from './shared/runtime-diagnostics.mjs';
 import {runtimeLogEvent} from './operations/runtime-log.mjs';
+
+const privateAgentOsPaths=new Set(['/v1/internal/agentos/authorize','/v1/internal/agentos/tools/execute',
+  '/v1/internal/agentos/p13/context','/v1/internal/agentos/p13/step',
+  '/v1/internal/agentos/autonomy/authorize','/v1/internal/agentos/autonomy/report','/v1/internal/agentos/autonomy/tools/execute','/v1/internal/agentos/autonomy/code']);
+function verifiedAgentOsRequest(request,url,gateway){
+  if(request.method!=='POST'||url.search||!privateAgentOsPaths.has(url.pathname)||typeof gateway?.verifyService!=='function')return false;
+  // Service credentials select only a separate bounded transport counter.
+  // Dispatch still authenticates again and resolves every current business permission.
+  try{gateway.verifyService(request);return true;}catch{return false;}
+}
 
 export function createApi({ readiness = async () => true, failureAudit = null, logger = () => {}, rateLimit = 60,
   healthRateLimit = 120, searchPageLimit = 25, readinessTimeoutMs = 2000, trustedProxyAddresses = [], browserOrigins = [], releaseId, requestQuotaPolicy=null, quotaNow=Date.now, metrics=null, ...services }) {
@@ -22,6 +32,7 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
   const healthLimit = fixedWindowLimiter({ limit: healthRateLimit });
   const searchPages=fixedWindowLimiter({limit:searchPageLimit,now:quotaNow});
   const quotas=requestQuotaPolicy?createRequestQuotas(requestQuotaPolicy,{now:quotaNow}):null;
+  const agentOsQuotas=createRequestQuotas(requestQuotaPolicy??defaultRequestQuotaPolicy,{now:quotaNow});
   const log=input=>{try{logger(runtimeLogEvent(input));}catch{/* No raw request/error fallback. */}};
   const recordFailure = async (requestId, status, code, route, actor = null,diagnostic={}) => {
     let auditStatus;
@@ -85,7 +96,13 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
       stage='http-quota';
       // Probe quota is independent from business traffic, but remains bounded.
       if(probe)healthLimit(address,response);
-      else if(quotas)bindRequestQuota(request,quotas.begin({method:request.method,path:url.pathname,hasCredential:request.headers.authorization!==undefined,address,response}));
+      else if(verifiedAgentOsRequest(request,url,services.agentOsGateway))agentOsQuotas.beginVerifiedService({address,response});
+      else if(quotas){
+        const websiteCredential=services.officialAccounts&&request.method!=='OPTIONS'?websiteQuotaCredential(request,url.pathname):null;
+        if(websiteCredential)await quotas.beginWebsite({method:request.method,path:url.pathname,address,response,credential:websiteCredential,
+          readCurrent:()=>services.officialAccounts.currentSession(request)});
+        else bindRequestQuota(request,quotas.begin({method:request.method,path:url.pathname,hasCredential:hasRequestCredential(request,url.pathname),address,response}));
+      }
       else limit(address,response);
       stage='http-browser-policy';
       if (applyBrowserPolicy(request, response, allowedBrowserOrigins)) return;
@@ -110,7 +127,8 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
       stage='http-dispatch';
       await withRuntimeDiagnosticContext({requestId,stage},()=>dispatch({ request, response, requestId, url, send,recordFailure:failed,consumeSearchPage:(actor,after)=>{
         if(after===undefined)return;
-        try{searchPages(actor?'subject:'+actor.subjectId:'anonymous:'+address,response);}
+        const pageActor=actor?.kind==='official-account'&&/^[0-9a-f-]{36}$/.test(actor.accountId??'')?'account:'+actor.accountId:actor?'subject:'+actor.subjectId:'anonymous:'+address;
+        try{searchPages(pageActor,response);}
         catch(error){response.setHeader('X-Galaxy-Quota-Category','search-pagination');throw error;}
       } }));
     } catch (error) {

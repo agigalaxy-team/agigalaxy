@@ -7,7 +7,7 @@ import { createTaskClientV2 } from '../src/task-client-v2.mjs';
 import { createSessionMemory } from '../src/session-memory.mjs';
 import { digest } from '../src/shared/digest.mjs';
 import { caseTaskLinkPayloadHash, legacyCaseTaskLinkPayloadHash } from '../src/shared/case-operation-hash.mjs';
-import { factToolDefinitions } from '../src/personal-mcp-facts-v2.mjs';
+import { factToolDefinitions } from '../src/adapters/mcp/personal/tools/facts-v2.mjs';
 
 const id = () => randomUUID();
 const scopes = ['binding', 'consent', 'case-teaser', 'assistance'];

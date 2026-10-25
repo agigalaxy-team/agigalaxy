@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "operationsConfigurationFile": "/etc/galaxy/operations/configuration.json",
+  "socketPath": "/run/galaxy-maintenance/agent.sock",
+  "serviceKeyFile": "/etc/galaxy/maintenance/service.key",
+  "apiGroupId": null,
+  "controlDirectory": "/var/lib/galaxy/maintenance",
+  "authorizationUrl": "http://127.0.0.1:3201/v1/internal/maintenance/authorize",
+  "production": {"enabled": false}
+}

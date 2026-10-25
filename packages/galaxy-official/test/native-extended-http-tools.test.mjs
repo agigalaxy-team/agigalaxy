@@ -1,20 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {extendedNativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/extended-http-tools.mjs';
-import {configurationToolDefinitions} from '../src/personal-mcp-configurations-v2.mjs';
-import {builderToolDefinitions} from '../src/personal-mcp-builders-v2.mjs';
-import {qualificationToolDefinitions} from '../src/personal-mcp-qualification-v2.mjs';
-import {honorToolDefinitions} from '../src/personal-mcp-honor-v2.mjs';
-import {ciToolDefinitions} from '../src/personal-mcp-ci-v2.mjs';
-import {attachmentToolDefinitions} from '../src/personal-mcp-attachments.mjs';
-import {hubToolDefinitions} from '../src/personal-mcp-hubs-v2.mjs';
-import {workerPackUseToolDefinitions} from '../src/personal-mcp-worker-pack-uses-v2.mjs';
-import {informationToolDefinitions} from '../src/personal-mcp-information-v2.mjs';
-import {targetGovernanceToolDefinitions} from '../src/personal-mcp-target-governance-v2.mjs';
-import {moderationToolDefinitions} from '../src/personal-mcp-moderation-v2.mjs';
-import {communityToolDefinitions} from '../src/personal-mcp-community-v1.mjs';
-import {readingBookmarkToolDefinitions} from '../src/personal-mcp-reading-bookmarks-v1.mjs';
+import {extendedNativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/extended-http.mjs';
+import {configurationToolDefinitions} from '../src/adapters/mcp/personal/tools/configurations-v2.mjs';
+import {builderToolDefinitions} from '../src/adapters/mcp/personal/tools/builders-v2.mjs';
+import {qualificationToolDefinitions} from '../src/adapters/mcp/personal/tools/qualification-v2.mjs';
+import {honorToolDefinitions} from '../src/adapters/mcp/personal/tools/honor-v2.mjs';
+import {ciToolDefinitions} from '../src/adapters/mcp/personal/tools/ci-v2.mjs';
+import {attachmentToolDefinitions} from '../src/adapters/mcp/personal/tools/attachments.mjs';
+import {hubToolDefinitions} from '../src/adapters/mcp/personal/tools/hubs-v2.mjs';
+import {workerPackUseToolDefinitions} from '../src/adapters/mcp/personal/tools/worker-pack-uses-v2.mjs';
+import {informationToolDefinitions} from '../src/adapters/mcp/personal/tools/information-v2.mjs';
+import {targetGovernanceToolDefinitions} from '../src/adapters/mcp/personal/tools/target-governance-v2.mjs';
+import {moderationToolDefinitions} from '../src/adapters/mcp/personal/tools/moderation-v2.mjs';
+import {communityToolDefinitions} from '../src/adapters/mcp/personal/tools/community-v1.mjs';
+import {readingBookmarkToolDefinitions} from '../src/adapters/mcp/personal/tools/reading-bookmarks-v1.mjs';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
@@ -24,10 +24,11 @@ const factories=[configurationToolDefinitions,builderToolDefinitions,qualificati
 const invoke=(tools,name,input)=>tools[name].run(tools[name].inputSchema.parse(input));
 
 test('extended native HTTP reuses every canonical capability and preserves signed bytes without model confirmation or attachment bytes',async()=>{
- const calls=[],native=extendedNativeHttpDefinitions({call:async(...args)=>{calls.push(args);return{transport:'synthetic-routing-only'};}});
+ const accounts=[{id:randomUUID(),email:'PRIVATE_LINKED_ACCOUNT_EMAIL'},{id:randomUUID(),displayName:'PRIVATE_LINKED_ACCOUNT_LABEL'}],
+  calls=[],native=extendedNativeHttpDefinitions({call:async(...args)=>{calls.push(args);return args[0]==='/v2/account-archives/accounts'?{accounts,subjectId:'NOT_PROJECTED'}:{transport:'synthetic-routing-only'};}});
  const spy=new Proxy(()=>{}, {get:()=>spy,apply:()=>({transport:'canonical-shape-only'})});
  const canonical=Object.assign({},...factories.map(f=>f(spy,null)));
- assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,97);
+ assert.deepEqual(Object.keys(native).sort(),Object.keys(canonical).sort());assert.equal(Object.keys(native).length,98);
  for(const[name,tool]of Object.entries(native)){
   assert.equal(tool.scope,canonical[name].scope,name);assert.equal(tool.write,canonical[name].write,name);assert.equal(tool.description,canonical[name].description,name);
  }
@@ -50,6 +51,7 @@ test('extended native HTTP reuses every canonical capability and preserves signe
  await invoke(native,'galaxy_moderation_receipt',{reportId:id,eventId:id,payloadHash:hash});
  assert.deepEqual(calls.at(-1),['/v1/moderation/reports/'+id+'/receipt',{eventId:id,payloadHash:hash}]);
  const samples={
+  galaxy_community_account_options:[{},'/v2/account-archives/accounts'],
   galaxy_community_owned:[{topic:'technology'},'/v2/community/posts/owned'],
   galaxy_bookmarks:[{kind:'forum-post'},'/v2/reading-bookmarks/query'],
   galaxy_bookmark_status:[{reference:{kind:'forum-post',postId:id}},'/v2/reading-bookmarks/status'],
@@ -107,6 +109,10 @@ test('extended native HTTP reuses every canonical capability and preserves signe
  for(const[name,[input,path,options]]of Object.entries(samples)){
   const parsed=native[name].inputSchema.parse(input);await native[name].run(parsed);assert.deepEqual(calls.at(-1),options?[path,null,options]:[path,parsed],name);
  }
+ assert.deepEqual(await invoke(native,'galaxy_community_account_options',{}),{items:accounts.map(({id})=>({id})),selectionRequired:true});
+ assert.equal(native.galaxy_community_account_options.inputSchema.safeParse({accountId:id}).success,false);
+ const malformed=extendedNativeHttpDefinitions({call:async()=>({items:[]})});
+ await assert.rejects(invoke(malformed,'galaxy_community_account_options',{}),{code:'native_account_options_unavailable'});
  const publicReads={
   galaxy_community_query:[{topic:'technology',query:'selected topic'},'/v2/community/posts/query'],
   galaxy_community_replies:[{postId:id,postVersionId:id},'/v2/community/replies/query'],

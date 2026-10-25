@@ -12,6 +12,8 @@ export function officialRoutes({ endpoint, apiPort }) {
     // browser preflight and later additive v2 operations reachable through the
     // same host; unknown routes remain an API 404, not another upstream.
     { method: ['GET','POST','OPTIONS'], path: ['/v2/*'] },
+    { method: ['GET'], path: ['/v1/discovery/config','/v1/discovery/search','/v1/discovery/recommendations','/v1/announcements'] },
+    { method: ['POST'], path: ['/v1/discovery/events'] },
     { method: ['PUT'], path_regexp:{name:'galaxy_attachment_upload',pattern:`^/v2/(chat|community)/attachments/${id}/upload$`} },
     { method: ['GET','POST','DELETE'], path:['/v1/account/*'] },
     { method:['POST'],path:['/v1/account/bookmarks/status','/v1/account/bookmarks/command','/v1/account/bookmarks/query','/v1/account/bookmarks/receipt'] },

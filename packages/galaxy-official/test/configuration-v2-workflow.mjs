@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import {configurationToolDefinitions} from '../src/personal-mcp-configurations-v2.mjs';
+import {configurationToolDefinitions} from '../src/adapters/mcp/personal/tools/configurations-v2.mjs';
 import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion} from '../src/operations/deletion-execute.mjs';
 import {verifyConfigurationBrowser} from './configuration-client-workflow.mjs';

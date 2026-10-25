@@ -1,10 +1,10 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
-import {verifyContactsV2} from './contacts-v2-workflow.mjs';
-import {getProjectContactClient,acknowledgedOperationLimit} from '../../galaxy-web/src/project-contact-client.mjs';
-import {createProjectViewClient,hasIndependentProject,projectQueryMemory} from '../../galaxy-web/src/project-view-client.mjs';
-import {createNativeNavigation} from '../../galaxy-edge-mcp/src/native-v2/navigation.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
+import {verifyContactsV2} from "./contacts-v2-workflow.mjs";
+import {getProjectContactClient,acknowledgedOperationLimit} from "../../galaxy-web/src/features/projects/clients/operations.mjs";
+import {createProjectViewClient,hasIndependentProject,projectQueryMemory} from "../../galaxy-web/src/features/projects/clients/views.mjs";
+import {createNativeNavigation} from "../../galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs";
 
 test('exact project → real discovery/recruitment → original Contact retry → ordinary room uses actual HTTP and Consent',async()=>{
  await verifyContactsV2(null,{afterWorkflow:async({f,p,alias,request})=>{

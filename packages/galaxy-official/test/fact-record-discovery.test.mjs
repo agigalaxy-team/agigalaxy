@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {serviceFixture} from './service-fixture.mjs';
-import {createApi} from '../src/http.mjs';
-import {browserScopes} from '../src/browser-client.mjs';
-import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
+import {serviceFixture} from "./service-fixture.mjs";
+import {createApi} from "../src/http.mjs";
+import {browserScopes} from "../src/browser-client.mjs";
+import {ciSourceMetadata} from "../src/shared/ci-observation-v2-schema.mjs";
+import { createExistingWebRuntime } from "./existing-web-identity-fixture.mjs";
+import {getFactClient} from "../../galaxy-web/src/features/work-records/client.mjs";
 
 test('a current Task discovers an unreferenced same-Case source without a local catalog and rereads its real permission',{timeout:60000},async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map(),writes=[];let runtime;

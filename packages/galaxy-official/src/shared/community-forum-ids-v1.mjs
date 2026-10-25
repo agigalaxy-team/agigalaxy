@@ -13,7 +13,11 @@ export function forumActorKey(actor){
 }
 export function forumActorOwns(actor,row){
  if(!row)return false;
- if(actor.kind==='official-account'||actor.accountAuthorized)return !!actor.accountId&&row.account_id===actor.accountId;
+ if(actor.kind==='official-account')return !!actor.accountId&&row.account_id===actor.accountId;
+ // Historical identity statements do not acquire an Account author when that
+ // same, currently authenticated identity selects one of its associations.
+ if(row.account_id===null)return !!actor.subjectId&&row.subject_id===actor.subjectId;
+ if(actor.accountAuthorized)return !!actor.accountId&&row.account_id===actor.accountId;
  return !!actor.subjectId&&row.subject_id===actor.subjectId;
 }
 const generated={

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
 import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
-import {createPersonalMcp} from '../src/personal-mcp.mjs';
+import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
 import {verifyContextV2} from './context-v2-workflow.mjs';
 
 test('actual MCP transport exposes per-participation Context without claiming execution or model service',{timeout:60000},async()=>{

@@ -22,12 +22,12 @@ export class OperationsProductRules{
     return (await db.query('SELECT * FROM operations_product_rules_v1 WHERE endpoint=$1 AND policy_key=$2 ORDER BY version DESC LIMIT 1',[this.endpoint,key])).rows[0]??null;
   }
   async list(operator){
-    this.businessAdmin.require(operator);
+    await this.businessAdmin.authorizeAction(operator,'rules.read');
     const items=[];for(const key of Object.keys(operationsPolicySchemas))items.push((await this.get(operator,key)).rule);
     return {items,protectedSources:[{key:'signed-governance',editable:false,reason:'existing-independent-review-required'}],checkedAt:this.now()};
   }
   async get(operator,key){
-    this.businessAdmin.require(operator);parse(operationsPolicyKeySchema,key);
+    await this.businessAdmin.authorizeAction(operator,'rules.read');parse(operationsPolicyKeySchema,key);
     const row=await this.currentWithin(this.db,key);
     if(!row)throw new ServiceError('operations_policy_not_initialized',503);
     const records=(await this.db.query(`SELECT * FROM operations_policy_processes_v1 WHERE endpoint=$1 AND policy_key=$2
@@ -38,7 +38,7 @@ export class OperationsProductRules{
       current:process.adopted_version===row.version&&!process.error_code&&this.now()-Date.parse(process.checked_at)/1000<=120})),checkedAt:this.now()};
   }
   async history(operator,key,input={}){
-    this.businessAdmin.require(operator);parse(operationsPolicyKeySchema,key);const page=parse(operationsPageSchema,input);
+    await this.businessAdmin.authorizeAction(operator,'rules.read');parse(operationsPolicyKeySchema,key);const page=parse(operationsPageSchema,input);
     if(page.after&&BigInt(page.after)>2147483647n)throw new ServiceError('invalid_operations_product_request');
     const rows=(await this.db.query(`SELECT * FROM operations_product_rules_v1 WHERE endpoint=$1 AND policy_key=$2 AND ($3::integer IS NULL OR version<$3)
       ORDER BY version DESC LIMIT $4`,[this.endpoint,key,page.after??null,page.limit+1])).rows;

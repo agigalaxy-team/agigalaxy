@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {serviceFixture} from './service-fixture.mjs';
-import {createApi} from '../src/http.mjs';
-import {browserScopes} from '../src/browser-client.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
-import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
+import {serviceFixture} from "./service-fixture.mjs";
+import {createApi} from "../src/http.mjs";
+import {browserScopes} from "../src/browser-client.mjs";
+import { createExistingWebRuntime } from "./existing-web-identity-fixture.mjs";
+import {getFactClient} from "../../galaxy-web/src/features/work-records/client.mjs";
+import {createRecoveryMaterial} from "../../galaxy-core/src/domain/identity-material.mjs";
 
 export const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
 export const outcome=promise=>promise.then(value=>({value}),error=>({error}));

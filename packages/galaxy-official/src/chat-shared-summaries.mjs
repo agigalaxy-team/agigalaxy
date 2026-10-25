@@ -4,6 +4,7 @@ import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
 import {PersonalSummaryService,createSummarySourceReader} from './personal-summaries.mjs';
 import {sharedSummaryPublishSchema,sharedSummaryGetSchema,sharedSummaryPageSchema,sharedSummaryReceiptSchema} from './shared/chat-shared-summary-schema.mjs';
+import {chatMessageOperationsBlockedWithin} from './chat-message-operations-gate.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),hash=x=>digest(canonicalize(x));
 const fail=(c,s=409)=>{throw new ServiceError(c,s);};
 function parse(schema,x){const p=schema.safeParse(x);if(!p.success)fail('invalid_shared_summary_request',400);return p.data;}
@@ -21,6 +22,7 @@ export class ChatSharedSummaryService {
     EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id AND d.state IN ('requested','review-needed','approved','partial','primary-erased')) AS author_pending
     FROM chat_message_refs m WHERE m.message_id=$1 AND m.room_id=$2 FOR SHARE OF m`,[messageId,roomId])).rows[0];
    if(!r||r.state!=='accepted'||r.revision!==revision||Date.parse(r.expires_at)<=now()*1000)return{available:false};
+    if(await chatMessageOperationsBlockedWithin(db,{messageId}))return{available:false,temporarilyUnavailable:true};
    return r.edit_pending||r.author_pending?{available:false,temporarilyUnavailable:true}:{available:true};
   }});
  }
@@ -52,12 +54,16 @@ export class ChatSharedSummaryService {
   if(row.subject_id!==actor.subjectId&&(await db.query("SELECT id FROM deletion_requests WHERE subject_id=$1 AND state IN ('requested','review-needed','approved','partial','primary-erased') LIMIT 1",[row.subject_id])).rows.length)fail('shared_summary_temporarily_unavailable',404);
  }
  async viewWithin(db,actor,row){row=await this.reconcileWithin(db,row);await this.requireVisibleWithin(db,actor,row);
-  const filtered=await this.filter.filterContentWithin(db,actor,row.room_id,row.content);
+   const noticeBlocked=row.message_id&&await chatMessageOperationsBlockedWithin(db,{messageId:row.message_id});
+   let filtered=noticeBlocked?{content:{},storageChanged:false,invalidated:true,temporarilyUnavailable:true}:await this.filter.filterContentWithin(db,actor,row.room_id,row.content);
   // Per-viewer temporary restrictions cannot permanently erase the shared copy.
   // Permanent message expiry/version changes affect every allowed room reader.
   if(filtered.storageChanged){const retained=new Set([...(filtered.persistedContent.fragments??[]).flatMap(f=>f.sourceRefs??[]),...(filtered.persistedContent.keyMessageRefs??[])].map(r=>r.messageId+':'+r.revision));
    const facts=row.source_facts.filter(r=>retained.has(r.messageId+':'+r.revision));
    await db.query('UPDATE room_shared_summaries SET content=$2,source_facts=$3 WHERE share_id=$1',[row.share_id,JSON.stringify(filtered.persistedContent),JSON.stringify(facts)]);row.source_facts=facts;}
+  // Source reads may await transport/permissions. A notice blocked during that
+  // interval must not expose its body; the retained copy remains reversible.
+  if(row.message_id&&await chatMessageOperationsBlockedWithin(db,{messageId:row.message_id}))filtered={content:{},storageChanged:false,invalidated:true,temporarilyUnavailable:true};
   const visible=new Set([...(filtered.content.fragments??[]).flatMap(f=>f.sourceRefs??[]),...(filtered.content.keyMessageRefs??[])].map(r=>r.messageId+':'+r.revision));
   return {shareId:row.share_id,roomId:row.room_id,authorId:row.subject_id,state:row.state,messageId:row.message_id,
    supersedesShareId:row.supersedes_share_id,createdAt:new Date(row.created_at).toISOString(),expiresAt:new Date(row.expires_at).toISOString(),

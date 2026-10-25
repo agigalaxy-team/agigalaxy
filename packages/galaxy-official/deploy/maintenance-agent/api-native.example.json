@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "socketPath": "/run/galaxy-maintenance/agent.sock",
+  "keyFile": "/etc/galaxy/maintenance/service.key"
+}

@@ -24,6 +24,7 @@
     "file-type": "22.1.0",
     "ipaddr.js": "2.5.0",
     "jose": "6.2.12",
+    "nodemailer": "10.1.7",
     "openid-client": "6.8.8",
     "pg": "8.23.0",
     "pg-boss": "12.38.0",

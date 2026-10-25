@@ -6,8 +6,8 @@ import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createChatAgentClient} from '../../galaxy-web/src/chat-agent-client.mjs';
-import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch/index.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 
 const store=()=>{const values=new Map();return{
  get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value)),

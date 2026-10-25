@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { nativeWorkerFixture } from './native-worker-pack-flow-workflow.mjs';
-import { createConfiguredNativeWorkerHost } from '../../galaxy-edge-mcp/src/native-v2/worker-pack-host.mjs';
+import { createConfiguredNativeWorkerHost } from '../../galaxy-edge-mcp/src/native-v2/adapters/worker-pack-host.mjs';
 import { createNativeToolServer } from '../../galaxy-edge-mcp/src/native-v2/server.mjs';
 
 const require = createRequire(new URL('../package.json', import.meta.url));

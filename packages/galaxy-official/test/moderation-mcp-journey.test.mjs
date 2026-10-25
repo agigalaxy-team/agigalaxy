@@ -6,7 +6,7 @@ import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client
 import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {createPersonalMcp} from '../src/personal-mcp.mjs';
+import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
 import {createModerationFlow} from '../src/moderation-flow.mjs';
 import {createModerationClient} from '../src/moderation-client.mjs';
 import {createSessionMemory} from '../src/session-memory.mjs';

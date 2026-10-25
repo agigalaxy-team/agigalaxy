@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {outcomeLifecycleFixture} from './outcome-material-lifecycle-continuity-workflow.mjs';
-import {outcomeMaterialToolDefinitions} from '../src/personal-mcp-outcome-materials-v2.mjs';
+import {outcomeMaterialToolDefinitions} from '../src/adapters/mcp/personal/tools/outcome-materials-v2.mjs';
 
 test('diagnostic: pre-retention source preview returns exact metadata without raw attachment bytes to HTTP or ordinary MCP',{timeout:60000},async t=>{
  const x=await outcomeLifecycleFixture();try{

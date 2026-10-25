@@ -1,9 +1,13 @@
 import * as oidc from 'openid-client';
 import { createHash, randomUUID } from 'node:crypto';
+import {personDisplayName} from './shared/person-display-name.mjs';
 
 const text = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max && !/\p{Cc}/u.test(value);
-function accountDisplayName(claims) {
-  if (text(claims.name, 200) && claims.name.trim()) return claims.name;
+function accountDisplayName(claims, operatorProfile = false) {
+  if (text(claims.name, 200) && claims.name.trim()) return operatorProfile
+    ? personDisplayName({firstName:text(claims.given_name,100)?claims.given_name:null,
+      lastName:text(claims.family_name,100)?claims.family_name:null,displayName:claims.name})
+    : claims.name;
   const username = text(claims.preferred_username, 200) ? claims.preferred_username : null;
   if (!username?.trim()) return null;
   const candidate = username.normalize('NFKC').trim();
@@ -125,7 +129,7 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
         accountVerification: Object.freeze({ method: 'email', verified: claims.email_verified === true }),
         ...(includeAccountProfile ? {accountProfile: Object.freeze({
           email: text(claims.email, 320) ? claims.email : null,
-          displayName: accountDisplayName(claims),
+          displayName: accountDisplayName(claims,includeOperatorRoles),
         })} : {}),
         ...(includeOperatorRoles ? {operatorRoles:signedOperatorRoles(claims,clientId)} : {}),
         verifiedAt: now(), issuedAt: claims.iat, expiresAt: Math.min(claims.exp, preview.expiresAt),

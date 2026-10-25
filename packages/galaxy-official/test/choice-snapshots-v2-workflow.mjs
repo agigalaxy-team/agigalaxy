@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
-import {choiceToolDefinitions} from '../src/personal-mcp-choices-v2.mjs';
+import {choiceToolDefinitions} from '../src/adapters/mcp/personal/tools/choices-v2.mjs';
 import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion} from '../src/operations/deletion-execute.mjs';
 export async function verifyChoiceSnapshots(database=null,options={}){

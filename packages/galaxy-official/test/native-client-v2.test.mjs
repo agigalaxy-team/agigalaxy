@@ -8,12 +8,12 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createNativeRuntime} from '../../galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 import {createNativeToolServer} from '../../galaxy-edge-mcp/src/native-v2/server.mjs';
-import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch.mjs';
+import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch/index.mjs';
 import {createNativeStore} from '../../galaxy-edge-mcp/src/native-v2/store.mjs';
 import {verifyContextV2} from './context-v2-workflow.mjs';
-import {createNativeNavigation,navigationSchema} from '../../galaxy-edge-mcp/src/native-v2/navigation.mjs';
+import {createNativeNavigation,navigationSchema} from '../../galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';
 import {InMemoryTransport,CLIENT_CAPABILITIES_META_KEY,CLIENT_INFO_META_KEY,PROTOCOL_VERSION_META_KEY} from '@modelcontextprotocol/server';
 
 async function verifyRequestCapabilities(server){

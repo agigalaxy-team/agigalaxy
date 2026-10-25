@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp,writeFile,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
-import { personalMcpConfigurationSchema,loadPersonalMcp } from '../src/personal-mcp-config.mjs';
+import { personalMcpConfigurationSchema,loadPersonalMcp } from '../src/adapters/mcp/personal/configuration.mjs';
 import { runtimeConfigSnapshot } from '../src/operations/runtime-config-audit.mjs';
 import { createApi } from '../src/http.mjs';
 

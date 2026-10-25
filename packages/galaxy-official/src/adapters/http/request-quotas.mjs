@@ -3,6 +3,7 @@ import { readFile,lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../../shared/service-error.mjs';
 import { digest } from '../../shared/digest.mjs';
+import {accountFollowMethod} from '../../shared/account-follows-schema.mjs';
 
 export const requestQuotaCategories=['anonymous','binding','query','submission','notifications','export','revocation'];
 const dimensions=z.object({ip:z.number().int().min(1).max(1000000),subject:z.number().int().min(1).max(1000000),credential:z.number().int().min(1).max(1000000)}).strict();
@@ -20,12 +21,43 @@ export async function loadRequestQuotaPolicy(path){
 const uuid='[0-9a-f-]{36}';
 const revocation=new RegExp(`^/v1/(?:bindings|consents|proofs|context-grants)/${uuid}/revoke$`);
 const publicMetadata=new Set(['/mcp/docs','/.well-known/galaxy-network.json','/.well-known/galaxy-signing-keys.json','/v1/policy','/v1/signing-keys/status','/v1/service-status','/v1/honor/rules','/v1/honor/ranking','/v1/honor/rule-history','/v1/builders/specification']);
-export function requestQuotaCategory(method,path,hasCredential=false){
+// This is a declaration used only to select the existing pre-auth transport
+// quota, just like the Authorization header. It grants no identity or access.
+// The management portal still verifies the real session and each action.
+export function hasRequestCredential(request,path){
+ if(request.headers.authorization!==undefined)return true;
+ if(!/^\/v1\/operations(?:\/|$)/.test(path)||['/v1/operations/login','/v1/operations/callback'].includes(path))return false;
+ const raw=request.headers.cookie;if(typeof raw!=='string'||raw.length>16384)return false;
+ const values=raw.split(';').map(value=>value.trim()).filter(value=>/^(?:__Host-galaxy-operator|galaxy-operator-fixture)=/.test(value));
+ return values.length===1&&/^(?:__Host-galaxy-operator|galaxy-operator-fixture)=[A-Za-z0-9_-]{43}$/.test(values[0]);
+}
+// This candidate only permits a bounded session lookup. currentSession must
+// confirm its portal scope/revocation/expiry before any account quota applies.
+export function websiteQuotaCredential(request,path){
+ if(request.headers.authorization!==undefined||['/v1/account/login','/v1/account/callback'].includes(path)
+  ||!/^\/(?:v1\/(?:account|discovery)|v2\/(?:community|chat))(?:\/|$)/.test(path))return null;
+ const raw=request.headers.cookie;if(typeof raw!=='string'||raw.length>16384)return null;
+ const values=raw.split(';').map(value=>value.trim()).filter(value=>/^(?:__Host-galaxy-account|galaxy-account-fixture)=/.test(value));
+ if(values.length!==1)return null;
+ const match=/^(?:__Host-galaxy-account|galaxy-account-fixture)=([A-Za-z0-9_-]{43})$/.exec(values[0]);
+ return match?.[1]??null;
+}
+export function requestQuotaCategory(method,path,hasCredential=false,{websiteAccount=false}={}){
+  if(method==='POST'&&['status','query','receipt'].includes(accountFollowMethod(path)))return hasCredential?'query':'anonymous';
   if(path.startsWith('/v2/community/')){
     if(method==='GET'&&/^\/v2\/community\/(?:posts\/[0-9a-f-]{36}(?:\/versions\/[0-9a-f-]{36})?|replies\/[0-9a-f-]{36})$/.test(path)
-      ||method==='POST'&&(path==='/v2/community/posts/query'||path==='/v2/community/replies/query'||/^\/v2\/community\/posts\/[0-9a-f-]{36}\/versions$/.test(path)))return 'anonymous';
+      ||method==='POST'&&(path==='/v2/community/posts/query'||path==='/v2/community/replies/query'||/^\/v2\/community\/posts\/[0-9a-f-]{36}\/versions$/.test(path)))return websiteAccount?'query':'anonymous';
     if(method==='POST'&&(path.endsWith('/withdraw')||path.endsWith('/appeal')))return 'revocation';
     if(method==='GET'||path.endsWith('/query')||path.endsWith('/config')||path.endsWith('/owned')||path.endsWith('/receipt'))return hasCredential?'query':'anonymous';
+  }
+  if(method==='POST'&&path.startsWith('/v2/chat/')){
+    // These exact native chat routes already use a read actor; classify only
+    // their transport quota here. Membership, source and CSRF remain in HTTP.
+    if(path==='/v2/chat/export/owned'||new RegExp(`^/v2/chat/attachments/${uuid}/export-content$`).test(path))return 'export';
+    if(path==='/v2/chat/rooms/directory'
+      ||new RegExp(`^/v2/chat/rooms/${uuid}/(?:read|history|decisions|receipt|operation-receipt|agent-grants|agent-participants|join-preview)$`).test(path)
+      ||new RegExp(`^/v2/chat/rooms/${uuid}/messages/${uuid}/context$`).test(path)
+      ||new RegExp(`^/v2/chat/attachments/${uuid}/content$`).test(path))return hasCredential?'query':'anonymous';
   }
   if(method==='POST'&&path==='/v2/target-governance/events')return 'revocation';
   if(method==='POST'&&['/v2/target-governance/receipt','/v2/target-governance/target'].includes(path))return hasCredential?'query':'anonymous';
@@ -63,6 +95,26 @@ export function createRequestQuotas(input,{now=Date.now}={}){
     for(const item of selected){item.value.count++;state.counters.set(item.key,item.value);}
   }
   return Object.freeze({
+    // Only the HTTP boundary calls this after the real private-service check.
+    // A separate instance keeps these bounded read/coordination calls from
+    // consuming ordinary business submissions on the same host address.
+    beginVerifiedService({address,response}){
+      response.setHeader('X-Galaxy-Quota-Scope','verified-agentos');
+      consume('query',{ip:address},response);
+    },
+    async beginWebsite({method,path,address,response,credential,readCurrent}){
+      if(typeof credential!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(credential)||typeof readCurrent!=='function')throw new Error('Website quota session lookup required');
+      const category=requestQuotaCategory(method,path,true,{websiteAccount:true});
+      // Session lookups retain the existing category's aggregate IP ceiling.
+      // Random/revoked cookies additionally spend the ordinary anonymous bucket.
+      consume(category,{ip:address},response);
+      const current=await readCurrent();
+      if(!current||!z.uuid().safeParse(current.accountId).success||!Number.isSafeInteger(current.expiresAt)||current.expiresAt<=Math.floor(now()/1000)){
+        if(category!=='anonymous')consume('anonymous',{ip:address},response);
+        return;
+      }
+      consume(category,{subject:'account:'+current.accountId,credential:digest(credential)},response);
+    },
     begin({method,path,hasCredential,address,response}){
       const category=requestQuotaCategory(method,path,hasCredential);consume(category,{ip:address},response);
       return ({subjectId,credential})=>{

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import { outcomeLifecycleFixture, approveOutcomeCopy } from './outcome-material-lifecycle-continuity-workflow.mjs';
-import { outcomeMaterialToolDefinitions } from '../src/personal-mcp-outcome-materials-v2.mjs';
+import { outcomeMaterialToolDefinitions } from '../src/adapters/mcp/personal/tools/outcome-materials-v2.mjs';
 
 const hash = text => createHash('sha256').update(text).digest('hex');
 

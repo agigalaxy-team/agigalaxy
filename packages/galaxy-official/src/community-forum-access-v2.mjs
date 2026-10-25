@@ -1,6 +1,7 @@
 import {ServiceError} from './shared/service-error.mjs';
 import {forumAudienceSchema,legacyForumAudience} from './shared/community-forum-access-v2.mjs';
 import {operationsVisibilityWithin} from './operations-content-visibility.mjs';
+import {forumOperationsHiddenWithin} from './operations-forum-visibility.mjs';
 
 const unavailable=error=>error instanceof ServiceError&&[403,404,409,422,503].includes(error.status);
 export class CommunityForumAccessV2{
@@ -69,10 +70,17 @@ export class CommunityForumAccessV2{
   if(row.section_id){const section=await this.sectionWithin(db,row.section_id);if(!section)throw new ServiceError('forum_source_unavailable',403);rules.push({kind:'source-audience',authorAccountId:section.maintainer_account_id,rule:section.audience.read});}
   return rules;
  }
- async contentWithin(db,permission,{viewerActor=null}={}){
+ async contentWithin(db,permission,{viewerActor=null,ignoreOperationsVisibility=false}={}){
   if(!['forum.post.publish','forum.reply.publish'].includes(permission.action))return true;
   const table=permission.action==='forum.post.publish'?'forum_versions_v1':'forum_replies_v1',row=(await db.query(`SELECT * FROM ${table} WHERE publication_event_id=$1`,[permission.event_id])).rows[0];
   if(!row)return false;
+  const kind=permission.action==='forum.post.publish'?'post':'reply',postId=row.post_id;
+  if(!ignoreOperationsVisibility&&await forumOperationsHiddenWithin(db,{endpoint:this.forum.access.endpoint,kind,id:kind==='post'?postId:row.id,postId,now:this.forum.clock()}))return false;
+  if(kind==='reply'){
+   // An operations/case takedown covers the thread. Original author exit or
+   // revocation keeps the existing independent-reply permission semantics.
+   if(await this.forum.hiddenWithin(db,{kind:'post-version',postId:row.post_id,versionId:row.post_version_id},{ignoreOperationsVisibility}))return false;
+  }
   if(viewerActor?.subjectId&&viewerActor.subjectId===row.subject_id)return true;
   const viewer=await this.viewerWithin(db,viewerActor);
   if(viewer?.accountId===row.account_id)return true;

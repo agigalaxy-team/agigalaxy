@@ -62,11 +62,11 @@ export class CommunityForumPermissionsV1 {
   if(!actor||!this.accounts)return null;
   try{return (await this.accounts.resolveWithin(db,actor)).id;}catch(error){if(['account_verification_required','account_selection_required'].includes(error.code))return null;throw error;}
  }
- async statusWithin(db,id,{viewerId=null,viewerActor=null,visibility=null,payloadHash=null,action=null,objectId=null,lock=true,checkAudience=true}={}){
+ async statusWithin(db,id,{viewerId=null,viewerActor=null,visibility=null,payloadHash=null,action=null,objectId=null,lock=true,checkAudience=true,ignoreOperationsVisibility=false}={}){
   const source=(await db.query(`SELECT id,authorization_kind,subject_id,account_id,event_id,consent_id,origin_binding_id,source_device_id,source_key_id,
    accepted_epoch,accepted_control_hash,signature_hash,payload_hash,action,object_id,visibility,fields,viewers,account_viewers,issued_at,published_until,
    accepted_at,authorization_audit_until,revoked_at,erased_at,policy_hash FROM forum_permissions_v1 WHERE id=$1${lock?' FOR SHARE':''}`,[id])).rows[0];
-  if(source?.authorization_kind==='official-account')return this.withAudienceWithin(db,await this.accountStatusWithin(db,source,{viewerId,viewerActor,visibility,payloadHash,action,objectId,checkAudience}),viewerActor,checkAudience);
+  if(source?.authorization_kind==='official-account')return this.withAudienceWithin(db,await this.accountStatusWithin(db,source,{viewerId,viewerActor,visibility,payloadHash,action,objectId,checkAudience}),viewerActor,checkAudience,ignoreOperationsVisibility);
   const row=(await db.query(`SELECT p.id,p.subject_id,p.account_id,p.event_id,p.consent_id,p.origin_binding_id,p.source_device_id,p.source_key_id,p.account_viewers,
     p.accepted_epoch,p.accepted_control_hash,p.signature_hash,p.payload_hash,p.action,p.object_id,p.visibility,p.fields,p.viewers,
     p.issued_at,p.published_until,p.accepted_at,p.revoked_at,p.erased_at,p.policy_hash,c.intent,c.revoked_at consent_revoked,c.signature_hash consent_signature_hash,
@@ -95,10 +95,10 @@ export class CommunityForumPermissionsV1 {
   }
   if(row.subject_id&&(await db.query("SELECT 1 FROM deletion_requests WHERE subject_id=$1 AND state IN ('requested','review-needed','approved','partial','primary-erased') LIMIT 1",[row.subject_id])).rows.length)
    reasons.push('deletion-pending');
-  return this.withAudienceWithin(db,{allowed:reasons.length===0,reasons,row},viewerActor,checkAudience);
+  return this.withAudienceWithin(db,{allowed:reasons.length===0,reasons,row},viewerActor,checkAudience,ignoreOperationsVisibility);
  }
- async withAudienceWithin(db,state,viewerActor,checkAudience){
-  if(state.allowed&&checkAudience&&this.contentAudience&&!await this.contentAudience(db,state.row,{viewerActor}))return {...state,allowed:false,reasons:[...state.reasons,'audience-condition-not-met']};
+ async withAudienceWithin(db,state,viewerActor,checkAudience,ignoreOperationsVisibility=false){
+  if(state.allowed&&checkAudience&&this.contentAudience&&!await this.contentAudience(db,state.row,{viewerActor,ignoreOperationsVisibility}))return {...state,allowed:false,reasons:[...state.reasons,'audience-condition-not-met']};
   return state;
  }
  async accountStatusWithin(db,row,{viewerId,viewerActor,visibility,payloadHash,action,objectId,checkAudience}){

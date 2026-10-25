@@ -7,7 +7,7 @@ import {QualificationV2Service} from '../src/qualification-v2.mjs';
 import {experienceReviewMigrationSql} from '../src/infrastructure/experience-review-schema.mjs';
 import {QualificationCalculationService} from '../src/qualification-calculation.mjs';
 import {createApi} from '../src/http.mjs';
-import {qualificationToolDefinitions} from '../src/personal-mcp-qualification-v2.mjs';
+import {qualificationToolDefinitions} from '../src/adapters/mcp/personal/tools/qualification-v2.mjs';
 export const scopes=['binding','consent','case-teaser','assistance','evidence','proof','capsules'];
 export const capabilityId='software-debugging';
 export async function fixture(database=null,options={}){const requestedScopes=[...new Set([...scopes,...(options.extraScopes??[])])];const f=await serviceFixture(requestedScopes,database,{syntheticCommunityQuota:false,...options});

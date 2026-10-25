@@ -8,7 +8,7 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createSessionMemory } from '../src/session-memory.mjs';
 import { createHelpRuntimeV2 } from '../src/help-runtime-v2.mjs';
-import { taskToolDefinitions } from '../src/personal-mcp-task-tools-v2.mjs';
+import { taskToolDefinitions } from '../src/adapters/mcp/personal/tools/task-tools-v2.mjs';
 import { registerHelpTools } from '../../galaxy-edge-mcp/src/help-tools-v2.mjs';
 import { helpOfferDraftSchema } from '../src/shared/help-schema-v2.mjs';
 

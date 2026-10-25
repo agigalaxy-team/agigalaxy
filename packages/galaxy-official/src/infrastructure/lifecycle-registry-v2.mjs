@@ -2,6 +2,13 @@
 // choices under CUR-35, not quotations of an exact user-selected table TTL.
 export const lifecyclePolicyVersion = 'galaxy-retention/v1-product-v2';
 export const productV2DeletionTargets = {
+  // Origin-controlled uploads are distinct from the online account itself.
+  // Their deletion tombstones are retained below, not selected as content.
+  private_conversation_chunks_v1:'t.archive_id IN (SELECT id FROM private_conversation_archives_v1 WHERE origin_subject_id=$1)',
+  private_conversation_archives_v1:'t.origin_subject_id=$1',
+  // A room or another participant may still require this locator. The normal
+  // FK leaf pass keeps it (and the minimum subject/control chain) in that case.
+  chat_participants_v3:"t.kind='identity' AND t.subject_id=$1",
   chat_human_message_reads:'t.subject_id=$1',
   reading_bookmarks_v1:'t.subject_id=$1',reading_bookmark_operations_v1:'t.subject_id=$1',
   task_materials_v1:'t.subject_id=$1',
@@ -52,10 +59,75 @@ export const productV2DeletionTargets = {
 };
 export const controlHistoryTables = new Set(['subject_control_heads','subject_control_events','device_authorizations','recovery_authorizations']);
 export const lifecycleManagedTables = ['lifecycle_erasure_records'];
+// Closed post-85 inventory for deletion of one *local identity*. A linked
+// online account and an independent operations principal are not that subject.
+// These explicit categories are also mandatory schema entries: an unclassified
+// future table still stops execution instead of silently falling out of scope.
+export const subjectDeletionServiceTables = Object.freeze({
+  accountOwned: [
+    'official_account_profiles_v1','official_account_type_history_v1','account_external_credentials_v1',
+    'account_reading_bookmarks_v2','account_reading_bookmark_operations_v2',
+    'official_account_sessions_v1','account_operations_notices_v1',
+    'operations_feedback_v1','operations_feedback_events_v1','feedback_attachments_v1',
+    'account_feedback_data_operations_v1','account_feedback_data_items_v1',
+  ],
+  // Source bodies are erased by prepareProductV2Deletion, while these receipts
+  // prevent an old upload/operation from restoring the same deleted scope.
+  sourceErasureReceipts: [
+    'account_work_scopes_v1','account_work_v1','account_work_operations_v1','private_conversation_deletions_v1',
+  ],
+  // Keep keys/links until actual object erasure. An SQL deletion is not a Garage
+  // or S3 receipt; source-bound reads must stop before delegated cleanup runs.
+  delegatedSourceObjects: ['forum_attachments_v1','forum_attachment_links_v1'],
+  accountGovernance: [
+    'account_chat_reports_v1','account_chat_governance_events_v1','account_chat_governance_materials_v1',
+    'operations_chat_message_visibility_v1','forum_operations_events_v1',
+  ],
+  independentAuthentication: [
+    'oidc_login_transactions_v1','official_account_logins_v1',
+    'operations_operator_principals_v1','operations_operator_logins_v1','operations_operator_sessions_v1',
+  ],
+  operatorConfigurationAndAudit: [
+    'business_admin_audit_v1','site_publications_v1','operations_content_visibility_v1',
+    'operations_product_commands_v1','operations_product_rules_v1','operations_policy_processes_v1',
+    'operations_notices_v1','operations_retention_runs_v1','operations_retention_observations_v1',
+    'operations_forum_curation_v1','operations_forum_tags_v1','operations_forum_content_events_v1',
+    'operations_permission_authority_v1','operations_business_roles_v1','operations_role_assignments_v1',
+    'operations_automation_grants_v1','operations_permission_events_v1',
+    'operations_messaging_plans_v1','operations_messaging_versions_v1','operations_messaging_commands_v1',
+    'operations_messaging_events_v1','operations_messaging_runs_v1','operations_messaging_recipients_v1',
+    'operations_messaging_attempts_v1','operations_messaging_announcements_v1',
+    'operations_smtp_settings_v1','operations_smtp_commands_v1','operations_smtp_events_v1','operations_smtp_tests_v1',
+    'operations_agentos_executions_v1','operations_agentos_source_refs_v1','operations_agentos_commands_v1','operations_agentos_tool_calls_v1',
+    'operations_agentos_conversations_v1','operations_agentos_conversation_commands_v1',
+    'operations_agentos_conversation_tool_calls_v1','operations_agentos_conversation_sources_v1','operations_agentos_conversation_cards_v1',
+    'operations_file_cleanup_plans_v1','operations_file_cleanup_items_v1',
+    'operations_file_access_heads_v1','operations_file_access_events_v1',
+    'operations_recommendation_policy_v1','operations_recommendation_themes_v1','operations_recommendation_events_v1',
+    'operations_search_quality_state_v1','operations_search_quality_versions_v1','operations_search_quality_operations_v1',
+    'operations_maintenance_plans_v1','operations_maintenance_events_v1',
+    'operations_model_settings_state_v1','operations_model_settings_versions_v1','operations_model_settings_operations_v1',
+    'operations_p14_rule_heads_v1','operations_p14_rule_versions_v1','operations_p14_rule_commands_v1','operations_p14_rule_events_v1','operations_p14_rule_decisions_v1',
+    'operations_p13_strategy_heads_v1','operations_p13_strategy_versions_v1','operations_p13_strategy_commands_v1','operations_p13_strategy_rehearsals_v1','operations_p13_strategy_runs_v1','operations_p13_strategy_events_v1',
+  ],
+  // These facts belong to an account/visitor, not an associated GUID. Keep the
+  // index queue too: deleting it could lose removal of an erased public source.
+  accountOrVisitorUsage: [
+    'discovery_usage_events_v1','discovery_delivery_outbox_v1','discovery_feedback_v1',
+    'discovery_recommendation_requests_v1','discovery_search_requests_v1',
+  ],
+  sourceIndexReconciliation: ['discovery_index_control_v1','discovery_index_outbox_v1'],
+});
 // These own transport-dependent lifecycles. PG references alone are not a MAM
 // body deletion receipt. Their adapter adds actual controlled-copy results.
 export const chatDelegatedTables = ['chat_rooms','chat_memberships','chat_decisions','chat_message_refs','chat_message_operations','chat_cursors','chat_message_preferences','chat_agent_grants','chat_attachments','outcome_materials_v2','outcome_material_events_v2'];
 export const productV2Retention = Object.freeze({
+  feedbackAttachments:{tables:['feedback_attachments_v1'],category:'private-feedback-attachment',
+    sourceRead:'current feedback operator permission, exact bound feedback and clean unexpired attachment checked for every read',
+    policy:'feedbackPolicy supplies configurable engineering defaults of 7 draft days and 30 bound days; these are not user-selected durations',
+    expiry:'expiry, revocation and quarantine stop reads immediately without renewing retention',
+    cleanup:'automatic physical cleanup is not connected; deleting an expired or unreferenced object requires the confirmed manual lifecycle process',
+    publicUrls:false},
   readingBookmarks:{tables:['reading_bookmarks_v1','reading_bookmark_operations_v1'],category:'owner-private-object-reference',automaticExpiry:null,
     contentStored:false,sourceRead:'current source permission and expiry checked on each read; saving grants no new source access',
     deletion:'explicit removal hides the reference; revision and operation receipts prevent late retries from restoring it; account deletion erases both owned tables'},

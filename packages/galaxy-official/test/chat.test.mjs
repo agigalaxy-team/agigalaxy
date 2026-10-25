@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {chatFixture,invite,verifyGovernance} from './chat-workflow.mjs';
-import {ChatService} from '../src/chat.mjs';
+import {ChatService} from '../src/chat/service.mjs';
 import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
 import {subjectResourceUsage,defaultResourceBudgetPolicy} from '../src/infrastructure/resource-budgets.mjs';
 

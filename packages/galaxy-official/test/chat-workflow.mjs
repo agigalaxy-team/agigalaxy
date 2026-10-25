@@ -5,7 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {migrate} from '../src/database.mjs';
 import {BindingService,digest} from '../src/bindings.mjs';
 import {AccessService} from '../src/access.mjs';
-import {ChatService} from '../src/chat.mjs';
+import {ChatService} from '../src/chat/service.mjs';
 import {createGalaxyGenesis} from '../../galaxy-core/src/galaxy-guid.mjs';
 const pem=k=>k.export({format:'pem',type:'spki'});
 export async function chatFixture({database=null,runtimeDb=null,transport=null,migrateDatabase=true,scopes=['binding']}={}){

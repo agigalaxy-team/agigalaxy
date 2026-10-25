@@ -8,7 +8,7 @@ import { createOidcLoginProvider } from '../src/oidc-login.mjs';
 import { createOAuthIntrospection } from '../src/oauth-introspection.mjs';
 import { createOAuthResourceAccess } from '../src/oauth-resource-access.mjs';
 import { IdentityLinkService } from '../src/identity-links.mjs';
-import { createPersonalMcpHandler } from '../src/personal-mcp.mjs';
+import { createPersonalMcpHandler } from '../src/adapters/mcp/personal/handler.mjs';
 import { createApi } from '../src/http.mjs';
 import { handleDocsMcp } from '../src/docs-mcp.mjs';
 import { httpFailureWriter } from '../src/infrastructure/http-failure-audit.mjs';

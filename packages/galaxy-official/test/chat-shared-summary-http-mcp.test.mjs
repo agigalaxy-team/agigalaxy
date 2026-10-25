@@ -6,7 +6,7 @@ import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client
 import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {createPersonalMcp} from '../src/personal-mcp.mjs';
+import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
 import {createChatSharedSummaryClient} from '../src/chat-shared-summary-client.mjs';
 import {invite} from './chat-workflow.mjs';
 test('shared HTTP client and actual MCP tool transport preserve explicit room publication',async()=>{

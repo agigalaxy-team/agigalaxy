@@ -31,10 +31,16 @@ const fixed = new Set(['/v1/identity/providers', '/v1/identity/begin', '/v1/iden
   '/v1/context-grants', '/v1/context-grants/query', '/v1/context-grants/receipt', '/v1/qualification/policies', '/v1/qualification/evaluate',
   '/v1/notifications/query', '/v1/notifications/preferences/read', '/v1/notifications/preferences/save', '/v1/notifications/read', '/v1/notifications/archive', '/v1/requester-history/facts',
   '/v1/moderation/config', '/v1/moderation/reports', '/v1/moderation/reports/query']);
-for(const path of ['/v1/account/session','/v1/account/login','/v1/account/logout','/v1/account/callback','/v1/account/settings',
+for(const path of ['/v1/account/follows/status','/v1/account/follows/query','/v1/account/follows/command','/v1/account/follows/receipt','/v1/account/session','/v1/account/login','/v1/account/logout','/v1/account/callback','/v1/account/settings',
   '/v1/account/work/list','/v1/account/work/get','/v1/account/work/status','/v1/account/work/delete','/v1/account/archives',
   '/v1/operations/session','/v1/operations/login','/v1/operations/callback','/v1/operations/logout','/v1/operations/users',
   '/v1/operations/audit','/v1/operations/chat-reports','/v1/operations/jobs','/v1/operations/search/failures','/v1/operations/content/publications',
+  '/v1/announcements','/v1/operations/messaging/plans','/v1/operations/messaging/runs',
+  '/v1/discovery/config','/v1/discovery/events','/v1/discovery/search','/v1/discovery/recommendations','/v1/operations/discovery/analytics',
+  '/v1/operations/agentos/status','/v1/operations/agentos/options','/v1/operations/agentos/executions','/v1/operations/agentos/runs',
+  '/v1/internal/agentos/authorize','/v1/internal/agentos/tools/execute',
+  '/v1/operations/smtp','/v1/operations/smtp/identities','/v1/operations/smtp/queue','/v1/operations/smtp/bounces','/v1/operations/smtp/domains',
+  '/v1/operations/smtp/tests','/v1/operations/smtp/history','/v1/operations/smtp/settings','/v1/operations/smtp/tests/connection','/v1/operations/smtp/tests/delivery',
   '/v2/community/topics','/v2/community/access-options','/v2/community/posts','/v2/community/posts/query',
   '/v2/community/posts/owned','/v2/community/sections','/v2/community/sections/query','/v2/community/reports',
   '/v2/community/reports/query','/v2/community/accounts/query','/v2/community/notifications/query',
@@ -46,10 +52,19 @@ for(const path of ['/v1/account/session','/v1/account/login','/v1/account/logout
   '/v2/reading-bookmarks/query','/v2/reading-bookmarks/get','/v2/reading-bookmarks/save','/v2/reading-bookmarks/remove'])fixed.add(path);
 const id='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
 const templates=[
+  [new RegExp('^/v1/operations/files/(?:chat|forum)/'+id+'/access$','i'),'/v1/operations/files/:kind/:id/access'],
+  [new RegExp('^/v1/operations/files/access/operations/'+id+'$','i'),'/v1/operations/files/access/operations/:id'],
+  [/^\/v1\/operations\/rules\/(resource-budget|community-quota|forum-quota|business-controls)\/(detail|versions|draft|publish|restore|sample)$/,'/v1/operations/rules/:key'],
+  [new RegExp('^/v1/operations/rules/operations/'+id+'$','i'),'/v1/operations/rules/operations/:id'],
+  [new RegExp('^/v1/operations/agentos/executions/'+id+'(/(?:events|runs|review|continue))?$','i'),'/v1/operations/agentos/executions/:id'],
+  [/^\/v1\/operations\/agentos\/runs\/[A-Za-z0-9_-]{1,128}$/,'/v1/operations/agentos/runs/:run'],
   [new RegExp('^/v1/account/public/by-uid/[a-z0-9]{6,16}$','i'),'/v1/account/public/by-uid/:uid'],
   [new RegExp('^/v1/account/public/'+id+'(/posts)?$','i'),'/v1/account/public/:id'],
   [new RegExp('^/v1/operations/users/'+id+'(/(?:audit|links|type-history|restriction(?:/release)?|type-change))?$','i'),'/v1/operations/users/:id'],
-  [new RegExp('^/v1/operations/jobs/(information-watch|search-recovery|content-publication)/'+id+'(/(?:cancel|retry))?$','i'),'/v1/operations/jobs/:queue/:id'],
+  [new RegExp('^/v1/operations/jobs/(information-watch|search-recovery|content-publication|account-notice|retention-cleanup|messaging-run|messaging-delivery)/'+id+'(/(?:cancel|retry))?$','i'),'/v1/operations/jobs/:queue/:id'],
+  [new RegExp('^/v1/operations/messaging/plans/'+id+'(/(?:save|activate|pause|resume|stop|withdraw|history))?$','i'),'/v1/operations/messaging/plans/:id'],
+  [new RegExp('^/v1/operations/messaging/runs/'+id+'(/(?:retry|recipients))?$','i'),'/v1/operations/messaging/runs/:id'],
+  [new RegExp('^/v1/announcements/'+id+'$','i'),'/v1/announcements/:id'],
   [new RegExp('^/v1/operations/search/failures/'+id+'(/retry)?$','i'),'/v1/operations/search/failures/:id'],
   [new RegExp('^/v1/operations/chat-reports/'+id+'(/event|/attachments/'+id+'/content)?$','i'),'/v1/operations/chat-reports/:id'],
   [new RegExp('^/v1/operations/content/publications/'+id+'$','i'),'/v1/operations/content/publications/:id'],
@@ -57,9 +72,13 @@ const templates=[
   [new RegExp('^/v2/(community|chat)/attachments/'+id+'/(content|export-content)$','i'),'/v2/:area/attachments/:id/:operation'],
 ];
 export function failureRoute(method, pathname) {
+  if(['GET','POST'].includes(method)&&/^\/v1\/operations\/files\/(?:\:kind\/\:id\/access|access\/operations\/\:id)$/.test(pathname??''))return `${method} ${pathname}`;
+  if(['GET','POST'].includes(method)&&/^\/v1\/operations\/rules\/(?:overview|:key\/(?:detail|versions|draft|publish|restore|sample)|operations\/:id)$/.test(pathname??''))return `${method} ${pathname}`;
+  if(['GET','POST'].includes(method)&&/^\/v1\/operations\/agentos\/(?:executions\/:id(?:\/(?:events|runs|review|continue))?|runs\/:run)$/.test(pathname??''))return `${method} ${pathname}`;
   if(['GET','POST','DELETE'].includes(method)&&pathname==='/mcp/personal')return `${method} /mcp/personal`;
   if(method==='GET'&&pathname==='/.well-known/oauth-protected-resource/mcp/personal')return 'GET /.well-known/oauth-protected-resource/mcp/personal';
   if (!['GET', 'POST'].includes(method)) return 'http.request';
+  if(/^\/v1\/(?:announcements\/:id|operations\/(?:messaging\/(?:plans\/:id(?:\/(?:save|activate|pause|resume|stop|withdraw|history))?|runs\/:id(?:\/(?:retry|recipients))?)|jobs\/(?:information-watch|search-recovery|content-publication|account-notice|retention-cleanup|messaging-run|messaging-delivery)\/:id(?:\/(?:cancel|retry))?))$/.test(pathname??''))return `${method} ${pathname}`;
   // Runtime logging receives the same already-templated tag as the audit path.
   if(typeof pathname==='string'&&(/^\/v1\/(?:identity\/callback\/:provider|(?:bindings|consents|cases|verifications|proofs|assistance|context-grants|moderation\/reports)\/:id(?:\/(?:revoke|status|events|accept|read))?|account\/public\/(?:by-uid\/:uid|:id(?:\/posts)?)|operations\/(?:users\/:id(?:\/(?:audit|links|type-history|restriction(?:\/release)?|type-change))?|jobs\/(?:information-watch|search-recovery|content-publication)\/:id(?:\/(?:cancel|retry))?|search\/failures\/:id(?:\/retry)?|chat-reports\/:id(?:\/event|\/attachments\/:id\/content)?|content\/publications\/:id))$/.test(pathname)
     ||/^\/v2\/(?:community\/(?:posts|sections|replies|reports)\/:id(?:\/(?:versions|replies|permissions|quota|classification|events|receipt))?|(?:community|chat)\/attachments\/:id\/(?:content|export-content))$/.test(pathname)))return `${method} ${pathname}`;
@@ -68,6 +87,7 @@ export function failureRoute(method, pathname) {
   for(const [pattern,template] of templates){
     const matched=pattern.exec(pathname??'');if(!matched)continue;
     const suffix=matched[1]??'';
+    if(template==='/v1/operations/rules/:key')return `${method} ${template}/${matched[2]}`;
     if(template==='/v2/community/:kind/:id')return `${method} /v2/community/${suffix}/:id${matched[2]??''}`;
     if(template==='/v1/operations/jobs/:queue/:id')return `${method} /v1/operations/jobs/${suffix}/:id${matched[2]??''}`;
     if(template==='/v2/:area/attachments/:id/:operation')return `${method} /v2/${suffix}/attachments/:id/${matched[2]}`;

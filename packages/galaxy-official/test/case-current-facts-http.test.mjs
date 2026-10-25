@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { factToolDefinitions } from '../src/personal-mcp-facts-v2.mjs';
+import { factToolDefinitions } from '../src/adapters/mcp/personal/tools/facts-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
 
 // Fictional identities and work. Canonical signatures, database transactions,

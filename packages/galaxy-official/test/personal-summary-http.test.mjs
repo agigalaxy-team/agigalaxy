@@ -4,8 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createPersonalSummaryClient,createNotificationInboxClient} from '../src/personal-summary-client.mjs';
-import {summaryToolDefinitions} from '../src/personal-mcp-summaries-v2.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {summaryToolDefinitions} from '../src/adapters/mcp/personal/tools/summaries-v2.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 import {invite} from './chat-workflow.mjs';
 test('current authenticated HTTP entry reaches private summaries and the independent inbox',async()=>{
  const f=await serviceFixture(['binding','notifications']),peer=await serviceFixture(['binding','notifications'],f.db,{migrateDatabase:false});

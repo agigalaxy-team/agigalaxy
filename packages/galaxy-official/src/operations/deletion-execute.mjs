@@ -6,7 +6,7 @@ import { deletionIntentSchema } from '../shared/deletion-schema.mjs';
 import { deletionReviewSchema } from './deletion-review.mjs';
 import { digest } from '../shared/digest.mjs';
 import { readDeletionEventPayload } from '../shared/deletion-event-payload.mjs';
-import { productV2DeletionTargets, controlHistoryTables, lifecycleManagedTables, chatDelegatedTables } from '../infrastructure/lifecycle-registry-v2.mjs';
+import { productV2DeletionTargets, controlHistoryTables, lifecycleManagedTables, chatDelegatedTables, subjectDeletionServiceTables } from '../infrastructure/lifecycle-registry-v2.mjs';
 import { prepareProductV2Deletion, minimizeRetainedProductContent } from './lifecycle-product-v2.mjs';
 
 export const deletionExecutionSchema = z.object({ version:z.literal(1),id:z.uuid(),requestId:z.uuid(),approvalId:z.uuid(),
@@ -34,7 +34,7 @@ const auditTables = new Set(['audit_events','audit_access_grants','audit_reads',
 // are counted in the receipt, rather than silently deleting another issuer's rule.
 // The directory counter contains one global ordering number, no subject data.
 // Each subject's individual read markers remain ordinary owned deletion targets.
-const excluded = ['schema_migrations','search_index_control','chat_directory_clock','recovery_state','deletion_requests','deletion_events','deletion_executions','deletion_replays','runtime_config_events','honor_rule_versions', ...lifecycleManagedTables];
+const excluded = ['schema_migrations','search_index_control','chat_directory_clock','recovery_state','deletion_requests','deletion_events','deletion_executions','deletion_replays','runtime_config_events','honor_rule_versions', ...lifecycleManagedTables, ...Object.values(subjectDeletionServiceTables).flat()];
 const quote = value => { if(!/^[a-z_][a-z0-9_]*$/.test(value))throw new Error('Unsupported database identifier');return `"${value}"`; };
 const counts = values => Object.fromEntries(Object.keys(deletionTargets).map(name=>[name,values[name]??0]));
 const sum = values => Object.values(values).reduce((total,value)=>total+value,0);
@@ -108,7 +108,9 @@ export async function executeDeletionInTransaction(db,input,{now=()=>Math.floor(
     for(const [table,where] of Object.entries(deletionTargets)){
       if(!keys[table]?.length)throw new Error('Deletion primary key missing');
       const object=`jsonb_build_object(${keys[table].map(key=>`'${key.column}',t.${quote(key.column)}`).join(',')})`;
-      selected[table]=affected(await db.query(`INSERT INTO galaxy_deletion_candidates SELECT $2,${object} FROM ${quote(table)} t WHERE ${where}`,[request.subject_id,table]));
+      // Independent account tables intentionally have no subject predicate.
+      // Do not bind an unused $1 into a constant-false query (PG 42P18).
+      selected[table]=where==='false'?0:affected(await db.query(`INSERT INTO galaxy_deletion_candidates SELECT $2,${object} FROM ${quote(table)} t WHERE ${where}`,[request.subject_id,table]));
       joins[table]=keys[table].map(key=>`t.${quote(key.column)}=(c.key_data->>'${key.column}')::${key.type}`).join(' AND ');
     }
     // Delete only candidate leaves. Never use CASCADE to remove another author.

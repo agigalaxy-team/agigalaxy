@@ -210,7 +210,8 @@ export async function runInformationCapacityV2(database = null, options = {}) {
       const receipt = await request(who, '/v2/tasks', submission);
       assert.equal(receipt.taskId, task.taskId);
     };
-    for (const relative of ['../src/information-v2.mjs', '../src/tasks-v2.mjs', '../src/choice-snapshots-v2.mjs',
+    for (const relative of ['../src/information-v2.mjs', '../src/tasks-v2.mjs', '../src/tasks/v2/authority.mjs',
+      '../src/tasks/v2/read-model.mjs', '../src/tasks/v2/service.mjs', '../src/tasks/v2/helpers.mjs', '../src/choice-snapshots-v2.mjs',
       '../src/infrastructure/resource-budgets.mjs', '../src/operations/cost-input.mjs', './capacity-driver.mjs', './information-capacity-v2-workflow.mjs']) {
       report.sourceHashes[relative] = sha(await readFile(new URL(relative, import.meta.url)));
     }

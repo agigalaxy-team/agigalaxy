@@ -18,9 +18,12 @@ export function createKeycloakAdminDirectory({issuer, clientId, clientSecret, ad
   if(management.origin!==(adminOrigin??authority.origin)||management.username||management.password
     ||management.protocol!=='https:'&&!(management.protocol==='http:'&&['127.0.0.1','[::1]'].includes(management.hostname)))throw Error('Invalid private directory origin.');
   const base = management.origin + realm[1] + '/admin/realms/' + encodeURIComponent(realm[2]) + '/';
-  const tokenUrl = issuer.replace(/\/$/, '') + '/protocol/openid-connect/token';
+  // Keep the public issuer identity; both server-to-server endpoints use the
+  // explicitly configured private directory transport (including token renewal).
+  const tokenUrl = management.origin + realm[1] + '/realms/' + encodeURIComponent(realm[2]) + '/protocol/openid-connect/token';
   let token = null;
   const roleCache = new Map();
+  let roleRevision = 0;
   async function responseJson(url, options) {
     const response = await transport(url, {...options, redirect:'error', signal:AbortSignal.timeout(5000)});
     if (response.status === 404) return {status:404, body:null};
@@ -78,6 +81,7 @@ export function createKeycloakAdminDirectory({issuer, clientId, clientSecret, ad
       if (principal?.issuer !== issuer || !validSubject(principal.externalSubject)) return [];
       const key = principal.externalSubject, cached = roleCache.get(key);
       if (cached && cached.expiresAt > now()) return [...cached.roles];
+      const revision = roleRevision;
       const path = 'users/' + encodeURIComponent(key);
       const user = await read(path, {optional:true});
       let roles = [];
@@ -86,12 +90,21 @@ export function createKeycloakAdminDirectory({issuer, clientId, clientSecret, ad
         if (!Array.isArray(result) || result.length > 4096) throw unavailable();
         roles = result.filter(role => typeof role?.name === 'string' && role.name.length <= 128).map(role => role.name);
       }
+      // A read started before an explicit security change cannot repopulate
+      // the cache or return an old qualification after that change completed.
+      if (revision !== roleRevision) throw unavailable();
       for (const [id, entry] of roleCache) if (entry.expiresAt <= now()) roleCache.delete(id);
       if (roleCache.size >= 256) roleCache.delete(roleCache.keys().next().value);
       // Permission removal/disabled accounts become effective within 15 seconds.
       // A failed refresh is never replaced with stale permissions.
       roleCache.set(key, {roles, expiresAt:now() + 15});
       return [...roles];
+    },
+    invalidateOperatorRoles(principal) {
+      if (principal?.issuer !== issuer || !validSubject(principal.externalSubject)) return false;
+      roleRevision++;
+      roleCache.delete(principal.externalSubject);
+      return true;
     },
   });
 }

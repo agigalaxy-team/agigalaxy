@@ -1,3 +1,12 @@
+import {accountRegistrationProfilesV1MigrationSql} from './account-registration-profiles-v1-schema.mjs';
+import {operationsAutonomyMigrationSql} from '../operations/autonomy/schema.mjs';
+import {operationsAutonomyEventsMigrationSql} from '../operations/autonomy/event-schema.mjs';
+import {operationsAutonomyMessagingMigrationSql} from '../operations/autonomy/messaging-schema.mjs';
+import {operationsAiDelegationMigrationSql} from '../operations/permissions/ai-delegation-schema.mjs';
+import {discoveryIndexRecheckSchedulingSql} from './discovery-index-recheck-schema.mjs';
+import {accountProfileV2MigrationSql} from './account-profile-v2-schema.mjs';
+import {operationsSystemSettingsV1MigrationSql} from './operations-system-settings-v1-schema.mjs';
+import {accountFollowsV1MigrationSql} from './account-follows-v1-schema.mjs';
 import {externalCredentialsV1MigrationSql} from './external-credentials-v1-schema.mjs';
 import {accountWorkV1MigrationSql} from './account-work-v1-schema.mjs';
 import {accountPublicQueryV1MigrationSql} from './account-public-query-v1-schema.mjs';
@@ -14,8 +23,36 @@ import {accountChatGovernanceV1MigrationSql} from './account-chat-governance-v1-
 import {operationsManagementAuditV1MigrationSql} from './operations-management-audit-v1-schema.mjs';
 import {operationsBusinessV1MigrationSql,operationsBusinessAuditActions} from './operations-business-v1-schema.mjs';
 import {operationsProductV1MigrationSql} from './operations-product-v1-schema.mjs';
+import {p14RulesV1MigrationSql} from './p14-rules-v1-schema.mjs';
+import {p13StrategiesMigrationSql} from './p13-strategies-v1-schema.mjs';
 import {operationsProductAuditActions} from '../shared/operations-product-schema.mjs';
 import {operationsJobsExpansionV1MigrationSql} from './operations-jobs-expansion-v1-schema.mjs';
+import {operationsFeedbackV1MigrationSql} from './operations-feedback-v1-schema.mjs';
+import {feedbackAuditActions} from '../shared/operations-feedback-schema.mjs';
+import {operationsForumContentV1MigrationSql} from './operations-forum-content-v1-schema.mjs';
+import {contentAuditActions} from '../shared/operations-forum-content-schema.mjs';
+import {feedbackAttachmentsV1MigrationSql} from './feedback-attachments-v1-schema.mjs';
+import {accountFeedbackDataV1MigrationSql} from './account-feedback-data-v1-schema.mjs';
+import {businessAdminAuditIndexesV1MigrationSql} from './business-admin-audit-indexes-v1.mjs';
+import {operationsMessagingV1MigrationSql} from './operations-messaging-v1-schema.mjs';
+import {operationsSmtpV1MigrationSql} from './operations-smtp-v1-schema.mjs';
+import {chatMessageOperationsV1MigrationSql} from './chat-message-operations-v1-schema.mjs';
+import {operationsPermissionsV1MigrationSql} from './operations-permissions-v1-schema.mjs';
+import {operationsAgentOsV1MigrationSql} from './operations-agentos-v1-schema.mjs';
+import {operationsAutomationScopeV1MigrationSql} from './operations-automation-scope-v1-schema.mjs';
+import {operationsPermissionCatalogV2MigrationSql} from './operations-permission-catalog-v2-schema.mjs';
+import {operationsRegisteredUsersV1MigrationSql} from './operations-registered-users-v1-schema.mjs';
+import {operationsManagementAccountsV1MigrationSql} from './operations-management-accounts-v1-schema.mjs';
+import {operationsAiWorkAccountsV1MigrationSql} from './operations-ai-work-accounts-v1-schema.mjs';
+import {operationsAgentOsConversationsMigrationSql} from './operations-agentos-conversations-v1-schema.mjs';
+import {operationsAgentOsConversationToolsMigrationSql} from './operations-agentos-conversation-tools-v1-schema.mjs';
+import {operationsFileCleanupV1Sql} from './operations-file-cleanup-v1-schema.mjs';
+import {operationsFileAccessV1Sql} from './operations-file-access-v1-schema.mjs';
+import {discoveryRuntimeMigrationSql} from '../discovery-runtime/schema.mjs';
+import {operationsRecommendationV1MigrationSql} from './operations-recommendation-v1-schema.mjs';
+import {operationsSearchQualityMigrationSql} from './operations-search-quality-v1-schema.mjs';
+import {operationsMaintenanceMigrationSql} from './operations-maintenance-v1-schema.mjs';
+import {operationsModelSettingsMigrationSql} from './operations-model-settings-v1-schema.mjs';
 import { communityForumV1MigrationSql } from './community-forum-v1-schema.mjs';
 import {communityForumTopicsV1MigrationSql} from './community-forum-topics-v1-schema.mjs';
 import {readingBookmarksV1MigrationSql} from './reading-bookmarks-v1-schema.mjs';
@@ -576,6 +613,127 @@ ALTER TABLE audit_events ADD CONSTRAINT audit_context_complete CHECK (context_ve
 ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
 ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
  (${[...operationsBusinessAuditActions,...operationsProductAuditActions].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')},
+  {version:98,sql:[operationsFeedbackV1MigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')},
+  {version:99,sql:[operationsForumContentV1MigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions,...contentAuditActions].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')}, {version:100,sql:feedbackAttachmentsV1MigrationSql},
+  {version:101,sql:businessAdminAuditIndexesV1MigrationSql},
+  {version:102,sql:chatMessageOperationsV1MigrationSql},
+  {version:103,sql:[operationsPermissionsV1MigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions,...contentAuditActions,
+  'permission-role-save','permission-assignment-save','permission-automation-save'].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')},
+  {version:104,sql:[operationsMessagingV1MigrationSql,operationsSmtpV1MigrationSql,`
+SELECT galaxy_jobs.create_queue('messaging-run','{"policy":"exclusive","retryLimit":4,"retryDelay":30,"retryBackoff":true,"retryDelayMax":900,"expireInSeconds":300,"heartbeatSeconds":30,"retentionSeconds":604800,"deleteAfterSeconds":604800}'::jsonb);
+SELECT galaxy_jobs.create_queue('messaging-delivery','{"policy":"exclusive","retryLimit":4,"retryDelay":30,"retryBackoff":true,"retryDelayMax":900,"expireInSeconds":300,"heartbeatSeconds":30,"retentionSeconds":604800,"deleteAfterSeconds":604800}'::jsonb);
+CREATE FUNCTION public.galaxy_notice_original_operator_role(text,uuid,text) RETURNS text
+LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+ SELECT a.operator_role FROM public.business_admin_audit_v1 a
+ WHERE a.endpoint=$1 AND a.operator_id=$3 AND a.action='notice-publish'
+ AND a.selection->>'noticeId'=$2::text AND a.operator_role IN('reader','administrator')
+ ORDER BY a.sequence DESC LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION public.galaxy_notice_original_operator_role(text,uuid,text) FROM PUBLIC;
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions,...contentAuditActions,
+  'permission-role-save','permission-assignment-save','permission-automation-save',
+  'smtp-query','smtp-config-save','smtp-connection-test','smtp-delivery-test','smtp-dns-check'].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')}, {version:105,sql:operationsAgentOsV1MigrationSql}, {version:106,sql:discoveryRuntimeMigrationSql}, {version:107,sql:[operationsRecommendationV1MigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions,...contentAuditActions,
+  'permission-role-save','permission-assignment-save','permission-automation-save',
+  'smtp-query','smtp-config-save','smtp-connection-test','smtp-delivery-test','smtp-dns-check','recommendations.configure'].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')}, {version:108,sql:[operationsSearchQualityMigrationSql,`
+ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check CHECK(action IN
+ (${[...operationsBusinessAuditActions,...operationsProductAuditActions,...feedbackAuditActions,...contentAuditActions,
+  'permission-role-save','permission-assignment-save','permission-automation-save',
+  'smtp-query','smtp-config-save','smtp-connection-test','smtp-delivery-test','smtp-dns-check','recommendations.configure',
+  'search-quality.configure','search-quality.publish','search-quality.restore'].map(action=>"'"+action+"'").join(',')}));
+`].join('\n')}, {version:109,sql:operationsMaintenanceMigrationSql}, {version:110,sql:operationsModelSettingsMigrationSql}, {version:111,sql:p14RulesV1MigrationSql}, {version:112,sql:p13StrategiesMigrationSql}, {version:113,sql:operationsAgentOsConversationsMigrationSql}, {version:114,sql:operationsAgentOsConversationToolsMigrationSql}, {version:115,sql:operationsFileCleanupV1Sql}, {version:116,sql:accountFeedbackDataV1MigrationSql}, {version:117,sql:operationsFileAccessV1Sql}, {version:118,sql:operationsAutomationScopeV1MigrationSql}, {version:119,sql:operationsPermissionCatalogV2MigrationSql}, {version:121,sql:[operationsRegisteredUsersV1MigrationSql,`
+DO $registered_users_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint
+ WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'registered_users_audit_constraint_missing';END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''registered-user-password-reset'',''registered-user-login-disable'',''registered-user-login-restore'',''registered-user-sessions-revoke'',''registered-user-profile-correct''))';
+END $registered_users_audit$;
+`].join('\n')});
+
+// Version 120 remains held. This release extends the published 119,121 chain.
+migrations.push({version:122,sql:[operationsManagementAccountsV1MigrationSql,`
+DO $management_accounts_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint
+ WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'management_accounts_audit_constraint_missing';END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''management-account-create'',''management-account-profile-update'',''management-account-login-disable'',''management-account-login-restore'',''management-account-password-reset'',''management-account-sessions-revoke'',''management-account-delete'',''management-account-admission-change'',''management-account-email-change''))';
+END $management_accounts_audit$;
+`].join('\n')});
+
+// AI123 follows the released119,121,122 chain; held120 is not imported.
+migrations.push({version:123,sql:[operationsAiWorkAccountsV1MigrationSql,`
+DO $ai_work_accounts_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint
+ WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'ai_work_accounts_audit_constraint_missing';END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''ai-work-profile-save'',''ai-work-state-save'',''ai-work-assignment-save''))';
+END $ai_work_accounts_audit$;
+`].join('\n')});
+
+// System124 adds explicit human settings and settings-only publication links.
+migrations.push({version:124,sql:[operationsSystemSettingsV1MigrationSql,`
+DO $system_settings_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint
+ WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'system_settings_audit_constraint_missing';END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''system-settings-save'',''system-settings-test'',''system-settings-apply'',''system-settings-credential-provision''))';
+END $system_settings_audit$;
+`].join('\n')});
+
+// Account125 only adds private one-way relationships and original-operation receipts.
+migrations.push({version:125,sql:accountFollowsV1MigrationSql});
+
+// Profile presentation only; registration verification remains unchanged.
+migrations.push({version:126,sql:accountProfileV2MigrationSql});
+
+migrations.push({version:127,sql:accountRegistrationProfilesV1MigrationSql});
+migrations.push({version:128,sql:discoveryIndexRecheckSchedulingSql});
+migrations.push({version:129,sql:[operationsAutonomyMigrationSql,operationsAiDelegationMigrationSql,operationsAutonomyMessagingMigrationSql,operationsAutonomyEventsMigrationSql,`
+DO $autonomy_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'autonomy_audit_constraint_missing'; END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+ 'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''autonomy-config'',''autonomy-enable'',''autonomy-control'',''autonomy-run'',''autonomy-settings'',''autonomy-strategy-task'',''autonomy-decision'',''ai-delegation-save'',''ai-role-create'',''ai-role-update'',''ai-role-assignment-save''))';
+END $autonomy_audit$;
 `].join('\n')});
 
 export function assertSupportedSchema(versions) {

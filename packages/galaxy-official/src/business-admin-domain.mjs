@@ -11,13 +11,14 @@ export const businessRestrictionView=(row,now)=>({
 
 // Both the owner and the operations service use the same type-change rules and
 // row lock. An operator is recorded as an operator, never as the account owner.
-export async function changeAccountTypeWithin(db,{accountId,endpoint,now,source,input}){
+export async function changeAccountTypeWithin(db,{accountId,endpoint,now,source,input,permissions=null}){
  const parsed=accountTypeChangeSchema.safeParse(input);
  if(!parsed.success)throw new ServiceError('invalid_account_data');
  const data=parsed.data;
  const owner=source?.kind==='account-owner'&&source.accountId===accountId;
- const operator=source?.kind==='business-operator'&&source.role==='administrator'&&source.endpoint===endpoint&&typeof source.operatorId==='string'&&!!source.operatorId;
+ const operator=source?.kind==='business-operator'&&source.endpoint===endpoint&&typeof source.operatorId==='string'&&!!source.operatorId;
  if(!owner&&!operator)throw new ServiceError('business_admin_denied',403);
+ if(operator){if(!permissions)throw new ServiceError('operations_authorization_unavailable',503);source=await permissions.requireAction(source,'accounts.type.change',{db});}
  if(!(await db.query('SELECT 1 FROM community_accounts WHERE id=$1 AND endpoint=$2 FOR UPDATE',[accountId,endpoint])).rows.length)throw new ServiceError('not_found',404);
  await ensureOfficialAccountProfileWithin(db,accountId,{now});
  const row=(await db.query('SELECT * FROM official_account_profiles_v1 WHERE account_id=$1 FOR UPDATE',[accountId])).rows[0];
@@ -32,8 +33,12 @@ export async function changeAccountTypeWithin(db,{accountId,endpoint,now,source,
   basisKind:owner?'account-owner-statement':'operator-recorded-statement',permissionsChanged:false};
 }
 
-export async function changeAccountRestrictionWithin(db,{accountId,endpoint,now,source,input,release=false}){
- if(source?.kind!=='business-operator'||source.role!=='administrator'||source.endpoint!==endpoint)throw new ServiceError('business_admin_denied',403);
+export async function changeAccountRestrictionWithin(db,{accountId,endpoint,now,source,input,release=false,permissions=null}){
+ const duty=source?.kind==='operations-ai-service'&&permissions?.aiServiceAuthority?.acceptsDuty(source);
+ if((source?.kind!=='business-operator'&&!duty)||source.endpoint!==endpoint)throw new ServiceError('business_admin_denied',403);
+ if(!permissions)throw new ServiceError('operations_authorization_unavailable',503);
+ const action=release?'accounts.restriction.release':'accounts.restriction.apply';
+ source=duty?await permissions.aiServiceAuthority.requireDutyOperation(source,[action],{accountId,...input},{db,action:release?'restriction-release':'restriction-set'}):await permissions.requireAction(source,action,{db});
  const row=(await db.query('SELECT * FROM community_accounts WHERE id=$1 AND endpoint=$2 FOR UPDATE',[accountId,endpoint])).rows[0];
  if(!row)throw new ServiceError('not_found',404);
  if(row.restriction_revision!==input.expectedRevision)throw new ServiceError('account_restriction_changed',409);

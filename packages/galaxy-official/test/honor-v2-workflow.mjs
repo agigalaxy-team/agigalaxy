@@ -5,7 +5,7 @@ import {nativeWork,ag,cg} from './qualification-v2-workflow.mjs';
 import {HonorService} from '../src/honor.mjs';
 import {HonorV2Service} from '../src/honor-v2.mjs';
 import {createApi} from '../src/http.mjs';
-import {honorToolDefinitions} from '../src/personal-mcp-honor-v2.mjs';
+import {honorToolDefinitions} from '../src/adapters/mcp/personal/tools/honor-v2.mjs';
 import {redactParticipationSnapshot} from '../src/operations/lifecycle-product-v2.mjs';
 const scopes=['binding','consent','case-teaser','assistance','evidence','proof','capsules','history','data-export','data-delete'];
 const ref=(kind,row,fields=['eventType','actorId'])=>({kind,id:row.id,eventVersion:1,payloadHash:row.payload_hash,fields});

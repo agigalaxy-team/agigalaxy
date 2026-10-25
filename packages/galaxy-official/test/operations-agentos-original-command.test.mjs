@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {migrate} from '../src/database.mjs';
+import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {BusinessAdminService} from '../src/business-admin.mjs';
+import {AiWorkAccountsReadModel} from '../src/operations/accounts/ai-work-read-model.mjs';
+import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
+import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
+import {dispatchOperationsAgentOs} from '../src/adapters/http/operations-agentos-http.mjs';
+
+test('the original assisted command GET is owner and current-role bound, keeps exact frozen selection, and never dispatches on missing or late native receipts',{timeout:90000},async t=>{
+ const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api']});
+ const endpoint='https://original-command.synthetic.invalid',at=1988193660,now=()=>at,owner={kind:'business-operator',operatorId:'original-command-owner',endpoint,role:'reader'},other={...owner,operatorId:'original-command-other'},admitted=new Set([owner.operatorId,other.operatorId]);
+ for(const person of [owner,other])await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://native.synthetic.invalid',$1,'合成管理账户',$3,$3)",[person.operatorId,endpoint,new Date(at*1000)]);
+ const permissions=new OperationsPermissionsService({db,endpoint,now,operatorAuthorization:async actor=>admitted.has(actor.operatorId)?'administrator':null}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,now}),ai=new AiWorkAccountsReadModel({db,endpoint,businessAdmin,now});permissions.aiWorkAccounts=ai;
+ const aiId=randomUUID();await db.query("INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,'governance','治理助手','合成只验证原回执',true,1,1,$3,$3)",[aiId,endpoint,new Date(at*1000)]);
+ const role=(await permissions.saveRole(owner,{operationId:randomUUID(),expectedVersion:0,name:'原事项三动作',description:'合成数据',enabled:true,permissions:['content.read','content.hide','content.restore']},{authorize:async()=>owner})).role;
+ const assignmentId=randomUUID();await db.query('INSERT INTO operations_ai_work_assignments_v1(id,endpoint,ai_account_id,role_id,enabled,version,created_at,updated_at) VALUES($1,$2,$3,$4,true,1,$5,$5)',[assignmentId,endpoint,aiId,role.id,new Date(at*1000)]);
+ const target=randomUUID(),grantInput={expectedVersion:0,name:'原事项精确授权',executorKind:'ai',mode:'assisted',enabled:true,permissions:['content.read','content.hide','content.restore'],resourceIds:[target],resourceScope:{kind:'selected',resourceIds:[target]},aiAccountId:aiId};
+ const grant=(await permissions.saveAutomation(owner,{...grantInput,operationId:randomUUID()},{authorize:async()=>owner})).automation;
+ const automatic=(await permissions.saveAutomation(owner,{...grantInput,operationId:randomUUID(),name:'不自动接入专项的授权',mode:'automatic'},{authorize:async()=>owner})).automation;
+ const authority=new OperationsAgentOsAuthority({db,endpoint,permissions,aiWorkAccounts:ai,now});
+ const choices=await authority.options(owner);assert.deepEqual(choices.items.map(item=>({id:item.id,domain:item.domain,mode:item.mode})),[{id:grant.id,domain:'governance',mode:'assisted'}]);assert.equal(choices.items.some(item=>item.id===automatic.id),false);
+ const operationId=randomUUID(),input={operationId,grantId:grant.id,expectedGrantVersion:grant.version,domain:'governance',actions:['content.read','content.hide'],resourceIds:[target],preparedCommand:{tool:'content-visibility',targetKind:'post',targetId:target,input:{kind:'hide',expectedVersion:7,expectedRevision:9,until:at+600,reason:'合成的明确本次处置'}}};
+ await db.query('SET ROLE galaxy_api');const created=await authority.create(owner,input,{authorize:async()=>owner});assert.equal(created.operationId,operationId);assert.equal(created.kind,'create');assert.deepEqual(created.preparedAction,input.preparedCommand);
+ let nativeDispatches=0,nativeReads=0,revokeDuringRead=false;const runId=randomUUID(),native={runId,operationId:null,status:'PAUSED',content:null,userInput:null,awaitingHuman:true};
+ const client={async status(){return{state:'connected',modelState:'configured'};},async run(){nativeDispatches++;return{run_id:runId,status:'PENDING'};},async read(){nativeReads++;if(revokeDuringRead){await db.query('RESET ROLE');await db.query('UPDATE operations_ai_work_assignments_v1 SET enabled=false WHERE id=$1',[assignmentId]);await db.query('SET ROLE galaxy_api');}return{runs:[native]};}};
+ const service=new OperationsAgentOsService({authority,client}),missingId=randomUUID(),missing=await service.operation(owner,missingId);assert.equal(missing.state,'not-recorded');assert.equal(missing.operationId,missingId);assert.equal(nativeReads,0);assert.equal(nativeDispatches,0);
+ const original=await service.operation(owner,operationId);assert.equal(original.state,'recorded');assert.equal(original.execution.id,created.execution.id);assert.deepEqual(original.preparedAction,input.preparedCommand);assert.equal(Object.hasOwn(original,'input'),false);assert.equal(Object.hasOwn(original,'commandState'),false);
+ await assert.rejects(service.operation(other,operationId),{code:'operations_agentos_operation_not_found'});await assert.rejects(service.operation({...owner,endpoint:'https://other.invalid'},operationId),{code:'business_admin_denied'});
+ const reviewId=randomUUID();await service.review(owner,created.execution.id,{operationId:reviewId,message:'核对本次固定事项'},{authorize:async()=>owner});assert.equal(nativeDispatches,1);
+ for(let n=0;n<3;n++){const receipt=await service.operation(owner,reviewId);assert.equal(receipt.operationId,reviewId);assert.equal(receipt.kind,'review');assert.equal(receipt.executionId,created.execution.id);assert.equal(receipt.state,'PAUSED');}
+ assert.equal(nativeDispatches,1,'Every GET only reads the original native receipt');
+ const returned=[];await dispatchOperationsAgentOs({operationsAgentOs:service,authorizeOperator:async()=>owner,request:{method:'GET'},url:new URL('/v1/operations/agentos/operations/'+operationId,endpoint),send:(status,value)=>returned.push({status,value})});assert.equal(returned[0].status,200);assert.equal(returned[0].value.operationId,operationId);
+ await assert.rejects(dispatchOperationsAgentOs({operationsAgentOs:service,authorizeOperator:async()=>owner,request:{method:'POST'},url:new URL('/v1/operations/agentos/operations/'+operationId,endpoint),send(){throw Error('Unexpected response');}}),{code:'not_found'});
+ revokeDuringRead=true;await assert.rejects(service.operation(owner,reviewId),{code:'operations_ai_work_permission_denied'});assert.equal(nativeDispatches,1);
+ await db.query('RESET ROLE');assert.equal((await db.query('SELECT count(*)::int AS n FROM operations_agentos_executions_v1')).rows[0].n,1);assert.equal((await db.query('SELECT count(*)::int AS n FROM operations_agentos_tool_calls_v1')).rows[0].n,0,'No visibility effect is performed by preparation or original lookup');
+});

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createNotificationLoader } from '../../galaxy-web/src/notification-loader.mjs';
+import { createNotificationLoader } from '../../galaxy-web/src/features/notifications/loader.mjs';
 
 test('notification filtering and refresh discard obsolete pages and failures without changing current inbox', async () => {
   const requests = [];

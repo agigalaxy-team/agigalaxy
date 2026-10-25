@@ -64,15 +64,16 @@ export function registerContentPublicationCancellation({jobs,endpoint,now=()=>Ma
 }
 
 export class ContentPublications {
-  constructor({db,endpoint,jobs,now=()=>Math.floor(Date.now()/1000)}){
-    Object.assign(this,{db,endpoint,jobs,now});registerContentPublicationCancellation({jobs,endpoint,now});
+  constructor({db,endpoint,jobs,businessAdmin=null,now=()=>Math.floor(Date.now()/1000)}){
+    Object.assign(this,{db,endpoint,jobs,businessAdmin,now});registerContentPublicationCancellation({jobs,endpoint,now});
   }
-  require(actor,write=false){if(actor?.kind!=='business-operator'||actor.endpoint!==this.endpoint||!['administrator','reader'].includes(actor.role)||write&&actor.role!=='administrator')throw new ServiceError('operations_access_denied',403);}
+  async require(actor,write=false,db=this.db){if(!this.businessAdmin)throw new ServiceError('operations_authorization_unavailable',503);return this.businessAdmin.authorizeAction(actor,write?'cms.publish':'cms.read',{db});}
   async request(actor,input){
-    this.require(actor,true);
+    await this.require(actor,true);
     const value=z.strictObject({operationId:z.uuid(),snapshot:contentSnapshotSchema}).safeParse(input);
     if(!value.success||Buffer.byteLength(JSON.stringify(value.data?.snapshot))>1048576)throw new ServiceError('invalid_site_publication');
     return transaction(this.db,async db=>{
+      await this.require(actor,true,db);
       await db.query('SELECT pg_advisory_xact_lock(734912340)');
       const prior=(await db.query('SELECT * FROM site_publications_v1 WHERE id=$1',[value.data.operationId])).rows[0];
       if(prior){
@@ -89,13 +90,13 @@ export class ContentPublications {
     });
   }
   async get(actor,id){
-    this.require(actor);if(!z.uuid().safeParse(id).success)throw new ServiceError('invalid_site_publication');
+    await this.require(actor);if(!z.uuid().safeParse(id).success)throw new ServiceError('invalid_site_publication');
     const row=(await this.db.query('SELECT * FROM site_publications_v1 WHERE id=$1 AND endpoint=$2',[id,this.endpoint])).rows[0];
     if(!row)throw new ServiceError('site_publication_not_found',404);
     return {publication:publicationView(row)};
   }
   async list(actor,{after,limit=20}={}){
-    this.require(actor);
+    await this.require(actor);
     if(!Number.isInteger(limit)||limit<1||limit>100||after!==undefined&&!/^[1-9][0-9]{0,18}$/.test(after))throw new ServiceError('invalid_operations_query');
     const rows=(await this.db.query(`SELECT * FROM site_publications_v1 WHERE endpoint=$1 AND ($2::bigint IS NULL OR sequence<$2)
       ORDER BY sequence DESC LIMIT $3`,[this.endpoint,after??null,limit+1])).rows;
@@ -105,12 +106,27 @@ export class ContentPublications {
 
 // The runner renders only the immutable stored public snapshot. Queue data is
 // a reference; no browser cookie, credential or file payload enters pg-boss.
-export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoint,jobs,publisher,now=()=>Math.floor(Date.now()/1000)}){
+export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoint,jobs,publisher,businessAdmin=null,now=()=>Math.floor(Date.now()/1000)}){
   let stopped=false;
   registerContentPublicationCancellation({jobs,endpoint,now});
   async function execute({publicationId},{signal}={}){
     const row=(await db.query('SELECT * FROM site_publications_v1 WHERE id=$1 AND endpoint=$2',[publicationId,endpoint])).rows[0];
     if(!row||row.state==='published'||row.error?.retryable===false)return {state:row?.state??'superseded'};
+    const authorize=async(connection=db)=>{
+      if(!businessAdmin)throw new ServiceError('operations_authorization_unavailable',503);
+      let action='cms.publish';
+      if(row.base_publication_id){
+        // Only the narrow, recorded settings-only bridge can use this action.
+        // An ordinary CMS publication never gains it from browser input.
+        const general=(await connection.query(`SELECT 1 FROM operations_system_general_publications_v1
+          WHERE endpoint=$1 AND operation_id=$2 AND publication_id=$2 AND operator_id=$3
+          AND input->>'expectedPublicationId'=$4`,[endpoint,row.id,row.requested_by,row.base_publication_id])).rows[0];
+        if(!general)throw new ServiceError('operations_authorization_unavailable',503);
+        action='system.settings.apply';
+      }
+      return businessAdmin.revalidate({kind:'business-operator',operatorId:row.requested_by,role:'reader',endpoint},{action,db:connection});
+    };
+    await authorize();
     signal?.throwIfAborted();
     const at=()=>new Date(now()*1000).toISOString();
     const claimed=(await db.query(`UPDATE site_publications_v1 SET state='building',attempts=attempts+1,error=NULL,updated_at=$2
@@ -122,6 +138,7 @@ export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoin
       if(current?.publicationId===row.id){
         const result={publicUrl:publicOrigin+'/',siteVersion:current.siteVersion,publicationId:row.id};
         return await transaction(db,async tx=>{
+          await authorize(tx);
           await tx.query('SELECT pg_advisory_xact_lock(734912341)');
           const live=(await tx.query('SELECT * FROM site_publications_v1 WHERE id=$1 AND endpoint=$2 FOR UPDATE',[row.id,endpoint])).rows[0];
           if(!live||live.error?.retryable===false)return {state:'superseded'};
@@ -142,7 +159,8 @@ export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoin
       artifact=await publisher.prepare({publicationId:row.id,snapshot:row.snapshot,signal});
       signal?.throwIfAborted();
       const prepared=await transaction(db,async tx=>{
-        await tx.query('SELECT pg_advisory_xact_lock(734912341)');
+        await authorize(tx);
+          await tx.query('SELECT pg_advisory_xact_lock(734912341)');
         const live=(await tx.query('SELECT * FROM site_publications_v1 WHERE id=$1 AND endpoint=$2 FOR UPDATE',[row.id,endpoint])).rows[0];
         if(!live||live.error?.retryable===false||stopped){return {state:'superseded'};}
         if(live.state==='published')return {state:'published'};
@@ -161,7 +179,8 @@ export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoin
       });
       if(prepared.state!=='prepared')return prepared;
       return await transaction(db,async tx=>{
-        await tx.query('SELECT pg_advisory_xact_lock(734912341)');
+        await authorize(tx);
+          await tx.query('SELECT pg_advisory_xact_lock(734912341)');
         const live=(await tx.query('SELECT * FROM site_publications_v1 WHERE id=$1 AND endpoint=$2 FOR UPDATE',[row.id,endpoint])).rows[0];
         if(!live||live.error?.retryable===false||stopped)return {state:'superseded'};
         if(live.state==='published')return {state:'published'};
@@ -171,8 +190,17 @@ export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoin
             JSON.stringify({code:'site_publication_superseded',message:'已有更新的内容发布；可从所需版本发起新发布。',retryable:false}),at()]);
           return {state:'superseded'};
         }
-        signal?.throwIfAborted();await publisher.activate(artifact);
-        const result={publicUrl:publicOrigin+'/',siteVersion:artifact.siteVersion,publicationId:row.id};
+        signal?.throwIfAborted();await authorize(tx);
+        let activated=null;
+        if(live.base_publication_id){
+          activated=await publisher.current();
+          // Settings-only publication preserves this exact content base.
+          // A lost acknowledgement of this same publication is reconciled.
+          if(activated?.publicationId!==row.id&&activated?.publicationId!==live.base_publication_id)
+            throw new ServiceError('site_publication_base_changed',409);
+        }
+        if(activated?.publicationId!==row.id)await publisher.activate(artifact);
+        const result={publicUrl:publicOrigin+'/',siteVersion:activated?.publicationId===row.id?activated.siteVersion:artifact.siteVersion,publicationId:row.id};
         await tx.query("UPDATE site_publications_v1 SET state='published',result=$2,error=NULL,published_at=$3,updated_at=$3 WHERE id=$1",[row.id,JSON.stringify(result),at()]);
         return {state:'published'};
       });
@@ -184,8 +212,11 @@ export function createContentPublicationWorker({db,endpoint,publicOrigin=endpoin
       if(current?.publicationId!==row.id)await db.query(`UPDATE site_publications_v1 SET state='failed',error=$2,updated_at=$3,
         result=CASE WHEN $4 THEN NULL ELSE result END
         WHERE id=$1 AND state<>'published' AND (error IS NULL OR error->>'retryable'<>'false')`,[row.id,
-        JSON.stringify({code:'site_publication_failed',message:'发布尚未完成，可以重试或查看当前发布状态。',retryable:true}),at(),known]);
-      const failure=new ServiceError('site_publication_failed',503);
+        JSON.stringify(error?.code==='site_publication_base_changed'
+          ?{code:'site_publication_base_changed',message:'官网内容已有更新，请读取后应用。',retryable:false}
+          :{code:'site_publication_failed',message:'发布尚未完成，可以重试或查看当前发布状态。',retryable:true}),at(),known]);
+      const failure=error?.code==='site_publication_base_changed'
+        ?new ServiceError('site_publication_base_changed',409):new ServiceError('site_publication_failed',503);
       Object.defineProperty(failure,'cause',{value:error});
       throw failure;
     }

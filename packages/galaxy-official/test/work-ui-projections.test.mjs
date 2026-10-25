@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {latestFacts} from '../../galaxy-web/src/fact-client.mjs';
-import {readWorkCompose} from '../../galaxy-web/src/work-fact-types.ts';
-import {assertPreparedComment,commentSubmission} from '../../galaxy-web/src/task-comment-view-types.ts';
-import {createTaskCommentClient} from '../../galaxy-web/src/task-comment-client.mjs';
+import {latestFacts} from "../../galaxy-web/src/features/work-records/client.mjs";
+import {readWorkCompose} from "../../galaxy-web/src/features/work-records/contracts.ts";
+import {assertPreparedComment,commentSubmission} from "../../galaxy-web/src/task-comment-view-types.ts";
+import {createTaskCommentClient} from "../../galaxy-web/src/task-comment-client.mjs";
 
 test('latest work facts retain full authored projections and their exact source versions',()=>{
  const first={id:randomUUID(),version:1,actorId:'first-author',description:'original author body',sourceRefs:[{kind:'evidence',id:randomUUID(),version:3}]};

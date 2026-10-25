@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { sha256Hex } from '../src/shared/web-primitives.mjs';
-import { getFactClient } from '../../galaxy-web/src/fact-client.mjs';
-import { factContinuityFixture, deferred, outcome } from './task-fact-client-continuity-workflow.mjs';
+import { sha256Hex } from "../src/shared/web-primitives.mjs";
+import { getFactClient } from "../../galaxy-web/src/features/work-records/client.mjs";
+import { factContinuityFixture, deferred, outcome } from "./task-fact-client-continuity-workflow.mjs";
 
 const subjectId='GUID'+'A'.repeat(28), endpoint='https://fictional.invalid';
 const fields=()=>({kind:'evidence',expectedVersion:0,evidenceType:'self-assertion',synthetic:true,

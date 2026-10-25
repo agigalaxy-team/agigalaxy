@@ -1,10 +1,10 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {randomUUID,createHash} from 'node:crypto';
-import {communityForumFixture} from './community-forum-fixture.mjs';
-import {createBrowserClient} from '../src/browser-client.mjs';
-import {recruitmentEventV2Schema} from '../src/shared/recruitment-schema-v2.mjs';
-import {getProjectContactClient} from '../../galaxy-web/src/project-contact-client.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import {randomUUID,createHash} from "node:crypto";
+import {communityForumFixture} from "./community-forum-fixture.mjs";
+import {createBrowserClient} from "../src/browser-client.mjs";
+import {recruitmentEventV2Schema} from "../src/shared/recruitment-schema-v2.mjs";
+import {getProjectContactClient} from "../../galaxy-web/src/features/projects/clients/operations.mjs";
 const digest=text=>createHash('sha256').update(text).digest('hex');
 
 test('actual daily quota rejection retains the original signed recruitment; receipts and current quota reads never blind-retry',async()=>{

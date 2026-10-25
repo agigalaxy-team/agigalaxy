@@ -4,7 +4,7 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { ServiceError } from '../src/shared/service-error.mjs';
 
-import { informationToolDefinitions } from '../src/personal-mcp-information-v2.mjs';
+import { informationToolDefinitions } from '../src/adapters/mcp/personal/tools/information-v2.mjs';
 import { cleanupInformationWatchesWithin } from '../src/operations/information-watch-retention-v2.mjs';
 import { createInformationClientV2 } from '../../galaxy-web/src/information-client-v2.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';

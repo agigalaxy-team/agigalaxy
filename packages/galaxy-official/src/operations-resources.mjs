@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {ServiceError} from './shared/service-error.mjs';
 import {operationsResourcesQuerySchema,operationsVisibilitySchema} from './shared/operations-business-schema.mjs';
 import {OperationsBusinessDomain,operationsVisibilityWithin,operationsParse,operationsFail,operationsIso} from './operations-content-visibility.mjs';
+import {hasOperationsPermission as permitted} from './operations-permission-catalog.mjs';
 
 const unavailable=error=>error instanceof ServiceError&&[403,404,409,410,422].includes(error.status);
 export class OperationsResourcesService extends OperationsBusinessDomain {
@@ -32,8 +33,8 @@ export class OperationsResourcesService extends OperationsBusinessDomain {
   let maintenance=null;if(kind==='methods'){const latest=(await db.query("SELECT id FROM capsule_events WHERE capsule_id=$1 AND kind='version' ORDER BY revision DESC LIMIT 1",[row.id])).rows[0];if(latest)maintenance=await this.capsules.maintenanceWithin(db,null,row.id,latest.id);}
   return {id:row.id,kind:resourceKind,version:row.revision,ownerId:row.owner_id??row.subject_id,creatorId:row.creator_id??row.subject_id,
    state:row.state??(maintenance?.deprecated?'deprecated':'recorded'),...(kind==='methods'?{deprecated:maintenance?.deprecated??null,securityIssue:maintenance?.securityIssue??null}:{}),createdAt:operationsIso(row.created_at),updatedAt:operationsIso(row.updated_at),title:source.title,
-   sourceState:source.state,visibility,canManage:operator.role==='administrator',
-   canHide:operator.role==='administrator'&&!visibility.hidden&&source.state==='available'&&(!row.state||row.state==='active'),canRestore:operator.role==='administrator'&&visibility.hidden,maxHideSeconds:this.maxHideSeconds,
+   sourceState:source.state,visibility,canManage:permitted(operator,'resources.hide')||permitted(operator,'resources.restore'),
+   canHide:permitted(operator,'resources.hide')&&!visibility.hidden&&source.state==='available'&&(!row.state||row.state==='active'),canRestore:permitted(operator,'resources.restore')&&visibility.hidden,maxHideSeconds:this.maxHideSeconds,
    ...(detail?{publicContent:source.content,readPermission:source.readPermission,privateMaterialsGranted:false}:{}),checkedAt:this.now()};
  }
  list(operator,kind,input={}){const q=operationsParse(operationsResourcesQuerySchema,input);this.kind(kind);if(kind==='methods'&&q.state!==undefined)operationsFail('invalid_operations_request',400);

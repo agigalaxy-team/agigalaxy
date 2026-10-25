@@ -3,11 +3,47 @@ import { loadIdentityProviders } from './identity-config.mjs';
 import {loadOfficialAccountPortal} from './official-account.mjs';
 import {loadOperationsConfiguration} from './operations-config.mjs';
 import {BusinessAdminService} from './business-admin.mjs';
+import {OperationsRegisteredUsersService} from './operations/accounts/registered-service.mjs';
+import {OperationsManagementAccountsService} from './operations/accounts/management-service.mjs';
+import {OperationsAiWorkAccountsService} from './operations/accounts/ai-work-service.mjs';
+import {loadRegisteredWebsiteDirectory} from './infrastructure/registered-directory-configuration.mjs';
+import {OperationsPermissionsService} from './operations-permissions.mjs';
+import {OperationsAgentOsAuthority} from './operations-agentos-authority.mjs';
+import {P13StrategiesAuthority} from './operations/strategies/authority.mjs';
+import {P13StrategiesService} from './operations/strategies/service.mjs';
+import {P13StrategyEffects} from './operations/strategies/effects.mjs';
+import {P13StrategiesNativeClient} from './operations/strategies/native-client.mjs';
+import {P13OrdinaryStrategies} from './operations/strategies/ordinary.mjs';
+import {P13StrategiesGateway} from './operations/strategies/gateway.mjs';
+import {OperationsAgentOsClient} from './operations-agentos-client.mjs';
+import {OperationsAgentOsService} from './operations-agentos.mjs';
+import {OperationsAutonomy} from './operations-autonomy.mjs';
+import {createOperationsAgentOsDutyTools} from './operations-agentos-duty-tools.mjs';
+import {loadOperationsAgentOsConfiguration} from './infrastructure/operations-agentos-configuration.mjs';
+import {loadDiscoveryConfiguration} from './infrastructure/discovery-configuration.mjs';
+import {createDiscoveryRuntime} from './discovery-runtime/runtime.mjs';
+import {createDiscoveryHttp} from './discovery-runtime/http.mjs';
+import {OperationsRecommendationService} from './operations-recommendation.mjs';
+import {OperationsSearchQualityService} from './operations-search-quality.mjs';
+import {OperationsMaintenanceService} from './operations-maintenance.mjs';
+import {MaintenanceNativeClient,loadMaintenanceNativeConfiguration} from './operations-maintenance-native.mjs';
+import {OperationsModelSettingsService} from './operations-model-settings.mjs';
+import {ModelSettingsNativeClient,loadModelSettingsNativeConfiguration} from './operations-model-settings-native.mjs';
+import {ServiceError} from './shared/service-error.mjs';
 import {OperationsCommunityService} from './operations-community.mjs';
 import {OperationsResourcesService} from './operations-resources.mjs';
 import {OperationsFilesService} from './operations-files.mjs';
+import {OperationsFileCleanupService} from './operations/files/cleanup-service.mjs';
+import {OperationsFileAccessService} from './operations/files/access-service.mjs';
+import {OperationsAccountUsageSummary} from './operations/accounts/usage-summary.mjs';
+import {OperationsAccountProfileSummary} from './operations/accounts/profile-summary.mjs';
 import {OperationsProductRules,createOperationsPolicyRuntime} from './operations-product-rules.mjs';
+import {P14RulesService} from './operations/rules/service.mjs';
+import {P14RulesRuntime} from './operations/rules/runtime.mjs';
 import {OperationsNotices} from './operations-notices.mjs';
+import {OperationsMessagingService} from './operations-messaging.mjs';
+import {OperationsSmtpService} from './operations-smtp.mjs';
+import {loadOperationsSmtpCredentials} from './infrastructure/operations-smtp-credentials.mjs';
 import {OperationsRetention} from './operations-retention.mjs';
 import {apiOperationsPolicyConsumers} from './operations-policy-consumers.mjs';
 import {createOperationsJobs} from './operations-jobs.mjs';
@@ -15,6 +51,10 @@ import {createInformationWatchWorker} from './information-watch-worker.mjs';
 import {SearchIndex} from './search-index.mjs';
 import {ContentPublications} from './content-publications.mjs';
 import {AccountChatGovernanceService} from './account-chat-governance.mjs';
+import {OperationsFeedbackService} from './operations-feedback.mjs';
+import {FeedbackAttachmentsV1Service} from './feedback-attachments-v1.mjs';
+import {AccountFeedbackDataService} from './operations/feedback/owner-data.mjs';
+import {AccountFollowsV1} from './account-follows-v1.mjs';
 import {loadExternalCredentialsConfiguration} from './external-credentials-config.mjs';
 import {createExternalCredentialsService} from './external-credentials.mjs';
 import {createExternalCredentialsMaintenance} from './external-credentials-maintenance.mjs';
@@ -48,6 +88,13 @@ import { assertSupportedSchema } from './infrastructure/migrations.mjs';
 import { readFile, stat } from 'node:fs/promises';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { openDatabase } from './database.mjs';
+import {OperationsSystemSettingsService} from './operations/system-settings/service.mjs';
+import {SystemSettingsNativeClient,loadSystemSettingsNativeConfiguration} from './operations/system-settings/native-client.mjs';
+import {SystemGeneralPublications} from './operations/system-settings/general-publications.mjs';
+import {SystemSettingsOperationsMailBridge} from './operations/system-settings/mail-bridge.mjs';
+import {reportServiceConnectionAdoption} from './operations/system-settings/service-connections.mjs';
+import {reportOperationsMailAdoption} from './operations/system-settings/mail-consumer.mjs';
+import {createRefreshingSmtpCredentialResolver} from './operations/system-settings/smtp-credentials.mjs';
 import { createApi } from './http.mjs';
 import { validateKeyring } from './trust-keyring.mjs';
 import { acceptKeyring } from './trust-store.mjs';
@@ -69,6 +116,8 @@ let externalCredentialsMaintenance;
 let operationsJobs;
 let informationWatchWorker;
 let policyRefreshTimer;
+let managementDirectoryTimer;
+let managementDirectoryWork;
 let policyRefreshWork;
 let runtimeLog=consoleRuntimeLogger('api',{destination:process.stderr,environment:process.env.GALAXY_ENVIRONMENT});
 let startupPhase = 'environment';
@@ -157,12 +206,24 @@ try {
   startupPhase = 'identity-providers';
   const identityConfiguration = await loadIdentityProviders(process.env.GALAXY_IDENTITY_CONFIG_FILE, { endpoint });
   const officialAccounts = await loadOfficialAccountPortal(process.env.GALAXY_ACCOUNT_CONFIG_FILE, {endpoint, db, browserOrigins:browserPolicy.origins, identityProviders:identityConfiguration.providers});
-  const operations=await loadOperationsConfiguration(process.env.GALAXY_OPERATIONS_CONFIG_FILE,{endpoint,db});
-  const businessAdmin=new BusinessAdminService({db,endpoint,identityDirectory:operations?.identityDirectory,operatorAuthorization:operations?.authorizeStoredOperator});
+  let operations;
+  const operationsPermissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization:(actor,options)=>{
+    if(!operations?.authorizeStoredOperator)throw new ServiceError('operations_authorization_unavailable',503);
+    return operations.authorizeStoredOperator(actor,options);
+  },managementMaintainerAuthorization:(actor,options)=>{
+    if(!operations?.authorizeManagementMaintainer)throw new ServiceError('operations_authorization_unavailable',503);
+    return operations.authorizeManagementMaintainer(actor,options);
+  }});
+  operations=await loadOperationsConfiguration(process.env.GALAXY_OPERATIONS_CONFIG_FILE,{endpoint,db,permissions:operationsPermissions});
+  const businessAdmin=new BusinessAdminService({db,endpoint,identityDirectory:operations?.identityDirectory,operatorAuthorization:operations?.authorizeStoredOperator,permissions:operationsPermissions});
+  const registeredDirectory=await loadRegisteredWebsiteDirectory(process.env.GALAXY_OPERATIONS_CONFIG_FILE,{write:true,expectedIssuer:officialAccounts?.identityIssuer??null});
+  const registeredUsers=new OperationsRegisteredUsersService({businessAdmin,directory:registeredDirectory,accountPortal:officialAccounts});
+  const managementAccounts=new OperationsManagementAccountsService({businessAdmin,directory:operations?.managementDirectory,
+    rootPrincipal:operations?.rootPrincipal,managementSessions:operations?.managementSessions});
   operationsJobs=createOperationsJobs({db,onError:diagnostic=>runtimeLog.write({event:'operations_job_failed',...diagnostic}),onEvent:runtimeLog.write});
   await operationsJobs.start();
   const operationsSearchIndex=new SearchIndex({db,endpoint,jobs:operationsJobs});
-  const contentPublications=new ContentPublications({db,endpoint,jobs:operationsJobs});
+  const contentPublications=new ContentPublications({db,endpoint,jobs:operationsJobs,businessAdmin});
   startupPhase = 'external-credentials';
   const externalCredentialsConfiguration=await loadExternalCredentialsConfiguration(process.env.GALAXY_EXTERNAL_CREDENTIALS_CONFIG_FILE);
   const externalCredentials=createExternalCredentialsService({db,endpoint,configuration:externalCredentialsConfiguration});
@@ -172,15 +233,82 @@ try {
   const services = createServices({ ...governance, officialAccounts,externalCredentials,communityPolicy, forumPolicy, chatTransport, attachmentConfiguration, identityProviders: identityConfiguration.providers, manifestProfile, retirement, incident, resourceBudgetPolicy, repositories: apiReads, db, endpoint, signingKey, kid, trustedKeys: trusted.keys,
     operator: process.env.GALAXY_OPERATOR, region: process.env.GALAXY_REGION });
   const accountChatGovernance=new AccountChatGovernanceService({chat:services.chat,businessAdmin});
+  businessAdmin.forum=services.forum;
+  const feedbackAttachments=new FeedbackAttachmentsV1Service({db,endpoint,accounts:services.communityAccounts,...attachmentConfiguration,logger:runtimeLog.write});
+  const operationsFeedback=new OperationsFeedbackService({businessAdmin,accounts:services.communityAccounts,feedbackAttachments});
+  const accountFeedbackData=new AccountFeedbackDataService({db,endpoint,accounts:services.communityAccounts,feedbackAttachments,logger:runtimeLog.write});
+  const accountFollows=new AccountFollowsV1({accounts:services.communityAccounts,endpoint});
   const operationsCommunity=new OperationsCommunityService({businessAdmin,forum:services.forum,governance:services.forumGovernance});
+  const agentOsConfiguration=await loadOperationsAgentOsConfiguration(process.env.GALAXY_AGENTOS_CONFIG_FILE,{endpoint});
+  const agentOsClient=new OperationsAgentOsClient(agentOsConfiguration);
+  const aiWorkAccounts=new OperationsAiWorkAccountsService({db,endpoint,businessAdmin,runtime:agentOsClient,automationEditorAvailable:true});
+  operationsPermissions.aiWorkAccounts=aiWorkAccounts;
+  const agentOsAuthority=new P13StrategiesAuthority({db,endpoint,permissions:operationsPermissions,content:operationsCommunity.content,aiWorkAccounts});
+  const agentOsGateway=new P13StrategiesGateway({authority:agentOsAuthority,content:operationsCommunity.content,serviceKey:agentOsConfiguration.serviceKey});
+  businessAdmin.executorAuthority=agentOsAuthority;
+  businessAdmin.executorGateway=agentOsGateway;
+  operationsPermissions.runtimeStatus=()=>agentOsClient.status();
+  const operationsAgentOs=new OperationsAgentOsService({authority:agentOsAuthority,client:agentOsClient,summaryForConversation:operator=>operationsCommunity.summary(operator)});
+  const strategies=new P13StrategiesService({db,endpoint,businessAdmin,authority:agentOsAuthority,
+    effects:new P13StrategyEffects({authority:agentOsAuthority,gateway:agentOsGateway,content:operationsCommunity.content}),native:new P13StrategiesNativeClient({client:agentOsClient})});
+  agentOsGateway.ordinaryStrategies=new P13OrdinaryStrategies({strategies});
+  agentOsAuthority.strategies=strategies;
+  const discoveryConfiguration=await loadDiscoveryConfiguration(process.env.GALAXY_DISCOVERY_CONFIG_FILE,{endpoint});
+  const discoveryRuntime=discoveryConfiguration?createDiscoveryRuntime({db,endpoint,forum:services.forum,accounts:services.communityAccounts,permissions:operationsPermissions,config:discoveryConfiguration}):null;
+  businessAdmin.accountUsageAnalysis=new OperationsAccountUsageSummary({businessAdmin,discovery:discoveryRuntime});
+  businessAdmin.accountProfileAnalysis=new OperationsAccountProfileSummary({businessAdmin,discovery:discoveryRuntime});
+  const discoveryHttp=discoveryConfiguration?createDiscoveryHttp(discoveryConfiguration):null;
+  if(discoveryRuntime)await discoveryRuntime.initialize();
+  const operationsRecommendation=discoveryRuntime?new OperationsRecommendationService({db,endpoint,permissions:operationsPermissions,businessAdmin,source:discoveryRuntime.source,openpanel:discoveryRuntime.openpanel}):null;
+  if(discoveryRuntime)discoveryRuntime.recommendationOperations=operationsRecommendation;
+  const operationsSearchQuality=discoveryRuntime?new OperationsSearchQualityService({db,endpoint,permissions:operationsPermissions,businessAdmin,meili:discoveryRuntime.meili,openpanel:discoveryRuntime.openpanel}):null;
+  if(discoveryRuntime)discoveryRuntime.searchQuality=operationsSearchQuality;
+  const maintenanceConfiguration=await loadMaintenanceNativeConfiguration(process.env.GALAXY_MAINTENANCE_NATIVE_FILE);
+  const maintenanceNative=maintenanceConfiguration?new MaintenanceNativeClient(maintenanceConfiguration):null;
+  const operationsMaintenance=new OperationsMaintenanceService({businessAdmin,native:maintenanceNative,incident});
+  const modelSettingsConfiguration=await loadModelSettingsNativeConfiguration(process.env.GALAXY_MODEL_SETTINGS_NATIVE_FILE??process.env.GALAXY_MAINTENANCE_NATIVE_FILE);
+  const modelSettingsNative=modelSettingsConfiguration?new ModelSettingsNativeClient(modelSettingsConfiguration):null;
+  const operationsModelSettings=new OperationsModelSettingsService({businessAdmin,native:modelSettingsNative});
+  const systemSettingsConfiguration=await loadSystemSettingsNativeConfiguration(process.env.GALAXY_SYSTEM_SETTINGS_NATIVE_FILE??process.env.GALAXY_MAINTENANCE_NATIVE_FILE);
+  const systemSettingsNative=systemSettingsConfiguration?new SystemSettingsNativeClient(systemSettingsConfiguration):null;
+  const operationsSystemSettings=new OperationsSystemSettingsService({businessAdmin,native:systemSettingsNative});
+  const systemGeneralPublications=new SystemGeneralPublications({businessAdmin,contentPublications,websiteOrigin:process.env.GALAXY_SYSTEM_SETTINGS_WEBSITE_ORIGIN??'https://agigalaxy.org'});
+  agentOsGateway.discovery=discoveryRuntime;
   const operationsResources=new OperationsResourcesService({businessAdmin,projects:services.projects,capsules:services.capsules.v2,maxHideSeconds:forumPolicy.maxGovernanceHideSeconds});
   const operationsFiles=new OperationsFilesService({businessAdmin,chatAttachments:services.attachments,forumAttachments:services.forumAttachments});
+  const operationsFileCleanup=new OperationsFileCleanupService({businessAdmin,chatAttachments:services.attachments,forumAttachments:services.forumAttachments,logger:runtimeLog.write});
+  const operationsFileAccess=new OperationsFileAccessService({businessAdmin,chatAttachments:services.attachments,forumAttachments:services.forumAttachments});
   const operationsRules=new OperationsProductRules({db,endpoint,businessAdmin});
   await operationsRules.bootstrap({'resource-budget':resourceBudgetPolicy,'community-quota':communityPolicy,'forum-quota':forumPolicy});
+  const p14Rules=new P14RulesService({db,endpoint,businessAdmin,legacyRules:operationsRules});
+  await p14Rules.initialize();
+  const businessRules=new P14RulesRuntime({db,endpoint,accounts:services.communityAccounts,publicWrites:services.publicWrites});
+  for(const consumer of [services.forum,services.chat,services.attachments,services.forumAttachments]){
+    if(!consumer)throw new Error('Business rule consumer unavailable');
+    consumer.businessRules=businessRules;
+  }
   const operationsNotices=new OperationsNotices({db,endpoint,businessAdmin,jobs:operationsJobs,accounts:services.communityAccounts});
+  const smtpCredentials=process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE
+    ?createRefreshingSmtpCredentialResolver(process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE,{endpoint})
+    :await loadOperationsSmtpCredentials(undefined,{endpoint});
+  const operationsSmtp=new OperationsSmtpService({db,endpoint,businessAdmin,directory:operations?.identityDirectory,credentialResolver:smtpCredentials});
+  const systemSettingsOperationsMail=new SystemSettingsOperationsMailBridge({settings:operationsSystemSettings,operationsSmtp});
+  const operationsMessaging=new OperationsMessagingService({db,endpoint,businessAdmin,accounts:services.communityAccounts,jobs:operationsJobs,mailProvider:operationsSmtp});
   const operationsRetention=new OperationsRetention({db,endpoint,businessAdmin,jobs:operationsJobs});
+  operationsAgentOs.connectConversationTools({gateway:agentOsGateway,services:{accounts:businessAdmin,registeredUsers,systemSettings:operationsSystemSettings,systemGeneral:systemGeneralPublications,community:operationsCommunity,content:operationsCommunity.content,chatReports:accountChatGovernance,
+    feedback:operationsFeedback,files:operationsFiles,fileCleanup:operationsFileCleanup,fileAccess:operationsFileAccess,resources:operationsResources,analytics:discoveryRuntime,recommendations:operationsRecommendation,searchQuality:operationsSearchQuality,
+    messaging:operationsMessaging,strategies,ordinaryStrategies:agentOsGateway.ordinaryStrategies,rules:p14Rules,maintenance:operationsMaintenance,aiRuns:operationsAgentOs.aiRuns,jobs:operationsJobs,permissions:operationsPermissions}});
+  const operationsAutonomy=new OperationsAutonomy({db,endpoint,businessAdmin,jobs:operationsJobs,authority:agentOsAuthority,client:agentOsClient,aiWorkAccounts,
+    queryTools:operationsAgentOs.conversations.tools.query,actionTools:operationsAgentOs.conversations.tools.actions,gateway:agentOsGateway});
+  operationsCommunity.autonomy=operationsAutonomy;
+  operationsAgentOs.conversations.autonomy=operationsAutonomy;
+  strategies.autonomy=operationsAutonomy;
+  operationsMessaging.autonomy=operationsAutonomy;
+  agentOsAuthority.durableOperationAuthorizationWithin=(tx,context)=>operationsMessaging.validatePersistedApprovalWithin(tx,context);
+  operationsAutonomy.dutyTools=createOperationsAgentOsDutyTools({authority:agentOsAuthority,actions:operationsAgentOs.conversations.tools.actions,
+    permissions:operationsPermissions,authorizeOperation:operationsAutonomy.authorizeOperationWithin.bind(operationsAutonomy)});
   const policyRuntime=createOperationsPolicyRuntime({rules:operationsRules,component:'api',consumers:apiOperationsPolicyConsumers(services,{onForumPolicy:policy=>{
-    operationsCommunity.maxHideSeconds=policy.maxGovernanceHideSeconds;operationsResources.maxHideSeconds=policy.maxGovernanceHideSeconds;
+    operationsCommunity.maxHideSeconds=policy.maxGovernanceHideSeconds;operationsCommunity.content.maxHideSeconds=policy.maxGovernanceHideSeconds;operationsResources.maxHideSeconds=policy.maxGovernanceHideSeconds;
   }})});
   await policyRuntime.refresh();
   informationWatchWorker=createInformationWatchWorker({services,jobs:operationsJobs,retirement,incident,onError:diagnostic=>runtimeLog.write({event:'information_watch_deferred',...diagnostic})});
@@ -199,7 +327,7 @@ try {
   failureSpool = await createFailureAuditSpool({ path: join(process.env.GALAXY_TRUST_DIRECTORY, 'http-failure-audit.sqlite'),
     endpoint, write: httpFailureWriter(db, endpoint), logger: runtimeLog.write });
   const server = createApi({ browserOrigins: [...new Set([...browserPolicy.origins,...(operations?[operations.adminOrigin]:[])])], ...services,
-    operations,businessAdmin,operationsJobs,operationsCommunity,operationsResources,operationsFiles,operationsRules,operationsNotices,operationsRetention,contentPublications,accountChatGovernance,searchIndex:operationsSearchIndex,personalMcp, incident, metrics, requestQuotaPolicy, releaseId: release?.releaseId, keyring, docsMcp: handleDocsMcp, failureAudit: failureSpool.record,
+    operations,operationsSystemSettings,systemGeneralPublications,systemSettingsOperationsMail,systemSettingsNative,registeredUsers,managementAccounts,aiWorkAccounts,operationsPermissions,operationsMessaging,operationsSmtp,operationsAgentOs,agentOsGateway,operationsAutonomy,strategies,discoveryRuntime,discoveryHttp,operationsRecommendation,operationsSearchQuality,operationsMaintenance,maintenanceNative,operationsModelSettings,modelSettingsNative,businessAdmin,operationsJobs,operationsCommunity,operationsResources,operationsFiles,operationsFileCleanup,operationsFileAccess,operationsRules,p14Rules,operationsNotices,operationsRetention,operationsFeedback,feedbackAttachments,accountFeedbackData,accountFollows,contentPublications,accountChatGovernance,searchIndex:operationsSearchIndex,personalMcp, incident, metrics, requestQuotaPolicy, releaseId: release?.releaseId, keyring, docsMcp: handleDocsMcp, failureAudit: failureSpool.record,
     trustedProxyAddresses: process.env.GALAXY_TRUSTED_PROXY_ADDRESSES
       ? process.env.GALAXY_TRUSTED_PROXY_ADDRESSES.split(',').map(value => value.trim()) : [],
     readiness: async () => {
@@ -215,6 +343,18 @@ try {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
   runtimeLog.write({ event: 'listening', port });
   runtimeLog.write({event:'runtime_started',stage:'listen',startedAt:runtimeStartedAt});
+  await reportServiceConnectionAdoption(process.env.GALAXY_SERVICE_CONNECTIONS_METADATA_FILE,{component:'api',discoveryRuntime,agentOsClient,attachmentConfiguration});
+  await reportOperationsMailAdoption(process.env.GALAXY_SYSTEM_SETTINGS_MAIL_METADATA_FILE,{component:'api',smtp:operationsSmtp,credentialFile:process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE});
+  if(operations?.managementDirectory){
+    const syncManagementDirectory=()=>{
+      if(managementDirectoryWork)return;
+      managementDirectoryWork=managementAccounts.sync()
+        .catch(error=>runtimeLog.error({event:'management_directory_sync_failed',stage:'management-directory-sync',error}))
+        .finally(()=>{managementDirectoryWork=null;});
+    };
+    managementDirectoryTimer=setInterval(syncManagementDirectory,60000);managementDirectoryTimer.unref();
+    syncManagementDirectory();
+  }
   chatMaintenance=createChatMaintenance({chat:services.chat,accountChatGovernance,summaries:services.summaries,sharedSummaries:services.sharedSummaries,choices:services.choices,transport:chatTransport,logger:runtimeLog.write});
   chatMaintenance.start();
   policyRefreshTimer=setInterval(()=>{
@@ -231,12 +371,14 @@ try {
     runtimeLog.write({event:'runtime_stopping',stage:'shutdown',signal});
     chatMaintenance?.quiesce();
     clearInterval(policyRefreshTimer);
+    clearInterval(managementDirectoryTimer);
     shutdown.start();
     const timeout = setTimeout(() => { server.closeAllConnections(); }, 10000);
     timeout.unref();
     stopPromise=new Promise(resolve=>server.close(resolve)).then(async()=>{
       clearTimeout(timeout);
       await closeStep('policy-refresh',()=>policyRefreshWork);
+      await closeStep('management-directory-sync',()=>managementDirectoryWork);
       await closeStep('metrics-close',()=>closeMetricsListener(metricsServer));
       await closeStep('watch-stop',()=>informationWatchWorker?.stop());
       await closeStep('queue-stop',()=>operationsJobs?.stop());
@@ -260,7 +402,9 @@ try {
   shutdown.start();
   chatMaintenance?.quiesce();
   clearInterval(policyRefreshTimer);
+  clearInterval(managementDirectoryTimer);
   await closeStep('policy-refresh',()=>policyRefreshWork);
+  await closeStep('management-directory-sync',()=>managementDirectoryWork);
   await closeStep('metrics-close',()=>closeMetricsListener(metricsServer));
   await closeStep('watch-stop',()=>informationWatchWorker?.stop());
   await closeStep('queue-stop',()=>operationsJobs?.stop());

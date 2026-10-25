@@ -101,7 +101,7 @@ export class CommunityForumGovernanceV1 {
   if(this.partyContext(actor,row).party||items.length&&await this.independent(db,actor.subjectId,this.parties(row),this.accountParties(row))){
    const decisions=(await db.query('SELECT * FROM forum_operations_events_v1 WHERE report_id=$1 AND retained_until>$2 ORDER BY version',[row.id,forumStamp(this.access.now())])).rows;
    for(const event of decisions)items.push({operationId:event.id,governanceEventId:event.id,version:event.version,kind:'resolve',authorId:null,authorAccountId:null,
-    author:{kind:'business-operator',operatorId:event.operator_id},payload:{kind:'resolve',reportId:row.id,reason:event.summary,resolution:event.resolution,
+    author:{kind:'business-operator',operatorId:event.operator_id},payload:{kind:'resolve',reportId:row.id,reason:event.summary,resolution:event.resolution,restrictionAction:event.restriction_action??null,
      effect:event.effect_until?{kind:'hide-version',until:forumSeconds(event.effect_until)}:null},checkedAt:this.access.now()});
   }
   return items.sort((a,b)=>a.version-b.version);

@@ -5,7 +5,7 @@ import canonicalize from 'canonicalize';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 import {choicePutIntent,choiceReceiptResultSchema} from '../src/shared/choice-snapshot-schema-v2.mjs';
 import {moderationReceiptResultSchema} from '../src/shared/moderation-schema.mjs';
 import {digest} from '../src/shared/digest.mjs';

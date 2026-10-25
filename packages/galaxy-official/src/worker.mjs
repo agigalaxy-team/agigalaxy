@@ -20,17 +20,37 @@ import { ConsentReader } from './consent-reader.mjs';
 import { EvidenceService } from './evidence.mjs';
 import { SearchIndex } from './search-index.mjs';
 import {createOperationsJobs} from './operations-jobs.mjs';
+import {OperationsAutonomy,createOperationsAutonomyWorker} from './operations-autonomy.mjs';
+import {OperationsAgentOsAuthority} from './operations-agentos-authority.mjs';
+import {OperationsAgentOsClient} from './operations-agentos-client.mjs';
+import {AiWorkAccountsReadModel} from './operations/accounts/ai-work-read-model.mjs';
+import {loadOperationsAgentOsConfiguration} from './infrastructure/operations-agentos-configuration.mjs';
 import { BuilderProbeWorker } from './builder-probes.mjs';
 import { createCiWorkerV2 } from './ci-worker-v2.mjs';
 import {loadAttachmentConfiguration} from './infrastructure/attachment-configuration.mjs';
 import {ChatAttachmentsService} from './chat-attachments.mjs';
 import {ForumAttachmentsV1Service} from './forum-attachments-v1.mjs';
+import {FeedbackAttachmentsV1Service} from './feedback-attachments-v1.mjs';
+import {AccountFeedbackDataService} from './operations/feedback/owner-data.mjs';
 import {BusinessAdminService} from './business-admin.mjs';
-import {loadOperationsWorkerAuthorization} from './operations-config.mjs';
+import {OperationsRegisteredUsersService} from './operations/accounts/registered-service.mjs';
+import {loadRegisteredWebsiteDirectory} from './infrastructure/registered-directory-configuration.mjs';
+import {OperationsFileCleanupService} from './operations/files/cleanup-service.mjs';
+import {OperationsPermissionsService} from './operations-permissions.mjs';
+import {loadOperationsWorkerAuthorization,loadOperationsAccountDirectory} from './operations-config.mjs';
 import {OperationsProductRules,createOperationsPolicyRuntime} from './operations-product-rules.mjs';
 import {workerOperationsPolicyConsumers} from './operations-policy-consumers.mjs';
 import {OperationsNotices,createOperationsNoticeWorker} from './operations-notices.mjs';
+import {OperationsMessagingService,createOperationsMessagingWorkers} from './operations-messaging.mjs';
+import {OperationsSmtpService} from './operations-smtp.mjs';
+import {reportServiceConnectionAdoption} from './operations/system-settings/service-connections.mjs';
+import {reportOperationsMailAdoption} from './operations/system-settings/mail-consumer.mjs';
+import {createRefreshingSmtpCredentialResolver} from './operations/system-settings/smtp-credentials.mjs';
+import {loadOperationsSmtpCredentials} from './infrastructure/operations-smtp-credentials.mjs';
 import {OperationsRetention,createOperationsRetentionWorker} from './operations-retention.mjs';
+import {loadDiscoveryConfiguration} from './infrastructure/discovery-configuration.mjs';
+import {createDiscoveryRuntime,DiscoveryWorker} from './discovery-runtime/runtime.mjs';
+import {createDiscoveryReadOnlySource} from './discovery-runtime/public-content-source.mjs';
 
 let db;
 let attachmentConfiguration;
@@ -71,6 +91,8 @@ try {
     to_regprocedure('public.galaxy_worker_lock_ci_record(uuid,uuid)') IS NOT NULL AND
     to_regprocedure('public.galaxy_worker_prune_forum_authorizations(timestamptz)') IS NOT NULL AND
     to_regprocedure('public.galaxy_worker_lock_closed_forum_reports(timestamptz)') IS NOT NULL AND
+    to_regprocedure('public.galaxy_worker_lock_messaging_plan(uuid,text)') IS NOT NULL AND
+    has_function_privilege(current_user,'public.galaxy_worker_lock_messaging_plan(uuid,text)','EXECUTE') AND
     has_function_privilege(current_user,'public.galaxy_worker_prune_forum_authorizations(timestamptz)','EXECUTE') AND
     has_function_privilege(current_user,'public.galaxy_worker_lock_closed_forum_reports(timestamptz)','EXECUTE') AS ready`)).rows[0];
   if (!functions.ready) throw new Error('Worker role provisioning required');
@@ -79,6 +101,8 @@ try {
   attachmentConfiguration=await loadAttachmentConfiguration(process.env);
   const attachments=attachmentConfiguration?new ChatAttachmentsService({chat:{db,now},...attachmentConfiguration,logger:runtimeLog.write}):null;
   const forumAttachments=attachmentConfiguration?new ForumAttachmentsV1Service({db,now,...attachmentConfiguration,logger:runtimeLog.write}):null;
+  const feedbackAttachments=attachmentConfiguration?new FeedbackAttachmentsV1Service({db,endpoint,now,...attachmentConfiguration,logger:runtimeLog.write}):null;
+  const accountFeedbackData=new AccountFeedbackDataService({db,endpoint,feedbackAttachments,now,logger:runtimeLog.write});
   stage='governance';
   const retirement = await loadRetirementController(process.env.GALAXY_RETIREMENT_FILE, { endpoint, now });
   const incident = await loadIncidentController(process.env.GALAXY_INCIDENT_FILE, { endpoint, now });
@@ -95,17 +119,52 @@ try {
   const ciV2 = createCiWorkerV2({ db, endpoint, now, resourceBudgetPolicy });
   const probes=new BuilderProbeWorker({db,endpoint,now,consents:new ConsentReader({now,readGrant:workerReads.readGrant}),readBuilder:workerReads.readBuilder,resourceBudgetPolicy});
   stage='queue-start';
-  operationsJobs=createOperationsJobs({db,onError:diagnostic=>runtimeLog.write({event:'operations_job_failed',...diagnostic}),onEvent:runtimeLog.write});
+  operationsJobs=createOperationsJobs({db,scheduling:true,onError:diagnostic=>runtimeLog.write({event:'operations_job_failed',...diagnostic}),onEvent:runtimeLog.write});
   await operationsJobs.start();
   stage='operations-config';
   const operatorAuthorization=await loadOperationsWorkerAuthorization(process.env.GALAXY_OPERATIONS_CONFIG_FILE,{db,endpoint});
-  const businessAdmin=new BusinessAdminService({db,endpoint,operatorAuthorization,now});
+  const accountDirectory=await loadOperationsAccountDirectory(process.env.GALAXY_OPERATIONS_CONFIG_FILE);
+  const permissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization,now});
+  const businessAdmin=new BusinessAdminService({db,endpoint,operatorAuthorization,permissions,identityDirectory:accountDirectory,now});
+  const aiWorkAccounts=new AiWorkAccountsReadModel({db,endpoint,businessAdmin,now});
+  permissions.aiWorkAccounts=aiWorkAccounts;
+  const autonomyConfiguration=await loadOperationsAgentOsConfiguration(process.env.GALAXY_AGENTOS_CONFIG_FILE,{endpoint});
+  const autonomyClient=new OperationsAgentOsClient({...autonomyConfiguration,now});
+  const autonomyAuthority=new OperationsAgentOsAuthority({db,endpoint,permissions,aiWorkAccounts,now});
+  const autonomy=new OperationsAutonomy({db,endpoint,businessAdmin,jobs:operationsJobs,authority:autonomyAuthority,client:autonomyClient,aiWorkAccounts,now});
+  autonomy.codeRunner=task=>autonomy.native.run(task);
+  businessAdmin.executorAuthority=autonomyAuthority;
+  const autonomyWorker=createOperationsAutonomyWorker({autonomy,jobs:operationsJobs,logger:runtimeLog.write});
+  await autonomyWorker.start();
+  const registeredDirectory=await loadRegisteredWebsiteDirectory(process.env.GALAXY_REGISTERED_DIRECTORY_CONFIG_FILE);
+  const registeredUsers=new OperationsRegisteredUsersService({businessAdmin,directory:registeredDirectory});
+  const operationsFileCleanup=new OperationsFileCleanupService({businessAdmin,chatAttachments:attachments,forumAttachments,now,logger:runtimeLog.write});
   const operationsRules=new OperationsProductRules({db,endpoint,businessAdmin,now});
-  const policyRuntime=createOperationsPolicyRuntime({rules:operationsRules,component:'worker',consumers:workerOperationsPolicyConsumers({evidence,ciV2,probes,onForumPolicy:policy=>{forumPolicy=policy;}})});
+  const discoveryConfiguration=await loadDiscoveryConfiguration(process.env.GALAXY_DISCOVERY_CONFIG_FILE,{endpoint});
+  if(discoveryConfiguration&&!discoveryConfiguration.sourceMetadata)throw new Error('Discovery worker source metadata is required');
+  const discoverySource=discoveryConfiguration?createDiscoveryReadOnlySource({db,endpoint,now,readGrant:workerReads.readGrant,forumPolicy,...discoveryConfiguration.sourceMetadata}):null;
+  const discoveryRuntime=discoveryConfiguration?createDiscoveryRuntime({db,endpoint,now,source:discoverySource,config:discoveryConfiguration}):null;
+  const discoveryWorker=discoveryRuntime?new DiscoveryWorker(discoveryRuntime):null;
+  if(discoveryRuntime)await discoveryRuntime.store.initialize();
+  let discoverySeedComplete=discoveryRuntime?Boolean((await db.query('SELECT scan_complete FROM discovery_index_control_v1 WHERE endpoint=$1',[endpoint])).rows[0]?.scan_complete):true;
+  const policyRuntime=createOperationsPolicyRuntime({rules:operationsRules,component:'worker',consumers:workerOperationsPolicyConsumers({evidence,ciV2,probes,onForumPolicy:policy=>{
+    forumPolicy=policy;
+    if(discoverySource){const policyHash=forumPolicyHash(policy),forum=discoverySource.forum;for(const consumer of [forum,forum.permissions,forum.budget,forum.governance])if(consumer)Object.assign(consumer,{policy,policyHash});}
+  }})});
   await policyRuntime.refresh();
   const operationsNotices=new OperationsNotices({db,endpoint,businessAdmin,jobs:operationsJobs,now});
+  const smtpCredentials=process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE
+    ?createRefreshingSmtpCredentialResolver(process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE,{endpoint})
+    :await loadOperationsSmtpCredentials(undefined,{endpoint});
+  const operationsSmtp=new OperationsSmtpService({db,endpoint,businessAdmin,directory:accountDirectory,credentialResolver:smtpCredentials,now});
+  const operationsMessaging=new OperationsMessagingService({db,endpoint,businessAdmin,jobs:operationsJobs,mailProvider:operationsSmtp,lockPlan:workerReads.lockMessagingPlan,now});
+  operationsMessaging.autonomy=autonomy;
+  autonomyAuthority.durableOperationAuthorizationWithin=(tx,context)=>operationsMessaging.validatePersistedApprovalWithin(tx,context);
+  const messagingWorkers=createOperationsMessagingWorkers({messaging:operationsMessaging});
   const operationsRetention=new OperationsRetention({db,endpoint,businessAdmin,jobs:operationsJobs,now});
   await createOperationsNoticeWorker({notices:operationsNotices,jobs:operationsJobs}).start();
+  await operationsJobs.work('messaging-run',messagingWorkers.run);
+  await operationsJobs.work('messaging-delivery',messagingWorkers.delivery);
   await createOperationsRetentionWorker({retention:operationsRetention,jobs:operationsJobs}).start();
   const searchIndex=process.env.GALAXY_SEARCH_INDEX_ENABLED==='true'?new SearchIndex({db,endpoint,now,readGrant:workerReads.readGrant,jobs:operationsJobs}):null;
   if(searchIndex)await searchIndex.configure({enabled:true});
@@ -115,14 +174,27 @@ try {
   metricsServer=await startMetricsListener(metrics,metricsConfig.port);
   installRuntimeFailureHandlers({logger:runtimeLog.error,onFatal:()=>stop()});
   runtimeLog.write({event:'runtime_started',stage:'startup',startedAt:runtimeStartedAt});
-  // This process never loads a signing key or executes uploaded code. Production
-  // deployment must separately restrict its egress and database role.
+  await reportServiceConnectionAdoption(process.env.GALAXY_SERVICE_CONNECTIONS_METADATA_FILE,{component:'worker',discoveryRuntime,attachmentConfiguration});
+  await reportOperationsMailAdoption(process.env.GALAXY_SYSTEM_SETTINGS_MAIL_METADATA_FILE,{component:'worker',smtp:operationsSmtp,credentialFile:process.env.GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE});
+  // Uploaded programs never execute here. The protected AgentOS service
+  // credential is used only for the fixed original-task endpoints.
   let nextExportCleanup = 0;
   let nextIndexRefresh=0;
+  let nextDiscoveryReconcile=Date.now()+60000;
   let nextPolicyRefresh=Date.now()+30000;
+  let nextRegisteredDirectorySync=0;
+  let nextAutonomyHealth=Date.now()+30000;
   while (!stopping) {
     const started=performance.now();
     try {
+      // The worker's independent fallback observes AI silence and re-arms the
+      // same durable tick; it does not invoke a model or replay a business POST.
+      if(Date.now()>=nextAutonomyHealth){stage='autonomy-health';await autonomyWorker.tick();nextAutonomyHealth=Date.now()+autonomy.defaults.healthSeconds*1000;}
+      if(registeredDirectory&&Date.now()>=nextRegisteredDirectorySync){
+        nextRegisteredDirectorySync=Date.now()+60000;stage='registered-directory-sync';
+        try{await registeredUsers.sync();}
+        catch(error){runtimeLog.error({event:'registered_directory_sync_failed',stage,error});}
+      }
       if(Date.now()>=nextPolicyRefresh){
         nextPolicyRefresh=Date.now()+30000;stage='policy-refresh';
         try{const refreshed=await policyRuntime.refresh();if(refreshed.items.some(item=>item.errorCode))runtimeLog.write({event:'operations_policy_refresh_failed',stage});}
@@ -150,7 +222,7 @@ try {
         // Storage retention continues during a publication pause; no model or
         // uploaded program executes here. Scanner outage defers only this queue.
         const attachmentStartedAt=performance.now();
-        try {stage='attachment-cleanup';await attachments.purgeExpired({limit:20});await forumAttachments.purgeExpired({limit:20});if(!paused&&!stopping){stage='attachment-scan';await attachments.scanPending({limit:1});await forumAttachments.scanPending({limit:1});}}
+        try {stage='attachment-cleanup';await attachments.purgeExpired({limit:20});await forumAttachments.purgeExpired({limit:20});if(!stopping){stage='approved-file-cleanup';await operationsFileCleanup.processApproved({limit:1});}if(!stopping){stage='account-feedback-deletion';await accountFeedbackData.processOwnerDeletions({limit:1});}if(!paused&&!stopping){stage='attachment-scan';await attachments.scanPending({limit:1});await forumAttachments.scanPending({limit:1});await feedbackAttachments.scanPending({limit:1});}}
         catch(error) {runtimeLog.write({event:'attachment_processing_deferred',stage,startedAt:attachmentStartedAt,error});}
       }
       if (nativeCi.processed) runtimeLog.write({ event: 'ci_v2_observation_job', state: nativeCi.state });
@@ -171,9 +243,19 @@ try {
         if(!stopping){stage='search-process';indexed=await searchIndex.processNext();}
         if(indexed.processed)runtimeLog.write({event:'search_index_job',state:indexed.state});
       }
+      let discoveryProcessed=false;
+      if(!stopping&&!paused&&discoveryWorker){
+        // A temporary governance restriction can expire without a SQL write.
+        // Reconcile in bounded batches so removed public candidates can return
+        // after that boundary; current-source checks still gate every result.
+        if(discoverySeedComplete&&Date.now()>=nextDiscoveryReconcile)discoverySeedComplete=false;
+        if(!discoverySeedComplete){stage='discovery-seed';const seeded=await discoveryWorker.seedBatch();discoverySeedComplete=seeded.complete;if(seeded.complete)nextDiscoveryReconcile=Date.now()+60000;}
+        if(!stopping){stage='discovery-index';const item=await discoveryWorker.indexOne();discoveryProcessed=!['idle','not-connected'].includes(item.state);if(discoveryProcessed)runtimeLog.write({event:'discovery_index_job',state:item.state,code:item.code});}
+        if(!stopping){stage='discovery-delivery';const item=await discoveryWorker.deliverOne();const processed=!['idle','not-connected'].includes(item.state);discoveryProcessed=discoveryProcessed||processed;if(processed)runtimeLog.write({event:'discovery_delivery_job',state:item.state,target:item.target,code:item.code});}
+      }
       metrics.workerIteration(result,(performance.now()-started)/1000,{paused});
       if (result.processed) runtimeLog.write({ event: 'evidence_job', state: result.state });
-      else if(!stopping&&!indexed.processed&&!probed.processed&&!nativeCi.processed)await new Promise(resolve => setTimeout(resolve, 1000));
+      else if(!stopping&&!indexed.processed&&!probed.processed&&!nativeCi.processed&&!discoveryProcessed)await new Promise(resolve => setTimeout(resolve, 1000));
     } catch(error) {
       metrics.workerIteration(null,(performance.now()-started)/1000,{failed:true});
       runtimeLog.error({event:'evidence_job_failed',stage,startedAt:started,error});

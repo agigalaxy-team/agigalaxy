@@ -79,6 +79,18 @@ export async function redactTaskEventCopies(db, events, { subjectId = null, requ
 }
 
 export async function prepareProductV2Deletion(db, { subjectId, requestId, at, retainedUntil }) {
+  // An identity can withdraw only its own uploaded source, even if several IDs
+  // share one account. Preserve the existing per-scope anti-resurrection marks
+  // and content-free operation receipts, and never reset an earlier deletion.
+  const work=(await db.query("UPDATE account_work_v1 SET state='deleted',revision=revision+1,data=NULL,deleted_at=$2,updated_at=$2 WHERE origin_subject_id=$1 AND state='stored' RETURNING account_id,work_id",[subjectId,iso(at)])).rows;
+  await db.query(`UPDATE account_work_scopes_v1 SET deleted_at=$2,deleted_reason='owner-deleted',deleted_by_kind='identity',
+    deleted_by_subject_id=$1,deleted_request_id=$3 WHERE origin_subject_id=$1 AND deleted_at IS NULL`,[subjectId,iso(at),requestId]);
+  const archives=(await db.query(`INSERT INTO private_conversation_deletions_v1(archive_id,account_id,scope_id,origin_subject_id,reason,deleted_at)
+    SELECT id,account_id,(selection->>'scopeId')::uuid,origin_subject_id,'owner-deleted',$2 FROM private_conversation_archives_v1
+    WHERE origin_subject_id=$1 ON CONFLICT(archive_id) DO NOTHING RETURNING archive_id`,[subjectId,iso(at)])).rows;
+  // Source-bound file pointers stay until physical cleanup is actually proven.
+  // Account-cookie uploads (subject_id IS NULL) are a different owner's data.
+  await db.query('UPDATE forum_attachments_v1 SET revoked_at=COALESCE(revoked_at,$2),purge_pending=true WHERE subject_id=$1 AND purged_at IS NULL',[subjectId,iso(at)]);
   // Called only after exact deletion approval is validated, never on request.
   // Keep the private object key until the worker has an actual Delete receipt.
   await db.query('UPDATE chat_attachments SET revoked_at=COALESCE(revoked_at,$2),purge_pending=true WHERE subject_id=$1 AND purged_at IS NULL',[subjectId,iso(at)]);
@@ -137,7 +149,8 @@ export async function prepareProductV2Deletion(db, { subjectId, requestId, at, r
   await db.query("UPDATE room_shared_summaries SET content='{}'::jsonb,source_facts='[]'::jsonb,state='retracted',retracted_at=COALESCE(retracted_at,$2) WHERE subject_id=$1", [subjectId,iso(at)]);
   await db.query(`UPDATE community_interactions SET invalidated_at=COALESCE(invalidated_at,$2)
     WHERE counterparty_id=$1 OR source_id IN (SELECT id FROM task_events WHERE subject_id=$1)`, [subjectId, iso(at)]);
-  return redacted;
+  return {...redacted,originWorkBodiesErased:work.length,originArchiveDeletionMarkers:archives.length,
+    originUploadReceipts:'retained-to-prevent-replay',forumAttachmentObjects:'delegated-erasure-required'};
 }
 
 // Other authors' references may hold a row after owner-only leaf deletion. A FK

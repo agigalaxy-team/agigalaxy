@@ -1,9 +1,9 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
-import { verifyContactsV2 } from './contacts-v2-workflow.mjs';
-import { getProjectContactClient } from '../../galaxy-web/src/project-contact-client.mjs';
-import { discoveryToolDefinitions } from '../src/personal-mcp-discovery-v2.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { verifyContactsV2 } from "./contacts-v2-workflow.mjs";
+import { getProjectContactClient } from "../../galaxy-web/src/features/projects/clients/operations.mjs";
+import { discoveryToolDefinitions } from "../src/adapters/mcp/personal/tools/discovery-v2.mjs";
 
 test('browser coordinator and MCP use actual HTTP/Consent for transfer, recruitment and independent Contact', async () => {
   await verifyContactsV2(null, {

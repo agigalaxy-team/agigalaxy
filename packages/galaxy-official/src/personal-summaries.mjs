@@ -4,6 +4,7 @@ import {digest} from './shared/digest.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {transaction} from './database.mjs';
 import {summaryPreferenceSchema,summaryPutSchema,summaryPageSchema,summaryReceiptSchema} from './shared/personal-summary-schema.mjs';
+import {chatMessageOperationsBlockedWithin} from './chat-message-operations-gate.mjs';
 const stamp=n=>new Date(n*1000).toISOString(),day=86400;
 const fail=(c,s=409)=>{throw new ServiceError(c,s);};
 function parse(schema,x){const v=schema.safeParse(x);if(!v.success)fail('invalid_personal_summary_request',400);return v.data;}
@@ -17,6 +18,7 @@ export function createSummarySourceReader(chat){return async(db,actor,{roomId,me
    EXISTS(SELECT 1 FROM deletion_requests d WHERE d.subject_id=m.subject_id AND d.state IN ('requested','review-needed','approved','partial','primary-erased')) AS author_pending
    FROM chat_message_refs m WHERE m.message_id=$1 AND m.room_id=$2 FOR SHARE OF m`,[messageId,roomId])).rows[0];
   if(!r||r.state!=='accepted'||r.revision!==revision||Date.parse(r.expires_at)<=chat.now()*1000)return {available:false};
+   if(await chatMessageOperationsBlockedWithin(db,{messageId}))return {available:false,temporarilyUnavailable:true};
   if(r.edit_pending||r.author_pending&&r.subject_id!==actor.subjectId)return {available:false,temporarilyUnavailable:true};
   return {available:true,expiresAt:new Date(r.expires_at).toISOString(),authorId:r.subject_id,revision:r.revision,sequence:String(r.sequence)};
  }catch(e){if(e instanceof ServiceError&&[403,404].includes(e.status))return {available:false};throw e;}

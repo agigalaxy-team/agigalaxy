@@ -17,14 +17,25 @@ export class OperationsBusinessDomain {
  constructor({businessAdmin,now=businessAdmin.now}){this.businessAdmin=businessAdmin;this.db=businessAdmin.db;this.endpoint=businessAdmin.endpoint;this.now=now;}
  require(operator,write=false){return this.businessAdmin.require(operator,{write});}
  async principalWithin(db,actor){
+  if(actor.kind==='operations-ai-service'){
+   const authority=this.businessAdmin.executorAuthority;if(!authority?.acceptsDuty(actor))operationsFail('business_admin_denied',403);
+   await authority.requireDutyAction(actor,'workbench.read',{db});return{kind:actor.kind,operatorId:actor.operatorId,aiAccountId:actor.aiAccountId,taskId:actor.taskId};
+  }
+  if(actor.kind==='operations-executor'){
+   if(!this.businessAdmin.executorAuthority?.accepts(actor))operationsFail('business_admin_denied',403);
+   await this.businessAdmin.executorAuthority.actor(actor.executionId,{db,resourceIds:actor.resourceIds,active:false});
+   return {kind:'operations-executor',executionId:actor.executionId,grantId:actor.grantId,operatorId:actor.operatorId};
+  }
   const principal=(await db.query('SELECT issuer,external_subject FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2 FOR SHARE',[actor.operatorId,this.endpoint])).rows[0];
   if(!principal)operationsFail('business_admin_denied',403);return principal;
  }
- async run(operator,write,action,selection,fn){const actor=this.require(operator,write);if(selection.id)selection={...selection,resourceId:selection.id};return transaction(this.db,async db=>{
+ async run(operator,write,action,selection,fn,transactionOptions={}){this.require(operator,write);if(selection.id)selection={...selection,resourceId:selection.id};return transaction(this.db,async db=>{
+  const actor=await this.businessAdmin.authorizeOperation(operator,action,selection,{db});
   await this.principalWithin(db,actor);
   const result=await fn(db,actor);await this.businessAdmin.recordWithin(db,actor,action,{selection,result:{count:result.items?.length??null}});return result;
- });}
- async command(operator,action,selection,fn){const actor=this.require(operator,true);if(selection.id)selection={...selection,resourceId:selection.id};return transaction(this.db,async db=>{
+ },transactionOptions);}
+ async command(operator,action,selection,fn){this.require(operator,true);if(selection.id)selection={...selection,resourceId:selection.id};return transaction(this.db,async db=>{
+  const actor=await this.businessAdmin.authorizeOperation(operator,action,selection,{db});
   await this.principalWithin(db,actor);
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912391))',[this.endpoint+':operations:'+selection.operationId]);
   const old=(await db.query('SELECT * FROM business_admin_audit_v1 WHERE endpoint=$1 AND operation_id=$2',[this.endpoint,selection.operationId])).rows[0];

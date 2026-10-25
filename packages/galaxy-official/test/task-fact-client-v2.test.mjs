@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { serviceFixture } from './service-fixture.mjs';
-import { createApi } from '../src/http.mjs';
-import { digest } from '../src/shared/digest.mjs';
+import { serviceFixture } from "./service-fixture.mjs";
+import { createApi } from "../src/http.mjs";
+import { digest } from "../src/shared/digest.mjs";
 import {
   getFactClient,
   latestFacts,
-} from '../../galaxy-web/src/fact-client.mjs';
+} from "../../galaxy-web/src/features/work-records/client.mjs";
 
 // Actual HTTP, signatures, Consent and persistent services. Synthetic identities
 // and work only; the browser KV bridge is a test double, not IndexedDB evidence.

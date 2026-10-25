@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {getFactClient} from '../../galaxy-web/src/fact-client.mjs';
-import {factContinuityFixture,deferred,outcome,intervention} from './task-fact-client-continuity-workflow.mjs';
+import {getFactClient} from "../../galaxy-web/src/features/work-records/client.mjs";
+import {factContinuityFixture,deferred,outcome,intervention} from "./task-fact-client-continuity-workflow.mjs";
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const changed=e=>e.code==='fact_authority_changed';
 const consents=h=>h.calls.filter(c=>c.path==='/v1/consents').length;

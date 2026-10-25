@@ -129,10 +129,11 @@ export class SearchIndex {
   }
   // Only the authenticated operations controller may expose this method. It
   // targets one failed generation; it cannot retry a newer source by accident.
-  async retryFailed({jobId,expectedGeneration},{audit}={}){
+  async retryFailed({jobId,expectedGeneration},{audit,authorize}={}){
     if(typeof jobId!=='string'||!/^[0-9a-f-]{36}$/i.test(jobId)||!Number.isInteger(expectedGeneration)||expectedGeneration<1)
       throw new ServiceError('invalid_search_recovery',400);
     return transaction(this.db,async db=>{
+      await authorize?.(db);
       const job=(await db.query("SELECT * FROM jobs WHERE id=$1 AND kind='search-index' FOR UPDATE",[jobId])).rows[0];
       if(!job)throw new ServiceError('search_job_not_found',404);
       if(job.state!=='failed'||job.payload.generation!==expectedGeneration)throw new ServiceError('search_recovery_conflict',409);

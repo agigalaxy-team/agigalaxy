@@ -1,14 +1,14 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
-import {serviceFixture} from './service-fixture.mjs';
-import {createApi} from '../src/http.mjs';
-import {browserScopes,createBrowserClient} from '../src/browser-client.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
-import {getProjectContactClient} from '../../galaxy-web/src/project-contact-client.mjs';
-import {digest} from '../src/shared/digest.mjs';
-import {verifyContactsV2} from './contacts-v2-workflow.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
+import {serviceFixture} from "./service-fixture.mjs";
+import {createApi} from "../src/http.mjs";
+import {browserScopes,createBrowserClient} from "../src/browser-client.mjs";
+import { createExistingWebRuntime } from "./existing-web-identity-fixture.mjs";
+import {createRecoveryMaterial} from "../../galaxy-core/src/domain/identity-material.mjs";
+import {getProjectContactClient} from "../../galaxy-web/src/features/projects/clients/operations.mjs";
+import {digest} from "../src/shared/digest.mjs";
+import {verifyContactsV2} from "./contacts-v2-workflow.mjs";
 
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
 function memoryStore(values,{get,put}={}){

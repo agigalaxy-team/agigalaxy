@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
+import {bindOperationsAiUse,withOperationsAiWork} from '../src/shared/operations-ai-use.mjs';
+import {ServiceError} from '../src/shared/service-error.mjs';
+import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';
+import {operationsAgentOsConversationToolsMigrationSql} from '../src/infrastructure/operations-agentos-conversation-tools-v1-schema.mjs';
+
+test('native PENDING metadata is associated only by the same owner conversation acknowledgement, preserving the original stop and current read boundary',{timeout:60000},async t=>{
+ const db=new PGlite();t.after(()=>db.close());await db.exec(operationsAgentOsConversationsMigrationSql);await db.exec(operationsAgentOsConversationToolsMigrationSql);await db.exec('ALTER TABLE operations_agentos_conversations_v1 ADD COLUMN ai_account_id uuid');
+ const endpoint='https://pending-binding.synthetic.invalid',owner='pending-binding-owner',aiId=randomUUID(),at=1988193660;let enabled=true,dispatches=0,revokeDuringRead=false;
+ const actor=()=>withOperationsAiWork(bindOperationsAiUse({kind:'business-operator',operatorId:owner,endpoint,businessAuthorization:{version:'1',permissions:['workbench.read','ai.use.overview']}},'overview'),{accountId:aiId,purpose:'query',resolve:async()=>({accountId:aiId,domain:'overview',enabled,permissions:[],roleVersions:[]})});
+ const authority={db,endpoint,now:()=>at,async human(input,{domain='overview'}={}){if(!enabled||input.operatorId!==owner||domain!=='overview')throw new ServiceError('operations_permission_denied',403);return actor();}};
+ const native={runId:randomUUID(),operationId:null,status:'RUNNING',content:null,userInput:'synthetic queued question',createdAt:at,events:[],awaitingHuman:false};let runs=[native];
+ const client={async status(){return{state:'connected',modelState:'configured',configuredDomains:['overview'],conversationVersion:2,conversationDomains:['overview'],conversationTransport:{events:true,cancel:true,originalRunLookup:true}};},async runConversation(row,input){dispatches++;return{run_id:native.runId,status:'PENDING'};},async readConversation(){if(revokeDuringRead)enabled=false;return{runs:structuredClone(runs),readExpiresAt:at+30};}};
+ const service=new AgentOsConversations({authority,client}),operationId=randomUUID();
+ await service.run(actor(),'overview',{operationId,message:'synthetic queued question'},{authorize:async()=>actor()});assert.equal(dispatches,1);
+ const initial=await service.read(actor(),'overview');assert.equal(initial.runs[0].operationId,operationId,'The queued run lacks native metadata until completion; its exact recorded acknowledgement must identify the ongoing original turn');
+ assert.equal(initial.runs[0].content,null);assert.equal(initial.runs[0].status,'RUNNING');assert.equal(native.operationId,null,'Projection does not mutate the native record');
+ const row=(await db.query('SELECT * FROM operations_agentos_conversations_v1')).rows[0],stopId=randomUUID();
+ await db.query('INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,native_run_id,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[stopId,endpoint,row.id,owner,'synthetic-stop','unknown',JSON.stringify({cancelledOperationId:operationId,runId:native.runId}),native.runId,new Date(at*1000)]);
+ const pendingStop=await service.read(actor(),'overview');assert.equal(pendingStop.runs[0].operationId,operationId);assert.equal(pendingStop.runs[0].cancellation.operationId,stopId,'The stop receipt is not mistaken for the original message acknowledgement');
+ native.operationId=randomUUID();assert.equal((await service.read(actor(),'overview')).runs[0].operationId,native.operationId,'A conflicting nonempty native operation ID is never replaced');native.operationId=null;
+ const unknownRun={...native,runId:randomUUID()},ambiguousRun={...native,runId:randomUUID()};runs=[native,unknownRun,ambiguousRun];
+ const otherConversation=randomUUID();await db.query('INSERT INTO operations_agentos_conversations_v1(id,endpoint,operator_id,domain,permission_key,session_id,created_at,ai_account_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[otherConversation,endpoint,'other-owner','overview','other-key',randomUUID(),new Date(at*1000),aiId]);
+ const insert=async(id,conversationId,operatorId,runId)=>db.query('INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,native_run_id,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[id,endpoint,conversationId,operatorId,'synthetic-receipt','accepted',JSON.stringify({runId}),runId,new Date(at*1000)]);
+ await insert(randomUUID(),otherConversation,'other-owner',unknownRun.runId);await insert(randomUUID(),row.id,owner,ambiguousRun.runId);await insert(randomUUID(),row.id,owner,ambiguousRun.runId);
+ const isolated=await service.read(actor(),'overview');assert.equal(isolated.runs[0].operationId,operationId);assert.equal(isolated.runs[1].operationId,null,'Another owner receipt cannot supply a binding');assert.equal(isolated.runs[2].operationId,null,'Ambiguous original receipts remain unknown');
+ await assert.rejects(service.read({...actor(),operatorId:'other-owner'},'overview'),{code:'operations_permission_denied'});
+ revokeDuringRead=true;await assert.rejects(service.read(actor(),'overview'),{code:'operations_permission_denied'},'Fresh permission loss after native read still withholds material');assert.equal(dispatches,1,'Read projection never submits or cancels a native run');
+});

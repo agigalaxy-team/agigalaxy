@@ -93,7 +93,9 @@ export async function initializeRestic(config, run = runCommand) {
   return { state: 'created' };
 }
 
-export async function createProductBackup(config, { type = 'auto', run = runCommand, now = () => new Date() } = {}) {
+export async function createProductBackup(config, { type = 'auto', run = runCommand, now = () => new Date(), captureContext = null, beforeTransfer = null, onPhase = null } = {}) {
+  const phase=async value=>{if(typeof onPhase==='function')try{await onPhase(value);}catch{/* Diagnostics do not change this command's result. */}};
+  await phase('prepare');
   requireConfiguration(config, 'backup');
   if (!['auto', 'full', 'diff', 'incr'].includes(type)) throw new Error('operations_backup_type_invalid');
   return withJobLock(config, () => publishStatus(config, 'create', async () => {
@@ -103,6 +105,7 @@ export async function createProductBackup(config, { type = 'auto', run = runComm
     let completed = false;
     try {
       const preliminary = await sourcesForCapture(config), databases = [];
+      await phase('database-backup');
       for (const pg of config.postgres) {
         const current = await inspectPostgres(config, pg, run);
         if (current.archiveMode !== 'on') throw new Error('operations_postgres_archive_not_enabled');
@@ -114,15 +117,38 @@ export async function createProductBackup(config, { type = 'auto', run = runComm
         const chosen = chooseBackup(after);
         databases.push({ id: pg.id, systemIdentifier: current.systemIdentifier, backupLabel: chosen.label, backupStoppedAt: chosen.timestamp.stop, restorePoint: 'galaxy_' + id.replaceAll('-', ''), dataPath: pg.dataPath, database: pg.database });
       }
+      await phase('size-check');
       await repositorySize(config, [...preliminary.sources.map(source => source.resolvedPath), ...config.postgres.map(pg => pg.repository)], run);
       // Completed pgBackRest backups and WAL segment objects are immutable. Copy
       // these before the pause; only newly archived WAL is added during capture.
+      await phase('precopy');
       for (const pg of config.postgres) await copyTree(run, pg.repository, stage + '/pgbackrest/' + pg.id);
+      const precopied=new Map(),early=config.backup.precopySourceIds??[];
+      if(!Array.isArray(early)||new Set(early).size!==early.length||early.some(id=>!['api-release','admin-release'].includes(id))||early.length&&captureContext===null)throw new Error('operations_capture_context_invalid');
+      for(const id of early){
+        const source=preliminary.sources.find(source=>source.id===id);
+        if(!source||source.kind!=='tree'||source.path!==source.resolvedPath||!/^\/(?:opt\/galaxy\/releases|srv\/galaxy\/admin\/releases)\/[A-Za-z0-9._-]+$/.test(source.path))throw new Error('operations_target_changed');
+        await copyTree(run,source.resolvedPath,stage+'/files/'+source.id);precopied.set(id,source);
+      }
       const captureStartedAt = Math.floor(Date.now() / 1000);
+      await phase('capture-and-resume');
       await quiesce(config, async remaining => {
         // A publisher may have switched current during the online database
         // backup. Resolve release pointers only after every writer is paused.
         const { sources, omitted } = await sourcesForCapture(config);
+         // The maintenance adapter resolves current service releases and owned
+         // volumes before this call. Recheck that same footprint after writers
+         // stop, and bind its closed coverage facts to this immutable capture.
+         // No command or path is obtained from an HTTP/model request here.
+         const maintenance = captureContext === null ? null : await captureContext({
+           captureId: id, sourceIds: sources.map(source => source.id),
+           postgresStanzas: config.postgres.map(pg => pg.id), remaining,
+         });
+         if (maintenance !== null && (maintenance?.version !== 1 || !/^[a-f0-9]{64}$/.test(maintenance.footprintDigest ?? '') || !Array.isArray(maintenance.coverage)
+           || maintenance.coverage.some(item => !['covered','uncovered','unknown','not-applicable'].includes(item?.state)
+             || !Array.isArray(item.sourceIds) || item.sourceIds.some(value => !sources.some(source => source.id === value))
+             || !Array.isArray(item.postgresStanzas) || item.postgresStanzas.some(value => !config.postgres.some(pg => pg.id === value))))) throw new Error('operations_capture_context_invalid');
+         if(early.length&&(maintenance===null||!Array.isArray(maintenance.immutableSourceIds)||early.some(id=>!maintenance.immutableSourceIds.includes(id))))throw new Error('operations_capture_context_invalid');
         for (const pg of config.postgres) {
           const database = databases.find(item => item.id === pg.id);
           const query = `SELECT pg_create_restore_point('${database.restorePoint}'); SELECT pg_switch_wal();`;
@@ -130,17 +156,24 @@ export async function createProductBackup(config, { type = 'auto', run = runComm
           await run(config.tools.docker, backrestArguments(pg, ['check']), { timeout: remaining() });
           await copyTree(run, pg.repository + '/archive/.', stage + '/pgbackrest/' + pg.id + '/archive', { timeout: remaining(), addOnly: true });
         }
-        for (const source of sources) await copyTree(run, source.resolvedPath, stage + '/files/' + source.id, { timeout: remaining() });
+        for(const [id,old]of precopied){const current=sources.find(source=>source.id===id);if(!current||current.path!==old.path||current.resolvedPath!==old.resolvedPath||current.kind!==old.kind)throw new Error('operations_target_changed');}
+        for (const source of sources) if(!precopied.has(source.id))await copyTree(run, source.resolvedPath, stage + '/files/' + source.id, { timeout: remaining() });
         const manifest = { version: 1, id, captureStartedAt, captureFinishedAt: Math.floor(Date.now() / 1000), databases,
-          files: sources.map(({ id: sourceId, path, resolvedPath, kind }) => ({ id: sourceId, path, resolvedPath, kind })), omittedSources: omitted,
+          precopySourceIds:[...precopied.keys()],files: sources.map(({ id: sourceId, path, resolvedPath, kind }) => ({ id: sourceId, path, resolvedPath, kind })), omittedSources: omitted,
           keycloakRealms: config.backup.keycloakRealms, restoreScope: 'named-database-points-and-files-in-this-capture' };
+         if (maintenance !== null) manifest.maintenance = maintenance;
         await atomicWrite(stage + '/capture.json', json(manifest));
       }, run);
       // Writers are already resumed before potentially slow remote transfer.
-      const response = await restic(config, ['backup', stage, '--json', '--host', config.backup.resticHost, '--tag', 'galaxy-product', '--tag', 'capture:' + id], run, { timeout: 14400000, maxOutput: 16777216 });
+       await phase('before-transfer');
+       if (beforeTransfer !== null) await beforeTransfer();
+      await phase('repository-transfer');
+      const response = await restic(config, ['--no-cache', 'backup', stage, '--json', '--host', config.backup.resticHost, '--tag', 'galaxy-product', '--tag', 'capture:' + id], run, { timeout: 14400000, maxOutput: 16777216 });
+      await phase('repository-result');
       const summary = response.stdout.split('\n').filter(Boolean).map(line => JSON.parse(line)).find(item => item.message_type === 'summary');
       if (!/^[a-f0-9]{64}$/.test(summary?.snapshot_id ?? '')) throw new Error('operations_restic_snapshot_unknown');
       const receipt = { version: 1, captureId: id, snapshotId: summary.snapshot_id, snapshotSubfolder: stage, finishedAt: Math.floor(Date.now() / 1000), databaseRestorePoints: databases.map(({ id: stanza, restorePoint, backupLabel }) => ({ stanza, restorePoint, backupLabel })) };
+      await phase('record-receipt');
       await atomicWrite(config.directories.status + '/last-capture.json', json(receipt));
       completed = true;
       return receipt;
@@ -148,7 +181,7 @@ export async function createProductBackup(config, { type = 'auto', run = runComm
       // A failed capture is retained for diagnosis; it is private and never
       // advertised as a successful restore point. Only this exact successful
       // staging directory is removed; repository history is untouched.
-      if (completed) await removeOwnedTarget(config.directories.captures, stage, id);
+      if (completed){await phase('cleanup');await removeOwnedTarget(config.directories.captures, stage, id);}
     }
   }));
 }
@@ -165,7 +198,7 @@ export function restoreManifest(input, config, captureId) {
   }
   return input;
 }
-export function isolatedPostgresArguments(config, pg, { root, repository, configurationFile, name, entrypoint, args }) {
+export function isolatedPostgresArguments(config, pg, { root, repository, configurationFile, name, entrypoint, args, socketDirectory=null }) {
   return ['run', ...(entrypoint === 'postgres' ? ['--detach', '--name', name] : ['--rm']), '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--user', pg.uid + ':' + pg.gid,
     '--tmpfs', '/tmp:rw,nosuid,size=64m', '--tmpfs', '/var/run/pgbackrest:rw,nosuid,size=16m,uid=' + pg.uid + ',gid=' + pg.gid,
     '--tmpfs', '/var/log/pgbackrest:rw,nosuid,size=16m,uid=' + pg.uid + ',gid=' + pg.gid,
@@ -173,10 +206,11 @@ export function isolatedPostgresArguments(config, pg, { root, repository, config
     '--mount', 'type=bind,src=' + root + ',dst=/var/lib/postgresql',
     '--mount', 'type=bind,src=' + repository + ',dst=/var/lib/pgbackrest,readonly',
     '--mount', 'type=bind,src=' + configurationFile + ',dst=/etc/pgbackrest/pgbackrest.conf,readonly',
+    ...(socketDirectory ? ['--mount', 'type=bind,src=' + socketDirectory + ',dst=/galaxy-recovery-socket'] : []),
     '--mount', 'type=bind,src=' + pg.cipherFile + ',dst=/run/secrets/pgbackrest_repository_cipher,readonly',
     '--entrypoint', entrypoint, config.images.postgresBackup, ...args];
 }
-async function restoreDatabase(config, pg, record, target, repository, run, { type = 'name', recoveryTarget = record.restorePoint } = {}) {
+async function restoreDatabase(config, pg, record, target, repository, run, { type = 'name', recoveryTarget = record.restorePoint, privateSocket=false } = {}) {
   const root = target + '/postgres/' + pg.id, configurationFile = target + '/restore-config/' + pg.id + '.conf';
   await ensureDirectory(root, { uid: pg.uid, gid: pg.gid });
   let dataPath = root;
@@ -188,14 +222,17 @@ async function restoreDatabase(config, pg, record, target, repository, run, { ty
   const name = 'galaxy-restore-' + randomUUID().replaceAll('-', '').slice(0, 12) + '-' + pg.id;
   const restoreArgs = ['--stanza=' + pg.id, '--set=' + record.backupLabel, '--type=' + type, '--target=' + recoveryTarget, '--target-action=promote', '--archive-mode=off', 'restore'];
   await run(config.tools.docker, isolatedPostgresArguments(config, pg, { root, repository, configurationFile, entrypoint: '/usr/local/bin/galaxy-pgbackrest', args: restoreArgs }), { timeout: 14400000 });
-  const command = ['-D', pg.dataPath, '-c', 'listen_addresses=', '-c', 'unix_socket_directories=/tmp', '-c', 'archive_mode=off', '-c', 'primary_conninfo=', '-c', 'primary_slot_name=', '-c', 'synchronous_standby_names=', '-c', `restore_command=/usr/local/bin/galaxy-pgbackrest --stanza=${pg.id} archive-get %f "%p"`];
-  await run(config.tools.docker, isolatedPostgresArguments(config, pg, { root, repository, configurationFile, name, entrypoint: 'postgres', args: command }));
-  const clone = { ...pg, container: name, socketPath: '/tmp' };
+  const socketDirectory=privateSocket?target+'/sockets/'+pg.id:null;
+  if(socketDirectory){await ensureDirectory(socketDirectory,{uid:pg.uid,gid:pg.gid});await atomicWrite(socketDirectory+'/pg_hba.conf','local all all trust\n',0o644);}
+  const socketPath=socketDirectory?'/galaxy-recovery-socket':'/tmp';
+  const command = ['-D', pg.dataPath, '-c', 'listen_addresses=', '-c', 'unix_socket_directories='+socketPath, ...(socketDirectory?['-c','hba_file=/galaxy-recovery-socket/pg_hba.conf']:[]), '-c', 'archive_mode=off', '-c', 'primary_conninfo=', '-c', 'primary_slot_name=', '-c', 'synchronous_standby_names=', '-c', `restore_command=/usr/local/bin/galaxy-pgbackrest --stanza=${pg.id} archive-get %f "%p"`];
+  await run(config.tools.docker, isolatedPostgresArguments(config, pg, { root, repository, configurationFile, name, entrypoint: 'postgres', args: command,socketDirectory }));
+  const clone = { ...pg, container: name, socketPath };
   try {
     const deadline = Date.now() + 300000;
     let ready = false;
     while (Date.now() < deadline) {
-      const result = await run(config.tools.docker, ['exec', '--user', 'postgres', name, 'pg_isready', '--host', '/tmp', '--username', pg.administrator, '--dbname', pg.database], { accepted: [0, 1, 2], timeout: 10000, maxOutput: 1024 });
+      const result = await run(config.tools.docker, ['exec', '--user', 'postgres', name, 'pg_isready', '--host', socketPath, '--username', pg.administrator, '--dbname', pg.database], { accepted: [0, 1, 2], timeout: 10000, maxOutput: 1024 });
       if (result.code === 0) {
         const recovery = await run(config.tools.docker, postgresSqlArguments(clone, 'SELECT pg_is_in_recovery()'));
         if (recovery.stdout.trim() === 'f') { ready = true; break; }
@@ -208,7 +245,7 @@ async function restoreDatabase(config, pg, record, target, repository, run, { ty
     // The clone has no network and no application. Clearing session rows never
     // touches the source cluster, principal mappings, UID or audit history.
     await run(config.tools.docker, postgresSqlArguments(clone, invalidateRestoredSessionsSql));
-    return { stanza: pg.id, container: name, dataPath, repository, network: 'none', ports: [], sessionsInvalidated: true };
+    return { stanza: pg.id, container: name, dataPath, repository, network: 'none', ports: [], sessionsInvalidated: true,...(socketDirectory?{socketDirectory,socketPath}:{}) };
   } catch (error) {
     await run(config.tools.docker, ['stop', '--time', '10', name]).catch(() => {});
     throw error;
@@ -224,11 +261,11 @@ export async function applyResticRetention(config, run = runCommand) {
     return { state: 'retained', host: config.backup.resticHost, tag: 'galaxy-product', ...policy };
   }));
 }
-export async function restoreProductBackup(config, { receipt: supplied, directory, run = runCommand }) {
+export async function restoreProductBackup(config, { receipt: supplied, directory, run = runCommand, lockHeld = false, privateSockets=false, selectedStanzas=null }) {
   requireConfiguration(config, 'restore');
   const receipt = restoreReceipt(supplied);
   if (!beneath(config.directories.restores, directory)) throw new Error('operations_restore_outside_root');
-  return withJobLock(config, () => publishStatus(config, 'restore', async () => {
+  const restore = () => publishStatus(config, 'restore', async () => {
     await newTarget(config.directories.restores, directory);
     await atomicWrite(directory + '/.galaxy-capture', json({ id: receipt.captureId, purpose: 'restore' }));
     const bundle = directory + '/bundle'; await mkdir(bundle, { mode: 0o700 });
@@ -236,7 +273,8 @@ export async function restoreProductBackup(config, { receipt: supplied, director
     const manifest = restoreManifest(JSON.parse(await readFile(bundle + '/capture.json', 'utf8')), config, receipt.captureId);
     const databases = [];
     try {
-      for (const pg of config.postgres) databases.push(await restoreDatabase(config, pg, manifest.databases.find(item => item.id === pg.id), directory, bundle + '/pgbackrest/' + pg.id, run));
+      if(selectedStanzas!==null&&(!Array.isArray(selectedStanzas)||!selectedStanzas.length||selectedStanzas.some(id=>!config.postgres.some(pg=>pg.id===id))))throw new Error('operations_restore_stanza_scope_invalid');
+      for (const pg of config.postgres.filter(pg=>selectedStanzas===null||selectedStanzas.includes(pg.id))) databases.push(await restoreDatabase(config, pg, manifest.databases.find(item => item.id === pg.id), directory, bundle + '/pgbackrest/' + pg.id, run,{privateSocket:privateSockets}));
     } catch (error) {
       for (const database of databases) await run(config.tools.docker, ['stop', '--time', '10', database.container]).catch(() => {});
       await atomicWrite(directory + '/restore.json', json({ version: 1, state: 'failed', target: directory, databases, publicActivation: false }));
@@ -246,7 +284,10 @@ export async function restoreProductBackup(config, { receipt: supplied, director
       keycloakLogoutAllRequired: config.backup.keycloakRealms, upstreamSessionsInvalidated: false };
     await atomicWrite(directory + '/restore.json', json(result));
     return result;
-  }));
+  });
+  // The fixed maintenance executor holds this same host lock across all phases.
+  // The standalone isolated-restore CLI retains its existing lock behavior.
+  return lockHeld ? restore() : withJobLock(config, restore);
 }
 
 export async function restoreDatabaseAtTime(config, { stanza, at, directory, run = runCommand }) {

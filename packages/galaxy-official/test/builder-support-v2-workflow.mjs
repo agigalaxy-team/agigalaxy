@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {builderDeclaration} from './builders-workflow.mjs';
-import {builderToolDefinitions} from '../src/personal-mcp-builders-v2.mjs';
+import {builderToolDefinitions} from '../src/adapters/mcp/personal/tools/builders-v2.mjs';
 import {createApi} from '../src/http.mjs';
 export function supportFor(declaration){return {profile:'galaxy-builder-support/2',implementation:{name:declaration.name,version:declaration.release.version},
   galaxySchema:'2',protocols:[{name:'MCP',version:'fixture-version'}],sdks:[],objectActions:['case.read','attempt.map','proof.export'],

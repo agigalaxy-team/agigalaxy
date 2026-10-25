@@ -6,6 +6,7 @@ import { costInputSchema } from './cost-input.mjs';
 import { failureRoute } from '../adapters/http/failure-audit.mjs';
 import { operationalSnapshot } from '../infrastructure/operational-snapshot.mjs';
 import { backupActions,readBackupStatus } from './backup-status.mjs';
+import {createAutonomyMetrics} from './autonomy/metrics.mjs';
 
 async function readCostInput(path) {
   if(!isAbsolute(path))throw new Error('Absolute cost input path required');
@@ -39,6 +40,7 @@ export function createOperationalMetrics({component,db=null,storageDirectory=nul
   const counter=(name,help,labelNames=[])=>new Counter({name:'galaxy_'+name,help,labelNames,registers:[registry]});
   const gauge=(name,help,labelNames=[])=>new Gauge({name:'galaxy_'+name,help,labelNames,registers:[registry]});
   const histogram=(name,help,labelNames=[])=>new Histogram({name:'galaxy_'+name,help,labelNames,registers:[registry],buckets:[0.005,0.025,0.1,0.5,1,2.5,5,10,30]});
+  const refreshAutonomy=db?createAutonomyMetrics({db,gauge,now}):null;
   const requests=counter('http_requests_total','Completed or closed application HTTP requests',['route','status']);
   const quotas=counter('resource_quota_rejections_total','Rejected resource or request quota growth',['kind']);
   const duration=histogram('http_request_duration_seconds','Application request duration to finish or close',['route','status']);
@@ -143,6 +145,7 @@ export function createOperationalMetrics({component,db=null,storageDirectory=nul
         }catch{logReady.set(0);logEvents.reset();}
       }
       if(db){
+        await refreshAutonomy();
         try{
           const s=await operationalSnapshot(db,now());
           dbBytes.set(s.database_bytes);

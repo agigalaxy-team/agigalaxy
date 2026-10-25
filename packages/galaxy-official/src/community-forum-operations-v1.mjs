@@ -9,7 +9,7 @@ export async function priorForumOperation(db,actor,operationId,payloadJson){
   UNION ALL SELECT subject_id,account_id,payload_hash,result,NULL::jsonb locator FROM forum_governance_events_v1 WHERE operation_id=$1
   UNION ALL SELECT subject_id,account_id,payload_hash,result,NULL::jsonb locator FROM forum_section_events_v2 WHERE id=$1 LIMIT 1`,[operationId])).rows[0];
  if(!row)return null;
- const owns=actor.kind==='official-account'?row.account_id===actor.accountId:!!actor.subjectId&&row.subject_id===actor.subjectId&&(!actor.accountId||actor.accountId===row.account_id);
+ const owns=actor.kind==='official-account'?row.account_id===actor.accountId:!!actor.subjectId&&row.subject_id===actor.subjectId&&(row.account_id===null||!actor.accountId||actor.accountId===row.account_id);
  if(!owns||row.payload_hash!==digest(payloadJson))throw new ServiceError('forum_operation_conflict',409);
  return {...row.result,acknowledged:true,authority:'accepted-operation-only'};
 }
@@ -41,7 +41,7 @@ export async function forumReceiptWithin(db,actor,{operationId,payloadHash}){
   UNION ALL SELECT subject_id,account_id,payload_hash,NULL::jsonb locator,result FROM forum_events_v1 WHERE id=$1 AND ${owner}=$2
   UNION ALL SELECT subject_id,account_id,payload_hash,NULL::jsonb locator,result FROM forum_governance_events_v1 WHERE operation_id=$1 AND ${owner}=$2
   UNION ALL SELECT subject_id,account_id,payload_hash,NULL::jsonb locator,result FROM forum_section_events_v2 WHERE id=$1 AND ${owner}=$2 LIMIT 1`,[operationId,key])).rows[0];
- if(row&&actor.kind!=='official-account'&&actor.accountId&&row.account_id!==actor.accountId)return {operationId,payloadHash,status:'absent',authority:'accepted-operation-only; not-current-read-access'};
+ if(row&&actor.kind!=='official-account'&&actor.accountId&&row.account_id!==null&&row.account_id!==actor.accountId)return {operationId,payloadHash,status:'absent',authority:'accepted-operation-only; not-current-read-access'};
  const status=!row?'absent':row.payload_hash===payloadHash?'acknowledged':'conflict';
  return {operationId,payloadHash,status,...(status==='acknowledged'?{locator:row.locator??row.result.locator??locatorForResult(row.result),result:row.result}:{}),authority:'accepted-operation-only; not-current-read-access'};
 }

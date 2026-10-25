@@ -5,7 +5,9 @@ const chatMessage=new RegExp('^/v2/chat/rooms/'+id+'/messages/'+id+'/(?:edit|ret
 const chatAttachmentJson=/^\/v2\/chat\/attachments\/(?:config|prepare|read|query|revoke)$/;
 const chatAttachmentBinary=new RegExp('^/v2/chat/attachments/'+id+'/(?:upload|content|export-content)$');
 const forumAttachmentBinary=new RegExp('^/v2/community/attachments/'+id+'/(?:upload|content)$');
+const feedbackAttachmentUpload=new RegExp('^/v1/account/feedback/attachments/'+id+'/upload$');
+const feedbackExportContent=new RegExp('^/v1/account/data/feedback/exports/'+id+'/attachments/'+id+'/content$');
 export const isAccountChatJsonPath=path=>chatGlobal.test(path)||chatRoom.test(path)||chatMessage.test(path)||chatAttachmentJson.test(path);
-export const isAccountBinaryPath=path=>chatAttachmentBinary.test(path)||forumAttachmentBinary.test(path);
+export const isAccountBinaryPath=path=>chatAttachmentBinary.test(path)||forumAttachmentBinary.test(path)||feedbackAttachmentUpload.test(path)||feedbackExportContent.test(path);
 export const isAccountUploadPath=path=>isAccountBinaryPath(path)&&path.endsWith('/upload');
 export const isAccountBookmarkPath=path=>/^\/v1\/account\/bookmarks\/(?:status|command|query|receipt)$/.test(path);

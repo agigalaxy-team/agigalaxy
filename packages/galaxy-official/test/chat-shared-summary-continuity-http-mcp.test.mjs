@@ -6,10 +6,10 @@ import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client
 import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {createPersonalMcp} from '../src/personal-mcp.mjs';
+import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
 import {createChatSharedSummaryClient,sharedSummaryRequestHash} from '../src/chat-shared-summary-client.mjs';
 import {serviceAccessV2} from '../src/operations/service-access-v2.mjs';
-import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/http-tools.mjs';
+import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 import {invite} from './chat-workflow.mjs';
 
 test('lost HTTP publication acknowledgement survives source withdrawal and departure through ordinary MCP and native receipt adapters',async()=>{
