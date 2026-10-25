@@ -340,7 +340,8 @@
       "id": "admin",
       "kind": "frontend",
       "roots": [
-        "apps/galaxy-admin"
+        "apps/galaxy-admin",
+        "tools/qa/operations-read-renewal"
       ],
       "dependsOn": [
         "contracts"
@@ -620,7 +621,8 @@
     "services/galaxy-model-gateway/config/models.empty.yaml",
     "docs/component-catalog.md",
     "docs/licensing-and-source.md",
-    "services/galaxy-model-gateway/SOURCE_PROVENANCE.json"
+    "services/galaxy-model-gateway/SOURCE_PROVENANCE.json",
+    "tools/qa/operations-read-renewal/SOURCE.json"
   ],
   "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog."
 }

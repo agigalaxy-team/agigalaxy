@@ -1,0 +1,46 @@
+{
+  "mainlineFreeze": "F14",
+  "baseline": "F13 exact preimage",
+  "parentCapture": "native34-conversation-continuity/ACTUAL_CAPTURE_R14.json",
+  "validationSource": "workbench-refresh-continuity/quiet-current-renewal",
+  "purpose": "Actual React/DOM hook before/after; read/authority/backend and poll/stream/progress triggers are explicit doubles. Playwright clock simulates delays/expiry. No real authority/production/model/POST.",
+  "inputs": [
+    {
+      "path": "tools/qa/operations-read-renewal/check.cjs",
+      "sourceKind": "exact external validation input, then portable path/output adaptation",
+      "originalSha256": "8548646b730ddfee9ccb34c2b2db68c523c281b03dc2db8085be24a7add0bc03"
+    },
+    {
+      "path": "tools/qa/operations-read-renewal/fixture.tsx",
+      "sourceKind": "exact external validation input",
+      "originalSha256": "44bc2dffa44143ce0f487511f995c51150c1255df02d6633fa09c8ebc653f961"
+    },
+    {
+      "path": "tools/qa/operations-read-renewal/read-double.ts",
+      "sourceKind": "exact external validation input",
+      "originalSha256": "2855172dbc443830947f04cb5b6eb276eb96fe5b6e2ec762fc30953f5083e8e0"
+    },
+    {
+      "path": "tools/qa/operations-read-renewal/fixtures/f13/use-operations-read.ts",
+      "sourceKind": "exact F13 preimage fixture",
+      "sha256": "d7a6097bdcef7472e7fc1a2ccb1965a55759696560ffd4ded177359f8f3c0f98"
+    },
+    {
+      "path": "tools/qa/operations-read-renewal/fixtures/f13/use-client-ready.ts",
+      "sourceKind": "exact F13 preimage fixture",
+      "sha256": "d69a3da6b281ab04bde31c843df0bc39082044c49ded5c65eefaa6eaf741fd7f"
+    },
+    {
+      "path": "tools/qa/operations-read-renewal/fixtures/f13/operations-read-lifecycle.ts",
+      "sourceKind": "exact F13 preimage fixture",
+      "sha256": "f41f584b4ca300359a829b7da93d9f40e6a005c299aedd58b1ea700327a7e449"
+    }
+  ],
+  "adaptations": [
+    "Resolve current product source from this repository",
+    "Ship three exact F13 hook/lifecycle fixtures",
+    "Use private pinned Playwright package or explicit toolchain path; optional headless executable",
+    "Write bundles/reports to a new output directory, never source"
+  ],
+  "standaloneSource": true
+}

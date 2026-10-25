@@ -1,0 +1,11 @@
+{
+  "name": "galaxy-operations-read-renewal-qa",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "check": "node check.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
