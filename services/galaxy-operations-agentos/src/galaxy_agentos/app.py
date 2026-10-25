@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import hmac
@@ -142,7 +143,10 @@ class PrivateSurface:
             conversation = isinstance(user_id, str) and user_id.startswith("conversation:")
             ident = conversation_id(user_id) if conversation else execution_id(user_id)
             resume_read = conversation and method == "POST" and re.fullmatch(r"/agents/galaxy-conversation-(?:overview|governance|messaging|discovery|maintenance)/runs/[A-Za-z0-9_-]{1,128}/resume", path)
-            current = self.runtime["gateway"].authorize(user_id, operation="read" if method == "GET" or resume_read else "run")
+            # The gateway performs blocking HTTP. Preserve its current check
+            # and ContextVars without stopping unrelated ASGI reads/streams.
+            current = await asyncio.to_thread(self.runtime["gateway"].authorize, user_id,
+                operation="read" if method == "GET" or resume_read else "run")
             row = current["execution"]
             scope.setdefault("state", {})["galaxy_execution"] = row
             scope["state"]["galaxy_user_id"] = user_id

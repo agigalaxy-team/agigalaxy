@@ -1,4 +1,5 @@
 """Native Agent sessions for a current management reader, not an automation grant."""
+import asyncio
 import json
 from agno.agent import Agent
 from agno.run.base import RunContext
@@ -78,10 +79,10 @@ def install_conversation_read(app, runtime, run_view):
         row, user_id = request.state.galaxy_execution, request.state.galaxy_user_id
         if row.get("mode") != "conversation" or row["id"] != ident:
             return JSONResponse({"error": "agentos_current_authority_denied"}, status_code=403)
-        before = runtime["gateway"].authorize(user_id, operation="read")
+        before = await asyncio.to_thread(runtime["gateway"].authorize, user_id, operation="read")
         if before.get("execution", {}).get("sessionId") != row["sessionId"]:
             return JSONResponse({"error": "agentos_current_authority_denied"}, status_code=403)
-        stored = runtime["db"].get_runs(session_id=row["sessionId"], user_id=user_id,
+        stored = await asyncio.to_thread(runtime["db"].get_runs, session_id=row["sessionId"], user_id=user_id,
             agent_id="galaxy-conversation-" + row["domain"], limit=50, page=1,
             sort_by="created_at", sort_order="desc")
         runs = [run_view(run) for run in stored]
@@ -89,7 +90,7 @@ def install_conversation_read(app, runtime, run_view):
             if str(run.get("status", "")).upper() == "ERROR":
                 # Raw provider errors and internal traces are not dialogue.
                 run["content"] = None
-        current = runtime["gateway"].authorize(user_id, operation="read")
+        current = await asyncio.to_thread(runtime["gateway"].authorize, user_id, operation="read")
         if current.get("execution", {}).get("sessionId") != row["sessionId"]:
             return JSONResponse({"error": "agentos_current_authority_denied"}, status_code=403)
         return {"conversationId": ident, "runs": sorted(runs, key=lambda x: x["createdAt"] or 0),

@@ -1,3 +1,4 @@
+import asyncio
 from functools import wraps
 
 from agno.run.authorization import current_authorization
@@ -40,12 +41,12 @@ def with_current_authority(model, gateway, *, admission=None):
 
     @wraps(ainvoke)
     async def achecked(*args, **kwargs):
-        current()
+        await asyncio.to_thread(current)
         with provider_call(model, count_calls) as first:
             if first:
                 await arecord_model_call(model)
             result = await ainvoke(*args, **kwargs)
-        current()
+        await asyncio.to_thread(current)
         return result
 
     @wraps(invoke_stream)
@@ -59,13 +60,13 @@ def with_current_authority(model, gateway, *, admission=None):
 
     @wraps(ainvoke_stream)
     async def astream(*args, **kwargs):
-        current()
+        await asyncio.to_thread(current)
         with provider_call(model, count_calls) as first:
             if first:
                 await arecord_model_call(model)
             async for chunk in ainvoke_stream(*args, **kwargs):
                 yield chunk
-        current()
+        await asyncio.to_thread(current)
 
     model.invoke, model.ainvoke = checked, achecked
     model.invoke_stream, model.ainvoke_stream = stream, astream
