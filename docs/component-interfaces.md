@@ -19,3 +19,9 @@
 `close` 继续终止整项工作，新写入必须包含 `terminationIntent: "terminate-task"`。历史 `closed` 不重开、旧事件字节不改写。缺少该字段的旧 `close` 只能查询已接受的原回执，不能自动补字段、转换为 stop-enrollment 或在 absent 后重发。新界面分别显示结束征集、取消与整单终止的影响；旧客户端得到明确拒绝，不能静默降级。
 
 事件及回执仍由 `task-schema-v2.mjs`、`task-owner-control-v2-schema.mjs` 定义，HTTP、MCP 和 Web 共用。并发仍按任务版本 CAS 和数据库锁处理；重复原事件回原回执，不增长第二份事实。部署此本地候选前应一起审阅 API 合同与客户端升级安排；此文不代表已经上线该合同。
+
+## Native 工具配对与受限动作
+
+Conversation 的 provider 原始工具ID仅服务原生SDK配对和后续模型请求；Node收到按当前run及完整provider值派生的短UUID5引用，公开元数据不带thought signature。Conversation持久化按同run的真实已存投影核对，不能只靠UUID形状或输入marker认定引用。Duty私有PAUSED记录保留继续原工具所需的原坐标，公开读取仍投影过滤。
+
+普通且事实已核实的既有消息计划可在真实角色、grant、策略、任务和CAS资格内发布/撤回；人工决定及未核实文案仍转人工。`jobs.cancel`、`jobs.retry`、`search.retry` 的typed命令与原操作恢复适配尚未接通，不因底层方法存在显示可用。生产值守保持关闭；本地合成链通过不等于已开启值守或实际投递。

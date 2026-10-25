@@ -21,7 +21,7 @@ from galaxy_agentos.conversation_tools import conversation_tools, _feedback_filt
 from galaxy_agentos.conversations import conversation_agents
 from galaxy_agentos.duty_continuation import call_reference
 from galaxy_agentos.gateway import AuthorityDenied, GalaxyGateway
-from galaxy_agentos.tool_call_ids import projected_tool_call_id, valid_tool_call_id
+from galaxy_agentos.tool_call_ids import conversation_call_reference, projected_tool_call_id, valid_tool_call_id
 
 
 @dataclass
@@ -106,7 +106,7 @@ class ToolCallIdContractTest(unittest.TestCase):
         call, result = self.execute(self.summary(self.gateway), opaque)
         self.assertEqual(result.status, "success")
         self.assertEqual(json.loads(result.result)["state"], "available")
-        self.assertEqual(self.requests[-1]["callId"], opaque)
+        self.assertEqual(self.requests[-1]["callId"], conversation_call_reference(self.context.run_id, opaque))
         self.assertEqual(self.requests[-1]["arguments"], {})
         self.assertEqual(call.call_id, opaque)
         self.assertEqual(len(self.requests), 1)
@@ -123,14 +123,14 @@ class ToolCallIdContractTest(unittest.TestCase):
                 self.assertEqual(result.status, "success")
                 tool_message = Message(role="tool", tool_call_id=call.call_id, content=result.result)
                 self.assertEqual(assistant.tool_calls[0]["id"], tool_message.tool_call_id)
-                self.assertEqual(self.requests[-1]["callId"], opaque)
+                self.assertEqual(self.requests[-1]["callId"], conversation_call_reference(self.context.run_id, opaque))
                 self.assertEqual(self.requests[-1]["arguments"], arguments)
                 self.assertTrue(valid_tool_call_id(opaque))
                 self.assertEqual(projected_tool_call_id(opaque), opaque)
         self.assertEqual(len(self.requests), len(identifiers))
 
     def test_invalid_call_id_is_distinct_closed_error_without_node_or_value_echo(self):
-        for value in ("", " x", "x ", "x y", "\t", "a\nb", "\x00", "\x1f", "\x7f", "银河", "x" * 201, None, 123):
+        for value in ("", " x", "x ", "x y", "\t", "a\nb", "\x00", "\x1f", "\x7f", "银河", "x" * 16385, None, 123):
             with self.subTest(kind=type(value).__name__):
                 self.assertFalse(valid_tool_call_id(value))
                 self.assertIsNone(projected_tool_call_id(value))

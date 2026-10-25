@@ -16,7 +16,7 @@ import httpx
 
 from galaxy_agentos.conversations import conversation_agents
 from galaxy_agentos.gateway import AuthorityDenied, GalaxyGateway
-from galaxy_agentos.tool_call_ids import rejected_tool_call_shape
+from galaxy_agentos.tool_call_ids import conversation_call_reference, rejected_tool_call_shape
 
 
 @dataclass
@@ -100,7 +100,7 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
     def test_invalid_id_logs_only_allowed_fields_and_unchanged_closed_exception(self):
         keys = {"code", "runId", "tool", "valueType", "stringLength", "hasWhitespace", "hasControl", "hasNonAscii", "isEmpty", "exceedsMaxLength"}
         fixtures = [None, "", "private-id-marker with-space", "private-id-marker\n", "private-id-marker银河",
-            "private-id-marker" + "x" * 201, {"private-id-marker": "private-value-marker"}]
+            "private-id-marker" + "x" * 16385, {"private-id-marker": "private-value-marker"}]
         for value in fixtures:
             with self.assertLogs("galaxy_agentos.gateway", level="WARNING") as logged:
                 with self.assertRaisesRegex(AuthorityDenied, "^agentos_tool_call_id_invalid$"):
@@ -146,7 +146,7 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
             self.assertIs(injected["run_context"], self.context)
             result = call.execute()
             self.assertEqual(result.status, "success")
-            self.assertEqual(self.requests[-1]["callId"], opaque)
+            self.assertEqual(self.requests[-1]["callId"], conversation_call_reference(self.context.run_id, opaque))
             self.assertEqual(self.requests[-1]["arguments"], {})
         self.assertEqual(len(self.requests), 4)
 
@@ -172,7 +172,7 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
         self.assertEqual(result.status, "success")
         self.assertEqual(call.call_id, opaque)
         self.assertEqual(call.arguments, {})
-        self.assertEqual(self.requests[0]["callId"], opaque)
+        self.assertEqual(self.requests[0]["callId"], conversation_call_reference(self.context.run_id, opaque))
         self.assertEqual(self.requests[0]["runId"], self.context.run_id)
 
 
