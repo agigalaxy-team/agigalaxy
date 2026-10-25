@@ -6,6 +6,6 @@
 
 AgentOS 依赖按 requirements.lock 固定，Agno 3.1.7 的 README 标明 Apache-2.0；实际二进制/镜像发布仍需携带对应分发原文与依赖材料。Model Gateway 的 `SOURCE.json` 固定 LiteLLM 上游；其 MIT 范围排除 enterprise，本目录 Dockerfile明确不安装 enterprise，并复制固定 upstream 的原许可和锁文件。`upstream-reference` 中保留的原文仅按其实际范围使用，不能用旧来源标记证明当前运行镜像。
 
-源码归档读取组件 catalog，把 apps/services 与包源、Java/FTL/Python/Dockerfile、锁文件、配置示例和 LICENSE/NOTICE/COPYING 纳入，排除实际环境文件、密钥、依赖树、输出、缓存和运行工件。它也按既有 service/source resource 清单检查必要资源；缺失直接失败。固定上游完整源码/大锁包按各组件获取合同准备，不把外部依赖树当作本仓库自有源码。
+源码归档读取组件 catalog，把 apps/services 与包源、Java/FTL/Python/Dockerfile、Java provider 注册描述、原生宿主脚本/清单、公开图片署名、锁文件、配置示例和 LICENSE/NOTICE/COPYING 纳入，排除实际环境文件、密钥、依赖树、输出、缓存和运行工件。它也按既有 service/source resource 清单检查必要资源；缺失直接失败。固定上游完整源码/大锁包按各组件获取合同准备，不把外部依赖树当作本仓库自有源码。`operations-stack/configuration.pilot.json` 属于具体主机配置，不随源码归档；使用实际配置加载器配合独立受保护配置，不能把原运行主机元数据当作通用默认。官网历史二进制下载按公开目录另行取得。
 
 归档是来源检查点；包内哈希只用于成员完整性和隔离解压校验，不证明法律权属、运行状态或发布授权。用户资料、私聊、模型提示词和业务数据不随代码许可或归档对外开放。
