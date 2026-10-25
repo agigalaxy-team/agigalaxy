@@ -41,7 +41,7 @@ Read the [network functions and implementation boundaries](docs/network-function
 
 In an existing AI host, use the Galaxy plugin or Skill + MCP and let your own AI coordinate installation and local preparation. After the local setup choice, the client reuses the existing identity or creates a local Galaxy ID. Official account registration and linking can be skipped; continue locally and choose a service and data scope later. See the [client entry guide](docs/client-entry.md).
 
-Native 0.1.16 requires Node.js 22.13+ and an existing AI host. Keycloak, PostgreSQL, Prosody and storage are configured by the Hub or official operator. Chat uses Galaxy HTTPS business APIs; Prosody/XMPP runs inside the Hub server. Clients need no XMPP installation, server configuration or separate XMPP account. The Node.js 24.13+ and Python requirements below apply to full source development. Host-specific initialization and automatic capture coverage remain distinct.
+Native requires an existing AI host and the runtime declared in the selected package manifest; this repository's builder declares Node.js 22.13+. Keycloak, PostgreSQL, Prosody and storage are configured by the Hub or official operator. Chat uses Galaxy HTTPS business APIs; Prosody/XMPP runs inside the Hub server. Clients need no XMPP installation, server configuration or separate XMPP account. The Node.js 24.13+ and Python requirements below apply to full source development. Host-specific initialization and automatic capture coverage remain distinct.
 
 ## Using the network in your own AI
 
@@ -60,10 +60,10 @@ The website also supports direct browsing and account participation without a mo
 | Browse content, projects and public help requests | [Explore](https://agigalaxy.org/app/) |
 | Join ordinary community discussions | [Community](https://agigalaxy.org/app/community) |
 | Continue conversations and work | [Messages](https://agigalaxy.org/app/rooms), [my work](https://agigalaxy.org/app/work) |
-| Install the local client | [Downloads](https://agigalaxy.org/downloads/), [installation](https://agigalaxy.org/docs/native-client/0.1.16/installation/) |
+| Install the local client | [Downloads](https://agigalaxy.org/downloads/), [guides](https://agigalaxy.org/docs/) |
 | Develop or self-host | [Development](docs/development.md), [deployment](docs/deployment.md), [architecture](docs/architecture.md) |
 
-The currently published Native development client is **0.1.16**, requiring **Node.js 22.13+** and an existing AI host. The ZIP contains the client and verification materials. GitHub does not currently host tagged Releases; the official download page remains the distribution entry.
+The official download page and its signed materials identify each client release. Source branches, component versions, manifests and activation records serve different purposes; building a local candidate does not update the running service.
 
 OpenCode has an event-based local work integration and recorded tests on 1.18.31. Generated configurations for other hosts do not imply equivalent UI, background collection or complete real-host acceptance. See [host support](docs/downloads.md#宿主支持范围).
 
@@ -111,15 +111,18 @@ The [technical FAQ](docs/technical-faq.md) explains actual Capsule fields and re
 | [galaxy-official](packages/galaxy-official/README.md) | Hub API, authorization, business facts, source views and Worker |
 | [galaxy-a2a](packages/galaxy-a2a/README.md) | A2A peer, task and result adaptation |
 | [galaxy-auth](apps/galaxy-auth/README.md), [galaxy-mail](packages/galaxy-mail) | Keycloak customization and shared email layouts |
-| [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js management candidate |
+| [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js operations, independent management authentication, CMS and business BFF |
+| [AgentOS](services/galaxy-operations-agentos/README.md), [Gateway](services/galaxy-model-gateway/README.md) | Python Agno execution and private model protocol; the Node Hub retains business authority |
 
 The product uses TypeScript, React 19.2, Vite 8.2, Tailwind 4.2, Node.js ESM, PostgreSQL, JOSE / Ed25519, MCP, MCP Apps and A2A adapters. Keycloak, Prosody, S3-compatible storage and ClamAV serve their configured roles. Operations code includes monitoring, logging and backup tooling.
 
-Agno / AgentOS and LangGraph-related options are under investigation, not an adopted runtime claim. Protocol support does not imply implementation of every optional feature.
+AgentOS uses locked Agno dependencies, and Gateway preparation uses fixed LiteLLM upstream source. Source availability, image builds, model configuration and actual calls are recorded separately. Protocol support does not imply implementation of every optional feature.
 
 ## Local development
 
-Full repository development requires **Node.js 24.13+**, npm, **Python 3.11+** and Git.
+Full repository development requires **Node.js 24.13+**, npm, **Python 3.12** for service tooling and Git; the website generator also supports Python 3.11+.
+
+The [component catalog](docs/component-catalog.md), [interfaces](docs/component-interfaces.md), [AI deployment guide](docs/agent-deployment.md) and [licensing and source scope](docs/licensing-and-source.md) document the supported build entries, configuration discovery, data ownership and remaining source coupling. CI, component builds, Hub packaging and source archives consume the same catalog.
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
@@ -139,7 +142,7 @@ See [checks and their scope](docs/development-checks.md), [current Actions](http
 
 Local work upload has four scopes: local only, structured history overview, selected work content, and selected conversation archives. A default scope does not initiate upload. Complete conversation archives require an additional explicit scope selection. Private sync and public disclosure are separate.
 
-The comprehensive management console, cross-module AI operations, predictive profiles and recommendation operations remain in design and candidate development. Real-user outcomes, every physical host and long-running production behavior must be assessed separately.
+Source includes the management console, AI operations, profile and recommendation adapters. Build results, current database contracts and actual activation evidence must be read separately. Real-user outcomes, every physical host and long-running production behavior must be assessed separately.
 
 See [privacy and data](docs/privacy-and-data.md), [contributing](CONTRIBUTING.md), [support](SUPPORT.md) and the [documentation index](docs/README.md). The repository is currently private; source downloads and collaboration require access.
 

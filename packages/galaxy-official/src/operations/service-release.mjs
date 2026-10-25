@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { migrations } from '../infrastructure/migrations.mjs';
 import { assertRecoveryReady } from '../infrastructure/recovery-state.mjs';
 import resources from '../../release-resources.json' with { type: 'json' };
+import components from '../../../../repository-components.json' with { type: 'json' };
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const label = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(value);
@@ -12,9 +13,30 @@ const safeName = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._
   && value.split('/').every(part => part && part !== '.' && part !== '..');
 const sourceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const migrationPath = 'packages/galaxy-official/src/infrastructure/migrations.mjs';
+export async function releaseImportResources(root,entries){
+  const queue=[...entries],found=new Set();
+  while(queue.length){
+    const name=queue.shift();if(found.has(name))continue;
+    if(!safeName(name))throw Error('Release import escaped repository.');
+    const source=join(root,name);
+    try{if(!(await lstat(source)).isFile()||await realpath(source)!==resolve(source))throw Error('Not a regular source file.');}
+    catch{throw Object.assign(Error('Missing release import resource.'),{code:'release_resource_missing',resource:name});}
+    found.add(name);if(!/\.(mjs|js)$/.test(name))continue;
+    const code=await readFile(source,'utf8');
+    for(const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"](\.[^'"]+)['"]/g)){
+      if(match[1].includes('${'))continue;
+      const absolute=resolve(dirname(source),match[1]);
+      const relative=absolute.slice(resolve(root).length+1).replaceAll('\\','/');
+      if(!absolute.startsWith(resolve(root)+'/')&&!absolute.startsWith(resolve(root)+'\\'))throw Error('Release import escaped repository.');
+      queue.push(relative);
+    }
+  }
+  return[...found];
+}
 
 async function sourceFiles(root) {
-  const files = [...resources.service];
+  const family=components.components.find(item=>item.id==='hub'&&item.kind==='service-family');
+  const files = [...resources.service,'repository-components.json',...await releaseImportResources(root,Object.values(family.entries))];
   async function walk(relative, extension) {
     for (const item of await readdir(join(root, relative), { withFileTypes: true })) {
       if (item.isSymbolicLink()) throw new Error('Release source symlink rejected.');
@@ -39,8 +61,7 @@ export async function createServiceRelease({ directory, releaseId, configuration
   }
   const manifest = { version: 1, kind: 'galaxy-official-service-release', releaseId, configurationVersion,
     createdAt: new Date().toISOString(), minimumNode: '24.13.0',
-    entries: { api: 'packages/galaxy-official/src/server.mjs', worker: 'packages/galaxy-official/src/worker.mjs',
-      migration: 'packages/galaxy-official/src/migrate.mjs' },
+    component:'hub',entries: components.components.find(item=>item.id==='hub'&&item.kind==='service-family').entries,
     migrations: migrations.map(item => ({ version: item.version, sha256: sha(item.sql) })), files: {} };
   await mkdir(directory, { mode: 0o700 });
   for (const name of await sourceFiles(sourceDirectory)) {

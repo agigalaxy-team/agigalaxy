@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/BerriAI/litellm",
+  "commit": "230f653523fa55aa446e1a5b6469f0871cf7278d",
+  "sourceVersion": "1.108.0",
+  "lock": "upstream/uv.lock",
+  "packageSource": "fixed-git-source",
+  "license": "MIT outside enterprise directory",
+  "enterpriseInstalled": false,
+  "modelConfiguration": "empty",
+  "runtimeActivated": false
+}

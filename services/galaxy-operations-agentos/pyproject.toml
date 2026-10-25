@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "galaxy-operations-agentos"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+description = "Private native Agno runtime behind Galaxy operations authority"
+dependencies = [
+  "agno[os,postgres]==3.1.7",
+  "SQLAlchemy==2.1.5",
+  "aiosqlite==0.22.1",
+  "httpx==0.28.1",
+  "PyJWT==2.15.1",
+  "openai==3.37.0",
+  "opentelemetry-sdk==1.45.1",
+  "openinference-instrumentation-agno==1.0.15",
+]
+
+[project.scripts]
+galaxy-agentos = "galaxy_agentos.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

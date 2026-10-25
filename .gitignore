@@ -20,6 +20,10 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.p12
+*.pfx
+*.pgpass
 
 # debug
 npm-debug.log*
@@ -29,6 +33,10 @@ yarn-error.log*
 
 # local environment
 .env*
+!**/.env.example
+.venv/
+/.openai/
+/.opencode/
 
 # deployment and generated files
 .vercel

@@ -22,6 +22,7 @@
     "packages/galaxy-official/scripts/incident-notices.mjs",
     "packages/galaxy-official/scripts/runtime-config-audit.mjs",
     "packages/galaxy-official/scripts/service-release.mjs",
+    "packages/galaxy-official/deploy/service-release-host.mjs",
     "packages/galaxy-official/scripts/prepare-linux.mjs",
     "packages/galaxy-official/scripts/prepare-caddy-candidate.mjs",
     "packages/galaxy-official/deploy/caddy-candidate.mjs",

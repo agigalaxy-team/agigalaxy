@@ -25,6 +25,8 @@
 
 这个仓库包含官网、网页工作区、客户端、Hub 业务服务及协议适配，当前处于 **Beta 开发阶段**。已有实际发行，也有继续建设的运营和生态能力；具体范围见[项目状态](docs/project-status.md)。
 
+开发与独立部署入口见[组件目录与局部构建](docs/component-catalog.md)、[配置和接口](docs/component-interfaces.md)、[AI Agent 部署说明](docs/agent-deployment.md)及[许可与源码范围](docs/licensing-and-source.md)。源码目录的边界、现有跨目录引用和运行服务边界分别列明，组件之间继续使用既有合同。
+
 完整源码与开发资料在本仓库维护；对外介绍另有[可匿名访问的公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)。本页和下列专题同步解释同一项目，源码访问与公开阅读各按实际权限处理。AI 或抓取工具可直接使用[合并阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，或阅读仓库内的 [llms.txt](llms.txt) 和 [llms-full.txt](llms-full.txt)。
 
 ## 冷启动、贡献与共同建设
@@ -60,7 +62,7 @@ MCP、A2A 等协议是接入与协作基础。银河复用它们，在其上组�
 
 ![网站、客户端与 Hub 运维的职责](docs/assets/client-entry.svg)
 
-Keycloak、PostgreSQL、Prosody 和相应存储由所用服务的维护者部署。当前 Native 0.1.16 的实际前置条件是已有 AI 宿主和 Node.js 22.13+；OpenCode 已有同次安装准备本机身份的路径，其他宿主按实际插件或 MCP／Skill 支持完成。详见[客户端入门](docs/client-entry.md)。
+Keycloak、PostgreSQL、Prosody 和相应存储由所用服务的维护者部署。原生客户端需要已有 AI 宿主，准确运行时要求以所选发行包的 manifest 为准；本仓库 Native builder 声明 Node.js 22.13+。OpenCode 已有同次安装准备本机身份的路径，其他宿主按实际插件或 MCP／Skill 支持完成。详见[客户端入门](docs/client-entry.md)。
 
 ## 在自己的 AI 中怎样使用
 
@@ -100,12 +102,12 @@ Keycloak、PostgreSQL、Prosody 和相应存储由所用服务的维护者部署
 
 | 想取得什么 | 入口 | 说明 |
 |---|---|---|
-| 银河客户端 | [官网下载页](https://agigalaxy.org/downloads/) · [0.1.16 安装 ZIP](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip) | 当前公开开发版；需要 Node.js **22.13+** 和已有 AI 宿主 |
-| 安装与升级 | [当前安装指南](https://agigalaxy.org/docs/native-client/0.1.16/installation/) · [仓库内说明](docs/downloads.md) | ZIP 内含客户端、发行材料与核验程序；升级沿用原资料目录 |
-| 当前分支源码 | [下载 main ZIP](https://github.com/agigalaxy-team/agigalaxy/archive/refs/heads/main.zip) · [Git 克隆](docs/development.md#取得源码) | 需要仓库访问权限；源码快照与客户端安装包分别使用 |
+| 银河客户端 | [官网下载页](https://agigalaxy.org/downloads/) | 按所选发行包的运行时要求安装，并使用已有 AI 宿主 |
+| 安装与升级 | [官网指南](https://agigalaxy.org/docs/) · [仓库内说明](docs/downloads.md) | ZIP 内含客户端、发行材料与核验程序；升级沿用原资料目录 |
+| 远端已提交源码 | [下载 main ZIP](https://github.com/agigalaxy-team/agigalaxy/archive/refs/heads/main.zip) · [Git 克隆](docs/development.md#取得源码) | 需要仓库访问权限；main、开发分支、本地候选与已部署制品分别核对 |
 | 自行运行服务 | [部署指南](docs/deployment.md) | 分别配置数据库、信任材料、认证、聊天与存储；前端预览不启动完整服务 |
 
-GitHub 当前没有正式 Release 或版本标签，客户端发行以官网下载页及其签名材料为准。后续版本变化时，优先从官网下载页取得当前入口。
+客户端发行以官网下载页及其签名材料为入口。源码分支、组件版本、包内 manifest 和实际激活记录共同确定一次发行；本地构建不会自动更新线上服务。
 
 [![银河客户端下载实际页面](docs/assets/website-downloads.jpg)](https://agigalaxy.org/downloads/)
 
@@ -124,7 +126,8 @@ GitHub 当前没有正式 Release 或版本标签，客户端发行以官网下�
 | [galaxy-official](packages/galaxy-official/README.md) | Hub 服务：主体、权限、社区、通信协调、工作事实、资料来源与数据管理 |
 | [galaxy-a2a](packages/galaxy-a2a/README.md) | A2A 对端、任务与结果适配；外部报告和本地判断分别保留 |
 | [galaxy-auth](apps/galaxy-auth/README.md) / [galaxy-mail](packages/galaxy-mail) | Keycloak 主题及验证码扩展、共享 HTML / 纯文本邮件布局 |
-| [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js 运营管理候选，管理认证和业务数据分别接线，仍在建设 |
+| [galaxy-admin](apps/galaxy-admin/README.md) | Payload / Next.js 运营后台，独立管理认证、CMS 与业务 BFF |
+| [AgentOS](services/galaxy-operations-agentos/README.md) / [Gateway](services/galaxy-model-gateway/README.md) | Python Agno 执行与私有模型协议，Node Hub 保持业务权威，模型由人配置 |
 | [运行工具](packages/galaxy-official/deploy) | Linux、反向代理、Prosody、监控日志、备份与恢复相关配置及编排 |
 
 从原始愿景到五层职责、客户端与网络的配合见[项目愿景与架构](docs/vision-and-architecture.md)，具体实现与源码地图见[架构说明](docs/architecture.md)。根目录 `app/` 为早期演示，当前产品网页入口为 `packages/galaxy-web/src/main.tsx`。
@@ -165,29 +168,29 @@ Hub 可以由企业、社区或服务提供者独立组织参与者、规则、�
 
 原始模块规划包括 `galaxy-core-spec`、`galaxy-sdk`、`galaxy-edge-core`、`galaxy-worker`、`galaxy-hub-core`、`galaxy-bridge` 和 `galaxy-conformance`。它们分别承担共同语义、接入、本机工作、专业执行、Hub、外部映射和兼容检查；这是逻辑分工，尚未全部形成独立公开软件包。
 
-银河复用 Keycloak、PostgreSQL、Prosody、S3 兼容存储及 ClamAV 等基础，正在整合 Payload / Next.js、pg-boss 和运行工具。银河开发重点是网络业务、来源、权限与完整使用过程，各组件的“已接入、工程选择、仍待验证”见[开放组件与当前交付](docs/open-components.md)。Native 选定发行组件的 Apache-2.0 范围与整个核心项目的许可分别核对，不因整理介绍而扩大授权。
+银河复用 Keycloak、PostgreSQL、Prosody、S3 兼容存储及 ClamAV 等基础，并包含 Payload / Next.js、pg-boss 和运行工具的接入实现。银河开发重点是网络业务、来源、权限与完整使用过程。实际组件入口、依赖、构建边界和拆分前置条件见[组件目录](docs/component-catalog.md)。Native 选定发行组件的 Apache-2.0 范围与整个核心项目的许可分别核对，不因整理介绍而扩大授权。
 
 ## 技术栈
 
-以下是完整源码的开发、服务端和客户端组件地图，版本来自仓库清单，服务端实际运行版本另外记录。普通客户端使用者只准备所选宿主与发行运行时；认证、数据库、聊天、存储与备份由相应服务维护者配置。Node.js 24.13+ 和 Python 属于下方完整源码开发要求，Native 0.1.16 的客户端运行要求另为 Node.js 22.13+。
+以下是完整源码的开发、服务端和客户端组件地图，版本来自仓库清单，服务端实际运行版本另外记录。普通客户端使用者只准备所选宿主与发行运行时；认证、数据库、聊天、存储与备份由相应服务维护者配置。完整源码开发与原生客户端的运行时要求分别列明。
 
 | 层面 | 技术 |
 |---|---|
-| 完整源码开发运行时 | Node.js **24.13+**；Python **3.11+** 用于官网构建 |
+| 完整源码开发运行时 | Node.js **24.13+**；Python **3.12** 用于服务工具链，官网生成器支持 **3.11+** |
 | 产品网页 | TypeScript 5.9、React 19.2、Vite 8.2、Tailwind CSS 4.2、Base UI、shadcn、Lucide |
 | 服务与数据 | Node.js ESM、PostgreSQL / `pg`、Zod、pg-boss；PGlite 用于部分隔离测试 |
 | 本地资料 | 文件持久化、SQLite 及版本化工作 / 会话记录 |
 | 身份与签名 | Ed25519、JOSE、规范化 JSON；OIDC / OAuth、Keycloak 主题与扩展 |
 | AI 与 Agent | 用户自带模型；MCP、MCP Apps、A2A SDK 与宿主适配 |
 | Hub／官方服务端聊天与文件 | Prosody / XMPP（服务器内部聊天与归档）、S3 兼容适配、Garage 选型、ClamAV 扫描；由服务维护者配置，客户端经银河 HTTPS 业务接口使用 |
-| 运营后台候选 | Payload 3.91、Next.js 16.4、独立管理 OIDC 与 PostgreSQL CMS 数据库 |
+| 运营后台 | Payload 3.91、Next.js 16.4、独立管理 OIDC 与 PostgreSQL CMS 数据库 |
 | 部署与运行工具 | Caddy、systemd、Docker Compose；Prometheus、Alertmanager、Grafana OSS、Loki、Alloy、restic、pgBackRest 的配置与编排 |
 
-协议接入不表示实现全部可选能力；生成宿主配置不表示完成所有实际宿主验收。Agno / AgentOS、LangGraph 等仍在研究，未列为已采用的运行引擎。
+协议接入不表示实现全部可选能力；生成宿主配置不表示完成所有实际宿主验收。AgentOS 的现有实现采用锁定的 Agno 依赖，Gateway 按固定 LiteLLM 上游准备；源代码、镜像构建、模型配置和实际调用分别记录。
 
 ## 本地开发
 
-准备 Node.js **24.13+**、npm、Python **3.11+** 和 Git，在仓库根目录运行：
+准备 Node.js **24.13+**、npm、Python **3.12** 和 Git，在仓库根目录运行：
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
@@ -220,7 +223,7 @@ node --test <相关测试文件>
 - 本地工作上传有“仅本机、履历概况、工作内容、会话归档”四档；默认档位不等于已经接入或开始上传。完整会话还需要明确选择相应范围。
 - 私有同步与对外公开分别处理。源内容撤回、权限到期或当前权限无法核实时，受控读取按实际规则停止。
 - 自述、宿主观察、模型整理、对端报告和技术核验各自保留来源。一次工具执行结束不自动代表问题解决。
-- 官网、浏览器参与及 Native 已有发行；全面运营后台、跨模块 AI 策略、画像与推荐运营仍在设计和候选建设中。
+- 源码包含官网、浏览器参与、Native、运营后台、AI 策略、画像与推荐接入；各组件的构建、数据合同和运行观察分别记录，不能从目录存在推定整条业务已验收。
 - 真实用户效果、长期运行及全部物理宿主覆盖继续核实，不以合成数据和协议检查替代。
 
 继续阅读[项目与能力说明](docs/project-overview.md)、[数据与权限](docs/privacy-and-data.md)、[状态及后续方向](docs/project-status.md)。

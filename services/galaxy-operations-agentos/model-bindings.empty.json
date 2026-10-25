@@ -1,0 +1,10 @@
+{
+  "version": "unconfigured-v1",
+  "scenarios": {
+    "overview": null,
+    "governance": null,
+    "messaging": null,
+    "discovery": null,
+    "maintenance": null
+  }
+}

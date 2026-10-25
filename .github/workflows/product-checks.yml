@@ -1,4 +1,4 @@
-name: Product build and integration checks
+name: Component builds and integration checks
 
 on:
   pull_request:
@@ -14,7 +14,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  product:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+      - id: plan
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if test -n "$BASE" && test "$BASE" != 0000000000000000000000000000000000000000; then
+            node scripts/components.mjs plan --base "$BASE" --output component-plan.json
+          else
+            node -e "require('fs').writeFileSync('component-inputs.json',JSON.stringify(['repository-components.json']))"
+            node scripts/components.mjs plan --files component-inputs.json --output component-plan.json
+          fi
+          node -e "let p=require('./component-plan.json');require('fs').appendFileSync(process.env.GITHUB_OUTPUT,'matrix='+JSON.stringify({include:p.include})+'\n')"
+  component:
+    needs: plan
+    if: needs.plan.outputs.matrix != '{"include":[]}'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -24,21 +52,20 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            packages/galaxy-official/package-lock.json
-            packages/galaxy-a2a/package-lock.json
-            integrations/native-v2/compact-app/package-lock.json
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-      - run: npm run setup
-      - run: npm run lint
-      - run: node node_modules/typescript/bin/tsc --noEmit
-      - run: npm run build
-      - run: npm run test:core
-      - name: Task material permissions and browser client
+      - if: matrix.component != 'agentos' && matrix.component != 'model-gateway' && matrix.component != 'discovery'
+        run: npm run setup
+      - if: matrix.component == 'admin'
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin
+      - run: node scripts/components.mjs check --component ${{ matrix.component }} --output outputs/check-${{ matrix.component }}
+      - run: node scripts/components.mjs build --component ${{ matrix.component }} --output outputs/build-${{ matrix.component }}
+      - if: matrix.component == 'web'
+        run: node node_modules/typescript/bin/tsc --noEmit
+      - if: matrix.component == 'hub' || matrix.component == 'contracts'
         run: node --test --test-concurrency=2 packages/galaxy-official/test/task-material-*.test.mjs packages/galaxy-web/test/task-material-client.test.mjs
-      - name: Normal client setup and native bridge
-        run: node --test integrations/native-v2/setup.test.mjs integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs
+      - if: matrix.component == 'hub'
+        run: node --test packages/galaxy-official/test/service-release-host.test.mjs
+      - if: matrix.component == 'hub'
+        run: python scripts/create-release-baseline.py

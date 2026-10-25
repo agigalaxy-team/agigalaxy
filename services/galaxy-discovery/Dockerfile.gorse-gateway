@@ -1,0 +1,6 @@
+FROM node:24.13.0-alpine
+WORKDIR /app
+COPY gorse-gateway.mjs ./
+USER node
+EXPOSE 8080
+CMD ["node", "gorse-gateway.mjs"]

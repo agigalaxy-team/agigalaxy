@@ -6,6 +6,9 @@
     "node": ">=24.13.0"
   },
   "scripts": {
+    "components": "node scripts/components.mjs",
+    "build:component": "node scripts/components.mjs build",
+    "check:component": "node scripts/components.mjs check",
     "check:requirements": "node scripts/check-requirements.mjs",
     "dev": "vite --config packages/galaxy-web/vite.config.mjs",
     "build": "node scripts/build-product.mjs",

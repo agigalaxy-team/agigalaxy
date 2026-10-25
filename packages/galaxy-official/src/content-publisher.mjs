@@ -9,6 +9,8 @@ import {assertSupportedSchema} from './infrastructure/migrations.mjs';
 import {createRuntimeLogger,consoleRuntimeLogger,runtimeLogConfiguration,installRuntimeFailureHandlers} from './operations/runtime-log.mjs';
 import {createShutdownDeadline} from './shutdown-deadline.mjs';
 import {readFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {runtimeServiceRelease} from './operations/service-release.mjs';
 
 let db,jobs,worker,stopPromise;
 let runtimeLog=consoleRuntimeLogger('content-publisher',{destination:process.stderr,environment:process.env.GALAXY_ENVIRONMENT});
@@ -34,7 +36,8 @@ try{
   await runtimeLog.close();runtimeLog=configuredLog;
   // Same captured API source, separate entry point. Read release metadata only.
   stage='release';
-  const release=await readFile(new URL('../../../service-release.json',import.meta.url),'utf8').then(text=>JSON.parse(text).releaseId,()=>null);
+  const pinned=await runtimeServiceRelease(process.env,'publisher',fileURLToPath(import.meta.url));
+  const release=pinned?.releaseId??await readFile(new URL('../../../service-release.json',import.meta.url),'utf8').then(text=>JSON.parse(text).releaseId,()=>null);
   runtimeLog.updateContext({release,environment:process.env.GALAXY_ENVIRONMENT});
   stage='publisher-config';
   const config=await loadContentPublisherConfiguration(process.env.GALAXY_CONTENT_PUBLISHER_CONFIG_FILE);

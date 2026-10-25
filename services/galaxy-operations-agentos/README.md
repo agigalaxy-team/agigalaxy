@@ -1,5 +1,11 @@
 # Galaxy operations AgentOS
 
+## Local isolated tests
+
+Build from the repository context with `docker build -f services/galaxy-operations-agentos/Dockerfile .`. The pinned lock and empty model bindings are explicit source inputs. Docker's selected default check does not use a persistence database or a real provider.
+
+Before Native persistence tests, run `python -m unittest discover -s services/galaxy-operations-agentos/tests -p test_database_contract.py -v`. The actual persistence suite requires all four process variables `GALAXY_AGENTOS_TEST_DATABASE_URL`, `GALAXY_AGENTOS_TEST_DATABASE_NAME`, `GALAXY_AGENTOS_TEST_ROLE`, `GALAXY_AGENTOS_TEST_SCHEMA`; names use the dedicated `galaxy_agentos_test_` prefix, loopback and an explicit port. Use a dedicated cluster/database with a restricted owning login role. No runtime URL fallback exists. The suite first probes actual database/user, dangerous privileges, memberships and target ownership through a read-only connection, then gives that confirmed target to Agno. Run the persistence suite only after provisioning that explicit test target. Protected runtime credentials are never test inputs.
+
 This service uses the fixed **Agno 3.1.7** (Apache-2.0) AgentOS, its native session/run persistence, durable queue, HumanReview pause/continue, and native OpenTelemetry database export. Galaxy does not implement another workflow engine or a second business permission authority. The installed dependency contract is [requirements.lock](requirements.lock) and [pyproject.toml](pyproject.toml); the image entry is `python -m galaxy_agentos.app`.
 
 The source defaults to **no configured model**. A model becomes callable only through an explicit human-managed scene binding to the private native LiteLLM Proxy, with the required data-policy and runtime profile. Agno never selects a provider, changes a key, borrows an ambient personal key or falls back to its default OpenAI model. A default is not a statement about the current server: deployed model state is read from the protected metadata API, not inferred from this README or the shipped empty binding example.

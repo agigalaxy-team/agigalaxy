@@ -1,0 +1,463 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "id": "contracts",
+      "kind": "library",
+      "roots": [
+        "packages/galaxy-official/src/shared"
+      ],
+      "files": [
+        "packages/galaxy-official/src/browser-client.mjs",
+        "packages/galaxy-official/src/operations-permission-catalog.mjs"
+      ],
+      "dependsOn": [],
+      "build": [],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "packages/galaxy-official/test/task-enrollment-v2.test.mjs"
+        ]
+      ]
+    },
+    {
+      "id": "core",
+      "kind": "library",
+      "roots": [
+        "packages/galaxy-core"
+      ],
+      "dependsOn": [],
+      "build": [],
+      "checks": [
+        [
+          "{node}",
+          "scripts/check.mjs",
+          "core"
+        ]
+      ]
+    },
+    {
+      "id": "mail",
+      "kind": "library",
+      "roots": [
+        "packages/galaxy-mail"
+      ],
+      "dependsOn": [],
+      "build": [],
+      "checks": []
+    },
+    {
+      "id": "hub",
+      "kind": "service-family",
+      "roots": [
+        "packages/galaxy-official"
+      ],
+      "dependsOn": [
+        "contracts",
+        "core",
+        "mail"
+      ],
+      "entries": {
+        "api": "packages/galaxy-official/src/server.mjs",
+        "worker": "packages/galaxy-official/src/worker.mjs",
+        "migration": "packages/galaxy-official/src/migrate.mjs",
+        "publisher": "packages/galaxy-official/src/content-publisher.mjs"
+      },
+      "build": [
+        [
+          "{node}",
+          "packages/galaxy-official/scripts/service-release.mjs",
+          "capture",
+          "{output}",
+          "local-review",
+          "local-review",
+          "{receipt}"
+        ]
+      ],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "packages/galaxy-official/test/operations-auth-root-lifecycle.test.mjs",
+          "packages/galaxy-official/test/task-fact-client-v2.test.mjs"
+        ]
+      ]
+    },
+    {
+      "id": "native-client",
+      "kind": "client",
+      "roots": [
+        "packages/galaxy-node",
+        "packages/galaxy-edge-mcp",
+        "integrations/native-v2",
+        "integrations/host-adapters"
+      ],
+      "dependsOn": [
+        "core",
+        "contracts"
+      ],
+      "build": [
+        [
+          "{node}",
+          "integrations/native-v2/compact-app/build.mjs"
+        ],
+        [
+          "{node}",
+          "scripts/build-native-v2.mjs",
+          "{output}"
+        ]
+      ],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "integrations/native-v2/setup.test.mjs",
+          "integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs"
+        ]
+      ],
+      "buildLimit": "Unsigned local source candidate. Dependency installation, license inventory and physical host acceptance remain separate."
+    },
+    {
+      "id": "a2a",
+      "kind": "client",
+      "roots": [
+        "packages/galaxy-a2a"
+      ],
+      "dependsOn": [
+        "core",
+        "contracts",
+        "native-client"
+      ],
+      "build": [],
+      "checks": [
+        [
+          "{node}",
+          "scripts/check.mjs",
+          "a2a"
+        ]
+      ]
+    },
+    {
+      "id": "web",
+      "kind": "frontend",
+      "roots": [
+        "packages/galaxy-web",
+        "components",
+        "hooks",
+        "lib"
+      ],
+      "dependsOn": [
+        "contracts",
+        "core",
+        "native-client"
+      ],
+      "build": [
+        [
+          "{node}",
+          "node_modules/vite/bin/vite.js",
+          "build",
+          "--config",
+          "packages/galaxy-web/vite.config.mjs",
+          "--configLoader",
+          "native",
+          "--outDir",
+          "{output}"
+        ]
+      ],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "packages/galaxy-official/test/task-owner-control-client-continuity.test.mjs"
+        ]
+      ]
+    },
+    {
+      "id": "site",
+      "kind": "frontend",
+      "roots": [
+        "apps/galaxy-site",
+        "public",
+        "app"
+      ],
+      "dependsOn": [
+        "web",
+        "contracts"
+      ],
+      "build": [
+        [
+          "{node}",
+          "scripts/build-product.mjs",
+          "--site-only",
+          "--web-dist",
+          "{webOutput}",
+          "--output",
+          "{output}"
+        ]
+      ],
+      "checks": []
+    },
+    {
+      "id": "auth",
+      "kind": "frontend",
+      "roots": [
+        "apps/galaxy-auth"
+      ],
+      "dependsOn": [
+        "mail",
+        "web"
+      ],
+      "build": [
+        [
+          "{node}",
+          "apps/galaxy-auth/build.mjs",
+          "--out",
+          "{output}"
+        ]
+      ],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "apps/galaxy-auth/shared/galaxy-auth.test.mjs"
+        ]
+      ]
+    },
+    {
+      "id": "admin",
+      "kind": "frontend",
+      "roots": [
+        "apps/galaxy-admin"
+      ],
+      "dependsOn": [
+        "contracts"
+      ],
+      "cwd": "apps/galaxy-admin",
+      "build": [
+        [
+          "{node}",
+          "node_modules/next/dist/bin/next",
+          "build"
+        ]
+      ],
+      "checks": []
+    },
+    {
+      "id": "agentos",
+      "kind": "service",
+      "roots": [
+        "services/galaxy-operations-agentos"
+      ],
+      "dependsOn": [],
+      "interfaces": [
+        "Node authority HTTP/service-key + JWT",
+        "Native AgentOS private HTTP/SSE"
+      ],
+      "build": [
+        [
+          "{python}",
+          "scripts/compile-python-source.py",
+          "services/galaxy-operations-agentos/src",
+          "{output}"
+        ]
+      ],
+      "buildLimit": "Python source compilation; Docker image and persistence checks are separate.",
+      "checks": [
+        [
+          "{python}",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "services/galaxy-operations-agentos/tests",
+          "-p",
+          "test_database_contract.py",
+          "-v"
+        ]
+      ]
+    },
+    {
+      "id": "model-gateway",
+      "kind": "service",
+      "roots": [
+        "services/galaxy-model-gateway"
+      ],
+      "dependsOn": [],
+      "interfaces": [
+        "OpenAI/Anthropic/Ollama compatible private HTTP",
+        "Node model-setting apply/readback"
+      ],
+      "build": [
+        [
+          "{python}",
+          "scripts/compile-python-source.py",
+          "services/galaxy-model-gateway/src",
+          "{output}"
+        ]
+      ],
+      "buildLimit": "Python source compilation; pinned upstream download and Docker build are separate.",
+      "checks": []
+    },
+    {
+      "id": "discovery",
+      "kind": "service-adapter",
+      "roots": [
+        "services/galaxy-discovery"
+      ],
+      "dependsOn": [],
+      "build": [],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "services/galaxy-discovery/test/gorse-gateway-pagination.test.mjs"
+        ]
+      ]
+    }
+  ],
+  "globalInputs": [
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "repository-components.json",
+    "scripts/components.mjs",
+    "scripts/compile-python-source.py",
+    "scripts/build-product.mjs",
+    "scripts/create-release-baseline.py",
+    ".github/workflows/product-checks.yml"
+  ],
+  "sourceRoots": [
+    "apps",
+    "services",
+    "packages",
+    "integrations",
+    "scripts",
+    "docs",
+    "public",
+    "components",
+    "hooks",
+    "lib",
+    "app",
+    ".github"
+  ],
+  "sourceFiles": [
+    "README.md",
+    "README.en.md",
+    "CONTRIBUTING.md",
+    "MAINTAINERS.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "MANIFESTO.md",
+    "llms.txt",
+    "llms-full.txt",
+    "AGENTS.md",
+    ".editorconfig",
+    ".gitignore",
+    ".gitattributes",
+    ".dockerignore",
+    "package.json",
+    "package-lock.json",
+    "repository-components.json",
+    "tsconfig.json",
+    "next-env.d.ts",
+    "components.json",
+    "vite.config.ts",
+    "next.config.ts",
+    ".oxlintrc.json",
+    ".oxfmtrc.json"
+  ],
+  "sourceExtensions": [
+    ".mjs",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".css",
+    ".scss",
+    ".py",
+    ".md",
+    ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".sql",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".lock",
+    ".ftl",
+    ".java",
+    ".xml",
+    ".properties",
+    ".txt",
+    ".lua",
+    ".patch",
+    ".sh",
+    ".conf",
+    ".service",
+    ".timer",
+    ".example",
+    ".html",
+    ".htm",
+    ".ps1",
+    ".swift",
+    ".plist",
+    ".cmd",
+    ".bat",
+    ".cjs",
+    ".mts",
+    ".cts",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf"
+  ],
+  "sourceExcludedDirectories": [
+    "node_modules",
+    "outputs",
+    "dist",
+    ".next",
+    ".git",
+    ".openai",
+    ".opencode",
+    "__pycache__",
+    ".venv",
+    ".cache",
+    "artifacts"
+  ],
+  "requiredSourceResources": [
+    "apps/galaxy-admin/package.json",
+    "apps/galaxy-admin/package-lock.json",
+    "apps/galaxy-admin/.env.example",
+    "apps/galaxy-auth/build.mjs",
+    "apps/galaxy-site/build.py",
+    "apps/galaxy-site/release-data.json",
+    "apps/galaxy-site/public-archive.json",
+    "apps/galaxy-site/public-reading-contract.json",
+    "apps/galaxy-site/workspace-navigation.json",
+    "public/images/examples/credits.json",
+    "public/images/external/credits.json",
+    "packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1",
+    "packages/galaxy-edge-mcp/src/native-v2/notifications/macos-helper/Info.plist",
+    "packages/galaxy-edge-mcp/src/native-v2/notifications/macos-helper/GalaxyNotifications.swift",
+    "integrations/native-v2/host-capabilities.json",
+    "integrations/native-v2/codex/galaxy-native-v2/.mcp.json",
+    "integrations/native-v2/codex/galaxy-native-v2/.codex-plugin/plugin.json",
+    "integrations/codex/plugins/galaxy-integration-pack/.mcp.json",
+    "integrations/codex/plugins/galaxy-integration-pack/.codex-plugin/plugin.json",
+    "services/galaxy-operations-agentos/Dockerfile",
+    "services/galaxy-operations-agentos/pyproject.toml",
+    "services/galaxy-operations-agentos/requirements.lock",
+    "services/galaxy-operations-agentos/runtime.env.example",
+    "services/galaxy-model-gateway/Dockerfile",
+    "services/galaxy-model-gateway/SOURCE.json",
+    "services/galaxy-model-gateway/config/models.empty.yaml",
+    "docs/component-catalog.md",
+    "docs/licensing-and-source.md"
+  ],
+  "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog."
+}
