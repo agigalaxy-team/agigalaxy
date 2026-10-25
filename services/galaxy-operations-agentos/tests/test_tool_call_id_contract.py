@@ -177,7 +177,7 @@ class ToolCallIdContractTest(unittest.TestCase):
     def test_feedback_query_is_rejected_without_dropping_it_or_leaking_values(self):
         query = conversation_tools(self.gateway)[0]
         call, result = self.execute(query, "provider/feedback:1", {"module": "feedback", "view": "list",
-            "filters": {"query": "synthetic-private-query-marker"}})
+            "filters": {"days": 7, "query": "synthetic-private-query-marker"}})
         self.assertEqual(result.status, "success")
         feedback = json.loads(result.result)
         self.assertEqual(feedback["state"], "invalid-request")
@@ -197,7 +197,7 @@ class ToolCallIdContractTest(unittest.TestCase):
 
     def test_feedback_valid_metadata_is_forwarded_unchanged_and_prose_requires_selected_read(self):
         query, read = conversation_tools(self.gateway)[:2]
-        for filters in ({}, {"category": "unclassified", "module": "other", "state": "pending", "days": 28,
+        for filters in ({"days": 7}, {"category": "unclassified", "module": "other", "state": "pending", "days": 28,
                 "after": "9223372036854775807", "limit": 25}, {"days": "all", "limit": 100}):
             _, result = self.execute(query, "provider/metadata:1", {"module": "feedback", "view": "list", "filters": filters})
             self.assertEqual(result.status, "success")

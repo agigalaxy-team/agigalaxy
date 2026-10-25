@@ -223,7 +223,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             node = NodeTransport(row)
             gateway = GalaxyGateway(settings(), transport=httpx.MockTransport(node))
             self.addCleanup(gateway.close)
-            plan = [("query_operations", {"module": "content", "view": "list", "filters": {},
+            plan = [("query_operations", {"module": "content", "view": "list", "filters": {"days": 7},
                         "fc": {"call_id": "forged-by-model"}, "run_context": {"user_id": "execution:forged"}}),
                 ("read_operation_object", {"kind": "post", "id": node.object_id}),
                 ("list_authorized_work", {}),
@@ -234,7 +234,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
             names = {tool.__name__ for tool in agents[0].tools}
-            self.assertEqual(names, {"current_summary", *(name for name, _ in plan)})
+            self.assertEqual(names, {"current_summary", "read_ai_delegation", *(name for name, _ in plan)})
             for tool in agents[0].tools:
                 function = Function.from_callable(tool)
                 self.assertNotIn("run_context", function.parameters["properties"])
@@ -265,7 +265,8 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                     self.assertEqual(packet["conversationId"], row["id"])
                     self.assertEqual(packet["sessionId"], row["sessionId"])
                     self.assertEqual(packet["turnId"], operation_id)
-                    self.assertEqual(packet["callId"], "native-call-" + str(index))
+                    from galaxy_agentos.tool_call_ids import conversation_call_reference
+                    self.assertEqual(packet["callId"], conversation_call_reference(packet["runId"], "native-call-" + str(index)))
                     self.assertNotIn("role", packet)
                 self.assertEqual(packets[3]["arguments"], {"executionId": node.execution_id})
                 self.assertNotIn("operationId", packets[4]["arguments"])

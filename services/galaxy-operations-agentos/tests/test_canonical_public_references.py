@@ -99,7 +99,7 @@ class CanonicalPublicReferences(unittest.TestCase):
         tools[0](context, query, module='content', view='list', filters=QueryFilters(targetId=post, limit=100))
         self.assertEqual(calls[-1]['tool'], 'read-operation-object')
         self.assertEqual(calls[-1]['publicReference'], ref, 'targetId cannot bypass a linked version by using the list tool')
-        tools[0](context, query, module='content', view='list', filters=QueryFilters(targetId=post, topic='learning', limit=5))
+        tools[0](context, query, module='content', view='list', filters=QueryFilters(targetId=post, topic='learning', limit=5, days=7))
         self.assertEqual(calls[-1]['tool'], 'query-operations', 'semantic list filters remain intact')
 
         read = FunctionCall(function=Function.from_callable(tools[1]), call_id='canonical-read')
@@ -114,7 +114,8 @@ class CanonicalPublicReferences(unittest.TestCase):
         self.assertNotIn('versionId', calls[-1]['arguments'], 'model does not supply the CAS or source restriction')
         changed_version = True
         changed = json.loads(tools[1](context, read, kind='post', id=post))
-        self.assertEqual(changed, {'state': 'changed', 'reason': 'agentos_public_reference_version_changed',
+        self.assertIsNone(changed['analysisConstraints']['requestedDays'])
+        self.assertEqual({key: value for key, value in changed.items() if key != 'analysisConstraints'}, {'state': 'changed', 'reason': 'agentos_public_reference_version_changed',
             'nextStep': 'select-current-version', 'effectState': 'not-confirmed'})
         self.assertNotIn('UNSAFE_', json.dumps(changed))
         changed_version = False
