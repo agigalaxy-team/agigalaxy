@@ -151,5 +151,12 @@
   "runtimeDataIncluded": false,
   "buildRecipe": "Dockerfile retained from the initial captured source; exact image Dockerfile bytes were not exported",
   "fullUpstreamSource": "Prepare exact SOURCE.json commit using prepare-source-context.py; original exported lock and licenses are retained",
-  "publishedByThisTask": false
+  "publishedByThisTask": false,
+  "localPatches": [
+    {
+      "path": "src/galaxy_model_gateway/usage.py",
+      "purpose": "Close every SQLite connection after the existing transaction; a connection context alone does not close its file handle",
+      "runtimeDeployed": false
+    }
+  ]
 }

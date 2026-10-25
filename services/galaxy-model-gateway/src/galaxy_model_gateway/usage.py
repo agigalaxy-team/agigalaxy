@@ -3,6 +3,7 @@
 No message, response, credential, provider URL, price or budget is persisted.
 """
 from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
 from pathlib import Path
 import re
 import sqlite3
@@ -34,10 +35,15 @@ class UsageStore:
             db.execute("CREATE INDEX IF NOT EXISTS calls_window ON calls(started_at, scenario, model_alias)")
         self.path.chmod(0o600)
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=3)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def start(self, metadata):
         call_id, scenario = metadata.get("galaxy_call_id"), metadata.get("galaxy_scenario")
