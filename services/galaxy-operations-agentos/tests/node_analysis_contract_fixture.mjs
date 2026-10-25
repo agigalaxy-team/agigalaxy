@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {createRequire,registerHooks,isBuiltin} from 'node:module';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
-const repo=process.env.GALAXY_NODE_REPO,dependencies=process.env.GALAXY_NODE_DEPENDENCY_ROOT;
-assert(repo&&dependencies);
+import {fileURLToPath,pathToFileURL} from 'node:url';
+const repo=process.env.GALAXY_NODE_REPO??path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
+const dependencies=process.env.GALAXY_NODE_DEPENDENCY_ROOT??repo;
 const dependencyRequire=createRequire(path.join(dependencies,'packages/galaxy-official/package.json'));
 registerHooks({resolve(specifier,context,nextResolve){
  try{return nextResolve(specifier,context);}catch(error){

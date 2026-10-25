@@ -3,6 +3,7 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import unittest
 from uuid import uuid4
@@ -93,7 +94,9 @@ class AnalysisSemanticsTests(unittest.TestCase):
         self.assertEqual(gateway.calls[1][1]['note'], 'explicit local requested note')
 
     def test_actual_f14_node_schemas_and_runtime_event_contract(self):
-        result = subprocess.run([os.environ['GALAXY_NODE_BINARY'], str(Path(__file__).with_name('node_analysis_contract_fixture.mjs'))],
+        node = os.environ.get('GALAXY_NODE_BINARY') or shutil.which('node')
+        self.assertIsNotNone(node, 'Install repository Node dependencies and put Node on PATH')
+        result = subprocess.run([node, str(Path(__file__).with_name('node_analysis_contract_fixture.mjs'))],
             capture_output=True, text=True, timeout=25)
         self.assertEqual(result.returncode, 0, result.stderr)
         proof = json.loads(result.stdout)

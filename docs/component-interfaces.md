@@ -25,3 +25,9 @@
 Conversation 的 provider 原始工具ID仅服务原生SDK配对和后续模型请求；Node收到按当前run及完整provider值派生的短UUID5引用，公开元数据不带thought signature。Conversation持久化按同run的真实已存投影核对，不能只靠UUID形状或输入marker认定引用。Duty私有PAUSED记录保留继续原工具所需的原坐标，公开读取仍投影过滤。
 
 普通且事实已核实的既有消息计划可在真实角色、grant、策略、任务和CAS资格内发布/撤回；人工决定及未核实文案仍转人工。`jobs.cancel`、`jobs.retry`、`search.retry` 的typed命令与原操作恢复适配尚未接通，不因底层方法存在显示可用。生产值守保持关闭；本地合成链通过不等于已开启值守或实际投递。
+
+## 分析与已记录模型版本
+
+Native 的窗口查询逐项显式传 `days`，未指定时间时可采用该视图已发布 schema 的默认值并在答案说明，无需额外追问。原始 period/basis/coverage、零与未知、固定周留存及业务状态分别保留；解释约束不等于模型正确性保证。反馈分类／模块／状态恢复不附带新增内部备注授权。
+
+API 全局运行列表和详情仅投影 Native 已记录的 `modelSettingsVersion`／`modelSettingsVersions`，后台按各自字段呈现。旧行、缺失或非法值保持 null，不查当前配置补历史，也不由一个字段推导另一个字段。当前审计权限及会话／对话绑定仍各自检查；不公开模型名称、端点或凭据。
