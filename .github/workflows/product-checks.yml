@@ -60,7 +60,17 @@ jobs:
       - if: matrix.component == 'admin'
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin
       - run: node scripts/components.mjs check --component ${{ matrix.component }} --output outputs/check-${{ matrix.component }}
-      - run: node scripts/components.mjs build --component ${{ matrix.component }} --output outputs/build-${{ matrix.component }}
+      - if: matrix.component != 'admin'
+        run: node scripts/components.mjs build --component ${{ matrix.component }} --output outputs/build-${{ matrix.component }}
+      - if: matrix.component == 'admin'
+        env:
+          GALAXY_ADMIN_PUBLIC_ORIGIN: http://127.0.0.1:3010
+          GALAXY_ADMIN_BFF_ORIGIN: http://127.0.0.1:3011
+          GALAXY_CMS_DATABASE_URL: postgresql://127.0.0.1:1/galaxy_admin_build_stub
+          GALAXY_CMS_SECRET: synthetic-ci-build-only-no-runtime-credential
+          GALAXY_CMS_DEV_PUSH: 'false'
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: node scripts/components.mjs build --component admin --output outputs/build-admin
       - if: matrix.component == 'web'
         run: node node_modules/typescript/bin/tsc --noEmit
       - if: matrix.component == 'hub' || matrix.component == 'contracts'
