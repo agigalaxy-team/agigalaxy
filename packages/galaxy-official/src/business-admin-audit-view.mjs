@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {baseBusinessAuditAttribution,businessAuditAttributionSchema} from './business-admin-audit-attribution.mjs';
 
 const uuid=z.uuid(),subject=z.string().regex(/^GUID[0-9A-Z]{28}$/),integer=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
  bool=z.boolean(),time=z.iso.datetime({offset:true}),sequence=z.string().regex(/^[1-9][0-9]{0,18}$/),
@@ -48,6 +49,11 @@ for(const aiWorkKind of ['profile-save','state-save','assignment-save'])register
  {id:uuid,domain:enumeration('overview','governance','messaging','discovery','maintenance')},
  {kind:z.literal(aiWorkKind),version:z.number().int().positive().max(Number.MAX_SAFE_INTEGER),enabled:bool,
   ...(aiWorkKind==='assignment-save'?{assignmentId:uuid,assignmentVersion:z.number().int().positive().max(Number.MAX_SAFE_INTEGER),assignmentEnabled:bool}:{})});
+register('ai-delegation-save ai-role-create ai-role-update ai-role-assignment-save',
+ {delegationId:uuid,delegationVersion:integer,sourceAiAccountId:uuid,roleId:nullable(uuid),aiAccountId:nullable(uuid)},
+ {enabled:bool,version:integer,permissionCount:integer,targetCount:integer});
+register('autonomy-config autonomy-enable autonomy-control autonomy-run autonomy-settings autonomy-strategy-task autonomy-decision',
+ {id:nullable(uuid)}, {kind:enumeration('config','enable','control','run','settings','strategy-task','decision'),revision:nullable(integer)});
 register('system-settings-save system-settings-test system-settings-apply system-settings-credential-provision',
  {section:enumeration('general','mail','service-connections'),kind:enumeration('save','test','apply','credential'),versionId:nullable(uuid),revision:integer},
  {state:enumeration('accepted','completed','partial','failed','unknown'),versionId:nullable(uuid),revision:integer});
@@ -64,12 +70,12 @@ register('community-posts-query',{...page},reading);
 register('community-post-read',selectionId,reading);
 register('community-sections-query',{...page,state:nullable(state),category:nullable(category)},reading);
 register('community-section-read community-report-read',selectionId,reading);
-register('community-section-classify',{...selectionId,...change,category},{...receipt,sectionId:uuid,version:integer,category,actorKind:enumeration('business-operator'),operatorId:z.string().min(1).max(1024)});
+register('community-section-classify',{...selectionId,...change,category},{...receipt,sectionId:uuid,version:integer,category,actorKind:enumeration('business-operator','operations-ai-service'),operatorId:z.string().min(1).max(1024)});
 register('community-section-visibility',{...selectionId,...change,kind:enumeration('hide','restore'),until:integer},
  {...receipt,target:object({kind,id:uuid}),sourceVersion:integer,visibility,sourcePermissionChanged:bool});
 register('community-reports-query',{...page,state:nullable(state)},reading);
 register('community-report-resolve',{...selectionId,...change,resolution,restrictionAction:enumeration('keep','release','hide'),hideUntil:integer},
- {...receipt,reportId:uuid,version:integer,state,resolution,restrictionAction:enumeration('keep','release','hide'),restrictionEventId:nullable(uuid),effectUntil:nullable(time),actorKind:enumeration('business-operator'),operatorId:z.string().min(1).max(1024)});
+ {...receipt,reportId:uuid,version:integer,state,resolution,restrictionAction:enumeration('keep','release','hide'),restrictionEventId:nullable(uuid),effectUntil:nullable(time),actorKind:enumeration('business-operator','operations-ai-service'),operatorId:z.string().min(1).max(1024)});
 register('resources-query',{...page,kind,state:nullable(state)},reading);
 register('resource-read',{...selectionId,kind},reading);
 register('resource-visibility',{...selectionId,kind,operationId:uuid,command:visibilityCommand},
@@ -154,9 +160,11 @@ function project(value,shape){
 export function businessAuditMetadata(row){
  const shape=shapes.get(row.action);
  const executor=row.actor_kind==='operations-executor'&&uuid.safeParse(row.execution_id).success&&uuid.safeParse(row.grant_id).success;
- const operatorDisplayName=row.actor_kind!=='operations-executor'&&typeof row.operator_display_name==='string'?row.operator_display_name.trim()||null:null;
- return {id:row.id,sequence:String(row.sequence),operatorId:row.operator_id,operatorDisplayName,operatorRole:executor?null:row.operator_role,action:row.action,
-  actorKind:executor?'operations-executor':'business-operator',executionId:executor?row.execution_id:null,grantId:executor?row.grant_id:null,
+ const ai=row.actor_kind==='operations-ai-service',human=row.actor_kind==='business-operator',actorKind=ai?'operations-ai-service':executor?'operations-executor':human?'business-operator':'unknown',
+  parsed=businessAuditAttributionSchema.safeParse(row.audit_attribution),attribution=parsed.success?parsed.data:baseBusinessAuditAttribution(row),
+  operatorDisplayName=human&&typeof row.operator_display_name==='string'?row.operator_display_name.trim()||null:null;
+ return {id:row.id,sequence:String(row.sequence),operatorId:row.operator_id,operatorDisplayName,operatorRole:human?row.operator_role:null,action:row.action,
+  actorKind,executionId:executor?row.execution_id:null,grantId:(executor||ai)&&uuid.safeParse(row.grant_id).success?row.grant_id:null,attribution,
   accountId:row.account_id,operationId:row.operation_id,httpRequestId:row.http_request_id,
   selection:shape?project(row.selection,shape.selection):{},result:shape?project(row.result,shape.result):{},
   createdAt:new Date(row.created_at).toISOString()};

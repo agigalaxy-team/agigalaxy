@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useOperationsRead} from '../lib/use-operations-read';
 import type {AuditFilters,AuditMetadata} from '../lib/audit-view-model';
-import {auditActionLabel,auditAvailableActions,auditExecution,auditFilterHref,auditHref,auditIsReception,auditKind,auditMetadata,auditNextHref,auditObjects,auditObjectRecordsHref,auditOutcome,auditPageHref,auditPreviousHref,auditReadPath,auditRelations,auditRoleLabel,auditShortId,auditTime} from '../lib/audit-view-model';
+import {auditActionLabel,auditActorLabel,auditActorRole,auditAvailableActions,auditDecision,auditExecution,auditFilterHref,auditHref,auditInitiator,auditIsReception,auditKind,auditMetadata,auditNextHref,auditObjects,auditObjectRecordsHref,auditOutcome,auditPageHref,auditPreviousHref,auditReadPath,auditRelations,auditShortId,auditTime} from '../lib/audit-view-model';
 import type {AuditEvent,AuditPage} from './business-types';
 import {ReadStatus} from './OperationControls';
 import {AdminIcon} from './AdminIcons';
@@ -48,8 +48,7 @@ function Outcome({item}:{item:AuditEvent}){
   return <span className="galaxy-audit-outcome" data-tone={outcome.tone}>{outcome.label}</span>;
 }
 function OperatorIdentity({item}:{item:AuditEvent;compact?:boolean}){
-  const name=item.actorKind!=='operations-executor'&&typeof item.operatorDisplayName==='string'?item.operatorDisplayName.trim():'';
-  return <strong className="galaxy-audit-operator-name" title={item.operatorId||undefined}>{name||(item.actorKind==='operations-executor'?'受控执行器':'管理账户')}</strong>;
+  return <strong className="galaxy-audit-operator-name" title={item.operatorId||undefined}>{auditActorLabel(item)}</strong>;
 }
 function RecordDetails({item,items,filters,onPick}:{item:AuditEvent;items:AuditEvent[];filters:AuditFilters;onPick:(id:string,origin?:HTMLButtonElement)=>void}){
   const objects=auditObjects(item),relations=auditRelations(item,items),selection=auditMetadata(item.selection,item.action),result=auditMetadata(item.result,item.action),reception=auditIsReception(item);
@@ -57,9 +56,11 @@ function RecordDetails({item,items,filters,onPick}:{item:AuditEvent;items:AuditE
     <header className="galaxy-audit-detail-heading"><div><p>{reception?'受理时记录':'记录详情'}</p><h2 id="audit-record-title" tabIndex={-1}>{auditActionLabel(item.action)}</h2></div><Outcome item={item}/></header>
     <div className="galaxy-audit-record-caption"><time dateTime={item.createdAt}>{auditTime(item.createdAt,true)}</time><code title={item.id}>{item.id}</code></div>
     <dl className="galaxy-audit-facts">
-      <div><dt>操作者</dt><dd className="galaxy-audit-operator-identity"><OperatorIdentity item={item}/></dd></div>
-      <div><dt>管理角色</dt><dd>{item.actorKind==='operations-executor'?'受控执行器':auditRoleLabel(item.operatorRole??'')}</dd></div>
-      <div><dt>决定来源</dt><dd className="galaxy-audit-muted">未记录</dd></div>
+      <div><dt>执行账户</dt><dd className="galaxy-audit-operator-identity"><OperatorIdentity item={item}/></dd></div>
+      <div><dt>账户类型</dt><dd>{auditActorRole(item)}</dd></div>
+      <div><dt>发起来源</dt><dd>{auditInitiator(item)}</dd></div>
+      <div><dt>决定来源</dt><dd>{auditDecision(item)}</dd></div>
+      {item.actorKind==='business-operator'&&item.attribution?.aiAccountName&&<div><dt>协助岗位</dt><dd>{item.attribution.aiAccountName}</dd></div>}
       <div><dt>执行通道</dt><dd>{auditExecution(item)}</dd></div>
       <div><dt>动作</dt><dd><code>{item.action}</code></dd></div>
     </dl>
@@ -68,6 +69,9 @@ function RecordDetails({item,items,filters,onPick}:{item:AuditEvent;items:AuditE
     <section className="galaxy-audit-detail-section"><h3>{reception?'受理时结果':'处理结果'}</h3>{reception&&(objects.some(object=>object.kind==='registered-user')?<p className="galaxy-audit-muted">当前办理结果请查看该用户的处理记录。</p>:objects.some(object=>object.kind==='system-settings-operation')?<p className="galaxy-audit-muted">本次处理的当前结果可从关联设置查看。</p>:null)}<Metadata items={result} empty="未记录可显示的结果元数据。"/></section>
     <section className="galaxy-audit-detail-section"><h3>操作与请求</h3><dl className="galaxy-audit-facts">
       <div><dt>操作编号</dt><dd><code>{item.operationId||'未记录'}</code></dd></div>
+      {item.attribution?.cardId&&<div><dt>确认操作卡</dt><dd><code>{item.attribution.cardId}</code></dd></div>}
+      {item.attribution?.grantId&&<div><dt>自动执行授权</dt><dd><Link href={'/admin/operations/permissions?tab=automatic&id='+encodeURIComponent(item.attribution.grantId)}>查看原授权</Link>{item.attribution.grantVersion?' · v'+item.attribution.grantVersion:''}</dd></div>}
+      {item.attribution?.strategyId&&<div><dt>策略依据</dt><dd><code>{item.attribution.strategyId}</code>{item.attribution.strategyVersionId&&<><br/><code>{item.attribution.strategyVersionId}</code></>}</dd></div>}
       <div><dt>请求编号</dt><dd><code>{item.httpRequestId||'未记录'}</code></dd></div>
       <div><dt>记录序号</dt><dd><code>{item.sequence}</code></dd></div>
     </dl></section>
@@ -244,7 +248,7 @@ export function Audit({filters,positionOwner}:{filters:AuditFilters;positionOwne
           {value&&visible.length?<ol className="galaxy-audit-records">{visible.map(item=>{const objects=auditObjects(item),subject=objects.find(object=>object.kind!=='account')??objects[0];return <li key={item.id}><button type="button" className="galaxy-audit-record" aria-pressed={selectedId===item.id} aria-controls="audit-record-details" onClick={()=>pick(item.id)}>
             <time dateTime={item.createdAt}>{auditTime(item.createdAt)}</time>
             <span className="galaxy-audit-record-main"><strong>{auditActionLabel(item.action)}</strong><span>{subject?<>{subject.label} · <code title={subject.id}>{auditShortId(subject.id)}</code></>:auditKind(item)==='reads'?'查询范围见记录详情':'未记录具体对象'}</span></span>
-            <span className="galaxy-audit-record-operator"><OperatorIdentity item={item} compact/><span>{item.actorKind==='operations-executor'?'受控执行器':auditRoleLabel(item.operatorRole??'')}</span></span><Outcome item={item}/>
+            <span className="galaxy-audit-record-operator"><OperatorIdentity item={item} compact/><span>{auditActorRole(item)}</span></span><Outcome item={item}/>
           </button></li>;})}</ol>:value?<div className="galaxy-audit-empty"><AdminIcon name="history" size={27}/><p>{scanning?'正在查找符合条件的记录。':narrowRequired?'缩小范围后继续查阅记录。':outOfRange?'第 '+pagination!.page+' 页超出本次记录范围，共 '+pagination!.totalPages+' 页。':value.scanLimited?'本轮尚未找到匹配记录。':filtered?'当前检索范围内没有符合条件的记录。':'当前范围内没有审计记录。'}</p>{outOfRange&&<Link href={pageLink(pagination!.totalPages!)} scroll={false}>前往最后一页</Link>}</div>:!page.error&&<div className="galaxy-audit-empty"><AdminIcon name="history" size={27}/><p>记录载入后可在此查阅。</p></div>}
         </div>
         {filters.after&&!pagination?<nav className="galaxy-audit-pagination" aria-label="审计记录分页"><div>{previous&&<Link href={previous} scroll={false}>较新记录</Link>}<Link href={auditHref(filters,{after:'',trail:'',selected:''})} scroll={false}>最新记录</Link></div>{value?.nextAfter&&<Link href={auditNextHref(filters,value.nextAfter)} scroll={false}>{value.scanLimited?'继续检索较早记录':'更早记录'}</Link>}</nav>:<Pagination page={pagination?.page??filters.page} pageSize={filters.pageSize} total={ready?pagination.total:null} totalPages={ready?pagination.totalPages:null} hasPrevious={pagination?.hasPrevious??false} hasNext={pagination?.hasNext??false} loading={busy} disabled={interactionDisabled} showNavigation={ready&&pagination.totalPages!>0} showTotal={false} layout="stacked" ariaLabel="审计记录分页" focusScope={paginationFocusScope} focusReady={page.verified&&ready&&!page.error} pageHref={pageLink} onPage={target=>navigateTo(pageLink(target))} onPageSize={size=>navigate({pageSize:size as AuditFilters['pageSize']})}>

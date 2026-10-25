@@ -3,6 +3,7 @@ import {operationsPermissionCatalog} from '../operations-permission-catalog.mjs'
 // One product action directory. A position's name is context, never an ACL.
 // Permission, human decision and connected handler are separate facts.
 const queryCodes=['accounts.read','accounts.registered.read','system.settings.read','analytics.read','content.read','sections.read','content.tags.read','cases.read','chat-reports.read','feedback.read','files.read','resources.read','recommendations.read','search-quality.read','notices.read','strategies.read','rules.read','maintenance.read','maintenance.logs.read','audit.read','jobs.read','permissions.read','ai.roles.read'];
+queryCodes.push('autonomy.read');
 const definitions=[
  ['content-visibility','governance','下架或恢复公开内容','content.read',['content.hide','content.restore'],'content',['get','visibility'],['ordinary','current-source','prior-automatic-decision']],
  ['content-curation','governance','调整公开内容分类与编排','content.read',['content.curate'],'content',['get','curate'],['ordinary','current-source','existing-taxonomy','prior-automatic-decision']],

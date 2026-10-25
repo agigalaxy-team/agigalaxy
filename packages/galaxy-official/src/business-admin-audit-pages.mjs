@@ -4,6 +4,8 @@ import {transaction} from './database.mjs';
 import {ServiceError} from './shared/service-error.mjs';
 import {businessAuditActionCodes,businessAuditMetadata} from './business-admin-audit-view.mjs';
 import {withPermissionAuditLinks} from './business-admin-permission-audit-links.mjs';
+import {withBusinessAuditAttribution} from './business-admin-audit-attribution.mjs';
+import {hasOperationsPermission} from './operations-permission-catalog.mjs';
 
 export const businessAuditReadActions=Object.freeze(['users-query','user-read','audit-read','chat-reports-query','chat-report-read','chat-report-attachment',
  'operations-summary-read','community-posts-query','community-post-read','community-sections-query','community-section-read',
@@ -61,7 +63,7 @@ export class BusinessAuditPages {
   bytes+=ids.byteLength+(matches?.byteLength??0);
   if(bytes>CACHE_BYTES){ids=new BigInt64Array();matches=null;names.clear();bytes=512;state='narrow-required';reason='cache-capacity';}
   // Expiration is fixed at creation. Reading a snapshot never renews it.
-  const entry={id,owner:ownerOf(actor),scope,createdAt:at,expiresAt:at+SNAPSHOT_SECONDS,usedAt:at,
+  const entry={id,owner:ownerOf(actor),canReadTasks:hasOperationsPermission(actor,'autonomy.read'),scope,createdAt:at,expiresAt:at+SNAPSHOT_SECONDS,usedAt:at,
    ids,matches,names,bytes,candidates:count,inspected:projecting?0:count,matched:projecting?0:count,state,reason,actions:captured.actions,scan:null,timer:null};
   if(state==='narrow-required'){entry.inspected=0;entry.matched=0;}
   while(this.entries.size>=CACHE_ENTRIES||this.bytes()+bytes>CACHE_BYTES){const oldest=[...this.entries.values()].sort((a,b)=>a.usedAt-b.usedAt)[0];if(!oldest)break;this.drop(oldest.id);}
@@ -70,7 +72,8 @@ export class BusinessAuditPages {
  }
  async rows(entry,ids){
   if(!ids.length)return new Map();
-  const rows=await withPermissionAuditLinks(this.db,{endpoint:this.endpoint,rows:(await this.db.query('SELECT * FROM business_admin_audit_v1 WHERE endpoint=$1 AND sequence=ANY($2::bigint[])',[this.endpoint,ids])).rows});
+  const linkedRows=await withPermissionAuditLinks(this.db,{endpoint:this.endpoint,rows:(await this.db.query('SELECT * FROM business_admin_audit_v1 WHERE endpoint=$1 AND sequence=ANY($2::bigint[])',[this.endpoint,ids])).rows});
+  const rows=await withBusinessAuditAttribution(this.db,{endpoint:this.endpoint,rows:linkedRows,canReadTasks:entry.canReadTasks});
   const bySequence=new Map(rows.map(row=>[String(row.sequence),row]));
   if(bySequence.size!==ids.length){this.drop(entry.id);fail('audit_snapshot_expired');}
   return bySequence;
@@ -85,7 +88,7 @@ export class BusinessAuditPages {
    const found=[];
    for(let index=start;index<end;index++){
     const item=safeRow(rows.get(String(entry.ids[index])),entry.names);
-    if(entry.scope.resourceId&&!resourceKeys.some(key=>typeof item.selection[key]==='string'&&item.selection[key].toLowerCase()===entry.scope.resourceId))continue;
+    if(entry.scope.resourceId&&![...resourceKeys.map(key=>item.selection[key]),item.attribution?.taskId,item.attribution?.cardId].some(id=>typeof id==='string'&&id.toLowerCase()===entry.scope.resourceId))continue;
     if(needle&&!scalarValues(item).some(value=>value.toLocaleLowerCase('zh-CN').includes(needle)))continue;
     found.push(index);
    }
@@ -102,7 +105,7 @@ export class BusinessAuditPages {
    if(entry.owner!==ownerOf(actor))fail('audit_snapshot_unavailable',404);
    if(!isDeepStrictEqual(entry.scope,scope))fail('audit_snapshot_mismatch');
   }else entry=await this.create(actor,scope);
-  entry.usedAt=this.now();await this.advance(entry);
+  entry.canReadTasks=hasOperationsPermission(actor,'autonomy.read');entry.usedAt=this.now();await this.advance(entry);
   if(!this.entries.has(entry.id)||entry.expiresAt<=this.now()){this.drop(entry.id);fail('audit_snapshot_expired');}
   const page=query.page??1,pageSize=query.pageSize??30,ready=entry.state==='ready',total=ready?entry.matched:null,totalPages=ready?Math.ceil(total/pageSize):null;
   const first=(page-1)*pageSize,last=ready?Math.min(entry.matched,first+pageSize):0,ids=[];

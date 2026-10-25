@@ -288,11 +288,12 @@ export class OperationsAutonomy extends AutonomyReadModel{
   const row=await this.taskWithin(db,taskId,{lock:true});if(terminalStates.has(row.state))return;
   await db.query(`UPDATE operations_autonomy_tasks_v1 SET state='waiting-human',human_decision=$3,lease_until=NULL,revision=revision+1,code=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2`,[this.endpoint,taskId,JSON.stringify({kind:'decision-required',operationId,code,at:iso(this.at())}),code,this.at()]);
  }
- async tool(input){const x=parse(toolSchema,input);const binding=await transaction(this.db,async db=>{const row=await this.taskWithin(db,x.taskId),actor=await this.authorizeTaskWithin(db,row);if(row.native_run_id&&x.nativeRunId!==row.native_run_id)fail('operations_autonomy_scope_denied',403);
+ async tool(input,{ruleSource=false}={}){const x=parse(toolSchema,input);const binding=await transaction(this.db,async db=>{const row=await this.taskWithin(db,x.taskId);let actor=await this.authorizeTaskWithin(db,row);if(row.native_run_id&&x.nativeRunId!==row.native_run_id)fail('operations_autonomy_scope_denied',403);
   if(!(await this.toolsWithin(db,row,actor)).includes(x.tool))fail('operations_permission_denied',403);
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912481))',[row.id+':'+x.callId]);const prior=(await db.query('SELECT * FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3',[this.endpoint,row.id,x.callId])).rows[0];
   if(prior&&(prior.tool!==x.tool||!isDeepStrictEqual(prior.arguments,x.arguments)))fail('operations_autonomy_operation_conflict');
   const operationId=prior?.operation_id??randomUUID();if(!prior)await db.query(`INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'started',$7,$7)`,[this.endpoint,row.id,x.callId,x.tool,JSON.stringify(x.arguments),operationId,this.at()]);
+  if(typeof this.authority.bindDutyAuditSourceWithin==='function')actor=await this.authority.bindDutyAuditSourceWithin(db,actor,{callId:x.callId,operationId,nativeRunId:x.nativeRunId??null,ruleSource});
   return{row,actor,operationId,prior};});
   try{
    let result;const {row,actor,operationId}=binding;

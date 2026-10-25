@@ -12,7 +12,7 @@ import {workbenchRunFact,workbenchCardFact} from './operations-agentos-duty-work
 const fail=(code,status=403)=>{throw new ServiceError(code,status);};
 const parse=(schema,input)=>{const value=schema.safeParse(input);if(!value.success)fail('invalid_operations_agentos_request',400);return value.data;};
 const hash=value=>createHash('sha256').update(value).digest('hex');
-const permissionKey=actor=>hash(JSON.stringify([actor.businessAuthorization.version,[...actor.businessAuthorization.permissions].sort()]));
+const permissionKey=actor=>hash(JSON.stringify([actor.businessAuthorization.version,[...actor.businessAuthorization.permissions].sort((a,b)=>a<b?-1:a>b?1:0)]));
 const nativeSchema=z.strictObject({conversationId:z.uuid(),operation:z.enum(['read','run']),resourceType:z.enum(['agents','workflows']).nullable().optional(),resourceId:z.string().min(1).max(100).nullable().optional()});
 const conversationRunSchema=agentOsRunSchema.extend({taskId:z.uuid().optional()});
 const turnDigest=x=>hash(x.taskId?JSON.stringify([x.message,x.taskId]):x.message);
@@ -23,7 +23,7 @@ const domainAction=(domain,action)=>domain==='overview'||(domain==='governance'?
 
 // This projection intentionally cannot carry operators, grants, private prose,
 // case materials, URLs or the summary's obsolete static AI connection state.
-export function conversationSummary(value,domain){
+export function conversationSummary(value,domain,permissions=[]){
  const result={domain,checkedAt:Number.isSafeInteger(value?.checkedAt)?value.checkedAt:null,readExpiresAt:Number.isSafeInteger(value?.readExpiresAt)?value.readExpiresAt:null,basis:{counts:'current-permitted-workbench-snapshot',availability:'summary-block-only-not-query-capability',recentChanges:'domain-subset-of-latest-12-operations-not-full-day'},countScopes:{search:'search-index-recovery-backlog-not-search-quality-analytics'},availability:{},counts:{},recentChanges:[]};
  for(const key of blocks[domain]){
   const available=value?.availability?.[key];result.availability[key]=['available','not-authorized'].includes(available)?available:'unknown';
@@ -32,6 +32,15 @@ export function conversationSummary(value,domain){
  if(['overview','governance','discovery'].includes(domain)){
   result.availability.recentOperations=value?.availability?.recentOperations==='available'?'available':value?.availability?.recentOperations==='not-authorized'?'not-authorized':'unknown';
   if(result.availability.recentOperations==='available')result.recentChanges=(value.recentOperations??[]).slice(0,12).filter(row=>typeof row.action==='string'&&/^[a-z0-9.-]{1,100}$/.test(row.action)&&domainAction(domain,row.action)&&typeof row.createdAt==='string'&&Number.isFinite(Date.parse(row.createdAt))).map(row=>({action:row.action,createdAt:row.createdAt}));
+ }
+ const canReadAutonomy=permissions.includes('autonomy.read');
+ result.availability.autonomy=!canReadAutonomy?'not-authorized':value?.availability?.ai==='available'&&value?.autonomy?'available':'unavailable';
+ if(result.availability.autonomy==='available'){
+  const source=value.autonomy,knownDomains=new Set(agentOsDomains),states=new Set(['queued','running','waiting-human','paused','completed','failed','unknown','stopped']),sources=new Set(['workbench','routine','event','recovery']),uuid=id=>z.uuid().safeParse(id).success;
+  const taskRows=rows=>(Array.isArray(rows)?rows:[]).slice(0,20).filter(row=>uuid(row.id)&&knownDomains.has(row.domain)&&states.has(row.state)&&sources.has(row.source)).map(row=>({id:row.id,domain:row.domain,source:row.source,state:row.state,modelState:['not-started','pending','running','completed','paused','failed','unknown','cancelled'].includes(row.modelState)?row.modelState:null,businessState:['not-started','completed','no-action','waiting-human','failed','unknown','cancelled'].includes(row.businessState)?row.businessState:null,updatedAt:typeof row.updatedAt==='string'&&Number.isFinite(Date.parse(row.updatedAt))?row.updatedAt:null,href:'/admin/operations/ai-runs?task='+encodeURIComponent(row.id)}));
+  result.autonomy={basis:'current-permitted-autonomy-snapshot-recorded-tasks-only',checkedAt:numeric(source.checkedAt),readExpiresAt:numeric(source.readExpiresAt),summary:Object.fromEntries(['enabledAccounts','healthyAccounts','active','queued','waitingHuman','failed','unknown','businessCompleted','expected','completed','late','backlog'].map(key=>[key,numeric(source.summary?.[key])])),
+   accounts:(Array.isArray(source.accounts)?source.accounts:[]).filter(row=>knownDomains.has(row.domain)).map(row=>({domain:row.domain,enabled:row.config?.enabled===true,health:['pending','healthy','attention','unavailable','blocked','unknown'].includes(row.health)?row.health:'unknown',lastValidAt:typeof row.lastValidAt==='string'&&Number.isFinite(Date.parse(row.lastValidAt))?row.lastValidAt:null,nextDueAt:typeof row.nextDueAt==='string'&&Number.isFinite(Date.parse(row.nextDueAt))?row.nextDueAt:null})),
+   recentTasks:taskRows(source.recentTasks),humanTasks:taskRows(source.humanTasks),exceptions:taskRows(source.exceptions)};
  }
  return result;
 }
@@ -206,16 +215,17 @@ export class AgentOsConversations{
   const priorReadReceipts=await this.priorReadReceipts(actor,domain,context);
   const boundedTask=await this.boundedTaskFor(actor,context);
   const priorActionReceipts=this.tools?await this.tools.priorActionReferences(actor,domain,context):{basis:'same-owner-current-fixed-ai-completed-action-ledger',scope:'latest-20-completed-content-visibility-cards',valuesCurrent:false,availability:'unavailable',items:[]};
+  const priorOperationReceipts=this.tools?await (await import('./operations-agentos-operation-receipts.mjs')).conversationOperationReceipts(this.tools,actor,domain,context):{availability:'unavailable',items:[]};
   let value,result;
   if(typeof this.summaryForConversation!=='function')result={domain,availability:'unavailable',reason:'summary-not-connected'};
   else try{value=await this.summaryForConversation(actor);}catch(error){if(error.status===403)throw error;result={domain,availability:'unavailable',reason:'summary-unavailable'};}
   const current=await this.authority.human(actor,{domain,purpose:'query'});
   if(current.businessAuthorization.version!==actor.businessAuthorization.version)fail('operations_agentos_authority_changed');
   if(context)await this.current(context.conversationId,{operator:current});
-  return {...(result??conversationSummary(value,domain)),queryAccess:agentOsQueryAccess(current.businessAuthorization.permissions),priorReadReceipts,priorActionReceipts,boundedTask};
+  return {...(result??conversationSummary(value,domain,current.businessAuthorization.permissions)),queryAccess:agentOsQueryAccess(current.businessAuthorization.permissions),priorReadReceipts,priorActionReceipts,priorOperationReceipts,boundedTask};
  }
  executeTool(input){if(!this.tools)fail('operations_agentos_conversation_not_ready',503);return this.tools.execute(input);}
- async read(operator,domain){const {row,contextChanged=false}=await this.session(operator,domain),status=await this.client.status();let native=null,runtimeState=status.state;
+ async read(operator,domain){const {row,contextChanged=false}=await this.session(operator,domain),status=await this.client.status();let native=null;const runtimeState=status.state;
   const ready=[1,2].includes(status.conversationVersion)&&Array.isArray(status.conversationDomains)&&status.conversationDomains.includes(domain);
   if(row){
    if(runtimeState!=='connected')fail('operations_agentos_unavailable',503);
@@ -246,7 +256,7 @@ export class AgentOsConversations{
   const saved=(await this.db.query(`SELECT c.*,s.domain,s.operator_id AS owner FROM operations_agentos_conversation_commands_v1 c
    JOIN operations_agentos_conversations_v1 s ON s.id=c.conversation_id WHERE c.endpoint=$1 AND c.id=$2`,[this.endpoint,id])).rows[0];
   if(!saved||saved.owner!==operator.operatorId||saved.domain!==domain)fail('operations_agentos_operation_not_found',404);
-  let row;try{row=(await this.current(saved.conversation_id,{operator})).row;}catch(error){if(error.code!=='operations_agentos_source_changed')throw error;return {...saved.result,state:'context-changed',native:null,contextChanged:true,replayed:true};}let current=null;
+  let row;try{row=(await this.current(saved.conversation_id,{operator})).row;}catch(error){if(error.code!=='operations_agentos_source_changed')throw error;return {...saved.result,state:'context-changed',native:null,contextChanged:true,replayed:true};}
   let target=saved;
   if(saved.result?.cancelledOperationId){target=(await this.db.query('SELECT * FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3 AND operator_id=$4',[this.endpoint,saved.result.cancelledOperationId,saved.conversation_id,operator.operatorId])).rows[0];if(!target||target.result?.cancelledOperationId)fail('operations_agentos_operation_conflict',409);}
   const found=await this.nativeOperation(row,target);

@@ -12,7 +12,7 @@ API 与 Worker 必须使用同一 endpoint、schema 129 和当前 least-privileg
 
 Worker 心跳的 producer 是 pg-boss `autonomy-tick` 和同一 Worker 的恢复循环；后者不能发现自身进程死亡。独立 consumer 是 API 的 loopback metrics exporter，它从数据库读取心跳和真实持久任务元数据，不依赖总控模型，也不调用模型。
 
-现有 Prometheus `galaxy-api` scrape（示例 `127.0.0.1:9464/metrics`，30 秒）必须实际加载更新后的 `docs/alerts/galaxy.rules.json`。新增 `GalaxyAutonomyCollectionFailed`、`GalaxyAutonomyWorkerStale`、`GalaxyAutonomyTasksOverdue` 沿既有 `owner_role=operations` Alertmanager 路由发送。实际端口和配置路径以部署环境为准；源码示例不代表监控已经安装、启用或投递成功。沿用现有 Prometheus 服务，无需新增自主执行 timer。
+现有 Prometheus `galaxy-api` scrape（示例 `127.0.0.1:9464/metrics`，30 秒）必须实际加载更新后的 `docs/alerts/galaxy.rules.json`。新增 `GalaxyAutonomyCollectionFailed`、`GalaxyAutonomyWorkerStale`、`GalaxyAutonomyTasksOverdue` 保留 `owner_role=operations` 标签，由部署环境既有 Alertmanager 路由决定接收器；标签本身不代表已配置独立分支。当前银河主机仍走既有 management 接收器。实际端口和配置路径以部署环境为准；源码示例不代表监控已经安装、启用或投递成功。沿用现有 Prometheus 服务，无需新增自主执行 timer。
 
 API exporter 暴露 `galaxy_autonomy_collection_success`、`galaxy_autonomy_enabled_accounts`、`galaxy_autonomy_worker_health_available`、`galaxy_autonomy_worker_tick_age_seconds`、`galaxy_autonomy_worker_tick_limit_seconds`、`galaxy_autonomy_overdue_start_tasks`、`galaxy_autonomy_overdue_round_tasks`。没有心跳时 age 缺席并由 health_available=0 表示，不能补造一个零时刻。所有岗位停用时不触发值守心跳过期警报。API/Worker 本身掉线沿原 TargetDown/TargetMissing 警报发现。
 

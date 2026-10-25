@@ -141,8 +141,8 @@ export const recipientItem=x=>project(x,{...strings('id channel state errorCode 
 export const historyItem=x=>project(x,{...strings('id sequence kind createdAt operatorDisplayName'),...numbers('version revision publishedVersion')});
 export function auditItem(row){
  const time=typeof row?.createdAt==='string'&&Number.isFinite(Date.parse(row.createdAt))?row.createdAt:null;if(!time)return null;
- const safe=businessAuditMetadata({id:row.id,sequence:row.sequence,action:row.action,operator_id:null,operator_display_name:row.operatorDisplayName,operator_role:row.operatorRole,actor_kind:row.actorKind,execution_id:row.executionId,grant_id:row.grantId,account_id:row.accountId,operation_id:row.operationId,http_request_id:null,selection:row.selection,result:row.result,created_at:time});
- return {...project(safe,{...strings('id sequence action actorKind operatorDisplayName accountId operationId createdAt')}),selection:safe.selection,result:safe.result};
+ const safe=businessAuditMetadata({id:row.id,sequence:row.sequence,action:row.action,operator_id:row.operatorId,operator_display_name:row.operatorDisplayName,operator_role:row.operatorRole,actor_kind:row.actorKind,execution_id:row.executionId,grant_id:row.grantId,account_id:row.accountId,operation_id:row.operationId,http_request_id:null,selection:row.selection,result:row.result,audit_attribution:row.attribution,created_at:time});
+ return {...project(safe,{...strings('id sequence action actorKind operatorDisplayName accountId operationId createdAt')}),attribution:{...safe.attribution,initiatorOperatorId:null},selection:safe.selection,result:safe.result};
 }
 const metrics={...numbers('exposures impressions clicks bookmarks notInterested engagement requests searches measuredSearches resultKnownSearches noResults noResultRate clickedSearches clickRate followUps scanLimited')};
 const observed={...strings('target lastAppliedAt'),...numbers('publishedVersion count')};

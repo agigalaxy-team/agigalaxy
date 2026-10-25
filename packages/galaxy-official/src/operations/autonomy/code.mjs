@@ -60,7 +60,7 @@ export async function runAutonomyCode(service,input){
    // a fixed rule cannot invent their deadline, audience or content.
    if(!request||!service.dutyTools){needsHuman=true;continue;}
    const prior=(await service.db.query("SELECT call_id FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND tool='execute-operation' AND arguments->>'targetId'=$3 ORDER BY created_at LIMIT 1",[service.endpoint,taskId,targetId])).rows[0];
-   const result=await service.tool({taskId,callId:prior?.call_id??randomUUID(),tool:'execute-operation',arguments:request});
+   const result=await service.tool({taskId,callId:prior?.call_id??randomUUID(),tool:'execute-operation',arguments:request},{ruleSource:true});
    if(result.state==='waiting-human'||result.state==='unknown')needsHuman=true;
   }
  }

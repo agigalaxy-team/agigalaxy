@@ -25,6 +25,8 @@ const actionLabels:Record<string,string>={
   'management-account-password-reset':'重置管理账户临时密码','management-account-sessions-revoke':'撤销管理账户会话','management-account-delete':'删除管理账户登录身份',
   'management-account-admission-change':'调整管理账户准入','management-account-email-change':'变更管理账户登录邮箱',
   'ai-work-profile-save':'修改 AI 工作账户资料','ai-work-state-save':'启停 AI 工作账户','ai-work-assignment-save':'调整 AI 工作账户角色',
+  'ai-delegation-save':'设置总控管理范围','ai-role-create':'创建 AI 专用角色','ai-role-update':'修改 AI 专用角色','ai-role-assignment-save':'调整 AI 岗位角色',
+  'autonomy-config':'保存值守计划','autonomy-enable':'启停岗位值守','autonomy-control':'处理任务状态','autonomy-run':'安排值守事项','autonomy-settings':'调整运行配置','autonomy-strategy-task':'安排策略事项','autonomy-decision':'记录人工决定',
   'system-settings-save':'保存系统设置','system-settings-test':'测试系统连接','system-settings-apply':'应用系统设置','system-settings-credential-provision':'更新系统服务凭据',
   'users-query':'查找账户','user-read':'读取账户资料','audit-read':'读取审计记录','rule-save':'保存业务规则',
   'notice-create':'创建通知','notice-save':'修改通知','notice-publish':'发布通知','notice-withdraw':'撤回通知','notice-delivery':'执行通知投递',
@@ -94,6 +96,7 @@ type ValueKind='id'|'number'|'boolean'|'token'|'time'|'fields'|'management-phase
 const fields:Record<string,{label:string;kind:ValueKind}>={
   id:{label:'对象编号',kind:'id'},accountId:{label:'账户编号',kind:'id'},resourceId:{label:'对象编号',kind:'id'},registrationId:{label:'注册用户编号',kind:'id'},
   targetOperatorId:{label:'目标管理账户编号',kind:'id'},roleId:{label:'业务角色编号',kind:'id'},
+  delegationId:{label:'总控管理范围',kind:'id'},delegationVersion:{label:'管理范围版本',kind:'number'},sourceAiAccountId:{label:'来源 AI 账户',kind:'id'},aiAccountId:{label:'目标 AI 账户',kind:'id'},targetCount:{label:'授权目标数',kind:'number'},
   versionId:{label:'设置版本',kind:'id'},section:{label:'设置类别',kind:'token'},
   assignmentId:{label:'角色分配编号',kind:'id'},domain:{label:'AI 职责',kind:'token'},
   assignmentVersion:{label:'分配版本',kind:'number'},assignmentEnabled:{label:'分配有效',kind:'boolean'},
@@ -271,7 +274,20 @@ export function auditOutcome(item:AuditEvent):AuditOutcome{
   return auditMetadata(item.result).length?{key:'recorded',label:'结果已记录',tone:'neutral'}:{key:'unknown',label:'未记录',tone:'neutral'};
 }
 export function auditIsReception(item:AuditEvent){return item.result.state==='accepted'&&(registeredUserActions.has(item.action)||systemSettingsActions.has(item.action));}
-export function auditExecution(item:AuditEvent){return item.selection.execution==='worker'?'后台Worker':'未记录';}
+const aiDomainNames={overview:'总控',governance:'治理',messaging:'消息',discovery:'数据与发现',maintenance:'运维'};
+export function auditActorLabel(item:AuditEvent){
+ if(item.actorKind==='operations-ai-service')return item.attribution?.aiAccountName||(item.attribution?.domain?aiDomainNames[item.attribution.domain]+' AI':'AI 工作账户');
+ if(item.actorKind==='operations-executor')return '受控执行器';
+ return item.actorKind==='unknown'?'执行账户未知':item.operatorDisplayName?.trim()||'管理账户';
+}
+export function auditActorRole(item:AuditEvent){return item.actorKind==='operations-ai-service'?'AI 工作账户':item.actorKind==='operations-executor'?'受控执行器':item.actorKind==='unknown'?'身份来源未知':auditRoleLabel(item.operatorRole??'');}
+export function auditDecision(item:AuditEvent){return ({human:'人工操作','human-confirmed':'人工确认操作卡',ai:'AI 工具判断',code:'程序规则',unknown:'未记录'})[item.attribution?.decisionSource??'unknown'];}
+export function auditInitiator(item:AuditEvent){
+ const source=item.attribution;if(!source)return '未记录';
+ return source.initiatorKind==='human'?source.initiatorDisplayName||item.actorKind==='business-operator'&&item.operatorDisplayName?.trim()||'管理账户':
+  ({schedule:'值守计划','business-event':'业务事件',recovery:'恢复接续',unknown:'未记录'})[source.initiatorKind];
+}
+export function auditExecution(item:AuditEvent){return item.selection.execution==='worker'?'后台Worker':item.actorKind==='operations-ai-service'?'AI 服务账户':item.actorKind==='operations-executor'?'受控执行器':item.attribution?.cardId?'工作台确认执行':'未记录';}
 export function auditObjects(item:AuditEvent):AuditObject[]{
   const objects:AuditObject[]=[],seen=new Set<string>();
   const add=(id:unknown,kind:string,label:string,href:string|null=null)=>{
@@ -325,15 +341,17 @@ export function auditObjects(item:AuditEvent):AuditObject[]{
     else if(item.action==='resource-visibility'&&(selection.kind==='projects'||selection.kind==='methods'))add(selection.id,selection.kind,selection.kind==='methods'?'方法':'项目','/admin/operations/resources?kind='+selection.kind+'&id='+encodeURIComponent(selection.id));
     else add(selection.id,'resource','对象');
   }
+  if(item.attribution?.taskId)add(item.attribution.taskId,'autonomy-task','共同任务',item.attribution.taskReadable?'/admin/operations/ai-runs?task='+encodeURIComponent(item.attribution.taskId):null);
   return objects;
 }
 export function auditRelations(item:AuditEvent,items:AuditEvent[]):AuditRelation[]{
-  const objects=new Set(auditObjects(item).filter(object=>object.kind!=='account').map(object=>object.id));
+  const objects=new Set(auditObjects(item).filter(object=>!['account','autonomy-task'].includes(object.kind)).map(object=>object.id));
   return items.filter(other=>other.id!==item.id).flatMap(other=>{
     const basis:string[]=[];
     if(item.operationId&&item.operationId===other.operationId)basis.push('同一操作');
     if(item.httpRequestId&&item.httpRequestId===other.httpRequestId)basis.push('同一请求');
-    if(auditObjects(other).some(object=>object.kind!=='account'&&objects.has(object.id)))basis.push('同一对象');
+    if(item.attribution?.taskId&&item.attribution.taskId===other.attribution?.taskId)basis.push('同一任务');
+    if(auditObjects(other).some(object=>!['account','autonomy-task'].includes(object.kind)&&objects.has(object.id)))basis.push('同一对象');
     return basis.length?[{item:other,basis}]:[];
   });
 }

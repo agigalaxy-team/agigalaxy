@@ -36,6 +36,18 @@ export class OperationsAgentOsAuthority {
  acceptsDuty(actor){return !!actor&&this.#dutyActors.has(actor);}
  dutyContext(actor){const context=this.#dutyActors.get(actor);if(!context)fail('business_admin_denied');return context;}
  dutyMetadata(actor){const context=this.dutyContext(actor);return{...structuredClone(Object.fromEntries(Object.entries(context).filter(([key])=>!['authorizeOperation','continuation'].includes(key)))),contextSchemaVersion:1,endpoint:this.endpoint};}
+ async bindDutyAuditSourceWithin(db,actor,{callId,operationId,nativeRunId=null,ruleSource=false}={}){
+  const context=this.dutyContext(actor),row=(await db.query(`SELECT t.native_run_id,t.mode FROM operations_autonomy_tasks_v1 t
+   JOIN operations_autonomy_tool_calls_v1 c ON c.endpoint=t.endpoint AND c.task_id=t.id
+   WHERE t.endpoint=$1 AND t.id=$2 AND t.ai_account_id=$3 AND c.call_id=$4 AND c.operation_id=$5`,
+   [this.endpoint,context.taskId,context.aiAccountId,callId,operationId])).rows[0];
+  // ruleSource is an internal call option, absent from the closed HTTP body.
+  // The code consumer supplies it only after its actual rule evaluation.
+  const kind=row&&typeof nativeRunId==='string'&&nativeRunId&&row.native_run_id===nativeRunId?'ai':
+   row&&ruleSource===true&&!nativeRunId&&!row.native_run_id&&row.mode==='code'?'code':null;
+  if(!kind)return this.dutyCurrentWithin(db,Object.freeze(Object.fromEntries(Object.entries(context).filter(([key])=>key!=='auditSource'))));
+  return this.dutyCurrentWithin(db,Object.freeze({...context,auditSource:Object.freeze({kind,callId,operationId})}));
+ }
  async continuationActorWithin(db,input){
   if(input?.contextSchemaVersion!==1||input.endpoint!==this.endpoint||!input?.operation?.operationId||!input.operation.permission||input.accessPurpose!=='execution'||typeof this.durableOperationAuthorizationWithin!=='function')fail('operations_ai_duty_operation_denied');
   const context=Object.freeze({...structuredClone(input),resourceIds:Object.freeze([...(input.resourceIds??[])]),operation:Object.freeze({...input.operation}),continuation:true});

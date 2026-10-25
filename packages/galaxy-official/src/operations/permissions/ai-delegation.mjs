@@ -6,6 +6,7 @@ import {operationsPermissionCatalog} from '../../operations-permission-catalog.m
 import {aiRoleDelegationSaveSchema,delegatedAiRoleCommandSchema} from './ai-delegation-schema.mjs';
 import {roleView,roleUsageWithin} from './views.mjs';
 import {fail,parse,identity} from './helpers.mjs';
+import {businessAuditActorContext} from '../../business-admin-audit-attribution.mjs';
 
 const subset=(items,ceiling)=>items.every(item=>ceiling.includes(item));
 const zOperation=z.uuid();
@@ -33,8 +34,9 @@ export class OperationsAiRoleDelegation{
   const action={'config-save':'ai-delegation-save','role-create':'ai-role-create','role-update':'ai-role-update','assignment-save':'ai-role-assignment-save'}[kind],
    auditSelection={delegationId:row.id,delegationVersion:row.version,sourceAiAccountId:row.source_ai_account_id,roleId:result.role?.id??selection.roleId??null,aiAccountId:selection.aiAccountId??null},
    auditResult={enabled:result.role?.enabled??result.assignment?.enabled??row.enabled,version:result.role?.version??result.assignment?.version??row.version,permissionCount:result.role?.permissions?.length??row.grantable_permissions.length,targetCount:row.target_ai_account_ids.length};
-  await db.query(`INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,operation_id,selection,result,created_at,actor_kind,execution_id,grant_id)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL,NULL)`,[randomUUID(),this.endpoint,actor.operatorId,actor.role??null,action,operationId,JSON.stringify(auditSelection),JSON.stringify(auditResult),value.recordedAt,actor.kind]);
+  const context=businessAuditActorContext(this.owner.aiServiceAuthority,actor);
+  await db.query(`INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,operation_id,selection,result,created_at,actor_kind,execution_id,grant_id,actor_context)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL,NULL,$11)`,[randomUUID(),this.endpoint,actor.operatorId,actor.role??null,action,operationId,JSON.stringify(auditSelection),JSON.stringify(auditResult),value.recordedAt,actor.kind,context?JSON.stringify(context):null]);
   return value;
  }
  async save(operator,input,{authorize}={}){

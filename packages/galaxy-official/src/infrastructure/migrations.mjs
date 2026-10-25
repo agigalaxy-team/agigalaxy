@@ -1,4 +1,5 @@
 import {accountRegistrationProfilesV1MigrationSql} from './account-registration-profiles-v1-schema.mjs';
+import {businessAuditAttributionMigrationSql} from './business-audit-attribution-v1-schema.mjs';
 import {operationsAutonomyMigrationSql} from '../operations/autonomy/schema.mjs';
 import {operationsAutonomyEventsMigrationSql} from '../operations/autonomy/event-schema.mjs';
 import {operationsAutonomyMessagingMigrationSql} from '../operations/autonomy/messaging-schema.mjs';
@@ -735,6 +736,8 @@ BEGIN
  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''autonomy-config'',''autonomy-enable'',''autonomy-control'',''autonomy-run'',''autonomy-settings'',''autonomy-strategy-task'',''autonomy-decision'',''ai-delegation-save'',''ai-role-create'',''ai-role-update'',''ai-role-assignment-save''))';
 END $autonomy_audit$;
 `].join('\n')});
+
+migrations.push({version:130,sql:businessAuditAttributionMigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

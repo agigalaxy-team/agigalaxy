@@ -286,3 +286,25 @@
 @media(max-width:700px){.galaxy-workbench .wb-overview-heading{align-items:start}.galaxy-workbench h1{font-size:22px}.galaxy-workbench .wb-overview-heading>div:first-child{display:block}.galaxy-workbench .wb-period{display:block;margin-top:4px}.galaxy-workbench .wb-metrics{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:20px;padding-block:20px}.galaxy-workbench .wb-metric{padding:0 10px}.galaxy-workbench .wb-metric:nth-child(3){border-left:0;padding-left:0}.galaxy-workbench .wb-charts{grid-template-columns:minmax(0,1fr);gap:18px}.galaxy-workbench .wb-chart-side{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;gap:10px}.galaxy-workbench .wb-activity-chart{height:200px;min-height:180px}.galaxy-workbench .wb-bottom,.galaxy-workbench--communicating .wb-bottom{grid-template-columns:minmax(0,1fr)}.galaxy-workbench .wb-operation-log{min-height:160px;max-height:240px}.galaxy-workbench .wb-communication{min-height:220px}.galaxy-workbench .wb-communication--focused{min-height:380px}.galaxy-workbench .wb-sidebar{grid-template-columns:minmax(0,1fr)}.galaxy-workbench .wb-pending{grid-row:auto;min-height:220px;max-height:390px}.galaxy-workbench .wb-inventory-name{white-space:normal;text-align:center}.galaxy-workbench .wb-shortcut-choices{grid-template-columns:minmax(0,1fr)}.galaxy-workbench .wb-chart-legend{font-size:11px}.galaxy-workbench .wb-compose textarea{font-size:14px}.galaxy-workbench .wb-overview{padding:16px 13px}.galaxy-workbench .wb-read-error{align-items:start}}
 
 .wb-task-context{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--theme-elevation-150,#e8e3eb);background:var(--theme-elevation-50,#f7f4f8);font-size:12px}.wb-task-context>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.wb-task-context strong{font-size:13px}.wb-task-context span{color:var(--theme-elevation-600,#6c6273)}.wb-task-context button{padding:5px 9px;font-size:12px}
+/* Keep the desktop workbench in two independently scrolling panes. */
+@media (min-width:761px) and (max-width:1100px){
+ .galaxy-operations.galaxy-operations--workbench{height:100%;min-height:0;overflow:hidden}
+ .galaxy-workbench{height:100%;min-height:0;overflow:hidden}
+ .galaxy-workbench .wb-layout{min-width:0;min-height:0;height:100%;grid-template-columns:minmax(0,1fr) clamp(190px,24vw,250px);gap:11px;overflow:hidden}
+ .galaxy-workbench :is(.wb-primary,.wb-sidebar){height:100%;min-width:0;min-height:0;overflow-y:scroll;overflow-x:hidden;padding-right:3px;scrollbar-gutter:stable}
+ .galaxy-workbench .wb-primary{grid-template-rows:minmax(260px,1fr) 430px;gap:11px}
+ .galaxy-workbench .wb-overview{min-height:0;overflow:auto}
+ .galaxy-workbench .wb-metrics{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px}
+ .galaxy-workbench .wb-metric:nth-child(odd){border-left:0;padding-left:0}
+ .galaxy-workbench .wb-charts{grid-template-columns:minmax(0,1fr)}
+ .galaxy-workbench .wb-chart-side{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto;gap:10px}
+ .galaxy-workbench .wb-bottom{min-height:0;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(150px,.42fr) minmax(230px,.58fr);gap:11px}
+ .galaxy-workbench .wb-operation-log{min-height:0;max-height:none}
+ .galaxy-workbench .wb-sidebar{display:flex;flex-direction:column;align-items:stretch;gap:11px}
+ .galaxy-workbench .wb-pending{grid-row:auto;min-height:280px;max-height:none}
+ .galaxy-workbench .wb-pending-scroll{max-height:none}
+ .galaxy-workbench .wb-ai-domains{gap:12px}
+ .galaxy-workbench .wb-communication--focused{min-height:0}
+ .galaxy-workbench.galaxy-workbench--communicating .wb-primary{grid-template-rows:minmax(120px,.3fr) minmax(490px,1.7fr)}
+ .galaxy-workbench.galaxy-workbench--communicating .wb-bottom{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(120px,.28fr) minmax(280px,1fr)}
+}

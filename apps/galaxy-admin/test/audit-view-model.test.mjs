@@ -1,10 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditActionLabel,auditAvailableActions,auditCursor,auditDay,auditExecution,auditFilterHref,auditHref,auditKind,auditMetadata,auditNextHref,auditObjects,auditOutcome,auditPreviousHref,auditReadPath,auditRelations,normalizeAuditFilters} from '../src/lib/audit-view-model.ts';
+import {auditActionLabel,auditActorLabel,auditActorRole,auditAvailableActions,auditCursor,auditDay,auditDecision,auditExecution,auditFilterHref,auditHref,auditInitiator,auditKind,auditMetadata,auditNextHref,auditObjects,auditOutcome,auditPreviousHref,auditReadPath,auditRelations,normalizeAuditFilters} from '../src/lib/audit-view-model.ts';
 
 const id='11111111-1111-4111-8111-111111111111',object='22222222-2222-4222-8222-222222222222';
 const operation='33333333-3333-4333-8333-333333333333',request='44444444-4444-4444-8444-444444444444';
 const event=(values={})=>({id,sequence:'31',operatorId:'verified-operator',operatorRole:'administrator',action:'feedback-update',accountId:null,operationId:null,httpRequestId:null,selection:{},result:{},createdAt:'2026-10-22T01:30:00Z',...values});
+
+test('AI execution identity and verified decisions keep the exact task and original outcome distinct',()=>{
+ const attribution={schemaVersion:1,aiAccountId:object,aiAccountName:'运维岗位',domain:'maintenance',initiatorKind:'schedule',initiatorOperatorId:null,initiatorDisplayName:null,
+  decisionSource:'unknown',decisionBasis:'not-recorded',taskId:request,taskSource:'routine',taskReadable:true,cardId:null,planId:null,planVersion:null,grantId:null,grantVersion:null,strategyId:null,strategyVersionId:null},
+  item=event({actorKind:'operations-ai-service',operatorRole:null,operatorDisplayName:'不能冒用的管理员名',operatorId:'ai:'+object,attribution,result:{state:'draft'}});
+ assert.equal(auditActorLabel(item),'运维岗位');assert.equal(auditActorRole(item),'AI 工作账户');assert.equal(auditExecution(item),'AI 服务账户');assert.equal(auditInitiator(item),'值守计划');assert.equal(auditDecision(item),'未记录');assert.equal(auditOutcome(item).key,'draft');
+ assert.equal(auditDecision({...item,attribution:{...attribution,decisionSource:'ai',decisionBasis:'verified-native-tool'}}),'AI 工具判断');
+ assert.equal(auditObjects(item).find(x=>x.kind==='autonomy-task')?.href,'/admin/operations/ai-runs?task='+request);
+ assert.equal(auditObjects({...item,attribution:{...attribution,taskReadable:false}}).find(x=>x.kind==='autonomy-task')?.href,null);
+ assert.deepEqual(auditRelations(item,[item,{...item,id:operation,operationId:object}])[0].basis,['同一任务']);
+ assert.equal(auditDecision(event()),'未记录','a role label alone does not prove a historical decision');
+ assert.equal(auditDecision(event({attribution:{...attribution,initiatorKind:'human',decisionSource:'human-confirmed',decisionBasis:'confirmed-operation-card',cardId:operation}})),'人工确认操作卡');
+});
 
 test('audit rendering exposes only explicit metadata paths and never arbitrary text or nested credentials',()=>{
  const metadata=auditMetadata({id:object,count:0,state:'pending',reason:'private reason',summary:'private summary',query:'private search',note:'private note',noteHash:'private hash',token:'private token',authorization:'private authorization',

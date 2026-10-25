@@ -6,6 +6,7 @@ import {ServiceError} from './shared/service-error.mjs';
 import {businessOperatorSchema,operationsExecutorSchema,businessUsersQuerySchema,businessSummaryQuerySchema,businessAuditQuerySchema,businessRestrictionSchema,businessReleaseRestrictionSchema,businessTypeChangeSchema} from './shared/business-admin-schema.mjs';
 import {businessRestrictionView,changeAccountRestrictionWithin,changeAccountTypeWithin} from './business-admin-domain.mjs';
 import {businessAuditMetadata} from './business-admin-audit-view.mjs';
+import {businessAuditActorContext,withBusinessAuditAttribution} from './business-admin-audit-attribution.mjs';
 import {withPermissionAuditLinks} from './business-admin-permission-audit-links.mjs';
 import {BusinessAuditPages,businessAuditReadActions,businessAuditBusinessActions} from './business-admin-audit-pages.mjs';
 import {operationsAnalyticsPeriod,publicForumActivityWithin} from './operations-analytics.mjs';
@@ -90,9 +91,10 @@ export class BusinessAdminService {
  async recordWithin(db,actor,action,{accountId=null,operationId=null,selection={},result={}}={}){
   // Executor attribution is explicit and remains separate from management
   // eligibility. No reader/administrator role is fabricated for an engine.
-  const row=(await db.query(`INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,account_id,operation_id,http_request_id,selection,result,created_at,actor_kind,execution_id,grant_id)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING sequence`,
-  [randomUUID(),this.endpoint,actor.operatorId,actor.role,action,accountId,operationId,actor.httpRequestId??null,JSON.stringify(selection),JSON.stringify(result),new Date(this.now()*1000).toISOString(),actor.kind,actor.executionId??null,actor.grantId??null])).rows[0];
+  const context=businessAuditActorContext(this.executorAuthority,actor);
+  const row=(await db.query(`INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,account_id,operation_id,http_request_id,selection,result,created_at,actor_kind,execution_id,grant_id,actor_context)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING sequence`,
+  [randomUUID(),this.endpoint,actor.operatorId,actor.role,action,accountId,operationId,actor.httpRequestId??null,JSON.stringify(selection),JSON.stringify(result),new Date(this.now()*1000).toISOString(),actor.kind,actor.executionId??null,actor.grantId??null,context?JSON.stringify(context):null])).rows[0];
   return String(row.sequence);
  }
  async identityFor(row,known=new Map()){
@@ -232,7 +234,7 @@ export class BusinessAdminService {
    WHERE endpoint=$1 AND action=ANY($2::text[]) ORDER BY action`,[this.endpoint,[...reads,...business]])).rows.map(row=>row.action);
   const kindActions=query.kind==='reads'?reads:query.kind==='business'?business:null;
   const projecting=!!(query.resourceId||query.query),maximum=projecting?500:query.limit;
-  const rows=await withPermissionAuditLinks(this.db,{endpoint:this.endpoint,rows:(await this.db.query(`SELECT a.*,NULLIF(BTRIM(p.display_name),'') AS operator_display_name
+  const linkedRows=await withPermissionAuditLinks(this.db,{endpoint:this.endpoint,rows:(await this.db.query(`SELECT a.*,NULLIF(BTRIM(p.display_name),'') AS operator_display_name
    FROM business_admin_audit_v1 a LEFT JOIN operations_operator_principals_v1 p
     ON p.operator_id=a.operator_id AND p.endpoint=a.endpoint AND a.actor_kind='business-operator'
    WHERE a.endpoint=$1 AND ($2::uuid IS NULL OR a.account_id=$2)
@@ -241,6 +243,7 @@ export class BusinessAdminService {
    AND ($7::date IS NULL OR (a.created_at>=($7::date::timestamp AT TIME ZONE 'Asia/Shanghai')
     AND a.created_at<(($7::date+1)::timestamp AT TIME ZONE 'Asia/Shanghai')))
    ORDER BY a.sequence DESC LIMIT $4`,[this.endpoint,query.accountId??null,query.after??null,maximum+1,query.action??null,kindActions,query.day??null])).rows});
+  const rows=await withBusinessAuditAttribution(this.db,{endpoint:this.endpoint,rows:linkedRows,canReadTasks:hasOperationsPermission(actor,'autonomy.read')});
   const resourceKeys=['resourceId','id','sectionId','reportId','projectId','methodId','fileId','feedbackId','noticeId','runId','jobId','planId','modelRecordId','roleId','versionId'];
   const scalarValues=value=>Array.isArray(value)?value.flatMap(scalarValues):value&&typeof value==='object'?Object.values(value).flatMap(scalarValues):
    ['string','number','boolean'].includes(typeof value)?[String(value)]:[];
@@ -251,7 +254,7 @@ export class BusinessAdminService {
    // Search the same closed projection that may leave the service. Never use
    // selection/result::text: even a match could disclose hidden stored prose.
    const item=businessAuditMetadata(row);
-   if(query.resourceId&&!resourceKeys.some(key=>typeof item.selection[key]==='string'&&item.selection[key].toLowerCase()===query.resourceId.toLowerCase()))continue;
+   if(query.resourceId&&![...resourceKeys.map(key=>item.selection[key]),item.attribution?.taskId,item.attribution?.cardId].some(id=>typeof id==='string'&&id.toLowerCase()===query.resourceId.toLowerCase()))continue;
    if(needle&&!scalarValues(item).some(value=>value.toLocaleLowerCase('zh-CN').includes(needle)))continue;
    matches.push(item);if(matches.length>query.limit)break;
   }
