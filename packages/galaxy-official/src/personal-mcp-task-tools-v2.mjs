@@ -21,7 +21,7 @@ export function taskToolDefinitions(services, actor) {
     galaxy_task_v2_create: tool(taskCreationSubmissionSchema,
       'Publish exact reviewed Task bytes. Ordinary input uses existing signed Consent; typed controlled material uses locally reviewed signedIntent and exact matching materialBodies atomically. A proactive Task needs no invented Case or failure. Public Account quotas remain enforced.', input => services.assistance.createTask(actor, input), true),
     galaxy_task_v2_event: tool(z.strictObject({ taskId: z.uuid(), ...submission }),
-      'Submit a Task event covered by exact signed Consent: private suggestions, invitations, responses, applications or enrollment changes. Suggestions do not send invitations.',
+      'Submit a Task event covered by exact signed Consent: private suggestions, invitations, responses, applications or enrollment changes. Use stop-enrollment to stop new participation while existing cooperation continues. Whole-task close requires terminationIntent=terminate-task and blocks further delivery/acceptance. Suggestions do not send invitations.',
       ({ taskId, ...signed }) => services.assistance.submitTaskEvent(actor, taskId, signed), true),
     galaxy_participation_v2_propose: tool(z.strictObject({ taskId: z.uuid(), ...submission }),
       'Propose one participant scope using exact signed Consent; provider confirmation is separate and other participants remain independent.',
@@ -38,10 +38,10 @@ export function taskToolDefinitions(services, actor) {
       'Read only currently authorized retained authored events with an existing locally signed task.owner-read Consent over the exact prepared descriptor. Returns a partial event set, never a complete Task or Task write permission.',
       ({taskId,...signed}) => services.taskOwnerRead.read(actor,taskId,signed)),
     galaxy_task_v2_owner_control_prepare: tool(taskOwnerControlPrepareV2Schema,
-      'Prepare one explicit owner cancel or close after same-ID recovery, with exact event bytes, current version and private authorization scope. Query the original receipt first if an operation may already have been accepted.',
+      'Prepare one explicit owner cancel, stop-enrollment or whole-task close after same-ID recovery; close requires terminationIntent=terminate-task, with exact event bytes, current version and private authorization scope. Query the original receipt first if an operation may already have been accepted.',
       input => services.taskOwnerControl.prepare(actor,input)),
     galaxy_task_v2_owner_control: tool(z.strictObject({taskId:z.uuid(),...taskOwnerControlRequestV2Schema.shape}),
-      'Execute one explicitly reviewed cancel or close using an existing locally signed exact private assistance.publish Consent. A read permit cannot authorize this write. Preserve the original event ID and bytes; after an unknown response query the original receipt before retrying. Ending a Task retains history and does not revoke materials or settle payments.',
+      'Execute one explicitly reviewed cancel, stop-enrollment or explicit whole-task close using an existing locally signed exact private assistance.publish Consent. A read permit cannot authorize this write. Preserve the original event ID and bytes; after an unknown response query the original receipt before retrying. Stopping enrollment keeps established cooperation open. Whole-task termination retains history and does not revoke materials or settle payments.',
       ({taskId,...signed}) => services.taskOwnerControl.execute(actor,taskId,signed),true),
   };
 }
