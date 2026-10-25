@@ -687,9 +687,6 @@ def conversation_tools(gateway, *, domain=None):
                 "reason": "agentos_tool_arguments_invalid", "module": module,
                 "allowedViews": sorted(VIEWS[module]), "effectExecuted": False})
         values = filters.model_dump(mode="json", exclude_unset=True, exclude_none=True) if filters else {}
-        feedback = _query_filter_feedback(module, view, values)
-        if feedback is not None:
-            return json.dumps(feedback, ensure_ascii=False, allow_nan=False)
         if module == "content" and view == "list":
             ref = selected_query_reference(values.get("query"), run_context.metadata)
             # A literal supplied link is an exact selection, not a request for
@@ -707,6 +704,11 @@ def conversation_tools(gateway, *, domain=None):
                     # A copied exact ID cannot discard this turn's version
                     # constraint by changing the model's choice of read tool.
                     return send(run_context, fc, "read-operation-object", {"kind": refs[0]["kind"], "id": values["targetId"]})
+        # Exact references above become object reads, not windowed lists.
+        # Keep their original version/ambiguity binding before list filters.
+        feedback = _query_filter_feedback(module, view, values)
+        if feedback is not None:
+            return json.dumps(feedback, ensure_ascii=False, allow_nan=False)
         if module == "analytics":
             allowed = {"days"}
             if view in {"paths", "retention"}:
