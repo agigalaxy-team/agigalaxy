@@ -7,6 +7,7 @@ import {ServiceError} from './shared/service-error.mjs';
 import {OperationsAgentOsQueryTools} from './operations-agentos-query-tools.mjs';
 import {OperationsAgentOsActionTools} from './operations-agentos-action-tools.mjs';
 import {agentOsQueryInvalidFeedback} from './shared/operations-agentos-query-schema.mjs';
+import {operationsToolCallIdSchema} from './shared/operations-tool-call-id.mjs';
 import {conversationReadRoute,conversationPriorActionTarget,conversationPriorActionReference,conversationAccountRestrictionReference} from './operations-agentos-tool-evidence.mjs';
 import {operationsAiWorkScope} from './shared/operations-ai-use.mjs';
 import {workbenchActionCatalog,workbenchAiPromptReviewSchema} from './operations-agentos-action-catalog.mjs';
@@ -15,7 +16,7 @@ import {conversationPublicReferenceSchema,checkConversationPublicReference} from
 const fail=(code,status=403)=>{throw new ServiceError(code,status);};
 const parse=(schema,value)=>{const result=schema.safeParse(value);if(!result.success)fail('invalid_operations_agentos_request',400);return result.data;};
 const digest=value=>createHash('sha256').update(canonicalize(value)).digest('hex');
-const envelope=z.strictObject({conversationId:z.uuid(),sessionId:z.uuid(),turnId:z.uuid(),runId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),callId:z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/),
+const envelope=z.strictObject({conversationId:z.uuid(),sessionId:z.uuid(),turnId:z.uuid(),runId:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),callId:operationsToolCallIdSchema,
  tool:z.enum(['workbench-summary','query-operations','read-operation-object','read-ai-delegation','list-authorized-work','run-authorized-work','prepare-operation']),arguments:z.record(z.string(),z.unknown()),publicReference:conversationPublicReferenceSchema.optional()});
 const confirmSchema=z.strictObject({cardId:z.uuid(),operationId:z.uuid()});
 const code=error=>error?.code==='invalid_operations_agentos_query'||/^(?:operations|business_admin|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$/.test(error?.code??'')?error.code:'operations_agentos_tool_unavailable';

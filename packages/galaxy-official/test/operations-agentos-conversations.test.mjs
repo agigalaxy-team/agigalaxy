@@ -48,7 +48,9 @@ test('workbench reader without automation can converse, receives only permitted 
  const current=await gateway.authorize(authorize);assert.equal(current.execution.mode,'conversation');assert.deepEqual(current.execution.actions,[]);assert.deepEqual(current.execution.resourceIds,[]);
  await assert.rejects(gateway.authorize({...authorize,resourceId:'galaxy-governance'}),{code:'operations_agentos_domain_mismatch'});
  await assert.rejects(gateway.authorize({...authorize,resourceType:'workflows',resourceId:'galaxy-prepared-review'}),{code:'operations_agentos_domain_mismatch'});
- const summary=await gateway.execute({conversationId:row.id,sessionId:row.session_id,turnId:input.operationId,tool:'workbench-summary',arguments:{},runId:'native-original-run',callId:'summary'});
+ const providerCallId="provider/functions.current_summary:1?part='original'/"+'x'.repeat(100);
+ const summary=await gateway.execute({conversationId:row.id,sessionId:row.session_id,turnId:input.operationId,tool:'workbench-summary',arguments:{},runId:'native-original-run',callId:providerCallId});
+ assert.equal((await f.db.query('SELECT call_id FROM operations_agentos_conversation_tool_calls_v1 WHERE endpoint=$1 AND turn_id=$2',[f.endpoint,input.operationId])).rows[0].call_id,providerCallId);
  assert.equal(summary.counts.communityReports.pending,0);assert.equal(summary.counts.chatReports,null);assert.equal(summary.availability.chatReports,'not-authorized');assert.equal(JSON.stringify(summary).includes('PRIVATE_MUST_NOT_FLOW'),false);assert.equal(Object.hasOwn(summary,'ai'),false);
  assert.equal(summary.managementCapabilities.schemaVersion,1);assert.equal(summary.managementCapabilities.prompt.update.available,false);assert.equal(summary.managementCapabilities.modelConfiguration.systemSupport,'human-only');
  await assert.rejects(gateway.execute({conversationId:row.id,tool:'execute-prepared-command',arguments:{},runId:'x',callId:'x'}),{code:'invalid_operations_agentos_request'});

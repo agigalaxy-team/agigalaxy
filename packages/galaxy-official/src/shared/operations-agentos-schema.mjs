@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {operationsPermissionCodes} from '../operations-permission-catalog.mjs';
+import {operationsToolCallIdSchema} from './operations-tool-call-id.mjs';
 
 export const agentOsDomains=['overview','governance','messaging','discovery','maintenance'];
 export const agentOsOperationIdSchema=z.uuid();
@@ -13,6 +14,6 @@ export const agentOsCreateSchema=z.strictObject({operationId:z.uuid(),grantId:z.
 export const agentOsStateSchema=z.strictObject({operationId:z.uuid(),expectedRevision:z.number().int().positive(),kind:z.enum(['pause','resume','stop'])});
 export const agentOsNativeAuthoritySchema=z.strictObject({executionId:z.uuid(),operation:z.enum(['read','run']),resourceType:z.enum(['agents','workflows']).nullable().optional(),resourceId:z.string().min(1).max(100).nullable().optional()});
 export const agentOsToolSchema=z.strictObject({executionId:z.uuid(),tool:z.enum(['read-selected-content','search-selected-public-content','execute-prepared-command']),
- arguments:z.record(z.string(),z.unknown()),runId:z.string().min(1).max(128),callId:z.string().min(1).max(128)});
+ arguments:z.record(z.string(),z.unknown()),runId:z.string().min(1).max(128),callId:operationsToolCallIdSchema});
 export const agentOsRunSchema=z.strictObject({operationId:z.uuid(),message:z.string().trim().min(1).max(12000)});
 export const agentOsContinueSchema=z.strictObject({operationId:z.uuid(),runId:z.string().min(1).max(128),confirmed:z.boolean()});

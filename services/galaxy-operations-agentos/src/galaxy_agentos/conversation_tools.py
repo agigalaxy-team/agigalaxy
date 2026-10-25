@@ -6,7 +6,7 @@ from uuid import UUID
 
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .gateway import AuthorityDenied
 from .conversation_references import selected_query_reference, tool_public_reference, current_public_references
@@ -57,7 +57,7 @@ class QueryFilters(ClosedArguments):
     subjectType: Literal["person", "organization", "agent", "unknown"] | None = None
     restriction: Literal["normal", "restricted"] | None = None
     days: Annotated[Annotated[int, Field(strict=True, ge=1, le=90)] | Literal["all"] | None,
-        Field(description="Relative window: analytics accepts integers 1..90 (default 7); recommendations/overview accepts 7,30,90 (default 30); search/overview accepts 7,30,90 (default 7); content/list accepts 7,28,all (default 7). Explicitly pass the requested supported window; defaults differ by module. Returned period/basis is authoritative.")] = None
+        Field(description="Relative window: analytics accepts integers 1..90 (default 7); recommendations/overview accepts 7,30,90 (default 30); search/overview accepts 7,30,90 (default 7); content/list and feedback/list accept 7,28,all (default 7). Explicitly pass the requested supported window; defaults differ by module. Returned period/basis is authoritative.")] = None
     kind: Annotated[Literal["post", "reply", "chat", "forum", "all", "business", "reads"] | None,
         Field(description="content/list accepts post or reply; omission returns one mixed page, not a separate page for each kind. Other modules retain their declared kinds.")] = None
     topic: Topic | None = None
@@ -111,6 +111,22 @@ class AccountSummaryReadFilters(ClosedArguments):
     def selected_window(self):
         if self.days not in {None, 7, 28}:
             raise ValueError("account-summary read days must be 7 or 28")
+        return self
+
+
+class FeedbackMetadataFilters(ClosedArguments):
+    """The feedback/list route exposes metadata filters, never prose search."""
+    category: Literal["unclassified", "problem", "suggestion"] | None = None
+    module: Literal["account", "community", "chat", "work", "discovery", "other"] | None = None
+    state: Literal["pending", "processing", "closed"] | None = None
+    days: Literal[7, 28, "all"] | None = None
+    after: Annotated[str, Field(pattern=r"^[1-9][0-9]{0,18}$", max_length=19)] | None = None
+    limit: Annotated[int, Field(strict=True, ge=1, le=100)] | None = None
+
+    @model_validator(mode="after")
+    def sequence_boundary(self):
+        if self.after is not None and int(self.after) > 9223372036854775807:
+            raise ValueError("agentos_feedback_cursor_invalid")
         return self
 
 
@@ -434,7 +450,36 @@ _QUERY_FILTER_CONTRACTS = {
 }
 
 
+_FEEDBACK_FILTER_KEYS = ["category", "module", "state", "days", "after", "limit"]
+_FEEDBACK_FILTER_ENUMS = {
+    "category": ["unclassified", "problem", "suggestion"],
+    "module": ["account", "community", "chat", "work", "discovery", "other"],
+    "state": ["pending", "processing", "closed"], "days": [7, 28, "all"],
+}
+
+
+def _feedback_filter_feedback(values):
+    try:
+        FeedbackMetadataFilters.model_validate(values)
+        return None
+    except ValidationError as error:
+        # Only schema-owned paths and closed codes reach the model. Neither
+        # supplied values nor an unknown user-provided key is echoed back.
+        issues = []
+        for issue in error.errors(include_input=False, include_context=False, include_url=False)[:5]:
+            field = next((part for part in issue["loc"] if part in _FEEDBACK_FILTER_KEYS), None)
+            issues.append({"path": "filters." + field if field else "filters",
+                "code": "unsupported-filter" if issue["type"] == "extra_forbidden" else "invalid-filter-value"})
+        return {"state": "invalid-request", "reason": "agentos_tool_arguments_invalid",
+            "module": "feedback", "view": "list", "allowedFilterKeys": _FEEDBACK_FILTER_KEYS,
+            "filterEnums": _FEEDBACK_FILTER_ENUMS, "defaults": {"days": 7, "limit": 30},
+            "issues": issues, "scope": "feedback-metadata-only", "dataRead": False,
+            "effectExecuted": False, "nextStep": "use-metadata-filters-or-read-selected-feedback"}
+
+
 def _query_filter_feedback(module, view, values):
+    if (module, view) == ("feedback", "list"):
+        return _feedback_filter_feedback(values)
     contract = _QUERY_FILTER_CONTRACTS.get((module, view))
     if contract is None:
         return None
@@ -488,6 +533,14 @@ def conversation_tools(gateway, *, domain=None):
         returns one mixed page, not two samples. Use independent kind queries
         when separate post/reply samples are requested. Returned pagination and
         scanLimited determine coverage; a page count is not a total.
+
+        feedback list accepts only category=unclassified/problem/suggestion,
+        module=account/community/chat/work/discovery/other,
+        state=pending/processing/closed, days=7/28/all, after and limit (1..100,
+        default 30). It does not accept query or search titles/bodies. Its list
+        contains metadata only; for the text of a selected real feedback ID,
+        use read_operation_object(kind="feedback", id=that actual ID).
+        An invalid filter response is not a completed read or an empty result.
 
         Common views: accounts list/summary; content list/sections/tags;
         analytics overview/business/retention/paths/account; messaging

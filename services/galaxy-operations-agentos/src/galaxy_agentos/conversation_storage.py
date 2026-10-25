@@ -10,6 +10,7 @@ from copy import copy, deepcopy
 import re
 
 from agno.run.agent import RunEvent
+from .tool_call_ids import projected_tool_call_id
 
 
 TOOL_NAMES = frozenset({"current_summary", "query_operations", "read_operation_object",
@@ -26,7 +27,7 @@ def _identifier(value):
 def _tool(value):
     if not isinstance(value, dict):
         return None
-    return {"tool_call_id": _identifier(value.get("tool_call_id")),
+    return {"tool_call_id": projected_tool_call_id(value.get("tool_call_id")),
         "tool_name": value.get("tool_name") if value.get("tool_name") in TOOL_NAMES else None,
         "tool_call_error": value.get("tool_call_error") if type(value.get("tool_call_error")) is bool else None,
         "created_at": value.get("created_at") if type(value.get("created_at")) is int else None,

@@ -12,6 +12,7 @@ import {aiWorkPreparationRegistry} from './shared/operations-ai-action-registry.
 import {p13OrdinaryDraftSchema,p13OrdinaryPublishSchema} from './shared/p13-strategies-schema.mjs';
 import {operationsChatMessageVisibilitySchema} from './shared/operations-chat-message-schema.mjs';
 import {delegatedAiRolePreparationSchema,delegatedAiPromptSaveSchema} from './operations/permissions/ai-delegation-schema.mjs';
+import {operationsToolCallIdSchema} from './shared/operations-tool-call-id.mjs';
 
 const id=z.uuid(),reason=z.string().trim().min(3).max(1600),targetKind=z.enum(['post','reply']);
 const fields=(schema,excluded)=>Object.fromEntries(Object.entries(schema.shape).filter(([key])=>!excluded.includes(key)));
@@ -87,7 +88,7 @@ export const workbenchCommandSchemas=Object.freeze({
   themeVersion:z.number().int().min(0).max(2147483646),themeEnabled:z.boolean(),
  }),
 });
-export const workbenchActionToolSchema=z.strictObject({conversationId:id,sessionId:id,turnId:id,runId:z.string().min(1).max(128),callId:z.string().min(1).max(128),
+export const workbenchActionToolSchema=z.strictObject({conversationId:id,sessionId:id,turnId:id,runId:z.string().min(1).max(128),callId:operationsToolCallIdSchema,
  tool:z.enum(['list-authorized-work','run-authorized-work','prepare-operation']),arguments:z.record(z.string(),z.unknown())});
 export const workbenchEmptyArgumentsSchema=z.strictObject({});
 export const workbenchRunArgumentsSchema=z.strictObject({executionId:id});

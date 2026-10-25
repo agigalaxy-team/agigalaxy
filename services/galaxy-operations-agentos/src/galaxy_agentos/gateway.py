@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 import re
 
 import httpx
+from .tool_call_ids import valid_tool_call_id
 
 
 class AuthorityDenied(PermissionError):
@@ -139,9 +140,10 @@ class GalaxyGateway:
         if (tool not in {"workbench-summary", "query-operations", "read-operation-object", "list-authorized-work",
                 "run-authorized-work", "prepare-operation", "read-ai-delegation"}
                 or not isinstance(arguments, dict)
-                or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)
-                or not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", call_id)):
+                or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)):
             raise AuthorityDenied("agentos_tool_arguments_invalid")
+        if not valid_tool_call_id(call_id):
+            raise AuthorityDenied("agentos_tool_call_id_invalid")
         try:
             if str(UUID(session_id)) != session_id or str(UUID(turn_id)) != turn_id:
                 raise ValueError()
