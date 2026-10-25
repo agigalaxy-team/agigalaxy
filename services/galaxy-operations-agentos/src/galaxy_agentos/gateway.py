@@ -5,7 +5,8 @@ import logging
 import re
 
 import httpx
-from .tool_call_ids import rejected_tool_call_shape, valid_tool_call_id
+from .tool_call_ids import (PROVIDER_TOOL_CALL_ID_MAX_LENGTH, conversation_call_reference,
+    rejected_tool_call_shape, valid_provider_tool_call_id)
 
 
 _LOGGER = logging.getLogger("galaxy_agentos.gateway")
@@ -147,11 +148,11 @@ class GalaxyGateway:
                 or not isinstance(arguments, dict)
                 or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)):
             raise AuthorityDenied("agentos_tool_arguments_invalid")
-        if not valid_tool_call_id(call_id):
+        if not valid_provider_tool_call_id(call_id):
             # run_id and tool have passed the fixed native context checks
             # above. Never include call_id, arguments, body or exception text.
             diagnostic = {"code": "agentos_tool_call_id_invalid", "runId": run_id,
-                "tool": tool, **rejected_tool_call_shape(call_id)}
+                "tool": tool, **rejected_tool_call_shape(call_id, max_length=PROVIDER_TOOL_CALL_ID_MAX_LENGTH)}
             _LOGGER.warning("agentos_tool_call_id_invalid %s", json.dumps(diagnostic,
                 ensure_ascii=True, sort_keys=True, separators=(",", ":")))
             raise AuthorityDenied("agentos_tool_call_id_invalid")
@@ -162,7 +163,7 @@ class GalaxyGateway:
             raise AuthorityDenied("agentos_conversation_context_required") from None
         data = {"conversationId": conversation_id(user_id), "sessionId": session_id,
             "turnId": turn_id, "tool": tool, "arguments": arguments,
-            "runId": run_id, "callId": call_id}
+            "runId": run_id, "callId": conversation_call_reference(run_id, call_id)}
         if public_reference is not None:
             # The caller is this process's typed tool wrapper, not model input.
             if tool not in {"read-operation-object", "prepare-operation"}:

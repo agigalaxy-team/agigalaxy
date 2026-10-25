@@ -65,6 +65,16 @@ def native_model(profile, *, alias, base_url, api_key, headers):
         return OpenAIResponses(**common, max_output_tokens=profile.max_output_tokens,
             use_previous_response_id=False, truncation="disabled", include=["reasoning.encrypted_content"])
     from agno.models.openai.like import OpenAILike
+    class GatewayOpenAILike(OpenAILike):
+        def _format_all_messages(self, messages, compress_tool_results=False):
+            # This endpoint is the selected LiteLLM protocol adapter, whose
+            # opaque IDs can include Gemini thought signatures. Agno's OpenAI
+            # provider max-40 history remapping would discard those signatures.
+            # Preserve both original pairing values; reuse the native message
+            # formatter and backwards-compatible combined-tool expansion.
+            from agno.utils.message import normalize_tool_messages
+            return [self._format_message(message, compress_tool_results)
+                for message in normalize_tool_messages(messages)]
     # LiteLLM performs the selected upstream Anthropic/Gemini conversion. The
     # adapter and gateway stay on a single explicit Chat Completions surface.
-    return OpenAILike(**common, max_tokens=profile.max_output_tokens)
+    return GatewayOpenAILike(**common, max_tokens=profile.max_output_tokens)
