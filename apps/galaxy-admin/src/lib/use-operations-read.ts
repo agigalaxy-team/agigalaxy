@@ -21,7 +21,7 @@ function waitForReadRetry(delay:number,signal:AbortSignal):Promise<void>{
     signal.addEventListener('abort',abort,{once:true});
   });
 }
-export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean}){
+export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false,renewBeforeMs}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean;renewBeforeMs?:number}){
   // Hydration must render the exact server snapshot, even when downloading JS
   // outlives its lease. Only the mounted client can validate or renew that lease.
   const ready=useClientReady();
@@ -69,6 +69,7 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     inFlight.current={path,controller,promise};return promise;
   },[path,failureMessage,clearOnOffline,retryUnavailable]);
   const read=useCallback(()=>performRead(),[performRead]);
+  const renew=useCallback(()=>performRead(true),[performRead]);
   const clear=useCallback(()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path]);
   useLayoutEffect(()=>{
     alive.current=true;
@@ -107,10 +108,14 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   useEffect(()=>{
     if(!ready||logoutPending||!clearOnOffline||state.value===null||state.checkedAt===null||state.refreshing)return;
     const end=expiresAt(state.value,state.checkedAt);if(end<=Date.now())return;
-    const lead=Math.min(5000,Math.max(250,(end-state.checkedAt)*.2)),next=Math.max(end-lead,(state.attemptedAt??state.checkedAt)+3000);
+    const usualLead=Math.min(5000,Math.max(250,(end-state.checkedAt)*.2));
+    // A slow current-conversation read needs time to finish before the source
+    // expires. This only starts its GET earlier; the original expiry still wins.
+    const earlyLead=typeof renewBeforeMs==='number'&&Number.isFinite(renewBeforeMs)?Math.max(0,Math.min(20000,renewBeforeMs)):0;
+    const lead=Math.max(usualLead,Math.min(earlyLead,Math.max(250,(end-state.checkedAt)*.8))),next=Math.max(end-lead,(state.attemptedAt??state.checkedAt)+3000);
     const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void performRead(true);},Math.max(0,next-Date.now()));
     return()=>clearTimeout(timer);
-  },[ready,clearOnOffline,state.value,state.checkedAt,state.attemptedAt,state.refreshing,performRead,logoutPending]);
+  },[ready,clearOnOffline,state.value,state.checkedAt,state.attemptedAt,state.refreshing,performRead,logoutPending,renewBeforeMs]);
   useEffect(()=>{
     // Opt-in for a long-running operation's read surface. A transient API
     // outage can outlive a lease; keep the original GET recoverable without
@@ -121,5 +126,5 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   },[retryUnavailable,path,state.path,state.value,state.loading,state.refreshing,state.error,state.attemptedAt,performRead,logoutPending]);
   const current=state.path===path?state:{path,value:null,loading:!!path,refreshing:false,error:'',checkedAt:null,attemptedAt:null};
   const valid=!ready||!clearOnOffline||expiresAt(current.value,current.checkedAt)>Date.now();
-  return{...current,value:!logoutPending&&valid?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,clear,ready,verified:!logoutPending&&ready&&valid&&current.checkedAt!==null};
+  return{...current,value:!logoutPending&&valid?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,clear,ready,verified:!logoutPending&&ready&&valid&&current.checkedAt!==null};
 }

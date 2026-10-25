@@ -54,15 +54,15 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const verifiedSession=!signedOut&&checkedSession?.state==='signed-in'&&checkedSession.operator.id===operatorId?checkedSession:null;
   const permittedDomains=domains.map(item=>item.id as AgentOsDomain).filter(item=>agentOsCanUseDomain(verifiedSession,item)),canUseDomain=permittedDomains.includes(domain);
   const runtime=useOperationsRead<AgentOsStatus>({path:permittedDomains.length?'/v1/operations/agentos/status':null,failureMessage:'运行服务状态暂时无法取得。',clearOnOffline:true});
-  const conversation=useOperationsRead<WorkbenchConversation>({path:canUseDomain&&(focused||logSource==='actions')?agentOsConversationPath(domain):null,failureMessage:'当前对话暂时无法取得。',clearOnOffline:true,retryUnavailable:true});
+  const conversation=useOperationsRead<WorkbenchConversation>({path:canUseDomain&&(focused||logSource==='actions')?agentOsConversationPath(domain):null,failureMessage:'当前对话暂时无法取得。',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000});
   const currentConversation=canUseDomain&&conversation.value?.domain===domain?conversation.value:null;
   const actionCards=workbenchActionCards(currentConversation?.toolCards,domain),cardsWaiting=actionCards.some(card=>['processing','unknown'].includes(card.state));
   const [,tickCardClock]=useState(0),cardNow=Math.floor(Date.now()/1000);
   useEffect(()=>{
     if(!conversation.verified||!actionCards.length)return;
     const expiresAt=Math.min(...actionCards.filter(card=>card.readExpiresAt>Math.floor(Date.now()/1000)).map(card=>card.readExpiresAt));if(!Number.isFinite(expiresAt))return;
-    const timer=setTimeout(()=>{tickCardClock(value=>value+1);void conversation.read();},Math.max(0,expiresAt*1000-Date.now()));return()=>clearTimeout(timer);
-  },[actionCards,conversation.verified,conversation.read]);
+    const timer=setTimeout(()=>{tickCardClock(value=>value+1);void conversation.renew();},Math.max(0,expiresAt*1000-Date.now()));return()=>clearTimeout(timer);
+  },[actionCards,conversation.verified,conversation.renew]);
   const interactive=session.ready&&operatorId!==null&&!identityEnded&&!signedOut;
   const waitingReply=canUseDomain&&verifiedSession&&!currentConversation?.contextChanged&&waiting[domain]?.csrfToken===verifiedSession.csrfToken?waiting[domain]:undefined;
   const waitingRun=waitingReply?currentConversation?.runs.find(run=>run.operationId===waitingReply.operationId||run.runId===(waitingReply.runId??waitingReply.operationId)):undefined;
@@ -85,7 +85,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const currentToken=async(targetDomain:AgentOsDomain)=>{const current=await session.read();return current?.state==='signed-in'&&current.operator.id===operatorId&&agentOsCanUseDomain(current,targetDomain)?current.csrfToken:null;};
   const denyConversation=()=>{session.clear();conversation.clear();void session.read();};
   const reread=()=>{void conversation.read();void runtime.read();};
-  const command=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,currentToken,onProgress:conversation.read,validateResult:authorizedCommandMatches,onConflict:reread,onDenied:denyConversation,
+  const command=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,currentToken,onProgress:conversation.renew,validateResult:authorizedCommandMatches,onConflict:reread,onDenied:denyConversation,
     onCommitted:async(value,path,body)=>{
       const dismissedCard=path.endsWith('/dismiss')&&typeof body.cardId==='string'?document.querySelector('[data-workbench-card="'+body.cardId+'"]'):null;
       const returnToInput=!!dismissedCard&&(document.activeElement===document.body||dismissedCard.contains(document.activeElement));
@@ -101,7 +101,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       await conversation.read();
       if(returnToInput&&(document.activeElement===document.body||dismissedCard?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
     }});
-  const dismissCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'card-dismissal',currentToken,onProgress:conversation.read,onConflict:reread,onDenied:denyConversation,
+  const dismissCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'card-dismissal',currentToken,onProgress:conversation.renew,onConflict:reread,onDenied:denyConversation,
     validateResult:(value,intent)=>value.operationId===intent.body.operationId&&(value as typeof value&{cardId?:unknown}).cardId===intent.body.cardId,
     onCommitted:async(_value,_path,body)=>{
       const card=typeof body.cardId==='string'?document.querySelector('[data-workbench-card="'+body.cardId+'"]'):null;
@@ -112,7 +112,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       if(restoreFocus&&(document.activeElement===document.body||card?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
     }});
   const workLocked=command.locked||dismissCommand.locked;
-  const stopCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'stop-generation',currentToken,onProgress:conversation.read,onConflict:reread,onDenied:denyConversation,
+  const stopCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'stop-generation',currentToken,onProgress:conversation.renew,onConflict:reread,onDenied:denyConversation,
     validateResult:(value,intent)=>value.cancelledOperationId===intent.path.match(/\/operations\/([0-9a-f-]{36})\/cancel$/)?.[1],
     onCommitted:async(value,path,body)=>{
       const stoppedDomain=domains.find(item=>path.startsWith(agentOsConversationPath(item.id as AgentOsDomain)+'/operations/'))?.id as AgentOsDomain|undefined;
@@ -123,7 +123,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   // A local intent may still be awaiting fresh authorization, before any POST.
   // Stream only a server-observed run or an ACK/original-GET-admitted reply.
   const activeTurn=activeRun?.operationId??waitingReply?.operationId??null;
-  const stream=useConversationStream({operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,operationId:activeTurn,enabled:focused&&canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canStream&&!currentConversation?.contextChanged&&!!activeTurn,readExpiresAt:Math.min(currentConversation?.readExpiresAt??0,session.value?.state==='signed-in'?session.value.expiresAt:Number.MAX_SAFE_INTEGER),onResync:conversation.read,onDenied:denyConversation,onContextChanged:()=>{setWaiting(previous=>{const next={...previous};delete next[domain];memory.current.waiting=next;return next;});setContextNotices(previous=>({...previous,[domain]:true}));}});
+  const stream=useConversationStream({operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,operationId:activeTurn,enabled:focused&&canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canStream&&!currentConversation?.contextChanged&&!!activeTurn,readExpiresAt:Math.min(currentConversation?.readExpiresAt??0,session.value?.state==='signed-in'?session.value.expiresAt:Number.MAX_SAFE_INTEGER),onResync:conversation.renew,onDenied:denyConversation,onContextChanged:()=>{setWaiting(previous=>{const next={...previous};delete next[domain];memory.current.waiting=next;return next;});setContextNotices(previous=>({...previous,[domain]:true}));}});
   const storedStop=stopping[domain]?.csrfToken===verifiedSession?.csrfToken&&stopping[domain]?.parentOperationId===activeTurn?stopping[domain]:undefined;
   const stopInProgress=!!activeRun?.cancellation||!!storedStop||stopCommand.pending?.domain===domain;
   const canStop=canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canCancel&&!!activeTurn&&!stream.finished&&(stream.stopAvailable||!!activeRun?.runId)&&!stopInProgress&&!stopCommand.locked;
@@ -145,7 +145,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     if(operatorId)retainedPanels.delete(operatorId);
     onIdentityChange(checkedSession.state==='signed-in'?checkedSession.operator.id:null);
   },[identityEnded,checkedSession,operatorId,onIdentityChange,command.cancel,dismissCommand.cancel,stopCommand.cancel,conversation.clear]);
-  useEffect(()=>{if((!focused&&logSource!=='actions')||!conversation.verified||!currentConversation||!replying&&!cardsWaiting)return;const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void conversation.read();},2000);return()=>clearTimeout(timer);},[focused,logSource,conversation.verified,currentConversation,replying,cardsWaiting,conversation.read]);
+  useEffect(()=>{if((!focused&&logSource!=='actions')||!conversation.verified||!currentConversation||!replying&&!cardsWaiting)return;const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void conversation.renew();},2000);return()=>clearTimeout(timer);},[focused,logSource,conversation.verified,currentConversation,replying,cardsWaiting,conversation.renew]);
   const taskReady=!taskId||!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
   const sendMessage=async(message:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
     scrollPositions.current[domain]={top:conversationElement.current?.scrollTop??0,follow:true};
