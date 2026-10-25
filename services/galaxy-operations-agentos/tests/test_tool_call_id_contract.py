@@ -90,7 +90,8 @@ class ToolCallIdContractTest(unittest.TestCase):
     def test_old_gateway_reproduces_same_closed_pre_node_failure_for_synthetic_opaque_id(self):
         # This deliberately synthetic shape is not a recovered production ID.
         namespace = {"__name__": "synthetic_native30_gateway"}
-        source = Path(os.environ["NATIVE30_GATEWAY_FIXTURE"])
+        source = Path(os.environ.get("NATIVE30_GATEWAY_FIXTURE",
+            Path(__file__).with_name("fixtures") / "native30_gateway.py"))
         exec(compile(source.read_text("utf-8"), str(source), "exec"), namespace)
         old = namespace["GalaxyGateway"](self.settings, transport=self.transport)
         self.addCleanup(old.close)
