@@ -31,6 +31,9 @@
 .aw-directory tr:last-child :is(th,td){border-bottom:0}
 .aw-directory tbody tr.is-selected{background:#fff0f7}
 .aw-directory tbody tr:hover{background:#fff7fb}
+.aw-directory tbody tr[data-selectable=true]{cursor:pointer;transition:background-color .12s ease}
+.aw-directory tbody tr[data-selectable=false]{cursor:default}
+.aw-directory tbody tr:focus-within{box-shadow:inset 3px 0 var(--aw-accent);background:#fff0f7}
 .galaxy-ai-work-accounts .aw-directory button{padding:0;min-height:27px;border:0;background:none;font-weight:550;text-align:left}
 .aw-state{display:inline-flex;align-items:center;gap:7px;font-size:13px;white-space:nowrap}
 .aw-state:before{content:'';width:7px;height:7px;border-radius:50%;background:#9aa6b6}
