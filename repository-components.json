@@ -57,6 +57,9 @@
       "dataOwner": "Local identity, device and work data remain owned by the selected local ID.",
       "interfaces": [
         "Source modules used by Native/A2A; no standalone npm package is declared"
+      ],
+      "files": [
+        "scripts/check-core-runtime.mjs"
       ]
     },
     {
@@ -132,7 +135,8 @@
       ],
       "files": [
         "packages/galaxy-official/src/shared/operations-agentos-schema.mjs",
-        "packages/galaxy-official/src/shared/operations-tool-call-id.mjs"
+        "packages/galaxy-official/src/shared/operations-tool-call-id.mjs",
+        "scripts/build-api-reference.mjs"
       ]
     },
     {
@@ -181,6 +185,35 @@
       "dataOwner": "Local ID controls local identity, history, work files and upload scope; account grants remain separate.",
       "interfaces": [
         "Native runtime/server exports, MCP, host adapters and signed browser handoff"
+      ],
+      "files": [
+        "scripts/browser-worker-pack-host-journey.mjs",
+        "scripts/build-client.mjs",
+        "scripts/build-host-test-runtime.mjs",
+        "scripts/build-native-client-verifier.mjs",
+        "scripts/build-native-host.mjs",
+        "scripts/build-native-v2.mjs",
+        "scripts/install-native-host-candidate.mjs",
+        "scripts/native-client-installed-host-probe.mjs",
+        "scripts/native-client-release.mjs",
+        "scripts/native-download-inputs.mjs",
+        "scripts/native-host-release.mjs",
+        "scripts/native-license-notices.mjs",
+        "scripts/opencode-binding-bridge.mjs",
+        "scripts/opencode-binding-probe.mjs",
+        "scripts/opencode-host-probe.mjs",
+        "scripts/opencode-initialization-probe.mjs",
+        "scripts/opencode-switch-bridge.mjs",
+        "scripts/opencode-switch-probe.mjs",
+        "scripts/prepare-client-candidate.mjs",
+        "scripts/prepare-opencode-host-check.mjs",
+        "scripts/prepare-opencode-switch-check.mjs",
+        "scripts/test-client-install.mjs",
+        "scripts/verify-native-client-download.mjs",
+        "scripts/verify-native-download.mjs",
+        "scripts/verify-native-v2-candidate.mjs",
+        "scripts/verify-public-configuration-v2.mjs",
+        "scripts/verify-public-trust-package-v2.mjs"
       ]
     },
     {
@@ -478,7 +511,19 @@
     "scripts/compile-python-source.py",
     "scripts/build-product.mjs",
     "scripts/create-release-baseline.py",
-    ".github/workflows/product-checks.yml"
+    ".github/workflows/product-checks.yml",
+    "scripts/check.mjs",
+    "scripts/checks",
+    "scripts/setup-development.mjs",
+    "scripts/check-requirements.mjs",
+    "scripts/run-conformance.mjs",
+    "scripts/verify-layers.mjs",
+    "scripts/release-identifiers.mjs",
+    "scripts/prepare-public-release.py",
+    ".gitignore",
+    ".gitattributes",
+    ".dockerignore",
+    "scripts/test/components.test.mjs"
   ],
   "sourceRoots": [
     "apps",
