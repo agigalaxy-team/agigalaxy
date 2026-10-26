@@ -1,5 +1,7 @@
 # 运营监控与备份
 
+维护读取与统一页面已有实现，生产整站恢复仍未启用，本地恢复适配器不能直接当已启用。每次恢复先人工批准具体方案，保留当前账号/密码/权限/密钥，代码执行且全部计划内模块就绪统一开放。本文隔离恢复命令不等于生产恢复授权，详见[项目状态](project-status.md)。
+
 运营后台是业务管理入口；Grafana、Alertmanager 和备份命令承担各自的专业工作。本目录部署材料面向 Linux 单机，复用已有 PostgreSQL 18、Keycloak、Prosody、Garage 和 ClamAV，不替换业务权限，也不另建账户系统。
 
 源码入口为 `packages/galaxy-official/deploy/operations-stack/manage.mjs`。本批提供配置和操作实现；是否已经部署、收到了指标、投递了告警或完成过恢复，以实际运行结果为准。
@@ -100,22 +102,26 @@ node packages/galaxy-official/deploy/operations-stack/manage.mjs activate-pitr -
 
 归档为 `archive_mode=on`、`archive_timeout=60s`，archive command 通过薄 wrapper 读取 cipher 引用；两仓库默认 AES256 加密。`stanza-create` 与工具自身的归档检查成功后才返回 activated；仍需完成首个全量备份。未声明外部 tablespace 时发现其存在会停止，不能把 tablespace 恢复到旧生产路径。物理备份、归档和恢复采用 [pgBackRest 官方命令](https://pgbackrest.org/command.html)与[PG18示例](https://pgbackrest.org/user-guide.html)。
 
-## 全产品备份与日常接续
+## 配置范围内的统一备份与日常接续
 
 restic 仓库和密码使用原生 `RESTIC_REPOSITORY_FILE`、`RESTIC_PASSWORD_FILE`；远端 backend credential 可另用私有、逐行 literal 的环境文件，支持的变量在 `host.mjs` 列出，不执行 shell 或 password command。仓库密码及 pgBackRest cipher 另存受保护的灾备副本，不能只留在需要它们解密的同一仓库里。[restic 仓库准备](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html)。
 
-`backup.sources` 包含实际配置、Caddyfile与其TLS/ACME状态、精确运行 units/drop-ins、API私有状态、Prosody、Garage、CMS media、admin 与 operations 源，以及所需 API/site/auth 发行目录；符号链接在所有写入者暂停后解析到本次真实发行目录并记入捕获说明。当前pilot来源为 API0.1.22、后台0.1.2、不可变网站0.1.34及current所指的CMS发布产物，并包括publisher、日志采集和备份单位。版本目录按实际发布更新；Loki/Alloy/collector日志数据本体和隔离恢复副本不重复纳入产品备份。不得将 PGDATA 再作为普通目录复制，数据库走物理备份；客户端其他设备上的本地资料不属于服务器备份。`backup.writers` 同时包含 API、Worker、Keycloak、Prosody、Garage、CMS/publisher 等实际写入者和 Grafana，精确列出 unit/container，不停整个混有数据库的 Keycloak compose unit。显式 optional 的缺失来源会记录为 omitted，不能把它说成已备份。
+`backup.sources` 必须按当前主机配置明确列入实际配置、Caddyfile与其TLS/ACME状态、精确运行 units/drop-ins、API私有状态、Prosody、Garage、CMS media、admin 与 operations 源，以及所需 API/site/auth 发行目录；符号链接在所有写入者暂停后解析到本次真实发行目录并记入捕获说明。10月22日配置样例来源曾为API0.1.22/后台0.1.2/网站0.1.34；10月24日23:44的历史运行检查点为API0.1.71/后台0.1.55/网站0.1.75，实际备份仍必须解析本次current所指的CMS发布产物和准确配置，并包括publisher、日志采集和备份单位。版本目录按实际发布更新；Loki/Alloy/collector日志数据本体和隔离恢复副本不重复纳入产品备份。不得将 PGDATA 再作为普通目录复制，数据库走物理备份；客户端其他设备上的本地资料不属于服务器备份。`backup.writers` 同时包含 API、Worker、Keycloak、Prosody、Garage、CMS/publisher 等实际写入者和 Grafana，精确列出 unit/container，不停整个混有数据库的 Keycloak compose unit。显式 optional 的缺失来源会记录为 omitted，不能把它说成已备份。
 
 ```sh
 node packages/galaxy-official/deploy/operations-stack/manage.mjs repository-init --config /etc/galaxy/operations/configuration.json
 node packages/galaxy-official/deploy/operations-stack/manage.mjs backup --config /etc/galaxy/operations/configuration.json --type auto
 ```
 
-一次备份依次在线备份两集群、预复制已完成的仓库文件、暂停明确写入者、分别写 named restore point 并等待对应 WAL 归档、捕获文件，再恢复原先运行的服务。默认暂停上限180秒；空间不足或超时会失败并恢复服务，不发布虚假的成功恢复点。`cp --reflink=auto` 可利用支持 CoW 的文件系统；其他文件系统会真实复制，所需暂停时间必须符合实际数据量。文件较大时应采用适合该主机的快照/分离存储安排，不能用“短暂停写”的文字承诺掩盖复制时间。
+本节命令只捕获该operations-stack配置实际列明的来源，不自动发现并纳入全部新增引擎。P19动态footprint是[另一条已实现的捕获入口](../packages/galaxy-official/deploy/maintenance-agent/DEPLOYMENT.md)，会解析原生引擎及受保护贡献；只有实际timer执行命令已采用它、并且对应恢复点记录了必需贡献，才能说该次备份覆盖新增卷。旧恢复点不回填新范围；本文没有重新读取当前timer或执行备份，不能据配置样例证明当前所有引擎已获备份。
+
+本节这一路径的一次备份依次在线备份两集群、预复制已完成的仓库文件、暂停明确写入者、分别写 named restore point 并等待对应 WAL 归档、捕获文件，再恢复原先运行的服务。默认暂停上限180秒；空间不足或超时会失败并恢复服务，不发布虚假的成功恢复点。`cp --reflink=auto` 可利用支持 CoW 的文件系统；其他文件系统会真实复制，所需暂停时间必须符合实际数据量。文件较大时应采用适合该主机的快照/分离存储安排，不能用“短暂停写”的文字承诺掩盖复制时间。
 
 服务恢复后才 restic 上传。`last-capture.json` 保存工具返回的 snapshot ID、捕获子目录和各数据库标签；没有另造逐文件指纹清单。只有全部必要数据捕获并成功进入所配仓库才将 `create` 状态记为成功。若仓库仍在同机，它只提供本地恢复，不能称为离机灾备。
 
-`auto` 首次全量，之后周日全量、其他日差异；显式 `--type full` 可手工全量。PG 仓库默认保留2个全量及其所需归档链。restic 保留策略默认14天/8周/6月，可在配置调整；执行下面命令才清理本产品 tag 和 host 的旧快照，不触其他产品：
+`auto` 首次全量，之后周日全量、其他日差异；显式 `--type full` 可手工全量。自动计划默认每周日03:15 UTC（北京时间11:15，另有最多10分钟错峰）执行一次，不再每日运行。PG 仓库默认保留2个全量及其所需归档链。restic默认至少保留最近2份，并按最近1日、4周、1月各取恢复点，规则取并集；“1日”是保留规则，不会新增每日备份任务。实际现有主机另有[互斥清理与磁盘保护](../packages/galaxy-official/deploy/operations-stack/HOUSEKEEPING.md)，还保护最近已校验恢复点及未结束方案引用；日常自动清理应使用该入口。
+
+下面的原始命令只按保留配置清理本产品tag和host，不处理上述额外保护引用；有恢复方案或验证引用时优先使用housekeeping入口：
 
 ```sh
 node packages/galaxy-official/deploy/operations-stack/manage.mjs retention --config /etc/galaxy/operations/configuration.json
@@ -128,7 +134,7 @@ systemctl enable --now galaxy-operations-backup.timer
 
 ## 隔离恢复
 
-完整产品恢复必须选择同一 `last-capture.json` 对应的 restic snapshot 和 named database points。任意时点的 WAL 恢复是另一种数据库能力，不能宣称每秒都存在与之匹配的 Garage/Prosody 文件副本。
+本节仅说明已捕获范围的隔离副本，必须选择同一 `last-capture.json` 对应的 restic snapshot 和 named database points；它不是生产切换步骤。任意时点的 WAL 恢复是另一种数据库能力，不能宣称每秒都存在与之匹配的 Garage/Prosody 文件副本。
 
 ```sh
 node packages/galaxy-official/deploy/operations-stack/manage.mjs restore --config /etc/galaxy/operations/configuration.json --receipt /protected/capture-receipt.json --directory /var/lib/galaxy/restores/incident-copy
@@ -144,7 +150,9 @@ node packages/galaxy-official/deploy/operations-stack/manage.mjs restore-databas
 
 程序选完成时间早于目标的备份，仍只启动隔离新容器。目标需在实际可用 WAL 范围内；缺失 WAL、未到目标或恢复失败不会返回 ready。此命令没有对应文件副本，不用它直接替换整站数据。[restic 子目录恢复](https://restic.readthedocs.io/en/stable/050_restore.html)。
 
-`restore.json` 记录确切新容器、目录及尚未执行的激活动作。切回真实服务前，需在受控恢复环境对 **galaxy 与 galaxy-operations 两个 Keycloak realm 分别 logout-all**；清官网表不等于已清 Keycloak SSO。CMS 若启用自身认证会话，也应按其实际机制失效。确认恢复内容后由现有部署流程切换，本文命令不会覆盖生产卷、自动修改 DSN、替换 Caddy 或自动激活还原文件。
+`restore.json` 记录确切新容器、目录和未执行的激活动作；实现返回`state:isolated`、`publicActivation:false`，且尚未令上游会话失效。源码见[backup.mjs](../packages/galaxy-official/deploy/operations-stack/backup.mjs)。这里恢复出的认证库仍是历史副本：清会话、两个realm执行logout-all或CMS会话失效，均不能保留今天新设的密码、已撤销角色、当前密钥与新账户。因此本文到隔离检查为止，不提供“确认后直接切回”的生产操作路径。
+
+生产整站恢复是另一份具体计划：先由人工确认恢复点、损失/影响、保留当前账户与登录安全状态、全部计划内模块的验证与统一开放条件，再由代码执行。当前仍`production.enabled:false`；schema131 删除清单缺少39张新增表，执行器在变更前拒绝继续，不能用旧schema通过记录代替当前恢复就绪。已有[生产适配实现与真实缺口](../packages/galaxy-official/deploy/maintenance-agent/PRODUCTION_ADAPTER.md)不等于已启用或完成生产恢复；Prosody等当前原生就绪检查未满足时必须阻止后续切换。本文没有修改生产卷、DSN、Caddy或执行任何恢复。
 
 ## AI Agent 部署
 

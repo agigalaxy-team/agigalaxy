@@ -1,5 +1,7 @@
 # 给 AI 与抓取工具的直接阅读入口
 
+本地0.1.19随版镜像已整理；2026年10月24日实际核对公开main尚无该目录，因此下面三项使用官网已公开的Markdown原件。其他GitHub来源链接用于定位对应资料，本地更新须经实际发布后才代表远端同文。
+
 [项目首页](../README.md) · [文档目录](README.md)
 
 本页提供匿名可访问的原始文本地址，减少在 GitHub 页面与官网之间逐层跟随链接的需要。抓取工具对域名、来源链接或访问策略的限制由该工具所在平台控制，仓库无法代为解除；普通 HTTP 可访问也不保证每个平台都允许读取。
@@ -40,9 +42,9 @@
 | 技术栈与组成 | [technology.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md) |
 | 当前状态 | [status.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md) |
 | 文档目录 | [docs/README.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) |
-| 0.1.16 安装指南镜像 | [installation.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md) |
-| 0.1.16 宿主说明镜像 | [hosts.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md) |
-| 0.1.16 运行与数据说明镜像 | [runtime.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md) |
+| 0.1.19 安装指南镜像 | [installation.md](https://agigalaxy.org/docs/native-client/0.1.19/installation.md) |
+| 0.1.19 宿主说明镜像 | [hosts.md](https://agigalaxy.org/docs/native-client/0.1.19/hosts.md) |
+| 0.1.19 运行与数据说明镜像 | [runtime.md](https://agigalaxy.org/docs/native-client/0.1.19/runtime.md) |
 | Capsule 结构示例 | [capsule-v2.json](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/examples/capsule-v2.json) |
 
 随版指南镜像注明原始官网地址和核对日期；内容属于对应版本，不会被后续版本自动替换。官网优先入口仍是[客户端下载页](https://agigalaxy.org/downloads/)。

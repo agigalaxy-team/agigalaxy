@@ -17,13 +17,13 @@
 
 ## 客户端安装
 
-从[官网安装 ZIP](https://agigalaxy.org/downloads/native-client/0.1.19/galaxy-native-client-0.1.16-install.zip)下载并解压。ZIP 包含客户端 tgz、发行元数据、签名、协议报告和核验程序。
+从[官网安装 ZIP](https://agigalaxy.org/downloads/native-client/0.1.19/galaxy-native-client-0.1.19-install.zip)下载并解压。ZIP 包含客户端 tgz、发行元数据、签名、协议报告和核验程序。
 
 可以由安装 Agent 完成同样步骤；需要手动执行或排障时，在解压目录运行：
 
 ```text
 node verify-native-client-download.mjs .
-tar -xzf galaxy-native-client-0.1.16.tgz
+tar -xzf galaxy-native-client-0.1.19.tgz
 cd package
 npm ci --ignore-scripts
 node setup.mjs https://agigalaxy.org
