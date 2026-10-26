@@ -1,0 +1,9 @@
+{
+  "upstreamCommit": "cd24bb838301df1a9087e2e132b344e5b8a99963",
+  "digestEncoding": "SHA-256 of UTF-8 text with LF newlines",
+  "accountArchivePackages": {
+    "package.json": "eef9c991f4b4df3f0ba3000d6421bf14a3682b676943bd9095d16c165ce4512e",
+    "apps/api/package.json": "18a96949e9c33bf066cc2abec6a2177abe7d1ad888d0157737e791628ebfd756"
+  },
+  "chartController": "8bf55a0aec31060b3b16ac369c048f7ead1779c56f126df5080f43b87db34d50"
+}

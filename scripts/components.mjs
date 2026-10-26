@@ -31,6 +31,7 @@ export function affectedComponents(catalog,files,imports=[]){
 }
 const run=(args,cwd)=>{const r=spawnSync(args[0],args.slice(1),{cwd,stdio:'inherit',windowsHide:true});if(r.error)throw r.error;if(r.status!==0)throw Error('Component command failed: '+r.status);};
 function gitFiles(base){const result=spawnSync('git',['diff','--no-renames','--name-only','-z',`${base}...HEAD`],{cwd:repositoryRoot,encoding:'utf8',windowsHide:true});if(result.status!==0)throw Error('Cannot resolve explicit comparison base.');return result.stdout.split('\0').filter(Boolean);}
+function gitDeletedFiles(base){const args=base?['diff','--no-renames','--diff-filter=D','--name-only','-z',`${base}...HEAD`]:['ls-files','--deleted','-z'];const result=spawnSync('git',args,{cwd:repositoryRoot,encoding:'utf8',windowsHide:true});if(result.status!==0)throw Error('Cannot resolve removed source inputs.');return result.stdout.split('\0').filter(Boolean);}
 function ordered(catalog,ids){const result=[],visiting=new Set(),done=new Set();function visit(id){if(done.has(id))return;if(visiting.has(id))throw Error('Component build dependency cycle.');visiting.add(id);const c=catalog.components.find(c=>c.id===id);if(!c)throw Error('Unknown component '+id);for(const dep of c.buildDependsOn??[])visit(dep);visiting.delete(id);done.add(id);result.push(c);}for(const id of ids)visit(id);return result;}
 
 // Static relative imports document real source coupling. This is deliberately
@@ -55,8 +56,9 @@ export async function componentImports(catalog,root=repositoryRoot){
 
 // Documentation may have no build consumer. Unmapped engineering inputs must
 // stop CI instead of silently producing a successful empty matrix.
-export function unmappedEngineeringInputs(plan){
- return plan.unclassified.filter(name=>!(/\.(md|txt)$/i.test(name)||/^docs\/.*\.(html?|png|jpe?g|webp|gif|svg|ico)$/i.test(name)||/(^|\/)(LICENSE|NOTICE|COPYING)(\.[^/]*)?$/i.test(name)));
+export function unmappedEngineeringInputs(plan,deletedFiles=[]){
+ const removed=new Set(deletedFiles);
+ return plan.unclassified.filter(name=>!removed.has(name)&&!(/\.(md|txt)$/i.test(name)||/^docs\/.*\.(html?|png|jpe?g|webp|gif|svg|ico)$/i.test(name)||/(^|\/)(LICENSE|NOTICE|COPYING)(\.[^/]*)?$/i.test(name)));
 }
 const within=(base,target)=>{const part=relative(base,target);return part===''||(!isAbsolute(part)&&part!=='..'&&!part.startsWith('..'+sep));};
 async function physicalDestination(target){
@@ -85,7 +87,7 @@ async function cli(){
  if(action==='plan'){
   const selected=value('--files'),base=value('--base');if(!selected&&!base)throw Error('plan requires --files JSON or --base Git commit.');
   const files=selected?JSON.parse(await readFile(resolve(selected),'utf8')):gitFiles(base),graph=await componentImports(catalog),plan=affectedComponents(catalog,files,graph.imports);
-  const blockedInputs=unmappedEngineeringInputs(plan),result={...plan,include:plan.affected.map(component=>({component})),changedFiles:files.length,blockedInputs};
+  const deletedFiles=gitDeletedFiles(base),blockedInputs=unmappedEngineeringInputs(plan,deletedFiles),result={...plan,removedUnclassified:plan.unclassified.filter(name=>deletedFiles.includes(name)),include:plan.affected.map(component=>({component})),changedFiles:files.length,blockedInputs};
   const output=value('--output');if(output)await writeFile(resolve(output),JSON.stringify(result,null,2)+'\n');else console.log(JSON.stringify(result));if(blockedInputs.length)throw Error('Unmapped engineering inputs: '+blockedInputs.join(', '));return;
  }
  if(action==='imports'){const result=await componentImports(catalog);const output=value('--output');if(output)await writeFile(resolve(output),JSON.stringify(result,null,2)+'\n');else console.log(JSON.stringify(result,null,2));return;}

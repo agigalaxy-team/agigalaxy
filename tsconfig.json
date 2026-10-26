@@ -39,6 +39,9 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/galaxy-admin"
+    "apps/galaxy-admin",
+    "services",
+    "tools/qa",
+    "outputs"
   ]
 }

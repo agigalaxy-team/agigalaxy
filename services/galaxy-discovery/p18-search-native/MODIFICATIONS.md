@@ -3,19 +3,19 @@
 Fixed upstream: Openpanel-dev/openpanel commit
 `cd24bb838301df1a9087e2e132b344e5b8a99963`, GNU Affero General Public License v3.
 This complete source also retains the previously applied Galaxy account-scope
-patch and original upstream notices and dependency lock.
+adaptation and original upstream notices and dependency lock.
 
 The native `/export/charts` controller's `series` and legacy `events` schemas
 previously stripped optional definition IDs, although its native formatter
 supports `event.id` and sorts results by their sums. Search and no-result series
 both use the event name `search`; stripping their IDs made a nonempty result
-ambiguous. This patch preserves optional nonempty IDs of at most100 characters
+ambiguous. This adaptation preserves optional nonempty IDs of at most100 characters
 in those two schemas. Requests without an ID keep their prior behavior. It
 adds the fixed corresponding-source Link to successful chart responses.
 
 Project-bound native reader authentication, account scope, data storage,
 query/filter algorithms, metrics, date handling and formatter are unchanged.
-The build only runs this patch's one schema/controller/formatter leaf; native
+The build only runs this adaptation's one schema/controller/formatter leaf; native
 query execution and project lookup in that leaf are explicit doubles. Empty
 live native reads are separate evidence. No analytics events, models or keys
 are created, and no migration is run.
@@ -25,10 +25,10 @@ https://agigalaxy.org/open-source/openpanel-public2-galaxy-search-20261023/sourc
 
 ## Build and AI-agent deployment
 
-Extract the complete archive, enter `p18-search-native-cd24bb8-r1/`, and run:
+Extract the complete build context using `../SOURCE_BUILD.md`, enter the chosen output directory, and run:
 `docker build -f Dockerfile.p18-search-native -t galaxy-openpanel-api:2-p18-search-native-20261023-r1 .`
 The source retains the native pnpm lock, original build files and all previous
-account-scope modifications, plus this patch, focused check and deployment tool.
+account-scope modifications, plus the maintained controller adaptation and focused check.
 No runtime env or credentials belong in the archive.
 
 Publish the complete archive and README before activation. Preserve the existing

@@ -52,6 +52,6 @@ CI 先按真实 Git base 计算 matrix，再调用相同的 `check`/`build`。�
 
 ## 当前源码收束的构建边界
 
-Discovery 的 OpenPanel 完整源码是显式外部输入，组装工具、修改、许可与受控检查随仓库保存，见 [SOURCE_BUILD.md](../services/galaxy-discovery/SOURCE_BUILD.md)。`upstream-reference` 只是对应修改的参考片段，不能直接构建完整 OpenPanel。Gateway 的运行源码与固定上游分开，部署模板要求显式镜像，不把历史 tag 当默认安装目标。
+Discovery 的 OpenPanel 完整源码是显式外部输入，组装工具、修改、许可与受控检查随仓库保存，见 [SOURCE_BUILD.md](../services/galaxy-discovery/SOURCE_BUILD.md)。固定 OpenPanel 输入由 `source-inputs.json` 描述，实际适配源码与许可随组件保存；不重复保留上游前像目录。Gateway 的运行源码与固定上游分开，部署模板要求显式镜像，不把历史 tag 当默认安装目标。
 
 管理邮件验证码 provider 的 Java21/Keycloak26.7.3 编译仍缺本机工具；主题构建不能替代这项编译。维护恢复配置入口保持关闭：当前 schema131 删除归属缺39张新增表，执行器先拒绝再执行，生产删除及整站恢复仍受阻。恢复的历史回归源保留原失败与平台边界，不把它们全部写成已通过。

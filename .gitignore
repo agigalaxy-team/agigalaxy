@@ -55,3 +55,9 @@ __pycache__/
 
 # Verified public website download cache
 /apps/galaxy-site/.cache/
+
+# Local diagnostics and discarded editor/merge files
+*.log
+*.bak
+*.orig
+*.rej

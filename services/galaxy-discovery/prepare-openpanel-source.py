@@ -1,9 +1,11 @@
 """Prepare the fixed full OpenPanel context from an explicitly supplied archive.
 
 This never downloads, installs dependencies, starts Docker or loads runtime
-configuration. The partial reference trees in Git are patch inputs, not an API.
+configuration. Git contains maintained adaptations and fixed input metadata,
+not a second copy of the upstream application.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -13,6 +15,7 @@ import tarfile
 HERE = Path(__file__).resolve().parent
 TOP = 'openpanel-account-scope-cd24bb8-r1'
 COMMIT = 'cd24bb838301df1a9087e2e132b344e5b8a99963'
+SOURCE_INPUTS = json.loads((HERE / 'source-inputs.json').read_text(encoding='utf-8'))
 
 
 def physical(path):
@@ -44,22 +47,28 @@ def same_text(left, right):
     return left.decode('utf-8').replace('\r\n', '\n') == right.decode('utf-8').replace('\r\n', '\n')
 
 
+def text_digest(value):
+    return hashlib.sha256(value.decode('utf-8').replace('\r\n', '\n').encode('utf-8')).hexdigest()
+
+
 def verify_inputs(archive, rows):
     lookup = {row.name: row for row in rows}
     required = ['LICENSE.md', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'apps/api/package.json']
     for name in required:
         if TOP + '/' + name not in lookup:
             raise ValueError('Incomplete corresponding source: missing ' + name)
-    # Bind the provided full source to the exact reviewed patch context, rather
-    # than accepting an unrelated archive with a matching filename/version.
-    references = HERE / 'openpanel-account-scope' / 'upstream-reference'
+    # Bind the full source to the fixed inputs without retaining duplicate
+    # upstream source trees in the application repository.
+    for name, expected in SOURCE_INPUTS['accountArchivePackages'].items():
+        row = lookup.get(TOP + '/' + name)
+        if row is None or not row.isfile() or text_digest(archive.extractfile(row).read()) != expected:
+            raise ValueError('Full source does not match the fixed account-scope input: ' + name)
     changed = HERE / 'openpanel-account-scope' / 'modified-source'
-    for root, names in [(references, ['package.json', 'apps/api/package.json']),
-                        (changed, [str(path.relative_to(physical(changed))).replace(os.sep, '/') for path in physical(changed).rglob('*.ts')])]:
-        for name in names:
-            row = lookup.get(TOP + '/' + name)
-            if row is None or not row.isfile() or not same_text(archive.extractfile(row).read(), physical(root / name).read_bytes()):
-                raise ValueError('Full source does not match the fixed account-scope input: ' + name)
+    for path in physical(changed).rglob('*.ts'):
+        name = path.relative_to(physical(changed)).as_posix()
+        row = lookup.get(TOP + '/' + name)
+        if row is None or not row.isfile() or not same_text(archive.extractfile(row).read(), path.read_bytes()):
+            raise ValueError('Full source does not match the fixed account-scope input: ' + name)
 
 
 def overlay(source, destination):
@@ -69,7 +78,7 @@ def overlay(source, destination):
         if 'artifacts' in relative.parts or '__pycache__' in relative.parts:
             continue
         if path.is_symlink():
-            raise ValueError('Patch support cannot contain a symbolic link.')
+            raise ValueError('Adaptation source cannot contain a symbolic link.')
         if path.is_file():
             target = physical(destination / relative)
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -103,8 +112,8 @@ def prepare(source, output, variant):
     shutil.copyfile(HERE / 'openpanel-account-scope' / 'Dockerfile.account-scope', physical(output / 'Dockerfile.account-scope'))
     if variant == 'p18':
         name = Path('apps/api/src/controllers/export.controller.ts')
-        expected = physical(HERE / 'p18-search-native/current-reference' / name).read_bytes()
-        if not same_text(physical(output / name).read_bytes(), expected):
+        expected = SOURCE_INPUTS['chartController']
+        if text_digest(physical(output / name).read_bytes()) != expected:
             raise ValueError('P18 export controller preimage does not match the fixed account-scope context.')
         shutil.copyfile(physical(HERE / 'p18-search-native/modified-source' / name), physical(output / name))
         overlay(HERE / 'p18-search-native', output / 'galaxy-p18-search-native')

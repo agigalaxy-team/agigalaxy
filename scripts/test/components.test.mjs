@@ -34,6 +34,8 @@ test('root tools and shared UI imports are read as actual source edges',async()=
 });
 test('unmapped engineering code and configuration fail classification',()=>{
  for(const file of ['tools/new-service-adapter.mjs','docs/unknown-contract.json'])assert.deepEqual(unmappedEngineeringInputs(plan(file)),[file]);
+ const retired='experiments/retired/tool.mjs',unknown='tools/new-service-adapter.mjs';
+ assert.deepEqual(unmappedEngineeringInputs(plan(retired,unknown),[retired]),[unknown]);
 });
 test('ordinary documentation may intentionally produce an empty matrix',()=>{
  const p=plan('docs/operator-notes.md','docs/architecture-view.html','README.md');assert.deepEqual(p.affected,[]);assert.deepEqual(unmappedEngineeringInputs(p),[]);

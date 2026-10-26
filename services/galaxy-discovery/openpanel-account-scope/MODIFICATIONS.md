@@ -7,7 +7,7 @@ Fixed commit: `cd24bb838301df1a9087e2e132b344e5b8a99963`.
 Modification date: 2026-10-23. License: preserve upstream `LICENSE.md`
 (GNU Affero General Public License v3) and all upstream notices. The full
 modified corresponding source, dependency lock, native Dockerfile, this build
-Dockerfile, patch and checks are supplied together. The server operator must
+Dockerfile, adaptations and checks are supplied together. The server operator must
 make that full artifact available to network users before activation. Planned
 source URL, published by the root operator only:
 https://agigalaxy.org/open-source/openpanel-public2-galaxy-accounts-20261023/source.tar.gz
@@ -27,7 +27,7 @@ The native retention engine applies the same generated filter to entry and
 return events. It retains the rolling 12-week window, weekly grouping,
 window-local first qualifying activity and `on_or_after` cumulative semantics.
 `toStartOfWeek` has no explicit mode/timezone in this fixed upstream version;
-the patch does not change that or relabel it as registration retention.
+the adaptation does not change that or relabel it as registration retention.
 
 In account scope only, native Sankey anchors and ordered events use the same
 filter, and the source key becomes `(profile_id, session_id)` before native
@@ -59,7 +59,7 @@ Use the existing protected discovery configuration and project-bound read
 client; never print it. Build from the complete source package, frozen lock
 and Dockerfile. Publish this exact modified corresponding source before
 activating the new API image. Retain runtime env/ports/volumes/project IDs;
-there is no new configuration or migration for this patch. A successful image
+there is no new configuration or migration for this adaptation. A successful image
 build is not a service activation. Check health, project binding, rejected
 scope/UUID/filter requests, scope acknowledgement, and both scoped native
 cohort/path responses when the root activates. Do not capture upstream
