@@ -488,6 +488,16 @@
           "{node}",
           "--test",
           "services/galaxy-discovery/test/gorse-gateway-pagination.test.mjs"
+        ],
+        [
+          "{python}",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "services/galaxy-discovery",
+          "-p",
+          "test_prepare_openpanel_source.py"
         ]
       ],
       "sourceEntries": [
@@ -496,11 +506,12 @@
       "configurationInputs": [
         "services/galaxy-discovery/Dockerfile.gorse-gateway"
       ],
-      "artifact": "separate-gorse-gateway-image",
+      "artifact": "gorse-gateway-image-and-fixed-openpanel-source-contexts",
       "dataOwner": "Gateway adds no business database; source eligibility is owned by the Hub and the engine owns its derived index.",
       "interfaces": [
         "Closed authenticated Gorse proxy paths and bounded pagination"
-      ]
+      ],
+      "buildLimit": "OpenPanel requires the explicitly supplied full cd24bb8 account-scope source archive; prepare-openpanel-source.py assembles a new context and never builds/activates an image or migrates data. See services/galaxy-discovery/SOURCE_BUILD.md."
     }
   ],
   "globalInputs": [
