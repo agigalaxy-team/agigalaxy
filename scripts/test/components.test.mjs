@@ -40,6 +40,9 @@ test('unmapped engineering code and configuration fail classification',()=>{
 });
 test('ordinary documentation may intentionally produce an empty matrix',()=>{
  const p=plan('docs/operator-notes.md','docs/architecture-view.html','README.md');assert.deepEqual(p.affected,[]);assert.deepEqual(unmappedEngineeringInputs(p),[]);
+ const originals=plan('originals/conversations/discussion.jsonl','docs/public/publish-manifest.json','WORK_STATUS.md');
+ assert.deepEqual(originals.affected,[]);assert.deepEqual(unmappedEngineeringInputs(originals),[]);
+ assert.equal(ownerOf(catalog,'docs/technical/native-client.md'),'native-client');
 });
 test('CLI writes an actionable failed plan and exits nonzero for unmapped source',async()=>{
  const destination=await mkdtemp(join(tmpdir(),'plan-cli-'));const files=join(destination,'files.json'),report=join(destination,'plan.json');

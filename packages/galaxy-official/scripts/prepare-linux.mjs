@@ -23,6 +23,6 @@ try {
   console.log(JSON.stringify({ event: 'linux_deployment_prepared', files: Object.keys(files).length,
     releaseId: release.releaseId, schema: release.migrations.at(-1).version, applied: false, secretsIncluded: false }));
 } catch {
-  console.error(JSON.stringify({ event: 'linux_deployment_preparation_failed', help: 'See docs/linux-deployment-v1.md' }));
+  console.error(JSON.stringify({ event: 'linux_deployment_preparation_failed', help: 'See docs/operations/deployment.md' }));
   process.exitCode = 1;
 }

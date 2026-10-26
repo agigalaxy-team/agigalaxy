@@ -107,7 +107,7 @@ test('real restic encrypted copies restore PostgreSQL facts/files and invalidate
     assert.equal(receipt.manifest.version, 2);
     assert.equal(receipt.manifest.database.inventoryOrdering, 'jsonb-text-c-v1');
     assert.equal(receipt.manifest.schema, migrations.at(-1).version); assert.equal(receipt.restoreVerified, false);
-    const inventory = JSON.parse(await readFile(new URL('../../../../docs/data-inventory-v0.1.json', import.meta.url), 'utf8'));
+    const inventory = JSON.parse(await readFile(new URL('../../../../docs/technical/reference/data-inventory-v0.1.json', import.meta.url), 'utf8'));
     assert.equal(inventory.schema, receipt.manifest.schema, 'data inventory must describe the actual backed-up schema');
     assert.deepEqual(inventory.tables.map(row => row.table).sort(), Object.keys(receipt.manifest.database.tables).sort());
     assert.equal(inventory.export.datasets, ownerExportDatasets.length);

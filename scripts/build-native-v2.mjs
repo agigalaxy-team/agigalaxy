@@ -53,8 +53,8 @@ export async function buildNativeV2({destination,version=INITIAL_VERSION,sourceD
  const pkg={name:'@galaxy/native-client',version,private:true,license:'Apache-2.0',type:'module',engines:{node:'>=22.13.0'},scripts:{start:'node galaxy.js',setup:'node setup.mjs'},exports:{'./runtime':'./runtime.js','./server':'./server.js','./opencode':'./opencode.js'},files:['*.js','*.mjs','windows-notify-icon.ps1','dist','skills','host-templates','host-capabilities.json','native-v2.json','source-hashes.json','README.md','HOSTS.md','LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','license-inventory.json','third-party-licenses'],dependencies};
  for(const[name,value]of Object.entries({'package.json':pkg,'native-v2.json':manifest,'source-hashes.json':sources}))await writeFile(join(destination,name),JSON.stringify(value,null,2)+'\n',{flag:'wx'});
  await cp(join(sourceDirectory,'integrations/native-v2/skills'),join(destination,'skills'),{recursive:true,errorOnExist:true});
- await cp(join(sourceDirectory,'docs/native-client-v2.md'),join(destination,'README.md'),{errorOnExist:true});
- await cp(join(sourceDirectory,'docs/native-client-hosts-v2.md'),join(destination,'HOSTS.md'),{errorOnExist:true});
+ await cp(join(sourceDirectory,'docs/technical/native-client.md'),join(destination,'README.md'),{errorOnExist:true});
+ await writeFile(join(destination,'HOSTS.md'),'# 宿主配置\n\n宿主配置、能力和平台限制统一见 [README](README.md#宿主配置与能力)。安装器只生成所选宿主连接，具体配置由同包 host-configs.mjs 与 host-capabilities.json 提供。\n',{flag:'wx'});
  await cp(join(sourceDirectory,'integrations/native-v2/codex'),join(destination,'host-templates/codex'),{recursive:true,errorOnExist:true});
  await cp(join(sourceDirectory,'integrations/native-v2/compact-app/dist'),join(destination,'dist'),{recursive:true,errorOnExist:true});
  for(const name of ['LICENSE','NOTICE'])await cp(join(sourceDirectory,'integrations/native-v2/legal',name),join(destination,name),{errorOnExist:true});

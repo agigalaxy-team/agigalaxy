@@ -19,7 +19,7 @@ export function operationsPlan(config) {
       { name: 'alloy', image: config.images.alloy, listen: '127.0.0.1:' + config.alloy.port, memoryMiB: 192, fileInputs: config.logs, journalInputs: config.journals, dockerInputs: config.dockerLogs, requestId: 'structured-metadata' }
     ],
     metrics: { mode: config.monitoring.mode, prometheus: config.monitoring.prometheusUrl, alertmanager: config.monitoring.alertmanagerUrl, api: config.monitoring.apiTarget, worker: config.monitoring.workerTarget,
-      receiverConfigurationFile: config.monitoring.receiverConfigurationFile, inheritedRules: ['docs/alerts/galaxy.rules.json', 'docs/monitoring/external.rules.json'] },
+      receiverConfigurationFile: config.monitoring.receiverConfigurationFile, inheritedRules: ['docs/operations/examples/alerts/galaxy.rules.json', 'docs/operations/examples/monitoring/external.rules.json'] },
     writes: { configuration: config.directories.configuration, data: config.directories.data, systemdUnits: ['galaxy-operations.service', 'galaxy-operations-backup.service', 'galaxy-operations-backup.timer', ...(config.dockerLogs.length ? ['galaxy-component-logs.service'] : []), ...(config.monitoring.mode === 'managed' ? ['galaxy-prometheus.service', 'galaxy-alertmanager.service', 'galaxy-blackbox-exporter.service'] : [])] },
     pitr: config.postgres.map(pg => ({ stanza: pg.id, container: pg.container, composeFile: pg.composeFile, projectName: pg.projectName, service: pg.service, database: pg.database,
       dataPath: pg.dataPath, repository: pg.repository, cipherReference: pg.cipherFile, archiveMode: 'enable-on-explicit-activate-pitr', image: config.images.postgresBackup })),

@@ -8,7 +8,7 @@ import { STORE_VERSION } from '../../packages/galaxy-core/src/domain/local-model
 const json = async path => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
 
 test('frozen current version contract matches service package and local store; unknown Manifest versions fail closed', async () => {
-  const contract = await json('../../docs/version-contract.json');
+  const contract = await json('../../docs/technical/reference/version-contract.json');
   assert.equal((await json('../../packages/galaxy-official/package.json')).version, contract.versions.service);
   assert.equal(STORE_VERSION, contract.versions.coreStore);
   assert.deepEqual(migrations.map(item => item.version), contract.versions.databaseMigrations);

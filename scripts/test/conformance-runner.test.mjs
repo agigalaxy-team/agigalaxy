@@ -19,7 +19,7 @@ test('runner does not turn absent, skipped, failed or changed-source checks into
 test('conformance source identity includes runtime JSON, proxy routes and both native TypeScript entrypoints', async () => {
   const current = await fingerprint();
   const expected = ['packages/galaxy-official/public-docs.json', 'packages/galaxy-official/api-reference.mjs',
-    'packages/galaxy-official/deploy/caddy-routes.mjs', 'docs/version-contract.json',
+    'packages/galaxy-official/deploy/caddy-routes.mjs', 'docs/technical/reference/version-contract.json',
     'integrations/host-adapters/opencode-stable/configured-galaxy.tui.ts',
     'integrations/host-adapters/opencode-stable/galaxy.tui.ts'];
   for (const name of expected) assert.match(current.files[name], /^[0-9a-f]{64}$/, name);

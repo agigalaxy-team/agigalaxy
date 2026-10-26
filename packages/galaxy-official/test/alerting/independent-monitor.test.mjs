@@ -48,7 +48,7 @@ test('real HTTPS API probes flow through Blackbox and Prometheus, fail and recov
     });
     tls.on('tlsClientError',()=>{});
     const origin='https://127.0.0.1:'+await startServer(tls);
-    const config=JSON.parse(await readFile(new URL('../../../../docs/monitoring/blackbox.json',import.meta.url),'utf8'));
+    const config=JSON.parse(await readFile(new URL('../../../../docs/operations/examples/monitoring/blackbox.json',import.meta.url),'utf8'));
     config.modules.fixture_untrusted=structuredClone(config.modules.galaxy_readiness_https);
     for(const name of ['galaxy_website_https','galaxy_liveness_https','galaxy_readiness_https'])
       config.modules[name].http.tls_config.ca_file=caPath;
@@ -66,7 +66,7 @@ test('real HTTPS API probes flow through Blackbox and Prometheus, fail and recov
     assert.match(await probe('galaxy_readiness_https','http://127.0.0.1:'+apiPort+'/readyz'),/^probe_success 0$/m);
     mode='wrong-body';assert.match(await probe('galaxy_readiness_https'),/^probe_success 0$/m);
     mode='redirect';assert.match(await probe('galaxy_readiness_https'),/^probe_success 0$/m);mode='normal';
-    const prom=JSON.parse(await readFile(new URL('../../../../docs/monitoring/prometheus.example.json',import.meta.url),'utf8'));
+    const prom=JSON.parse(await readFile(new URL('../../../../docs/operations/examples/monitoring/prometheus.example.json',import.meta.url),'utf8'));
     prom.global={scrape_interval:'1s',scrape_timeout:'900ms',evaluation_interval:'1s'};
     // Rule timing is covered by promtool fixtures; this test exercises real scrape transport.
     delete prom.rule_files;delete prom.alerting;

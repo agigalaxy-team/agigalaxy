@@ -37,6 +37,6 @@ try {
   await writeFile(receipt, JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ action, receiptWritten: true, deployed: action==='attempt'&&result.state==='activated',state:result.state??null }));
 } catch(error) {
-  console.error(JSON.stringify({ event: 'service_release_failed',...(error.code==='release_resource_missing'?{code:error.code,resource:error.resource}:{}), help: 'See docs/service-release-rollback-v1.md; no raw database configuration is logged.' }));
+  console.error(JSON.stringify({ event: 'service_release_failed',...(error.code==='release_resource_missing'?{code:error.code,resource:error.resource}:{}), help: 'See docs/operations/deployment.md; no raw database configuration is logged.' }));
   process.exitCode = 1;
 } finally { if (db) await db.end(); }

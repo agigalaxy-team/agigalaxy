@@ -49,7 +49,7 @@ test('authored API reference matches real dispatch, concrete service methods and
       const request=Readable.from([Buffer.from(JSON.stringify(input))]);request.method=item.method;request.headers={'content-type':'application/json'};
       await assert.rejects(dispatch({request,response:{setHeader(){},getHeader(){}},requestId:id,url:new URL(path,endpoint),send(){}}),error=>error.status===401,key);
     }
-    assert.ok((await readFile(new URL('../../../docs/'+item.documentation,import.meta.url),'utf8')).length);
+    assert.ok((await readFile(new URL('../../../'+item.documentation,import.meta.url),'utf8')).length);
   }
 });
 
@@ -71,7 +71,7 @@ test('every documented external route reaches the exact-host Caddy matcher, whil
 
 test('generated API reference and error declarations match current source and never supply a production API server',async()=>{
   await buildApiReference({check:true});
-  const catalog=JSON.parse(await readFile(new URL('../../../docs/development-api-reference-v1.json',import.meta.url),'utf8'));
+  const catalog=JSON.parse(await readFile(new URL('../../../docs/technical/reference/development-api-reference-v1.json',import.meta.url),'utf8'));
   assert.deepEqual(catalog.publicApiEndpoints,[]);assert.equal(catalog.kind,'development-source-reference-not-deployed-api');
   assert.equal(catalog.entries.length,businessApiReference.length+specialApiReference.length);
 });

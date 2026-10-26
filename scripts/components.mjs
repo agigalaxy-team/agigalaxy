@@ -18,7 +18,7 @@ export function ownerOf(catalog,input){
   .find(item=>name===item.root||name.startsWith(item.root+'/'))?.id??null;
 }
 export function affectedComponents(catalog,files,imports=[]){
- const changed=files.map(normalize),globalInput=name=>catalog.globalInputs.some(input=>name===input||name.startsWith(input+'/')),all=changed.some(globalInput),nonBuildInput=name=>(catalog.nonBuildInputs??[]).includes(name);
+ const changed=files.map(normalize),globalInput=name=>catalog.globalInputs.some(input=>name===input||name.startsWith(input+'/')),all=changed.some(globalInput),nonBuildInput=name=>(catalog.nonBuildInputs??[]).some(input=>name===input||name.startsWith(input+'/'));
  const impactedFiles=new Set(changed);let imported=true;
  while(imported){imported=false;for(const edge of imports)if(edge.kind==='source'&&!impactedFiles.has(edge.source)&&[...impactedFiles].some(name=>edge.target===name||edge.target+'.ts'===name||edge.target+'.tsx'===name||edge.target+'.mjs'===name)){
   impactedFiles.add(edge.source);imported=true;

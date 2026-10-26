@@ -1,0 +1,26 @@
+name: 文档纠错 / Documentation
+description: 指出公开资料中的错误、缺失或与实际版本不一致的内容。
+title: "[文档] "
+body:
+  - type: markdown
+    attributes:
+      value: "此反馈会公开显示。请只提供可公开内容，移除令牌、私聊和个人信息。"
+  - type: input
+    id: location
+    attributes:
+      label: 文档或页面
+      description: 文件路径或公开页面地址。
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 哪些描述不准确
+      description: 说明原描述、观察到的实际情况及适用版本。
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: 建议修正与依据
+      description: 可附公开来源、脱敏截图或建议文案。

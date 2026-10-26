@@ -11,3 +11,4 @@
 *.tgz binary
 *.gz binary
 *.jar binary
+originals/** -text

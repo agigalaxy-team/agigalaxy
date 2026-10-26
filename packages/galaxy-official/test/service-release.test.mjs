@@ -19,7 +19,7 @@ test('frozen service tree and runtime are bound to the pinned manifest and confi
     })));
     assert.equal(receipt.schema, migrations.at(-1).version);
     for (const name of resources.service) assert.ok(release.files[name], name);
-    assert.ok(release.files['docs/service-release-rollback-v1.md']);
+    assert.ok(release.files['docs/operations/deployment.md']);
     assert.equal(release.files['packages/galaxy-official/scripts/test-postgres.mjs'], undefined);
     const env = { GALAXY_RELEASE_DIRECTORY: directory, GALAXY_RELEASE_SHA256: receipt.manifestSha256, GALAXY_CONFIGURATION_VERSION: 'cfg-1' };
     assert.equal((await runtimeServiceRelease(env, 'api', join(directory, release.entries.api))).releaseId, 'candidate-1');

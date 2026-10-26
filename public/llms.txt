@@ -1,6 +1,6 @@
 # Galaxy local Integration Pack
 
-This file describes the original local-only Integration Pack, not the entire Galaxy project. Shared Native client documentation is in docs/native-client-v2.md; repository documentation links to current product requirements.
+This file describes the original local-only Integration Pack, not the entire Galaxy project. Shared Native client documentation is in docs/technical/native-client.md; repository documentation links to current product requirements.
 
 Local pack integration model:
 - Galaxy Integration Pack combines a local stdio MCP server with an AI-guided Skill.

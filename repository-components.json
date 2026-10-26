@@ -137,8 +137,27 @@
         "packages/galaxy-official/src/shared/operations-agentos-schema.mjs",
         "packages/galaxy-official/src/shared/operations-tool-call-id.mjs",
         "scripts/build-api-reference.mjs",
-        "docs/alerts/galaxy.rules.json",
-        "docs/alerts/galaxy.rules.test.json"
+        "docs/operations/examples/alerts/galaxy.rules.json",
+        "docs/operations/examples/alerts/galaxy.rules.test.json",
+        "docs/operations/examples/metrics-cost.example.json",
+        "docs/operations/examples/prometheus.example.yml",
+        "docs/operations/examples/request-quotas.example.json",
+        "docs/operations/examples/resource-budgets.example.json",
+        "docs/operations/examples/runtime-logging.example.conf",
+        "docs/operations/examples/alerts/owners.example.json",
+        "docs/operations/examples/alerts/alertmanager.example.json",
+        "docs/operations/examples/monitoring/blackbox.json",
+        "docs/operations/examples/monitoring/external.rules.json",
+        "docs/operations/examples/monitoring/host-network.example.json",
+        "docs/operations/examples/monitoring/oci-cost.example.json",
+        "docs/operations/examples/monitoring/prometheus.example.json",
+        "docs/operations/examples/monitoring/galaxy-cost-collector.service",
+        "docs/operations/examples/monitoring/galaxy-cost-collector.timer",
+        "docs/operations/examples/monitoring/galaxy-node-exporter.service",
+        "docs/operations/examples/slo/pilot-profile.json",
+        "docs/operations/examples/slo/pilot.rules.json",
+        "docs/operations/examples/monitoring/external.rules.test.json",
+        "docs/operations/examples/slo/pilot.rules.test.json"
       ]
     },
     {
@@ -223,7 +242,9 @@
         "test/native-local-cloud-sync.test.mjs",
         "test/native-local-continuity.test.mjs",
         "test/native-local-panel-state.test.mjs",
-        "test/native-public-account-tools.test.mjs"
+        "test/native-public-account-tools.test.mjs",
+        "docs/technical/native-client.md",
+        "scripts/test/client-artifact.test.mjs"
       ]
     },
     {
@@ -548,7 +569,6 @@
     "scripts/check.mjs",
     "scripts/checks",
     "scripts/setup-development.mjs",
-    "scripts/check-requirements.mjs",
     "scripts/run-conformance.mjs",
     "scripts/verify-layers.mjs",
     "scripts/release-identifiers.mjs",
@@ -558,7 +578,9 @@
     ".dockerignore",
     "scripts/test/components.test.mjs",
     ".oxlintrc.json",
-    "scripts/test/check.test.mjs"
+    "scripts/test/check.test.mjs",
+    "scripts/test/conformance-runner.test.mjs",
+    "scripts/test/version-contract.test.mjs"
   ],
   "sourceRoots": [
     "apps",
@@ -576,34 +598,31 @@
     "test",
     "tools",
     ".github",
-    "deploy"
+    "deploy",
+    "originals"
   ],
   "sourceFiles": [
     "README.md",
     "README.en.md",
     "CONTRIBUTING.md",
     "MAINTAINERS.md",
-    "CHANGELOG.md",
     "SECURITY.md",
-    "MANIFESTO.md",
     "llms.txt",
-    "llms-full.txt",
     "AGENTS.md",
     ".editorconfig",
     ".gitignore",
     ".gitattributes",
-    ".dockerignore",
     "package.json",
     "package-lock.json",
     "repository-components.json",
     "tsconfig.json",
-    "next-env.d.ts",
     "components.json",
     "vite.config.ts",
     "next.config.ts",
     ".oxlintrc.json",
     ".oxfmtrc.json",
-    "RIGHTS.md"
+    "RIGHTS.md",
+    "WORK_STATUS.md"
   ],
   "sourceExtensions": [
     ".mjs",
@@ -652,7 +671,8 @@
     ".woff",
     ".woff2",
     ".ttf",
-    ".otf"
+    ".otf",
+    ".jsonl"
   ],
   "sourceExcludedDirectories": [
     "node_modules",
@@ -693,7 +713,7 @@
     "integrations/codex/plugins/galaxy-integration-pack/skills/galaxy-integration/agents/openai.yaml",
     "packages/galaxy-official/deploy/operations-stack/postgres/galaxy-pgbackrest",
     "packages/galaxy-official/public-docs/manifest.json",
-    "examples/capsule-v2.json",
+    "docs/public/examples/capsule-v2.json",
     "services/galaxy-operations-agentos/Dockerfile",
     "services/galaxy-operations-agentos/pyproject.toml",
     "services/galaxy-operations-agentos/requirements.lock",
@@ -701,8 +721,8 @@
     "services/galaxy-model-gateway/Dockerfile",
     "services/galaxy-model-gateway/SOURCE.json",
     "services/galaxy-model-gateway/config/models.empty.yaml",
-    "docs/component-catalog.md",
-    "docs/licensing-and-source.md",
+    "docs/technical/architecture.md",
+    "docs/technical/source-and-licensing.md",
     "services/galaxy-model-gateway/SOURCE_PROVENANCE.json",
     "tools/qa/operations-read-renewal/SOURCE.json",
     "apps/galaxy-auth/providers/management-email-change/src/main/resources/META-INF/services/org.keycloak.services.resource.RealmResourceProviderFactory",
@@ -711,22 +731,37 @@
     "deploy/model-gateway/model-settings.compose.yaml",
     "services/galaxy-discovery/source-inputs.json",
     "services/galaxy-discovery/openpanel-account-scope/LICENSE.md",
-    "docs/data-inventory-v0.1.json",
-    "docs/threat-model-v0.1.json",
-    "docs/version-contract.json",
-    "docs/api-error-catalog-v0.1.json",
-    "docs/development-api-reference-v1.json",
-    "docs/alerts/galaxy.rules.json",
-    "docs/alerts/galaxy.rules.test.json"
+    "docs/technical/reference/data-inventory-v0.1.json",
+    "docs/technical/reference/threat-model-v0.1.json",
+    "docs/technical/reference/version-contract.json",
+    "docs/technical/reference/api-error-catalog-v0.1.json",
+    "docs/technical/reference/development-api-reference-v1.json",
+    "docs/operations/examples/alerts/galaxy.rules.json",
+    "docs/operations/examples/alerts/galaxy.rules.test.json",
+    "docs/README.md",
+    "docs/product/overview.md",
+    "docs/operations/deployment.md",
+    "originals/README.md",
+    "docs/public/publish-manifest.json"
   ],
   "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog.",
   "nonBuildInputs": [
     ".editorconfig",
-    "docs/api-error-catalog-v0.1.json",
-    "docs/data-inventory-v0.1.json",
-    "docs/development-api-reference-v1.json",
-    "docs/threat-model-v0.1.json",
-    "docs/version-contract.json",
-    "tools/build_reader_bundle.py"
+    "docs/technical/reference/api-error-catalog-v0.1.json",
+    "docs/technical/reference/data-inventory-v0.1.json",
+    "docs/technical/reference/development-api-reference-v1.json",
+    "docs/technical/reference/threat-model-v0.1.json",
+    "docs/technical/reference/version-contract.json",
+    "tools/build_reader_bundle.py",
+    "originals",
+    "docs/product",
+    "docs/public",
+    "WORK_STATUS.md",
+    "tools/docs.py",
+    "tools/sync_public_docs.py",
+    "test/test_public_docs_tools.py",
+    "scripts/check-requirements.mjs",
+    "test/test_docs.py",
+    ".github/ISSUE_TEMPLATE/config.yml"
   ]
 }

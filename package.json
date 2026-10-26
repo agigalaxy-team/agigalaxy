@@ -35,7 +35,9 @@
     "build:site": "node scripts/build-product.mjs --site-only",
     "build:demo": "vinext build",
     "start:demo": "wrangler dev --config dist/server/wrangler.json",
-    "setup": "node scripts/setup-development.mjs"
+    "setup": "node scripts/setup-development.mjs",
+    "docs:check": "node scripts/check-requirements.mjs",
+    "docs:public": "python tools/sync_public_docs.py"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

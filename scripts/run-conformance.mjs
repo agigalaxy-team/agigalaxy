@@ -27,7 +27,7 @@ export async function fingerprint(sourceRoot = root) {
     'scripts/prepare-client-candidate.mjs', 'scripts/build-api-reference.mjs',
     'packages/galaxy-official/public-docs.json', 'packages/galaxy-official/api-reference.mjs',
     'packages/galaxy-official/deploy/caddy-routes.mjs', 'packages/galaxy-official/scripts/build_public_docs.py',
-    'docs/version-contract.json'];
+    'docs/technical/reference/version-contract.json'];
   async function walk(directory) {
     for (const entry of await readdir(join(sourceRoot, directory), { withFileTypes: true })) {
       const path = portable(join(directory, entry.name));

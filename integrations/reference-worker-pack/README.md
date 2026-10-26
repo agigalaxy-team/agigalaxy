@@ -92,7 +92,7 @@ real external transport, TLS and peer credentials require the owner's explicit
 deployment and selection. The local reference's authenticated SDK context means
 only local-owner transport, not public identity verification.
 
-Development methods are in [贡献与开发说明](../../CONTRIBUTING.md); tool commands are in [Development checks](../../docs/development-checks.md).
+Development methods are in [贡献与开发说明](../../CONTRIBUTING.md); tool commands are in [Development checks](../../docs/technical/development.md).
 
 The workflow uses actual independent child processes, the locked SDK, signed
 HTTP business requests, PGlite and a filesystem A2A journal. It verifies normal

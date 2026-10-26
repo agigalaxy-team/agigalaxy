@@ -13,7 +13,7 @@ test('client artifact has only approved source/dependencies and deterministic ha
     assert.equal(first.files, second.files);
     assert.deepEqual(Object.keys(first.dependencies), ['canonicalize', 'ipaddr.js', 'jose', 'zod']);
     const manifest = JSON.parse(await readFile(join(a, 'package.json'), 'utf8'));
-    const contract = JSON.parse(await readFile(new URL('../../docs/version-contract.json', import.meta.url), 'utf8'));
+    const contract = JSON.parse(await readFile(new URL('../../docs/technical/reference/version-contract.json', import.meta.url), 'utf8'));
     assert.equal(manifest.version, contract.versions.client);
     assert.equal(manifest.private, true);
     assert.equal(manifest.scripts, undefined);

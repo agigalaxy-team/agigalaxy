@@ -1,0 +1,36 @@
+name: 使用反馈与建议 / Feedback
+description: 提交可公开的使用问题或功能建议。
+title: "[反馈] "
+body:
+  - type: markdown
+    attributes:
+      value: "请勿上传凭据、完整私聊、个人资料或未公开项目材料。私人账户问题请先使用官网的适当入口。"
+  - type: dropdown
+    id: category
+    attributes:
+      label: 反馈类型
+      options:
+        - 实际使用问题
+        - 功能建议
+        - 安装与宿主兼容
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 使用场景与目的
+      description: 希望完成什么，遇到了什么阻碍。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 版本与环境
+      description: 如官网页面、客户端版本、宿主与操作系统；请移除本地用户名等私人信息。
+  - type: textarea
+    id: details
+    attributes:
+      label: 复现步骤、实际结果与期望
+      description: 功能建议可说明当前做法及希望改进的部分。
+    validations:
+      required: true

@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "source": "docs/public/site-files/.github/ISSUE_TEMPLATE/config.yml",
+      "target": ".github/ISSUE_TEMPLATE/config.yml"
+    },
+    {
+      "source": "docs/public/site-files/.github/ISSUE_TEMPLATE/documentation.yml",
+      "target": ".github/ISSUE_TEMPLATE/documentation.yml"
+    },
+    {
+      "source": "docs/public/site-files/.github/ISSUE_TEMPLATE/feedback.yml",
+      "target": ".github/ISSUE_TEMPLATE/feedback.yml"
+    },
+    {
+      "source": "docs/public/site-files/.github/PULL_REQUEST_TEMPLATE.md",
+      "target": ".github/PULL_REQUEST_TEMPLATE.md"
+    },
+    {
+      "source": "docs/public/site-files/.gitignore",
+      "target": ".gitignore"
+    },
+    {
+      "source": "docs/public/site-files/CONTRIBUTING.md",
+      "target": "CONTRIBUTING.md"
+    },
+    {
+      "source": "docs/public/site-files/MANIFESTO.md",
+      "target": "MANIFESTO.md"
+    },
+    {
+      "source": "docs/public/site-files/README.en.md",
+      "target": "README.en.md"
+    },
+    {
+      "source": "docs/public/site-files/README.md",
+      "target": "README.md"
+    },
+    {
+      "source": "docs/public/site-files/RIGHTS.md",
+      "target": "RIGHTS.md"
+    },
+    {
+      "source": "docs/public/site-files/SUPPORT.md",
+      "target": "SUPPORT.md"
+    },
+    {
+      "source": "docs/public/README.md",
+      "target": "docs/README.md"
+    },
+    {
+      "source": "docs/public/ai-reading.md",
+      "target": "docs/ai-reading.md"
+    },
+    {
+      "source": "docs/assets/client-entry.svg",
+      "target": "docs/assets/client-entry.svg"
+    },
+    {
+      "source": "docs/assets/community-value.svg",
+      "target": "docs/assets/community-value.svg"
+    },
+    {
+      "source": "docs/assets/galaxy-mark.png",
+      "target": "docs/assets/galaxy-mark.png"
+    },
+    {
+      "source": "docs/assets/hub-topology.svg",
+      "target": "docs/assets/hub-topology.svg"
+    },
+    {
+      "source": "docs/assets/network-functions.svg",
+      "target": "docs/assets/network-functions.svg"
+    },
+    {
+      "source": "docs/assets/website-home.jpg",
+      "target": "docs/assets/website-home.jpg"
+    },
+    {
+      "source": "docs/public/business-and-participation.md",
+      "target": "docs/business-and-participation.md"
+    },
+    {
+      "source": "docs/public/client-entry.md",
+      "target": "docs/client-entry.md"
+    },
+    {
+      "source": "docs/public/community-governance.md",
+      "target": "docs/community-governance.md"
+    },
+    {
+      "source": "docs/public/ecosystem-and-hubs.md",
+      "target": "docs/ecosystem-and-hubs.md"
+    },
+    {
+      "source": "docs/public/getting-started.md",
+      "target": "docs/getting-started.md"
+    },
+    {
+      "source": "docs/public/growth-and-contribution.md",
+      "target": "docs/growth-and-contribution.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.16/hosts.md",
+      "target": "docs/native-client/0.1.16/hosts.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.16/installation.md",
+      "target": "docs/native-client/0.1.16/installation.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.16/runtime.md",
+      "target": "docs/native-client/0.1.16/runtime.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.19/hosts.md",
+      "target": "docs/native-client/0.1.19/hosts.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.19/installation.md",
+      "target": "docs/native-client/0.1.19/installation.md"
+    },
+    {
+      "source": "docs/public/native-client/0.1.19/runtime.md",
+      "target": "docs/native-client/0.1.19/runtime.md"
+    },
+    {
+      "source": "docs/public/network.md",
+      "target": "docs/network.md"
+    },
+    {
+      "source": "docs/public/open-components.md",
+      "target": "docs/open-components.md"
+    },
+    {
+      "source": "docs/public/privacy.md",
+      "target": "docs/privacy.md"
+    },
+    {
+      "source": "docs/public/status.md",
+      "target": "docs/status.md"
+    },
+    {
+      "source": "docs/public/technical-faq.md",
+      "target": "docs/technical-faq.md"
+    },
+    {
+      "source": "docs/public/technology.md",
+      "target": "docs/technology.md"
+    },
+    {
+      "source": "docs/public/vision-and-architecture.md",
+      "target": "docs/vision-and-architecture.md"
+    },
+    {
+      "source": "docs/public/examples/capsule-v2.json",
+      "target": "examples/capsule-v2.json"
+    },
+    {
+      "source": "docs/public/site-files/tools/build_reader_bundle.py",
+      "target": "tools/build_reader_bundle.py"
+    }
+  ],
+  "readerDocuments": [
+    "MANIFESTO.md",
+    "docs/growth-and-contribution.md",
+    "docs/community-governance.md",
+    "docs/client-entry.md",
+    "docs/vision-and-architecture.md",
+    "docs/ecosystem-and-hubs.md",
+    "docs/business-and-participation.md",
+    "docs/open-components.md",
+    "docs/technical-faq.md",
+    "docs/native-client/0.1.19/runtime.md",
+    "docs/native-client/0.1.19/hosts.md",
+    "docs/native-client/0.1.19/installation.md",
+    "docs/network.md",
+    "docs/getting-started.md",
+    "docs/privacy.md",
+    "docs/technology.md",
+    "docs/status.md"
+  ]
+}

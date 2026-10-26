@@ -24,6 +24,6 @@ package.json 的实际导出为：
 
 ## 开发和集成
 
-根 setup 安装本目录锁定依赖。相关检查可使用根 npm run test:a2a 或对应 node --test 文件，前置与边界见[开发检查](../../docs/development-checks.md)。
+根 setup 安装本目录锁定依赖。相关检查可使用根 npm run test:a2a 或对应 node --test 文件，前置与边界见[开发检查](../../docs/technical/development.md)。
 
-Native 配置、预览及使用方式见[客户端说明](../../docs/native-client-v2.md)。[架构](../../docs/architecture.md)说明与 Hub、Core、HTTP 和 MCP 的关系；[项目状态](../../docs/project-status.md)区分源码、发行与实际运行范围。
+Native 配置、预览及使用方式见[客户端说明](../../docs/technical/native-client.md)。[架构](../../docs/technical/architecture.md)说明与 Hub、Core、HTTP 和 MCP 的关系；[项目状态](../../WORK_STATUS.md)区分源码、发行与实际运行范围。

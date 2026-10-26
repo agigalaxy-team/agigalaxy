@@ -1,10 +1,10 @@
 # Galaxy 宿主适配
 
-本目录把银河 Native、MCP 工具与原 AI 宿主的实际能力连接起来。安装普通客户端请从[下载说明](../../docs/downloads.md)进入，不需要先理解全部适配器。
+本目录把银河 Native、MCP 工具与原 AI 宿主的实际能力连接起来。安装普通客户端请从[安装说明](../../docs/public/getting-started.md)进入，不需要先理解全部适配器。
 
 ## 接入与职责
 
-[Native 客户端说明](../../docs/native-client-v2.md)描述身份、连接、工具、工作资料、预览和结果返回。模型由用户的宿主提供，适配器不创建模型账户、不替换模型设置，也不因打开菜单自动扩大权限。
+[Native 客户端说明](../../docs/technical/native-client.md)描述身份、连接、工具、工作资料、预览和结果返回。模型由用户的宿主提供，适配器不创建模型账户、不替换模型设置，也不因打开菜单自动扩大权限。
 
 OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设置和原工作接续。安装后的普通工作采集使用其公开事件接口；其他宿主的配置生成不自动具有相同后台事件能力。
 
@@ -18,6 +18,6 @@ OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设�
 
 ## 开发
 
-根 setup 安装常用开发依赖，检查按受影响模块选择，见[开发指南](../../docs/development.md)和[检查](../../docs/development-checks.md)。当前客户端发行、自己的 AI 与本地数据范围见[状态](../../docs/project-status.md)和[数据说明](../../docs/privacy-and-data.md)。
+根 setup 安装常用开发依赖，检查按受影响模块选择，见[开发指南](../../docs/technical/development.md)和[检查](../../docs/technical/development.md)。当前客户端发行、自己的 AI 与本地数据范围见[状态](../../WORK_STATUS.md)和[数据说明](../../docs/product/data-and-files.md)。
 
 旧独立 adapter 和兼容入口按各自源码使用；不能从目录或生成配置数量推定采用人数、相同界面能力或稳定发行。

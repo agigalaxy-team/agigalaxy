@@ -1,74 +1,43 @@
-"""Build reader entries from the core repository's public-material subset."""
-
+"""Generate optional reader files from the selected public output; no private inputs."""
+import argparse
+import json
 from pathlib import Path
-import re
 from urllib.parse import urljoin
+import re
 
-ROOT = Path(__file__).resolve().parents[1]
-RAW = "https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/"
-DOCUMENTS = [
-    "MANIFESTO.md",
-    "docs/growth-and-contribution.md",
-    "docs/community-governance.md",
-    "docs/client-entry.md",
-    "docs/vision-and-architecture.md",
-    "docs/ecosystem-and-hubs.md",
-    "docs/business-and-participation.md",
-    "docs/open-components.md",
-    "docs/technical-faq.md",
-    "docs/native-client/0.1.19/runtime.md",
-    "docs/native-client/0.1.19/hosts.md",
-    "docs/native-client/0.1.19/installation.md",
-    "docs/network.md",
-    "docs/getting-started.md",
-    "docs/privacy.md",
-    "docs/technology.md",
-    "docs/status.md",
-]
+RAW = 'https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/'
 
 
-def absolute_links(text, source):
-    def replace(match):
-        target = match.group(2)
-        return match.group(1) + urljoin(RAW + source, target) + ")"
-
-    return re.sub(r"(\]\()([^\s)]+)\)", replace, text)
+def reader_outputs(files, documents):
+    index = ['# Galaxy public materials', '', 'Choose relevant pages; the combined bundle is optional.', '',
+             '- Reading guide: ' + RAW + 'docs/ai-reading.md', '', '## Documents']
+    sections = ['# 银河公开资料合并阅读包', '',
+                'Generated from canonical public sources. Preserve each version and date boundary.', '']
+    for source in documents:
+        content = files[source].decode('utf-8').strip()
+        title = next((line[2:] for line in content.splitlines() if line.startswith('# ')), source)
+        index.append('- ' + title + ': ' + RAW + source)
+        content = re.sub(r'(\]\()([^\s)]+)\)',
+                         lambda m: m[1] + urljoin(RAW + source, m[2]) + ')', content)
+        sections.extend(['---', '', 'Public counterpart: ' + RAW + source, '', content, ''])
+    example = 'examples/capsule-v2.json'
+    sections.extend(['---', '', 'Public counterpart: ' + RAW + example, '',
+                     '# Capsule v2 合成结构示例', '', '```json', files[example].decode('utf-8').strip(), '```', ''])
+    return {'llms.txt': ('\n'.join(index) + '\n').encode('utf-8'),
+            'llms-full.txt': '\n'.join(sections).encode('utf-8')}
 
 
 def main():
-    index = [
-        "# Galaxy / AGI Galaxy public materials",
-        "",
-        "Public project and user documentation. Beta; core implementation managed separately.",
-        "",
-        "Choose documents for the current question. The combined bundle is optional, not a required reading sequence.",
-        "For source development, use that checkout's AGENTS.md and relevant component guide; this public bundle is not a development checklist.",
-        "",
-        "- Reading guide: " + RAW + "docs/ai-reading.md",
-        "- Combined plain text: " + RAW + "llms-full.txt",
-        "- Capsule JSON example (synthetic): " + RAW + "examples/capsule-v2.json",
-        "",
-        "## Documents",
-    ]
-    sections = [
-        "# 银河公开技术与使用资料合并阅读包",
-        "",
-        "Generated from the core repository public-material subset. Links point to the public counterpart repository.",
-        "Read the stated dates, release scopes, implementation boundaries and limitations.",
-        "Use this bundle when full public background is needed; source development starts with the checkout's AGENTS.md and relevant component guide.",
-        "",
-    ]
-    for source in DOCUMENTS:
-        content = (ROOT / source).read_text(encoding="utf-8").strip()
-        title = next((line[2:] for line in content.splitlines() if line.startswith("# ")), source)
-        index.append("- " + title + ": " + RAW + source)
-        sections.extend(["---", "", "Public counterpart: " + RAW + source, "", absolute_links(content, source), ""])
-    example = "examples/capsule-v2.json"
-    sections.extend(["---", "", "Public counterpart: " + RAW + example, "", "# Capsule v2 合成结构示例", "", "```json", (ROOT / example).read_text(encoding="utf-8").strip(), "```", ""])
-    (ROOT / "llms.txt").write_text("\n".join(index) + "\n", encoding="utf-8", newline="\n")
-    (ROOT / "llms-full.txt").write_text("\n".join(sections), encoding="utf-8", newline="\n")
-    print("Updated llms.txt and llms-full.txt from " + str(len(DOCUMENTS)) + " public documents and one synthetic example.")
+    from sync_public_docs import plan, apply_plan
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, required=True, help='Explicit local output directory; never uploads')
+    parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--check', action='store_true')
+    args = parser.parse_args()
+    files, _ = plan()
+    selected = {key: files[key] for key in ('llms.txt', 'llms-full.txt')}
+    print(json.dumps(apply_plan(args.output, selected, args.dry_run, args.check), ensure_ascii=False))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

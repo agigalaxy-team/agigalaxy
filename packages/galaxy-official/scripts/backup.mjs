@@ -69,6 +69,6 @@ try {
 } catch {
   await publishStatus(false);
   console.error(JSON.stringify({ event: 'backup_operation_failed', action: ['init', 'create', 'check', 'copy', 'retention', 'restore','prepare-cleanup','cleanup'].includes(action) ? action : 'invalid',
-    help: 'node scripts/backup.mjs <init|create|check|copy|retention|restore|prepare-cleanup|cleanup> <absolute-config.json> <new-absolute-receipt.json>; cleanup may have partly committed; retry the original approved plan; see docs/backup-recovery-v1.md' }));
+    help: 'node scripts/backup.mjs <init|create|check|copy|retention|restore|prepare-cleanup|cleanup> <absolute-config.json> <new-absolute-receipt.json>; cleanup may have partly committed; retry the original approved plan; see docs/operations/recovery.md' }));
   process.exitCode = 1;
 } finally { try{if (pool) await pool.end();}catch{console.error(JSON.stringify({event:'backup_connection_close_failed'}));process.exitCode=1;} }

@@ -33,7 +33,7 @@ for area in roots:
         private = (name.startswith('.env') and not name.endswith('.example')) or path.suffix in {'.key','.pem','.pyc','.log','.tsbuildinfo'}
         named = name.startswith(('LICENSE','NOTICE','COPYING')) or name.startswith('Dockerfile') or name.endswith('.env.example') or name in {'.gitignore','.dockerignore','.gitattributes'}
         configuration = path.suffix in {'.json','.yaml','.yml'}
-        source_config = any(part in {'src','test','tests','theme','.github'} for part in path.relative_to(root).parts) or any(mark in name for mark in ('.example','.empty')) or name in {'SOURCE.json','package.json','package-lock.json','tsconfig.json','client-contract.json'}
+        source_config = path.relative_to(root).parts[0]=='originals' or any(part in {'src','test','tests','theme','.github'} for part in path.relative_to(root).parts) or any(mark in name for mark in ('.example','.empty')) or name in {'SOURCE.json','package.json','package-lock.json','tsconfig.json','client-contract.json'}
         if not private and (path.suffix in extensions or named) and (not configuration or source_config):
             if not any(part in excluded for part in path.relative_to(root).parts):
                 files.add(path)

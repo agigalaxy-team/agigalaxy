@@ -2,7 +2,7 @@
 
 ## Product status
 
-This guide describes the original local-only Integration Pack and its tools. The shared Native client is documented in `docs/native-client-v2.md`; product requirements and current work are in the repository documentation. The local pack's available tools do not define the capabilities of the whole Galaxy project.
+This guide describes the original local-only Integration Pack and its tools. The shared Native client is documented in `docs/technical/native-client.md`; product requirements and current work are in the repository documentation. The local pack's available tools do not define the capabilities of the whole Galaxy project.
 
 ## Primary integration path
 
@@ -72,5 +72,5 @@ Treat `/Galaxy` as a state-aware user entry. Call `galaxy_command` first rather 
 - `/llms.txt`
 - Repository `README.md`
 - `integrations/codex/plugins/galaxy-integration-pack/skills/galaxy-integration/SKILL.md`
-- `docs/GALAXY_DATA_AND_CAPABILITY_CONSENT_v0.1.md`
-- `docs/OPENCLAW_ADAPTER_BOUNDARY.md`
+- `docs/product/data-and-files.md`
+- `docs/technical/interfaces.md`

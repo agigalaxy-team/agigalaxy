@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 银河官网与文档
+    url: https://agigalaxy.org/docs/
+    about: 查看官网文档及实际业务入口。
+  - name: 客户端下载与核验
+    url: https://agigalaxy.org/downloads/
+    about: 获取当前客户端和对应安装资料。

@@ -22,7 +22,7 @@ test('actual Alertmanager routes firing and resolved alerts to loopback receiver
     receiver.listen(0,'127.0.0.1');await once(receiver,'listening');
     const reserve=createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');
     const port=reserve.address().port;await new Promise(resolve=>reserve.close(resolve));
-    const config=JSON.parse(await readFile(new URL('../../../../docs/alerts/alertmanager.example.json',import.meta.url),'utf8'));
+    const config=JSON.parse(await readFile(new URL('../../../../docs/operations/examples/alerts/alertmanager.example.json',import.meta.url),'utf8'));
     config.route.group_wait='0s';config.route.group_interval='1s';config.route.repeat_interval='1h';
     config.receivers=config.receivers.map(entry=>({...entry,webhook_configs:[{url:'http://127.0.0.1:'+receiver.address().port+'/',send_resolved:true}]}));
     const path=join(directory,'config.json');await writeFile(path,JSON.stringify(config));

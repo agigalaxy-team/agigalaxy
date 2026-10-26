@@ -4,5 +4,5 @@ contact_links:
     url: https://agigalaxy.org/docs/
     about: 查看网站与当前客户端说明
   - name: 开发与自部署
-    url: https://github.com/agigalaxy-team/agigalaxy/blob/main/docs/development.md
+    url: https://github.com/agigalaxy-team/agigalaxy/blob/main/docs/technical/development.md
     about: 查看本地环境、服务配置与排障入口

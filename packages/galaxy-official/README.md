@@ -1,6 +1,6 @@
 # Galaxy Hub 业务服务
 
-本组件实现银河的 Hub 业务 API、Worker、持久数据和权限协调。产品关系见[项目概览](../../docs/project-overview.md)及[架构](../../docs/architecture.md)，具体业务接口见[开发 API 目录](../../docs/development-api-reference-v1.md)。
+本组件实现银河的 Hub 业务 API、Worker、持久数据和权限协调。产品关系见[项目概览](../../docs/technical/architecture.md)及[架构](../../docs/technical/architecture.md)，具体业务接口见[开发 API 目录](../../docs/technical/interfaces.md)。
 
 ## 职责与边界
 
@@ -21,10 +21,10 @@ PostgreSQL 是业务持久化入口，迁移显式执行；运行 API 不自动�
 
 当前服务开发要求 Node.js 24.13+。根 setup 安装本组件锁定依赖。服务运行还需要 PostgreSQL、目标环境、受信签名材料、准确 HTTPS 地址及所用业务配置，不是仅运行 npm start 即可得到完整新实例。
 
-详见[部署指南](../../docs/deployment.md)、[运行环境](../../docs/runtime-environments.md)、[Linux 准备](../../docs/linux-deployment-v1.md)。认证、Prosody、文件存储、扫描器和管理 OIDC 按启用功能分别接线。
+详见[部署指南](../../docs/operations/deployment.md)、[运行环境](../../docs/technical/development.md)、[Linux 准备](../../docs/operations/deployment.md)。认证、Prosody、文件存储、扫描器和管理 OIDC 按启用功能分别接线。
 
 ## 验证与运行
 
-按受影响代码使用[开发检查](../../docs/development-checks.md)。隔离 PGlite、合成 OIDC 或测试消息传输只能证明对应范围；实际 PostgreSQL、邮件、Prosody、S3、ClamAV 与模型需相应环境。
+按受影响代码使用[开发检查](../../docs/technical/development.md)。隔离 PGlite、合成 OIDC 或测试消息传输只能证明对应范围；实际 PostgreSQL、邮件、Prosody、S3、ClamAV 与模型需相应环境。
 
-健康和就绪读取说明有限状态，不能代替业务流程。EVIDENCE.md、PROOFS.md 与早期实现历史保留其时间和范围，不用其中旧通过记录声明当前全站状态。当前版本差额见[项目状态](../../docs/project-status.md)。
+健康和就绪读取说明有限状态，不能代替业务流程。来源观察与远程签名的当前合同见[来源观察](../../docs/technical/source-observations.md)，旧执行历史留在仓库外。当前版本差额见[项目状态](../../WORK_STATUS.md)。
