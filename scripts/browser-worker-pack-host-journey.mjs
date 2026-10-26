@@ -1,4 +1,4 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright';
 import { build } from '../node_modules/esbuild/lib/main.js';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { workerPanelResult, workerComponentResult } from '../integrations/native
 import { workerToolsFixture } from '../integrations/native-v2/worker-tools-fixture.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const out = resolve(root, '../../../07-logs/development/ui-resume-20261002/worker-pack-host');
+const out=fileURLToPath(new URL('../outputs/worker-pack-host-journey/tmp/',import.meta.url));
 await mkdir(out, { recursive: true });
 const bundle = await build({ stdin: { contents: `
   import React from 'react';
@@ -24,8 +24,7 @@ const builtAssets = resolve(root, 'packages/galaxy-web/dist/assets');
 const builtCss = (await readdir(builtAssets)).filter(name => name.endsWith('.css'));
 assert.ok(builtCss.length, 'Build the existing web stylesheet before the visual check.');
 const baseCss = (await Promise.all(builtCss.map(name => readFile(resolve(builtAssets, name), 'utf8')))).join('\n');
-const browser = await chromium.launch({ headless: true,
-  executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+const browser = await chromium.launch({ headless: true });
 const checks = [], pageErrors = [];
 const actualEvidence = { executed: false };
 const pack = { builderId: '11111111-1111-4111-8111-111111111111', manifestId: '22222222-2222-4222-8222-222222222222',

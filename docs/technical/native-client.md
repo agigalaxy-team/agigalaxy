@@ -24,6 +24,8 @@ node host-configs.mjs <公开配置绝对路径> <不存在的输出绝对目录
 
 发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
 
+`scripts/build-native-v2.mjs`在新candidate内即时构建compact UI并捕获自有UI源摘要，不要求源码预存dist。OpenCode安装在搬移运行包时闭合复制当前已安装的依赖图，包括npm consumer提升至父node_modules的传递依赖，不在安装中联网补包。宿主验收launcher在准备前传入并核对独立profile；CLI发现、真实隔离TUI与物理桌面仍分开记录。
+
 ## 宿主配置与能力
 
 生成器的配置形状不是跨宿主验收结论。运行前按包内 `HOSTS.md`、`host-capabilities.json` 和实际 `tools/list` 确认可用能力。

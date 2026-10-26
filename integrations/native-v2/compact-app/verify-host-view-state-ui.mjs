@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -19,7 +19,7 @@ import {workerPanelResult} from './worker-result.mjs';
 import {createNativeWorkerPackAdapter} from '../../../packages/galaxy-edge-mcp/src/native-v2/adapters/worker-pack.mjs';
 import {createWorkerPackHostFlowV2} from '../../../packages/galaxy-a2a/src/worker-pack-flow-v2.mjs';
 
-const compact=fileURLToPath(new URL('.',import.meta.url)),root=resolve(compact,'../../..'),out=resolve(root,'../../../07-logs/development/ui-resume-20261002/host-view-state');await mkdir(out,{recursive:true});
+const compact=fileURLToPath(new URL('.',import.meta.url)),out=fileURLToPath(new URL('../../../outputs/compact-host-view-state/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const directory=await mkdtemp(join(tmpdir(),'galaxy-host-view-browser-')),f=await serviceFixture(browserScopes),checks=[],errors=[],calls=[];
 let api,runtime,mcp,client,registration,workerTools,workerAdapter,frontend,browser,heldRelease,heldReady,holdRead=false;
 try{
@@ -52,7 +52,7 @@ try{
  `},bundle:true,write:false,format:'esm',platform:'browser'});
  frontend=createServer(async(req,res)=>{try{if(req.url==='/call'){let raw='';for await(const c of req)raw+=c;const input=JSON.parse(raw);calls.push({name:input.name,action:input.arguments?.action});const result=await client.callTool(input);if(holdRead&&input.name==='galaxy_host_view_state'&&input.arguments.action==='read'){holdRead=false;heldReady?.();await new Promise(ok=>heldRelease=ok);}res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;}
   res.setHeader('Content-Type',req.url?.endsWith('.js')?'text/javascript':'text/html');res.end(req.url==='/child.js'?child.outputFiles[0].text:req.url==='/parent.js'?parent.outputFiles[0].text:req.url==='/child'?html:'<script type="module" src="/parent.js"></script>');}catch(e){res.statusCode=500;res.end(JSON.stringify({error:e.code??'fixture_failed'}));}});
- await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:800,height:800}});page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+frontend.address().port);
  const panel=()=>page.frameLocator('iframe'),status=()=>panel().locator('.galaxy-host-view-status'),saveCount=()=>calls.filter(x=>x.name==='galaxy_host_view_state'&&x.action==='save').length;
  await status().filter({hasText:'显示偏好仅在你调整后'}).waitFor();assert.equal(saveCount(),0);
@@ -66,7 +66,7 @@ try{
  const ready=new Promise(ok=>heldReady=ok);holdRead=true;await page.evaluate(()=>window.openPanel());await ready;
  await runtime.connect({confirmed:true});await page.evaluate(()=>window.refreshPanel());await status().filter({hasText:'已恢复'}).waitFor();const requestCount=await page.evaluate(()=>window.requests.length);heldRelease();heldRelease=null;
  await page.waitForFunction(()=>window.mode==='fullscreen');await page.evaluate(()=>new Promise(ok=>setTimeout(ok,100)));assert.equal(await page.evaluate(()=>window.requests.length),requestCount);assert.equal(saveCount(),1);checks.push({name:'Same subject new binding fresh panel fences an old read response; no stale restore or save',passed:true});
- await client.close();registration.close();await workerTools.close();workerAdapter.close();await mcp.close();runtime.close();runtime=await createNativeRuntime(options);await runtime.connect({confirmed:true});await connectMcp();
+ await client.close();registration.close();await workerTools.close();workerAdapter.close();await mcp.close();await runtime.close();runtime=await createNativeRuntime(options);await runtime.connect({confirmed:true});await connectMcp();
  await page.evaluate(()=>window.openPanel());await status().filter({hasText:'已恢复'}).waitFor();assert.equal(await page.evaluate(()=>window.mode),'fullscreen');assert.equal(saveCount(),1);checks.push({name:'Actual NativeRuntime recreation from same filesystem retains only selected host preference',passed:true});
  const helpCalls=calls.filter(x=>x.name==='galaxy_panel').length;
  await page.evaluate(()=>window.openPanel('synthetic-direct-worker-host',['inline','fullscreen'],true));await status().filter({hasText:'显示偏好仅在你调整后'}).waitFor();await panel().getByText('在自己的宿主中继续工作',{exact:true}).waitFor();
@@ -74,4 +74,4 @@ try{
  await page.evaluate(()=>window.openPanel('synthetic-direct-worker-host',['inline','fullscreen'],true));await status().filter({hasText:'已恢复'}).waitFor();assert.equal(await page.evaluate(()=>window.mode),'fullscreen');assert.equal(saveCount(),2);assert.equal(calls.filter(x=>x.name==='galaxy_panel').length,helpCalls);
  assert.equal(calls.filter(x=>x.name.startsWith('galaxy_worker_')&&x.name!=='galaxy_worker_host_read').length,0);checks.push({name:'Direct Worker resource uses actual Native Worker ownerScope and FS association read; explicit preference saves and reopens without Help bootstrap',passed:true});await page.screenshot({path:resolve(out,'direct-worker-restored-display.png')});
  assert.deepEqual(errors,[]);const report={time:new Date().toISOString(),passed:checks.length,checks,pageErrors:errors,saveCalls:saveCount(),actualBrowser:true,actualOfficialAppBridge:true,actualMcpServer:true,actualNativeFilesystem:true,actualNativeRuntimeRecreated:true,actualDirectWorkerResource:true,actualHostUi:false,modelCalls:0,businessWrites:0};await writeFile(resolve(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
-}finally{heldRelease?.();await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await workerTools?.close();workerAdapter?.close();await mcp?.close();runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-host-view-browser-'));await rm(target,{recursive:true,force:true});}
+}finally{heldRelease?.();await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await workerTools?.close();workerAdapter?.close();await mcp?.close();await runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-host-view-browser-'));await rm(target,{recursive:true,force:true});}

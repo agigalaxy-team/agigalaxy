@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join,resolve,dirname} from 'node:path';
+import {join,resolve,dirname,isAbsolute} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 
 const argument=name=>process.argv.find(value=>value.startsWith('--'+name+'='))?.slice(name.length+3);
+const executable=argument('executable');
+assert.ok(typeof executable==='string'&&isAbsolute(executable),'Explicit --executable=<installed OpenCode absolute path> is required.');
+assert.equal((await stat(executable)).isFile(),true);
 const candidate=resolve(argument('candidate')),report=resolve(argument('report')),scene=JSON.parse(await readFile(resolve(argument('scene')),'utf8'));
 const {prepareNativeInstallation}=await import(pathToFileURL(join(candidate,'setup.mjs')).href);
 const role=scene.roles.find(value=>value.role===(argument('role')??'responder'));assert.ok(role);
-const executable='C:/Users/USER1/AppData/Roaming/npm/node_modules/opencode-ai/bin/opencode.exe';
-assert.equal((await stat(executable)).isFile(),true);
 const scratch=await mkdtemp(join(tmpdir(),'galaxy-native-work-check-')),here=dirname(fileURLToPath(import.meta.url));
 const folders={project:join(scratch,'project'),config:join(scratch,'config'),data:join(scratch,'data'),state:join(scratch,'state'),cache:join(scratch,'cache'),temp:join(scratch,'temp')};
 await Promise.all(Object.values(folders).map(path=>mkdir(path,{recursive:true})));await mkdir(dirname(report),{recursive:true});

@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -16,9 +16,9 @@ import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-
 import {registerNativeCompactApps} from './server.mjs';
 import {syntheticMessageTransport} from './purpose-fixture.mjs';
 
-const compact=fileURLToPath(new URL('.',import.meta.url)),root=resolve(compact,'../../..');
+const compact=fileURLToPath(new URL('.',import.meta.url));
 const previewMode=process.argv.includes('--preview');
-const out=resolve(root,'../../../07-logs/development/ui-reconstruction-20261009/native-first-batch');await mkdir(out,{recursive:true});
+const out=fileURLToPath(new URL('../../../outputs/compact-purpose/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const directory=await mkdtemp(join(tmpdir(),'galaxy-purpose-browser-')),f=await serviceFixture(browserScopes),checks=[],errors=[],calls=[],opened=[];
 let api,runtime,mcp,client,registration,frontend,browser,failure,drop=false,sendCalls=0;
 const report={actualBrowser:true,actualOfficialAppBridge:true,actualMcpServer:true,actualSignedHttp:true,actualNativeFilesystem:true,
@@ -55,7 +55,7 @@ try{
  await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));
  if(previewMode){report.previewUrl='http://127.0.0.1:'+frontend.address().port;console.log(JSON.stringify({previewUrl:report.previewUrl,syntheticMessageTransport:true,physicalAiHostUi:false}));await new Promise(ok=>{process.once('SIGINT',ok);process.once('SIGTERM',ok);});}
  else{
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:390,height:1000},reducedMotion:'reduce'});page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+frontend.address().port);
  const panel=page.frameLocator('iframe'),reply=panel.getByRole('textbox',{name:'回复',exact:true}),note=panel.getByRole('textbox',{name:'仅在本机保留的笔记'});
  await panel.getByRole('heading',{name:'合成：继续文档解析工作'}).waitFor();await panel.getByText('合成内容：已找到解析错误的位置，先检查这个小片段。',{exact:true}).waitFor();
@@ -76,5 +76,5 @@ try{
  assert.deepEqual(errors,[]);report.messageRows=(await f.db.query('SELECT count(*)::int n FROM chat_message_refs')).rows[0].n;report.sendCalls=sendCalls;report.navigationUrls=opened;report.calls=calls.map(c=>c.name);
  }
 }catch(e){failure=e;report.failure={message:e.message,code:e.code??null};}
-finally{report.success=!failure;report.recordedAt=new Date().toISOString();const reportPath=resolve(out,previewMode?'preview-report.json':'report.json');await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({success:report.success,checks,errors,reportPath,failure:report.failure??null}));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await mcp?.close();runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-purpose-browser-'));await rm(target,{recursive:true,force:true});}
+finally{report.success=!failure;report.recordedAt=new Date().toISOString();const reportPath=resolve(out,previewMode?'preview-report.json':'report.json');await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({success:report.success,checks,errors,reportPath,failure:report.failure??null}));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await mcp?.close();await runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-purpose-browser-'));await rm(target,{recursive:true,force:true});}
 if(failure)throw failure;

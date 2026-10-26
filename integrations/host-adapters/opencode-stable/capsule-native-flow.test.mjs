@@ -16,9 +16,8 @@ import {createApi} from '../../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../../packages/galaxy-official/src/browser-client.mjs';
 const require=createRequire(new URL('../../../packages/galaxy-official/package.json',import.meta.url));
 const{Client,InMemoryTransport}=await import(pathToFileURL(require.resolve('@modelcontextprotocol/client')).href);
-const{chromium}=await import('file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs');
-const browserExecutable='C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe';
-const out=fileURLToPath(new URL('../../../../../../07-logs/development/ui-reconstruction-20261009/native-capsule-batch/',import.meta.url));
+import {chromium} from 'playwright';
+const out=fileURLToPath(new URL('../../../outputs/opencode-capsule-flow/tmp/',import.meta.url));
 
 test('current /galaxy methods publish, apply and reverify existing v2 work through real Native choices; no person types source IDs',{timeout:120000},async t=>{
  const f=await serviceFixture(browserScopes),directory=await mkdtemp(join(tmpdir(),'galaxy-native-capsule-'));
@@ -42,7 +41,7 @@ test('current /galaxy methods publish, apply and reverify existing v2 work throu
   const verification={id:randomUUID(),operationId:randomUUID(),expectedVersion:0,caseId:target.root.caseId,reportedBy:subjectId,synthetic:true,kind:'verification',target:{type:'result',id:target.result.eventId,version:1},scopeVersion:1,method:'local-test',scope:'仅所选导出的合成调用',conditions:{runtime:'Node 26'},observation:'passed',summary:'合成：本机选择的调用检查通过。',evidenceRefs:[{id:evidence.id,version:1}],relationship:'same-controller',observedAt:new Date(f.now*1000).toISOString()};
   await authorize(verification,'evidence.submit','/v2/verification-records/submit');
   server=createNativeToolServer(runtime);client=new Client({name:'synthetic-opencode-methods-host',version:'1'});const[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
-  browser=await chromium.launch({executablePath:browserExecutable,headless:true});const context=await browser.newContext({viewport:{width:390,height:844}});
+  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:390,height:844}});
   adapter=createGalaxyAdapter(null,{dataDirectory:join(directory,'unused-host-identity'),nativeTools:{call:(name,args)=>{toolCalls.push(name);return client.callTool({name,arguments:args});},openLink:async url=>{choice=await context.newPage();await choice.goto(url);}}});
   await adapter.tui({keymap:{registerLayer:({commands:entries})=>{for(const e of entries)commands.set(e.name,e);return()=>{for(const e of entries)commands.delete(e.name);};}},
    ui:{dialog:{setSize(){},clear(){onClose?.();onClose=null;page=null;},replace(fn,cleanup){onClose?.();onClose=cleanup;page=fn();}},DialogSelect:p=>({kind:'select',...p}),DialogPrompt:p=>({kind:'prompt',...p}),DialogAlert:p=>({kind:'alert',...p})}});
@@ -79,5 +78,5 @@ test('current /galaxy methods publish, apply and reverify existing v2 work throu
   checks.push('重新连接后可只读查询本机原操作；最小 ACK 不回填旧正文、不授予源访问、不重发。');
   const report={success:true,checks,actualNativeMcp:true,actualSignedHttp:true,database:'PGlite',actualBrowserLocalChoice:true,actualTuiPluginApi:false,stableDialogContract:true,syntheticWorkAndVerification:true,physicalAiHostUi:false,realUserAcceptance:false,modelCalls:0,publicationWrites,useWrites,toolCalls,recordedAt:new Date().toISOString()};
   await writeFile(join(out,'report.json'),JSON.stringify(report,null,2)+'\n');t.diagnostic(JSON.stringify(report));
- }finally{adapter?.close();await browser?.close();await client?.close();await server?.close();runtime?.close();if(api?.listening){api.closeAllConnections();await new Promise(ok=>api.close(ok));}await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-capsule-'));await rm(target,{recursive:true,force:true});}
+ }finally{await adapter?.close();await browser?.close();await client?.close();await server?.close();await runtime?.close();if(api?.listening){api.closeAllConnections();await new Promise(ok=>api.close(ok));}await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-capsule-'));await rm(target,{recursive:true,force:true});}
 });

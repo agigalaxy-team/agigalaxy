@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {compactVerify,importSPKI} from 'jose';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes,createBrowserClient} from '../../galaxy-official/src/browser-client.mjs';
@@ -19,7 +19,7 @@ import {webIdentityProofType,webIdentityProtocol} from '../src/native-v2/identit
 import {webIdentityDefaultScopes} from '../../../integrations/native-v2/identity-web-connect-tools.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
-const out=resolve(root,process.env.GALAXY_IDENTITY_BRIDGE_UI_REPORT_DIR??'../../../07-logs/development/goal-20261008-current-plan/sol-1/identity-bridge-ui');
+const out=resolve(root,process.env.GALAXY_IDENTITY_BRIDGE_UI_REPORT_DIR??'outputs/identity-handoff-bridge/tmp');
 const sourcePaths=['packages/galaxy-edge-mcp/src/native-v2/identity/web-handoff.mjs','packages/galaxy-edge-mcp/src/native-v2/runtime.mjs',
  'packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs','packages/galaxy-edge-mcp/src/native-v2/server.mjs',
  'integrations/native-v2/identity-web-connect-tools.mjs','packages/galaxy-edge-mcp/test/verify-web-identity-handoff-bridge-ui.mjs'];
@@ -55,7 +55,7 @@ window.packet=(kind,payload)=>({protocol:'galaxy-web-identity-handoff',version:1
 window.send=(kind,payload,change={})=>{const message={...window.packet(kind,payload),...change};window.opener?.postMessage(message,params.get('agentBridgeOrigin'));};
 window.addEventListener('message',event=>{if(event.origin===params.get('agentBridgeOrigin')&&event.source===window.opener){window.received.push(event.data);document.querySelector('pre').textContent=JSON.stringify(event.data);}});
 document.querySelector('p').textContent='Synthetic public peer; production main and host model not exercised.';`;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({headless:true});
  context=await browser.newContext({viewport:{width:1200,height:900},reducedMotion:'reduce'});
  let coop=false;
  await context.route(/^https:\/\/(?:selected|foreign)\.example\//,async route=>{

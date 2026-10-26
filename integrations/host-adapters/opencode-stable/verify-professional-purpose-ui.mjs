@@ -1,3 +1,4 @@
+import {fileURLToPath} from 'node:url';
 import {createServer} from 'node:http';
 import {mkdir,writeFile,readFile,readdir} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
@@ -11,12 +12,12 @@ import {createSearchMenu} from './search-menu.mjs';
 import {createAssistanceMenu} from './assistance-menu.mjs';
 import {createDataExportMenu} from './data-export-menu.mjs';
 import {readableDialogSelect} from './dialog-reading.mjs';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 
 const preview=process.argv.includes('--preview'),legacy=process.argv.includes('--legacy'),helpOnly=process.argv.includes('--help-only'),entries=helpOnly||process.argv.includes('--entries'),port=Number(process.argv.find(v=>v.startsWith('--port='))?.slice(7)??0),kinds=helpOnly?['drafts']:entries?['drafts','search','export']:legacy?['capsule','a2a']:['builder','deletion'];
 assert.ok(!(entries&&legacy));
 assert.ok(Number.isSafeInteger(port)&&(port===0||port>=1024&&port<=65535));
-const out=resolve('../../../07-logs/development/ui-reconstruction-20261009/'+(entries?'native-professional-batch/entries':legacy?'native-legacy-purpose-batch':'native-professional-batch'));await mkdir(out,{recursive:true});
+const out=resolve(fileURLToPath(new URL('../../../outputs/opencode-professional-purpose/tmp/',import.meta.url)),entries?'entries':legacy?'legacy':'current');await mkdir(out,{recursive:true});
 const checks=[],errors=[],report={actualBrowser:true,actualSignedHttp:true,database:'PGlite',actualLocalRecordArchive:true,dialogContractMirror:true,actualTuiPluginApi:false,physicalAiHostUi:false,syntheticCaseAndCi:true,modelCalls:0,checks,pageErrors:errors};
 let server,browser,failure;const hosts={};
 try{
@@ -46,7 +47,7 @@ try{
   res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html);
  }catch{res.statusCode=500;res.end('{"error":"local_fixture_incomplete"}');}});await new Promise(ok=>server.listen(port,'127.0.0.1',ok));report.previewUrl='http://127.0.0.1:'+server.address().port;
  if(preview){console.log(JSON.stringify({previewUrl:report.previewUrl,...(hosts.export?{exportDirectory:hosts.export.x.exportDirectory}:{}),actualSignedHttp:true,actualTuiPluginApi:false,physicalAiHostUi:false}));await new Promise(ok=>{process.once('SIGINT',ok);process.once('SIGTERM',ok);});}
- else{browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});const page=await browser.newPage({viewport:{width:390,height:900}});page.on('pageerror',e=>errors.push(e.message));
+ else{browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:900}});page.on('pageerror',e=>errors.push(e.message));
   async function choose(title){for(let i=0;i<5;i++){const target=page.getByRole('button',{name:title,exact:true});if(await target.count()){await target.click();await page.waitForTimeout(400);return;}const next=page.getByRole('button',{name:/^(下一页|继续查看)$/,exact:true});if(!await next.count()){await target.waitFor({timeout:3000});await target.click();await page.waitForTimeout(400);return;}await next.click();await page.waitForTimeout(400);}assert.fail(title);}
   if(helpOnly){
    const d=hosts.drafts.x;await page.goto(report.previewUrl+'/drafts');await choose('发起求助');await page.getByRole('textbox',{name:'当前内容'}).waitFor();

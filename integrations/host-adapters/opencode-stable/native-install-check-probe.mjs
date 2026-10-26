@@ -19,15 +19,9 @@ async function run(api){
   await stage('enter-original-unsent-work');await wait(()=>frame().includes(original),2400);
   dispatch('galaxy.open');await wait(()=>has('galaxy.choose.5'));await stage('normal-purpose-menu');
   dispatch('galaxy.choose.4');await wait(()=>frame().includes('我的与设置'));dispatch('galaxy.choose.1');
-  await wait(()=>frame().includes('在本机准备身份'));await stage('native-unprepared-device');dispatch('galaxy.choose.1');
-  await wait(()=>frame().includes('/review/'));
-  // The real 80-column host wraps this visible address across two rows. Read
-  // the unique visible origin/path and exact hex suffix, not an internal field.
-  const bases=frame().match(/http:\/\/127\.0\.0\.1:\d+\/review\//g)??[],suffixes=frame().match(/[a-f0-9]{48}/g)??[];
-  assert.equal(bases.length,1);assert.equal(suffixes.length,1);report.choiceUrl=bases[0]+suffixes[0];await stage('actual-local-identity-choice');
-  // The probe never submits a model prompt or approves its own local choice.
-  // The authorized synthetic test uses a fresh virtual headless page separately.
-  await wait(()=>frame().includes('尚未连接')&&frame().includes('连接当前身份'),2400);await stage('original-local-identity-disconnected');
+  // The current normal installer prepares the synthetic local identity in its
+  // single installation choice. Loading the host must preserve that identity.
+  await wait(()=>frame().includes('尚未连接')&&frame().includes('连接当前身份'),2400);await stage('installed-local-identity-disconnected');
   const identity=JSON.parse(await readFile(join(process.env.GALAXY_DATA_DIR,'galaxy-id.json'),'utf8'));report.identity=identity.id;
   assert.match(identity.id,/^GUID/);assert.equal(frame().includes('尚未连接'),true);
   report.localFiles=await readdir(process.env.GALAXY_DATA_DIR);assert.equal(report.localFiles.includes('connection-binding.json'),false);

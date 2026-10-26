@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -15,7 +15,7 @@ import {browserScopes} from '../../../packages/galaxy-official/src/browser-clien
 import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import {registerNativeCompactApps} from './server.mjs';
 
-const compact=fileURLToPath(new URL('.',import.meta.url)),root=resolve(compact,'../../..'),out=resolve(root,'../../../07-logs/development/ui-resume-20261002/view-draft-return');
+const compact=fileURLToPath(new URL('.',import.meta.url)),out=fileURLToPath(new URL('../../../outputs/compact-view-draft-return/tmp/',import.meta.url));
 await mkdir(out,{recursive:true});const directory=await mkdtemp(join(tmpdir(),'galaxy-view-draft-return-')),f=await serviceFixture(browserScopes),checks=[],errors=[],calls=[],opened=[];
 let api,runtime,mcp,client,registration,frontend,browser,failure;
 const report={actualBrowser:true,actualOfficialAppBridge:true,actualMcpServer:true,actualNativeFilesystem:true,actualHostUi:false,modelCalls:0,fixtureRooms:2,syntheticAccountEligibility:true,checks,pageErrors:errors};
@@ -46,7 +46,7 @@ try{
  frontend=createServer(async(req,res)=>{try{if(req.url==='/call'){let raw='';for await(const c of req)raw+=c;const input=JSON.parse(raw);calls.push(input);res.setHeader('Content-Type','application/json');res.end(JSON.stringify(await client.callTool(input)));return;}
   if(req.url?.startsWith('/result/')){const original=results[Number(req.url.slice(8))];const refreshed=await client.callTool({name:'galaxy_panel_refresh',arguments:{viewId:original.structuredContent.viewId}});res.setHeader('Content-Type','application/json');res.end(JSON.stringify(refreshed));return;}
   res.setHeader('Content-Type',req.url?.endsWith('.js')?'text/javascript':'text/html; charset=utf-8');res.end(req.url==='/child.js'?child.outputFiles[0].text:req.url==='/parent.js'?parent.outputFiles[0].text:req.url==='/child'?html:'<meta charset="utf-8"><style>body{margin:0}</style><button id="host-toggle">合成宿主外部焦点</button><script type="module" src="/parent.js"></script>');}catch(e){res.statusCode=500;res.end(JSON.stringify({error:e.code??'fixture_failed'}));}});
- await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:960,height:980}});page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+frontend.address().port);
  const panel=page.frameLocator('iframe'),draft=panel.getByRole('textbox',{name:'仅在本机保留的笔记'}),summary=panel.getByText('本机笔记',{exact:true});
  await panel.getByRole('heading',{name:'合成：原工作房间',exact:true}).waitFor();await summary.focus();await page.keyboard.press('Enter');await page.keyboard.press('Tab');assert.equal(await draft.evaluate(el=>el===el.ownerDocument.activeElement),true);
@@ -67,5 +67,5 @@ try{
  await draft.fill('关闭资源后不得回显的未保存文字');await page.evaluate(()=>window.closeResource());assert.equal(await panel.getByRole('textbox',{name:'仅在本机保留的笔记'}).count(),0);await page.reload();await panel.getByRole('heading',{name:'合成：原工作房间',exact:true}).waitFor();await summary.click();assert.equal(await draft.inputValue(),'');checks.push({name:'Actual resource teardown clears local editor memory; reopening never restores unsaved text from another lifecycle',passed:true});
  report.localSaveCalls=calls.filter(x=>x.name==='galaxy_panel_draft_save').length;report.messageRows=(await f.db.query('SELECT count(*)::int n FROM chat_message_refs')).rows[0].n;assert.equal(report.localSaveCalls,0);assert.equal(report.messageRows,0);assert.deepEqual(errors,[]);
 }catch(error){failure=error;report.failure={message:error.message,code:error.code??null};}
-finally{report.passed=checks.length;report.success=!failure;report.calls=calls.map(x=>({name:x.name}));report.recordedAt=new Date().toISOString();await writeFile(resolve(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await mcp?.close();runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-view-draft-return-'));await rm(target,{recursive:true,force:true});}
+finally{report.passed=checks.length;report.success=!failure;report.calls=calls.map(x=>({name:x.name}));report.recordedAt=new Date().toISOString();await writeFile(resolve(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();registration?.close();await mcp?.close();await runtime?.close();if(api?.listening)await new Promise(ok=>api.close(ok));await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-view-draft-return-'));await rm(target,{recursive:true,force:true});}
 if(failure)throw failure;

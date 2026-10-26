@@ -1,5 +1,5 @@
 import {mkdir,stat,lstat,writeFile,readFile,cp} from 'node:fs/promises';
-import {join,resolve,isAbsolute,delimiter,relative} from 'node:path';
+import {join,resolve,isAbsolute,delimiter,relative,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
@@ -58,6 +58,32 @@ async function installOpenCodeClientPackage(packageDirectory,configurationDirect
  const clientRoot=join(configurationDirectory,'galaxy-native');await mkdir(clientRoot,{recursive:true});
  if((await lstat(clientRoot)).isSymbolicLink())throw Error('setup_opencode_config_conflict');
  await cp(packageDirectory,installed,{recursive:true,errorOnExist:true,force:false});
+ // npm can hoist this package's dependencies into its consumer's node_modules.
+ // Capture that already installed runtime graph before moving the client; no
+ // download, npm process or ambient host dependency is needed after installation.
+ let packageJson;try{packageJson=JSON.parse(await readFile(join(packageDirectory,'package.json'),'utf8'));}
+ catch(error){if(error.code!=='ENOENT')throw error;}
+ async function dependency(name,from){
+  if(!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(name))throw Error('setup_dependency_invalid');
+  let current=resolve(from);
+  for(;;){const directory=join(current,'node_modules',name);
+   try{const info=await lstat(directory);if(!info.isDirectory()||info.isSymbolicLink())throw Error('setup_dependency_invalid');
+    const pkg=JSON.parse(await readFile(join(directory,'package.json'),'utf8'));if(pkg.name!==name)throw Error('setup_dependency_invalid');return{directory,pkg};
+   }catch(error){if(error.code!=='ENOENT')throw error;}
+   const parent=resolve(current,'..');if(parent===current)return null;current=parent;
+  }
+ }
+ async function capture(name,from,to,optional=false,exact){
+  const source=await dependency(name,from);if(!source){if(optional)return;throw Error('setup_dependency_missing');}
+  if(exact&&source.pkg.version!==exact)throw Error('setup_dependency_version');
+  const found=await dependency(name,to);if(found?.pkg.version===source.pkg.version&&
+   resolve(found.directory).startsWith(resolve(installed)+sep))return;
+  const target=join(to,'node_modules',name);await mkdir(join(target,'..'),{recursive:true});
+  await cp(source.directory,target,{recursive:true,errorOnExist:true,force:false});
+  for(const child of Object.keys({...source.pkg.dependencies,...source.pkg.optionalDependencies}))
+   await capture(child,source.directory,target,Object.hasOwn(source.pkg.optionalDependencies??{},child));
+ }
+ for(const[name,version]of Object.entries(packageJson?.dependencies??{}))await capture(name,packageDirectory,installed,false,version);
  return installed;
 }
 

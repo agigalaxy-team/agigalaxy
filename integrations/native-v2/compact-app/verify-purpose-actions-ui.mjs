@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -14,12 +14,11 @@ import {createApi} from '../../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../../packages/galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../../../packages/galaxy-edge-mcp/src/native-v2/server.mjs';
-import {componentResult} from './result.mjs';
 
-const compact=fileURLToPath(new URL('.',import.meta.url)),root=resolve(compact,'../../..'),preview=process.argv.includes('--preview');
+const compact=fileURLToPath(new URL('.',import.meta.url)),preview=process.argv.includes('--preview');
 const portArg=process.argv.find(value=>value.startsWith('--port=')),port=portArg?Number(portArg.slice(7)):0;
 assert.ok(Number.isSafeInteger(port)&&(port===0||port>=1024&&port<=65535),'Valid loopback preview port required');
-const out=resolve(root,'../../../07-logs/development/ui-reconstruction-20261009/native-third-batch');await mkdir(out,{recursive:true});
+const out=fileURLToPath(new URL('../../../outputs/compact-purpose-actions/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const directory=await mkdtemp(join(tmpdir(),'galaxy-purpose-actions-browser-')),f=await serviceFixture(browserScopes),checks=[],errors=[],calls=[];
 let api,runtime,mcp,client,frontend,browser,failure,drop=false,writes=0;
 const report={actualBrowser:true,actualOfficialAppBridge:true,actualMcpServer:true,actualNativeRuntime:true,actualSignedHttp:true,database:'PGlite',syntheticCapsuleSourceFacts:true,syntheticCurrentWork:true,physicalAiHostUi:false,realUserAcceptance:false,modelCalls:0,checks,pageErrors:errors};
@@ -64,7 +63,7 @@ try{
  await new Promise(ok=>frontend.listen(port,'127.0.0.1',ok));report.previewUrl='http://127.0.0.1:'+frontend.address().port;
  if(preview){console.log(JSON.stringify({previewUrl:report.previewUrl,methodUrl:report.previewUrl+'/?kind=method',errorUrl:report.previewUrl+'/?kind=error',actualNativeRuntime:true,physicalAiHostUi:false}));await new Promise(ok=>{process.once('SIGINT',ok);process.once('SIGTERM',ok);});}
  else{
-  browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+  browser=await chromium.launch({headless:true});
   const page=await browser.newPage({viewport:{width:390,height:900},reducedMotion:'reduce'});page.on('pageerror',error=>errors.push(error.message));await page.goto(report.previewUrl);const panel=page.frameLocator('iframe');
   await panel.getByText(payload.summary,{exact:true}).waitFor();assert.equal(writes,0);assert.equal(await panel.locator('pre').count(),0);assert.equal(await panel.getByText(/payloadHash|authorizationRequestId/).count(),0);
   await page.screenshot({path:resolve(out,'native-choice-input-mobile.png'),fullPage:true});
@@ -85,5 +84,5 @@ try{
   assert.deepEqual(errors,[]);report.taskWrites=writes;report.calls=calls;report.capsuleReuseRows=Number((await f.db.query('SELECT count(*)::int n FROM capsule_uses_v2')).rows[0].n);
  }
 }catch(error){failure=error;report.failure={message:error.message,code:error.code??null};}
-finally{report.success=!failure;report.recordedAt=new Date().toISOString();const reportPath=resolve(out,preview?'native-preview-report.json':'native-report.json');await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({success:report.success,checks,errors,reportPath,failure:report.failure??null}));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();await mcp?.close();runtime?.close();if(api?.listening){api.closeAllConnections();await new Promise(ok=>api.close(ok));}await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-purpose-actions-browser-'));await rm(target,{recursive:true,force:true});}
+finally{report.success=!failure;report.recordedAt=new Date().toISOString();const reportPath=resolve(out,preview?'native-preview-report.json':'native-report.json');await writeFile(reportPath,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({success:report.success,checks,errors,reportPath,failure:report.failure??null}));await browser?.close();if(frontend?.listening)await new Promise(ok=>frontend.close(ok));await client?.close();await mcp?.close();await runtime?.close();if(api?.listening){api.closeAllConnections();await new Promise(ok=>api.close(ok));}await f.db.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-purpose-actions-browser-'));await rm(target,{recursive:true,force:true});}
 if(failure)throw failure;

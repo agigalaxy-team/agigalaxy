@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,stat,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,stat,rm,rename} from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
 import {join,resolve,sep,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {generateKeyPairSync} from 'node:crypto';
@@ -76,4 +77,27 @@ test('local installation preserves existing identity and a declined start never 
  const adopted=join(folder,'adopted'),endpoint='https://existing-service.invalid',selected='3343ef91-8dbf-40af-8e9c-4f04561c154a';
  await createNativeStore(adopted).updateConnection(endpoint,current=>({...current,active:{subjectId:selected}}));
  const kept=await prepareOpenCodeLocalWork(adopted,{subjectType:'person',endpoint});assert.equal(kept.identity,selected);assert.equal(kept.created,false);assert.equal((await getLocalSnapshot(adopted)).identity,null);
+});
+
+test('an npm-hoisted runtime and its transitive dependency remain usable after the original consumer moves',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'galaxy-setup-hoisted-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const consumer=join(folder,'consumer'),packageDirectory=join(consumer,'node_modules/@galaxy/native-client');
+ await mkdir(join(packageDirectory,'skills/galaxy'),{recursive:true});
+ for(const[name,content]of Object.entries({'package.json':JSON.stringify({name:'@galaxy/native-client',type:'module',dependencies:{'galaxy-fixture-runtime':'1.0.0'}}),
+  'galaxy.js':'export {};','opencode.js':"export {prepareOpenCodeLocalWork} from 'galaxy-fixture-runtime';",
+  'native-v2.json':JSON.stringify({kind:'galaxy-native-v2-local-candidate'}),'host-capabilities.json':'{}','HOSTS.md':'Synthetic fixture','skills/galaxy/SKILL.md':'Synthetic fixture'}))await writeFile(join(packageDirectory,name),content);
+ for(const[name,dependencies,body]of [['galaxy-fixture-runtime',{'galaxy-fixture-value':'1.0.0'},"import {value} from 'galaxy-fixture-value'; export async function prepareOpenCodeLocalWork(){return {created:false,identity:value,subjectType:'person',existingIdentityPreserved:true};}"],
+  ['galaxy-fixture-value',{},"export const value='synthetic-preserved-identity';"]]){
+  const directory=join(consumer,'node_modules',name);await mkdir(directory,{recursive:true});
+  await writeFile(join(directory,'package.json'),JSON.stringify({name,version:'1.0.0',type:'module',exports:'./index.mjs',dependencies}));await writeFile(join(directory,'index.mjs'),body);
+ }
+ const now=Math.floor(Date.now()/1000),publicKeyPem=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'pem'});
+ const result=await prepareNativeInstallation({website:'https://site.invalid',host:'opencode',packageDirectory,dataDirectory:join(folder,'data'),destination:join(folder,'connection'),
+  openCodePath:process.execPath,openCodeConfigDirectory:join(folder,'isolated-profile'),confirm:()=>true,
+  fetch:async()=>Response.json({version:1,endpoint:'https://api.invalid',signingKeys:[{kid:'fixture',publicKeyPem,notBefore:now-1,notAfter:now+60,revoked:false}]})});
+ assert.equal(result.identityCreated,false);assert.equal(result.existingIdentityPreserved,true);
+ await rename(consumer,join(folder,'consumer-moved'));
+ const installed=await import(pathToFileURL(join(result.packageDirectory,'opencode.js')).href);
+ assert.equal((await installed.prepareOpenCodeLocalWork()).identity,'synthetic-preserved-identity');
+ assert.equal(JSON.parse(await readFile(join(result.packageDirectory,'node_modules/galaxy-fixture-runtime/node_modules/galaxy-fixture-value/package.json'),'utf8')).version,'1.0.0');
 });

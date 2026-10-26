@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -10,7 +10,7 @@ import {a2aPurposeFixture} from '../a2a-purpose-fixture.mjs';
 import {workerComponentResult} from './worker-result.mjs';
 const directory=fileURLToPath(new URL('.',import.meta.url)),preview=process.argv.includes('--preview'),port=Number(process.argv.find(a=>a.startsWith('--port='))?.slice(7)??0);
 assert.ok(Number.isSafeInteger(port)&&(port===0||port>=1024&&port<=65535));
-const out=resolve(directory,'../../../../../../07-logs/development/ui-reconstruction-20261009/native-a2a-batch');await mkdir(out,{recursive:true});
+const out=fileURLToPath(new URL('../../../outputs/compact-a2a-purpose/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const html='<meta charset="utf-8"><main id="galaxy"></main><script type="module" src="/child.js"></script>';
 const x=await a2aPurposeFixture({longPreview:preview,compactArtifact:{html,manifest:{uri:'ui://galaxy/synthetic-a2a-purpose.html',sha256:createHash('sha256').update(html).digest('hex')}}});
 const checks=[],errors=[],report={actualBrowser:true,actualOfficialAppBridge:true,actualNativeRuntime:true,actualMcpServer:true,actualSignedHttp:true,database:'PGlite',actualReferenceNodeProcess:true,syntheticSourceWork:true,physicalAiHostUi:false,actualOpenCodeTui:false,realUserAcceptance:false,modelCalls:0,checks,pageErrors:errors};
@@ -36,7 +36,7 @@ try{
   res.end(req.url==='/parent.js'?parent.outputFiles[0].text:req.url==='/child'?html:'<meta charset="utf-8"><style>body{margin:0;background:#faf9f6;height:100dvh;display:flex;flex-direction:column;overflow:hidden}#host-focus{margin:8px;align-self:flex-start}iframe[hidden]{display:none!important}</style><button id="host-focus">合成宿主：原工作焦点</button><script type="module" src="/parent.js"></script>');
  }catch(error){res.statusCode=500;res.end(JSON.stringify({error:error.code??'a2a_fixture_incomplete'}));}});await new Promise(ok=>frontend.listen(port,'127.0.0.1',ok));report.previewUrl='http://127.0.0.1:'+frontend.address().port;
  if(preview){console.log(JSON.stringify({previewUrl:report.previewUrl,actualNativeRuntime:true,actualReferenceNodeProcess:true,physicalAiHostUi:false}));await new Promise(ok=>{process.once('SIGINT',ok);process.once('SIGTERM',ok);});}
- else{browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});const page=await browser.newPage({viewport:{width:390,height:900}});page.on('pageerror',e=>errors.push(e.message));await page.goto(report.previewUrl);const panel=page.frameLocator('iframe');
+ else{browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:900}});page.on('pageerror',e=>errors.push(e.message));await page.goto(report.previewUrl);const panel=page.frameLocator('iframe');
   await panel.getByRole('heading',{name:'交给所选服务处理',exact:true}).waitFor();assert.equal(await panel.locator('pre').count(),0);assert.equal((await x.processPeer.observations()).starts,0);
   await page.screenshot({path:resolve(out,'a2a-input-mobile.png'),fullPage:true});
   async function choose(name){const popup=page.context().waitForEvent('page');await panel.getByRole('button',{name,exact:true}).click();const choice=await popup;await choice.waitForLoadState();assert.equal(await panel.getByRole('button',{name:'等待你的选择',exact:true}).isDisabled(),true);assert.equal(await choice.locator('pre').count(),0);

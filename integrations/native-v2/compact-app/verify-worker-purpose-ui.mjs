@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import {chromium} from 'playwright';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import {workerToolsFixture} from '../worker-tools-fixture.mjs';
 import {workerComponentResult} from './worker-result.mjs';
 
-const directory=fileURLToPath(new URL('.',import.meta.url)),root=resolve(directory,'../../..'),previewMode=process.argv.includes('--preview');
+const directory=fileURLToPath(new URL('.',import.meta.url)),previewMode=process.argv.includes('--preview');
 const requestedPort=process.argv.find(value=>value.startsWith('--port='))?.slice(7),port=requestedPort===undefined?0:Number(requestedPort);
 assert.ok(Number.isSafeInteger(port)&&(port===0||port>=1024&&port<=65535),'Select a valid loopback preview port.');
-const out=resolve(root,'../../../07-logs/development/ui-reconstruction-20261009/native-second-batch');await mkdir(out,{recursive:true});
+const out=fileURLToPath(new URL('../../../outputs/compact-worker-purpose/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const x=await workerToolsFixture(previewMode?{peerTrustLifetimeMs:7200000}:{}),checks=[],errors=[],calls=[];let frontend,browser,failure,currentResult,readDelay=0;
 const report={actualBrowser:true,actualOfficialAppBridge:true,actualMcpSdk:true,actualSignedHttp:true,actualDatabase:'PGlite',actualWorkerNodeProcess:true,
  nativeLease:'contract fixture',hostLocalChoiceStore:'Map fixture',selectedPeerTrustExpiresAt:new Date(x.peerTrustExpiresAt).toISOString(),physicalAiHostUi:false,realUserAcceptance:false,modelCalls:0,checks,pageErrors:errors};
@@ -46,7 +46,7 @@ try{
  await new Promise((ok,fail)=>{frontend.once('error',fail);frontend.listen(port,'127.0.0.1',ok);});report.previewUrl='http://127.0.0.1:'+frontend.address().port;
  if(previewMode){console.log(JSON.stringify({previewUrl:report.previewUrl,actualWorkerNodeProcess:true,physicalAiHostUi:false,nativeLease:'contract fixture'}));await new Promise(ok=>{process.once('SIGINT',ok);process.once('SIGTERM',ok);});}
  else{
-  browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+  browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:390,height:1050}}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(report.previewUrl);const panel=page.frameLocator('iframe');
   const focusPanel=async()=>{await page.bringToFront();await page.locator('#host-focus').click();};
   const choose=async(buttonName,{denied=false}={})=>{await page.evaluate(value=>{window.denyOpenLinks=value;},denied);const popup=page.context().waitForEvent('page');await panel.getByRole('button',{name:buttonName,exact:true}).click();if(denied){const link=panel.getByRole('link',{name:'打开本机选择页',exact:true});await link.waitFor();await link.click();}const review=await popup;await review.waitForLoadState();assert.equal(await review.locator('pre').count(),0);assert.equal(await panel.getByRole('button',{name:'等待你的选择',exact:true}).isDisabled(),true);assert.equal(await panel.getByRole('button',{name:'刷新',exact:true}).count(),0);
