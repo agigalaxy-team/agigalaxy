@@ -124,7 +124,7 @@ test('selected feedback stays current private task material and its real ACK/aud
 
  // Explicit hostile ACK doubles do not add effects. An unconfirmed ACK keeps
  // the same operation unknown until the real immutable audit can prove it.
- const realEvent=services.feedback.event;
+ const realEvent=services.feedback.event.bind(services.feedback);
  for(const corrupt of [v=>({...v,operationId:randomUUID()}),v=>({...v,feedback:{...v.feedback,id:randomUUID()}}),v=>({...v,feedback:{...v.feedback,revision:4}}),v=>({...v,feedback:{...v.feedback,state:'closed'}}),v=>({...v,history:{items:[{kind:'updated',note:'different note'}]}})]){
   services.feedback.event=async()=>corrupt(returnedAck);
   const uncertain=await actions.executePrepared(reader,proposal,{authorize:async()=>reader,operationId});

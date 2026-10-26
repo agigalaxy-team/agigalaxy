@@ -11,7 +11,7 @@ import {noSymlinkPath} from '../operations-stack/host.mjs';
 const fail=code=>Object.assign(Error(code),{code});
 const maximum=100000,pageSize=200;
 async function inventory(meili,gorse){
- const keys=new Set();let offset=0,total=null,cursor='',seen=new Set();
+ const keys=new Set();let offset=0;let total=null;let cursor='';const seen=new Set();
  if(meili)for(;;){
   const page=await meili.call('/indexes/'+meili.index+'/documents?'+new URLSearchParams({fields:'id',offset:String(offset),limit:String(pageSize)}));
   if(!Array.isArray(page.results)||page.results.length>pageSize||!Number.isSafeInteger(page.total)||page.total<0||page.total>maximum||total!==null&&total!==page.total)throw fail('maintenance_discovery_inventory_unconfirmed');

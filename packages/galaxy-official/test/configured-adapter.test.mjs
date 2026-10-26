@@ -29,7 +29,7 @@ test('configured discovery stays explicit, verifies signatures and discards canc
     return document;
   } });
   t.after(() => source.close());
-  const adapter = createConfiguredGalaxyAdapter(config); adapter.close();
+  const adapter = createConfiguredGalaxyAdapter(config); await adapter.close();
   assert.equal(source.status().state, 'not-read');
   assert.equal(calls, 0); assert.deepEqual(await readdir(directory), []);
   release = null;
@@ -118,7 +118,7 @@ for (const networkType of ['official','hub']) test(`native configured ${networkT
   command('galaxy.exit'); assert.equal(page, null); release(); await pending;
   assert.equal(page, null);
   await openConnection(); assert.match(viewText(), /读取已取消/);
-  page.options.find(option => option.value === '1').onSelect(); adapter.close();
+  page.options.find(option => option.value === '1').onSelect(); await adapter.close();
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(reads, 2); assert.equal(page, null); assert.equal(layers.length, 0);
   await assert.rejects(adapter.tui(api));

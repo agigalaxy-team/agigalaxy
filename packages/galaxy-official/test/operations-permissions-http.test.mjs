@@ -34,7 +34,8 @@ import {adminOrigin,operatorRoles,request,response,acceptCookies} from './operat
 // transport are explicit fixture contracts. There are no external identities,
 // live messages, emails, storage changes or automatic execution engines here.
 async function fixture(t){
- const f=await accountChatFixture();let authDb,issuer,jobs,server;
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ const f=await accountChatFixture();let authDb;let issuer;let jobs;let server;
  t.after(async()=>{if(server)await new Promise(resolve=>server.close(resolve));await jobs?.stop();await issuer?.close();await authDb?.close();await f.close();});
  authDb=new PGlite();await migrate(authDb);
  const roles=new Map(),callback=adminOrigin+'/v1/operations/callback',now=()=>Math.floor(Date.now()/1000);
@@ -120,7 +121,7 @@ test('registered business authorization keeps independent login, exact APIs and 
   await saveRole(['workbench.read','feedback.read']);
   const summary=await f.call('/v1/operations/summary',reader);assert.equal(summary.status,200);const value=await summary.json();assert.equal(value.feedback.pending,1);assert.equal(value.availability.feedback,'available');
   for(const key of ['communityReports','chatReports','sections','resources','files','jobs','search','businessActivity','recentOperations']){assert.equal(value[key],null,key);assert.equal(value.availability[key],'not-authorized');}
-  assert.equal(value.analytics.state,'not-collected');assert.equal(value.ai.state,'not-connected');assert.equal(JSON.stringify(value).includes('PRIVATE_'),false);
+  assert.equal(value.analytics.state,'not-collected');assert.equal(value.ai,null);assert.equal(JSON.stringify(value).includes('PRIVATE_'),false);
   for(const path of ['/v1/operations/users','/v1/operations/users/summary','/v1/operations/community/sections','/v1/operations/community/reports','/v1/operations/community/content','/v1/operations/community/tags',
    '/v1/operations/resources/projects','/v1/operations/files/summary','/v1/operations/chat-reports','/v1/operations/notices','/v1/operations/rules','/v1/operations/retention','/v1/operations/jobs','/v1/operations/search/failures','/v1/operations/audit'])assert.equal((await f.call(path,reader)).status,403,path);
   const feedbackId=(await f.db.query('SELECT id FROM operations_feedback_v1 LIMIT 1')).rows[0].id;
@@ -147,7 +148,7 @@ test('registered business authorization keeps independent login, exact APIs and 
    await assert.rejects(f.db.query('DELETE FROM operations_business_roles_v1 WHERE false'),{code:'42501'});
    await assert.rejects(f.db.query("UPDATE operations_permission_events_v1 SET input='{}'::jsonb WHERE false"),{code:'42501'});
    await f.db.query('RESET ROLE');await f.db.query('SET ROLE galaxy_evidence_worker');
-   assert.equal((await f.permissions.effective(actor)).source,'upstream-administrator');
+   assert.equal((await f.permissions.effective(actor)).source,'preconfigured-root');
    await assert.rejects(f.db.query('UPDATE operations_permission_authority_v1 SET version=version+1 WHERE false'),{code:'42501'});
    await assert.rejects(f.db.query('SELECT input FROM operations_permission_events_v1 LIMIT 1'),{code:'42501'});
    await f.db.query('RESET ROLE');await f.db.query('SET ROLE galaxy_content_publisher');

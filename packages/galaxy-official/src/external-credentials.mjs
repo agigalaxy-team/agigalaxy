@@ -43,7 +43,7 @@ export function createExternalCredentialsService({db,endpoint,configuration={ver
       ||!saved.issuedAt||Date.parse(saved.issuedAt)+issuer.revocation.maxAgeSeconds*1000<=now()*1000
       ||!issuer.keys.some(key=>isDeepStrictEqual(key,saved.signingKey)))
       return {state:'unknown',source:issuer?.revocation?.url??null,checkedAt:saved?.checkedAt??null,validUntil:saved?.validUntil??null,reason:'status-not-current',lastKnownState:saved?.state??null};
-    const {signingKey,...visible}=saved;return visible;
+    const {signingKey:_signingKey,...visible}=saved;return visible;
   }
   function conditionIds(metadata,issuer){return (issuer?.conditions||[]).filter(condition=>metadata.types.includes(condition.type)
     &&(!condition.claim||same(claimAt(metadata.vc,condition.claim.path),condition.claim.equals))).map(condition=>condition.id);}

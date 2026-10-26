@@ -73,7 +73,7 @@ export function createStoredManagementMaintainerAuthorization({db,endpoint,issue
 
 export async function loadOperationsWorkerAuthorization(path,{db,endpoint}={}){
   if(!path)return null;
-  const config=await privateJson(path),{directoryOrigin,accountDirectory,rootOperatorFile,managementAccounts,...core}=config;
+  const config=await privateJson(path),{directoryOrigin,accountDirectory:_accountDirectory,rootOperatorFile,managementAccounts,...core}=config;
   if(config.version!==1||Object.keys(core).sort().join(',')!=='adminOrigin,clientId,directoryCredentialFile,issuer,roles,version'
     ||!validManagementAccountsReference(managementAccounts))throw Error('Invalid operations worker configuration.');
   origin(config.adminOrigin);

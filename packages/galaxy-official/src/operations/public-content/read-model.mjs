@@ -85,7 +85,7 @@ export class PublicContentReadModel extends PublicContentSource{
   return this.run(operator,false,'community-content-query',{...metadata,hasQuery:!!query},async(db,actor)=>{
    const cache=new Map(),read=async row=>{const k=key(row);if(!cache.has(k))cache.set(k,this.viewWithin(db,actor,row.kind,row.id,{detail:true}).catch(error=>{if(error instanceof ServiceError&&error.status===404)return null;throw error;}));return cache.get(k);},
     rows=await this.candidatesWithin(db,q,{after:q.after,limit:201}),items=[];let last=null,processed=0;
-   for(const row of rows.slice(0,200)){last=row;processed++;const view=await read(row);if(view&&this.matches(view,q)){const {body,links,attachments,publishedUntil,...item}=view;items.push(item);}if(items.length===q.limit)break;}
+   for(const row of rows.slice(0,200)){last=row;processed++;const view=await read(row);if(view&&this.matches(view,q)){const {body:_body,links:_links,attachments:_attachments,publishedUntil:_publishedUntil,...item}=view;items.push(item);}if(items.length===q.limit)break;}
    const all=await this.candidatesWithin(db,q,{limit:2001}),trendDays=q.days===28?28:7,window=operationsAnalyticsPeriod(this.now(),trendDays);
    let summary={available:false,state:'unavailable',reason:'public-content-window-too-large',total:null,visible:null,hidden:null,unavailable:null,posts:null,replies:null,pendingReview:null,trendDays,daily:[]};
    if(all.length<=2000){

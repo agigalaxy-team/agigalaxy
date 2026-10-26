@@ -1,5 +1,5 @@
 import pg from 'pg';
-import {mkdir,chown} from 'node:fs/promises';
+import {mkdir} from 'node:fs/promises';
 import {migrate} from '../../src/database.mjs';
 import {postgresSqlArguments,noSymlinkPath} from '../operations-stack/host.mjs';
 import {replayNativeCurrentFacts} from './current-facts.mjs';

@@ -99,7 +99,7 @@ test('native Dialog and keymap route edits projects, signs publication, displays
     assert.equal((await runtime.controller.queryProjectDiscovery({ projectId })).items.length, 0);
     assert.ok(calls > 20, 'real HTTP used through runtime and portable clients');
   } finally {
-    adapter?.close(); runtime?.close(); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close();
+    await adapter?.close(); runtime?.close(); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close();
     assert.equal(dirname(directory), tmpdir()); assert.ok(directory.startsWith(join(tmpdir(), 'galaxy-project-discovery-ui-')));
     await rm(directory, { recursive: true, force: true });
   }

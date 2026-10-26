@@ -85,7 +85,7 @@ test('operations block gates own attachment bytes, reversible derived summaries,
   assert.deepEqual(lateNotice.content,{});assert.deepEqual(lateNotice.sourceFacts,[]);assert.equal(lateNotice.sourcesTemporarilyUnavailable,true);
   assert.equal((await db.query('SELECT content FROM room_shared_summaries WHERE share_id=$1',[published.shareId])).rows[0].content.fragments.length,1,'A late notice block hides the projection without erasing the retained copy');
   shared.filter.sourceReader=sourceReader;await notice.setHidden(false);
-  const get=contract.store.get,run=chat.run.bind(chat);let blockDuringBytes=true,authorizedDb=null;
+  const get=contract.store.get.bind(contract.store),run=chat.run.bind(chat);let blockDuringBytes=true,authorizedDb=null;
   // PGlite serializes transactions. Schedule this fixture transition in the
   // existing authorized transaction rather than pretending it is another DB.
   chat.run=(actor,write,operation,options)=>run(actor,write,db=>{authorizedDb=db;return operation(db);},options);

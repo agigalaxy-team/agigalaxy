@@ -108,7 +108,7 @@ test('actual public reader, Gorse order and server-issued positions survive poli
 });
 
 test('native recommendation aggregation and qualified theme facts keep unknowns while clicked receipts remain bound across collectors and identities',async t=>{
- const f=await fixture(t),[a,b]=f.people,A=await f.publish(a),B=await f.publish(b,'life'),visitor=randomUUID(),requests=[];let series=[];
+ const f=await fixture(t),[a,b]=f.people,A=await f.publish(a),_B=await f.publish(b,'life'),visitor=randomUUID(),requests=[];let series=[];
  const panel=new OpenPanelClient({url:'http://openpanel.invalid',projectId:randomUUID(),clientId:'w'.repeat(36),clientSecret:'s'.repeat(40),readClientId:'r'.repeat(36),readClientSecret:'t'.repeat(40),fetch:async(url,options)=>{requests.push({url:new URL(url),options});return Response.json({series});}});f.operations.openpanel=panel;
  const made=await f.operations.saveTheme(f.admin,{operationId:randomUUID(),expectedVersion:0,label:'显式跨类用途',enabled:true,mapping:{categories:['technology','life'],tagIds:[],queryTerms:['找工具']},reason:'本地明确映射'},authorize(f.admin));
  const runtime=new DiscoveryRuntime({db:f.db,endpoint:f.endpoint,accounts:f.accounts,source:f.source,now:f.now,recommendationOperations:f.operations,gorse:{recommend:async()=>[{id:'post_'+A.postId,source:'gorse-recommendation'}]}});await runtime.initialize();

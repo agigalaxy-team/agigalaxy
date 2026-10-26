@@ -3,6 +3,7 @@ import {ServiceError} from '../../../shared/service-error.mjs';
 // Deliberately enumerate model-visible fields. Never return a source DTO,
 // credential reference, upstream error, session list, issuer, or raw subject.
 export const fail=()=>{throw new ServiceError('operations_query_response_invalid',503);};
+// eslint-disable-next-line no-control-regex -- Deliberately reject or sanitize ASCII control characters.
 export const text=(value,max=240)=>typeof value==='string'&&value.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)?value:null;
 export const number=value=>Number.isSafeInteger(value)&&value>=0?value:null;
 export const bool=value=>typeof value==='boolean'?value:null;

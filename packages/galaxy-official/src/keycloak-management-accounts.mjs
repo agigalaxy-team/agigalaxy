@@ -4,7 +4,7 @@ const validSubject=value=>typeof value==='string'&&value!=='.'&&value!=='..'&&/^
 const invalid=(code='management_identity_unavailable',status=503)=>{throw new ServiceError(code,status);};
 const text=(v,max)=>typeof v==='string'&&v.length<=max?v:'';
 const date=v=>Number.isSafeInteger(v)&&v>=0?new Date(v).toISOString():null;
-async function limited(values,read){const result=new Array(values.length);let cursor=0;await Promise.all(Array.from({length:Math.min(4,values.length)},async()=>{for(;;){const i=cursor++;if(i>=values.length)return;result[i]=await read(values[i]);}}));return result;}
+async function limited(values,read){const result=Array.from({length:values.length});let cursor=0;await Promise.all(Array.from({length:Math.min(4,values.length)},async()=>{for(;;){const i=cursor++;if(i>=values.length)return;result[i]=await read(values[i]);}}));return result;}
 
 // Management realm only. Reader/writer are distinct protected service clients;
 // no browser credential, email match or native administrator role grants root.
@@ -72,7 +72,7 @@ export function createKeycloakManagementAccounts({issuer,reader,writer=null,admi
     if(!matches.length||matches.some(row=>!validSubject(row.id)||row.clientRole===true)||new Set(matches.map(row=>row.id)).size!==1)invalid('management_identity_response_invalid');
     return {id:matches[0].id,name};};
    const role=fixedRole(roleNames[admission]),admin=admission==='reader'?fixedRole(roleNames.administrator):null;
-   let result=await write(path,'POST',[role],options);if(result.state!=='confirmed'||!admin)return result;
+   const result=await write(path,'POST',[role],options);if(result.state!=='confirmed'||!admin)return result;
    return write(path,'DELETE',[admin],options);},
   async sessions(principal){const rows=await read(target(principal)+'/sessions');if(!Array.isArray(rows)||rows.length>10000)invalid('management_identity_response_invalid');return {state:'available',activeCount:rows.length,scope:'keycloak-management-sso'};},
   async requestEmailChange(principal,newEmail,options){if(!emailChangeConfigured||await emailChanges.available()!==true)invalid('management_email_verification_not_configured');

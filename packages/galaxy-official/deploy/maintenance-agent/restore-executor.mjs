@@ -57,10 +57,10 @@ export class MaintenanceRestoreExecutor{
   }catch(error){
    const step=row.steps.findLast(x=>x.state==='running');if(step){step.state='failed';step.finishedAt=this.now().toISOString();}
    row.planState='failed';row.publicActivation=openingAttempted?null:false;
-   if(openingAttempted)error=fail('maintenance_public_activation_unknown');
+   const finalError=openingAttempted?fail('maintenance_public_activation_unknown'):error;
    // No automatic rollback, restart of unrelated writers, opening or repeated
    // restore is attempted after an ambiguous or failed production stage.
-   return this.journal.finish(row,error);
+   return this.journal.finish(row,finalError);
   }
  }
 }

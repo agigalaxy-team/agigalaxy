@@ -110,9 +110,9 @@ register('notice-create notice-save notice-publish notice-withdraw',{noticeId:uu
 register('notice-delivery',{noticeId:uuid,execution:enumeration('worker'),...messagingSelection},{state:messagingState,version:integer,revision:integer,audienceCount:integer,deliveredCount:integer,code,
  counts:messagingCounts,submission:enumeration('submitted','not-configured','ineligible','failed','unknown'),retryable:bool,
  errorCode:enumeration('smtp_not_configured','smtp_credential_unavailable','smtp_recipient_ineligible','smtp_submission_unknown','operations_permission_denied','business_admin_denied','operations_messaging_not_active','operations_messaging_recipient_ineligible')});
-register('retention-request retention-complete retention-failed',{runId:uuid,target:targetKey,execution:enumeration('worker')},
+register('retention-request retention-complete retention-failed',{runId:uuid,target:targetKey,execution:enumeration('worker'),reason:enumeration('authority_changed','execution_failed')},
  {state,maximumRowsPerRun:integer,maximumRootsPerRun:nullable(integer),code,
- counts:object({expired:integer,removed:integer,deleted:integer,removedVersions:integer,removedHeads:integer,removedOperations:integer,removedArchives:integer,removedChunks:integer})});
+ counts:object({privateConversationArchives:integer,expired:integer,removed:integer,deleted:integer,removedVersions:integer,removedHeads:integer,removedOperations:integer,removedArchives:integer,removedChunks:integer})});
 register('feedback-query',{...page,hasQuery:bool,module:nullable(module),days:z.union([enumeration(7,28),z.literal('all')]),category:nullable(category),state:nullable(state)},reading);
 register('feedback-read',{...selectionId,historyAfter:nullable(sequence),attachmentId:uuid},reading);
 register('feedback-update',{...selectionId,...change,category:nullable(category),module,state}, {...receipt,feedbackId:uuid,revision:integer});

@@ -32,5 +32,5 @@ export const serviceConnectionTestSchema=z.strictObject({id,kind:serviceConnecti
  checks:z.array(z.strictObject({kind:z.enum(['transport','authentication','reader-authentication','writer-authentication','index','runtime','execution-signature','scanner-signatures']),state:z.enum(['passed','failed','not-tested'])})).max(8),
  code:z.enum(['service_connection_test_failed','service_connection_credentials_unavailable','service_connection_signatures_stale','service_connection_runtime_not_ready']).nullable()});
 
-export function serviceConnectionBinding(configuration){const {credentialRef,...binding}=serviceConnectionSchema.parse(configuration);return serviceConnectionBindingSchema.parse(binding);}
+export function serviceConnectionBinding(configuration){const {credentialRef:_credentialRef,...binding}=serviceConnectionSchema.parse(configuration);return serviceConnectionBindingSchema.parse(binding);}
 export function serviceConnectionCredentialTarget(configuration){const binding=serviceConnectionBindingSchema.safeParse(configuration),value=binding.success?binding.data:serviceConnectionBinding(configuration);if(value.kind==='file-scanning')return null;return{section:'service-connections',id:value.id,kind:value.kind,origin:value.url};}

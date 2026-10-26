@@ -46,7 +46,7 @@ test('account feedback data uses real owner sessions, fixed export selection and
  await f.db.query(`INSERT INTO official_account_sessions_v1(scope_hash,token_hash,login_hash,account_id,issuer,external_subject,email,email_verified,csrf_token,created_at,expires_at)
   VALUES($1,$2,$3,$4,'https://login.example.org','synthetic-0','fixture@example.invalid',true,$5,$6,$7)`,[portal.configurationHash,f.digest(token),f.digest('synthetic-login'),owner.accountId,csrf,f.now(),f.now()+3600]);
  await migrate(f.db,{roles:['api','worker']});await f.db.exec('SET ROLE galaxy_api');
- const first=await f.submit(owner,{fileCount:1}),foreign=await f.submit(other,{body:'FOREIGN_FEEDBACK_TEXT'});f.advance(61);const second=await f.submit(owner,{body:'SECOND_OWN_FEEDBACK'});
+ const first=await f.submit(owner,{fileCount:1}),foreign=await f.submit(other,{body:'FOREIGN_FEEDBACK_TEXT'});f.advance(61);const _second=await f.submit(owner,{body:'SECOND_OWN_FEEDBACK'});
  await f.feedback.event(f.admin,first.receipt.feedbackId,{operationId:randomUUID(),expectedRevision:1,state:'processing',note:'PRIVATE_OPERATOR_NOTE'});
  const server=createApi({bindings:{endpoint:f.endpoint},officialAccounts:portal,accountFeedbackData:f.ownerData,operationsFeedback:f.feedback,feedbackAttachments:f.files,browserOrigins:[website],logger:entry=>f.logs.push(entry),rateLimit:250});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));

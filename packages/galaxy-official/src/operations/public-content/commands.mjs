@@ -37,9 +37,9 @@ export class PublicContentCommands extends PublicContentReadModel{
    if(view.version!==x.expectedVersion)operationsFail('operations_source_changed');if(view.curation.revision!==x.expectedRevision)operationsFail('operations_curation_changed');
    if(!view.capabilities.canCurate)operationsFail('operations_source_unavailable');
    const old=view.curation.appliesToCurrent?view.curation:{topic:null,pinned:false,featured:false,tagIds:[]},topic=Object.hasOwn(x,'topic')?x.topic:old.topic,
-    pinned=x.pinned??old.pinned,featured=x.featured??old.featured,tagIds=[...(x.tagIds??old.tagIds)].sort();
+    pinned=x.pinned??old.pinned,featured=x.featured??old.featured,tagIds=[...(x.tagIds??old.tagIds)].sort((a,b)=>a<b?-1:a>b?1:0);
    if(tagIds.length&&(await db.query('SELECT id FROM operations_forum_tags_v1 WHERE endpoint=$1 AND id=ANY($2::uuid[]) AND enabled=true',[this.endpoint,tagIds])).rows.length!==tagIds.length)operationsFail('operations_tag_unavailable');
-   if(view.curation.appliesToCurrent&&topic===old.topic&&pinned===old.pinned&&featured===old.featured&&isDeepStrictEqual(tagIds,[...old.tagIds].sort()))operationsFail('operations_content_unchanged');
+   if(view.curation.appliesToCurrent&&topic===old.topic&&pinned===old.pinned&&featured===old.featured&&isDeepStrictEqual(tagIds,[...old.tagIds].sort((a,b)=>a<b?-1:a>b?1:0)))operationsFail('operations_content_unchanged');
    const revision=view.curation.revision+1,at=operationsStamp(this.now());
    await db.query(`INSERT INTO operations_forum_curation_v1(endpoint,target_kind,target_id,revision,source_version,topic,pinned,featured,tag_ids,operation_id,updated_at)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(endpoint,target_kind,target_id) DO UPDATE SET revision=EXCLUDED.revision,source_version=EXCLUDED.source_version,

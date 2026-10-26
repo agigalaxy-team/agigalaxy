@@ -13,7 +13,7 @@ test('canonical linked version is rechecked before read output, private card pre
  const db=new PGlite();t.after(()=>db.close());
  await db.exec(operationsAgentOsConversationsMigrationSql);await db.exec(operationsAgentOsConversationToolsMigrationSql);await db.exec('ALTER TABLE operations_agentos_conversations_v1 ADD COLUMN ai_account_id uuid');
  const endpoint='https://canonical-reference.synthetic.invalid',owner='canonical-version-owner',ai=randomUUID(),post=randomUUID(),reply=randomUUID(),original=randomUUID();
- let currentVersionId=original,sourceVersion=1,readAllowed=true,writeAllowed=true,effects=0,readCount=0;
+ let currentVersionId=original;const sourceVersion=1;let readAllowed=true;const writeAllowed=true;let effects=0;let readCount=0;
  const now=()=>2000000000,expiry=now()+3600;
  const actor=()=>withOperationsAiWork(bindOperationsAiUse({kind:'business-operator',operatorId:owner,endpoint,role:'reader',businessAuthorization:{version:'1',permissions:['workbench.read','ai.use.governance',...(readAllowed?['content.read']:[]),...(writeAllowed?['content.curate']:[])]}},'governance'),{accountId:ai,purpose:'query',resolve:async()=>({accountId:ai,domain:'governance',enabled:true,permissions:[],roleVersions:[]})});
  const authority={db,endpoint,now,async human(input,{action='workbench.read',domain=null}={}){

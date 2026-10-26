@@ -1,14 +1,15 @@
 import test from 'node:test';
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {stripTypeScriptTypes} from 'node:module';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
+import {migrate} from '../src/database.mjs';
 import {migrations} from '../src/infrastructure/migrations.mjs';
 import {createStoredOperatorAuthorization} from '../src/operations-config.mjs';
 import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
-import {OperationsPermissionsAuthority} from '../src/operations/permissions/authority.mjs';
+import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
 import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
 import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
 import {BusinessAdminService} from '../src/business-admin.mjs';
@@ -24,7 +25,7 @@ const domains=['overview','governance','messaging','discovery','maintenance'];
 // upstream native-role responses are explicit doubles. No provider I/O.
 test('human domain AI permissions gate conversations, receipts, callbacks, cards and assisted executions without granting business rights or restricting automatic grants',
  {timeout:90000},async t=>{
-  assert.deepEqual(migrations.map(x=>x.version),[...Array.from({length:119},(_,i)=>i+1),121,122]);
+  assert.deepEqual(migrations.map(x=>x.version),[...Array.from({length:119},(_,i)=>i+1),...Array.from({length:11},(_,i)=>i+121)]);
   const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api']});
   assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE column_name='ai_domains'")).rows[0].n,0);
   const now=()=>Math.floor(Date.now()/1000),at=()=>new Date(now()*1000).toISOString();
@@ -33,7 +34,7 @@ test('human domain AI permissions gate conversations, receipts, callbacks, cards
   const nativeRoles={async getOperatorRoles(){return ['native-management-admin'];},invalidateOperatorRoles(){return true;}};
   const lifecycle=createOperationsManagementSessions({db,endpoint,issuer,roleDirectory:nativeRoles,now});
   const stored=createStoredOperatorAuthorization({db,endpoint,issuer,roles:{administrator:'native-management-admin',reader:'native-management-reader'},roleDirectory:nativeRoles,rootPrincipal:root,managementSessions:lifecycle});
-  const permissions=new OperationsPermissionsAuthority({db,endpoint,operatorAuthorization:stored,now});
+  const permissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization:stored,now});
   for(const sub of ['fixed-root','member'])await db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
    VALUES($1,$2,$3,$4,$4,$5,$5)`,[id(sub),endpoint,issuer,sub,at()]);
   const roleId=randomUUID(),base=['workbench.read','accounts.read','accounts.restriction.apply'];
@@ -44,8 +45,11 @@ test('human domain AI permissions gate conversations, receipts, callbacks, cards
    VALUES($1,$2,$3,$4,true,1,$5,$5,$6,$6)`,[randomUUID(),endpoint,person.operatorId,roleId,root.operatorId,at()]);
   const target=randomUUID();await db.query(`INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at)
    VALUES($1,$2,'https://website.example.invalid/realms/galaxy','synthetic-target','email',$3,$3)`,[target,endpoint,at()]);
+  const bootstrapBusiness=new BusinessAdminService({db,endpoint,permissions,now});
+  const bootstrapAuthority=new OperationsAgentOsAuthority({db,endpoint,permissions,now});
+  const {accounts:aiWorkAccounts,ids:aiIds}=await attachAiWorkFixture({db,endpoint,permissions,businessAdmin:bootstrapBusiness,authority:bootstrapAuthority,admin,domains,codes:base,now});
   await db.exec('SET ROLE galaxy_api');
-  const authority=new OperationsAgentOsAuthority({db,endpoint,permissions,now}),ledger=new Map();let dispatches=0;
+  const authority=new OperationsAgentOsAuthority({db,endpoint,permissions,aiWorkAccounts,now}),ledger=new Map();let dispatches=0;
   const client={
    async status(){return {state:'connected',modelState:'configured',configuredDomains:domains,conversationVersion:2,conversationDomains:domains};},
    async runConversation(execution,input){dispatches++;ledger.set(execution.id,[{runId:input.runId,operationId:input.runId,status:'COMPLETED',content:'Explicit native double',userInput:input.message,awaitingHuman:false}]);return {run_id:input.runId};},
@@ -104,20 +108,20 @@ test('human domain AI permissions gate conversations, receipts, callbacks, cards
   t.diagnostic('conversation/read/send/original operation/native callback/tools/direct card and confirmation race exercised; no real model');
 
   await setPermissions([...base,'ai.use.overview']);
-  const assisted=randomUUID(),automatic=randomUUID(),humanOnly=randomUUID();
-  for(const [grantId,mode,codes] of [[assisted,'assisted',[]],[automatic,'automatic',[]],[humanOnly,'assisted',['ai.use.overview']]])await db.query(`INSERT INTO operations_automation_grants_v1(id,endpoint,name,executor_kind,mode,enabled,version,permissions,resource_ids,resource_scope_kind,created_by,updated_by,created_at,updated_at)
-   VALUES($1::uuid,$2,$1::uuid::text,'ai',$3,true,1,$4,$5,$6,$7,$7,$8,$8)`,[grantId,endpoint,mode,codes,grantId===humanOnly?[target]:[],grantId===humanOnly?'selected':null,root.operatorId,at()]);
+  const assisted=randomUUID(),automatic=randomUUID(),humanOnly=randomUUID(),legacyGrant=randomUUID();
+  for(const [grantId,mode,codes] of [[assisted,'assisted',[]],[automatic,'automatic',[]],[humanOnly,'assisted',['ai.use.overview']],[legacyGrant,'assisted',[]]])await db.query(`INSERT INTO operations_automation_grants_v1(id,endpoint,name,executor_kind,mode,enabled,version,permissions,resource_ids,resource_scope_kind,ai_account_id,created_by,updated_by,created_at,updated_at)
+   VALUES($1::uuid,$2,$1::uuid::text,'ai',$3,true,1,$4,$5,$6,$9,$7,$7,$8,$8)`,[grantId,endpoint,mode,codes,grantId===humanOnly?[target]:[],grantId===humanOnly?'selected':null,root.operatorId,at(),grantId===legacyGrant?aiIds.governance:mode==='automatic'?aiIds.maintenance:aiIds.overview]);
   const input={operationId:randomUUID(),grantId:assisted,expectedGrantVersion:1,domain:'overview',actions:[],resourceIds:[],preparedCommand:null};
   const created=await authority.create(person,input,{authorize});assert.equal(created.execution.domain,'overview');
   await assert.rejects(authority.create(person,{...input,operationId:randomUUID(),domain:'governance'},{authorize}),hasCode('operations_agentos_ai_use_denied'));
-  const legacyId=randomUUID();await db.query(`INSERT INTO operations_agentos_executions_v1(id,endpoint,grant_id,grant_version,domain,executor_kind,mode,operator_id,created_by,actions,resource_ids,state,revision,session_id,created_at,updated_at)
-   VALUES($1,$2,$3,1,'governance','ai','assisted',$4,$4,'{}','{}','active',1,$5,$6,$6)`,[legacyId,endpoint,assisted,person.operatorId,randomUUID(),at()]);
+  const legacyId=randomUUID();await db.query(`INSERT INTO operations_agentos_executions_v1(id,endpoint,grant_id,grant_version,domain,executor_kind,mode,operator_id,created_by,actions,resource_ids,ai_account_id,state,revision,session_id,created_at,updated_at)
+   VALUES($1,$2,$3,1,'governance','ai','assisted',$4,$4,'{}','{}',$7,'active',1,$5,$6,$6)`,[legacyId,endpoint,legacyGrant,person.operatorId,randomUUID(),at(),aiIds.governance]);
   assert.deepEqual((await authority.list(person)).items.map(x=>x.id),[created.execution.id]);
   await assert.rejects(authority.get(person,legacyId),hasCode('operations_agentos_ai_use_denied'));
   await assert.rejects(authority.nativeAuthorization({executionId:legacyId,operation:'run'}),hasCode('operations_agentos_ai_use_denied'));
-  assert((await authority.options(person)).items.some(x=>x.id===assisted));
+  assert.deepEqual((await authority.options(person)).items,[],'an empty action grant is not advertised as an executable option');
   const auto=await authority.create(admin,{...input,operationId:randomUUID(),grantId:automatic,domain:'maintenance'},{authorize:async()=>admin});
-  await assert.rejects(authority.create(admin,{...input,operationId:randomUUID(),grantId:humanOnly,actions:['ai.use.overview'],resourceIds:[target]},{authorize:async()=>admin}),hasCode('operations_agentos_scope_denied'));
+  await assert.rejects(authority.create(admin,{...input,operationId:randomUUID(),grantId:humanOnly,actions:['ai.use.overview'],resourceIds:[target]},{authorize:async()=>admin}),hasCode('operations_ai_work_permission_denied'));
   await setPermissions(base);
   assert.deepEqual((await authority.list(person)).items,[]);
   assert.deepEqual((await authority.options(person)).items,[]);

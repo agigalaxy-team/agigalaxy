@@ -4,7 +4,7 @@ import canonicalize from 'canonicalize';
 import {transaction} from './database.mjs';
 import {digest} from './shared/digest.mjs';
 import {ServiceError} from './shared/service-error.mjs';
-import {modelSettingsNativeStatus,modelSettingsNativeOperation,modelSettingsNativeCredential,modelSettingsNativeUsage} from './operations-model-settings-native.mjs';
+import {modelSettingsNativeStatus,modelSettingsNativeOperation,modelSettingsNativeUsage} from './operations-model-settings-native.mjs';
 import {modelSettingsDomains,modelSettingsFormats,modelSettingsConfigurationSchema,emptyModelSettingsConfiguration,modelSettingsDraftSchema,modelSettingsApplySchema,modelSettingsCredentialSchema,modelSettingsHistorySchema,modelSettingsUsageSchema,modelSettingsOperationSchema,modelSettingsNativeAuthorizationSchema,parseModelSettings,assertModelSettingsApplicable} from './shared/operations-model-settings-schema.mjs';
 
 const fail=(code,status=409)=>{throw new ServiceError(code,status);};
@@ -15,7 +15,7 @@ const operationView=(row,replayed=false)=>({operationId:row.operation_id,kind:ro
  modelRecordId:row.input?.modelRecordId??null,credentialRef:row.credential_ref,errorCode:row.error_code,replayed,recordedAt:stamp(row.created_at),updatedAt:stamp(row.updated_at)});
 const modelFields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','reasoning','timeoutSeconds','toolCalling','structuredOutput','imageUnderstanding','parallelToolCalls','verbosity','fallbacks','enabled'];
 function configurationChanges(before,after){
- const ids=[...new Set([...before.models,...after.models].map(model=>model.id))].sort();
+ const ids=[...new Set([...before.models,...after.models].map(model=>model.id))].sort((a,b)=>a<b?-1:a>b?1:0);
  return {models:ids.map(id=>{const a=before.models.find(model=>model.id===id)??null,b=after.models.find(model=>model.id===id)??null;
   return{id,kind:a===null?'added':b===null?'removed':'changed',fields:modelFields.filter(field=>!isDeepStrictEqual(a?.[field]??null,b?.[field]??null)).map(field=>({field,before:a?.[field]??null,after:b?.[field]??null}))};
  }).filter(row=>row.fields.length),scenarios:modelSettingsDomains.filter(domain=>!isDeepStrictEqual(before.scenarios[domain],after.scenarios[domain])).map(domain=>({domain,before:before.scenarios[domain],after:after.scenarios[domain]}))};
@@ -103,7 +103,7 @@ export class OperationsModelSettingsService{
   const selected=await this.versionWithin(this.db,row.version_id),expectedScenarios=modelSettingsDomains.filter(domain=>selected.configuration.scenarios[domain]!==null).sort();
   if(status.appliedVersionId!==row.version_id||!status.configurationVersion||status.engines.gateway.configurationVersion!==status.configurationVersion||status.engines.agentos.configurationVersion!==status.configurationVersion||
    ['unknown','unavailable'].includes(status.engines.gateway.state)||['unknown','unavailable'].includes(status.engines.agentos.state)||
-   status.engines.gateway.modelCount!==selected.configuration.models.filter(model=>model.enabled).length||!isDeepStrictEqual([...status.engines.agentos.configuredScenarios].sort(),expectedScenarios))
+   status.engines.gateway.modelCount!==selected.configuration.models.filter(model=>model.enabled).length||!isDeepStrictEqual([...status.engines.agentos.configuredScenarios].sort((a,b)=>a<b?-1:a>b?1:0),expectedScenarios))
    return this.advance(row,'result-unknown',{errorCode:'model_settings_native_readback_mismatch'});
   return this.advance(row,'applied');
  }

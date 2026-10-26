@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import {BusinessAdminService} from '../src/business-admin.mjs';
 import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
 import {chatMessageOperationsBlockedWithin} from '../src/chat-message-operations-gate.mjs';
@@ -14,8 +15,9 @@ async function fixture(t){
   reader={...admin,operatorId:'message-operations-reader',role:'reader'},other={...admin,operatorId:'message-operations-other-admin'};
  for(const actor of [admin,reader,other])await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,'https://operations.example.invalid',$1,'合成消息处理者',$3,$3)`,[actor.operatorId,f.endpoint,new Date(f.now()*1000).toISOString()]);
+ const current=await attachOperationsFixtureAuthority({businessAdmin,admin,reader,permissions:['chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read']});current.roles.set(other.operatorId,'administrator');
  const authorize=async()=>admin;
- return{...f,businessAdmin,governance,admin,reader,other,authorization:{authorize}};
+ return{...f,businessAdmin,governance,admin,reader,other,roles:current.roles,authorization:{authorize}};
 }
 async function message(f,actor,roomId,{file=false,text='当前必要选材正文'}={}){
  let attachmentId=null,bytes=null,attachments;
@@ -90,7 +92,7 @@ test('author edits cannot bypass message-level blocks and restoration never subs
  assert.equal(await chatMessageOperationsBlockedWithin(f.db,{messageId:edited.messageId}),true);assert.equal((await f.chat.history(a,roomId)).messages.some(item=>item.messageId===edited.messageId),false);
  first=await f.governance.operatorGet(f.admin,{reportId:first.reportId});const old=material(first,edited.messageId);
  assert.equal(old.state,'unavailable');assert.equal(old.text,null);assert.equal(old.authorAccountId,null);assert.equal(old.authorDisplayName,null);assert.equal(old.authorUid,null);assert.equal(old.moderation.canRestore,false);assert.equal(old.moderation.hidden,true);
- let reads=0;const archiveRead=f.transport.read;f.transport.read=async input=>{reads++;return archiveRead(input);};
+ let reads=0;const archiveRead=f.transport.read.bind(f.transport);f.transport.read=async input=>{reads++;return archiveRead(input);};
  await assert.rejects(act(f,first,edited,body(first,edited,'restore')),{code:'chat_report_source_changed'});
  await assert.rejects(act(f,first,edited,body(first,edited,'restore',{messageRevision:2})),{code:'chat_report_message_not_selected'});assert.equal(reads,0,'a moderation command does not fetch the unselected replacement body');
  await f.chat.retract(b,roomId,withdrawn.messageId);second=await f.governance.operatorGet(f.admin,{reportId:second.reportId});
@@ -104,13 +106,13 @@ test('author edits cannot bypass message-level blocks and restoration never subs
 test('message commands require current independent administrator authority and roll back when the request verifier changes',{timeout:60000},async t=>{
  const f=await fixture(t),[a,b]=f.people,roomId=await joinAccountConversation(f,a,b),selected=await message(f,b,roomId),record=await report(f,a,roomId,[selected]),
   detail=await f.governance.operatorGet(f.admin,{reportId:record.reportId}),input=body(detail,selected,'hide'),target={reportId:record.reportId,messageId:selected.messageId};
- await assert.rejects(f.governance.operatorMessageVisibility(f.reader,target,input,{authorize:async()=>f.reader}),{code:'business_admin_denied'});
+ await assert.rejects(f.governance.operatorMessageVisibility(f.reader,target,input,{authorize:async()=>f.reader}),{code:'operations_permission_denied'});
  await assert.rejects(act(f,detail,selected,input,{}),{code:'operations_authorization_unavailable'});
  await assert.rejects(act(f,detail,selected,{...input,operatorId:f.admin.operatorId}),{code:'invalid_chat_report_request'});
- let calls=0;await assert.rejects(act(f,detail,selected,input,{authorize:async()=>++calls===1?f.admin:{...f.admin,role:'reader'}}),{code:'business_admin_denied'});
+ let calls=0;await assert.rejects(act(f,detail,selected,input,{authorize:async()=>{if(++calls>1)f.roles.set(f.admin.operatorId,'reader');return f.admin;}}),{code:'operations_permission_denied'});f.roles.set(f.admin.operatorId,'administrator');
  calls=0;await assert.rejects(act(f,detail,selected,input,{authorize:async()=>++calls===1?f.admin:f.other}),{code:'business_admin_denied'});
  await assert.rejects(act(f,detail,selected,input,{authorize:async()=>({...f.admin,endpoint:'https://another.example.invalid'})}),{code:'business_admin_denied'});
- const implicated={...f.admin,operatorId:'actual-selected-message-author'};
+ const implicated={...f.admin,operatorId:'actual-selected-message-author'};f.roles.set(implicated.operatorId,'administrator');
  await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,'https://login.example.org','synthetic-1','本案实际发送者',$3,$3)`,[implicated.operatorId,f.endpoint,new Date(f.now()*1000).toISOString()]);
  await assert.rejects(f.governance.operatorMessageVisibility(implicated,target,input,{authorize:async()=>implicated}),{code:'chat_report_moderation_denied'});

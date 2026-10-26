@@ -28,7 +28,7 @@ export async function readUsageAnalytics(runtime,actor,input){if(!runtime.permis
    data={unit:'events',current,previous};basis={from:startDate,to:endDate,previousFrom,previousTo,windowSeconds,bounds:'[from,to)',precision:'second',aggregation:'native-chart-metrics-sum',eventNames:discoveryBusinessEvents};
   }
   else if(request.kind==='retention'){
-   if(request.scope==='accounts'){const native=await runtime.openpanel.accountAnalysis('get_retention_cohort',{...(request.accountId?{accountId:request.accountId}:{})});data=native.data;basis={window:'native-last-12-weeks',interval:'week',criteria:'on_or_after',activity:'any-event',...accountAnalysisBasis(request,native,'native-clickhouse-default'),identityRule:request.accountId?'profile_id = account:<UUID>':'profile_id starts with account:',accountPrefixFilterSupported:true,cohortEntry:'first-qualified-activity-in-window'};}
+   if(request.scope==='accounts'){const native=await runtime.openpanel.accountAnalysis('get_retention_cohort',(request.accountId?{accountId:request.accountId}:{}));data=native.data;basis={window:'native-last-12-weeks',interval:'week',criteria:'on_or_after',activity:'any-event',...accountAnalysisBasis(request,native,'native-clickhouse-default'),identityRule:request.accountId?'profile_id = account:<UUID>':'profile_id starts with account:',accountPrefixFilterSupported:true,cohortEntry:'first-qualified-activity-in-window'};}
    else{data=await runtime.openpanel.tool('get_retention_cohort');basis={window:'native-last-12-weeks',interval:'week',criteria:'on_or_after',activity:'any-event',population:'mixed-account-and-visitor-profiles',identityRule:'profile_id != device_id',accountOnly:false,accountPrefixFilterSupported:false};}
   }
   else if(request.kind==='paths'){

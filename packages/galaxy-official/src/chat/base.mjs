@@ -2,7 +2,7 @@ import {chatActorRef,isAccountChatRef,ensureChatActorWithin} from "../chat-actor
 import {lockSubjectResourceBudget,subjectResourceUsage,enforceResourceGrowth} from "../infrastructure/resource-budgets.mjs";
 import {targetRestrictionsWithin} from "../target-governance-restrictions-v2.mjs";
 import {lockControllerMappingsWithin} from "../controller-mapping-lock.mjs";
-import {fail,parse,uuid} from './helpers.mjs';
+import {fail,uuid} from './helpers.mjs';
 
 // Current Access/account authority, room membership and independent controller mapping. The MUC projection is never the authority for Galaxy governance.
 export class ChatAuthority{

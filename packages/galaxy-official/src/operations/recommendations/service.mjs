@@ -17,7 +17,7 @@ export class OperationsRecommendationService extends RecommendationReadModel{
  }
  async command(operator,kind,input,change,{authorize=null}={}){
   if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);
-  const current=async db=>{const fresh=await authorize();if(fresh?.kind!=='business-operator'&&!this.businessAdmin?.executorAuthority?.acceptsDuty(fresh)||fresh.endpoint!==this.endpoint||fresh.operatorId!==operator.operatorId)fail('business_admin_denied',403);return this.authorize(fresh,'recommendations.configure',db);};
+  const current=async db=>{const fresh=await authorize({db});if(fresh?.kind!=='business-operator'&&!this.businessAdmin?.executorAuthority?.acceptsDuty(fresh)||fresh.endpoint!==this.endpoint||fresh.operatorId!==operator.operatorId)fail('business_admin_denied',403);return this.authorize(fresh,'recommendations.configure',db);};
   await current();return transaction(this.db,async db=>{
   const actor=await current(db),requestHash=digest(canonicalize({kind,input}));
   if(actor.kind==='operations-ai-service'){

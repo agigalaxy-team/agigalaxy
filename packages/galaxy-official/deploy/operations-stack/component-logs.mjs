@@ -38,7 +38,9 @@ export async function collectDockerLogs(config) {
   const cursorPath = directory + '/cursors.json', cursors = {};
   try { Object.assign(cursors, JSON.parse(await readFile(cursorPath, 'utf8'))); } catch (error) { if (error.code !== 'ENOENT') throw new Error('operations_log_cursor_unavailable'); }
   const watchers = new Map(), finished = new Map(), sizes = new Map();
-  let queue = Promise.resolve(), stopping = false, pollingPromise = null, discoveryChild = null, fatal;
+  let queue = Promise.resolve(), stopping = false, discoveryChild = null, fatal;
+  /** @type {Promise<void> | null} */
+  let pollingPromise = null;
   const maxBytes = config.logCollection.maxFileBytes, retained = config.logCollection.files;
   const enqueue = job => { queue = queue.then(job); queue.catch(error => { fatal ??= error; stop(); }); return queue; };
   const write = async (entry, record) => {
@@ -64,21 +66,21 @@ export async function collectDockerLogs(config) {
     const read = stream => {
       const decoder = createDockerLogDecoder(({ line, truncated }) => {
         const matched = timestamp.exec(line);
-        if (!matched) { enqueue(() => write(entry, { ...normalizeOperationalRecord(line), event: truncated ? 'log_record_truncated' : 'log_source_notice', level: 'warn', detailsOmitted: true })); return; }
+        if (!matched) { void enqueue(() => write(entry, { ...normalizeOperationalRecord(line), event: truncated ? 'log_record_truncated' : 'log_source_notice', level: 'warn', detailsOmitted: true })); return; }
         const [, time, body] = matched;
         const record = normalizeOperationalRecord(body, { time });
-        enqueue(async () => {
+        void enqueue(async () => {
           await write(entry, record);
           const prior = cursors[key];
           if (!prior || prior.containerId !== id || time > prior.time) cursors[key] = { containerId: id, time };
         });
       });
-      stream.setEncoding('utf8'); stream.on('data', decoder.write); stream.on('end', decoder.end);
+      stream.setEncoding('utf8'); stream.on('data', decoder.write.bind(decoder)); stream.on('end', decoder.end);
     };
     read(child.stdout); read(child.stderr);
     watcher.done = new Promise(resolve => {
-      child.once('error', () => { enqueue(() => write(entry, { event: 'log_source_unavailable', level: 'error', code: 'docker_logs_unavailable' })); });
-      child.once('close', code => { if (watchers.get(key) === watcher) watchers.delete(key); finished.set(key, id); if (code !== 0 && !stopping) enqueue(() => write(entry, { event: 'log_source_interrupted', level: 'warn', code: 'docker_logs_interrupted' })); resolve(); });
+      child.once('error', () => { void enqueue(() => write(entry, { event: 'log_source_unavailable', level: 'error', code: 'docker_logs_unavailable' })); });
+      child.once('close', code => { if (watchers.get(key) === watcher) watchers.delete(key); finished.set(key, id); if (code !== 0 && !stopping) void enqueue(() => write(entry, { event: 'log_source_interrupted', level: 'warn', code: 'docker_logs_interrupted' })); resolve(); });
     });
   };
   async function discover() {
@@ -114,7 +116,7 @@ export async function collectDockerLogs(config) {
   try { await poll(); await stopped; }
   finally {
     clearInterval(pollTimer); clearInterval(cursorTimer);
-    await pollingPromise;
+    await Promise.resolve(pollingPromise);
     const closing = [...watchers.values()];
     const deadline = setTimeout(() => { for (const watcher of closing) watcher.child.kill('SIGKILL'); }, 10000);
     for (const watcher of closing) watcher.child.kill('SIGTERM');

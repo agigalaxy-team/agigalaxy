@@ -2,7 +2,7 @@ import {transaction} from "../../database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {operationsOperatorNamesWithin} from "../../operations-history-identities.mjs";
 import {searchQualityFixedConstraints,searchQualityOverviewSchema,searchQualityHistorySchema,searchQualityOperationSchema,parseSearchQuality,editableSearchSettings,sameNativeSettings} from "../../shared/operations-search-quality-schema.mjs";
-import {iso,stamp,fail,phases,versionView,operationView,changes} from './helpers.mjs';
+import {iso,stamp,fail,phases,versionView,operationView} from './helpers.mjs';
 import {SearchQualityMeasurement} from './measurement.mjs';
 
 // Current configuration, operation history and quality overview projections for authorized management reads.

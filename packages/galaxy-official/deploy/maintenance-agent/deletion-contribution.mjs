@@ -40,7 +40,7 @@ export async function replayDeletionRecoveryContribution({database,contribution,
  await noSymlinkPath(contribution.artifactPath);
  const info=await lstat(contribution.artifactPath);if(!info.isFile()||info.isSymbolicLink()||(info.mode&0o077)||info.size>20*1024*1024)throw fail('maintenance_private_recovery_facts_required');
  const payload=await readFile(contribution.artifactPath,'utf8');if(sha(payload)!==contribution.sha256)throw fail('maintenance_recovery_facts_changed');
- const result=await replayDeletionLedger(database,payload,{version:1,id:contribution.operationId,recoveryId,endpoint:origin,ledgerSha256:contribution.sha256,capturedNotBefore:contribution.capturedAt,executorRef},{...(now?{now}:{})});
+ const result=await replayDeletionLedger(database,payload,{version:1,id:contribution.operationId,recoveryId,endpoint:origin,ledgerSha256:contribution.sha256,capturedNotBefore:contribution.capturedAt,executorRef},(now?{now}:{}));
  if(result.quarantined!==true||result.publicActivationReady!==false)throw fail('maintenance_deletion_replay_unconfirmed');
  return{kind:'current-deletion-ledger',sha256:contribution.sha256,requestsImported:result.requestsImported,requestsReplayed:result.requestsReplayed,executionsReplayed:result.executionsReplayed,quarantined:true,publicActivationReady:false};
 }

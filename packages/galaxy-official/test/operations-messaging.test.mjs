@@ -90,7 +90,7 @@ test('messaging schedules through fixed native queue contracts, pins each run ve
 });
 
 test('messaging bounds only confirmed pre-DATA retries, preserves stable Message-ID and refuses unknown or interrupted submissions rather than blindly resending',async t=>{
- const f=await fixture(t),config=f.config({channels:['email'],audience:{kind:'accounts',accountIds:[f.people[0].accountId]}});let calls=0,ids=[];
+ const f=await fixture(t),config=f.config({channels:['email'],audience:{kind:'accounts',accountIds:[f.people[0].accountId]}});let calls=0;const ids=[];
  f.setSubmit(async input=>{await input.authorize();ids.push(input.messageId);calls++;return calls===1?{submission:'failed',code:'smtp_connection_failed',retryable:true}:{submission:'submitted',code:null,retryable:false};});
  const plan=await f.activate(config),run=await f.execute(plan);let result=await f.messaging.deliver({runId:run.id});assert.equal(result.run.delivery.email.failed,1);assert.equal(result.run.state,'running');assert.equal(calls,1);
  await f.messaging.deliver({runId:run.id});assert.equal(calls,1);f.advance(30);result=await f.messaging.deliver({runId:run.id});assert.equal(result.run.delivery.email.submitted,1);assert.equal(calls,2);assert.equal(ids[0],ids[1]);assert.equal(result.run.delivery.email.delivered,null);

@@ -14,7 +14,7 @@ export class OperationsFileAccessService extends OperationsFilesReadModel{
  human(operator){const actor=this.require(operator,true);if(actor.kind!=='business-operator'&&!this.businessAdmin.executorAuthority?.acceptsDuty(actor))fail('operations_permission_denied',403);return actor;}
  async fresh(actor,action,authorize,db=this.db){
   if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);
-  const current=this.human(await authorize());if(current.operatorId!==actor.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);
+  const current=this.human(await authorize({db}));if(current.operatorId!==actor.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);
   return this.businessAdmin.authorizeAction(current,action,{db});
  }
  async change(operator,kind,id,input,{authorize=null}={}){

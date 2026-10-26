@@ -34,7 +34,7 @@ export class P14RulesBase{
  async readable(operator){return this.businessAdmin.authorizeAction(operator,'rules.read');}
  async currentActor(operator,authorize,db){
   if(typeof authorize!=='function')throw new ServiceError('operations_authorization_unavailable',503);
-  const fresh=await authorize();if(!fresh||fresh.kind!=='business-operator'||fresh.operatorId!==operator.operatorId||fresh.endpoint!==this.endpoint)throw new ServiceError('business_admin_denied',403);
+  const fresh=await authorize({db});if(!fresh||fresh.kind!=='business-operator'||fresh.operatorId!==operator.operatorId||fresh.endpoint!==this.endpoint)throw new ServiceError('business_admin_denied',403);
   return this.businessAdmin.authorizeAction(fresh,'rules.write',{db});
  }
  async validateAccounts(db,key,policy){if(key!=='business-controls')return;const ids=[...new Set(policy.rules.flatMap(rule=>rule.exceptions.flatMap(exception=>exception.accountIds)))];if(!ids.length)return;

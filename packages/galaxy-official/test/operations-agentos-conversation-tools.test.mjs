@@ -6,12 +6,21 @@ import {accountChatFixture} from './account-chat-fixture.mjs';
 import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
 import {OperationsAgentOsGateway} from '../src/operations-agentos-gateway.mjs';
 import {dispatchOperationsAgentOs} from '../src/adapters/http/operations-agentos-http.mjs';
+import {bindOperationsAiUse,withOperationsAiWork} from '../src/shared/operations-ai-use.mjs';
 import {operationsProxyPolicy} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
 
 test('114 real SQL binds early native tool calls to their original turn, stores metadata, renews controlled context and recovers the exact human card',{timeout:60000},async t=>{
  const f=await accountChatFixture();t.after(f.close);
  const operator={kind:'business-operator',operatorId:'typed-tools-reader',endpoint:f.endpoint,businessAuthorization:{version:'1',permissions:['workbench.read','content.read','feedback.read','feedback.update']}},permissions=new Set(operator.businessAuthorization.permissions);
- const authority={db:f.db,endpoint:f.endpoint,now:f.now,async human(actor,{action='workbench.read'}={}){if(actor.operatorId!==operator.operatorId||!permissions.has(action))throw Object.assign(new Error('explicit denied fixture'),{code:'operations_permission_denied',status:403});return operator;}};
+ const aiAccountId=randomUUID(),resolve=async()=>({accountId:aiAccountId,domain:'overview',enabled:true,
+  permissions:[...permissions],roleVersions:[]});
+ const authority={db:f.db,endpoint:f.endpoint,now:f.now,
+  async human(actor,{action='workbench.read',purpose='conversation'}={}){
+   if(actor.operatorId!==operator.operatorId||!permissions.has(action))throw Object.assign(new Error('explicit denied fixture'),{code:'operations_permission_denied',status:403});
+   return withOperationsAiWork(bindOperationsAiUse({...operator},'overview'),{accountId:aiAccountId,purpose,resolve});
+  }};
+
+ await f.db.query("INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,'overview','SQL context fixture','',true,1,1,$3,$3)",[aiAccountId,f.endpoint,new Date(f.now()*1000)]);
  const runId=randomUUID(),turnId=randomUUID();let early=null;
  // Only the engine transport and individual domain adapters are doubles here.
  // All conversation/command/tool/card/source SQL and HTTP are actual product.
@@ -22,7 +31,7 @@ test('114 real SQL binds early native tool calls to their original turn, stores 
  tools.query.execute=async()=>({availability:'available',data:{body:'CONTROLLED_BODY_NOT_A_TOOL_LEDGER'},evidenceRefs:[{kind:'post',id:targetId,version:1,purpose:'public-content',controlledSource:true,read:{tool:'read-operation-object',arguments:{kind:'post',id:targetId,filters:{}}}}]});
  tools.query.revalidate=async()=>({valid:sourceValid,refs:[],invalidRefs:[]});
  await service.conversationRun(operator,'overview',{operationId:turnId,message:'合成跨模块查询'},{authorize:async()=>operator});assert.equal(early.data.body,'CONTROLLED_BODY_NOT_A_TOOL_LEDGER');
- let context=(await service.conversations.session(operator,'overview')).row;
+ const context=(await service.conversations.session(operator,'overview')).row;
  const envelope={conversationId:context.id,sessionId:context.session_id,turnId,runId,callId:'second-query',tool:'query-operations',arguments:{module:'content',view:'list',filters:{}}};
  await assert.rejects(gateway.execute({...envelope,runId:randomUUID()}),{code:'operations_agentos_scope_denied'});
  await assert.rejects(gateway.execute({...envelope,sessionId:randomUUID()}),{code:'operations_agentos_scope_denied'});
@@ -40,7 +49,7 @@ test('114 real SQL binds early native tool calls to their original turn, stores 
  assert.equal((await tools.card(operator,'overview',input.cardId)).state,'completed');
  assert.equal((await tools.confirm(operator,'overview',input.cardId,input,{authorize:async()=>operator})).state,'completed');assert.equal(effects,1);
  await assert.rejects(tools.confirm(operator,'overview',input.cardId,{...input,operationId:randomUUID()},{authorize:async()=>operator}),{code:'operations_agentos_operation_conflict'});
- permissions.delete('feedback.update');await assert.rejects(tools.card(operator,'overview',input.cardId),{code:'operations_permission_denied'});permissions.add('feedback.update');
+ permissions.delete('feedback.update');assert.equal((await tools.card(operator,'overview',input.cardId)).state,'completed');await assert.rejects(tools.confirm(operator,'overview',input.cardId,input,{authorize:async()=>operator}),{code:'operations_permission_denied'});permissions.add('feedback.update');
  sourceValid=false;const fresh=await service.conversations.session(operator,'overview',{create:true});assert.notEqual(fresh.row.session_id,context.session_id);assert.equal(fresh.contextChanged,true);
  await assert.rejects(gateway.execute({...envelope,callId:'old-context'}),{code:'operations_agentos_source_changed'});
  assert.equal((await service.conversationOperation(operator,'overview',turnId)).state,'context-changed');

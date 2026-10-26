@@ -161,6 +161,6 @@ test('concurrent accepted revision and stable pagination preserve distinct work 
   await service.put(actor,put(projection(f.owner)));await service.put(actor,put(projection(f.owner)));
   const all=[];let after;
   do{const page=await service.list(account.actor,{limit:1,...(after?{after}:{})});all.push(...page.items.map(item=>item.workId));after=page.nextAfter;}while(after);
-  assert.equal(all.length,3);assert.equal(new Set(all).size,3);assert.deepEqual(all,[...all].sort());
+  assert.equal(all.length,3);assert.equal(new Set(all).size,3);assert.deepEqual(all,[...all].sort((a,b)=>a<b?-1:a>b?1:0));
  }finally{await f.close();}
 });

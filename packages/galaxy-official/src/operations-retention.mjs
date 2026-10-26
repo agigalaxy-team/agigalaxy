@@ -120,9 +120,9 @@ export function createOperationsRetentionWorker({retention,jobs=retention.jobs})
         await db.query("UPDATE operations_retention_runs_v1 SET state='failed',attempts=attempts+1,error_code=$2,updated_at=$3,finished_at=$3 WHERE id=$1",[runId,code,at]);
         await retention.recordMaintenance({target:row.target,errorCode:code},db);
         const actor=retention.businessAdmin.require(row.request_actor,{write:true});
-        await retention.businessAdmin.recordWithin(db,actor,'retention-failed',{selection:{runId,target:row.target,execution:'worker',reason:code==='business_admin_denied'?'authority_changed':'execution_failed'},result:{state:'failed',code}});
+        await retention.businessAdmin.recordWithin(db,actor,'retention-failed',{selection:{runId,target:row.target,execution:'worker',reason:['business_admin_denied','operations_permission_denied'].includes(code)?'authority_changed':'execution_failed'},result:{state:'failed',code}});
       });
-      throw new ServiceError(code,code==='business_admin_denied'?403:503);
+      throw new ServiceError(code,['business_admin_denied','operations_permission_denied'].includes(code)?403:503);
     }
   }
   return {execute,start:()=>jobs.work('retention-cleanup',execute),stop:()=>jobs.stopWork('retention-cleanup')};

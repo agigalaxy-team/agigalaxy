@@ -15,7 +15,7 @@ test('a retired-source follow-up gets only its owned fixed-AI completed target r
  await db.exec('ALTER TABLE operations_agentos_conversations_v1 ADD COLUMN ai_account_id uuid');
  await db.exec('CREATE TABLE business_admin_audit_v1(endpoint text,operator_id text,operation_id uuid,action text,selection jsonb,result jsonb)');
  const endpoint='https://official.synthetic.invalid',owner='action-reference-owner',aiAccountId=randomUUID(),targetId=randomUUID(),versionId=randomUUID();
- let seconds=1988193660,revision=1,write=true,read=true,enabled=true,hidden=false,sourceAvailable=true,sourceFailure=false,visibilityVersion=0,effects=0,currentAiAccountId=aiAccountId,reads=0;
+ let seconds=1988193660;let revision=1;let write=true;let read=true;const enabled=true;let hidden=false;let sourceAvailable=true;let sourceFailure=false;let visibilityVersion=0;let effects=0;let currentAiAccountId=aiAccountId;let reads=0;
  const now=()=>seconds,sourceExpiry=now()+3600;
  const actor=()=>withOperationsAiWork(bindOperationsAiUse({kind:'business-operator',operatorId:owner,endpoint,role:'reader',businessAuthorization:{version:String(revision),permissions:['workbench.read','ai.use.governance',...(read?['content.read']:[]),...(write?['content.hide','content.restore']:[])]}},'governance'),{accountId:currentAiAccountId,purpose:'query',resolve:async()=>({accountId:currentAiAccountId,domain:'governance',enabled,permissions:[],roleVersions:[]})});
  const authority={db,endpoint,now,async human(input,{action='workbench.read',domain=null,purpose=null}={}){

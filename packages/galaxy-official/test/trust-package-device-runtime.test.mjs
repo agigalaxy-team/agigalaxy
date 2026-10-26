@@ -39,7 +39,7 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   await native.initialize({profile:'coding-case'},{confirmed:true});const id=(await native.status()).identity;
   await exportOffline(native,id,0);assert.equal(requests,0);
   await native.connect({confirmed:true});await native.disconnect();await exportOffline(native,id,1);
-  native.close();native=await createNativeRuntime({...config,dataDirectory:directory,website:'https://galaxy.example',fetch:fetcher,now:()=>f.now});
+  await native.close();native=await createNativeRuntime({...config,dataDirectory:directory,website:'https://galaxy.example',fetch:fetcher,now:()=>f.now});
   await exportOffline(native,id,1);
   const records=new Map(),store={get:async key=>records.get(key),put:async(key,value)=>records.set(key,value),update:memoryAtomicUpdate(records)};
   web=await createExistingWebRuntime(config,{store,fetch:fetcher,now:()=>f.now});
@@ -50,7 +50,7 @@ test('real native and WebCrypto device runtimes export offline self-claims befor
   const adapter=createTrustPackageDeviceAdapter({endpoint:config.endpoint,getMaterial:()=>null,readIdentity:()=>null,writeIdentity:()=>{},fetchIdentity:()=>{throw Error('unexpected network');}});
   await assert.rejects(adapter.sign('unrelated','galaxy-identity-control-v2+jws',{}),/trust_signature_type_forbidden/);
  }finally{
-  native?.close();web?.close();if(api)await new Promise(r=>api.close(r));await f.db.close();
+  await native?.close();web?.close();if(api)await new Promise(r=>api.close(r));await f.db.close();
   const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&target.split(sep).at(-1).startsWith('galaxy-trust-runtime-'));
   await rm(target,{recursive:true,force:true});
  }

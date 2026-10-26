@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {OperationsRetention,createOperationsRetentionWorker} from '../src/operations-retention.mjs';
@@ -35,10 +36,10 @@ test('bounded retention removes only due copies and records the exact operator a
 test('authority revocation, audit rollback and cross-process cancellation never erase private data',{timeout:60000},async t=>{
   const f=await operationsProductFixture(t),retention=new OperationsRetention(f),worker=createOperationsRetentionWorker({retention}),id=await archive(f);
   const requested=await retention.request(f.actor,{operationId:randomUUID(),target:'private-conversation-archives'});
-  f.setRole('reader');await assert.rejects(worker.execute({runId:requested.run.id}),{code:'business_admin_denied'});
-  assert.equal((await retention.get(f.reader,requested.run.id)).run.errorCode,'business_admin_denied');
+  f.setRole('reader');await assert.rejects(worker.execute({runId:requested.run.id}),{code:'operations_permission_denied'});
+  assert.equal((await retention.get(f.reader,requested.run.id)).run.errorCode,'operations_permission_denied');
   assert.equal((await f.db.query('SELECT count(*)::integer AS n FROM private_conversation_archives_v1 WHERE id=$1',[id])).rows[0].n,1);
-  f.setRole('administrator');const record=f.businessAdmin.recordWithin;
+  f.setRole('administrator');const record=f.businessAdmin.recordWithin.bind(f.businessAdmin);
   f.businessAdmin.recordWithin=async function(db,actor,action,input){if(action==='retention-complete')throw Error('synthetic audit commit failure');return record.call(this,db,actor,action,input);};
   await assert.rejects(worker.execute({runId:requested.run.id}),{code:'retention_cleanup_failed'});
   f.businessAdmin.recordWithin=record;
@@ -48,6 +49,14 @@ test('authority revocation, audit rollback and cross-process cancellation never 
   await f.jobs.cancel('retention-cleanup',requested.run.jobId,{endpoint:f.endpoint});
   assert.equal((await newWorker.execute({runId:requested.run.id})).state,'cancelled','API cancellation persists domain state used in another process');
   assert.equal((await f.db.query('SELECT count(*)::integer AS n FROM private_conversation_archives_v1 WHERE id=$1',[id])).rows[0].n,1);
-  await assert.rejects(retention.request(f.reader,{operationId:randomUUID(),target:'private-conversation-archives'}),{code:'business_admin_denied'});
+  await assert.rejects(retention.request(f.reader,{operationId:randomUUID(),target:'private-conversation-archives'}),{code:'operations_permission_denied'});
   const audit=await f.businessAdmin.audit(f.reader);assert.ok(audit.items.some(item=>item.action==='retention-failed'&&item.selection.reason==='authority_changed'));
+});
+
+test('retention audit keeps only fixed count metadata and closed authority reasons',()=>{
+ const base={id:randomUUID(),sequence:1,operator_id:'retention-fixture',operator_role:'administrator',action:'retention-complete',created_at:new Date()};
+ const row=businessAuditMetadata({...base,selection:{reason:'authority_changed',body:'PRIVATE_UNSELECTED'},result:{counts:{privateConversationArchives:100,objectKeys:'PRIVATE_UNSELECTED'},body:'PRIVATE_UNSELECTED'}});
+ assert.deepEqual(row.selection,{reason:'authority_changed'});assert.deepEqual(row.result,{counts:{privateConversationArchives:100}});assert(!JSON.stringify(row).includes('PRIVATE_UNSELECTED'));
+ const invalid=businessAuditMetadata({...base,selection:{reason:'PRIVATE_UNSELECTED'},result:{counts:{privateConversationArchives:'PRIVATE_UNSELECTED'}}});
+ assert.deepEqual(invalid.selection,{});assert.deepEqual(invalid.result,{});
 });

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {migrate} from '../src/database.mjs';
 import {accountChatFixture} from './account-chat-fixture.mjs';
@@ -20,7 +20,8 @@ import {queueFixture} from './operations-jobs-fixture.mjs';
 // Upstream operator/recipient directories and SMTP are explicit doubles.
 export async function messagingIntegrationFixture(t){
  const f=await accountChatFixture(),roles=new Map(),calls=[],logs=[],mailCalls=[],identities=new Map();
- let issuer,server,queue,authDb;
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ let issuer;let server;let queue;let authDb;
  t.after(async()=>{if(server)await new Promise(resolve=>server.close(resolve));await queue?.jobs.stop();await issuer?.close();await authDb?.close();await f.close();});
  authDb=new PGlite();await migrate(authDb);
  const callback=adminOrigin+'/v1/operations/callback',now=()=>Math.floor(Date.now()/1000);

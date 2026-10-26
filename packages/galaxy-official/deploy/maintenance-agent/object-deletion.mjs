@@ -53,7 +53,7 @@ export function buildObjectDeletionPlan({current,point,canonical,deletedSubjects
  }
  const targets=[...records.values()].filter(row=>row.table!=='feedback_attachments_v1'&&(owners.has(row.subjectId)||row.table==='outcome_materials_v2'&&owners.has(row.authorId)));
   if(targets.some(row=>row.leaseId&&(!row.leaseUntil||!Number.isFinite(Date.parse(row.leaseUntil))||Date.parse(row.leaseUntil)>now*1000)))throw fail('maintenance_object_processing_busy');
- return{targets:targets.map(({leaseId,leaseUntil,state,purgedAt,...row})=>row),knownKeys:[...keys.keys()].sort(),deletedSubjects};
+ return{targets:targets.map(({leaseId:_leaseId,leaseUntil:_leaseUntil,state:_state,purgedAt:_purgedAt,...row})=>row),knownKeys:[...keys.keys()].sort((a,b)=>a<b?-1:a>b?1:0),deletedSubjects};
 }
 
 // Complete bounded native inventory is used only to deny an unowned/unknown

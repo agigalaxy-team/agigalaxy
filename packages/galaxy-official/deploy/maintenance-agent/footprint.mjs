@@ -66,7 +66,7 @@ async function serviceFacts(config,binding,{run,fs,captureProof}){
  if(!releases.size)return{...binding,state:'unknown',releasePaths:[],reason:'maintenance_current_release_unknown'};
  const paths=[];for(const root of releases){if(!approvedFootprintPath(root))throw code('maintenance_runtime_reference_invalid');paths.push(await fs.realpath(root));}
  const releaseProtectionDigest=captureProof?digest(Object.fromEntries(['User','ProtectSystem','ReadWritePaths','BindPaths','TemporaryFileSystem','RootDirectory','RootImage'].map(key=>[key,fields[key]??'']))):null;
- return{...binding,state:'available',active:fields.ActiveState==='active',releasePaths:paths.sort(),immutableReleasePaths:captureProof?serviceImmutableReleasePaths(fields,paths):[],releaseProtectionDigest,configurationPaths:[...configurationPaths.keys()].sort(),optionalConfigurationPaths:[...configurationPaths].filter(([,optional])=>optional).map(([path])=>path),reason:null};
+ return{...binding,state:'available',active:fields.ActiveState==='active',releasePaths:paths.sort((a,b)=>a<b?-1:a>b?1:0),immutableReleasePaths:captureProof?serviceImmutableReleasePaths(fields,paths):[],releaseProtectionDigest,configurationPaths:[...configurationPaths.keys()].sort((a,b)=>a<b?-1:a>b?1:0),optionalConfigurationPaths:[...configurationPaths].filter(([,optional])=>optional).map(([path])=>path),reason:null};
 }
 async function containerFacts(config,binding,{run}){
   if(binding.aliases?.length){
@@ -156,7 +156,7 @@ export async function resolveMaintenanceFootprint(config,{run=runCommand,fs={rea
   const covered=!unknown&&(sourceIds.length>0||postgresStanzas.length>0);
   return{id:module.id,state:covered?'covered':unknown?'unknown':'uncovered',sourceIds,postgresStanzas,method:postgresStanzas.length?'pgbackrest-cluster':bindings.some(x=>x.mounts.some(m=>m.writable))?'bounded-quiesced-volume':'selected-files',reasonCodes:covered?[]:[unknown?'maintenance_current_footprint_unknown':'maintenance_source_not_registered'],existenceAtOlderPoint:'not-inferred'};
  });
- const sourceIdentities=[];for(const {id,path,kind,optional} of resultSources){let resolvedPath=null;try{resolvedPath=await fs.realpath(path);}catch(error){if(!optional)throw code('maintenance_source_unavailable');}sourceIdentities.push({id,path,resolvedPath,kind,optional:!!optional});}
+ const sourceIdentities=[];for(const {id,path,kind,optional} of resultSources){let resolvedPath=null;try{resolvedPath=await fs.realpath(path);}catch{if(!optional)throw code('maintenance_source_unavailable');}sourceIdentities.push({id,path,resolvedPath,kind,optional:!!optional});}
  const moduleDatabaseBindings={agentos:agentosDatabase};
  const identity={sources:sourceIdentities,writers,moduleDatabaseBindings,...(captureProof?{immutableSources,keycloakOnline:keycloakOnline.state==='available'?keycloakOnline:null}:{}),services:serviceRows.map(({id,releasePaths,state,releaseProtectionDigest})=>({id,releasePaths,state,...(captureProof?{releaseProtectionDigest:releaseProtectionDigest??null}:{})})),containers:containerRows.map(({id,image,mounts,state,composeDirectory,unprovenMounts})=>({id,image,mounts,state,composeDirectory,...(captureProof?{unprovenMounts:unprovenMounts??null}:{})}))};
  return{version:1,digest:digest(identity),captureProof,sources:resultSources,writers,services:serviceRows,containers:containerRows,coverage,moduleDatabaseBindings,immutableSources,keycloakOnline,identity};
@@ -169,7 +169,7 @@ export function maintenanceCaptureConfiguration(config,footprint){
  // in reverse order. Existing pgBackRest clusters remain online and create
  // their named recovery points only after application writers have stopped.
  const online=footprint.keycloakOnline?.state==='available',keycloak=footprint.containers.find(row=>row.id==='keycloak');
- return{...config,backup:{...config.backup,sources:footprint.sources.map(({modules,captureMode,owner,...s})=>s),precopySourceIds:footprint.immutableSources,
+ return{...config,backup:{...config.backup,sources:footprint.sources.map(({modules:_modules,captureMode:_captureMode,owner:_owner,...s})=>s),precopySourceIds:footprint.immutableSources,
   writers:footprint.writers.filter(writer=>!(online&&keycloak&&writer.kind==='container'&&writer.name===keycloak.name))}};
 }
 

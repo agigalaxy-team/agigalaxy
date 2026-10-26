@@ -7,6 +7,7 @@ const safeHref=value=>{
  if(value.startsWith('/')&&!value.startsWith('//'))return true;
  try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}
 };
+// eslint-disable-next-line no-control-regex -- Deliberately reject or sanitize ASCII control characters.
 const text=max=>z.string().trim().max(max).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value));
 export const systemGeneralConfigurationSchema=z.strictObject({siteTitle:text(120).min(1),description:text(600),
  footerLinks:z.array(z.strictObject({label:text(100).min(1),href:z.string().max(2048).refine(safeHref)})).max(12)});

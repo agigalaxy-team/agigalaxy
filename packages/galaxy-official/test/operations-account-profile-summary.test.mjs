@@ -33,7 +33,7 @@ test('account topic analysis derives qualified normal-purpose facts and recorded
   const payload=await bindForumIds('create-post','account:'+person.accountId,{schemaVersion:1,operationId:randomUUID(),postId:randomUUID(),versionId:randomUUID(),expectedHeadVersion:0,accountId:person.accountId,title:'私密测试标记不会出现在画像 '+randomUUID(),body:'PRIVATE_BODY_MARKER',links:[],topic,audience:{read:{kind:publicRead?'everyone':'accounts'},participate:{kind:'accounts'}},publishedUntil:f.now()+3600});
   await forum.publish(person,{payloadJson:JSON.stringify(payload)});return payload;
  };
- const A=await publish(b,'technology'),Self=await publish(a,'arts'),Private=await publish(a,'life',false),Legacy=await publish(a,'galaxy'),Negative=await publish(b,'learning');
+ const A=await publish(b,'technology'),_Self=await publish(a,'arts'),Private=await publish(a,'life',false),Legacy=await publish(a,'galaxy'),Negative=await publish(b,'learning');
  // Simulate an existing subject-only head. An account association is not
  // original authorship; this adapter only accepts the exact stored account.
  await f.db.query('UPDATE forum_posts_v1 SET account_id=NULL WHERE id=$1',[Legacy.postId]);
@@ -64,7 +64,7 @@ test('account topic analysis derives qualified normal-purpose facts and recorded
  const service=new OperationsAccountProfileSummary({businessAdmin,discovery,now:f.now});businessAdmin.accountProfileAnalysis=service;
  const count=async table=>(await f.db.query('SELECT count(*)::int AS count FROM '+table)).rows[0].count,
   before={events:await count('discovery_usage_events_v1'),requests:await count('discovery_recommendation_requests_v1'),feedback:await count('discovery_feedback_v1')};
- let summary=await businessAdmin.accountSummary(reader,a.accountId,{days:7}),value=summary.profile;
+ let summary=await businessAdmin.accountSummary(reader,a.accountId,{days:7});const value=summary.profile;
  t.diagnostic('Real API-role summary, public sources and normal-purpose ledgers read');
  assert.equal(value.state,'partial','a rejected legacy event is excluded and not represented as complete collection');assert.equal(value.validUntil,null);assert.equal(value.period.timeZone,'Asia/Shanghai');assert.equal(summary.readExpiresAt,f.now()+30);
  const technology=value.interests.find(row=>row.key==='category:technology');assert.ok(technology);assert.deepEqual(technology.signalCounts,{views:1,clicks:2,bookmarks:2,participations:1,publicPosts:0,publicReplies:0,searches:0,notInterested:0});assert.equal(technology.method,'qualified-topic-observation-v1');assert.equal(technology.firstObservedAt,at());assert.equal(technology.lastObservedAt,at());

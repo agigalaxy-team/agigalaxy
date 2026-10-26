@@ -3,7 +3,7 @@ import {transaction} from '../../database.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';
 import {businessRestrictionView} from '../../business-admin-domain.mjs';
 import {RegisteredDirectory} from './registered-directory.mjs';
-import {registeredUsersParse as parse,registeredUsersQuerySchema,registeredUserIdSchema,registeredUsersHistorySchema,registeredCommandActions} from './registered-schema.mjs';
+import {registeredUsersParse as parse,registeredUsersQuerySchema,registeredUserIdSchema,registeredUsersHistorySchema} from './registered-schema.mjs';
 
 export const registeredStamp=value=>value===null||value===undefined?null:new Date(value).toISOString();
 const fail=(code,status=403)=>{throw new ServiceError(code,status);};

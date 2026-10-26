@@ -26,7 +26,7 @@ export async function fileCleanupSourceWithin(db,{kind,row,now,lock=false}){
  }
  const links=(await db.query(`SELECT source_key,post_id,version_id,reply_id,published_until FROM forum_attachment_links_v1 WHERE attachment_id=$1 ORDER BY source_key LIMIT 201${lock?' FOR SHARE NOWAIT':''}`,[row.id])).rows;
  if(links.length>200)return{kind,references:[],truncated:true,linked:true,activeReferences:null,explicitWithdrawal:false};
- const ids=key=>[...new Set(links.map(link=>link[key]).filter(Boolean))].sort();
+ const ids=key=>[...new Set(links.map(link=>link[key]).filter(Boolean))].sort((a,b)=>a<b?-1:a>b?1:0);
  const select=async(table,key)=>{const values=ids(key);return new Map((values.length?(await db.query(`SELECT id,state FROM ${table} WHERE id=ANY($1::uuid[]) ORDER BY id${lock?' FOR SHARE NOWAIT':''}`,[values])).rows:[]).map(value=>[value.id,value.state]));};
  // Upload/bind already locks the attachment. Source locks also prevent an
  // author transition while a concrete deletion is being checked and issued.

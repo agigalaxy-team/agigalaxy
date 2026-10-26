@@ -23,7 +23,7 @@ const code=error=>error?.code==='invalid_operations_agentos_query'||/^(?:operati
 const same=(left,right)=>left?.operatorId===right?.operatorId&&left?.endpoint===right?.endpoint;
 const attempted=row=>Object.hasOwn(row.proposal??{},'confirmationAttemptedAt')||Object.hasOwn(row.result??{},'confirmationAttemptedAt');
 const withAttempt=(row,result)=>Object.hasOwn(row.result??{},'confirmationAttemptedAt')?{...result,confirmationAttemptedAt:row.result.confirmationAttemptedAt}:result;
-const publicResult=value=>{if(!value||typeof value!=='object')return value;const {confirmationAttemptedAt,...result}=value;return result;};
+const publicResult=value=>{if(!value||typeof value!=='object')return value;const {confirmationAttemptedAt:_confirmationAttemptedAt,...result}=value;return result;};
 const projection=row=>({cardId:row.id,operationId:row.operation_id,turnId:row.turn_id,kind:row.proposal.kind,domain:row.domain,
  target:row.proposal.target,title:row.proposal.title,impact:row.proposal.impact,basis:row.proposal.basis,requiredAction:row.proposal.requiredAction,
  state:row.state,result:publicResult(row.result)??null,checkedAt:null,readExpiresAt:null,capability:{canConfirm:false,canDismiss:false,reason:null}});
@@ -89,7 +89,7 @@ export class AgentOsConversationTools{
     await this.cardActor(operator,row);
     const reference=conversationPriorActionReference(row,value);if(reference)result.items.push(reference);
     else result.availability='partial';
-   }catch(error){
+   }catch{
     result.availability='partial';
    }
   }
@@ -180,11 +180,11 @@ export class AgentOsConversationTools{
   await this.cardActor(operator,row);
   return row;
  }
- async cardActor(operator,row){
+ async cardActor(operator,row,{db=this.db}={}){
   const entry=workbenchActionCatalog.find(item=>item.kind===row.proposal?.kind);
   if(!entry)fail('invalid_operations_agentos_action',400);
-  const actor=await this.authority.human(operator,{domain:row.domain,action:entry.read,purpose:'query'});
-  const conversation=(await this.db.query('SELECT operator_id,domain,ai_account_id FROM operations_agentos_conversations_v1 WHERE endpoint=$1 AND id=$2',[this.endpoint,row.conversation_id])).rows[0];
+  const actor=await this.authority.human(operator,{db,domain:row.domain,action:entry.read,purpose:'query'});
+  const conversation=(await db.query('SELECT operator_id,domain,ai_account_id FROM operations_agentos_conversations_v1 WHERE endpoint=$1 AND id=$2',[this.endpoint,row.conversation_id])).rows[0];
   // A completed action may invalidate its own public source. Its receipt is
   // still bound to the original owner and fixed AI position, with fresh read
   // authority. This does not reopen the retired conversation's prose/history.
@@ -265,7 +265,7 @@ export class AgentOsConversationTools{
  async confirm(operator,domain,id,input,{authorize}={}){
   const x=parse(confirmSchema,input);if(x.cardId!==id||typeof authorize!=='function')fail('invalid_operations_agentos_request',400);
   const current=await authorize();if(!same(current,operator))fail('business_admin_denied');
-  let row=await this.ownedCard(current,domain,id);if(row.operation_id!==x.operationId)fail('operations_agentos_operation_conflict',409);
+  const row=await this.ownedCard(current,domain,id);if(row.operation_id!==x.operationId)fail('operations_agentos_operation_conflict',409);
   const bound=await this.cardActor(current,row);
   await this.authority.human(bound,{action:row.proposal.requiredAction,domain:row.domain,purpose:'prepare'});
   if(row.state==='completed')return this.cardView(current,row);
@@ -297,7 +297,7 @@ export class AgentOsConversationTools{
   if(!claimed)return this.cardView(operator,await this.ownedCard(operator,row.domain,row.id));
   row=claimed;
   let result,state;
-  const scopedAuthorize=async()=>{const fresh=await authorize();if(!same(fresh,operator))fail('business_admin_denied');const bound=await this.cardActor(fresh,row);await this.conversations.assertBoundedProposal(row.conversation_id,row.turn_id,row.proposal);return this.authority.human(bound,{domain:row.domain,purpose:'prepare'});};
+  const scopedAuthorize=async({db=this.db}={})=>{const fresh=await authorize({db});if(!same(fresh,operator))fail('business_admin_denied');const bound=await this.cardActor(fresh,row,{db});await this.conversations.assertBoundedProposal(row.conversation_id,row.turn_id,row.proposal,{db});return this.authority.human(bound,{db,domain:row.domain,purpose:'prepare'});};
   try{const scoped=await scopedAuthorize();result=await this.actions.executePrepared(scoped,row.proposal,{authorize:scopedAuthorize,operationId:row.operation_id});state=['completed','processing','unknown'].includes(result.state)?result.state:'not-available';}
   catch(error){state=error.status===403||error.status===409||error.status===400||error.status===404?'not-available':'unknown';result={operationId:row.operation_id,state,summary:state==='unknown'?'正在查询这次处理的原结果。':'当前条件已变化，本次处理未继续。',code:code(error)};}
   row=(await this.db.query('UPDATE operations_agentos_conversation_cards_v1 SET state=$3,result=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING *',[this.endpoint,row.id,state,JSON.stringify(withAttempt(row,result)),new Date(this.now()*1000)])).rows[0];

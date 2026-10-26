@@ -21,7 +21,8 @@ import {operationsProxyPolicy,operationsReadPath} from '../../../apps/galaxy-adm
 // a repository backup or production restoration check.
 test('maintenance central HTTP confines exact metadata routes, fresh human grants and authenticated private intent', {timeout:90000},async t=>{
  const f=await accountChatFixture(),authDb=new PGlite();await migrate(authDb);const roles=new Map(),subjects=new Map(),nativeCalls=[],records=[];
- let server,issuer,service,afterAuthentication=null;
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ let server;let issuer;let service;let afterAuthentication=null;
  t.after(async()=>{if(server)await new Promise(resolve=>server.close(resolve));await issuer?.close();await authDb.close();await f.close();});
  const callback=adminOrigin+'/v1/operations/callback',now=()=>Math.floor(Date.now()/1000);
  issuer=await oidcProviderFixture([callback],{emailVerified:true,roleClaims:{realm_access:{roles:[operatorRoles.reader]}}});

@@ -28,7 +28,7 @@ export function applyBrowserPolicy(request, response, origins) {
   response.setHeader('Vary', 'Origin');
   response.setHeader('Access-Control-Allow-Origin', origin);
   const pathname=new URL(request.url,'https://galaxy.invalid').pathname;
-  const operationsSession=/^\/v1\/operations\//.test(pathname);
+  const operationsSession=pathname.startsWith('/v1/operations/');
   const discoverySession=/^\/v1\/discovery\/(?:config|events|recommendations|search)$/.test(pathname);
   const accountDataMethod=request.method==='OPTIONS'?request.headers['access-control-request-method']:request.method;
   const accountDataId='[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';

@@ -143,7 +143,7 @@ export class OperationsMaintenanceService{
     const plan={version:1,scope:x.scope,point,moduleIds,modules,footprintDigest:preview.footprintDigest??null,adapterVersion:preview.adapterVersion??null,
      preservedCurrent:{state:'declared',items:['accounts','passwords','current-permissions','keys'],basis:'current-security-authority'},
     possibleLoss:{from,to:at,observedWindowSeconds:loss,maximumSeconds:null,through:'related-writer-pause',basis:from?'point-to-plan-time':'unknown'},
-    openingConditions:maintenanceOpeningConditions.map(id=>({id,state:'required'})),blockers:[...blockers].sort()};
+    openingConditions:maintenanceOpeningConditions.map(id=>({id,state:'required'})),blockers:[...blockers].sort((a,b)=>a<b?-1:a>b?1:0)};
    const id=randomUUID(),state=blockers.size?'blocked':'awaiting-approval',hash=digest(plan);
    await db.query(`INSERT INTO operations_maintenance_plans_v1(id,endpoint,revision,point_id,state,plan,plan_digest,created_by,created_at,updated_at) VALUES($1,$2,1,$3,$4,$5,$6,$7,$8,$8)`,[id,this.endpoint,x.pointId,state,JSON.stringify(plan),hash,actor.operatorId,at]);
    return{planId:id,revision:1,state,planDigest:hash};

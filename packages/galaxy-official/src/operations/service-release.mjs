@@ -48,7 +48,7 @@ async function sourceFiles(root) {
   for (const name of ['galaxy-official', 'galaxy-core']) await walk(`packages/${name}/src`, /\.(mjs|sql)$/);
   await walk('docs', /\.md$/);
   if (files.some(name => !safeName(name))) throw new Error('Invalid release resource path.');
-  return [...new Set(files)].sort();
+  return [...new Set(files)].sort((a,b)=>a<b?-1:a>b?1:0);
 }
 
 export async function createServiceRelease({ directory, releaseId, configurationVersion, sourceDirectory = sourceRoot }) {

@@ -8,7 +8,7 @@ export class OperationsFilesService extends OperationsFilesReadModel {
  async retry(operator,kind,id,input,{authorize=null}={}){
   const actor=this.require(operator,true),x=operationsParse(operationsFileRetrySchema,input);operationsParse(z.uuid(),id);const service=this.service(kind);
   if(typeof authorize!=='function')operationsFail('operations_authorization_unavailable',503);
-  const current=async(db=this.db)=>{const fresh=await this.businessAdmin.authorizeAction(await authorize(),'files.scan.retry',{db});if(fresh.operatorId!==actor.operatorId||fresh.endpoint!==actor.endpoint)operationsFail('business_admin_denied',403);return fresh;};
+  const current=async(db=this.db)=>{const fresh=await this.businessAdmin.authorizeAction(await authorize({db}),'files.scan.retry',{db});if(fresh.operatorId!==actor.operatorId||fresh.endpoint!==actor.endpoint)operationsFail('business_admin_denied',403);return fresh;};
   await current();
   if(x.kind==='cleanup')operationsFail('operations_file_cleanup_authorization_required');
   const receipt=await this.command(actor,'file-retry',{kind,id,command:x,operationId:x.operationId},async(db,operator)=>{

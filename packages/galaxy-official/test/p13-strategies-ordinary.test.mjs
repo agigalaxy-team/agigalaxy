@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {p13Fixture} from './p13-strategies-fixture.mjs';
@@ -15,7 +16,8 @@ test('P13 bounded ordinary strategy tools change actual current predicates and d
  const approval=structuredClone(config);approval.strategies[0].recovery={versionId:original.versionId,conditions:['workflow-failed']};
  let active=await f.publish(approval,tasks.slice(1).map(v=>v.execution.id));
  const actions=['strategies.read','strategies.ordinary.configure','strategies.ordinary.publish'];
- const grant=(await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'仅此普通策略的合成AI授权',executorKind:'ai',mode:'automatic',enabled:true,permissions:actions,resourceIds:[sid]},{authorize:async()=>f.admin})).automation;
+ const {ids}=await attachAiWorkFixture({...f,authority:f.authority,permissions:f.permissions,businessAdmin:f.businessAdmin,admin:f.admin,domains:['governance'],codes:actions});
+ const grant=(await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'仅此普通策略的合成AI授权',executorKind:'ai',aiAccountId:ids.governance,mode:'automatic',enabled:true,permissions:actions,resourceIds:[sid]},{authorize:async()=>f.admin})).automation;
  const execution=(await f.authority.create(f.admin,{operationId:randomUUID(),grantId:grant.id,expectedGrantVersion:grant.version,domain:'governance',actions,resourceIds:[sid]},{authorize:async()=>f.admin})).execution;
  const call=(tool,args,executionId=execution.id)=>f.gateway.execute({executionId,tool,arguments:args,runId:'synthetic-ordinary-native-run',callId:tool});
  const read=await call('read-selected-strategy',{strategyId:sid});assert.equal(read.strategy.condition.rules[0].value,40);assert.equal(read.goals.common,config.common.objective);
@@ -27,7 +29,7 @@ test('P13 bounded ordinary strategy tools change actual current predicates and d
  assert.equal(draft.state,'saved');assert.equal((await call('save-selected-strategy-draft',input)).replayed,true);
  const publishInput={operationId:randomUUID(),expectedRevision:draft.revision,strategyId:sid,versionId:draft.versionId};
  active=await call('publish-selected-strategy',publishInput);assert.equal(active.state,'active-for-new-matters');
- let current=await f.service.get(f.admin);assert.deepEqual(current.configuration.common,approval.common);assert.deepEqual(current.configuration.domains,approval.domains);
+ const current=await f.service.get(f.admin);assert.deepEqual(current.configuration.common,approval.common);assert.deepEqual(current.configuration.domains,approval.domains);
  assert.deepEqual(current.configuration.strategies[0].ordinaryBounds,strategy.ordinaryBounds);assert.equal(current.configuration.strategies[0].condition.rules[0].value,10);
  assert.equal(current.active.ordinaryExecutionId,execution.id);assert.equal(current.active.parentVersionId,read.versionId);
  const secondId=randomUUID(),pinnedId=randomUUID();
@@ -48,10 +50,10 @@ test('P13 bounded ordinary strategy tools change actual current predicates and d
  const records=await f.service.records(f.admin);assert.ok(records.items.some(v=>v.kind==='ordinary-draft'));
  // A known not-accepted dispatch can resume the original matter only after
  // the native ledger explicitly reports NOT_RECORDED; unknown never dispatches.
- const later=await f.task(),runId=randomUUID(),realStart=f.native.start;let starts=0;
+ const later=await f.task(),runId=randomUUID(),realStart=f.native.start.bind(f.native);let starts=0;
  f.native.start=async()=>{throw Object.assign(new Error('closed synthetic native'),{code:'operations_agentos_model_not_configured',status:503});};
  await assert.rejects(f.service.run(f.admin,{operationId:runId,strategyId:sid,executionId:later.execution.id},{authorize:async()=>f.admin}),{code:'operations_agentos_model_not_configured'});
- const readNative=f.native.read;f.native.read=async row=>(await readNative(row))??{status:'NOT_RECORDED'};f.native.start=async row=>{starts++;return realStart(row);};
+ const readNative=f.native.read.bind(f.native);f.native.read=async row=>(await readNative(row))??{status:'NOT_RECORDED'};f.native.start=async row=>{starts++;return realStart(row);};
  await f.service.run(f.admin,{operationId:runId,strategyId:sid,executionId:later.execution.id},{authorize:async()=>f.admin});assert.equal(starts,1);
  await f.db.query("UPDATE operations_p13_strategy_runs_v1 SET state='unknown',code='native-dispatch-unknown' WHERE id=$1",[runId]);
  await f.service.run(f.admin,{operationId:runId,strategyId:sid,executionId:later.execution.id},{authorize:async()=>f.admin});assert.equal(starts,1);

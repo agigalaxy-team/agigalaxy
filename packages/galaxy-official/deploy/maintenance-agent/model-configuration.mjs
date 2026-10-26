@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
 import {MaintenanceControlJournal} from './journal.mjs';
 import {maintenanceRequestSignature} from '../../src/operations-maintenance-native.mjs';
-import {modelSettingsNativeCommandSchema,modelSettingsDomains} from '../../src/shared/operations-model-settings-schema.mjs';
+import {modelSettingsNativeCommandSchema} from '../../src/shared/operations-model-settings-schema.mjs';
 import {compileModelConfiguration,credentialVariable,recordIdFromAlias} from './model-configuration-codec.mjs';
 
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -87,7 +87,7 @@ export class ModelConfigurationRuntime{
    if(value.days!==days||!Array.isArray(value.byModel)||!Array.isArray(value.byScenario))throw failure('model_settings_engine_response_invalid');
    const byModel=value.byModel.map(row=>({...row,modelRecordId:recordIdFromAlias(row.modelAlias)}));
    if(byModel.some(row=>!row.modelRecordId))return unavailableUsage(days);
-   return{...value,byModel:byModel.map(({modelAlias,...row})=>row),byScenario:value.byScenario.map(({scenario,...row})=>({...row,domain:scenario}))};
+   return{...value,byModel:byModel.map(({modelAlias:_modelAlias,...row})=>row),byScenario:value.byScenario.map(({scenario,...row})=>({...row,domain:scenario}))};
   }catch{return unavailableUsage(days);}
  }
  async authorize(intent){
@@ -111,7 +111,7 @@ export class ModelConfigurationRuntime{
  }
  matches(engines,compiled){return engines.gateway.state==='running'&&engines.agentos.state==='running'
   &&engines.gateway.configurationVersion===compiled.configurationVersion&&engines.agentos.configurationVersion===compiled.configurationVersion
-  &&engines.gateway.modelCount===compiled.modelCount&&isDeepStrictEqual([...engines.agentos.configuredScenarios].sort(),[...compiled.configuredScenarios].sort());}
+  &&engines.gateway.modelCount===compiled.modelCount&&isDeepStrictEqual([...engines.agentos.configuredScenarios].sort((a,b)=>a<b?-1:a>b?1:0),[...compiled.configuredScenarios].sort((a,b)=>a<b?-1:a>b?1:0));}
  async waitFor(compiled){
   // Native Proxy imports alone can take longer than the former eleven-second
   // window. Bound the complete readiness wait, including slow HTTP responses.

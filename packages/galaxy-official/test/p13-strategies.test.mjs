@@ -37,7 +37,7 @@ test('P13 real PG versions, current consumer rehearsal, pinned matters and origi
  await assert.rejects(f.service.step({runId,executionId:second.execution.id,nativeRunId:runId,phase:'effect'}),{code:'p13_human_confirmation_required'});
  // Explicit native transport double follows the current immutable pause and
  // once-only continuation receipt contract; it is not an Agno runtime test.
- const pauseId=randomUUID()+':0',acceptedContinuations=new Set(),continueNative=f.native.continue;
+ const pauseId=randomUUID()+':0',acceptedContinuations=new Set(),continueNative=f.native.continue.bind(f.native);
  f.native.continuation=async(row,operationId)=>({operationId,runId:row.id,nativeRunId:row.id,pauseId,state:acceptedContinuations.has(operationId)?'accepted':'not-recorded'});
  f.native.continue=async(row,input)=>{await continueNative(row,input);acceptedContinuations.add(input.operationId);};
  f.nativeRuns.set(runId,{runId,status:'PAUSED',awaitingHuman:true,pauseKind:'confirmation',pauseId,workflowId:'galaxy-p13-selected-content-v1',workflowVersion:1});

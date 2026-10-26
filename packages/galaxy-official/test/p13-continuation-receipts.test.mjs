@@ -25,7 +25,7 @@ test('P13 original human continuation receipts recover before pause checks witho
  assert.equal(dispatches,1);assert.equal((await f.service.operation(f.admin,operationId)).continuation.state,'accepted');assert.equal(dispatches,1,'GET never dispatches');
  const saved=(await f.db.query('SELECT input,result FROM operations_p13_strategy_commands_v1 WHERE endpoint=$1 AND operation_id=$2',[f.endpoint,operationId])).rows[0];
  assert.deepEqual(saved.input,{...input,runId});assert.deepEqual(saved.result.continuation,{nativeRunId:runId,pauseId});
- const restarted=new P13StrategiesService({...f.service});
+ const restarted=new P13StrategiesService(Object.fromEntries(Object.entries(f.service)));
  assert.equal((await restarted.continue(f.admin,runId,input,{authorize})).continuation.state,'accepted');assert.equal(dispatches,1,'restarted service replays accepted receipt while native is RUNNING');
  await assert.rejects(restarted.continue(f.admin,runId,{operationId,confirmed:false},{authorize}),{code:'p13_operation_conflict'});
  f.nativeRuns.get(runId).awaitingHuman=true;f.nativeRuns.get(runId).pauseId=pauseId;

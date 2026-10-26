@@ -72,7 +72,7 @@ const templates=[
   [new RegExp('^/v2/(community|chat)/attachments/'+id+'/(content|export-content)$','i'),'/v2/:area/attachments/:id/:operation'],
 ];
 export function failureRoute(method, pathname) {
-  if(['GET','POST'].includes(method)&&/^\/v1\/operations\/files\/(?:\:kind\/\:id\/access|access\/operations\/\:id)$/.test(pathname??''))return `${method} ${pathname}`;
+  if(['GET','POST'].includes(method)&&/^\/v1\/operations\/files\/(?::kind\/:id\/access|access\/operations\/:id)$/.test(pathname??''))return `${method} ${pathname}`;
   if(['GET','POST'].includes(method)&&/^\/v1\/operations\/rules\/(?:overview|:key\/(?:detail|versions|draft|publish|restore|sample)|operations\/:id)$/.test(pathname??''))return `${method} ${pathname}`;
   if(['GET','POST'].includes(method)&&/^\/v1\/operations\/agentos\/(?:executions\/:id(?:\/(?:events|runs|review|continue))?|runs\/:run)$/.test(pathname??''))return `${method} ${pathname}`;
   if(['GET','POST','DELETE'].includes(method)&&pathname==='/mcp/personal')return `${method} /mcp/personal`;

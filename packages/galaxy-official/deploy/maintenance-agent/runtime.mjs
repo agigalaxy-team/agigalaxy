@@ -1,11 +1,11 @@
 import {statfs,lstat,readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
-import {posix} from 'node:path';
+import 'node:path';
 import {runCommand,resticEnvironment,withJobLock} from '../operations-stack/host.mjs';
 import {createProductBackup} from '../operations-stack/backup.mjs';
 import {readBackupStatus} from '../../src/operations/backup-status.mjs';
 import {normalizeOperationalRecord} from '../operations-stack/log-record.mjs';
-import {maintenanceModules,maintenanceOpeningConditions} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceModules} from '../../src/operations-maintenance-catalog.mjs';
 import {maintenanceNativeCommandSchema} from '../../src/shared/operations-maintenance-schema.mjs';
 import {maintenanceRequestSignature} from '../../src/operations-maintenance-native.mjs';
 import {resolveMaintenanceFootprint,maintenanceCaptureConfiguration,maintenanceCaptureContext} from './footprint.mjs';
@@ -22,7 +22,7 @@ const captureId=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const knownState=value=>['active','inactive','failed'].includes(value)?value:'unknown';
 const status=row=>row?{...row,startedAt:iso(row.startedAt),finishedAt:iso(row.finishedAt),lastSuccessAt:iso(row.lastSuccessAt)}:null;
 const periodSeconds={'15m':900,'1h':3600,'24h':86400};
-const commandView=operation=>{if(!operation)return null;const{intent,intentDigest,approval,backupDiagnostic,...safe}=operation;return safe;};
+const commandView=operation=>{if(!operation)return null;const{intent:_intent,intentDigest:_intentDigest,approval:_approval,backupDiagnostic:_backupDiagnostic,...safe}=operation;return safe;};
 
 export class MaintenanceNativeRuntime{
  constructor({configuration,run=runCommand,now=()=>new Date(),journal=null,restoreAdapters=null,fetchImpl=fetch,footprint=resolveMaintenanceFootprint,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
@@ -43,7 +43,7 @@ export class MaintenanceNativeRuntime{
  }
  async snapshot(id){if(!snapshotId.test(id))throw fail('maintenance_point_invalid');const row=(await this.snapshots()).find(x=>x.id===id);if(!row)throw fail('maintenance_backup_not_found');return row;}
  async manifest(snapshot){
-  const id=(snapshot.tags??[]).filter(x=>/^capture:/.test(x)).map(x=>x.slice(8));
+  const id=(snapshot.tags??[]).filter(x=>x.startsWith('capture:')).map(x=>x.slice(8));
   if(id.length!==1||!captureId.test(id[0])||snapshot.paths[0]!==this.config.directories.captures+'/'+id[0])throw fail('maintenance_capture_metadata_invalid');
   const result=await this.restic(['--no-lock','dump',snapshot.id,snapshot.paths[0]+'/capture.json'],{maxOutput:1048576});
   const row=JSON.parse(result.stdout);
@@ -107,7 +107,7 @@ export class MaintenanceNativeRuntime{
   return{availability:{state:'available'},components,storage,coverage:footprint.coverage,errors};
  }
  async logs(query){
-  const components=[...new Set([...this.config.logs,...this.config.journals,...this.config.dockerLogs].map(x=>x.component))].sort();
+  const components=[...new Set([...this.config.logs,...this.config.journals,...this.config.dockerLogs].map(x=>x.component))].sort((a,b)=>a<b?-1:a>b?1:0);
   if(query.component&&!components.includes(query.component))throw fail('maintenance_log_component_unknown');
   const nowNs=BigInt(this.now().getTime())*1000000n;
   const endNs=query.before?(/^[0-9]{16,20}$/.test(query.before)?BigInt(query.before):BigInt(Date.parse(query.before))*1000000n):nowNs;if(endNs>nowNs)throw fail('maintenance_log_window_invalid');
@@ -117,7 +117,7 @@ export class MaintenanceNativeRuntime{
   const response=await this.fetchJson(url);if(response.status!=='success'||response.data?.resultType!=='streams'||!Array.isArray(response.data.result))throw fail('maintenance_native_response_invalid');
   const items=[];
   for(const stream of response.data.result){if(!components.includes(stream.stream?.component))continue;for(const pair of stream.values??[]){if(!Array.isArray(pair)||!/^[0-9]{16,20}$/.test(pair[0]))continue;const at=new Date(Number(BigInt(pair[0])/1000000n)).toISOString();items.push({...normalizeOperationalRecord(pair[1],{time:at}),component:stream.stream.component,at,cursor:pair[0]});}}
-  items.sort((a,b)=>BigInt(a.cursor)>BigInt(b.cursor)?-1:BigInt(a.cursor)<BigInt(b.cursor)?1:0);return{items:items.slice(0,query.limit).map(({cursor,...item})=>item),components,nextBefore:items.length>=query.limit?(BigInt(items[query.limit-1].cursor)-1n).toString():null};
+  items.sort((a,b)=>BigInt(a.cursor)>BigInt(b.cursor)?-1:BigInt(a.cursor)<BigInt(b.cursor)?1:0);return{items:items.slice(0,query.limit).map(({cursor:_cursor,...item})=>item),components,nextBefore:items.length>=query.limit?(BigInt(items[query.limit-1].cursor)-1n).toString():null};
  }
  async preview(pointId,moduleIds){
   const source=await this.point(pointId),{point,manifest}=source,footprint=await this.footprint(),caps=this.restoreExecutor.capabilities(moduleIds),blockers=[...caps.blockers];

@@ -26,7 +26,7 @@ test('rule revisions persist across processes, reject stale writers and become a
   assert.equal((await another.get(f.reader,'community-quota')).rule.version,2,'restart files never overwrite an operator revision');
   assert.equal((await another.save(f.actor,'community-quota',command)).replayed,true);
   await assert.rejects(rules.save(f.actor,'community-quota',{...command,operationId:randomUUID()}),{code:'operations_policy_version_changed'});
-  await assert.rejects(rules.save(f.reader,'community-quota',{...command,operationId:randomUUID()}),{code:'business_admin_denied'});
+  await assert.rejects(rules.save(f.reader,'community-quota',{...command,operationId:randomUUID()}),{code:'operations_permission_denied'});
   await assert.rejects(rules.save(f.actor,'community-quota',{operationId:randomUUID(),expectedVersion:2,policy:{...policy,serverPassword:'forbidden'}}),{code:'invalid_operations_product_request'});
   await runtime.refresh();assert.equal((await publicWrites.status(f.people[0])).quotas[0].limit,9);
   assert.equal((await rules.get(f.reader,'community-quota')).processes[0].current,true);
@@ -41,7 +41,7 @@ test('rule revisions persist across processes, reject stale writers and become a
 
 test('a failed audit cannot leave a saved rule or a replay receipt behind',{timeout:60000},async t=>{
   const f=await operationsProductFixture(t),rules=new OperationsProductRules(f);await rules.bootstrap({'resource-budget':defaultResourceBudgetPolicy});
-  const record=f.businessAdmin.recordWithin;f.businessAdmin.recordWithin=async()=>{throw Error('synthetic audit storage unavailable');};
+  const record=f.businessAdmin.recordWithin.bind(f.businessAdmin);f.businessAdmin.recordWithin=async()=>{throw Error('synthetic audit storage unavailable');};
   const operationId=randomUUID();
   await assert.rejects(rules.save(f.actor,'resource-budget',{operationId,expectedVersion:1,policy:{...defaultResourceBudgetPolicy,maxQueuedJobsPerSubject:40}}),/audit storage/);
   f.businessAdmin.recordWithin=record;

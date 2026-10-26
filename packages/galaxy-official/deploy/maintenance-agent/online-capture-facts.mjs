@@ -14,7 +14,7 @@ export async function immutableReleaseSourceIds(sources,services,containers,{fs=
   if(containers.some(row=>row.state==='available'&&row.mounts.some(m=>m.writable&&intersects(source.path,m.path))))continue;
   const info=await fs.lstat(source.path);if(info.isDirectory()&&!info.isSymbolicLink()&&info.uid===0&&!(info.mode&0o022))ids.push(source.id);
  }
- return ids.sort();
+ return ids.sort((a,b)=>a<b?-1:a>b?1:0);
 }
 export function serviceImmutableReleasePaths(fields,paths){
  // A versioned pathname alone is not an immutability guarantee. Application

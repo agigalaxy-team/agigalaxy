@@ -74,7 +74,7 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
   }
   async function unschedule(name,key,{db:within}={}){
     if(queueName(name)!=='messaging-run'||typeof key!=='string'||!key||key.length>300)throw new ServiceError('operations_messaging_schedule_invalid',400);
-    return boss.unschedule(name,key,{...(within?{db:operationsDatabase(within)}:{})});
+    return boss.unschedule(name,key,(within?{db:operationsDatabase(within)}:{}));
   }
   async function execute(job, handler) {
     const startedAt=performance.now(),fields={queue:job.name,jobId:job.id,attempt:job.retryCount??0,stage:'queue-execute'};

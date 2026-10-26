@@ -26,7 +26,8 @@ test('maintenance binds concrete approvals and native commands to current PG aut
  const pointId='a'.repeat(64),footprintDigest='b'.repeat(64),nowIso=new Date(f.now()*1000).toISOString();
  const coverage=maintenanceModuleIds.map(id=>({id,state:'covered',sourceIds:[],postgresStanzas:['business'],method:'pgbackrest-cluster',reasonCodes:[]}));
  const point={id:pointId,createdAt:new Date((f.now()-1800)*1000).toISOString(),logicalBytes:1024,logicalFileCount:4,integrity:{state:'verified',checkedAt:nowIso},coverage,capture:{state:'available',startedAt:new Date((f.now()-1810)*1000).toISOString(),finishedAt:new Date((f.now()-1805)*1000).toISOString(),consistency:'named-pg-points-and-bounded-quiesced-files'}};
- let executable=false,starts=0,dropAck=false,service;const operations=new Map();
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ let executable=false;let starts=0;let dropAck=false;let service;const operations=new Map();
  const native={async call(x){
   if(x.kind==='overview')return{availability:{state:'available'},components:[{id:'api',processState:'running',health:'unknown',healthBasis:'systemd-process',checkedAt:nowIso}],storage:[{id:'host-filesystem',availability:{state:'available'},capacityBytes:100,availableBytes:40,usedBytes:50,observedAt:nowIso}],coverage,errors:{availability:{state:'unavailable'},count:null},secret:'must-not-cross-projection'};
   if(x.kind==='catalog')return{items:[point],total:70,nextAfter:pointId,coverage,policy:{calendar:'*-*-* 03:15:00 UTC',timer:{state:'active',enabled:true},retention:{daily:14,weekly:8,monthly:6},repository:{location:'same-host',encrypted:true},repositoryUrl:'must-not-cross-projection'},capabilities:{backupCreate:true,backupVerify:true}};

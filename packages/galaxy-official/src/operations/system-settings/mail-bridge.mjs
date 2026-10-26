@@ -32,7 +32,7 @@ export class SystemSettingsOperationsMailBridge{
    const connection=version?.configuration.connections.find(item=>item.id===id);
    if(!connection||!connection.credentialRef)failure('system_settings_configuration_incomplete');
    if(row.result.operationsSmtp)return{row,command:row.result.operationsSmtp};
-   const current=await this.smtp.current(db),{id:unused,name,credentialRef,...transport}=connection;
+   const current=await this.smtp.current(db),{id:_unused,name:_name,credentialRef,...transport}=connection;
    const command={operationId:childId(row.operation_id),expectedVersion:current.version,
     configuration:{enabled:true,...transport,credentialRef:operationsSmtpCredentialAlias(credentialRef)}};
    await db.query('UPDATE operations_system_settings_commands_v1 SET result=$3 WHERE endpoint=$1 AND operation_id=$2',

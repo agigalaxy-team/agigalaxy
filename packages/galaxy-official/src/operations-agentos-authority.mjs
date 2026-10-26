@@ -172,11 +172,11 @@ export class OperationsAgentOsAuthority {
  async human(operator,{db=this.db,action='workbench.read',authorize=null,domain=null,purpose=null}={}){
   if(this.acceptsDuty(operator)){
    const context=this.dutyContext(operator);if(domain!==null&&domain!==context.domain)fail('operations_agentos_domain_mismatch');
-   if(authorize){const fresh=await authorize();if(!this.acceptsDuty(fresh)||fresh.taskId!==operator.taskId||fresh.aiAccountId!==operator.aiAccountId)fail('business_admin_denied');operator=fresh;}
+   if(authorize){const fresh=await authorize({db});if(!this.acceptsDuty(fresh)||fresh.taskId!==operator.taskId||fresh.aiAccountId!==operator.aiAccountId)fail('business_admin_denied');operator=fresh;}
    return this.requireDutyAction(operator,action,{db,purpose});
   }
   const original=operator;
-  if(authorize){operator=await authorize();if(operator?.kind!=='business-operator'||operator.operatorId!==original.operatorId||operator.endpoint!==this.endpoint)fail('business_admin_denied');operator=inheritOperationsAiUse(original,operator);}
+  if(authorize){operator=await authorize({db});if(operator?.kind!=='business-operator'||operator.operatorId!==original.operatorId||operator.endpoint!==this.endpoint)fail('business_admin_denied');operator=inheritOperationsAiUse(original,operator);}
   // Identity/context callbacks may themselves read current conversations. Do
   // not hold a connection while asking them for a fresh identity. The actual
   // human/AI role intersection below still uses one transaction and lock.

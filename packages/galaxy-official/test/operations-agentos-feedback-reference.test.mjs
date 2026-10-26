@@ -54,7 +54,7 @@ test('a completed feedback effect can locate the same current object after sourc
   return withOperationsAiWork(bindOperationsAiUse(authorized,'governance'),{accountId:currentAi,purpose,resolve:resolveAi});
  }};
  const saved=await feedback.submit(f.people[0],{operationId:randomUUID(),title:'PRIVATE_FEEDBACK_TITLE',body:'PRIVATE_FEEDBACK_BODY',category:'suggestion',module:'other'});
- const services={feedback:{...feedback,get:async(...args)=>{const value=await feedback.get(...args);if(afterGet)await afterGet(value);return value;},
+ const services={feedback:{get:async(...args)=>{const value=await feedback.get(...args);if(afterGet)await afterGet(value);return value;},
   event:feedback.event.bind(feedback),operation:feedback.operation.bind(feedback)}};
  const client={async status(){return{state:'connected',modelState:'configured',configuredDomains:['governance'],conversationVersion:2,conversationDomains:['governance']};},async readConversation(){return{runs:[],readExpiresAt:now()+30};}};
  const conversations=new AgentOsConversations({authority,client,summaryForConversation:async()=>({checkedAt:now(),readExpiresAt:now()+30,availability:{}})}),

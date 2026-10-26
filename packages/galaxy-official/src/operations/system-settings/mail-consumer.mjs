@@ -13,7 +13,7 @@ export const operationsMailReceiptSchema=z.strictObject({version:z.literal(1),ve
  checkedAt:z.number().int().nonnegative(),configurationVersion:z.number().int().nonnegative(),configuration:smtpConfigurationSchema,
  credentialConfigured:z.boolean(),credentialFile:z.string().min(1)});
 export function operationsMailConfiguration(connection){
- const {id,name,credentialRef,...transport}=connection;
+ const {id:_id,name:_name,credentialRef,...transport}=connection;
  return smtpConfigurationSchema.parse({enabled:true,...transport,credentialRef:operationsSmtpCredentialAlias(credentialRef)});
 }
 async function writeReceipt(file,value){

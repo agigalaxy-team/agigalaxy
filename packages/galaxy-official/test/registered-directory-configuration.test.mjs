@@ -7,6 +7,8 @@ import {loadRegisteredWebsiteDirectory} from '../src/infrastructure/registered-d
 
 test('website directory config reuses its reader and loads an independent writer only for API',async()=>{
   const root=await mkdtemp(join(tmpdir(),'galaxy-directory-config-'));
+  const target=resolve(root);
+  if(dirname(target)!==resolve(tmpdir())||!basename(target).startsWith('galaxy-directory-config-'))throw Error('Unexpected fixture cleanup target.');
   try{
     const reader=join(root,'reader.json'),writer=join(root,'writer.json'),path=join(root,'operations.json');
     const issuer='https://identity.example.invalid/realms/website';
@@ -30,8 +32,6 @@ test('website directory config reuses its reader and loads an independent writer
     await assert.rejects(loadRegisteredWebsiteDirectory(path),/Invalid registered website/);
     assert.equal(await loadRegisteredWebsiteDirectory(null),null);
   }finally{
-    const target=resolve(root);
-    if(dirname(target)!==resolve(tmpdir())||!basename(target).startsWith('galaxy-directory-config-'))throw Error('Unexpected fixture cleanup target.');
     await rm(target,{recursive:true,force:true});
   }
 });

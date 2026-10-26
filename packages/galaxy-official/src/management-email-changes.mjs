@@ -83,6 +83,7 @@ export function createManagementEmailChanges({ issuer, privateOrigin, writer = n
     async request(principal, newEmail, { operationId, authorize } = {}) {
       if (principal?.issuer !== issuer || !subject(principal.externalSubject) || !uuid.test(operationId ?? '')
         || typeof newEmail !== 'string' || newEmail.length > 320 || !newEmail || newEmail.trim() !== newEmail
+// eslint-disable-next-line no-control-regex -- Deliberately reject or sanitize ASCII control characters.
         || /[\u0000-\u001f\u007f]/.test(newEmail)) fail('invalid_management_accounts_request', 400);
       if (typeof authorize !== 'function') fail('operations_authorization_unavailable');
       if (!await available()) fail('management_email_verification_not_configured');

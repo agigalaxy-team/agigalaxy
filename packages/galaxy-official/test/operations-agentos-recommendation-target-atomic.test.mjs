@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {writeFile} from 'node:fs/promises';
+import 'node:fs/promises';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {PGlite} from '@electric-sql/pglite';
 import {migrate} from '../src/database.mjs';
@@ -10,13 +10,13 @@ import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
 import {OperationsRecommendationService} from '../src/operations/recommendations/service.mjs';
 import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
-import {queryProjection as view} from '../src/operations-agentos-query-view.mjs';
-import {workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
-import {aiWorkCapabilities} from '../src/shared/operations-ai-work-capabilities.mjs';
+import '../src/operations-agentos-conversation-tools.mjs';
+import '../src/operations-agentos-conversations.mjs';
+import '../src/operations-agentos-query-view.mjs';
+import '../src/operations-agentos-action-catalog.mjs';
+import '../src/shared/operations-ai-work-capabilities.mjs';
 import {bindOperationsAiUse,withOperationsAiWork,inheritOperationsAiUse,operationsAiUseDomain} from '../src/shared/operations-ai-use.mjs';
-import {applyRecommendationControl} from '../src/discovery-runtime/recommendation-control.mjs';
+import '../src/discovery-runtime/recommendation-control.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 // Real PGlite migrations/galaxy_api role, stored human and AI role grants,
@@ -43,14 +43,10 @@ test('the frozen recommendation target is checked inside the original policy tra
  await db.query(`INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at)
   VALUES($1,$2,'discovery','本地发现岗位','Explicit local fixture',true,1,1,$3,$3)`,[aiId,endpoint,new Date(now()*1000)]);
  const grant=async(name,codes)=> (await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name,description:'Only this local new leaf',enabled:true,permissions:codes},{authorize:async()=>admin})).role;
- let humanRole=await grant('本地推荐人员',['workbench.read','ai.use.discovery','recommendations.read','recommendations.configure']),aiRole=await grant('本地推荐岗位',['recommendations.read','recommendations.configure']);
+ const humanRole=await grant('本地推荐人员',['workbench.read','ai.use.discovery','recommendations.read','recommendations.configure']),aiRole=await grant('本地推荐岗位',['recommendations.read','recommendations.configure']);
  await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:reader.operatorId,roleId:humanRole.id,enabled:true},{authorize:async()=>admin});
  await migrate(db,{roles:['api']});await db.exec('SET ROLE galaxy_api');
  await aiAccounts.assignment(admin,'discovery',{operationId:randomUUID(),expectedVersion:0,roleId:aiRole.id,enabled:true},{authorize:async()=>admin});
- const setRole=async(which,codes)=>{
-  const old=which==='ai'?aiRole:humanRole,next=(await permissions.saveRole(admin,{operationId:randomUUID(),id:old.id,expectedVersion:old.version,name:old.name,description:old.description,enabled:true,permissions:codes},{authorize:async()=>admin})).role;
-  if(which==='ai')aiRole=next;else humanRole=next;
- };
  const resolveAi=(tx,domain,options)=>aiAccounts.authorizationWithin(tx,domain,options);
  const authority={db,endpoint,now,supported:new Set(),async human(input,{action='workbench.read',domain=operationsAiUseDomain(input)??'discovery',purpose='query',authorize,db:tx=db}={}){
   if(domain!=='discovery')throw new ServiceError('operations_agentos_domain_mismatch',403);
@@ -63,7 +59,7 @@ test('the frozen recommendation target is checked inside the original policy tra
   recommendation=new OperationsRecommendationService({db,endpoint,permissions,businessAdmin,source,now}),theme=(await recommendation.saveTheme(admin,{operationId:randomUUID(),expectedVersion:0,label:'观察与记录交流',enabled:false,mapping:{categories:['life','arts'],tagIds:[],queryTerms:['观察笔记']},reason:'明确本地自有主题'},{authorize:async()=>admin})).theme;
  const controls={avoidRepetition:false,avoidConcentration:false};
  await recommendation.savePolicy(admin,{operationId:randomUUID(),expectedVersion:0,enabled:false,themeKey:'category:technology',direction:'decrease',controls,reason:'保留另一项已有分类方向'},{authorize:async()=>admin});
- const base=(await recommendation.savePolicy(admin,{operationId:randomUUID(),expectedVersion:1,enabled:false,themeKey:theme.key,direction:'keep',controls,reason:'本地原中性方向'},{authorize:async()=>admin})).policy;
+ await recommendation.savePolicy(admin,{operationId:randomUUID(),expectedVersion:1,enabled:false,themeKey:theme.key,direction:'keep',controls,reason:'本地原中性方向'},{authorize:async()=>admin});
 
  let race=null,saveCalls=0;
  const services={recommendations:{overview:recommendation.overview.bind(recommendation),commandResult:recommendation.commandResult.bind(recommendation),async savePolicy(...args){

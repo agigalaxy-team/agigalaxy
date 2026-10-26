@@ -1,6 +1,6 @@
 import {lstat,readFile,mkdir,chmod,chown,writeFile,unlink} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
-import {createHmac,randomUUID} from 'node:crypto';
+import {createHmac} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
 import {createOperationsSmtpTransport} from '../../src/operations-smtp-transport.mjs';
@@ -57,7 +57,7 @@ export class UnifiedMailAdapter{
   const source=await this.fileReader(this.control.operationsCredentialFiles.api);
   if(source.value.version!==1||source.value.endpoint!==this.control.endpoint||!Array.isArray(source.value.credentials))throw failure('system_settings_private_configuration_invalid');
   const item=source.value.credentials.find(row=>row.ref===configuration.credentialRef&&row.host===configuration.host&&row.port===configuration.port&&row.tls===configuration.tls);
-  const {enabled,credentialRef,...values}=configuration;
+  const {enabled:_enabled,credentialRef:_credentialRef,...values}=configuration;
   return this.connection('operations',values,item?{user:item.user,password:item.password}:null,[current.version,source.body]);
  }
  async nativeSource(realm){

@@ -89,11 +89,14 @@ export class AgentOsConversations{
    return this.boundedTaskWithin(db,row,command);
   });
  }
- async assertBoundedProposal(conversationId,turnId,proposal){
-  const source=(await this.db.query('SELECT result FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3',[this.endpoint,turnId,conversationId])).rows[0];
+ async assertBoundedProposal(conversationId,turnId,proposal,{db=this.db}={}){
+  const source=(await db.query('SELECT result FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3',[this.endpoint,turnId,conversationId])).rows[0];
   if(!source?.result?.taskId)return null;
-  const {row}=await this.current(conversationId);
-  return transaction(this.db,async db=>{
+  // The outer confirmation checks complete conversation/source validity.
+  // In a business transaction, renew identity and task bounds on that same
+  // connection; a second global pool lease would deadlock serialized stores.
+  const row=(db===this.db?await this.current(conversationId):await this.currentWithin(db,conversationId)).row;
+  const check=async db=>{
    const command=(await db.query('SELECT * FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3 AND operator_id=$4',[this.endpoint,turnId,row.id,row.operator_id])).rows[0];
    const task=await this.boundedTaskWithin(db,row,command);if(!task)return null;
    if(!Array.isArray(task.actions)||!task.actions.includes(proposal.requiredAction))fail('operations_autonomy_workbench_scope_denied');
@@ -101,7 +104,8 @@ export class AgentOsConversations{
    const targets=proposal.kind==='public-content-batch'?proposal.request?.items?.map(item=>item.id):[proposal.target?.id];
    if(!scope||!['all','eligible','selected'].includes(scope.kind)||scope.kind==='selected'&&(!task.resourceIds?.length||!targets?.length||targets.some(id=>!task.resourceIds.includes(id))))fail('operations_autonomy_workbench_scope_denied');
    return task;
-  });
+  };
+  return db===this.db?transaction(db,check):check(db);
  }
  async syncWorkbenchCardWithin(db,row){
   if(typeof this.autonomy?.updateWorkbenchWithin!=='function')return;
@@ -177,7 +181,7 @@ export class AgentOsConversations{
  }
  async retire(id,reason){await this.db.query('UPDATE operations_agentos_conversations_v1 SET retired_at=$3,retirement_reason=$4 WHERE endpoint=$1 AND id=$2 AND retired_at IS NULL',[this.endpoint,id,new Date(this.now()*1000),reason]);}
  view(row){return {id:row.id,domain:row.domain,sessionId:row.session_id,mode:'conversation',operatorId:row.operator_id,actions:[],resourceIds:[],hasPreparedCommand:false};}
- async current(id,{operator=null}={}){parse(z.uuid(),id);const result=await transaction(this.db,async db=>{
+ async currentWithin(db,id,{operator=null}={}){
   const row=(await db.query('SELECT * FROM operations_agentos_conversations_v1 WHERE endpoint=$1 AND id=$2',[this.endpoint,id])).rows[0];
   if(!row||operator&&row.operator_id!==operator.operatorId)fail('operations_agentos_conversation_not_found',404);
   if(row.retired_at)fail('operations_agentos_source_changed',409);
@@ -185,7 +189,8 @@ export class AgentOsConversations{
   const actor=await this.authority.human({kind:'business-operator',operatorId:row.operator_id,endpoint:this.endpoint},{db,domain:row.domain,purpose:'conversation'});
   if(operationsAiWorkScope(actor).accountId!==row.ai_account_id)fail('operations_ai_work_unassigned');
   if(permissionKey(actor)!==row.permission_key)fail('operations_agentos_authority_changed');return {row,actor};
- });
+ }
+ async current(id,{operator=null}={}){parse(z.uuid(),id);const result=await transaction(this.db,db=>this.currentWithin(db,id,{operator}));
   if(this.tools&&!await this.tools.contextValid(result.row,result.actor)){await this.retire(id,'source-changed');fail('operations_agentos_source_changed',409);}
   return result;
  }
@@ -347,7 +352,7 @@ export class AgentOsConversations{
    if(checked?.status!=='ERROR'||checked.errorCode!=='operations_agentos_model_request_failed'||checked.businessActivity?.state!=='not-started'||!['rate-limit','timeout','connection','service-unavailable','unknown'].includes(checked.failure?.category??'unknown')||checked.userInput!==x.message)fail('operations_agentos_retry_unavailable',409);
    retry={retryOfOperationId:parent.id,retryOfRunId:checked.runId,priorFailure:{status:'ERROR',errorCode:checked.errorCode,failure:checked.failure??null}};
   }
-  const receipt={operationId:x.operationId,runId:null,state:'dispatching',native:null,replayed:false,...(x.taskId?{taskId:x.taskId}:{}),...(retry??{})};
+  const receipt={operationId:x.operationId,runId:null,state:'dispatching',native:null,replayed:false,...(x.taskId?{taskId:x.taskId}:{}),...retry};
   const inserted=await transaction(this.db,async db=>{await this.authority.human(fresh,{db,domain});await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))',[this.endpoint+':conversation:'+x.operationId]);
    if(retry){
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))',[this.endpoint+':conversation-retry:'+retry.retryOfOperationId]);

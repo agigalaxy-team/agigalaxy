@@ -68,7 +68,7 @@ test('new authorized native device explicitly revokes old device; FS restart rea
   await assert.rejects(client.confirm(structuredClone(preview),{confirmed:true}),e=>e.code==='device_management_confirmation_required');
   x.setAfterCommit(true);await assert.rejects(client.confirm(preview,{confirmed:true}),/committed ACK lost/);
   const pending=(await client.pending()).active;assert.equal(pending.operationId,preview.operationId);assert.equal(pending.state,'result-unknown');
-  x.newer.close();const restarted=await x.native('new');await restarted.connect({confirmed:true});
+  await x.newer.close();const restarted=await x.native('new');await restarted.connect({confirmed:true});
   const restored=x.management(restarted),result=await restored.reconcile(preview.operationId);
   assert.equal(result.receipt.state,'committed');assert.equal(result.acceptedOperationOnly,true);assert.equal(result.currentAccessGranted,false);
   assert.equal(x.writes.length,before+1);assert.equal((await restored.pending()).active,null);

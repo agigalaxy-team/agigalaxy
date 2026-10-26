@@ -51,7 +51,7 @@ export class ManagementAccountsReadModel{
   const root=this.rootTarget(user),sources=eligible?(root?[{kind:'preconfigured-root',roleId:null,label:'预配置根管理员',permissions:[...operationsPermissionCodes]}]:roles
    .filter(row=>row.enabled&&row.assignmentEnabled).map(row=>({kind:'business-role',roleId:row.id,label:row.name,
     permissions:row.permissions.filter(code=>user.admission==='administrator'||!requiresManagementMaintainer(code))}))):[];
-  return {state:eligible?'available':'not-eligible',permissions:[...new Set(sources.flatMap(row=>row.permissions))].sort(),sources};
+  return {state:eligible?'available':'not-eligible',permissions:[...new Set(sources.flatMap(row=>row.permissions))].sort((a,b)=>a<b?-1:a>b?1:0),sources};
  }
  aiUse(effective,root){return {domains:['overview','governance','messaging','discovery','maintenance'].filter(domain=>effective.permissions.includes('ai.use.'+domain)),
   source:root?'preconfigured-root':'business-roles'};}

@@ -27,7 +27,7 @@ test('P14 drafts, explicit publication, adoption and restoration preserve actual
  const history=await f.rules.versions(f.admin,key,{limit:1});assert.equal(history.items[0].kind,'restore');assert(history.nextAfter);assert.equal((await f.rules.versions(f.admin,key,{after:history.nextAfter,limit:1})).items[0].kind,'publish');
  f.roles.set(f.admin.operatorId,'reader');await assert.rejects(f.rules.saveDraft({...f.admin,role:'administrator'},key,input,{authorize:f.authorize}),{code:'operations_permission_denied'});
  f.roles.set(f.admin.operatorId,'administrator');
- const failed={operationId:randomUUID(),expectedRevision:3,policy,reason:'事务必须共同回滚'},record=f.businessAdmin.recordWithin;f.businessAdmin.recordWithin=async()=>{throw Error('synthetic rule audit failure');};
+ const failed={operationId:randomUUID(),expectedRevision:3,policy,reason:'事务必须共同回滚'},record=f.businessAdmin.recordWithin.bind(f.businessAdmin);f.businessAdmin.recordWithin=async()=>{throw Error('synthetic rule audit failure');};
  await assert.rejects(f.rules.saveDraft(f.admin,key,failed,{authorize:f.authorize}),/synthetic rule audit failure/);f.businessAdmin.recordWithin=record;
  assert.equal((await f.rules.get(f.admin,key)).revision,3);assert.equal((await f.rules.operation(f.admin,failed.operationId)).state,'not-recorded');
  const audit=(await f.db.query("SELECT selection,result FROM business_admin_audit_v1 WHERE action='rule-save'")).rows;

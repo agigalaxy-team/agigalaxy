@@ -1,5 +1,5 @@
 import {capsuleReadSchema,capsuleQuerySchema} from "../../shared/capsule-v2-schema.mjs";
-import {capsuleRule as rule,parseCapsuleV2 as parse} from "./sources.mjs";
+import {capsuleRule as rule} from "./sources.mjs";
 import {transaction} from "../../database.mjs";
 import {absent,ownControl} from './helpers.mjs';
 import {CapsuleUses} from './uses.mjs';

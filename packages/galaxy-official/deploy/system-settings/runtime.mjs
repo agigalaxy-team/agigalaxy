@@ -94,7 +94,7 @@ export class SystemSettingsRuntime{
   try{
    await authorize();
    if(input.kind==='settings-credential-provision'){
-    const {kind,operatorId,...provision}=input;effectStarted=true;const result=await this.credentialStore.provision(provision);await authorize();
+    const {kind:_kind,operatorId:_operatorId,...provision}=input;effectStarted=true;const result=await this.credentialStore.provision(provision);await authorize();
     return this.finish(row,[phase('credential','completed')],{credentialRef:result.reference});
    }
    const adapter=this.adapter(input.section),args={versionId:input.versionId,configuration:input.configuration,...(input.connectionId?{connectionId:input.connectionId}:{})};

@@ -43,6 +43,6 @@ export const managementId=(issuer,sub)=>createHash('sha256').update(issuer+'\0'+
 export const managementDisplay=user=>personDisplayName({firstName:user?.firstName,lastName:user?.lastName})||user?.username||'管理账户';
 export const managementStamp=value=>value===null||value===undefined?null:new Date(value).toISOString();
 export const managementTargetVersion=(user,meta)=>createHash('sha256').update(JSON.stringify([user,{version:meta?.version??0,loginBlocked:meta?.login_blocked??false,deletedAt:managementStamp(meta?.deleted_at)}])).digest('hex');
-export const managementIntent=input=>{const {temporaryPassword,...safe}=input;return safe;};
+export const managementIntent=input=>{const {temporaryPassword:_temporaryPassword,...safe}=input;return safe;};
 export const managementSafeCode=error=>managementCodes.includes(error?.code)?error.code:'management_command_unavailable';
 

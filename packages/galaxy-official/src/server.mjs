@@ -8,7 +8,7 @@ import {OperationsManagementAccountsService} from './operations/accounts/managem
 import {OperationsAiWorkAccountsService} from './operations/accounts/ai-work-service.mjs';
 import {loadRegisteredWebsiteDirectory} from './infrastructure/registered-directory-configuration.mjs';
 import {OperationsPermissionsService} from './operations-permissions.mjs';
-import {OperationsAgentOsAuthority} from './operations-agentos-authority.mjs';
+import './operations-agentos-authority.mjs';
 import {P13StrategiesAuthority} from './operations/strategies/authority.mjs';
 import {P13StrategiesService} from './operations/strategies/service.mjs';
 import {P13StrategyEffects} from './operations/strategies/effects.mjs';
@@ -206,6 +206,7 @@ try {
   startupPhase = 'identity-providers';
   const identityConfiguration = await loadIdentityProviders(process.env.GALAXY_IDENTITY_CONFIG_FILE, { endpoint });
   const officialAccounts = await loadOfficialAccountPortal(process.env.GALAXY_ACCOUNT_CONFIG_FILE, {endpoint, db, browserOrigins:browserPolicy.origins, identityProviders:identityConfiguration.providers});
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
   let operations;
   const operationsPermissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization:(actor,options)=>{
     if(!operations?.authorizeStoredOperator)throw new ServiceError('operations_authorization_unavailable',503);

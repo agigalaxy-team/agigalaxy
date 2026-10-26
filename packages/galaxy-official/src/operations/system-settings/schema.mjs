@@ -80,7 +80,7 @@ export const systemSettingsNativeCommandSchema=z.discriminatedUnion('kind',[
  try{
   if(['settings-test','settings-apply'].includes(value.kind))systemSettingsConfiguration(value.section,value.configuration);
   if(value.kind==='settings-credential-provision'){
-   const {kind,operatorId:unused,...intent}=value;parseSystemSettings(systemSettingsCredentialSchema,intent);
+   const {kind:_kind,operatorId:_unused,...intent}=value;parseSystemSettings(systemSettingsCredentialSchema,intent);
   }
  }catch{context.addIssue({code:'custom',message:'Invalid fixed system settings command'});}
 });
@@ -109,4 +109,4 @@ export function parseSystemSettings(schema,input){const result=schema.safeParse(
 export function safeSystemSettingsError(error,fallback='system_settings_native_unavailable'){
  return systemSettingsErrorCodes.includes(error?.code)?error.code:fallback;
 }
-export function credentialMetadata(input){const {credential,...metadata}=input;return metadata;}
+export function credentialMetadata(input){const {credential:_credential,...metadata}=input;return metadata;}

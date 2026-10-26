@@ -85,17 +85,17 @@ test('ordinary verified messaging connects through the real duty tool and origin
   const task=await newTask(),before=await counts(),result=await call(task,{kind:'messaging-state',targetId:plan.id,action:'withdraw'});assert.equal(result.state,'waiting-human');assert.equal((await messaging.planWithin(db,plan.id)).state,'active');assert.deepEqual(await counts(),before);
  });
  await t.test('current AI role revocation rejects a previously prepared intent before the effect',async()=>{
-  const plan=await create(),task=await newTask(),original=actions.prepareFor;let changed=false;
+  const plan=await create(),task=await newTask(),original=actions.prepareFor.bind(actions);let changed=false;
   actions.prepareFor=async(...args)=>{const proposal=await original(...args);if(!changed){changed=true;await assign(false);}return proposal;};
   try{const before=await counts();await assert.rejects(call(task,{kind:'messaging-state',targetId:plan.id,action:'activate'}),{code:'operations_permission_denied'});assert.equal((await messaging.planWithin(db,plan.id)).state,'draft');assert.deepEqual(await counts(),before);}finally{actions.prepareFor=original;await assign(true);}
  });
  await t.test('current grant revocation after preparation is checked by the real task authorizer',async()=>{
-  const plan=await create(),task=await newTask(),original=actions.prepareFor;let changed=false;
+  const plan=await create(),task=await newTask(),original=actions.prepareFor.bind(actions);let changed=false;
   actions.prepareFor=async(...args)=>{const proposal=await original(...args);if(!changed){changed=true;await saveGrant(false);}return proposal;};
   try{const before=await counts();await assert.rejects(call(task,{kind:'messaging-state',targetId:plan.id,action:'activate'}),{code:'operations_autonomy_authorization_changed'});assert.equal((await messaging.planWithin(db,plan.id)).state,'draft');assert.deepEqual(await counts(),before);}finally{actions.prepareFor=original;await saveGrant(true);}
  });
  await t.test('a current plan CAS change rejects the frozen command and reconciliation does not re-prepare it',async()=>{
-  const plan=await create(),task=await newTask(),original=actions.prepareFor,callId=randomUUID(),input={kind:'messaging-state',targetId:plan.id,action:'activate'};let changed=false;
+  const plan=await create(),task=await newTask(),original=actions.prepareFor.bind(actions),callId=randomUUID(),input={kind:'messaging-state',targetId:plan.id,action:'activate'};let changed=false;
   actions.prepareFor=async(...args)=>{const proposal=await original(...args);if(!changed){changed=true;await messaging.save(admin,plan.id,{operationId:randomUUID(),expectedVersion:1,expectedRevision:1,config:config({content:{...plan.config.content,title:'人工保存的第二版'}})},auth);}return proposal;};
   try{await assert.rejects(call(task,input,callId),{code:'operations_messaging_version_changed'});}finally{actions.prepareFor=original;}
   const before=await counts(),prepares=phases.prepare,result=await call(task,input,callId);assert.equal(result.effectState,'unknown');assert.equal(result.basis,'original-operation-query');assert.equal(phases.prepare,prepares);assert.deepEqual(await counts(),before);assert.equal((await messaging.planWithin(db,plan.id)).version,2);assert.equal((await messaging.planWithin(db,plan.id)).state,'draft');

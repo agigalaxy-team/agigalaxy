@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
+import {BusinessAdminService} from '../src/business-admin.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
@@ -30,7 +32,8 @@ const syntheticSigningKey='SYNTHETIC_AGENTOS_SIGNING_KEY_NOT_PRODUCTION';
 // native PostgreSQL/queue/HITL checks have separate Oracle evidence.
 async function fixture(t){
  const f=await accountChatFixture(),roles=new Map(),subjects=new Map(),calls=[],runtimeCalls=[],logs=[];
- let authDb,issuer,server;
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ let authDb;let issuer;let server;
  t.after(async()=>{if(server)await new Promise(resolve=>server.close(resolve));await issuer?.close();await authDb?.close();await f.close();});
  authDb=new PGlite();await migrate(authDb);
  const callback=adminOrigin+'/v1/operations/callback',wallNow=()=>Math.floor(Date.now()/1000);
@@ -81,7 +84,9 @@ async function fixture(t){
 
 test('AgentOS registered central HTTP contracts',{timeout:120000},async t=>{
  const f=await fixture(t),admin=await f.login('agentos-central-admin','administrator'),reader=await f.login('agentos-central-reader','reader');
- const grant=(await f.permissions.saveAutomation(admin.actor,{operationId:randomUUID(),expectedVersion:0,name:'合成HTTP助手',executorKind:'ai',mode:'assisted',enabled:true,permissions:[],resourceIds:[randomUUID()]},{authorize:async()=>admin.actor})).automation;
+ const businessAdmin=new BusinessAdminService({...f,permissions:f.permissions});
+ const {ids}=await attachAiWorkFixture({...f,businessAdmin,authority:f.authority,permissions:f.permissions,admin:admin.actor,domains:['overview'],codes:[],now:f.now});
+ const grant=(await f.permissions.saveAutomation(admin.actor,{operationId:randomUUID(),expectedVersion:0,name:'合成HTTP助手',executorKind:'ai',aiAccountId:ids.overview,mode:'assisted',enabled:true,permissions:[],resourceIds:[randomUUID()]},{authorize:async()=>admin.actor})).automation;
  const createBody=()=>({operationId:randomUUID(),grantId:grant.id,expectedGrantVersion:grant.version,domain:'overview',actions:[],resourceIds:[],preparedCommand:null});
  let role;
  async function saveRole(permissions){role=(await f.permissions.saveRole(admin.actor,{operationId:randomUUID(),...(role?{id:role.id}:{}),expectedVersion:role?.version??0,name:'合成HTTP工作台角色',description:'',enabled:true,permissions},{authorize:async()=>admin.actor})).role;return role;}
@@ -99,12 +104,13 @@ test('AgentOS registered central HTTP contracts',{timeout:120000},async t=>{
   for(const csrf of [null,'SYNTHETIC_WRONG_CSRF'])assert.equal((await f.call(prefix+'/executions',reader,createBody(),{'x-galaxy-operator-csrf':csrf})).status,403);
   assert.equal((await f.call(prefix+'/executions',reader,createBody(),{origin:'https://untrusted.example.invalid'})).status,403);
   assert.equal((await f.call(prefix+'/executions',reader,{...createBody(),role:'administrator'})).status,400);
+  await saveRole(['workbench.read','ai.use.overview']);
   const created=await f.call(prefix+'/executions',reader,createBody());assert.equal(created.status,200);const execution=(await created.json()).execution;f.control.executionId=execution.id;
   assert.equal((await f.call(prefix+'/executions/'+execution.id,reader)).status,200);
   assert.equal((await f.call(prefix+'/executions/'+execution.id,admin)).status,404,'owner history is separate from global run metadata');
   const model=await f.call(prefix+'/executions/'+execution.id+'/runs',reader,{operationId:randomUUID(),message:'PRIVATE_WORKBENCH_PROMPT'});
   assert.equal(model.status,503);assert.equal((await model.json()).error,'operations_agentos_model_not_configured');assert.equal(f.control.modelSubmissions,0);
-  await saveRole(['workbench.read','audit.read']);
+  await saveRole(['workbench.read','ai.use.overview','audit.read']);
   const page=await f.call(prefix+'/runs?page=2&limit=5&domain=governance&state=PAUSED',reader);assert.equal(page.status,200);
   assert.deepEqual((await page.json()).items,[]);assert(f.runtimeCalls.some(row=>row.path==='/galaxy/runs'&&row.query.includes('domain=governance')&&row.query.includes('state=PAUSED')));
   assert.equal((await f.call(prefix+'/runs/native_run-case_1',reader)).status,200,'native run IDs need not be UUIDs');
@@ -115,7 +121,7 @@ test('AgentOS registered central HTTP contracts',{timeout:120000},async t=>{
   f.control.afterAuthentication=()=>saveRole([]);
   assert.equal((await f.call(prefix+'/executions/'+execution.id+'/events',reader,{operationId:randomUUID(),expectedRevision:1,kind:'pause'})).status,403);
   assert.equal((await f.db.query('SELECT state FROM operations_agentos_executions_v1 WHERE id=$1',[execution.id])).rows[0].state,'active');
-  await saveRole(['workbench.read']);
+  await saveRole(['workbench.read','ai.use.overview']);
   f.control.afterAuthentication=()=>f.portal.logout(request(reader.jar,{origin:adminOrigin,'x-galaxy-operator-csrf':reader.session.csrfToken},'POST'),response());
   assert.equal((await f.call(prefix+'/executions/'+execution.id+'/events',reader,{operationId:randomUUID(),expectedRevision:1,kind:'pause'})).status,401,'the command callback verifies the current local session');
   assert(f.calls.some(call=>call.write===true&&call.action===undefined),'command reauthorization must not disappear at registration');

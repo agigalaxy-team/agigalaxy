@@ -90,7 +90,7 @@ test('public external credential metadata remains account-bound, current and wit
   await credential({subjectId:'urn:someone-else'});await credential({subjectId:endpoint+'/v1/account/public/'+randomUUID()});
   await account.settings({enabled:true,scope:'profile'});await assert.rejects(query.credentials(account.id),{code:'not_found'});
   await account.settings({enabled:true,scope:'profile',showExternalCredentials:true});
-  let page=await query.credentials(account.id,{limit:1}),items=[...page.items];
+  let page=await query.credentials(account.id,{limit:1});const items=[...page.items];
   while(page.nextAfter){page=await query.credentials(account.id,{limit:1,after:page.nextAfter});items.push(...page.items);}
   assert.deepEqual(new Set(items.map(item=>item.id)),new Set([owned.id,expired.id]));
   const visible=items.find(item=>item.id===owned.id);assert.equal(visible.issuer.uri,issuer);assert.equal(visible.subject.binding,'bound');assert.equal(visible.signature.state,'valid');assert.equal(visible.revocation.state,'not-revoked');assert.equal(visible.galaxyIssued,false);

@@ -179,9 +179,9 @@ export class OperationsAgentOsActionTools{
   return definition.handler?.methods.every(method=>typeof this.services[definition.handler.service]?.[method]==='function')===true;
  }
  service(name,method){const service=this.services[name];if(typeof service?.[method]!=='function')fail('operations_agentos_action_not_connected',503);return service;}
- async human(operator,action,{authorize=null}={}){
-  if(this.authority.acceptsDuty?.(operator))return this.authority.human(operator,{action,authorize});
-  return this.authority.human(operator,{action,authorize,purpose:'prepare'});
+ async human(operator,action,{authorize=null,db}={}){
+  if(this.authority.acceptsDuty?.(operator))return this.authority.human(operator,{action,authorize,db});
+  return this.authority.human(operator,{action,authorize,db,purpose:'prepare'});
  }
  async prepareFor(operator,domain,input,{publicReference,operationId}={}){
   const request=parse(requestSchema(input),input),entry=workbenchActionCatalog.find(item=>item.kind===request.kind);
@@ -428,7 +428,7 @@ export class OperationsAgentOsActionTools{
   const actor=await this.authority.human(operator,{domain:proposal.domain,action:expectedAction,authorize,purpose:this.authority.acceptsDuty?.(operator)?null:'prepare'}),
    // Services recheck a service actor on their own transaction connection.
    // An identity callback must not start a second PG lease inside that check.
-   fresh=()=>this.authority.acceptsDuty?.(actor)?actor:this.human(actor,'workbench.read',{authorize});
+   fresh=({db}={})=>this.authority.acceptsDuty?.(actor)?actor:this.human(actor,'workbench.read',{authorize,db});
   let result;
   if(x.kind==='ai-work-prompt-save'){
    if(this.authority.acceptsDuty?.(actor)||input.aiAccountId!==x.aiAccountId||input.prompt!==x.prompt||proposal.target?.kind!=='ai-work-prompt'||proposal.target.id!==x.aiAccountId)fail('invalid_operations_agentos_action',400);

@@ -57,7 +57,7 @@ export function currentRecoveryFactsCaptureSql(endpoint){
  const pk=table=>`(SELECT jsonb_agg(a.attname ORDER BY k.ord) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid JOIN pg_namespace n ON n.oid=r.relnamespace CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=r.oid AND a.attnum=k.num WHERE c.contype='p' AND n.nspname='public' AND r.relname=${literal(table)})`;
  const tables=full.map(table=>literal(table)+`,jsonb_build_object('keys',${pk(table)},'rows',(SELECT coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) FROM ${quote(table)} t))`);
  const gates=Object.entries(sourceGates).map(([table,fields])=>{
-  const cols=`(SELECT coalesce(jsonb_agg(column_name ORDER BY ordinal_position),'[]'::jsonb) FROM information_schema.columns WHERE table_schema='public' AND table_name=${literal(table)} AND column_name=ANY(ARRAY[${fields.map(literal)}]::text[]))`;
+  const cols=`(SELECT coalesce(jsonb_agg(column_name ORDER BY ordinal_position),'[]'::jsonb) FROM information_schema.columns WHERE table_schema='public' AND table_name=${literal(table)} AND column_name=ANY(ARRAY[${fields.map(literal).join(',')}]::text[]))`;
   return literal(table)+`,jsonb_build_object('keys',${pk(table)},'columns',${cols},'rows',(SELECT coalesce(jsonb_agg((SELECT jsonb_object_agg(c,to_jsonb(t)->c) FROM jsonb_array_elements_text(${pk(table)}||${cols}) c)),'[]'::jsonb) FROM ${quote(table)} t))`;
  });
  return `BEGIN; LOCK TABLE ${[...new Set([...full,...Object.keys(sourceGates)])].map(quote).join(',')} IN SHARE MODE; SELECT jsonb_build_object('version',1,'endpoint',${literal(endpoint)},'capturedAt',floor(extract(epoch FROM transaction_timestamp()))::bigint,'schema',(SELECT max(version) FROM schema_migrations),'tables',(${jsonObject(tables)}),'gates',(${jsonObject(gates)})); COMMIT;`;
@@ -176,7 +176,7 @@ export async function reconcileCurrentRecoveryFacts(database,facts,{endpoint,rec
   await db.query('UPDATE forum_permissions_v1 SET revoked_at=COALESCE(revoked_at,$1)',[new Date(facts.capturedAt*1000)]);
   for(const table of recoveryGovernanceTables){for(const row of facts.tables[table].rows){
    if(table==='operations_chat_message_visibility_v1'&&!(await db.query('SELECT 1 FROM chat_message_refs WHERE message_id=$1',[row.message_id])).rows.length){skipped.push(table);continue;}
-   try{await upsertRows(db,schema,table,[row]);}catch(error){throw fail('maintenance_governance_reconciliation_incomplete');}
+   try{await upsertRows(db,schema,table,[row]);}catch{throw fail('maintenance_governance_reconciliation_incomplete');}
   }}
   const gates=await reconcileGates(db,schema,facts);if(gates.unresolved.length)throw fail('maintenance_source_lifecycle_reconciliation_incomplete');
   await upsertRows(db,schema,'lifecycle_erasure_records',facts.tables.lifecycle_erasure_records.rows);

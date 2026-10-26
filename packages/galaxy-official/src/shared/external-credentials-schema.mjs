@@ -15,7 +15,7 @@ const publicJwk = z.record(z.string(),z.unknown()).superRefine((key,context) => 
 });
 const condition = z.strictObject({id:identifier,label:text(160),type:text(256),claim:z.strictObject({
   path:z.string().min(1).max(512).refine(value=>value.startsWith('/credentialSubject/')&&!value.split('/').some(part=>['__proto__','prototype','constructor'].includes(part))),
-  equals:z.union([text(2048),z.number().finite(),z.boolean()]),
+  equals:z.union([text(2048),z.number(),z.boolean()]),
 }).optional()});
 export const externalCredentialsConfigurationSchema=z.strictObject({version:z.literal(1),issuers:z.array(z.strictObject({
   id:identifier,name:text(160),issuer:uri,

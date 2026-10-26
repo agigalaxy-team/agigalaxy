@@ -12,6 +12,7 @@ import {fileProcessingVersion} from './processing.mjs';
 import {fileCleanupTable,fileCleanupSourceWithin,fileCleanupEligibility} from './cleanup-eligibility.mjs';
 
 const stamp=now=>new Date(now*1000).toISOString();
+// eslint-disable-next-line no-control-regex -- Deliberately reject or sanitize ASCII control characters.
 const safeName=value=>typeof value==='string'?value.replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,180)||null:null;
 const total=values=>{const sum=values.reduce((value,next)=>value+Number(next),0);return Number.isSafeInteger(sum)?sum:null;};
 const readMeta=now=>({checkedAt:now,readExpiresAt:now+30,metadataOnly:true});
@@ -22,7 +23,7 @@ export class OperationsFileCleanupService extends OperationsFilesReadModel{
  human(operator){const actor=this.require(operator,true);if(actor.kind!=='business-operator')fail('operations_permission_denied',403);return actor;}
  async fresh(actor,action,authorize,db=this.db){
   if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);
-  const current=this.human(await authorize());if(current.operatorId!==actor.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);
+  const current=this.human(await authorize({db}));if(current.operatorId!==actor.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);
   return this.businessAdmin.authorizeAction(current,action,{db});
  }
  caps(actor){return{canCreate:permitted(actor,'files.cleanup.plan'),canApprove:permitted(actor,'files.cleanup.approve'),canCancel:permitted(actor,'files.cleanup.plan')};}

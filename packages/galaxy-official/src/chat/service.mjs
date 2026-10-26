@@ -2,7 +2,7 @@ import {chatActorRef} from "../chat-actors.mjs";
 import {ServiceError} from "../shared/service-error.mjs";
 import {transaction} from "../database.mjs";
 import {chatMessageOperationsBlockedWithin,chatMessageOperationsBlockedSql} from "../chat-message-operations-gate.mjs";
-import {day,stamp,fail,parse} from './helpers.mjs';
+import {day,stamp,fail} from './helpers.mjs';
 import {ChatMessages} from './messages.mjs';
 
 // Formal ChatService plus existing body-free readiness, worker-only archive lifecycle and bounded original owner export.

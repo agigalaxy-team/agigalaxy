@@ -7,7 +7,7 @@ export class P13StrategiesBase{
  metadata(){const checkedAt=this.now();return {checkedAt,readExpiresAt:checkedAt+30,metadataOnly:true};}
  lock(db,key='head'){return db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912437))',[this.endpoint+':p13:'+key]);}
  async actor(operator,action,{db=this.db,authorize=null,fresh=false}={}){
-  if(fresh){if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);const current=await authorize();if(!current||current.kind!=='business-operator'||current.operatorId!==operator.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);operator=current;}
+  if(fresh){if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);const current=await authorize({db});if(!current||current.kind!=='business-operator'||current.operatorId!==operator.operatorId||current.endpoint!==this.endpoint)fail('business_admin_denied',403);operator=current;}
   // Common boundaries and domain goals are never editable by an AI actor.
   if(operator?.kind==='operations-ai-service'&&action==='strategies.read')return this.businessAdmin.authorizeAction(operator,action,{db});
   if(operator?.kind!=='business-operator')fail('business_admin_denied',403);

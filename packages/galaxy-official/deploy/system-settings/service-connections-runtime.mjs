@@ -50,7 +50,7 @@ export class ServiceConnectionsAdapter{
  legacyRow(kind,source){
   const raw=rawConnection(kind,source.value),id=stableId([this.control.endpoint,'connection',kind]),binding=publicConnection(kind,id,raw),credential=rawCredential(kind,raw);
   if(!credential)return{configuration:binding,row:null};
-  const {credentialRef,...target}=binding,parsed=serviceCredentialProvisionSchema.safeParse({binding:target,credential});
+  const {credentialRef:_credentialRef,...target}=binding,parsed=serviceCredentialProvisionSchema.safeParse({binding:target,credential});
   if(!parsed.success)return{configuration:binding,row:null};
   // A reference denotes this observed source version, never a mutable alias
   // to whichever credential happens to be in that file on a later request.
@@ -79,7 +79,7 @@ export class ServiceConnectionsAdapter{
   return{file,...source};
  }
  patch(value,configuration,credential){
-  const next=structuredClone(value),{id,kind,credentialRef,...fields}=configuration;
+  const next=structuredClone(value),{id:_id,kind,credentialRef:_credentialRef,...fields}=configuration;
   if(kind==='analysis')next.openpanel={...next.openpanel,...fields,...credential};
   else if(kind==='recommendation')next.gorse={...next.gorse,...fields,...credential};
   else if(kind==='search')next.meilisearch={...next.meilisearch,...fields,...credential};

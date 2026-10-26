@@ -6,7 +6,7 @@ export const feedbackCategories=Object.freeze(['problem','suggestion']);
 export const feedbackModules=Object.freeze(['account','community','chat','work','discovery','other']);
 export const feedbackStates=Object.freeze(['pending','processing','closed']);
 export const feedbackAuditActions=Object.freeze(['feedback-query','feedback-read','feedback-update']);
-const text=max=>z.string().trim().min(1).max(max).refine(value=>![...value].some(char=>char.codePointAt(0)<32&&!['\n','\t','\r'].includes(char)));
+const text=max=>z.string().trim().min(1).max(max).refine(value=>!Array.from(value).some(char=>char.codePointAt(0)<32&&!['\n','\t','\r'].includes(char)));
 const category=z.enum(feedbackCategories).nullable();
 const module=z.enum(feedbackModules);
 const state=z.enum(feedbackStates);

@@ -10,7 +10,7 @@ const object=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:
 export async function withPermissionAuditLinks(pool,{endpoint,rows}){
  const base=rows.map(row=>{
   if(row.action!=='permission-assignment-save')return row;
-  const {targetOperatorId,roleId,...selection}=object(row.selection);
+  const {targetOperatorId:_targetOperatorId,roleId:_roleId,...selection}=object(row.selection);
   return {...row,selection};
  });
  const candidates=base.filter(row=>row.endpoint===endpoint&&row.action==='permission-assignment-save'

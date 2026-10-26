@@ -62,7 +62,8 @@ export async function checkpointServiceSources({directory,operationId,versionId,
 /** Optional construction by the existing maintenance service. No new daemon,
  * listening port, worker credential, arbitrary command or configuration key. */
 export async function createSystemSettingsRuntime({configuration,control,dependencies={}}){
- const parsed=schema.parse(control);let mail,services;
+// eslint-disable-next-line prefer-const -- Forward references must stay initialized to undefined when setup fails before assignment.
+ const parsed=schema.parse(control);let mail;let services;
  const bridge=dependencies.bridge??new SystemSettingsControlClient({origin:parsed.apiOrigin,host:new URL(parsed.endpoint).hostname,serviceKey:configuration.serviceKey,fetchImpl:dependencies.fetchImpl});
  const store=dependencies.credentialStore??new SystemSettingsCredentialStore({root:parsed.credentialDirectory,
   legacy:async reference=>await mail?.legacyCredential(reference)??await services?.legacyCredential(reference)??null});

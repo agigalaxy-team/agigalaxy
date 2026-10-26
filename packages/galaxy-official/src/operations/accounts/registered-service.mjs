@@ -1,4 +1,4 @@
-import {randomUUID} from 'node:crypto';
+import 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {transaction} from '../../database.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';

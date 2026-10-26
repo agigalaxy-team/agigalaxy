@@ -36,7 +36,7 @@ test('previous read receipts retain verified denial facts without result bodies 
  await receipt(futureTurn,conversationId,'query-operations','completed',{module:'messaging',view:'plans',state:'read'},'2033-01-01T12:02:05Z');
  await receipt(foreignTurn,foreignConversation,'query-operations','completed',{module:'analytics',view:'overview',state:'read'},'2033-01-01T12:00:25Z');
  const database={query:async(sql,args)=>{const result=await db.query(sql,args);if(changeAfterRead&&sql.includes('WITH previous_turns'))allowed=false;return result;},transaction:callback=>db.transaction(tx=>callback(tx))};
- const authority={db:database,endpoint,now:()=>1988193660,async human(input,{domain}={}){if(!allowed||input.operatorId!==actor.operatorId)throw new ServiceError('operations_permission_denied',403);return actor;}};
+ const authority={db:database,endpoint,now:()=>1988193660,async human(input,{domain:_domain}={}){if(!allowed||input.operatorId!==actor.operatorId)throw new ServiceError('operations_permission_denied',403);return actor;}};
  const service=new AgentOsConversations({authority,client:{},summaryForConversation:async()=>({checkedAt:1988193660,readExpiresAt:1988193690,availability:{communityReports:'available'},communityReports:{pending:0,total:2,body:'PRIVATE_BODY'}})});
  const result=await service.summaryFor(actor,'overview',{}, {conversationId,turnId:currentTurn});
  assert.equal(result.counts.communityReports.pending,0);

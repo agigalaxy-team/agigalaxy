@@ -107,7 +107,7 @@ test('native current device survives restart; real HTTP Task and Consent retry p
    const entry=await runtime.navigation.open({object:{kind}});assert.equal(entry.targetPath,'/app/'+path);assert.equal(launchUrl,'https://www.galaxy.example/app/'+path);}
   const projectId=randomUUID(),projectLink=await runtime.navigation.open({object:{kind:'project',id:projectId}});assert.equal(projectLink.targetPath,'/app/projects/'+projectId);assert.equal(launchUrl,'https://www.galaxy.example/app/projects/'+projectId);assert.equal(projectLink.opened,'unverified');
   const resumed=await runtime.navigation.resume(nav.navigationId);assert.equal(resumed.data.taskId,task.taskId);assert.equal(resumed.origin.workRef,'private-local-only-ref');
-  runtime.close();second=await createNativeRuntime(config);const reread=await nativeHttpDefinitions(second.api).galaxy_task_v2_get.run({taskId:task.taskId});assert.equal(reread.taskId,task.taskId);
+  await runtime.close();second=await createNativeRuntime(config);const reread=await nativeHttpDefinitions(second.api).galaxy_task_v2_get.run({taskId:task.taskId});assert.equal(reread.taskId,task.taskId);
   assert.equal((await second.status()).identity,first.identity);assert.notEqual((await second.status()).connection.bindingId,first.connection.bindingId);
   const retry=await second.authorize(input);assert.equal(retry.consentId,authorized.consentId);assert.equal(retry.payloadJson,input.payloadJson);
   third=await createNativeRuntime({...config,dataDirectory:join(directory,'new-device')});
@@ -125,7 +125,7 @@ test('native current device survives restart; real HTTP Task and Consent retry p
   assert.throws(()=>definitions.galaxy_evidence_v2_submit.run({consentId:randomUUID(),payloadJson:JSON.stringify({kind:'revoke',id:randomUUID(),operationId:randomUUID(),expectedVersion:1,
    caseId:randomUUID(),reportedBy:first.identity,synthetic:true,objectType:'evidence',reason:'Synthetic wrong-kind test'})}),/invalid_evidence_event/);assert.equal(requests,beforeEvidence);
   await second.disconnect();const before=requests;await assert.rejects(second.api.call('/v2/tasks/query',{}),/native_connection_choice_required/);assert.equal(requests,before);
- }finally{runtime?.close();second?.close();third?.close();if(api)await new Promise(r=>api.close(r));await f.db.close();await rm(directory,{recursive:true,force:true});}
+ }finally{await runtime?.close();await second?.close();await third?.close();if(api)await new Promise(r=>api.close(r));await f.db.close();await rm(directory,{recursive:true,force:true});}
 });
 
 test('host-driven watch is leased, rechecks source, skips self echo and never calls a model',async()=>{

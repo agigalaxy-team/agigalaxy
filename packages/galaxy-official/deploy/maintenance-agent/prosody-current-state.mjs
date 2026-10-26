@@ -56,7 +56,7 @@ export function verifyProsodyState(native,projection,security,{now=Math.floor(Da
   if(seen.has(room.roomId))throw fail('maintenance_prosody_current_authority_unconfirmed');seen.add(room.roomId);
   const source=expected.get(room.roomId),wanted=source?.members??[];
   if(source?(room.revision!==source.revision||room.state!==source.state):room.state!=='archived')throw fail('maintenance_prosody_current_authority_unconfirmed');
-  if(canonical([...room.members].sort())!==canonical([...wanted].sort())||canonical(room.affiliations)!==canonical(Object.fromEntries(wanted.map(ref=>[node(ref)+'@gateway.galaxy.internal','member']))))throw fail('maintenance_prosody_current_authority_unconfirmed');
+  if(canonical([...room.members].sort((a,b)=>a<b?-1:a>b?1:0))!==canonical([...wanted].sort((a,b)=>a<b?-1:a>b?1:0))||canonical(room.affiliations)!==canonical(Object.fromEntries(wanted.map(ref=>[node(ref)+'@gateway.galaxy.internal','member']))))throw fail('maintenance_prosody_current_authority_unconfirmed');
  }
  if([...expected.keys()].some(id=>!seen.has(id)))throw fail('maintenance_prosody_current_authority_unconfirmed');
  const messages=new Map(projection.messages.map(x=>[key(x),x])),deleted=new Set(projection.deletedSubjects.map(x=>x.subjectId));let withheld=0;

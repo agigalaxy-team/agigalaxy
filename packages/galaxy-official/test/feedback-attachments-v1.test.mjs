@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import {BusinessAdminService} from '../src/business-admin.mjs';
 import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
 import {FeedbackAttachmentsV1Service} from '../src/feedback-attachments-v1.mjs';
 import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
+import {CommunityForumV1} from '../src/community-forum-v1.mjs';
 import {AttachmentS3Store} from '../src/infrastructure/attachment-s3-store.mjs';
 import {defaultAttachmentPolicy} from '../src/shared/chat-attachments-schema.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
@@ -15,15 +17,16 @@ import {createApi} from '../src/http.mjs';
 import {migrate} from '../src/database.mjs';
 
 async function fixture(t,{policy=defaultAttachmentPolicy,feedbackPolicy}={}){
- const f=await accountChatFixture();t.after(f.close);const objects=new Map(),roles=new Map(),store={keyId:'synthetic-feedback-only',
+ const f=await accountChatFixture();t.after(f.close);const objects=new Map(),store={keyId:'synthetic-feedback-only',
   async put({key,bytes}){objects.set(key,Buffer.from(bytes));},async get({key}){return objects.get(key);},async erase(){throw Error('No automatic erase is authorized in this fixture');}},
   scanner={scan:async()=>({state:'clean',engine:'explicit-scanner-contract',guaranteedSafe:false})},
   files=new FeedbackAttachmentsV1Service({db:f.db,endpoint:f.endpoint,accounts:f.accounts,now:f.now,store,scanner,policy,feedbackPolicy}),
-  businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now,operatorAuthorization:async actor=>roles.get(actor.operatorId)}),
+  businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),
   feedback=new OperationsFeedbackService({businessAdmin,accounts:f.accounts,feedbackAttachments:files,now:f.now}),
   admin={kind:'business-operator',operatorId:'feedback-file-admin',role:'administrator',endpoint:f.endpoint},reader={...admin,operatorId:'feedback-file-reader',role:'reader'};
- for(const actor of [admin,reader]){roles.set(actor.operatorId,actor.role);await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
+ for(const actor of [admin,reader]){await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,'https://operations.example.org',$1,'合成附件检查人员',$3,$3)`,[actor.operatorId,f.endpoint,new Date(f.now()*1000)]);}
+ const {roles}=await attachOperationsFixtureAuthority({businessAdmin,admin,reader,permissions:['feedback.read','feedback.attachments.read']});
  const prepare=async(actor,operationId,bytes=Buffer.from('PRIVATE_FILE_BYTES'),name='PRIVATE_FILE_NAME.txt')=>{
   const input={operationId,attachmentId:randomUUID(),name,mediaType:'text/plain',size:bytes.length,sha256:f.digest(bytes)};
   return {input,bytes,receipt:await files.prepare(actor,input)};
@@ -60,7 +63,7 @@ test('private feedback files use exact account/draft ownership, real SQL binding
  let checks=0;await assert.rejects(f.feedback.attachmentContent(f.reader,receipt.feedbackId,file.input.attachmentId,{authorize:async()=>{
   checks++;if(checks===2)throw new ServiceError('business_admin_denied',403);return f.reader;
  }}),{code:'business_admin_denied'});assert.equal(checks,2,'permission is checked again after storage read');
- const originalGet=f.store.get;f.store.get=async input=>{const bytes=await originalGet(input);f.advance(31*86400);return bytes;};
+ const originalGet=f.store.get.bind(f.store);f.store.get=async input=>{const bytes=await originalGet(input);f.advance(31*86400);return bytes;};
  await assert.rejects(f.feedback.attachmentContent(f.reader,receipt.feedbackId,file.input.attachmentId),{code:'feedback_attachment_content_unavailable'});
  assert.equal((await f.feedback.get(f.reader,receipt.feedbackId)).feedback.attachments[0].state,'expired');
  assert.equal((await f.feedback.submit(owner,submission)).replayed,true,'lost acknowledgement is recoverable after file expiry');
@@ -92,14 +95,15 @@ test('feedback attachment byte validation, quarantine, expiry and same-operation
  const textOnly=new OperationsFeedbackService({businessAdmin:f.businessAdmin,accounts:f.accounts,now:f.now}),plain={operationId:randomUUID(),body:'没有附件仍可提交'};
  assert.equal((await textOnly.submit(owner,plain)).replayed,false);assert.equal((await textOnly.submit(owner,{...plain,attachments:[]})).replayed,true);
  const id=randomUUID();assert.equal(AttachmentS3Store.prototype.key('feedback-attachments/'+id),'feedback-attachments/'+id);
- for(const key of ['feedback-attachments/../'+id,'public/'+id,'forum-attachments/'+id])assert.throws(()=>AttachmentS3Store.prototype.key(key),{code:'attachment_storage_key_invalid'});
+ assert.equal(AttachmentS3Store.prototype.key('forum-attachments/'+id),'forum-attachments/'+id,'the private store is shared; source services enforce ownership');
+ for(const key of ['feedback-attachments/../'+id,'public/'+id,'forum-attachments/../'+id])assert.throws(()=>AttachmentS3Store.prototype.key(key),{code:'attachment_storage_key_invalid'});
 });
 
 test('feedback reservations and upload leases participate in the existing shared account/global quotas',{timeout:60000},async t=>{
  const policy={...defaultAttachmentPolicy,maxFileBytes:90,maxSubjectBytes:100,maxGlobalBytes:120},f=await fixture(t,{policy}),[owner,other]=f.people;
  f.files.policy=policy;f.chat.attachments.policy=policy;
  const roomId=await joinAccountConversation(f,owner,other),reservation=await f.prepare(owner,randomUUID(),Buffer.alloc(60,65));
- const forum=new ForumAttachmentsV1Service({db:f.db,accounts:f.accounts,now:f.now,store:f.store,scanner:f.scanner,policy}),prepare={attachmentId:randomUUID(),name:'quota.txt',mediaType:'text/plain',size:50,sha256:f.digest(Buffer.alloc(50,66))};
+ const forumSource=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),forum=new ForumAttachmentsV1Service({forum:forumSource,now:f.now,store:f.store,scanner:f.scanner,policy}),prepare={attachmentId:randomUUID(),name:'quota.txt',mediaType:'text/plain',size:50,sha256:f.digest(Buffer.alloc(50,66))};
  await assert.rejects(forum.prepare(owner,prepare),{code:'attachment_storage_quota_exceeded'});
  await assert.rejects(f.chat.attachments.prepare(owner,{...prepare,roomId,purpose:'temporary-room-attachment',confirmed:true}),{code:'attachment_storage_quota_exceeded'});
  await assert.rejects(f.prepare(other,randomUUID(),Buffer.alloc(61,67)),{code:'attachment_storage_quota_exceeded'});

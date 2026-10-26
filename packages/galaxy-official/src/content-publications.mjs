@@ -9,6 +9,7 @@ const safeHref=value=>{
   try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}
 };
 const href=z.string().max(2048).refine(safeHref);
+// eslint-disable-next-line no-control-regex -- Deliberately reject or sanitize ASCII control characters.
 const text=max=>z.string().max(max).refine(value=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value));
 const links=z.array(z.strictObject({label:text(120).min(1),href,description:text(400).optional()})).max(12);
 const heading=text(200).optional();

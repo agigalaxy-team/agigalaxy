@@ -41,7 +41,7 @@ async function nativeFixture() {
       async close() { runtime?.close(); await t.close(); const resolved = join(tmpdir(), directory.slice(tmpdir().length + 1));
         assert.equal(resolved, directory); assert.ok(directory.startsWith(join(tmpdir(), 'galaxy-receipt-native-'))); await rm(directory, { recursive: true, force: true }); }
     };
-  } catch (error) { runtime?.close(); await t.close(); assert.ok(directory.startsWith(join(tmpdir(), 'galaxy-receipt-native-'))); await rm(directory, { recursive: true, force: true }); throw error; }
+  } catch (error) { await runtime?.close(); await t.close(); assert.ok(directory.startsWith(join(tmpdir(), 'galaxy-receipt-native-'))); await rm(directory, { recursive: true, force: true }); throw error; }
 }
 
 test('Native persistent device/cache survives restart; all sessions expire and only the original read-only receipt is recovered', async () => {
@@ -88,6 +88,6 @@ test('Native no-session disconnect ABA during a challenge is fenced; an unselect
     x.setHook(null);
     const empty = await createNativeRuntime({ ...x.config, dataDirectory: join(x.config.dataDirectory, 'unselected') });
     try { const count = x.t.requests.length; await assert.rejects(empty.receiptStatus.query(x.operation), /authority_changed/); assert.equal(x.t.requests.length, count); }
-    finally { empty.close(); }
+    finally { await empty.close(); }
   } finally { await x.close(); }
 });

@@ -3,7 +3,7 @@ import {ServiceError} from "../../shared/service-error.mjs";
 import {hasOperationsPermission} from "../../operations-permission-catalog.mjs";
 import {p14RuleKeys,p14KeySchema,p14PageSchema,p14PublishSchema,p14Parse as parse} from "../../shared/p14-rules-schema.mjs";
 import {p14RulesCatalog} from "./catalog.mjs";
-import {iso,versionView,changes} from './views.mjs';
+import {iso,versionView} from './views.mjs';
 import {P14RulesBase} from './base.mjs';
 
 // Controlled rule details, adoption state, version history and original command receipts.

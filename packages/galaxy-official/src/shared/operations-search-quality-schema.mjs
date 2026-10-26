@@ -17,12 +17,12 @@ export const searchQualityDraftSchema=z.strictObject({operationId:uuid,expectedR
 export const searchQualityApplySchema=z.strictObject({operationId:uuid,expectedRevision:revision,versionId:uuid,reason:z.string().trim().min(1).max(500)});
 export const searchQualityOperationSchema=uuid;
 export function parseSearchQuality(schema,input){const value=schema.safeParse(input);if(!value.success)throw new ServiceError('invalid_search_quality_request',400);return value.data;}
-export function canonicalSearchSettings(settings){return {...settings,synonyms:settings.synonyms.map(row=>({term:row.term,alternatives:[...new Set(row.alternatives)].sort()})).sort((a,b)=>a.term.localeCompare(b.term))};}
+export function canonicalSearchSettings(settings){return {...settings,synonyms:settings.synonyms.map(row=>({term:row.term,alternatives:[...new Set(row.alternatives)].sort((a,b)=>a<b?-1:a>b?1:0)})).sort((a,b)=>a.term.localeCompare(b.term))};}
 export function nativeSearchSettings(settings){return {synonyms:Object.fromEntries(settings.synonyms.map(row=>[row.term,row.alternatives])),rankingRules:[...searchQualityRankingRules[settings.rankingMode]]};}
 export function controlledNativeSettings(value){
  if(!value||typeof value!=='object'||!value.synonyms||Array.isArray(value.synonyms)||typeof value.synonyms!=='object'||!Array.isArray(value.rankingRules)||value.rankingRules.length>32||value.rankingRules.some(rule=>typeof rule!=='string'||rule.length>80))throw new ServiceError('discovery_engine_response_invalid',503);
  const synonyms={};if(Object.keys(value.synonyms).length>1000)throw new ServiceError('discovery_engine_response_invalid',503);
- for(const[term,alternatives]of Object.entries(value.synonyms)){const key=normalizeSearchTerm(term);if(!key||term.length>200||['__proto__','constructor','prototype'].includes(key)||Object.hasOwn(synonyms,key)||!Array.isArray(alternatives)||alternatives.length>100||alternatives.some(word=>typeof word!=='string'||!normalizeSearchTerm(word)||word.length>200))throw new ServiceError('discovery_engine_response_invalid',503);synonyms[key]=[...new Set(alternatives.map(normalizeSearchTerm))].sort();}
+ for(const[term,alternatives]of Object.entries(value.synonyms)){const key=normalizeSearchTerm(term);if(!key||term.length>200||['__proto__','constructor','prototype'].includes(key)||Object.hasOwn(synonyms,key)||!Array.isArray(alternatives)||alternatives.length>100||alternatives.some(word=>typeof word!=='string'||!normalizeSearchTerm(word)||word.length>200))throw new ServiceError('discovery_engine_response_invalid',503);synonyms[key]=[...new Set(alternatives.map(normalizeSearchTerm))].sort((a,b)=>a<b?-1:a>b?1:0);}
  return {synonyms:Object.fromEntries(Object.entries(synonyms).sort(([a],[b])=>a.localeCompare(b))),rankingRules:value.rankingRules.map(rule=>rule==='attributeRank'?'attribute':rule)};
 }
 export function editableSearchSettings(native){

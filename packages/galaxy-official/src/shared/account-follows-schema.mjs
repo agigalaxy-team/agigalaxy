@@ -6,7 +6,7 @@ export const accountFollowStatusRequestSchema=z.strictObject({targetAccountId:z.
 export const accountFollowReceiptRequestSchema=z.strictObject({operationId:z.uuid(),payloadHash:z.string().regex(/^[a-f0-9]{64}$/)});
 export const accountFollowQuerySchema=z.strictObject({after:z.string().regex(/^af1\.[A-Za-z0-9_-]+$/).max(512).optional(),limit:z.number().int().min(1).max(50).default(20)});
 export const accountFollowRelationshipSchema=z.strictObject({id:z.uuid().nullable(),targetAccountId:z.uuid(),following:z.boolean(),revision,
- followedAt:z.string().datetime({offset:true}).nullable(),updatedAt:z.string().datetime({offset:true}).nullable()});
+ followedAt:z.iso.datetime({offset:true}).nullable(),updatedAt:z.iso.datetime({offset:true}).nullable()});
 const publicProfile=z.strictObject({accountId:z.uuid(),uid:z.string().regex(/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,16}$/).nullable(),
  displayName:z.string().max(120).nullable(),subjectType:z.enum(['person','organization','agent']).nullable()});
 const source=z.discriminatedUnion('state',[

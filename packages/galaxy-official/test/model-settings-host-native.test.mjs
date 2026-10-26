@@ -40,7 +40,7 @@ test('model compiler maps four native formats, exact limits and approved domains
  assert.equal(recordIdFromAlias('unrelated-default'),null);
 });
 
-test('root configuration keeps immutable key versions and unknown operations, applies only with two real version receipts',async()=>{
+test('root configuration keeps immutable key versions and unknown operations, applies only with two real version receipts',{skip:process.platform==='win32'?'Private Unix file-mode journal requires the Linux host runtime.':false},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-p20-control-'));
  let observed=state(),restartCount=0,authorizations=0,allow=true;
  const configuration={controlDirectory:directory+'/journal',operations:{tools:{docker:'/usr/bin/docker'}}};
@@ -53,7 +53,7 @@ test('root configuration keeps immutable key versions and unknown operations, ap
  try{
   await runtime.initialize();const id=randomUUID(),credentialId=randomUUID(),operatorId=randomUUID(),apiKey='SYNTHETIC_PRIVATE_KEY_NOT_A_PROVIDER';
   const provision={kind:'models-credential-provision',operationId:credentialId,operatorId,modelRecordId:id,apiKey};
-  await runtime.call(provision);await Promise.all([...runtime.tasks.values()]);
+  await runtime.call(provision);await Promise.all(runtime.tasks.values());
   const credential=modelSettingsNativeCredential((await runtime.call(provision)).credential);
   assert.equal(credential.reference,'model-key:'+credentialId);assert.equal(credential.modelRecordId,id);
   assert.equal((await lstat(directory+'/models/keys/'+credentialId+'.json')).mode&0o777,0o600);
@@ -61,7 +61,7 @@ test('root configuration keeps immutable key versions and unknown operations, ap
   assert.doesNotMatch(await readFile(journalFile,'utf8'),new RegExp(apiKey));
   const config=empty();config.models.push(fixtureModel(id,credential.reference));config.scenarios.governance={modelId:id,dataPolicyApproved:true};
   const intent={kind:'models-apply',operationId:randomUUID(),operatorId,versionId:randomUUID(),revision:1,configuration:config};
-  await runtime.call(intent);await Promise.all([...runtime.tasks.values()]);
+  await runtime.call(intent);await Promise.all(runtime.tasks.values());
   const applied=modelSettingsNativeOperation((await runtime.call({kind:'models-operation',operationId:intent.operationId})).operation);
   assert.equal(applied.state,'completed');assert.equal(restartCount,1);
   const overview=modelSettingsNativeStatus(await runtime.call({kind:'models-overview'}));
@@ -70,7 +70,7 @@ test('root configuration keeps immutable key versions and unknown operations, ap
   const version=JSON.parse(await readFile(directory+'/models/versions/models-'+intent.versionId+'/metadata.json','utf8'));
   assert.doesNotMatch(JSON.stringify(version),new RegExp(apiKey));
   const secondCredential={...provision,operationId:randomUUID(),apiKey:apiKey+'_ROTATED'};
-  await runtime.call(secondCredential);await Promise.all([...runtime.tasks.values()]);
+  await runtime.call(secondCredential);await Promise.all(runtime.tasks.values());
   assert.equal((await runtime.credentials()).length,2);assert.equal((await runtime.key(credential.reference)).apiKey,apiKey);
   // Simulate interruption after an actual effect and before its terminal ack.
   const lostId=randomUUID(),lost={...intent,operationId:lostId};
@@ -88,7 +88,7 @@ test('root configuration keeps immutable key versions and unknown operations, ap
 });
 
 test('model control uses the authenticated signed private socket route and never dispatches unauthorized request bodies',async()=>{
- const directory=await mkdtemp(join(tmpdir(),'galaxy-p20-socket-')),socketPath=directory+'/control.sock';
+ const directory=await mkdtemp(join(tmpdir(),'galaxy-p20-socket-')),socketPath=process.platform==='win32'?'\\\\.\\pipe\\galaxy-model-control-'+randomUUID():directory+'/control.sock';
  const serviceKey='SYNTHETIC_ROOT_CONTROL_KEY_NOT_A_PROVIDER_00000';let dispatched=0;
  const server=createMaintenanceNativeHttpServer({runtime:{call:()=>{throw Error('Wrong domain');}},modelRuntime:{call:async input=>{dispatched++;return{received:input.kind};}},serviceKey});
  const call=(key,signatureOverride)=>new Promise((resolve,reject)=>{
@@ -106,7 +106,7 @@ test('model control uses the authenticated signed private socket route and never
  }finally{await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});}
 });
 
-test('model application waits for native startup and continues a proved rollback once under the original authorization',async()=>{
+test('model application waits for native startup and continues a proved rollback once under the original authorization',{skip:process.platform==='win32'?'Private Unix file-mode journal requires the Linux host runtime.':false},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-p20-startup-'));let tick=0,restarts=0,reads=0,allowed=true;
  const now=()=>new Date(2000000000000+tick),configuration={controlDirectory:directory+'/journal',operations:{tools:{docker:'/usr/bin/docker'}}};
  const runtime=new ModelConfigurationRuntime({configuration,control,root:directory+'/models',now,pause:async ms=>{tick+=ms;},
@@ -127,7 +127,7 @@ test('model application waits for native startup and continues a proved rollback
   const compiled=compileModelConfiguration(selected,intent.versionId,await runtime.credentials());
   runtime.run=async()=>{restarts++;observed=state(compiled.configurationVersion,1,[]);reads=0;};
   assert.equal((await runtime.call({kind:'models-operation',operationId:row.id})).operation.state,'running');
-  await Promise.all([...runtime.tasks.values()]);assert.equal(restarts,1);assert.ok(tick>=15000);
+  await Promise.all(runtime.tasks.values());assert.equal(restarts,1);assert.ok(tick>=15000);
   assert.equal((await runtime.call({kind:'models-operation',operationId:row.id})).operation.state,'completed');
   assert.equal((await runtime.journal.read(row.id)).recoveryAttempt,1);assert.equal((await runtime.credentials()).length,1);
   assert.equal((await runtime.active()).versionId,intent.versionId);assert.equal(restarts,1);

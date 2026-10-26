@@ -8,6 +8,7 @@ import {createServiceReleaseHost} from '../deploy/service-release-host.mjs';
 
 test('host adapter snapshots and restores exact environment/unit bytes and verifies real readyz contract',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-release-host-'));
+ if(dirname(resolve(directory))!==resolve(tmpdir())||!basename(directory).startsWith('galaxy-release-host-'))throw Error('Unexpected fixture cleanup target.');
  const env=join(directory,'api.env'),unit=join(directory,'worker.service'),nextEnv=join(directory,'target.env'),nextUnit=join(directory,'target.service'),commands=[];
  const oldEnv=Buffer.from('GALAXY_RELEASE_DIRECTORY=/synthetic/old\r\n'),oldUnit=Buffer.from('[Service]\nExecStart=/synthetic/old\n');
  try{
@@ -25,5 +26,5 @@ test('host adapter snapshots and restores exact environment/unit bytes and verif
   await adapter.journal.write({operationId,state:'result-unknown',snapshotReference:reference});
   assert.deepEqual(await adapter.journal.read(operationId),{operationId,state:'result-unknown',snapshotReference:reference});
   assert.equal(commands.filter(args=>args[0]==='stop').length,2);
- }finally{if(dirname(resolve(directory))!==resolve(tmpdir())||!basename(directory).startsWith('galaxy-release-host-'))throw Error('Unexpected fixture cleanup target.');await rm(directory,{recursive:true,force:true});}
+ }finally{await rm(directory,{recursive:true,force:true});}
 });

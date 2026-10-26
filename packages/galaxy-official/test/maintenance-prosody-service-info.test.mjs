@@ -6,7 +6,7 @@ import parse from '@xmpp/xml/lib/parse.js';
 import {ProsodyChatTransport} from '../src/infrastructure/prosody-chat.mjs';
 import {runCommand} from '../deploy/operations-stack/host.mjs';
 
-const info='http://jabber.org/protocol/disco#info',muc='http://jabber.org/protocol/muc';
+const info='http://jabber.org/protocol/disco#info',_muc='http://jabber.org/protocol/muc';
 const rooms='rooms.galaxy.internal',gateway='gateway.galaxy.internal';
 const linux={skip:process.platform!=='linux'?'Uses the current fixed Prosody image without network or production mounts.':false};
 

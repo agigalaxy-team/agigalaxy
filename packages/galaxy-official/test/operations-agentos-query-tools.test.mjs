@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
+import {operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {EventEmitter} from 'node:events';
@@ -6,7 +8,7 @@ import {Readable} from 'node:stream';
 import {p14Fixture} from './p14-rules-fixture.mjs';
 import {joinAccountConversation} from './account-chat-fixture.mjs';
 import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
-import {agentOsQueryArgumentsSchema,agentOsReadArgumentsSchema,agentOsQueryViews} from '../src/shared/operations-agentos-query-schema.mjs';
+import {agentOsReadArgumentsSchema,agentOsQueryViews} from '../src/shared/operations-agentos-query-schema.mjs';
 import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
 import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
 import {OperationsCommunityService} from '../src/operations-community.mjs';
@@ -41,6 +43,7 @@ test('cross-module query tools use actual service DTOs across eighteen modules, 
   strategies=new P13StrategiesService({...f,businessAdmin:f.businessAdmin,native:{status:async()=>({state:'connected',modelState:'not-configured'})}}),
   maintenance=new OperationsMaintenanceService({businessAdmin:f.businessAdmin,native:{call:async input=>input.kind==='catalog'?{items:[],total:0}:input.kind==='logs'?{items:[{at:new Date(f.now()*1000).toISOString(),component:'business-api',level:'error',event:'operations_query_failed',code:'operations_query_unavailable',message:'PRIVATE_LOG_MESSAGE'}]}:{components:[],storage:[]}},now:f.now}),
   authority=new OperationsAgentOsAuthority({...f,permissions:f.permissions}),aiRuns=new OperationsAiRunsService({authority,client:{runs:async()=>({items:[{runId:'real-native-contract',domain:'overview',state:'COMPLETED',createdAt:f.now(),updatedAt:f.now(),tokens:{input:null,output:null,total:null},content:'PRIVATE_RUN_CONTENT'}],total:1,nextPage:null}),runDetail:async()=>({run:{runId:'real-native-contract',domain:'overview',state:'COMPLETED',createdAt:f.now()},spans:[],events:[],input:'PRIVATE_RUN_INPUT'})}});
+ await attachAiWorkFixture({...f,authority,admin:f.admin,codes:operationsPermissionCodes.filter(code=>code.endsWith('.read')),domains:['overview']});
  const tools=new OperationsAgentOsQueryTools({authority,services:{accounts:f.businessAdmin,community,content:community.content,chatReports,feedback,files,resources,analytics,recommendations,searchQuality:quality,messaging,strategies,rules:f.rules,maintenance,aiRuns,jobs,permissions:f.permissions}}),
   query=(module,view,filters={})=>tools.execute({actor:f.admin,domain:'overview',tool:'query-operations',arguments:{module,view,filters}}),
   read=(kind,id,filters={})=>tools.execute({actor:f.admin,domain:'overview',tool:'read-operation-object',arguments:{kind,id,filters}});
@@ -56,9 +59,11 @@ test('cross-module query tools use actual service DTOs across eighteen modules, 
  await f.db.query("UPDATE operations_messaging_recipients_v1 SET state='failed',error_code='synthetic_delivery_failed' WHERE run_id=$1 AND account_id=$2",[run.id,f.people[0].accountId]);
  const visitorId=randomUUID(),empty=await analytics.search({query:'当前缺少结果',limit:2},{usageIdentity:{actor:f.people[0],visitorId}});await analytics.recordUsage(f.people[0],visitorId,{eventId:randomUUID(),name:'search',pageKey:'find',query:empty.query,search:{requestId:empty.search.requestId}});f.advance(1);
  // Every exposed module is routed through its real service instance.
+ /** @type {Array<[string, string, Record<string, unknown>?]>} */
  const requests=[['accounts','list'],['accounts','summary'],['content','list'],['content','sections'],['content','tags'],['cases','list'],['chat-reports','list'],['feedback','list'],['files','list'],['files','summary'],['resources','projects'],['resources','methods'],['analytics','account',{accountId:f.people[0].accountId}],['recommendations','overview'],['recommendations','history'],['search','overview',{issue:'no-results'}],['search','history'],['messaging','plans'],['messaging','runs'],['messaging','recipients',{runId:run.id,state:'failed'}],['messaging','history',{planId:plan.id}],['strategies','overview'],['strategies','versions'],['strategies','records'],['rules','overview'],['rules','versions',{key:'community-quota'}],['maintenance','overview'],['maintenance','backups'],['maintenance','plans'],['maintenance','logs'],['audit','list'],['runs','list'],['jobs','list',{queue:'search-recovery'}],['permissions','roles'],['permissions','personnel'],['permissions','automation']];
  const results=new Map();for(const [module,view,filters]of requests){const value=await query(module,view,filters);assert.equal(value.availability,'available',module+'.'+view);assert(value.data!==null,module+'.'+view);assert(value.readExpiresAt>value.checkedAt);results.set(module+'.'+view,value);}
- assert.equal(new Set(requests.map(x=>x[0])).size,Object.keys(agentOsQueryViews).length);
+ // Registered-directory and protected system-settings sources have dedicated contract suites.
+ assert.deepEqual([...new Set(requests.map(x=>x[0]))].sort((a,b)=>a<b?-1:a>b?1:0),Object.keys(agentOsQueryViews).filter(module=>!['registered-users','system-settings'].includes(module)).sort((a,b)=>a<b?-1:a>b?1:0));
  assert.equal(results.get('accounts.list').data.items.length,3);assert.equal(results.get('accounts.summary').data.totals.accounts,3);
  assert.equal(results.get('content.list').data.items[0].title,p.title);assert.equal(results.get('files.list').data.items.find(x=>x.id===attachmentId).name,'真实文件名.txt');
  assert.equal(results.get('messaging.recipients').data.items.length,1);assert.equal(results.get('messaging.runs').data.items[0].delivery.email.delivered,null);
@@ -67,18 +72,20 @@ test('cross-module query tools use actual service DTOs across eighteen modules, 
  const details=[await read('account',f.people[0].accountId),await read('account-summary',f.people[0].accountId),await read('post',p.postId),await read('case',report.reportId),await read('chat-report',chatCase.reportId),await read('feedback',feedbackReceipt.feedbackId),await read('chat-file',attachmentId),await read('message-plan',plan.id),await read('message-run',run.id),await read('rule','community-quota'),await read('ai-run','real-native-contract')];
  assert.equal(details[1].data.usage.publicContributions,1);assert.equal(details[2].data.body,'CURRENT_PUBLIC_BODY');assert.equal(details[2].evidenceRefs.find(r=>r.kind==='post').purpose,'public-content');
  assert.match(details[2].evidenceRefs.find(r=>r.kind==='post').href,/contentKind=post/);
- const all=JSON.stringify([...results.values(),...details]);for(const forbidden of ['PRIVATE_FEEDBACK_PROSE','PRIVATE_CASE_PROSE','PRIVATE_CHAT_BODY','PRIVATE_CHAT_REPORT','PRIVATE_NOTICE_TITLE','PRIVATE_NOTICE_BODY','PRIVATE_FILE_BYTES','PRIVATE_LOG_MESSAGE','PRIVATE_RUN_CONTENT','PRIVATE_RUN_INPUT','QUEUE_PRIVATE_BODY','QUEUE_SECRET','987654321'])assert(!all.includes(forbidden),forbidden);
+ const all=JSON.stringify([...results.values()]);for(const forbidden of ['PRIVATE_FEEDBACK_PROSE','PRIVATE_CASE_PROSE','PRIVATE_CHAT_BODY','PRIVATE_CHAT_REPORT','PRIVATE_NOTICE_TITLE','PRIVATE_NOTICE_BODY','PRIVATE_FILE_BYTES','PRIVATE_LOG_MESSAGE','PRIVATE_RUN_CONTENT','PRIVATE_RUN_INPUT','QUEUE_PRIVATE_BODY','QUEUE_SECRET','987654321'])assert(!all.includes(forbidden),forbidden);
+ assert.equal(details[5].data.body,'PRIVATE_FEEDBACK_PROSE');assert.equal(details[5].evidenceRefs.find(ref=>ref.kind==='feedback').purpose,'feedback-processing');assert.equal(details[5].data.material.instructionAuthority,'none');
+ const unselected=JSON.stringify(details);for(const forbidden of ['PRIVATE_FILE_BYTES','PRIVATE_LOG_MESSAGE','PRIVATE_RUN_CONTENT','PRIVATE_RUN_INPUT','QUEUE_PRIVATE_BODY','QUEUE_SECRET','987654321'])assert(!unselected.includes(forbidden),forbidden);
  const publicRef=details[2].evidenceRefs.filter(r=>r.kind==='post');assert.equal((await tools.revalidate({actor:f.admin,domain:'overview',evidenceRefs:publicRef})).valid,true);
  await community.content.visibility(f.admin,'post',p.postId,{operationId:randomUUID(),expectedVersion:1,expectedRevision:0,kind:'hide',until:f.now()+60,reason:'只为本地来源失效验证'});
  assert.equal((await tools.revalidate({actor:f.admin,domain:'overview',evidenceRefs:publicRef})).valid,false);assert.equal((await read('post',p.postId)).data.body,null);
- const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'限定查询',description:'只读',enabled:true,permissions:['workbench.read','accounts.read']},{authorize:async()=>f.admin})).role,
+ const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'限定查询',description:'只读',enabled:true,permissions:['workbench.read','ai.use.overview','accounts.read']},{authorize:async()=>f.admin})).role,
   assignment=(await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),expectedVersion:0,operatorId:f.reader.operatorId,roleId:role.id,enabled:true},{authorize:async()=>f.admin})).assignment;
  const limited=input=>tools.execute({actor:f.reader,domain:'overview',tool:'query-operations',arguments:input});assert.equal((await limited({module:'accounts',view:'list'})).data.items.length,3);await assert.rejects(limited({module:'files',view:'list'}),{code:'operations_permission_denied'});
  await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),id:assignment.id,expectedVersion:assignment.version,operatorId:f.reader.operatorId,roleId:role.id,enabled:false},{authorize:async()=>f.admin});await assert.rejects(limited({module:'accounts',view:'list'}),{code:'operations_permission_denied'});
 });
 
 test('query tools reject open parameters, keep real cursors and unknowns, recheck authority after reads and invalidate only controlled source revisions',async()=>{
- let now=2000000000,denied=false,changed=false,afterRead=false;const actor={kind:'business-operator',operatorId:'synthetic',endpoint:'https://example.invalid'},checks=[];
+ const now=2000000000;let denied=false;let changed=false;const afterRead=false;const actor={kind:'business-operator',operatorId:'synthetic',endpoint:'https://example.invalid'},checks=[];
  const authority={now:()=>now,human:async(value,{action})=>{assert.equal(value,actor);checks.push(action);if(denied)throw new ServiceError('operations_permission_denied',403);return value;}};
  const id=randomUUID(),next=randomUUID(),row={id,kind:'post',version:1,versionId:randomUUID(),title:'当前公开名称',body:'CURRENT_BODY',excerpt:'CURRENT_EXCERPT',sourceState:'available',visibility:{hidden:false},publishedUntil:now+10},
   services={accounts:{list:async()=>{if(afterRead)denied=true;return{items:[{accountId:id,uid:'U123',displayName:'合成用户',identity:{email:'PRIVATE_EMAIL'},profileRevision:changed?2:1}],nextAfter:next};},get:async()=>({account:{accountId:id,profileRevision:changed?2:1}})},content:{get:async()=>({content:row}),list:async(_actor,q)=>{assert.equal(q.visibility,'visible');return{items:[row],nextAfter:'post:'+id,scanTruncated:true,summary:{total:null}};}}};

@@ -3,7 +3,7 @@ import {ServiceError} from './service-error.mjs';
 
 export const messagingChannels=Object.freeze(['announcement','inapp','email']);
 export const messagingSenderKeys=Object.freeze(['account','notice','community','updates','team']);
-const text=max=>z.string().trim().min(1).max(max).refine(value=>![...value].some(char=>char.codePointAt(0)<32&&!['\n','\t','\r'].includes(char)));
+const text=max=>z.string().trim().min(1).max(max).refine(value=>!Array.from(value).some(char=>char.codePointAt(0)<32&&!['\n','\t','\r'].includes(char)));
 const unique=values=>new Set(values).size===values.length;
 const ids=z.array(z.uuid()).min(1).max(500).refine(unique);
 const internalHref=z.string().max(2048).refine(value=>value.startsWith('/')&&!value.startsWith('//')&&!/[\s\\\p{Cc}]/u.test(value)&&!/^\/(?:api|v1|v2|admin)(?:\/|$)/.test(value));

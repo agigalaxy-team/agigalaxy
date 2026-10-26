@@ -10,7 +10,7 @@ export class MessagingBase{
  constructor({db,endpoint,businessAdmin,accounts,jobs,mailProvider=null,lockPlan=null,now=()=>Math.floor(Date.now()/1000)}){Object.assign(this,{db,endpoint,businessAdmin,accounts,jobs,mailProvider,lockPlan,now});}
  async requestActor(operator,authorize,code,db){
   if(typeof authorize!=='function')fail('operations_authorization_unavailable',503);
-  const current=this.businessAdmin.require(await authorize());
+  const current=this.businessAdmin.require(await authorize({db}));
   const authority=this.businessAdmin.executorAuthority;
   const sameDuty=authority?.acceptsDuty?.(current)&&authority.acceptsDuty(operator)&&current.operatorId===operator.operatorId&&current.taskId===operator.taskId;
   if((!same(current,operator)&&!sameDuty)||current.endpoint!==this.endpoint)fail('business_admin_denied',403);
@@ -114,7 +114,7 @@ export class MessagingBase{
   const id=context.operation?.targetId;if(!id||context.operation.permission!=='notices.publish')return{allowed:false};
   const plan=await this.planWithin(db,id),stored=plan.approved_ai;
   if(!stored||plan.state!=='active'||stored.messageVersion!==plan.version||stored.messagePlanId!==id||plan.approved_by!=='ai:'+context.aiAccountId||plan.approved_role!==null||plan.config.automation?.kind!=='ordinary'||plan.config.automation?.factsConfirmed!==true)return{allowed:false};
-  const {messagePlanId,messageVersion,...metadata}=stored;
+  const {messagePlanId:_messagePlanId,messageVersion:_messageVersion,...metadata}=stored;
   // Only the exact committed approval can reconstruct an execution identity.
   const clean=Object.fromEntries(Object.entries(context).filter(([key])=>!['continuation','businessAction','selection'].includes(key)));
   if(!isDeepStrictEqual(metadata,clean))return{allowed:false};

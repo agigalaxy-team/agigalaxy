@@ -20,7 +20,7 @@ import {createDiscoveryClient} from '../../galaxy-web/src/features/discovery/cli
 import {dispatchOperationsSearchQuality} from '../src/adapters/http/operations-search-quality-http.mjs';
 import {requestUrl} from '../src/adapters/http/policy.mjs';
 import {operationsReadPath,operationsProxyPolicy} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
-import {searchQualityFixedConstraints,searchQualityRankingRules,nativeSearchSettings} from '../src/shared/operations-search-quality-schema.mjs';
+import {searchQualityFixedConstraints,searchQualityRankingRules} from '../src/shared/operations-search-quality-schema.mjs';
 
 const options=actor=>({authorize:async()=>actor});
 const settings=(patch={})=>({synonyms:[{term:'摄影入门',alternatives:['摄影基础']}],rankingMode:'newest',fixedConstraints:{...searchQualityFixedConstraints},...patch});

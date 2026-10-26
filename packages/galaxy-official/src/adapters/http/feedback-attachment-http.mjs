@@ -4,7 +4,7 @@ import {ServiceError} from '../../shared/service-error.mjs';
 const id='[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const uploadPath=new RegExp('^('+id+')/upload$','i');
 const methods={prepare:'prepare',read:'get',revoke:'revoke'};
-export async function dispatchFeedbackAttachments({feedbackAttachments,officialAccounts,request,response,requestId,url,send}){
+export async function dispatchFeedbackAttachments({feedbackAttachments,officialAccounts,request,response:_response,requestId,url,send}){
  const prefix='/v1/account/feedback/attachments/';if(!url.pathname.startsWith(prefix))return false;
  const path=url.pathname.slice(prefix.length),upload=uploadPath.exec(path);
  if(url.search||request.method!==(upload?'PUT':'POST')||!upload&&path!=='config'&&!Object.hasOwn(methods,path))throw new ServiceError('not_found',404);

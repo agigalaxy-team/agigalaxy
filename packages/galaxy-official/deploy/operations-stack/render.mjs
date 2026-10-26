@@ -6,7 +6,6 @@ import { alloyConfiguration, logFileSources, loggingDashboard } from './log-pipe
 
 const json = value => JSON.stringify(value, null, 2) + '\n';
 const bind = (source, target, readOnly = true) => ({ type: 'bind', source, target, read_only: readOnly, bind: { create_host_path: false } });
-const q = value => JSON.stringify(value);
 const command = values => values.map(value => '"' + value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%') + '"').join(' ');
 export const sourceDirectory = fileURLToPath(new URL('.', import.meta.url));
 const repositoryDocs = new URL('../../../../docs/', import.meta.url);
@@ -127,7 +126,7 @@ export function operationsCompose(config) {
 }
 
 function panel(id, title, expression, x, y, width = 12, unit) {
-  return { id, title, type: 'timeseries', datasource: { type: 'prometheus', uid: 'galaxy-prometheus' }, gridPos: { x, y, w: width, h: 8 }, targets: [{ refId: 'A', expr: expression }], fieldConfig: { defaults: { ...(unit ? { unit } : {}) }, overrides: [] }, options: { legend: { displayMode: 'list', placement: 'bottom' } } };
+  return { id, title, type: 'timeseries', datasource: { type: 'prometheus', uid: 'galaxy-prometheus' }, gridPos: { x, y, w: width, h: 8 }, targets: [{ refId: 'A', expr: expression }], fieldConfig: { defaults: (unit ? { unit } : {}), overrides: [] }, options: { legend: { displayMode: 'list', placement: 'bottom' } } };
 }
 export function operationsDashboard() {
   return { uid: 'galaxy-operations', title: '银河运行', schemaVersion: 40, version: 1, editable: false, tags: ['galaxy'], timezone: 'browser', time: { from: 'now-6h', to: 'now' }, refresh: '30s', panels: [

@@ -45,7 +45,7 @@ export function compileModelConfiguration(configuration,versionId,credentials){
    const alias=modelAlias(item.modelId),profile=profiles[alias];
    if(!item.dataPolicyApproved||!profile)throw fail();
    if(!profile.scenarios.includes(domain))profile.scenarios.push(domain);
-   const {scenarios:unused,...runtimeProfile}=profile;
+   const {scenarios:_unused,...runtimeProfile}=profile;
    backups.push({alias,dataPolicyApproved:true,runtimeProfile});
   }
   if(backups.length)scenarios[domain].fallbacks=backups;

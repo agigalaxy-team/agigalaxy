@@ -15,7 +15,7 @@ import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.
 // doubles. No provider, production event collection or model analysis runs.
 test('account usage summary bridges native facts with exact ownership, distinct periods and current permission without exposing detailed paths',{timeout:60000},async t=>{
  const raw=new PGlite();t.after(()=>raw.close());await migrate(raw,{roles:['api']});
- let transactionDepth=0,clock=Date.parse('2026-10-24T01:00:00.000Z')/1000;
+ let transactionDepth=0;const clock=Date.parse('2026-10-24T01:00:00.000Z')/1000;
  const db={query:raw.query.bind(raw),transaction:operation=>raw.transaction(async connection=>{transactionDepth++;try{return await operation(connection);}finally{transactionDepth--;}})},
   endpoint='https://usage-summary.example.invalid',foreign='https://foreign-usage.example.invalid',accountId=randomUUID(),otherId=randomUUID(),now=()=>clock,at=new Date(clock*1000).toISOString(),
   admin={kind:'business-operator',operatorId:'account-usage-admin',role:'administrator',endpoint},reader={...admin,operatorId:'account-usage-reader',role:'reader'},ungranted={...reader,operatorId:'account-usage-ungranted'};

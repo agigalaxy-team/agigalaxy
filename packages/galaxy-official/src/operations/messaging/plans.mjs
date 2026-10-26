@@ -45,7 +45,7 @@ export class MessagingPlans extends MessagingReadModel{
    const row=await this.planWithin(db,id,{lock:true});this.cas(row,x);
    if(actor.kind==='operations-ai-service')await this.assertDutyPlanWithin(db,actor,row,kind);
    if(kind==='activate'&&row.state!=='draft'||kind==='pause'&&row.state!=='active'||kind==='resume'&&row.state!=='paused'||kind==='stop'&&!['active','paused'].includes(row.state))fail('operations_messaging_state_changed');
-   let state=kind==='activate'||kind==='resume'?'active':kind==='pause'?'paused':'stopped';
+   const state=kind==='activate'||kind==='resume'?'active':kind==='pause'?'paused':'stopped';
    if(state==='active')await this.validateConfig(row.config,db,{activating:kind==='activate'});
    if(state!=='active'&&row.config.schedule.kind==='recurring'){
     if(typeof this.jobs?.unschedule!=='function')fail('operations_messaging_scheduler_unavailable',503);
@@ -68,7 +68,7 @@ export class MessagingPlans extends MessagingReadModel{
  }
  async retry(operator,runId,input,{authorize}={}){
   const x=parse(messagingRetrySchema,input);
-  return this.command(operator,'retry',{...x,runId},authorize,async(db,actor)=>{
+  return this.command(operator,'retry',{...x,runId},authorize,async(db,_actor)=>{
    const row=await this.runWithin(db,runId,{lock:true});if(row.revision!==x.expectedRevision)fail('operations_messaging_version_changed');await this.runtimeWithin(db,row);await this.recoverSubmissionsWithin(db,runId);
    const result=await db.query(`UPDATE operations_messaging_recipients_v1 SET state='pending',retryable=false,retry_at=NULL,error_code=NULL,completed_at=NULL,updated_at=$2 WHERE run_id=$1 AND (state='blocked' OR state='failed' AND retryable) AND attempt_count<$3 RETURNING id`,[runId,iso(this.now()),messagingRecoveryPolicy.maxSubmitAttempts]);
    if(!result.rows.length)fail('operations_messaging_retry_not_allowed');
