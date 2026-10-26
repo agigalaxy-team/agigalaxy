@@ -33,7 +33,7 @@ export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
   const {packages,files,separate}=selection;
   if(separate.length)console.log('[galaxy-check] separate environment/artifact acceptance (not executed by this run): '+separate.join(', '));
   // Bound file processes only; individual tests retain their own concurrency.
-  const status=run(`tests (${packages.join(', ')}; ${files.length} files; concurrency 4)`,['--experimental-test-module-mocks','--test','--test-concurrency=4',...files]);
+  const status=run(`tests (${packages.join(', ')}; ${files.length} files; concurrency 4)`,['--import','tsx','--experimental-test-module-mocks','--test','--test-concurrency=4',...files]);
   if(status!==0)return status;
  }
  if(mode==='all'||mode==='lint'){

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, copyFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 
 test('combined runner includes service and client failures and rejects an empty suite', async () => {
   const prefix = join(tmpdir(), 'galaxy-check-runner-');
@@ -12,6 +13,8 @@ test('combined runner includes service and client failures and rejects an empty 
     for (const path of ['scripts/test', 'scripts/checks', 'packages/galaxy-core/test', 'packages/galaxy-official/test', 'packages/galaxy-a2a/test', 'packages/galaxy-web/test', 'packages/galaxy-edge-mcp/test']) {
       await mkdir(join(root, path), { recursive: true });
     }
+    await mkdir(join(root,'node_modules'));
+    await symlink(resolve(fileURLToPath(import.meta.resolve('tsx/package.json')),'..'),join(root,'node_modules/tsx'),process.platform==='win32'?'junction':'dir');
     await copyFile(new URL('../check.mjs', import.meta.url), join(root, 'scripts/check.mjs'));
     for (const name of ['runner.mjs', 'test-discovery.mjs'])
       await copyFile(new URL('../checks/' + name, import.meta.url), join(root, 'scripts/checks', name));
