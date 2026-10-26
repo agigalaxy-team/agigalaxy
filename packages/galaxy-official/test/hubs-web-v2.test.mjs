@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createHubsWebClient} from '../../galaxy-web/src/hubs-client.mjs';
+import {createHubsWebClient} from "../../galaxy-web/src/features/hubs/hubs-client.mjs";
 import {builderDeclaration} from './builders-workflow.mjs';
 import {sampleCharter} from './hubs-workflow.mjs';
 test('Hub browser actual local signatures recover lost Charter and peering ACKs without new choices or duplicate writes',async()=>{

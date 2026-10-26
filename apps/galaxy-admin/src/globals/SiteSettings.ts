@@ -2,7 +2,7 @@ import type {GlobalConfig,GlobalBeforeChangeHook} from 'payload';
 import {canRead,canEdit} from '../lib/access';
 import {safeHref} from '../lib/content-model.mjs';
 import {enforceCmsPublication} from '../lib/cms-access';
-import {enforceSystemGeneralMetadata,systemGeneralPublicationBoundary} from '../lib/system-settings-general-metadata.mjs';
+import {enforceSystemGeneralMetadata,systemGeneralPublicationBoundary} from "../lib/system-settings/system-settings-general-metadata.mjs";
 const enforceSiteSettingsMetadata:GlobalBeforeChangeHook=({data,originalDoc,req})=>
   enforceSystemGeneralMetadata({data,originalDoc,req});
 export const SiteSettings:GlobalConfig={

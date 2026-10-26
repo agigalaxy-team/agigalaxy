@@ -2,8 +2,8 @@
 
 import {Bar,BarChart,CartesianGrid,ResponsiveContainer,Sankey,Tooltip,XAxis,YAxis} from 'recharts';
 import type {SankeyNodeProps} from 'recharts';
-import type {AnalyticsBusinessData,AnalyticsBusinessKey,AnalyticsFlowData} from '../analytics-types';
-import {analyticsBusinessLabels,analyticsNumber} from '../../lib/analytics-view-model';
+import type {AnalyticsBusinessData,AnalyticsBusinessKey,AnalyticsFlowData} from "./analytics-types";
+import {analyticsBusinessLabels,analyticsNumber} from "../../lib/analytics/analytics-view-model";
 import './analytics-charts.css';
 
 export {AnalyticsDaysControl,AnalyticsObjectControl,RetentionGrid} from './AnalyticsChartPrimitives';

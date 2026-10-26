@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import {loadToolMcpClient} from '../../galaxy-web/scripts/browser-tool-runtime.mjs';
 const {Client,InMemoryTransport}=await loadToolMcpClient();
 import { serviceFixture } from './service-fixture.mjs';
-import { createLocalHostRuntime } from '../src/local-host-runtime.mjs';
+import { createLocalHostRuntime } from "../src/clients/local/host-runtime.mjs";
 import { createRemoteToolServer } from '../../galaxy-edge-mcp/src/remote-server.mjs';
 import { initializeGalaxyIntegration, createCaseDraft } from '../../galaxy-core/src/local-store.mjs';
 import { createConnectionProfile, saveConnectionProfile } from '../../galaxy-core/src/connection-profile.mjs';

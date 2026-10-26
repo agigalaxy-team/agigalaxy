@@ -1,3 +1,4 @@
+import {runtimeLogEvent} from '../src/operations/runtime-log.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
@@ -122,7 +123,13 @@ test('HTTP parsing, authentication scope and sanitized errors survive route extr
     assert.equal(missing.status, 404);
     assert.equal(missing.headers['x-content-type-options'], 'nosniff');
     assert.equal(missing.headers['x-request-id'], missing.body.requestId);
-    assert.ok(logs.every(event => Object.keys(event).sort().join(',') === 'code,requestId,status'));
+    assert.ok(logs.length>0);
+    for(const event of logs){
+      assert.ok(['http_rejected','http_completed'].includes(event.event));
+      assert.equal(typeof event.requestId,'string');assert.equal(Number.isInteger(event.status),true);
+      assert.deepEqual(event,runtimeLogEvent(event),'HTTP logs keep the closed production diagnostic projection');
+      for(const field of ['error','message','body','payload','credential','authorization'])assert.equal(Object.hasOwn(event,field),false);
+    }
     assert.ok(!JSON.stringify(logs).includes('synthetic'));
   });
 });

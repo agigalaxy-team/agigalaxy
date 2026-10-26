@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {randomUUID} from 'node:crypto';
 import {dispatchOperationsMaintenance} from '../src/adapters/http/operations-maintenance-http.mjs';
-import {MaintenanceNativeClient,maintenanceRequestSignature} from '../src/operations-maintenance-native.mjs';
+import {MaintenanceNativeClient,maintenanceRequestSignature} from "../src/operations/maintenance/native.mjs";
 
 test('fixed maintenance chat readiness authenticates before body and projects only the existing-connection acknowledgement',async()=>{
  const key='SYNTHETIC_MAINTENANCE_READINESS_KEY_ONLY',native=new MaintenanceNativeClient({key}),path='/v1/internal/maintenance/chat-probe';let probes=0,bodyReads=0;

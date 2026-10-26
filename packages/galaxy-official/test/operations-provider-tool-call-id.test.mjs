@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {operationsToolCallIdSchema} from '../src/shared/operations-tool-call-id.mjs';
-import {workbenchActionToolSchema} from '../src/operations-agentos-action-catalog.mjs';
+import {workbenchActionToolSchema} from "../src/operations/agentos/action-catalog.mjs";
 import {agentOsToolSchema} from '../src/shared/operations-agentos-schema.mjs';
 
 test('provider call pairing values preserve punctuation and length across preparation and legacy tool boundaries',()=>{

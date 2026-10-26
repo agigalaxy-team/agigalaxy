@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {autonomyConfigBody,autonomyConfigMerge,autonomyNumber,autonomyPercent,autonomyTaskHref} from '../src/lib/autonomy-view-model.ts';
-import {aiRunsLocation,aiRunsHref,autonomyRunsPath} from '../src/lib/ai-runs-view-model.ts';
-import {automationDraft,automationSaveBody,roleDraft,roleSaveBody,permissionConditionReason} from '../src/lib/permissions-view-model.ts';
+import {autonomyConfigBody,autonomyConfigMerge,autonomyNumber,autonomyPercent,autonomyTaskHref} from "../src/lib/autonomy/autonomy-view-model.ts";
+import {aiRunsLocation,aiRunsHref,autonomyRunsPath} from "../src/lib/autonomy/ai-runs-view-model.ts";
+import {automationDraft,automationSaveBody,roleDraft,roleSaveBody,permissionConditionReason} from "../src/lib/permissions/permissions-view-model.ts";
 import {createSettingsDraftMemory,settingsAiWorkReceiptPath,settingsSystemReceiptPath} from '../src/lib/settings-draft-memory.ts';
-import {autonomyRuntimeDraft,autonomyRuntimeConfiguration,autonomyRuntimeMerge,systemSettingsMemorySnapshot} from '../src/lib/system-settings-view-model.ts';
-import {strategyExecution,strategyExecutionDefaults} from '../src/lib/strategies-view-model.ts';
+import {autonomyRuntimeDraft,autonomyRuntimeConfiguration,autonomyRuntimeMerge,systemSettingsMemorySnapshot} from "../src/lib/system-settings/system-settings-view-model.ts";
+import {strategyExecution,strategyExecutionDefaults} from "../src/lib/strategies/strategies-view-model.ts";
 
 const id='11111111-1111-4111-8111-111111111111',accountId='22222222-2222-4222-8222-222222222222',operationId='33333333-3333-4333-8333-333333333333';
 const config=()=>({id,domain:'maintenance',revision:2,enabled:false,mode:'ai-human',schedule:{kind:'daily',at:null,timezone:'Asia/Shanghai'},purpose:'operations-maintenance',goal:'原目标',prompt:'原提示词',promptVersion:1,planVersion:1,delegationVersion:null,nextDueAt:null,plan:{strategyIds:[],grantIds:[],actions:[],resourceIds:[],eventTypes:[]}});

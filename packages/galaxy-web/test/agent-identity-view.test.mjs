@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createDeviceMaterial,identityKeyId,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
-import {createAgentIdentityView} from '../src/agent-identity-view.ts';
+import {createAgentIdentityView} from "../src/features/agent-identity/agent-identity-view.ts";
 
 const endpoint='https://official.example.org',website='https://galaxy.example.org',bridgeOrigin='http://127.0.0.1:39841';
 const subjectId='GUID10'+'0'.repeat(26),protocol='galaxy-web-identity-handoff';

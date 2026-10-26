@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {contentItem} from '../src/operations-agentos-query-view.mjs';
+import {contentItem} from "../src/operations/agentos/query-view.mjs";
 
 test('current public content exposes the actual author topic, while hidden and unavailable sources expose neither topic',()=>{
  const current={kind:'post',id:'a71473b1-2a8d-87e0-a6d8-7d16b5ee4837',version:1,sourceState:'available',

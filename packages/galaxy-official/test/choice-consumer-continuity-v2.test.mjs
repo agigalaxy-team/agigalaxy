@@ -5,8 +5,8 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
-import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
+import {createHelpSearchClient} from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
+import {createChoiceSyncClient} from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
 
 // Actual HTTP, PGlite and browser runtime/signatures. The local store and its
 // completion barrier are explicit doubles, not physical browser/device QA.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { CaseService } from '../src/cases.mjs';
+import { CaseService } from "../src/cases/index.mjs";
 import { createApi } from '../src/http.mjs';
 
 test('authorized Case preserves ordered failures and corrections without asserting verification', async () => {

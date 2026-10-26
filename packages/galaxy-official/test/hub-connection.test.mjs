@@ -9,8 +9,8 @@ import { localPaths } from '../../galaxy-core/src/storage/files.mjs';
 import { createConnectionProfile,saveConnectionProfile } from '../../galaxy-core/src/connection-profile.mjs';
 import { createConfiguredRuntime } from '../../../integrations/host-adapters/opencode-stable/configured-runtime.mjs';
 import { createApi } from '../src/http.mjs';
-import { createBuilderClient } from '../src/builder-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createBuilderClient } from "../src/clients/builder.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 import { serviceFixture } from './service-fixture.mjs';
 import { hubProfile,hubManifestFixture,hubDeclaration } from './hub-manifest-fixture.mjs';
 

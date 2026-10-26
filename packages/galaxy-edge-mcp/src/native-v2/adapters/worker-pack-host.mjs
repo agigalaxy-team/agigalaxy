@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 import { createNativeWorkerPackAdapter } from './worker-pack.mjs';
 import { createConfiguredNativeA2a, nativeA2aSchema } from './a2a.mjs';
-import { createWorkerPackHostFlowV2 } from '../../../../galaxy-a2a/src/worker-pack-flow-v2.mjs';
+import { createWorkerPackHostFlowV2 } from '../../../../galaxy-a2a/src/hosts/worker-pack-flow-v2.mjs';
 
 const identifier = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
 export const nativeWorkerPacksSchema = z.strictObject({ workers: z.array(z.strictObject({

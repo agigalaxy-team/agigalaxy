@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { workerReads } from '../../src/infrastructure/worker-reads.mjs';
 import { verifyVisibilityAcceptance } from '../visibility-acceptance-workflow.mjs';

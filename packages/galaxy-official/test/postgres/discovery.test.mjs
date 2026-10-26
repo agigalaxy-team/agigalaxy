@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { verifyDiscoveryWorkflow } from '../discovery-workflow.mjs';
 test('project discovery runs through HTTP on PostgreSQL using the existing restricted API role', { timeout: 60000 }, async () => {

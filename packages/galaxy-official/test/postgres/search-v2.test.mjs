@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifySearchV2} from '../search-v2-workflow.mjs';
 test('Search v2 actual PostgreSQL limited API role and HTTP permission/current-source workflow',{timeout:90000},async()=>{

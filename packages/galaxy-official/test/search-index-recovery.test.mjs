@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { queueFixture } from './operations-jobs-fixture.mjs';
-import { SearchIndex } from '../src/search-index.mjs';
+import { SearchIndex } from "../src/discovery/search-index.mjs";
 import { ServiceError } from '../src/shared/service-error.mjs';
 
 test('first-document exhaustion has durable bounded compensation and an exact-generation operator retry', async () => {

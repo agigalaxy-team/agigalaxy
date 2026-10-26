@@ -7,7 +7,7 @@ import { runtimeConfigSnapshot,recordRuntimeConfig } from '../src/operations/run
 import { createApi } from '../src/http.mjs';
 import { deletionPreview } from '../src/operations/deletion-preview.mjs';
 import { lockDeletionTables } from '../src/operations/deletion-execute.mjs';
-import { transaction } from '../src/database.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
 
 export async function verifyIncidentNotices(database=null,options={}){
   const endpoint='https://official.example.org',now=2000000000;

@@ -4,8 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {p14Fixture} from './p14-rules-fixture.mjs';
 import {p14EmptyControls,p14ControlsSchema,p14Parse} from '../src/shared/p14-rules-schema.mjs';
 import {p14Evaluate} from '../src/operations/rules/evaluator.mjs';
-import {createOperationsPolicyRuntime} from '../src/operations-product-rules.mjs';
-import {apiOperationsPolicyConsumers} from '../src/operations-policy-consumers.mjs';
+import {createOperationsPolicyRuntime} from "../src/operations/rules/product-rules.mjs";
+import {apiOperationsPolicyConsumers} from "../src/operations/rules/policy-consumers.mjs";
 
 test('P14 drafts, explicit publication, adoption and restoration preserve actual policy and current grants before original-command replay',async t=>{
  const f=await p14Fixture(t),key='community-quota',start=await f.rules.get(f.admin,key),policy=structuredClone(start.active.policy);

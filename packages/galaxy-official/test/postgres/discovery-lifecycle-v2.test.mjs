@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { verifyDiscoveryLifecycleV2 } from '../discovery-lifecycle-v2-workflow.mjs';
 test('M19 schema52–56 owner export, field-source erasure and bounded Contact expiry under PostgreSQL roles',{timeout:120000},async()=>{

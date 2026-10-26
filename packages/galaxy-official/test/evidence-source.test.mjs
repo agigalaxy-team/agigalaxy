@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectGithubRun, githubEvidenceSource } from '../src/github-evidence.mjs';
-import { checkedObservation } from '../src/evidence-source.mjs';
+import { inspectGithubRun, githubEvidenceSource } from "../src/evidence/github-evidence.mjs";
+import { checkedObservation } from "../src/evidence/evidence-source.mjs";
 
 const now = 2000000000;
 const reference = { provider: 'github-actions', owner: 'fixture', repository: 'example', runId: 1, attempt: 1, commit: 'a'.repeat(40) };

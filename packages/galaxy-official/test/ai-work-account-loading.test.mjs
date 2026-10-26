@@ -5,10 +5,10 @@ import {AiWorkAccountsReadModel} from '../src/operations/accounts/ai-work-read-m
 import {dispatchOperationsAiWorkAccounts} from '../src/adapters/http/operations-ai-work-accounts-http.mjs';
 import {operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {aiWorkReadPath,aiWorkWritePath,aiWorkQueryAllowed} from '../../../apps/galaxy-admin/src/lib/ai-work-proxy-policy.mjs';
+import {aiWorkReadPath,aiWorkWritePath,aiWorkQueryAllowed} from "../../../apps/galaxy-admin/src/lib/ai-work-accounts/ai-work-proxy-policy.mjs";
 import {operationsProxyPolicy,operationsReadPath} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
 import {automationAiOptionsWithin} from '../src/operations/permissions/ai-binding.mjs';
-import {automationBindingIssue,permissionAiExecutionIssue} from '../../../apps/galaxy-admin/src/lib/permissions-view-model.ts';
+import {automationBindingIssue,permissionAiExecutionIssue} from "../../../apps/galaxy-admin/src/lib/permissions/permissions-view-model.ts";
 
 const actor={kind:'business-operator',endpoint:'https://api.example.invalid',operatorId:'a'.repeat(64),businessAuthorization:{version:'1',permissions:operationsPermissionCodes}};
 const row={id:'11111111-1111-4111-8111-111111111111',domain:'overview',name:'总控',description:'日常运营',enabled:true,version:1,authorization_version:1,created_at:new Date(),updated_at:new Date()};
@@ -71,16 +71,16 @@ test('runtime route is a closed GET with no query or write access',async()=>{
  assert.equal(operationsReadPath(target),true);assert.equal(policy(target).allowed,true);assert.equal(policy(target,'POST').allowed,false);assert.equal(policy(target+'?url=other').allowed,false);
 });
 
-test('automatic authorization distinguishes missing roles from unconnected execution',async()=>{
+test('automatic authorization intent uses current roles while handler readiness remains separate',async()=>{
  const accounts=[{...row,domain:'overview'},{...row,id:roles[0].id,domain:'governance'}];
  const db={query:async()=>({rows:accounts})};
  const aiWorkAccounts={authorizationWithin:async(db,domain)=>({enabled:true,permissions:domain==='overview'?operationsPermissionCodes:[]})};
  const result=await automationAiOptionsWithin(db,{endpoint:actor.endpoint,aiWorkAccounts,actor});
- assert.equal(result.items[0].unavailableReason,'execution-not-connected');assert.equal(result.items[1].unavailableReason,'role-missing');
- for(const item of result.items)assert.equal(item.canEnable,false);
- assert.match(permissionAiExecutionIssue(result.items[0]),/尚未接通/);assert.match(permissionAiExecutionIssue(result.items[1]),/先.*分配/);
+ assert.equal(result.items[0].unavailableReason,null);assert.equal(result.items[0].canEnable,true);assert.ok(result.items[0].readiness.length>0);assert.ok(result.items[0].readiness.every(item=>item.handlerReady===false&&item.ready===false&&item.reasons.includes('handler-not-connected')));assert.equal(result.items[1].unavailableReason,'role-missing');
+ assert.equal(result.items[1].canEnable,false);
+ assert.equal(permissionAiExecutionIssue(result.items[0]),'');assert.match(permissionAiExecutionIssue(result.items[1]),/先.*分配/);
  const draft={executorKind:'ai',enabled:true,aiAccountId:row.id,permissions:['content.read']};
- assert.match(automationBindingIssue(draft,result),/尚未接通/);
+ assert.equal(automationBindingIssue(draft,result),'');
  const supported=await automationAiOptionsWithin(db,{endpoint:actor.endpoint,aiWorkAccounts:{authorizationWithin:async()=>({enabled:true,permissions:['content.read','content.hide']})},actor});
- assert.equal(supported.items[0].canEnable,false);assert.equal(supported.items[1].canEnable,true);assert.deepEqual(supported.items[1].executablePermissions,['content.read','content.hide']);
+ assert.equal(supported.items[0].canEnable,true);assert.equal(supported.items[1].canEnable,true);assert.deepEqual(supported.items[1].executablePermissions,['content.read','content.hide']);
 });

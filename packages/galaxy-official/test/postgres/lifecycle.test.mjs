@@ -15,9 +15,9 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { serviceFixture } from '../service-fixture.mjs';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { migrations } from '../../src/infrastructure/migrations.mjs';
-import { issueKeyring } from '../../src/trust-keyring.mjs';
+import { issueKeyring } from "../../src/security/trust-keyring.mjs";
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 30));
 test('isolated PostgreSQL: actual API and Worker stop/restart preserve in-flight queue state', { timeout: 45000 }, async () => {

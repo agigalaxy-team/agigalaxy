@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import {AdminTabs} from '../AdminTabs';
 import {useWorkbenchInteraction} from './WorkbenchInteraction';
-import {workbenchTime,type WorkbenchRecord} from '../../lib/workbench-view-model';
-import type {AutonomyTask} from '../autonomy-types';
-import {autonomyDomains,autonomyStates,autonomyTaskHref,autonomyTaskTitle} from '../../lib/autonomy-view-model';
+import {workbenchTime,type WorkbenchRecord} from "../../lib/workbench/workbench-view-model";
+import type {AutonomyTask} from "../autonomy/autonomy-types";
+import {autonomyDomains,autonomyStates,autonomyTaskHref,autonomyTaskTitle} from "../../lib/autonomy/autonomy-view-model";
 
 export function WorkbenchOperationsLog({records,available,loading,aiState,denied=false,aiDenied=false,aiTasks=[]}:{records:WorkbenchRecord[];available:boolean;loading:boolean;aiState:'connected'|'not-connected'|'unavailable'|'loading';denied?:boolean;aiDenied?:boolean;aiTasks?:AutonomyTask[]}){
   const {source,setSource,setActionsTarget}=useWorkbenchInteraction();

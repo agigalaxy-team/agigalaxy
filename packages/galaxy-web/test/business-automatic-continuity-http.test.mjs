@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {getContributionClient} from '../src/contribution-client.mjs';
+import {getContributionClient} from "../src/features/work-records/contribution-client.mjs";
 
 async function fixture(t){const f=await privacyConsumerFixture();t.after(()=>f.close());return f;}
 async function contribution(f){

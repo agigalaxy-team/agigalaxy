@@ -3,12 +3,12 @@ import { retainTaskContactAgent, taskContactWebsite } from './task-contact-agent
 import assert from 'node:assert/strict';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
-import { taskDraft, publicationFromDraft } from '../src/task-bounty-client.mjs';
-import { createTaskContactClient } from '../src/task-contact-client.mjs';
+import { taskDraft, publicationFromDraft } from "../src/features/tasks/task-bounty-client.mjs";
+import { createTaskContactClient } from "../src/features/tasks/contact/task-contact-client.mjs";
 
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 // Explicit single-process synchronous clone transaction. Real IDB mutual

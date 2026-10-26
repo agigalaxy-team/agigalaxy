@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 import {OperationsManagementAccountsService} from '../src/operations/accounts/management-service.mjs';
-import {createKeycloakManagementAccounts} from '../src/keycloak-management-accounts.mjs';
-import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
+import {createKeycloakManagementAccounts} from "../src/identity/authentication/keycloak-management-accounts.mjs";
+import {createOperationsManagementSessions} from "../src/operations/accounts/management-sessions.mjs";
 import {managementId} from '../src/operations/accounts/management-schema.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -24,7 +24,7 @@ const syntheticSecret='SYNTHETIC_MANAGEMENT_SECRET_NOT_A_REAL_CREDENTIAL';
 // multi-connection contention or a human OIDC browser workflow.
 test('submitted verification preserves old email and original receipt; native session uncertainty never skips independent portal revocation',
  {timeout:90000},async t=>{
-  assert.equal(migrations.at(-1).version,122);
+  assert.equal(migrations.some(row=>row.version===122),true);
   assert(!migrations.some(row=>row.version===120),'Use the isolated released119/121 plus management122 composition, never held120');
   const db=new PGlite();t.after(()=>db.close());
   await migrate(db,{roles:['api']});

@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {readFile,realpath,lstat,readlink,readdir} from 'node:fs/promises';
 import {posix} from 'node:path';
 import {runCommand,postgresSqlArguments} from '../operations-stack/host.mjs';
-import {maintenanceModules} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceModules} from "../../src/operations/maintenance/catalog.mjs";
 import {serviceImmutableReleasePaths,immutableReleaseSourceIds,keycloakOnlinePostgresBinding} from './online-capture-facts.mjs';
 
 export const currentServiceBindings=Object.freeze([

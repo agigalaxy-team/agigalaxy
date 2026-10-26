@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { AgentCard, Message, Role, SendMessageRequest, GetTaskRequest, CancelTaskRequest } from '@a2a-js/sdk';
 import { ClientFactory, JsonRpcTransportFactory } from '@a2a-js/sdk/client';
 import { A2AError } from '@a2a-js/sdk/errors';
-import { postA2aJson, validatePublicUrl } from '../../../galaxy-official/src/public-fetch.mjs';
+import { postA2aJson, validatePublicUrl } from "../../../galaxy-official/src/infrastructure/public-fetch.mjs";
 import { createJournal, hash } from '../storage/journal.mjs';
 import { snapshot, terminal, resultDraft } from '../facts/mapping.mjs';
 import { resultDraftV2 } from '../facts/facts-v2.mjs';

@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import * as z from 'zod/v4';
 import { createGalaxyGenesis } from '../../galaxy-core/src/galaxy-guid.mjs';
-import { createLocalHelpStoreV2 } from '../src/local-help-store-v2.mjs';
-import { createHelpFlowV2 } from '../src/help-flow-v2.mjs';
+import { createLocalHelpStoreV2 } from "../src/clients/local/help-store-v2.mjs";
+import { createHelpFlowV2 } from "../src/clients/flows/help-v2.mjs";
 import { registerHelpTools } from '../../galaxy-edge-mcp/src/help-tools-v2.mjs';
 
 const endpoint = 'https://help-fixture.example.org';

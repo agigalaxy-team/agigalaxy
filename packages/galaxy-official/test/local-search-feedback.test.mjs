@@ -5,8 +5,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
-import { saveLocalSearchFeedback } from '../src/local-search-feedback.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { saveLocalSearchFeedback } from "../src/clients/local/search-feedback.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 
 test('explicit feedback is tied to shown results, stored locally, replaceable and removable', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-search-feedback-'));

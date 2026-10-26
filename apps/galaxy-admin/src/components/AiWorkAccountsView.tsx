@@ -2,9 +2,9 @@ import type {AdminViewServerProps} from 'payload';
 import {redirect} from 'next/navigation';
 import {hasOperatorPermission,operatorBusinessAuthorization} from '../lib/access';
 import {operationsRead} from '../lib/operations.mjs';
-import {aiWorkBase,aiWorkHref,aiWorkLocation,aiWorkRoute} from '../lib/ai-work-accounts-view-model';
-import type {AiWorkDetail,AiWorkHistory,AiWorkPage} from './ai-work-accounts-types';
-import {AiWorkAccounts} from './AiWorkAccounts';
+import {aiWorkBase,aiWorkHref,aiWorkLocation,aiWorkRoute} from "../lib/ai-work-accounts/ai-work-accounts-view-model";
+import type {AiWorkDetail,AiWorkHistory,AiWorkPage} from "./ai-work-accounts/ai-work-accounts-types";
+import {AiWorkAccounts} from "./ai-work-accounts/AiWorkAccounts";
 import {OperationsPage,operationsPageContext} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 

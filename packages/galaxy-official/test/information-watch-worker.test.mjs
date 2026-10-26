@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { queueFixture } from './operations-jobs-fixture.mjs';
-import { createInformationWatchWorker } from '../src/information-watch-worker.mjs';
+import { createInformationWatchWorker } from "../src/information/information-watch-worker.mjs";
 
 const scopes = ['binding', 'consent', 'assistance', 'history', 'notifications'];
 const command = now => ({ action: 'start', operationId: randomUUID(), watchId: randomUUID(), expectedRevision: 0,

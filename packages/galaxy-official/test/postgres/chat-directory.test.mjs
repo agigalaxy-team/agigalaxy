@@ -4,7 +4,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import pg from 'pg';
 import canonicalize from 'canonicalize';
-import {migrate,transaction} from '../../src/database.mjs';
+import {migrate,transaction} from "../../src/infrastructure/database.mjs";
 import {migrations} from '../../src/infrastructure/migrations.mjs';
 import {chatSendSchema} from '../../src/shared/chat-schema.mjs';
 import {digest} from '../../src/shared/digest.mjs';

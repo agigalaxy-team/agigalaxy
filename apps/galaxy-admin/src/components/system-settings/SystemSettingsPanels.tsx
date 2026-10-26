@@ -1,8 +1,8 @@
 'use client';
 
 import type {ReactNode} from 'react';
-import {systemSettingsState,systemSettingsServiceLabels,systemSettingsServiceKinds} from '../../lib/system-settings-view-model';
-import type {SystemSettingsConsumer,SystemSettingsOperation,SystemSettingsServiceKind,SystemSettingsMail} from '../system-settings-types';
+import {systemSettingsState,systemSettingsServiceLabels,systemSettingsServiceKinds} from "../../lib/system-settings/system-settings-view-model";
+import type {SystemSettingsConsumer,SystemSettingsOperation,SystemSettingsServiceKind,SystemSettingsMail} from "./system-settings-types";
 
 type SecretFields={key:string;label:string}[];
 

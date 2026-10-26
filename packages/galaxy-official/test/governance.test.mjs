@@ -16,11 +16,11 @@ test('moderation accepts all bidirectional abuse categories and bounded typed re
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
-import { QualificationService } from '../src/qualification.mjs';
-import { loadGovernanceConfig, governanceConfigSchema } from '../src/governance-config.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
+import { QualificationService } from "../src/qualifications/qualification.mjs";
+import { loadGovernanceConfig, governanceConfigSchema } from "../src/governance/governance-config.mjs";
 test('qualification counts only current policy-matched CI facts and never certifies personal ability',async()=>{
   const f=await serviceFixture(['binding','consent','case-teaser','evidence','proof','assistance']);
   try {

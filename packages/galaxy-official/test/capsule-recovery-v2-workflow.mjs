@@ -4,7 +4,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createBrowserClient} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import {createCapsuleVisibilityClient} from '../../galaxy-web/src/capsule-visibility-client.mjs';
+import {createCapsuleVisibilityClient} from "../../galaxy-web/src/features/capsules/capsule-visibility-client.mjs";
 const scopes=['binding','consent','case-teaser','capsules','history','notifications','evidence','proof'];
 const pub={visibility:'Public',purpose:'public-profile'};
 async function work(f){const caseId=randomUUID(),attempt=randomUUID(),result=randomUUID();const events=[

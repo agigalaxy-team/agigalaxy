@@ -1,4 +1,4 @@
-import type {SmtpOriginalReceipt,SmtpTestState,SmtpConfiguration,SmtpCredential} from '../components/smtp-types';
+import type {SmtpOriginalReceipt,SmtpTestState,SmtpConfiguration,SmtpCredential} from "../components/smtp/smtp-types";
 
 export const smtpTabs=[{id:'configuration',label:'服务配置'},{id:'identities',label:'身份与发信地址'},{id:'queue',label:'发送队列'},{id:'bounces',label:'退信记录'},{id:'domains',label:'域名与验证'}] as const;
 export type SmtpTab=typeof smtpTabs[number]['id'];

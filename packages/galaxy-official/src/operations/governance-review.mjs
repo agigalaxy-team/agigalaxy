@@ -3,7 +3,7 @@ import { createPublicKey } from 'node:crypto';
 import { readFile,writeFile,lstat,mkdir } from 'node:fs/promises';
 import { isAbsolute,join } from 'node:path';
 import { z } from 'zod';
-import { governanceConfigSchema,loadGovernanceConfig } from '../governance-config.mjs';
+import { governanceConfigSchema,loadGovernanceConfig } from "../governance/governance-config.mjs";
 import { digest } from '../shared/digest.mjs';
 
 const normalized=value=>Array.isArray(value)?value.map(normalized):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,normalized(value[key])])):value;

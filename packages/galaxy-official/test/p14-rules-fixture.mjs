@@ -2,16 +2,16 @@ import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {migrations} from '../src/infrastructure/migrations.mjs';
 import {p14RulesV1MigrationSql} from '../src/infrastructure/p14-rules-v1-schema.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsProductRules} from '../src/operations-product-rules.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsProductRules} from "../src/operations/rules/product-rules.mjs";
 import {P14RulesService} from '../src/operations/rules/service.mjs';
 import {P14RulesRuntime} from '../src/operations/rules/runtime.mjs';
 import {defaultResourceBudgetPolicy} from '../src/infrastructure/resource-budgets.mjs';
-import {defaultCommunityPolicy} from '../src/public-writes.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
+import {defaultCommunityPolicy} from "../src/publishing/public-writes.mjs";
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
 
 // Actual PG, current business grants, quotas and write services. Only the
 // management directory, message transport and file/scanner I/O are doubles.

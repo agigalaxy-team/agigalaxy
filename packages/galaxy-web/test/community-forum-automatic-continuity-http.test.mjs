@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {digest} from '../../galaxy-official/src/shared/digest.mjs';
 import {communityForumFixture} from '../../galaxy-official/test/community-forum-fixture.mjs';
-import {createCommunityForumClient,newForumDraft} from '../src/community-forum-client.mjs';
+import {createCommunityForumClient,newForumDraft} from "../src/features/community-forum/community-forum-client.mjs";
 
 function runtimeFixture(f){
  const rows=new Map(),writes=[],signed=[];let generation=1,loss=null;

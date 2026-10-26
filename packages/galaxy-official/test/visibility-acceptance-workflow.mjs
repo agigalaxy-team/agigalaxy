@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 // The matrix exercises the current subject/explicit-viewer model. Organization
 // roles are not implemented; unrecognized organization claims must grant nothing.

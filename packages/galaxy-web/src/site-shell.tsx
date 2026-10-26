@@ -1,23 +1,23 @@
 import React,{lazy,Suspense,useEffect,useRef} from 'react';
 import {GlobalRail,SiteHeader,ShellSearch,StandardHeaderActions} from './site-chrome.mjs';
 import {siteSearchTarget} from './site-search.mjs';
-import {CommunityLayout} from './community-navigation';
+import {CommunityLayout} from "./features/community-forum/community-navigation";
 import {PublicBrowseWorkspace} from './features/discovery/browse';
-import {ReadingDetails,ReadingSummary} from './reading-details';
-const SettingsLayout=lazy(()=>import('./account-center').then(module=>({default:module.SettingsLayout})));
-import {carryHelpOrigin} from './help-origin-client.mjs';
+import {ReadingDetails,ReadingSummary} from "./shared/reading/reading-details";
+const SettingsLayout=lazy(()=>import("./features/accounts/account-center").then(module=>({default:module.SettingsLayout})));
+import {carryHelpOrigin} from "./features/help-search/help-origin-client.mjs";
 import {workspaceLocation} from './workspace-location.mjs';
 import {isPublicReadingRoute} from './features/public-reading/contract.mjs';
-import {readAgentIdentityEntry} from './agent-identity-handoff.mjs';
-import {AccountSessionScope,useAccountSessionModel} from './account-session-scope';
+import {readAgentIdentityEntry} from "./features/agent-identity/agent-identity-handoff.mjs";
+import {AccountSessionScope,useAccountSessionModel} from "./features/accounts/account-session-scope";
 import {ReadingBookmarksAccountProvider} from "./features/bookmarks/controls";
 import type {createWebRuntime} from './runtime.mjs';
 import './selected-shell.css';
 import {SiteContentTransitionContext,useSiteContentTransition} from './use-site-content-transition';
 import './site-content-transition.css';
-import {PageLoading} from './interaction-feedback';
+import {PageLoading} from "./shared/feedback/interaction-feedback";
 export {GalaxyMark} from './galaxy-mark';
-export {PageLoading} from './interaction-feedback';
+export {PageLoading} from "./shared/feedback/interaction-feedback";
 
 type Props={path:string;search?:string;endpoint?:string;navigate:(path:string)=>void;children:React.ReactNode};
 const capabilityGroups=[

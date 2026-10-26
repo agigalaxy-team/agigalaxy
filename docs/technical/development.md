@@ -87,7 +87,7 @@ CI [`product-checks.yml`](../../.github/workflows/product-checks.yml) 按真实 
 
 统一测试 CLI 接受明确 `.test.mjs`，也可在 `test:core`/`test:official`/`test:a2a` 后追加本包文件。未知参数、无效路径、缺专用环境直接失败，不回退全套。根与 Admin 测试复用 `tsx`，生产构建仍走各自工具链。
 
-`npm test` 无路径是普通全范围；`npm run check` 再含根 lint，只在需要整体回归时选一次。`check:layers` 包含重叠和真实环境前提；需要单层用 `node scripts/verify-layers.mjs --layers=<所需层>`。`npm run check:requirements` 检查本仓库docs及相关链接，可用 `npm run check:requirements -- docs/technical/interfaces.md` 限定文件，不依赖上层项目manifest。`prepare:client` 用于正式客户端候选，不是普通编辑前提。
+`npm test` 无路径覆盖普通 packages 与 scripts/test 范围；仓库级 test/ 集成用例及专用环境检查按相应入口显式选择。`npm run check` 再含根 lint，只在需要整体回归时选一次。`check:layers` 包含重叠和真实环境前提；需要单层用 `node scripts/verify-layers.mjs --layers=<所需层>`。`npm run check:requirements` 检查本仓库docs及相关链接，可用 `npm run check:requirements -- docs/technical/interfaces.md` 限定文件，不依赖上层项目manifest。`prepare:client` 用于正式客户端候选，不是普通编辑前提。
 
 根 lint 涵盖 `app/`、`packages/`、`scripts/`、`lib/browser-demo.mjs`，Next 规则限早期 `app/`，未采用 React Compiler 专用规则。oxlint 不替代完整 tsc；DiceBear 生成文件的精确排除和来源见 [`THIRD_PARTY_AVATARS.md`](../../packages/galaxy-web/THIRD_PARTY_AVATARS.md)，调用代码仍检查。读取续期的独立 React/DOM 合成 QA 见 [`tools/qa/operations-read-renewal`](../../tools/qa/operations-read-renewal/README.md)，不证明真实后端或生产不中断。
 

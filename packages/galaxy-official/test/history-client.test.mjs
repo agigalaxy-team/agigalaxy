@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
-import { createHistoryClient } from '../src/history-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createHistoryClient } from "../src/clients/history.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 
 const endpoint = 'https://official.example.org';
 const subjectId = 'GUID' + '0'.repeat(28);

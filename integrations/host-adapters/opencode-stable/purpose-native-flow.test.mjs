@@ -32,7 +32,9 @@ test('stable TUI Native bridge reads actual signed messages, uses an existing re
   await runtime.api.call('/v2/chat/rooms/'+roomId+'/send',{clientMessageId:randomUUID(),text:'合成：已得到可用的解析片段。',replyTo:null,agentGrantId:grantId});
   server=createNativeToolServer(runtime);client=new Client({name:'synthetic-opencode-native-host',version:'1'});const[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
   const unusedHostDirectory=join(directory,'unused-host-identity');
-  adapter=createGalaxyAdapter(null,{dataDirectory:unusedHostDirectory,nativeTools:{call:(name,args)=>{calls.push(name);return client.callTool({name,arguments:args});}}});
+  // This probe exercises the connected Native message bridge. Local recording
+  // has separate lifecycle/onboarding coverage and must not prepare an identity.
+  adapter=createGalaxyAdapter(null,{dataDirectory:unusedHostDirectory,recordWork:false,nativeTools:{call:(name,args)=>{calls.push(name);return client.callTool({name,arguments:args});}}});
   await adapter.tui({keymap:{registerLayer:({commands:entries})=>{for(const entry of entries)commands.set(entry.name,entry);return()=>{for(const entry of entries)commands.delete(entry.name);};}},
    ui:{dialog:{setSize(){},clear(){onClose?.();onClose=null;page=null;},replace(fn,cleanup){onClose?.();onClose=cleanup;page=fn();}},DialogSelect:props=>({kind:'select',...props}),DialogAlert:props=>({kind:'alert',...props}),DialogPrompt:props=>({kind:'prompt',...props})}});
   const wait=async(predicate,attempts=200)=>{for(let i=0;i<attempts&&!predicate();i++)await delay(10);assert.ok(predicate(),JSON.stringify(page));};

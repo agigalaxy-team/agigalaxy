@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { InformationWatchServiceV2 } from '../src/information-watches-v2.mjs';
-import { InformationServiceV2 } from '../src/information-v2.mjs';
+import { InformationWatchServiceV2 } from "../src/information/information-watches-v2.mjs";
+import { InformationServiceV2 } from "../src/information/information-v2.mjs";
 test('independent cursor scope and incomplete multi-check coverage never infer deletion', async () => {
   const source = {
       kind: 'search',

@@ -1,7 +1,7 @@
 import {EMAIL_DESIGNS, EMAIL_SCENARIOS, SENDER_NAME_CHOICES, EMAIL_PREVIEW} from './email-data.mjs';
-import {renderCodeEmail, renderGalaxyEmail} from './common/email-layout.mjs';
+import {renderCodeEmail, renderGalaxyEmail} from '../../../packages/galaxy-mail/src/layout.mjs';
 export {EMAIL_DESIGNS, EMAIL_SCENARIOS, SENDER_NAME_CHOICES, EMAIL_PREVIEW};
-export {renderEmailLayout, renderGalaxyEmail} from './common/email-layout.mjs';
+export {renderEmailLayout, renderGalaxyEmail} from '../../../packages/galaxy-mail/src/layout.mjs';
 
 const font = "-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif";
 const mono = "'SFMono-Regular',Consolas,'Liberation Mono',monospace";

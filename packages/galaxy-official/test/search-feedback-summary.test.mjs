@@ -5,8 +5,8 @@ import { mkdtemp,readFile,writeFile,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
-import { readLocalSearchFeedback,saveLocalSearchFeedback,editLocalSearchFeedback } from '../src/local-search-feedback.mjs';
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
+import { readLocalSearchFeedback,saveLocalSearchFeedback,editLocalSearchFeedback } from "../src/clients/local/search-feedback.mjs";
 import { createConfiguredRuntime } from '../../../integrations/host-adapters/opencode-stable/configured-runtime.mjs';
 
 const endpoint='https://official.example.org',yes={relevance:'relevant',helpedSelection:true};

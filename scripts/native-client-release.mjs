@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {isDeepStrictEqual} from 'node:util';
-import {signRelease} from '../packages/galaxy-official/src/release-artifact.mjs';
+import {signRelease} from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 import {verifyNativeLicenseNotices} from './native-license-notices.mjs';
 import {parseComponentRelease} from './release-identifiers.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),sha=x=>createHash('sha256').update(x).digest('hex'),json=x=>JSON.stringify(x,null,2)+'\n';

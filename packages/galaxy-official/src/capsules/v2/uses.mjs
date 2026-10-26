@@ -2,7 +2,7 @@ import {capsuleUseV2Schema,capsuleUsesQuerySchema,capsuleUseOriginRef} from "../
 import {capsuleRule as rule,parseCapsuleV2 as parse} from "./sources.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {digest} from "../../shared/digest.mjs";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {absent,json,ownControl,audit} from './helpers.mjs';
 import {CapsulePublication} from './publication.mjs';
 

@@ -8,7 +8,8 @@ from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from pydantic import BaseModel, ConfigDict
 
-from .conversation_tools import conversation_tools, DutyPreparedOperation, _prepared_arguments
+from .conversation_tools import conversation_tools
+from .conversation_tool_contracts import DutyPreparedOperation, _prepared_arguments
 from .duty_storage import duty_database
 from .duty_deadline import DutyAgent, MAX_ROUND_SECONDS
 from .duty_continuation import call_reference, with_duty_pauses

@@ -3,7 +3,7 @@ import {PublicRecommendations} from "../public-reading/native-content";
 import {BookOpen,Layers,MessagesSquare,Search,UsersRound} from "lucide-react";
 import {discoveryTarget} from "./navigation";
 import "./home.css";
-import {CommunityHighlights} from "../../community-highlights";
+import {CommunityHighlights} from "../community-forum/community-highlights";
 import {directories} from "./contracts";
 import type {Props,Kind,TaskBrowseItem,CapsuleBrowseItem,ProjectBrowseItem,BrowsePage,ContentEntry} from "./contracts";
 import {contentKey,BrowseHighlight} from "./content-card";

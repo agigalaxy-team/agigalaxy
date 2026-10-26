@@ -10,7 +10,7 @@ import {MaintenancePublicGate,containedPublicConfiguration} from '../deploy/main
 import {createProductionRestoreAdapters} from '../deploy/maintenance-agent/production-restore.mjs';
 import {MaintenanceRestoreExecutor} from '../deploy/maintenance-agent/restore-executor.mjs';
 import {MaintenanceControlJournal} from '../deploy/maintenance-agent/journal.mjs';
-import {maintenanceOpeningConditions} from '../src/operations-maintenance-catalog.mjs';
+import {maintenanceOpeningConditions} from "../src/operations/maintenance/catalog.mjs";
 import {isolatedPostgresArguments} from '../deploy/operations-stack/backup.mjs';
 import {restoredDatabaseNames,MaintenanceHostDatabase} from '../deploy/maintenance-agent/host-database.mjs';
 import {maintenanceFileTransfers} from '../deploy/maintenance-agent/host-files.mjs';
@@ -21,7 +21,7 @@ import {compileModelConfiguration,credentialVariable} from '../deploy/maintenanc
 import {MaintenanceCaddyControl} from '../deploy/maintenance-agent/caddy-control.mjs';
 import {reconcileDiscoveryItems} from '../deploy/maintenance-agent/discovery-reconciliation.mjs';
 import {createDiscoveryReadOnlySource} from '../src/discovery-runtime/public-content-source.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {MaintenanceWebsitePointer} from '../deploy/maintenance-agent/website-pointer.mjs';

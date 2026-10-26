@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeConversationFailureLabel} from '../src/lib/agentos-client.ts';
+import {nativeConversationFailureLabel} from "../src/lib/workbench/agentos-client.ts";
 
 test('reply failure text separates model failure, positively unstarted business, and existing or unknown effects',()=>{
  const run={runId:'owned-run',operationId:'owned-turn',status:'ERROR',content:null,userInput:null,createdAt:1,events:[],awaitingHuman:false,errorCode:'operations_agentos_model_request_failed'};

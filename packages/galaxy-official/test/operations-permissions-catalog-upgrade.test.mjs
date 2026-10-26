@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
 import {operationsPermissionCatalogV2Codes} from '../src/infrastructure/operations-permission-catalog-v2-schema.mjs';
 import {operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 
 const arraySql=codes=>'ARRAY['+codes.map(code=>"'"+code+"'").join(',')+']::text[]';
 

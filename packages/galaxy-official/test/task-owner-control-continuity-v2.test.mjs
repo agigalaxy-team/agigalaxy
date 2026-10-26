@@ -6,9 +6,9 @@ import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createNativeRecoveryWebFixture as createExistingWebRuntime} from './native-recovery-web-fixture.mjs';
 import {createRecoveryMaterial,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
-import {TaskOwnerControlServiceV2} from '../src/task-owner-control-v2.mjs';
+import {TaskOwnerControlServiceV2} from "../src/tasks/v2/owner-control-v2.mjs";
 import {digest} from '../src/shared/digest.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 
 // Actual HTTP, PGlite, device recovery and signed Consent. Device storage is a
 // Map contract fixture, not physical browser/IDB; community quotas are isolated

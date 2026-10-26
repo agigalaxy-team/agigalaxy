@@ -6,7 +6,7 @@ import {bindForumIds,assertForumIds} from '../src/shared/community-forum-ids-v1.
 import {forumWriteSpec} from '../src/shared/community-forum-v1-schema.mjs';
 import {communityForumFixture} from './community-forum-fixture.mjs';
 import {cleanupProductV2Retention} from '../src/operations/lifecycle-retention-v2.mjs';
-import {forumBudgetTables} from '../src/community-forum-budget-v1.mjs';
+import {forumBudgetTables} from "../src/community/community-forum-budget-v1.mjs";
 
 const fixedSubject='GUID15'+'0'.repeat(26),fixed={schemaVersion:1,operationId:'11111111-1111-4111-8111-111111111111',postId:'22222222-2222-4222-8222-222222222222',expectedHeadVersion:0,versionId:'33333333-3333-4333-8333-333333333333',title:'Fixed ordinary post',body:'Exact text 银河 😀',links:['https://example.org/a?x=1'],publishedUntil:2000000000};
 // Independent Node implementation of the specified wire formula, not the

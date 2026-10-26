@@ -6,10 +6,10 @@ import {randomUUID} from 'node:crypto';
 import {compileFunction} from 'node:vm';
 import ts from 'typescript';
 import {capsuleWebContinuityFixture} from './capsule-web-continuity-fixture.mjs';
-import {createCapsuleWebClient,capsuleCaseSources,capsuleRefKey,currentCapsuleFacts} from '../../galaxy-web/src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient,capsuleCaseSources,capsuleRefKey,currentCapsuleFacts} from "../../galaxy-web/src/features/capsules/capsule-workspace-client.mjs";
 import {sha256Hex} from '../src/shared/web-primitives.mjs';
 import {capsuleSourceV2Schema} from '../src/shared/capsule-v2-schema.mjs';
-import {createGovernanceDraftState} from '../../galaxy-web/src/governance-draft-state.ts';
+import {createGovernanceDraftState} from "../../galaxy-web/src/features/governance/governance-draft-state.ts";
 
 const web=new URL('../../galaxy-web/src/',import.meta.url);
 async function declarations(file,names,parent){
@@ -26,12 +26,12 @@ function compile(source,globals,names){
  return compileFunction(js+'\nreturn {'+names.join(',')+'};',['exports',...Object.keys(globals)])({},...Object.values(globals));
 }
 const sharedNames=['sourceKind','sourceLocator','uniqueSources','readableCaseSources','methodInputError','readCapsulePermissionSources'];
-const shared=compile(await declarations('capsule-authoring-shared.tsx',sharedNames),{capsuleCaseSources,capsuleRefKey,currentCapsuleFacts,capsuleSourceV2Schema},sharedNames);
+const shared=compile(await declarations("features/capsules/capsule-authoring-shared.tsx",sharedNames),{capsuleCaseSources,capsuleRefKey,currentCapsuleFacts,capsuleSourceV2Schema},sharedNames);
 const authorNames=['textLines','factKey','blank','referenceFromKey','capsuleAuthorInput','migrateCapsuleAuthorInput'];
-const author=compile(await declarations('capsule-authoring.tsx',authorNames),{...shared,capsuleRefKey},authorNames);
+const author=compile(await declarations("features/capsules/capsule-authoring.tsx",authorNames),{...shared,capsuleRefKey},authorNames);
 const stateNames=['same','isCapsuleInputRecord','legacyImport','isCapsuleLocator','capsuleAuthoringDraftKey','capsuleInputDraftKey','prepareCapsuleInput','settleCapsuleInput'];
-const state=compile(await declarations('capsule-authoring-state.tsx',stateNames),{sha256Hex},stateNames);
-const authorActions=await declarations('capsule-authoring.tsx',['assertCurrent','snapshot','publicationPayload','prepare','context'],'CapsuleAuthorEditor');
+const state=compile(await declarations("features/capsules/capsule-authoring-state.tsx",stateNames),{sha256Hex},stateNames);
+const authorActions=await declarations("features/capsules/capsule-authoring.tsx",['assertCurrent','snapshot','publicationPayload','prepare','context'],'CapsuleAuthorEditor');
 
 async function actualDraft(runtime,subjectId,key,initial){
  const draft=createGovernanceDraftState(runtime,subjectId,true,key,initial,error=>error.message);

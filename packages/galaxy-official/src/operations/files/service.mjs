@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {operationsParse,operationsFail} from '../../operations-content-visibility.mjs';
+import {operationsParse,operationsFail} from "../public-content/content-visibility.mjs";
 import {operationsFileRetrySchema} from '../../shared/operations-business-schema.mjs';
 import {fileProcessingVersion} from './processing.mjs';
 import {OperationsFilesReadModel} from './read-model.mjs';

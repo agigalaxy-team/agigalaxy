@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
-import {OperationsMessagingService} from '../src/operations-messaging.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
+import {OperationsMessagingService} from "../src/operations/messaging/index.mjs";
 import {workerReads} from '../src/infrastructure/worker-reads.mjs';
 
 // Actual PG/API+galaxy_evidence_worker roles, old failing branch, the new
@@ -16,6 +16,10 @@ test('messaging worker locks only its exact endpoint plan in the caller transact
  const endpoint='https://worker-plan.example.invalid',otherEndpoint='https://other-plan.example.invalid',id=randomUUID(),foreignId=randomUUID(),at='2026-10-24T00:00:00.000Z',config={channels:['announcement'],content:{purpose:'service-update',title:'本地固定计划',body:'只检查固定行锁，不执行发布',href:null,expiresAt:'2033-05-18T04:33:20.000Z'},audience:{kind:'all-accounts'},senderKey:'notice',schedule:{kind:'immediate'}};
  for(const [plan,scope]of [[id,endpoint],[foreignId,otherEndpoint]]){await db.query("INSERT INTO operations_messaging_plans_v1(id,endpoint,version,revision,state,created_by,updated_by,approved_by,approved_role,approved_at,created_at,updated_at) VALUES($1,$2,1,2,'active','local-author','local-author','local-author','reader',$3,$3,$3)",[plan,scope,at]);await db.query('INSERT INTO operations_messaging_versions_v1(plan_id,version,config,created_by,created_at) VALUES($1,1,$2,\'local-author\',$3)',[plan,JSON.stringify(config),at]);}
  const baseline=(await db.query('SELECT * FROM public.operations_messaging_plans_v1 WHERE id=$1',[id])).rows[0];
+ // Current provisioning already contains the helper. Recreate only its
+ // historical absence before checking the old worker path, then provision
+ // the actual current worker SQL below.
+ await db.exec('DROP FUNCTION public.galaxy_worker_lock_messaging_plan(uuid,text)');
  assert.equal((await db.query("SELECT to_regprocedure('public.galaxy_worker_lock_messaging_plan(uuid,text)') IS NULL AS absent")).rows[0].absent,true);
  await db.exec('SET ROLE galaxy_evidence_worker');assert.equal((await db.query('SELECT current_user AS role')).rows[0].role,'galaxy_evidence_worker');
  const old=new OperationsMessagingService({db,endpoint,now:()=>2000000000});

@@ -1,5 +1,5 @@
 import {writeFile} from 'node:fs/promises';
-import {keycloakEmailThemeTemplates} from './common/email-layout.mjs';
+import {keycloakEmailThemeTemplates} from '../../../packages/galaxy-mail/src/layout.mjs';
 
 // Write the selected theme's static FTL source artifacts. No Keycloak runtime,
 // real message values, transport or account operations are involved.

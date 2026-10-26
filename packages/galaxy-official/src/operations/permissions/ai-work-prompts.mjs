@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
-import {businessAuditActorContext} from '../../business-admin-audit-attribution.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
+import {businessAuditActorContext} from "../audit/attribution.mjs";
 import {delegatedAiPromptReadSchema,delegatedAiPromptSaveSchema} from './ai-delegation-schema.mjs';
 import {fail,parse} from './helpers.mjs';
 

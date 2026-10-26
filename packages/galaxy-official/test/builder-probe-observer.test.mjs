@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sdkPeer } from '../../galaxy-a2a/test/sdk-peer.mjs';
-import { observeBuilderEndpoint } from '../src/builder-probe-observer.mjs';
+import { observeBuilderEndpoint } from "../src/builders/builder-probe-observer.mjs";
 
 test('SDK read-only probe observes exact A2A interface without dispatch, credentials, redirects or task contents',async()=>{
   const peer=await sdkPeer(),now=2000000000;

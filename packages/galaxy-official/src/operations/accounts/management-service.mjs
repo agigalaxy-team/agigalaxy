@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {ManagementAccountsReadModel} from './management-read-model.mjs';
 import {managementParse as parse,managementCreateSchema,managementCommandSchema,managementAssignmentSchema,managementCommandActions,

@@ -5,7 +5,7 @@ import {once} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {clientAddressReader} from '../src/adapters/http/policy.mjs';
 import {dispatchOperationsModelSettings} from '../src/adapters/http/operations-model-settings-http.mjs';
-import {ModelSettingsNativeClient} from '../src/operations-model-settings-native.mjs';
+import {ModelSettingsNativeClient} from "../src/operations/model-settings/native.mjs";
 import {ModelConfigurationRuntime} from '../deploy/maintenance-agent/model-configuration.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 

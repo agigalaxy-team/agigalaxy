@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
+import {AgentOsConversationTools} from "../src/operations/agentos/conversation-tools.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {bindOperationsAiUse,withOperationsAiWork} from '../src/shared/operations-ai-use.mjs';
 import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';
 import {operationsAgentOsConversationToolsMigrationSql} from '../src/infrastructure/operations-agentos-conversation-tools-v1-schema.mjs';
-import {workbenchCardFact,workbenchRunFact} from '../src/operations-agentos-duty-workbench.mjs';
+import {workbenchCardFact,workbenchRunFact} from "../src/operations/agentos/duty-workbench.mjs";
 
 test('new workbench turns project original native facts without changing session authority or replaying after a projection failure',{timeout:60000},async t=>{
  const db=new PGlite();t.after(()=>db.close());await db.exec(operationsAgentOsConversationsMigrationSql);await db.exec(operationsAgentOsConversationToolsMigrationSql);await db.exec('ALTER TABLE operations_agentos_conversations_v1 ADD COLUMN ai_account_id uuid');

@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate, transaction} from '../src/database.mjs';
+import {migrate, transaction} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {createOperationsPortal} from '../src/operations-auth.mjs';
-import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
-import {createStoredOperatorAuthorization} from '../src/operations-config.mjs';
+import {createOperationsPortal} from "../src/operations/permissions/auth.mjs";
+import {createOperationsManagementSessions} from "../src/operations/accounts/management-sessions.mjs";
+import {createStoredOperatorAuthorization} from "../src/operations/configuration.mjs";
 import {OperationsPermissionsAuthority} from '../src/operations/permissions/authority.mjs';
-import {createKeycloakAdminDirectory} from '../src/keycloak-admin-directory.mjs';
+import {createKeycloakAdminDirectory} from "../src/identity/authentication/keycloak-admin-directory.mjs";
 import {operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
 import {acceptCookies, request, response, deferred, endpoint, adminOrigin, operatorRoles} from './operations-management-fixture.mjs';
 

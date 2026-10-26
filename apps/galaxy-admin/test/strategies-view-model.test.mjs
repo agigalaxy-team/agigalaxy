@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {strategiesLocation,strategiesHref,strategiesRecordsPath,strategiesVersionsPath,strategiesOperationPath,strategiesNext,strategiesPrevious,strategyConfiguration,strategiesOverview,strategiesDraft,strategiesDraftBody,strategiesDraftChanged,strategiesOptions,strategiesRehearsal,strategiesRunDetail,strategiesCommandResult,strategiesRecords,strategyOptionLabel,strategyCondition,strategyConditionLeaves,strategyNeedsLegacySamples,strategyRehearsalReady} from '../src/lib/strategies-view-model.ts';
+import {strategiesLocation,strategiesHref,strategiesRecordsPath,strategiesVersionsPath,strategiesOperationPath,strategiesNext,strategiesPrevious,strategyConfiguration,strategiesOverview,strategiesDraft,strategiesDraftBody,strategiesDraftChanged,strategiesOptions,strategiesRehearsal,strategiesRunDetail,strategiesCommandResult,strategiesRecords,strategyOptionLabel,strategyCondition,strategyConditionLeaves,strategyNeedsLegacySamples,strategyRehearsalReady} from "../src/lib/strategies/strategies-view-model.ts";
 import {p13ConfigurationSchema} from '../../../packages/galaxy-official/src/shared/p13-strategies-schema.mjs';
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0'),time='2026-10-23T10:00:00.000Z',lease={checkedAt:1792749600,readExpiresAt:1792749630,metadataOnly:true};

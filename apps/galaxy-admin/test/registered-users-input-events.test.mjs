@@ -19,11 +19,11 @@ if(browserExecutable!==undefined){
  assert.ok(fs.statSync(browserExecutable).isFile(),'Headless-shell override must exist');
 }
 const app=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const sourcePath=process.env.GALAXY_REGISTERED_INPUT_SOURCE||path.join(app,'src/components/RegisteredUsers.tsx');
+const sourcePath=process.env.GALAXY_REGISTERED_INPUT_SOURCE||path.join(app,"src/components/accounts/RegisteredUsers.tsx");
 const source=fs.readFileSync(sourcePath,'utf8'),tree=ts.createSourceFile(sourcePath,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
 const find=(root,predicate)=>{const out=[];const visit=node=>{if(predicate(node))out.push(node);ts.forEachChild(node,visit);};visit(root);return out;};
 const js=source=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
-const dateSource=fs.readFileSync(path.join(app,'src/lib/registered-users-view-model.ts'),'utf8');
+const dateSource=fs.readFileSync(path.join(app,"src/lib/accounts/registered-users-view-model.ts"),'utf8');
 const dateTree=ts.createSourceFile('registered-users-view-model.ts',dateSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
 const dateFunction=find(dateTree,node=>ts.isFunctionDeclaration(node)&&node.name?.text==='registeredDateFromInput')[0];
 const registeredDateFromInput=compileFunction(js(dateFunction.getText(dateTree).replace(/^export\s+/,''))+';return registeredDateFromInput;')();

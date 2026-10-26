@@ -7,7 +7,7 @@ import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
-import {createChatSharedSummaryClient} from '../src/chat-shared-summary-client.mjs';
+import {createChatSharedSummaryClient} from "../src/clients/chat-shared-summary.mjs";
 import {invite} from './chat-workflow.mjs';
 test('shared HTTP client and actual MCP tool transport preserve explicit room publication',async()=>{
  const f=await serviceFixture(['binding','notifications']),peer=await serviceFixture(['binding','notifications'],f.db,{migrateDatabase:false}),bodies=new Map();

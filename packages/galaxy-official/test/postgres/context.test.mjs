@@ -31,7 +31,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { verifyContextWorkflow } from '../context-workflow.mjs';
 test('isolated PostgreSQL API role runs materials, notifications and requester history with restricted writes', async () => {

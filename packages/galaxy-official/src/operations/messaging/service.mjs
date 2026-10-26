@@ -1,5 +1,5 @@
 import {randomUUID} from "node:crypto";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {messagingDeliveryJobSchema,messagingParse as parse} from "../../shared/operations-messaging-schema.mjs";
 import {messagingRunViewWithin} from "./views.mjs";
 import {messagingRecoveryPolicy,safeProviderCodes,fail,iso,messageId} from './policy.mjs';

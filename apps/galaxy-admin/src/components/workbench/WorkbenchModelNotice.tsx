@@ -2,7 +2,7 @@
 
 import {useId} from 'react';
 import {AdminIcon} from '../AdminIcons';
-import {nativeConversationFailure,type AgentOsNativeRun} from '../../lib/agentos-client';
+import {nativeConversationFailure,type AgentOsNativeRun} from "../../lib/workbench/agentos-client";
 
 export function WorkbenchModelNotice({run,canSend,busy,onRetry}:{run:AgentOsNativeRun;canSend:boolean;busy:boolean;onRetry:()=>void}){
  const id=useId(),failure=nativeConversationFailure(run);

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {queueFixture} from './operations-jobs-fixture.mjs';
-import {SearchIndex} from '../src/search-index.mjs';
-import {OperationsJobActions} from '../src/operations-job-actions.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
+import {SearchIndex} from "../src/discovery/search-index.mjs";
+import {OperationsJobActions} from "../src/operations/jobs/job-actions.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {workbenchPrepareSchemas} from "../src/operations/agentos/action-catalog.mjs";
 import {aiActionDefinition} from '../src/shared/operations-ai-action-registry.mjs';
 
 test('typed job cards freeze real state; real queue/audit commit atomically and recovery never dispatches',async()=>{

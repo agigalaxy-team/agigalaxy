@@ -1,11 +1,11 @@
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
-import {operationsParse as parse,operationsFail as fail,operationsIso as iso} from '../../operations-content-visibility.mjs';
+import {operationsParse as parse,operationsFail as fail,operationsIso as iso} from "../public-content/content-visibility.mjs";
 import {hasOperationsPermission as permitted} from '../../operations-permission-catalog.mjs';
-import {operationsOperatorNamesWithin} from '../../operations-history-identities.mjs';
+import {operationsOperatorNamesWithin} from "../accounts/history-identities.mjs";
 import {operationsFileCleanupCandidatesSchema,operationsFileCleanupPlansSchema,operationsFileCleanupCreateSchema,operationsFileCleanupDecisionSchema} from '../../shared/operations-file-cleanup-schema.mjs';
 import {OperationsFilesReadModel} from './read-model.mjs';
 import {fileProcessingVersion} from './processing.mjs';

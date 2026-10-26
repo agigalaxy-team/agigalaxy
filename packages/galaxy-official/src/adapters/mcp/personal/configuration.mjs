@@ -2,8 +2,8 @@ import { readFile,lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { digest } from '../../../shared/digest.mjs';
-import { createOAuthIntrospection } from '../../../oauth-introspection.mjs';
-import { createOAuthResourceAccess } from '../../../oauth-resource-access.mjs';
+import { createOAuthIntrospection } from "../../../identity/authentication/oauth-introspection.mjs";
+import { createOAuthResourceAccess } from "../../../identity/authentication/oauth-resource-access.mjs";
 import { createPersonalMcpHandler } from './handler.mjs';
 
 const text=max=>z.string().min(1).max(max).refine(value=>!/\p{Cc}/u.test(value));

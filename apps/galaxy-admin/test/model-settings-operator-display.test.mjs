@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {modelSettingsOperator} from '../src/lib/model-settings-view-model.ts';
+import {modelSettingsOperator} from "../src/lib/models/model-settings-view-model.ts";
 
 test('model settings history shows the actual principal name and never substitutes an internal operator identifier',()=>{
  const operatorId='ab'.repeat(32);

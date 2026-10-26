@@ -1,11 +1,11 @@
-import { fetchPublicJson, validatePublicUrl } from '../../../packages/galaxy-official/src/public-fetch.mjs';
+import { fetchPublicJson, validatePublicUrl } from "../../../packages/galaxy-official/src/infrastructure/public-fetch.mjs";
 import { verifyNetworkManifest } from '../../../packages/galaxy-official/src/verification/manifest.mjs';
-import { createLocalHostRuntime } from '../../../packages/galaxy-official/src/local-host-runtime.mjs';
-import { createLocalBindingReceipts } from '../../../packages/galaxy-official/src/local-binding-receipts.mjs';
-import { createLocalAssistanceStore } from '../../../packages/galaxy-official/src/local-assistance-store.mjs';
-import { createLocalContextStore } from '../../../packages/galaxy-official/src/local-context-store.mjs';
-import { readLocalSearchFeedback, editLocalSearchFeedback } from '../../../packages/galaxy-official/src/local-search-feedback.mjs';
-import { acceptKeyring } from '../../../packages/galaxy-official/src/trust-store.mjs';
+import { createLocalHostRuntime } from "../../../packages/galaxy-official/src/clients/local/host-runtime.mjs";
+import { createLocalBindingReceipts } from "../../../packages/galaxy-official/src/clients/local/binding-receipts.mjs";
+import { createLocalAssistanceStore } from "../../../packages/galaxy-official/src/clients/local/assistance-store.mjs";
+import { createLocalContextStore } from "../../../packages/galaxy-official/src/clients/local/context-store.mjs";
+import { readLocalSearchFeedback, editLocalSearchFeedback } from "../../../packages/galaxy-official/src/clients/local/search-feedback.mjs";
+import { acceptKeyring } from "../../../packages/galaxy-official/src/security/trust-store.mjs";
 import { isAbsolute } from 'node:path';
 
 // Trusted host configuration only. Construction does not read identity or fetch.

@@ -2510,7 +2510,7 @@
     {
       "table": "schema_migrations",
       "introducedByMigration": null,
-      "source": "packages/galaxy-official/src/database.mjs",
+      "source": "packages/galaxy-official/src/infrastructure/database.mjs",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {migrate} from '../../galaxy-official/src/database.mjs';
+import {migrate} from "../../galaxy-official/src/infrastructure/database.mjs";
 import {createServices} from '../../galaxy-official/src/services.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';

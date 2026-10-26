@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {createSessionMemory} from '../src/session-memory.mjs';
-import {createModerationClient} from '../src/moderation-client.mjs';
-import {createModerationFlow} from '../src/moderation-flow.mjs';
+import {createSessionMemory} from "../src/infrastructure/session-memory.mjs";
+import {createModerationClient} from "../src/clients/moderation.mjs";
+import {createModerationFlow} from "../src/clients/flows/moderation.mjs";
 
 const sha=value=>createHash('sha256').update(value).digest('hex');
 async function fixture(){

@@ -5,9 +5,9 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {getContributionClient} from '../../galaxy-web/src/contribution-client.mjs';
+import {getContributionClient} from "../../galaxy-web/src/features/work-records/contribution-client.mjs";
 import {nativeWork} from './qualification-v2-workflow.mjs';
-import {HonorService} from '../src/honor.mjs';
+import {HonorService} from "../src/records/honor.mjs";
 
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
 async function fixture(){

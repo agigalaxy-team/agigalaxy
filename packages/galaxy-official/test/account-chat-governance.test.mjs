@@ -1,10 +1,11 @@
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
 import {dispatchAccountChatGovernance} from '../src/adapters/http/account-chat-governance-http.mjs';
 
 async function fixture(t){
@@ -14,7 +15,8 @@ async function fixture(t){
  const operator={kind:'business-operator',operatorId:'https://operations.example.org|independent-handler',role:'administrator',endpoint:f.endpoint,httpRequestId:randomUUID()};
  const reader={...operator,operatorId:'https://operations.example.org|reader',role:'reader'};
  for(const [actor,issuer,subject]of [[operator,'https://operations.example.org','independent-handler'],[reader,'https://operations.example.org','reader']])await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,$3,$4,'合成处理者',$5,$5)`,[actor.operatorId,f.endpoint,issuer,subject,new Date(f.now()*1000).toISOString()]);
- return{...f,governance,businessAdmin,operator,reader};
+ const current=await attachOperationsFixtureAuthority({businessAdmin,admin:operator,reader,permissions:['chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read']});
+ return{...f,governance,businessAdmin,operator,reader,current};
 }
 async function report(f,actor,roomId,{materials=[],summary='只对明确选中的问题提出举报。'}={}){
  const source=await f.governance.source(actor,{roomId,messageIds:materials.map(item=>item.messageId)});
@@ -42,9 +44,9 @@ test('Cookie account reports selected messages/files without a local ID or room-
  const detail=await f.governance.operatorGet(f.operator,{reportId:result.reportId});
  assert.equal(detail.canModerate,true);assert.equal(detail.materials.length,1);assert.ok(!JSON.stringify(detail).includes('这条原文没有被选择'));
  assert.equal(detail.materials.some(item=>item.messageId===unrelated.messageId),false);
- assert.deepEqual((await f.governance.operatorAttachment(f.operator,{reportId:result.reportId,attachmentId:selected.attachmentId})).bytes,selected.bytes);
+ assert.deepEqual((await f.governance.operatorAttachment(f.operator,{reportId:result.reportId,attachmentId:selected.attachmentId},{authorize:async()=>f.operator})).bytes,selected.bytes);
  const other=await uploaded(f,b,roomId,'另一个未选择附件');
- await assert.rejects(f.governance.operatorAttachment(f.operator,{reportId:result.reportId,attachmentId:other.attachmentId}),/chat_report_attachment_unavailable/);
+ await assert.rejects(f.governance.operatorAttachment(f.operator,{reportId:result.reportId,attachmentId:other.attachmentId},{authorize:async()=>f.operator}),/chat_report_attachment_unavailable/);
  await assert.rejects(f.chat.history(c,roomId),/chat_access_denied/);
  await assert.rejects(f.governance.get(c,{reportId:result.reportId}),/chat_report_unavailable/);
  const affected=await f.governance.get(b,{reportId:result.reportId});
@@ -66,7 +68,7 @@ test('source version/readability is rechecked, and selected material does not su
  assert.equal(unavailable.state,'unavailable');assert.equal(unavailable.text,null);
  const file=await uploaded(f,b,roomId),caseWithFile=(await report(f,a,roomId,{materials:[{messageId:file.message.messageId,revision:1,attachmentIds:[file.attachmentId]}]})).result;
  const get=f.files.store.get;f.files.store.get=async input=>{const bytes=await get(input);f.advance(31*86400);return bytes;};
- await assert.rejects(f.governance.operatorAttachment(f.operator,{reportId:caseWithFile.reportId,attachmentId:file.attachmentId}),/attachment_content_unavailable|chat_report_attachment_unavailable/);
+ await assert.rejects(f.governance.operatorAttachment(f.operator,{reportId:caseWithFile.reportId,attachmentId:file.attachmentId},{authorize:async()=>f.operator}),/attachment_content_unavailable|chat_report_attachment_unavailable/);
 });
 
 test('a selected message author cannot handle their own case by leaving the room before it is reported',async t=>{
@@ -75,6 +77,7 @@ test('a selected message author cannot handle their own case by leaving the room
  const {result}=await report(f,a,roomId,{materials:[{messageId:message.messageId,revision:1,attachmentIds:[]}]});
  const formerAuthor={...f.operator,operatorId:'synthetic-former-author'};
  await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://login.example.org','synthetic-1','合成前成员',$3,$3)`,[formerAuthor.operatorId,f.endpoint,new Date(f.now()*1000).toISOString()]);
+ f.current.roles.set(formerAuthor.operatorId,'administrator');
  const view=await f.governance.operatorGet(formerAuthor,{reportId:result.reportId});assert.equal(view.canModerate,false);assert.deepEqual(view.materials,[]);
  await assert.rejects(f.governance.operatorEvent(formerAuthor,event(result,'review')),/chat_report_moderation_denied/);
  const unknown={...f.operator,operatorId:'no-current-principal-mapping'};
@@ -96,6 +99,7 @@ test('a separate management realm does not match a business account by equal sub
  await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,$3,$4,'独立管理身份',$5,$5)`,[management.operatorId,f.endpoint,managementIssuer,subject,new Date(f.now()*1000).toISOString()]);
  assert.equal(Number((await f.db.query('SELECT count(*) AS n FROM community_accounts WHERE endpoint=$1 AND issuer=$2',[f.endpoint,managementIssuer])).rows[0].n),0);
+ f.current.roles.set(management.operatorId,'administrator');
  const view=await f.governance.operatorGet(management,{reportId:result.reportId});
  assert.equal(view.canModerate,true,'a verified management identity needs no normal Galaxy account');
  assert.equal(view.materials[0].text,'只选择这条随案消息。');
@@ -109,9 +113,10 @@ test('operations role, independent handling and expiring room restrictions use t
  const f=await fixture(t),[a,b]=f.people,roomId=await joinAccountConversation(f,a,b),{result}=await report(f,a,roomId);
  const implicated={...f.operator,operatorId:'https://login.example.org|synthetic-0'};
  await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://login.example.org','synthetic-0','合成当事人',$3,$3)`,[implicated.operatorId,f.endpoint,new Date(f.now()*1000).toISOString()]);
+ f.current.roles.set(implicated.operatorId,'administrator');
  assert.equal((await f.governance.operatorGet(implicated,{reportId:result.reportId})).canModerate,false);
  await assert.rejects(f.governance.operatorEvent(implicated,event(result,'review')),/chat_report_moderation_denied/);
- await assert.rejects(async()=>f.governance.operatorEvent(f.reader,event(result,'review')),/business_admin_denied/);
+ await assert.rejects(async()=>f.governance.operatorEvent(f.reader,event(result,'review')),/operations_permission_denied/);
  let current=await f.governance.operatorEvent(f.operator,event(result,'pause',{targetVersion:result.currentTarget.version,scopes:['sending-paused','invitations-paused'],until:f.now()+3600,rule:'禁止骚扰'}));
  await assert.rejects(f.chat.send(b,roomId,{clientMessageId:randomUUID(),text:'暂停期间不能发送'}),/target_operation_restricted/);
  await assert.rejects(async()=>f.governance.event(a,event(current,'resume')),/chat_report_moderation_denied/);
@@ -141,6 +146,6 @@ test('report HTTP obtains Cookie/operator authority on the server, not from the 
  const bearer=request(input);bearer.headers.authorization='Bearer invalid';await assert.rejects(dispatchAccountChatGovernance({...common,request:bearer,url:new URL('/v1/account/chat-reports/report',f.endpoint)}),/chat_report_account_required/);
  assert.equal(cookieCalls,2,'supplied ID credentials cannot fall back into the account cookie');
  const route=new URL('/v1/operations/chat-reports/'+sent.reportId+'/event',f.endpoint),write=request(event(sent,'review'));
- await assert.rejects(dispatchAccountChatGovernance({...common,request:write,url:route,authorizeOperator:async(_request,context)=>{operatorCalls++;assert.equal(context.write,true);return f.reader;}}),/business_admin_denied/);
+ await assert.rejects(dispatchAccountChatGovernance({...common,request:write,url:route,authorizeOperator:async(_request,context)=>{operatorCalls++;assert.equal(context.write,true);return f.reader;}}),/operations_permission_denied/);
  assert.equal(operatorCalls,1);
 });

@@ -1,4 +1,4 @@
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { redactTaskEventCopies, recordContentErasure } from './lifecycle-product-v2.mjs';
 import { productV2Retention } from '../infrastructure/lifecycle-registry-v2.mjs';
 import { cleanupTaskCommentsWithin } from './task-comment-retention-v2.mjs';

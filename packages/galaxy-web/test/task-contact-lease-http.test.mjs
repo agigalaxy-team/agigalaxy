@@ -6,12 +6,12 @@ import { resolve } from 'node:path';
 import { browserToolOutput } from '../scripts/browser-tool-runtime.mjs';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
-import { createTaskContactClient } from '../src/task-contact-client.mjs';
-import { taskDraft, publicationFromDraft } from '../src/task-bounty-client.mjs';
+import { createTaskContactClient } from "../src/features/tasks/contact/task-contact-client.mjs";
+import { taskDraft, publicationFromDraft } from "../src/features/tasks/task-bounty-client.mjs";
 
 test('same-subject reconnection cannot continue an old contact-send intent after a delayed local read', { timeout: 60000 }, async () => {
   const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';

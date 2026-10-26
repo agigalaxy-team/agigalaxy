@@ -1,16 +1,17 @@
+import {OperationsPermissionsService} from '../src/operations/permissions/service.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {PGlite} from '@electric-sql/pglite';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
 import {createApi} from '../src/http.mjs';
-import {migrate} from '../src/database.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOidcTransactionStore} from '../src/oidc-transaction-store.mjs';
-import {createOperationsPortal} from '../src/operations-auth.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOidcTransactionStore} from "../src/identity/authentication/oidc-transaction-store.mjs";
+import {createOperationsPortal} from "../src/operations/permissions/auth.mjs";
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 import {adminOrigin,operatorRoles,request,response,acceptCookies} from './operations-management-fixture.mjs';
 
@@ -28,9 +29,21 @@ async function fixture(t){
   id:'operations-admin',name:'Synthetic attachment reader',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:callback,
   includeOperatorRoles:true,includeAccountProfile:true,allowLoopbackHttp:true,now,
   transactionStore:createOidcTransactionStore({db:authDb,namespace:'chat-case-attachment-auth',now})
- }),portal=createOperationsPortal({db:authDb,endpoint:f.endpoint,adminOrigin,provider,now,roles:operatorRoles,
+ });
+ // The directory and committed business grants are separate current checks.
+ const fixtureAdmin={kind:'business-operator',operatorId:'case-attachment-fixture-admin',role:'administrator',endpoint:f.endpoint};
+ for(const db of [f.db,authDb])await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://fixture.invalid',$1,'权限夹具管理员',$3,$3)",[fixtureAdmin.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ const permissionOptions=db=>({db,endpoint:f.endpoint,now:f.now,operatorAuthorization:async(actor,{db:tx}={})=>{
+  if(actor.operatorId===fixtureAdmin.operatorId)return'administrator';
+  const row=(await tx.query('SELECT external_subject FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2',[actor.operatorId,f.endpoint])).rows[0];
+  return row&&roles.get(row.external_subject)?.includes(operatorRoles.reader)?'reader':null;
+ }});
+ const permissions=new OperationsPermissionsService(permissionOptions(f.db)),portalPermissions=new OperationsPermissionsService(permissionOptions(authDb));
+ const readRole=async service=>(await service.saveRole(fixtureAdmin,{operationId:randomUUID(),expectedVersion:0,name:'选入附件当前读取',description:'Explicit local fixture grant',enabled:true,permissions:['chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read']},{authorize:async()=>fixtureAdmin})).role;
+ const materialRole=await readRole(permissions),portalMaterialRole=await readRole(portalPermissions);
+ const portal=createOperationsPortal({db:authDb,endpoint:f.endpoint,adminOrigin,provider,now,roles:operatorRoles,permissions:portalPermissions,
   roleDirectory:{async getOperatorRoles({externalSubject}){return [...(roles.get(externalSubject)??[])];}}});
- const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),governance=new AccountChatGovernanceService({chat:f.chat,businessAdmin});
+ const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now,permissions}),governance=new AccountChatGovernanceService({chat:f.chat,businessAdmin});
  async function login(subject){
   roles.set(subject,[operatorRoles.reader]);issuer.setAccount(subject);const jar=new Map(),started=response();
   await portal.login(request(jar),started,new URL(adminOrigin+'/v1/operations/login'));acceptCookies(jar,started);
@@ -39,6 +52,8 @@ async function fixture(t){
   const principal=(await authDb.query('SELECT * FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2',[session.operator.id,f.endpoint])).rows[0];
   await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
    VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(operator_id) DO NOTHING`,[principal.operator_id,f.endpoint,principal.issuer,principal.external_subject,principal.display_name,new Date(f.now()*1000).toISOString()]);
+  await permissions.saveAssignment(fixtureAdmin,{operationId:randomUUID(),expectedVersion:0,operatorId:principal.operator_id,roleId:materialRole.id,enabled:true},{authorize:async()=>fixtureAdmin});
+  await portalPermissions.saveAssignment(fixtureAdmin,{operationId:randomUUID(),expectedVersion:0,operatorId:principal.operator_id,roleId:portalMaterialRole.id,enabled:true},{authorize:async()=>fixtureAdmin});
   return{jar,session,subject};
  }
  const logs=[],authorizationCalls=[],control={replacement:null,endpoint:null},server=createApi({bindings:{endpoint:f.endpoint},businessAdmin,accountChatGovernance:governance,
@@ -92,7 +107,7 @@ test('case attachment HTTP binds reader CSRF and fresh operator authority around
   await denied(reader,403,'operations_access_denied',{extra:{'x-galaxy-operator-csrf':'incorrect'}});
   await denied(reader,403,'browser_origin_not_enabled',{extra:{origin:'https://foreign.example.invalid'}});
   const result=await f.post('/v1/operations/chat-reports/'+selected.record.reportId+'/event',reader,{operationId:randomUUID(),reportId:selected.record.reportId,expectedVersion:selected.record.version,kind:'review',summary:'A reader may not submit this decision.'});
-  assert.equal(result.status,403);assert.equal((await result.json()).error,'operations_access_denied');assert.equal(reads,before);assert.equal(await auditCount(f),1);
+  assert.equal(result.status,403);assert.equal((await result.json()).error,'operations_permission_denied');assert.equal(reads,before);assert.equal(await auditCount(f),1);
  });
  await t.test('a real local session logout during storage returns no file bytes and no success audit',async()=>{
   afterRead=()=>f.portal.logout(request(reader.jar,{origin:adminOrigin,'x-galaxy-operator-csrf':reader.session.csrfToken},'POST'),response());

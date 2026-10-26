@@ -4,7 +4,7 @@ import {createDiscoveryReadOnlySource} from '../../src/discovery-runtime/public-
 import {discoveryItemReference} from '../../src/discovery-runtime/purpose.mjs';
 import {MeilisearchClient,GorseClient} from '../../src/discovery-runtime/native-clients.mjs';
 import {loadDiscoveryConfiguration} from '../../src/infrastructure/discovery-configuration.mjs';
-import {loadForumPolicy} from '../../src/community-forum-policy-v1.mjs';
+import {loadForumPolicy} from "../../src/community/community-forum-policy-v1.mjs";
 import {workerReads} from '../../src/infrastructure/worker-reads.mjs';
 import {noSymlinkPath} from '../operations-stack/host.mjs';
 

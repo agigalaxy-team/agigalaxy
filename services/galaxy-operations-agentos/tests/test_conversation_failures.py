@@ -63,9 +63,9 @@ class ConversationFailureTest(unittest.TestCase):
         self.assertIsNone(failure_view('galaxy_conversation_model_failure:unknown:503 '+secret))
 
         # Compile the actual pure projection without starting AgentOS or reading settings.
-        source = Path(__file__).parents[1]/'src/galaxy_agentos/app.py'
+        source = Path(__file__).parents[1]/'src/galaxy_agentos/run_view.py'
         if not source.is_file():
-            source = Path('/app/src/galaxy_agentos/app.py')
+            source = Path('/app/src/galaxy_agentos/run_view.py')
         tree = ast.parse(source.read_text())
         projection = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {'run_view','_completed_conversation_content'}], type_ignores=[])
         import math

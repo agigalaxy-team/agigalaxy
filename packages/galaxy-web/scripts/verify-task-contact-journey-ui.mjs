@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 

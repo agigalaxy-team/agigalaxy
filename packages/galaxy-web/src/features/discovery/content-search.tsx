@@ -1,13 +1,13 @@
-import {forumBodyExcerpt} from '../../community-forum-browse.mjs';
+import {forumBodyExcerpt} from "../community-forum/community-forum-browse.mjs";
 import React,{useEffect,useState} from 'react';
 import {Search} from 'lucide-react';
 import {ContentCard} from './content-card';
 import type {TaskBrowseItem,CapsuleBrowseItem,ProjectBrowseItem,BrowsePage} from './contracts';
-import {availableForumContent,type ForumPostView} from '../../community-forum-view-types';
-import {forumVersionPath} from '../../community-forum-origin.mjs';
+import {availableForumContent,type ForumPostView} from "../community-forum/community-forum-view-types";
+import {forumVersionPath} from "../community-forum/community-forum-origin.mjs";
 import {forumTopics} from '../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 import {discoveryTarget} from './navigation';
-import {PublicIdentityAccounts,PublicAccountMatch} from '../../public-account-relations';
+import {PublicIdentityAccounts,PublicAccountMatch} from "../accounts/public-account-relations";
 import {NativeCommunitySearch} from '../public-reading/native-content';
 import type {createWebRuntime} from '../../runtime.mjs';
 import './content-search.css';

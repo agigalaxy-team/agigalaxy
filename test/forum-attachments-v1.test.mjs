@@ -6,7 +6,7 @@ import {Readable} from 'node:stream';
 import {communityForumFixture} from '../packages/galaxy-official/test/community-forum-fixture.mjs';
 import {accountChatFixture} from '../packages/galaxy-official/test/account-chat-fixture.mjs';
 import {attachmentContractFixture} from '../packages/galaxy-official/test/chat-attachments-workflow.mjs';
-import {ForumAttachmentsV1Service} from '../packages/galaxy-official/src/forum-attachments-v1.mjs';
+import {ForumAttachmentsV1Service} from "../packages/galaxy-official/src/community/forum-attachments-v1.mjs";
 import {defaultAttachmentPolicy} from '../packages/galaxy-official/src/shared/chat-attachments-schema.mjs';
 import {bindForumIds} from '../packages/galaxy-official/src/shared/community-forum-ids-v1.mjs';
 import {forumWriteSpec} from '../packages/galaxy-official/src/shared/community-forum-v1-schema.mjs';
@@ -214,12 +214,19 @@ test('reply parent withdrawal, revocation and expiry stop downloads, and cleanup
     assert.equal((await owner.write('withdraw-post', {schemaVersion: 1, operationId: randomUUID(), postId: parent.payload.postId, expectedHeadVersion: 1})).status, 200);
     assert.equal((await content(f, replyFile, {replyId: reply.payload.replyId})).status, 404);
 
-    // This is the actual persisted interval between the worker's queue-marking
-    // query and its later per-object erase transaction, not a fake publication.
+    // A retained queue mark prevents rebinding, but a parent's withdrawal
+    // is not the reply attachment owner's deletion authority.
     await f.db.query('UPDATE forum_attachments_v1 SET purge_pending=true WHERE id=$1', [replyFile.attachmentId]);
     const revived = await owner.write('create-post', await f.post({attachments: [ref(replyFile)]}));
     assert.equal(revived.status, 409);
     assert.equal(revived.body.error, 'attachment_reference_unavailable');
+    await f.files.purgeExpired();
+    assert.equal(f.contract.objects.has('forum-attachments/' + replyFile.attachmentId), true, 'a queue mark and parent withdrawal do not authorize deleting the reply attachment');
+    const retainedReply = (await owner.request(root + 'read', {input: {attachmentId: replyFile.attachmentId}})).body;
+    assert.equal(retainedReply.cleanupPending, true);
+    assert.equal(retainedReply.objectRemoved, false);
+    assert.equal((await content(f, replyFile, {replyId: reply.payload.replyId})).status, 404);
+    assert.equal((await owner.request(root + 'revoke', {input: {attachmentId: replyFile.attachmentId}})).status, 200);
     await f.files.purgeExpired();
     assert.equal(f.contract.objects.has('forum-attachments/' + replyFile.attachmentId), false);
     assert.equal((await owner.request(root + 'read', {input: {attachmentId: replyFile.attachmentId}})).body.objectRemoved, true);
@@ -237,6 +244,10 @@ test('reply parent withdrawal, revocation and expiry stop downloads, and cleanup
     const expiredFile = await upload(f, owner), expiredPost = await publish(f, owner, expiredFile, {publishedUntil: f.clock.now + 120});
     f.clock.now += 121;
     assert.equal((await content(f, expiredFile, source(expiredPost))).status, 404);
+    await f.files.purgeExpired();
+    assert.equal(f.contract.objects.has('forum-attachments/' + expiredFile.attachmentId), true, 'a published attachment expiry stops downloads but requires operational approval or owner revocation for physical deletion');
+    assert.equal((await owner.request(root + 'read', {input: {attachmentId: expiredFile.attachmentId}})).body.objectRemoved, false);
+    assert.equal((await owner.request(root + 'revoke', {input: {attachmentId: expiredFile.attachmentId}})).status, 200);
     await f.files.purgeExpired();
     assert.equal(f.contract.objects.has('forum-attachments/' + expiredFile.attachmentId), false);
   } finally { await f.close(); }

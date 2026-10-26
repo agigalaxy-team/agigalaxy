@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {AiWorkAccountsReadModel} from '../src/operations/accounts/ai-work-read-model.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsService} from "../src/operations/agentos/service.mjs";
 import {dispatchOperationsAgentOs} from '../src/adapters/http/operations-agentos-http.mjs';
 
 test('the original assisted command GET is owner and current-role bound, keeps exact frozen selection, and never dispatches on missing or late native receipts',{timeout:90000},async t=>{

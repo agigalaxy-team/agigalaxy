@@ -1,7 +1,7 @@
 import {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
 import type {DiscoveryPurpose} from "./contracts";
 import {projectErrorText,object,isDiscoveryPurpose} from "./contracts";
-import type {DiscoveryInput} from "../../help-contact-view-types";
+import type {DiscoveryInput} from "../help-search/help-contact-view-types";
 
 export const purposes:[DiscoveryPurpose,string][]=[['conversation','交流想法'],['reuse','了解复用'],['collaboration','一起做事'],['recruitment','了解招募']];
 export const tags=(value:string)=>[...new Set(value.split(/[,，、\n]/).map(item=>item.trim()).filter(Boolean))];

@@ -4,15 +4,15 @@ import {randomUUID,createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {chatFixture,invite} from './chat-workflow.mjs';
 import {attachmentContractFixture} from './chat-attachments-workflow.mjs';
-import {ChatAttachmentsService} from '../src/chat-attachments.mjs';
-import {PersonalSummaryService,createSummarySourceReader} from '../src/personal-summaries.mjs';
-import {ChatSharedSummaryService} from '../src/chat-shared-summaries.mjs';
-import {NotificationService} from '../src/notifications.mjs';
-import {NotificationInboxService} from '../src/notification-inbox.mjs';
+import {ChatAttachmentsService} from "../src/chat/chat-attachments.mjs";
+import {PersonalSummaryService,createSummarySourceReader} from "../src/summaries/personal-summaries.mjs";
+import {ChatSharedSummaryService} from "../src/chat/chat-shared-summaries.mjs";
+import {NotificationService} from "../src/notifications/notifications.mjs";
+import {NotificationInboxService} from "../src/notifications/notification-inbox.mjs";
 import {serviceFixture} from './service-fixture.mjs';
-import {ChatService} from '../src/chat.mjs';
-import {OutcomeMaterialServiceV2} from '../src/outcome-material-v2.mjs';
-import {createAccountUid} from '../src/official-account-uid.mjs';
+import {ChatService} from "../src/chat/service.mjs";
+import {OutcomeMaterialServiceV2} from "../src/evidence/outcome-material-v2.mjs";
+import {createAccountUid} from "../src/accounts/uid.mjs";
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 function messageTransport(){

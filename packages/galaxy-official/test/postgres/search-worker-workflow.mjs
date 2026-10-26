@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { serviceFixture } from '../service-fixture.mjs';
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { builderDeclaration } from '../builders-workflow.mjs';

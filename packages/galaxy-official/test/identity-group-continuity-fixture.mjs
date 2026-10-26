@@ -2,8 +2,8 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createBrowserClient,browserScopes} from '../src/browser-client.mjs';
-import {createIdentityGroupClientV2} from '../src/identity-group-client-v2.mjs';
-import {createIdentityGroupsWebClient} from '../../galaxy-web/src/identity-group-client.mjs';
+import {createIdentityGroupClientV2} from "../src/clients/identity-group-v2.mjs";
+import {createIdentityGroupsWebClient} from "../../galaxy-web/src/features/identity-groups/identity-group-client.mjs";
 import {digest} from '../src/shared/digest.mjs';
 export async function identityGroupContinuityFixture(){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000),syntheticCommunityQuota:false}),p=await serviceFixture(browserScopes,f.db,{now:f.now,migrateDatabase:false,syntheticCommunityQuota:false}),q=await serviceFixture(browserScopes,f.db,{now:f.now,migrateDatabase:false,syntheticCommunityQuota:false});

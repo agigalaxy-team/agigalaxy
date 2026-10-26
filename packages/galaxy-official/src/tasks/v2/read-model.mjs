@@ -1,4 +1,4 @@
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {taskReceiptV2Schema,taskQueryV2Schema} from "../../shared/task-schema-v2.mjs";
 import {legacyAssistanceTaskV2,taskEnrollmentOpen} from "../../domain/task-v2.mjs";

@@ -1,4 +1,4 @@
-import {maintenanceOpeningConditions} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceOpeningConditions} from "../../src/operations/maintenance/catalog.mjs";
 
 const fail=code=>Object.assign(new Error(code),{code});
 const stages=['contain','capture-current-facts','prepare','restore','reconcile','validate','activate'];

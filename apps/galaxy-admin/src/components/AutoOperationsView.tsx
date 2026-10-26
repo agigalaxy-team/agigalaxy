@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {AutoOperations} from './AutoOperations';
+import {AutoOperations} from "./autonomy/AutoOperations";
 import {OperationsPage,operationsPageContext} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 

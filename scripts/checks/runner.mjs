@@ -21,7 +21,7 @@ export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
   delete childEnv.NODE_TEST_CONTEXT;
   const result=spawnSync(process.execPath,args,{cwd:root,stdio:'inherit',shell:false,env:childEnv});
   if(result.error||result.status!==0){
-   console.error(`[galaxy-check] ${label} failed${result.signal?` (${result.signal})`:''}`);
+   console.error(`[galaxy-check] ${label} failed${result.error?.code?` (${result.error.code})`:result.signal?` (${result.signal})`:''}`);
    return result.status??1;
   }
   return 0;
@@ -33,8 +33,18 @@ export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
   const {packages,files,separate}=selection;
   if(separate.length)console.log('[galaxy-check] separate environment/artifact acceptance (not executed by this run): '+separate.join(', '));
   // Bound file processes only; individual tests retain their own concurrency.
-  const status=run(`tests (${packages.join(', ')}; ${files.length} files; concurrency 4)`,['--import','tsx','--experimental-test-module-mocks','--test','--test-concurrency=4',...files]);
-  if(status!==0)return status;
+  const flags=['--import','tsx','--experimental-test-module-mocks','--test','--test-concurrency=4'];
+  // Windows has a command-line limit; keep the same discovery, isolation and
+  // concurrency while splitting only the argument list when necessary.
+  const batches=[[]];let characters=process.execPath.length+flags.join(' ').length;
+  for(const file of files){
+   if(process.platform==='win32'&&batches.at(-1).length&&characters+file.length+3>24000){batches.push([]);characters=process.execPath.length+flags.join(' ').length;}
+   batches.at(-1).push(file);characters+=file.length+3;
+  }
+  for(const [index,batch] of batches.entries()){
+   const status=run(`tests (${packages.join(', ')}; ${batch.length} files; concurrency 4)${batches.length>1?` batch ${index+1}/${batches.length}`:''}`,[...flags,...batch]);
+   if(status!==0)return status;
+  }
  }
  if(mode==='all'||mode==='lint'){
   const status=run('lint',['node_modules/oxlint/bin/oxlint','app','packages','scripts','lib/browser-demo.mjs']);

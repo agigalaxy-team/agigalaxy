@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { verifyDiscoveryV2 } from '../discovery-v2-workflow.mjs';
 import { verifyChatOwnerMetadataExport } from '../chat-owner-export-workflow.mjs';

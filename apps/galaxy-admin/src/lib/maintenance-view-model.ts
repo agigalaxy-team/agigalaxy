@@ -1,4 +1,4 @@
-import type {MaintenanceAvailability,MaintenanceCommandResult,MaintenanceComponent,MaintenanceComponentAvailability,MaintenanceLocation,MaintenanceNativeOperation,MaintenanceOperationDetail,MaintenancePlan,MaintenancePlanDetail,MaintenancePoint,MaintenanceTab} from '../components/maintenance-types';
+import type {MaintenanceAvailability,MaintenanceCommandResult,MaintenanceComponent,MaintenanceComponentAvailability,MaintenanceLocation,MaintenanceNativeOperation,MaintenanceOperationDetail,MaintenancePlan,MaintenancePlanDetail,MaintenancePoint,MaintenanceTab} from "../components/maintenance/maintenance-types";
 
 const hash=/^[a-f0-9]{64}$/,uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,sequence=/^[1-9][0-9]{0,15}$/;
 export type MaintenanceRecoveredResult=Omit<MaintenanceCommandResult,'recordedAt'>;

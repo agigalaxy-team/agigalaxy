@@ -3,13 +3,14 @@
 import {useCallback,useContext,useEffect,useState} from 'react';
 import Link from 'next/link';
 import {AccountPicker} from '../AccountPicker';
-import {CommandFeedback,ReadStatus,useOperationCommand} from '../OperationControls';
+import {CommandFeedback,ReadStatus} from '../OperationControls';
+import {useOperationCommand} from '../../lib/use-operation-command';
 import {useOperationsRead} from '../../lib/use-operations-read';
 import {operationsRequest,OperationsRequestError} from '../../lib/operations-client';
 import {SettingsDraftMemoryContext} from '../../lib/use-settings-draft-memory';
 import {SettingsReceiptNotice,useSettingsReceiptRecovery} from '../../lib/use-settings-receipt-recovery';
 import {smtpCode,smtpErrors,smtpFieldLabels,smtpPageQuery,smtpOperationReceipt,smtpOperationReceiptPath,validateSmtpTestOutcome,smtpState,smtpTime} from '../../lib/smtp-view-model';
-import type {SmtpBounces,SmtpDomains,SmtpHistory,SmtpQueue,SmtpSettings,SmtpTestOutcome,SmtpTests} from '../smtp-types';
+import type {SmtpBounces,SmtpDomains,SmtpHistory,SmtpQueue,SmtpSettings,SmtpTestOutcome,SmtpTests} from "../smtp/smtp-types";
 
 /** Existing operations SMTP read/test contracts, without a second connection editor. */
 export function SystemSettingsMailOperations({active,canRead,csrfToken,configurationLocked,configurationDirty,onPendingChange}:{active:boolean;canRead:boolean;csrfToken:string;configurationLocked:boolean;configurationDirty:boolean;onPendingChange:(value:boolean)=>void}){

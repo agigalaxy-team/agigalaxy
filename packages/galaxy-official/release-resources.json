@@ -85,11 +85,11 @@
     "packages/galaxy-official/deploy/system-settings/runtime.mjs",
     "packages/galaxy-official/deploy/system-settings/service-connections-probes.mjs",
     "packages/galaxy-official/deploy/system-settings/service-connections-runtime.mjs",
-    "packages/galaxy-official/src/operations-agentos-tool-evidence.mjs",
+    "packages/galaxy-official/src/operations/agentos/tool-evidence.mjs",
     "packages/galaxy-official/src/discovery-runtime/public-read-batch.mjs",
     "packages/galaxy-official/src/discovery-runtime/public-read-templates.mjs",
     "packages/galaxy-official/src/adapters/http/operations-agentos-conversation-sse.mjs",
-    "packages/galaxy-official/src/operations-agentos-conversation-stream.mjs",
+    "packages/galaxy-official/src/operations/agentos/conversation-stream.mjs",
     "packages/galaxy-official/src/shared/person-display-name.mjs"
   ],
   "source": [

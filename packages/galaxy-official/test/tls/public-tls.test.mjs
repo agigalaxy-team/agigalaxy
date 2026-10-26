@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join, isAbsolute, relative } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fetchPublicJson, fetchBindingJson, postConnectionJson, postA2aJson } from '../../src/public-fetch.mjs';
+import { fetchPublicJson, fetchBindingJson, postConnectionJson, postA2aJson } from "../../src/infrastructure/public-fetch.mjs";
 
 // Real TLS sockets and HTTP streams. Only address routing and per-request CA
 // are test-specific; production validation and default TLS verification stay on.

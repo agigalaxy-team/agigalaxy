@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {p13OrdinaryDraftSchema,p13OrdinaryPublishSchema,p13ConfigurationSchema,p13Parse} from '../../shared/p13-strategies-schema.mjs';
 import {p13Classify} from './evaluator.mjs';

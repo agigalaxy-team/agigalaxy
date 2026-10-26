@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
 import {accountUidV1MigrationSql} from '../src/infrastructure/account-uid-v1-schema.mjs';
-import {OfficialAccountData} from '../src/official-account-data.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
-import {accountUidPattern,upsertOfficialAccountWithin,ensureOfficialAccountProfileWithin} from '../src/official-account-uid.mjs';
+import {OfficialAccountData} from "../src/accounts/data.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
+import {accountUidPattern,upsertOfficialAccountWithin,ensureOfficialAccountProfileWithin} from "../src/accounts/uid.mjs";
 
 const endpoint='https://official.example.org',issuer='https://issuer.example.org',now=2000000000;
 const input=externalSubject=>({endpoint,issuer,externalSubject,verificationMethod:'email',verifiedAt:now});

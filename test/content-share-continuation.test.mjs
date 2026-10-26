@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTrustPackageWorkspaceClient} from '../packages/galaxy-web/src/trust-package-workspace-client.mjs';
+import {createTrustPackageWorkspaceClient} from "../packages/galaxy-web/src/features/trust-packages/trust-package-workspace-client.mjs";
 
 test('returning to a completed content export keeps its exact file after another content was exported',async()=>{
   const subjectId='GUID10'+'A'.repeat(26),endpoint='https://example.test',values=new Map();let current=true;

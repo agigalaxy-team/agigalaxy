@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from '../../galaxy-official/test/community-forum-fixture.mjs';
 import {accountBookmarkBrowser} from '../../galaxy-official/test/account-reading-bookmarks-fixture.mjs';
 import {createAccountReadingBookmarksClient} from '../src/features/bookmarks/client.mjs';
-import {rememberBookmarkLogin,readBookmarkLogin,claimBookmarkLogin,finishBookmarkLogin} from '../src/account-bookmark-pending.mjs';
+import {rememberBookmarkLogin,readBookmarkLogin,claimBookmarkLogin,finishBookmarkLogin} from "../src/features/bookmarks/account-bookmark-pending.mjs";
 
 function journalStore(){
   const values=new Map();let tail=Promise.resolve();

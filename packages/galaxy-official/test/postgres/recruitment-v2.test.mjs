@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { verifyRecruitmentV2 } from '../recruitment-v2-workflow.mjs';
 test('Recruitment HTTP, real Account quota and independent data lifecycle under PostgreSQL API role',{timeout:150000},async()=>{

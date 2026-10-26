@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyticsData,queryProjection} from '../src/operations-agentos-query-view.mjs';
+import {analyticsData,queryProjection} from "../src/operations/agentos/query-view.mjs";
 
 test('AI analytics projection keeps count zero but clears only mathematically undefined zero/one-session metrics in overview and both lifetime paths',()=>{
  for(const sessions of [0,1,2,null]){

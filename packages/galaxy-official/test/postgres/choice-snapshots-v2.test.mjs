@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyChoiceSnapshots} from '../choice-snapshots-v2-workflow.mjs';
 test('Choice cloud actual PostgreSQL galaxy_api + HTTP, conflicts, source recheck and lifecycle deletion',{timeout:90000},async()=>{

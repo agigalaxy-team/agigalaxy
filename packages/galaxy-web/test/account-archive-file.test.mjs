@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readConversationArchiveFile,conversationArchiveParts,exportConversationArchive,conversationArchiveReading} from '../src/account-archive-file.mjs';
+import {readConversationArchiveFile,conversationArchiveParts,exportConversationArchive,conversationArchiveReading} from "../src/features/accounts/account-archive-file.mjs";
 
 test('only explicitly selected sessions enter an archive, with complete UTF-8 content across chunk boundaries',()=>{
  const file=readConversationArchiveFile(JSON.stringify({workspaceId:'my-workspace',sessions:[{sessionId:'chosen',title:'需要保存',content:'真实会话🙂'.repeat(50000)},{sessionId:'excluded',content:'不允许附带上传的会话'}]}));

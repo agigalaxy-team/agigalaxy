@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
+import {AgentOsConversationTools} from "../src/operations/agentos/conversation-tools.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 // Actual bind/execute/query schema and adapter; transaction/ledger, current
@@ -28,7 +28,7 @@ test('conversation query schema failures return bounded correction feedback whil
   current=async id=>{assert.equal(id,conversationId);checks++;if(checks===denyOnCheck)throw new ServiceError('operations_permission_denied',403);return{row,actor};},
   authority={db,endpoint,now:()=>now,human:async(value,{action})=>{assert.equal(value,actor);assert(['workbench.read','accounts.read'].includes(action));return value;}},
   services={accounts:{list:async()=>{serviceCalls++;if(serviceError)throw serviceError;return{items:[],nextAfter:null,readExpiresAt:now+30};}}},
-  tools=new AgentOsConversationTools({conversations:{current},authority,gateway:{},services}),
+  tools=new AgentOsConversationTools({conversations:{current,async boundedTaskWithin(_db,value,command){assert.equal(value,row);assert.equal(command.id,turnId);}},authority,gateway:{},services}),
   execute=(tool,args)=>tools.execute({conversationId,sessionId,turnId,runId,callId:randomUUID(),tool,arguments:args});
 
  const invalid={module:'content',view:'list',filters:{days:30,query:'PRIVATE_SEARCH_WORD',unknownField:'PRIVATE_EMAIL_OR_BODY'}};

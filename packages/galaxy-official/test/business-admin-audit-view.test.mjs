@@ -1,10 +1,11 @@
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFeedbackService} from "../src/operations/feedback/service.mjs";
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 
 test('chat review audit preserves only controlled message operations and room scope metadata',()=>{
  const reportId=randomUUID(),roomId=randomUUID(),messageId=randomUUID(),createdAt=new Date('2026-10-23T00:00:00Z'),secret='PRIVATE_CASE_PROSE',
@@ -28,11 +29,13 @@ test('chat review audit preserves only controlled message operations and room sc
 
 test('audit projects actual business reads and commands without copying prose, credentials, fingerprints or unknown fields',{timeout:60000},async t=>{
  const f=await accountChatFixture();t.after(f.close);
- const service=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),admin={kind:'business-operator',operatorId:'audit-synthetic-admin',role:'administrator',endpoint:f.endpoint},reader={...admin,role:'reader'},
+ const service=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),admin={kind:'business-operator',operatorId:'audit-synthetic-admin',role:'administrator',endpoint:f.endpoint},reader={...admin,operatorId:'audit-synthetic-reader',role:'reader'},
   feedback=new OperationsFeedbackService({businessAdmin:service,accounts:f.accounts}),privateText='PRIVATE_AUDIT_PROSE',fingerprint='a'.repeat(64),account=f.people[0],
   restriction={operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+3600)*1000).toISOString(),reason:privateText};
  await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,'https://operations.example.org','audit-synthetic','合成运营人员',$3,$3)`,[admin.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ await f.db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://operations.example.org','audit-synthetic-reader','合成审计读取者',$3,$3)",[reader.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ await attachOperationsFixtureAuthority({businessAdmin:service,admin,reader,permissions:['audit.read']});
  await service.restrict(admin,account.accountId,restriction);
  await service.changeType(admin,account.accountId,{operationId:randomUUID(),expectedRevision:0,subjectType:'organization',reason:privateText,basis:privateText,preserveHistory:true});
  const submitted=await feedback.submit(account,{operationId:randomUUID(),body:privateText,category:'problem'});

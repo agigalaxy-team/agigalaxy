@@ -3,15 +3,15 @@ import { randomUUID, generateKeyPairSync } from 'node:crypto';
 import canonicalize from 'canonicalize';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createRetirementController } from '../src/retirement.mjs';
-import { createReceiptStatusService } from '../src/receipt-status.mjs';
-import { createReceiptStatusClient, createReceiptStatusDeviceSigner } from '../src/receipt-status-client.mjs';
+import { createRetirementController } from "../src/privacy/retirement.mjs";
+import { createReceiptStatusService } from "../src/verification/receipt-status.mjs";
+import { createReceiptStatusClient, createReceiptStatusDeviceSigner } from "../src/clients/receipt-status.mjs";
 import { choicePutIntent } from '../src/shared/choice-snapshot-schema-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import { createHelpSearchClient } from '../../galaxy-web/src/help-search-client.mjs';
-import { createChoiceSyncClient } from '../../galaxy-web/src/choice-sync-client.mjs';
+import { createHelpSearchClient } from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
+import { createChoiceSyncClient } from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
 
 // Actual signed Binding/Control/Consent HTTP and PGlite. The local CryptoKey
 // store is a Map, not a claim about physical IndexedDB or a real user account.

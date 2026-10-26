@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { SignJWT } from 'jose';
-import { signEnvelope, verifyEnvelope } from '../src/signed-envelope.mjs';
+import { signEnvelope, verifyEnvelope } from "../src/security/signed-envelope.mjs";
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519');
 const pin = { publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }),

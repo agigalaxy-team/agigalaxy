@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {AccountPublicQuery} from '../src/account-public-query.mjs';
-import {createExternalCredentialsService} from '../src/external-credentials.mjs';
+import {AccountPublicQuery} from "../src/accounts/public-query.mjs";
+import {createExternalCredentialsService} from "../src/identity/authentication/external-credentials.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {createBrowserClient} from '../src/browser-client.mjs';
 

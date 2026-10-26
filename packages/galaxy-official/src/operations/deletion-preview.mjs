@@ -1,4 +1,4 @@
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { exportSources } from '../infrastructure/export-datasets.mjs';
 import { productV2Retention } from '../infrastructure/lifecycle-registry-v2.mjs';
 

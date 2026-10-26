@@ -16,7 +16,7 @@ const load = path => import(pathToFileURL(join(repo, path)));
 const [{ serviceFixture }, { createApi }, { browserScopes }, { oidcProviderFixture }, { createOidcLoginProvider }] = await Promise.all([
   load('packages/galaxy-official/test/service-fixture.mjs'), load('packages/galaxy-official/src/http.mjs'),
   load('packages/galaxy-official/src/browser-client.mjs'), load('packages/galaxy-official/test/oidc-provider-fixture.mjs'),
-  load('packages/galaxy-official/src/oidc-login.mjs')
+  load("packages/galaxy-official/src/identity/authentication/oidc-login.mjs")
 ]);
 const sha = value => createHash('sha256').update(value).digest('hex');
 const files = [fileURLToPath(import.meta.url)];

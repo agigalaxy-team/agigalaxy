@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHelpRuntimeV2 } from '../src/help-runtime-v2.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHelpRuntimeV2 } from "../src/clients/flows/help-runtime-v2.mjs";
 
 test('native help consumes current Capsule, facts, Task and project HTTP sources; keeps exact references and invalidates withdrawn basis', { timeout: 90000 }, async () => {
   const scopes = ['binding', 'consent', 'case-teaser', 'history', 'capsules', 'assistance', 'notifications'];

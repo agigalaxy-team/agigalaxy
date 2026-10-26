@@ -1,8 +1,8 @@
 import {z} from 'zod';
 import {body,authenticate} from './request.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';
-import {OfficialAccountData} from '../../official-account-data.mjs';
-import {communityAccountView} from '../../community-accounts.mjs';
+import {OfficialAccountData} from "../../accounts/data.mjs";
+import {communityAccountView} from "../../accounts/community-accounts.mjs";
 
 const methods={create:'createArchive',chunk:'appendChunk',complete:'completeArchive',list:'listArchives',status:'archiveStatus',export:'exportChunk',delete:'deleteArchive',cleanup:'cleanup'};
 export async function dispatchAccountArchives({access,communityAccounts,request,url,send}){

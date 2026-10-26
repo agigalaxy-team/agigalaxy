@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {RegisteredUsersReadModel} from '../src/operations/accounts/registered-read-model.mjs';
 import {registeredDirectoryItem} from '../src/operations/agentos/query/registered-directory.mjs';
 
-const source=await readFile(new URL('../../../apps/galaxy-admin/src/lib/registered-users-view-model.ts',import.meta.url),'utf8');
+const source=await readFile(new URL("../../../apps/galaxy-admin/src/lib/accounts/registered-users-view-model.ts",import.meta.url),'utf8');
 const {registeredUserName,registeredUserUid}=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source,{mode:'strip'})).toString('base64'));
 
 // These are SQL-result rows, not database or native transport doubles.

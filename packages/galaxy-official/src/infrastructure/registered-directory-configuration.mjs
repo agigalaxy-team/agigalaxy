@@ -1,6 +1,6 @@
 import {lstat,readFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
-import {createKeycloakWebsiteDirectory} from '../keycloak-website-directory.mjs';
+import {createKeycloakWebsiteDirectory} from "../identity/authentication/keycloak-website-directory.mjs";
 
 async function protectedJson(path){
   if(typeof path!=='string'||!isAbsolute(path))throw Error('Absolute registered directory reference required.');

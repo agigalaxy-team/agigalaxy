@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
-import { createLocalContextStore } from '../src/local-context-store.mjs';
-import { createContextFlow } from '../src/context-flow.mjs';
+import { createLocalContextStore } from "../src/clients/local/context-store.mjs";
+import { createContextFlow } from "../src/clients/flows/context.mjs";
 import { createContextDraftMenu } from '../../../integrations/host-adapters/opencode-stable/context-draft-menu.mjs';
 import { createAssistanceMenu } from '../../../integrations/host-adapters/opencode-stable/assistance-menu.mjs';
 

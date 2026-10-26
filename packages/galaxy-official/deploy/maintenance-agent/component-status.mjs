@@ -1,4 +1,4 @@
-import {maintenanceComponents} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceComponents} from "../../src/operations/maintenance/catalog.mjs";
 
 // Read existing process/monitor samples only. This adapter never joins the
 // backup footprint, starts a probe, reads logs, or changes a capture writer.

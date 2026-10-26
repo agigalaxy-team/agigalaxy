@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCapsuleWebClient} from '../src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient} from "../src/features/capsules/capsule-workspace-client.mjs";
 const subjectId='GUID10'+'0'.repeat(26),endpoint='https://official.example.org';
 function fixture(scopes){
  const calls=[],records=new Map(),state={subjectId,bindingId:crypto.randomUUID(),generation:1,scopes};

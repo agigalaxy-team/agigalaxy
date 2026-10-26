@@ -1,7 +1,7 @@
 import {body} from './request.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';
 import {serveAccountNavigationError} from './identity-callback-page.mjs';
-import {AccountPublicQuery} from '../../account-public-query.mjs';
+import {AccountPublicQuery} from "../../accounts/public-query.mjs";
 
 function publicPage(url){
   if([...url.searchParams.keys()].some(key=>!['after','limit'].includes(key)||url.searchParams.getAll(key).length!==1))throw new ServiceError('invalid_account_query');

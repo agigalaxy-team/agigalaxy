@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paginateHonor } from '../src/domain/honor-pagination.mjs';
-import { createHonorClient } from '../src/honor-client.mjs';
+import { createHonorClient } from "../src/clients/honor.mjs";
 const id=i=>`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`;
 const subjectId=`GUID${'A'.repeat(28)}`,query={ruleId:'rule',ruleVersion:'1',subjectId};
 function fixture(){

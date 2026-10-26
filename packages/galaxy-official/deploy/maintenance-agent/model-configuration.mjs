@@ -3,7 +3,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {randomUUID} from 'node:crypto';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
 import {MaintenanceControlJournal} from './journal.mjs';
-import {maintenanceRequestSignature} from '../../src/operations-maintenance-native.mjs';
+import {maintenanceRequestSignature} from "../../src/operations/maintenance/native.mjs";
 import {modelSettingsNativeCommandSchema} from '../../src/shared/operations-model-settings-schema.mjs';
 import {compileModelConfiguration,credentialVariable,recordIdFromAlias} from './model-configuration-codec.mjs';
 

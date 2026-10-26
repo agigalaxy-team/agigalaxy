@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
 import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';
 
 test('retry is owner-bound, keeps an original parent and dispatches one native regeneration',async t=>{

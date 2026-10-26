@@ -4,10 +4,10 @@ import {createServices} from '../src/services.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
-import {seedExistingWebIdentity} from './existing-web-identity-fixture.mjs';
-import {createProfileEditorClient} from '../../galaxy-web/src/profile-editor-client.mjs';
+import {createExistingWebRuntime} from './existing-web-identity-fixture.mjs';
+import {createProfileEditorClient} from "../../galaxy-web/src/features/profiles/profile-editor-client.mjs";
 import {digest} from '../src/shared/digest.mjs';
-import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
+import {createNativeRecoveryWebFixture} from './native-recovery-web-fixture.mjs';
 
 // The HTTP service, signatures, identity control and SQL are real. Only the
 // local browser storage and deliberate response loss below are test adapters.
@@ -40,19 +40,23 @@ export async function profileEditorFixture(){
   }
   return response;
  };
- async function actor({initialize=true}={}){
+ async function actor({initialize=true,nativeRecovery=false}={}){
   const values=new Map(),store={get:async name=>structuredClone(values.get(name)),put:async(name,value)=>{values.set(name,structuredClone(value));},
-   update:async(name,change)=>{const value=change(structuredClone(values.get(name)));values.set(name,structuredClone(value));return structuredClone(value);},
-   prepareRecovery:async(subjectId,operationId)=>{
-    const material=await createRecoveryMaterial(subjectId);
-    values.set(`pending-recovery:${subjectId}:${operationId}`,{...material,operationId,saveDeclared:false});return material;
-   }};
-   if(initialize)await seedExistingWebIdentity(config,{store,fetch:wire,now:()=>time});
-   let runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>time});
+   update:async(name,change)=>{const value=change(structuredClone(values.get(name)));values.set(name,structuredClone(value));return structuredClone(value);}};
+   // Positive editors use an actual Native handoff. Recovery scenarios opt
+   // into the existing test-only installed-client adapter, never Web APIs.
+   const options={store,fetch:wire,now:()=>time},factory=nativeRecovery?createNativeRecoveryWebFixture:createExistingWebRuntime;
+   let nativeReady=initialize&&nativeRecovery,runtime=await (initialize?factory:createWebRuntime)(config,options);
+   const nativeCall=async(name,...args)=>{
+    if(!nativeRecovery)throw Error('Explicit fixture Native recovery selection required.');
+    // An explicitly empty browser stays empty until this Native operation.
+    if(!nativeReady){runtime.close();runtime=await factory(config,options);nativeReady=true;}
+    return runtime[name](...args);
+   };
   if(initialize){await runtime.connect({confirmed:true});}
   const subjectId=runtime.api.snapshot()?.subjectId;
-  const result={get runtime(){return runtime;},get subjectId(){return subjectId??runtime.api.snapshot()?.subjectId;},editor:()=>createProfileEditorClient(runtime,{now:()=>time}),
-   async reload({connectNew=false}={}){runtime.close();runtime=await createWebRuntime(config,{store,fetch:wire,now:()=>time});
+  const result={native:{prepareRecovery:(...args)=>nativeCall('prepareRecovery',...args),saveRecovery:(...args)=>nativeCall('saveRecovery',...args),recover:(...args)=>nativeCall('recover',...args),confirmRecoveredCode:(...args)=>nativeCall('confirmRecoveredCode',...args)},get runtime(){return runtime;},get subjectId(){return subjectId??runtime.api.snapshot()?.subjectId;},editor:()=>createProfileEditorClient(runtime,{now:()=>time}),
+   async reload({connectNew=false}={}){runtime.close();runtime=await factory(config,options);
     if(connectNew)await runtime.connect({confirmed:true});else await runtime.resumeConnection();return runtime;}};
   actors.push(result);return result;
  }

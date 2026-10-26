@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {isOperationsPermission} from '../../operations-permission-catalog.mjs';
 import {AiWorkAccountsReadModel,aiWorkAccountView} from './ai-work-read-model.mjs';

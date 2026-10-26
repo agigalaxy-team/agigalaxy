@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createModerationClient } from '../src/moderation-client.mjs';
-import { createModerationFlow } from '../src/moderation-flow.mjs';
-import { createAssistanceClient } from '../src/assistance-client.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createModerationClient } from "../src/clients/moderation.mjs";
+import { createModerationFlow } from "../src/clients/flows/moderation.mjs";
+import { createAssistanceClient } from "../src/clients/assistance.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 import { qualificationPolicySchema } from '../src/shared/qualification-schema.mjs';
 export async function verifyGovernanceWorkflow(db=null,options={}) {
   const scopes=['data-export','binding','consent','case-teaser','assistance','context','moderation'];

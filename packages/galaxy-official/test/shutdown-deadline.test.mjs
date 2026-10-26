@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createShutdownDeadline } from '../src/shutdown-deadline.mjs';
+import { createShutdownDeadline } from "../src/infrastructure/shutdown-deadline.mjs";
 
 test('shutdown forces an incomplete child process to fail; repeated stop does not renew its budget', () => {
-  const moduleUrl = new URL('../src/shutdown-deadline.mjs', import.meta.url).href;
+  const moduleUrl = new URL("../src/infrastructure/shutdown-deadline.mjs", import.meta.url).href;
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
     import { createShutdownDeadline } from ${JSON.stringify(moduleUrl)};
     const deadline = createShutdownDeadline({ timeoutMs: 80 });
@@ -19,7 +19,7 @@ test('shutdown forces an incomplete child process to fail; repeated stop does no
 });
 
 test('completed shutdown clears the deadline and permits clean process exit', () => {
-  const moduleUrl = new URL('../src/shutdown-deadline.mjs', import.meta.url).href;
+  const moduleUrl = new URL("../src/infrastructure/shutdown-deadline.mjs", import.meta.url).href;
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
     import { createShutdownDeadline } from ${JSON.stringify(moduleUrl)};
     const deadline = createShutdownDeadline({ timeoutMs: 80 });

@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {queueFixture} from './operations-jobs-fixture.mjs';
 

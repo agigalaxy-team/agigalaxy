@@ -10,7 +10,7 @@ import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {oidcProviderFixture} from '../../galaxy-official/test/oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../../galaxy-official/src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const out=browserToolOutput(import.meta.url, process.env.GALAXY_ROOM_REPORT_DIR);

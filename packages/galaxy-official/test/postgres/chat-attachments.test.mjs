@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {verifyAttachments} from '../chat-attachments-workflow.mjs';
 test('PostgreSQL API and worker roles operate private attachment orchestration without schema-owner bypass',{timeout:90000},async()=>{
  assert.equal(process.env.GALAXY_TEST_PG_ISOLATED,'1');

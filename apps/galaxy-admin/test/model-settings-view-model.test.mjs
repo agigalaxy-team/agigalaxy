@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {modelSettingsLocation,modelSettingsHref,modelSettingsPath,modelSettingsEmpty,modelSettingsNewModel,modelSettingsSafeConfiguration,modelSettingsValidation,modelSettingsMerge,modelSettingsCredential,modelSettingsEffective,modelSettingsOperationLabel,modelSettingsHistoryLines} from '../src/lib/model-settings-view-model.ts';
+import {modelSettingsLocation,modelSettingsHref,modelSettingsPath,modelSettingsEmpty,modelSettingsNewModel,modelSettingsSafeConfiguration,modelSettingsValidation,modelSettingsMerge,modelSettingsCredential,modelSettingsEffective,modelSettingsOperationLabel,modelSettingsHistoryLines} from "../src/lib/models/model-settings-view-model.ts";
 
 const id='f4a43fd1-4eb3-486f-966d-642b06c008cc',versionId='2a6f0bd2-a81c-496d-9156-bf18982ed344',operationId='65ed7357-e6de-425b-9e3a-1a15850a229f';
 function configured(){const value=modelSettingsEmpty();value.models=[{...modelSettingsNewModel(id),displayName:'人工配置连接',modelId:'provider-real-model',baseUrl:'https://provider.example/v1',credentialRef:'model-key:'+operationId,contextWindow:128000,maxOutputTokens:4096,timeoutSeconds:60,enabled:true}];return value;}

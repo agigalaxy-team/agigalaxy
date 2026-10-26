@@ -5,8 +5,8 @@ import type {recruitmentDocumentV2Schema,recruitmentEventV2Schema} from "../../.
 import type {contactEventV2Schema} from "../../../../galaxy-official/src/shared/contacts-schema-v2.mjs";
 import type {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
 import type {discoveryPreferencesSchema} from "../../../../galaxy-official/src/shared/discovery-schema.mjs";
-import type {HistoryRecord} from "../../record-workspace-types";
-import type {useGovernanceDraft} from "../../governance-presentation";
+import type {HistoryRecord} from "../work-records/record-workspace-types";
+import type {useGovernanceDraft} from "../governance/governance-presentation";
 
 export type ProjectRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 export type ProjectLease=ReturnType<ProjectRuntime['receiptStatus']['captureLease']>;

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { buildersContinuityFixture } from './builders-client-continuity-workflow.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { sampleCharter } from './hubs-workflow.mjs';
-import { createHubsWebClient } from '../../galaxy-web/src/hubs-client.mjs';
+import { createHubsWebClient } from "../../galaxy-web/src/features/hubs/hubs-client.mjs";
 
 // Actual Browser binding/JWS/Consent/HTTP/PGlite. Synthetic identity and Map
 // storage remain explicit; no independent operator or third-party network.

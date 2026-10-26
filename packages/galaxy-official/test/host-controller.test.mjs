@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 
 test('host Case preview excludes other operations, cancels late writes and resumes after failure', async () => {
   let release, canceled = 0, readSignal;

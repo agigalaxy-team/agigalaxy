@@ -1,12 +1,12 @@
 import {forumBodyExcerpt} from '../shared/community-forum-body-text.mjs';
-import {transaction} from '../database.mjs';
+import {transaction} from "../infrastructure/database.mjs";
 import {ServiceError} from '../shared/service-error.mjs';
 import {discoveryItemKey} from './purpose.mjs';
 import {digest} from '../shared/digest.mjs';
-import {CommunityForumV1} from '../community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../community-forum-governance-v1.mjs';
-import {CommunityAccountRegistry} from '../community-accounts.mjs';
-import {ConsentReader} from '../consent-reader.mjs';
+import {CommunityForumV1} from "../community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../community/community-forum-governance-v1.mjs";
+import {CommunityAccountRegistry} from "../accounts/community-accounts.mjs";
+import {ConsentReader} from "../consents/consent-reader.mjs";
 import {publicReadBatch} from './public-read-batch.mjs';
 
 // This adapter deliberately has no message, notice, case, bookmark, generic

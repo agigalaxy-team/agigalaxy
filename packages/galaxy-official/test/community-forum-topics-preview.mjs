@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {join,resolve,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createReconstructionFlowPreview} from './reconstruction-flow-preview.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 import {forumTopics} from '../src/shared/community-forum-topics-v1.mjs';
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {digest} from '../src/shared/digest.mjs';

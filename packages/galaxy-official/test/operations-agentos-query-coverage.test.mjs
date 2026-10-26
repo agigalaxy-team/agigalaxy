@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
 import {OperationsPermissionsAuthority} from '../src/operations/permissions/authority.mjs';
 import {RegisteredUsersReadModel} from '../src/operations/accounts/registered-read-model.mjs';
 import {OperationsSystemSettingsService} from '../src/operations/system-settings/service.mjs';
 import {SystemGeneralPublications} from '../src/operations/system-settings/general-publications.mjs';
 import {aiWorkQueryPermissions,aiWorkCapabilities} from '../src/shared/operations-ai-work-capabilities.mjs';
-import {conversationReadRoute,conversationPriorReadReceipt} from '../src/operations-agentos-tool-evidence.mjs';
+import {conversationReadRoute,conversationPriorReadReceipt} from "../src/operations/agentos/tool-evidence.mjs";
 
 // Actual services, permission/AI-context intersection and projection. SQL rows,
 // Native directory/control and public marker transport are explicit doubles.
@@ -32,6 +32,7 @@ test('new registration and system queries preserve exact populations, strict saf
   if(sql.includes('SELECT 1 FROM operations_operator_principals_v1'))return{rows:[{exists:1}]};
   if(sql.includes('SELECT version FROM operations_permission_authority_v1'))return{rows:[{version:1}]};
   if(sql.includes('SELECT DISTINCT unnest(r.permissions)'))return{rows:humanPermissions.map(permission=>({permission}))};
+  if(sql.includes('SELECT a.id,a.version,a.enabled,r.id AS role_id'))return{rows:[{id:ids.first,version:1,enabled:true,role_id:ids.second,role_version:1,role_enabled:true}]};
   if(sql.includes('SELECT d.*,g.observed_count'))return{rows:ready?[{issuer:'https://identity.invalid/website',generation_id:ids.generation,observed_count:2,last_completed_at:'2026-10-25T02:30:00Z',last_started_at:'2026-10-25T02:29:00Z',last_error:null}]:[]};
   if(sql.startsWith('SELECT count(*)::text'))return{rows:[{n:sql.includes('a.id IS NULL')?'1':'2'}]};
   if(sql.includes('FROM operations_registered_subjects_v1 s')&&sql.includes('LEFT JOIN operations_registered_directory_v1'))return{rows:rows.filter(row=>row.registration_id===args[1])};

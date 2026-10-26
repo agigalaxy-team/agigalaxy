@@ -8,8 +8,8 @@ import {request} from 'node:http';
 import {compileModelConfiguration,modelAlias,recordIdFromAlias} from '../deploy/maintenance-agent/model-configuration-codec.mjs';
 import {ModelConfigurationRuntime} from '../deploy/maintenance-agent/model-configuration.mjs';
 import {createMaintenanceNativeHttpServer} from '../deploy/maintenance-agent/server.mjs';
-import {modelSettingsNativeCredential,modelSettingsNativeOperation,modelSettingsNativeStatus} from '../src/operations-model-settings-native.mjs';
-import {maintenanceRequestSignature} from '../src/operations-maintenance-native.mjs';
+import {modelSettingsNativeCredential,modelSettingsNativeOperation,modelSettingsNativeStatus} from "../src/operations/model-settings/native.mjs";
+import {maintenanceRequestSignature} from "../src/operations/maintenance/native.mjs";
 
 const domains=['overview','governance','messaging','discovery','maintenance'];
 const empty=()=>({models:[],scenarios:Object.fromEntries(domains.map(domain=>[domain,null]))});

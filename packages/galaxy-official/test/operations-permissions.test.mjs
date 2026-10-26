@@ -1,3 +1,4 @@
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -5,14 +6,14 @@ import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
 import {OperationsPermissionsService} from '../src/operations/permissions/service.mjs';
 import {operationsPermissionCatalog,operationsPermissionCodes,operationActionPermissions} from '../src/operations-permission-catalog.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsBusinessDomain} from '../src/operations-content-visibility.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
-import {ContentPublications,createContentPublicationWorker} from '../src/content-publications.mjs';
-import {OperationsNotices,createOperationsNoticeWorker} from '../src/operations-notices.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsBusinessDomain} from "../src/operations/public-content/content-visibility.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
+import {ContentPublications,createContentPublicationWorker} from "../src/publishing/content-publications.mjs";
+import {OperationsNotices,createOperationsNoticeWorker} from "../src/operations/messaging/notices.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 
 // Real local PGlite, domain writes and official-account fixture. The management
@@ -23,12 +24,12 @@ async function fixture(t){
  const roles=new Map([[admin.operatorId,'administrator'],[reader.operatorId,'reader'],[other.operatorId,'reader']]);
  for(const actor of [admin,reader,other])await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
   VALUES($1,$2,'https://operations.example.invalid',$1,'合成管理人员',$3,$3)`,[actor.operatorId,f.endpoint,new Date(f.now()*1000)]);
- const operatorAuthorization=async actor=>roles.get(actor.operatorId),permissions=new OperationsPermissionsService({db:f.db,endpoint:f.endpoint,operatorAuthorization,now:f.now});
+ const maintainers=new Set(),operatorAuthorization=async actor=>roles.get(actor.operatorId),permissions=new OperationsPermissionsService({db:f.db,endpoint:f.endpoint,operatorAuthorization,managementMaintainerAuthorization:async actor=>maintainers.has(actor.operatorId),now:f.now});
  let identityReads=0;
  const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,permissions,operatorAuthorization,now:f.now,identityDirectory:{get:async()=>{identityReads++;return null;},findByEmail:async()=>{identityReads++;return[];}}});
  const makeRole=async(codes,name='合成角色 '+randomUUID())=>(await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name,description:'本地功能动作授权夹具',enabled:true,permissions:codes},{authorize:async()=>admin})).role;
  const assign=async(role,person=reader)=>(await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:person.operatorId,roleId:role.id,enabled:true},{authorize:async()=>admin})).assignment;
- return {...f,admin,reader,other,roles,permissions,businessAdmin,makeRole,assign,identityReads:()=>identityReads};
+ return {...f,admin,reader,other,roles,maintainers,permissions,businessAdmin,makeRole,assign,identityReads:()=>identityReads};
 }
 
 test('PG business grants authorize a real reader action without impersonating administrator and block forged snapshots or ungranted identity reads',async t=>{
@@ -49,6 +50,7 @@ test('PG business grants authorize a real reader action without impersonating ad
 
 test('role and personnel commands enforce CAS, stable original intent, bounded grant authority and current revocation before replay',async t=>{
  const f=await fixture(t),manager=await f.makeRole(['permissions.read','permissions.roles.write','permissions.assignments.write','content.read']),assignment=await f.assign(manager);
+ f.maintainers.add(f.reader.operatorId); // Explicit current management admission, separate from the business role.
  const input={operationId:randomUUID(),expectedVersion:0,name:'允许的下级业务动作集合',description:'不产生角色树或继承',enabled:true,permissions:['content.read']};
  const made=await f.permissions.saveRole(f.reader,input,{authorize:async()=>f.reader});assert.equal(made.role.version,1);
  assert.equal((await f.permissions.saveRole(f.reader,input,{authorize:async()=>f.reader})).replayed,true);
@@ -83,7 +85,8 @@ test('private case metadata, selected body, attachment bytes and message actions
  updated=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),id:role.id,expectedVersion:updated.version,name:role.name,description:role.description,enabled:true,permissions:['chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read']},{authorize:async()=>f.admin})).role;
  assert.deepEqual((await g.operatorAttachment(f.reader,{reportId:report.reportId,attachmentId},{authorize:async()=>f.reader})).bytes,bytes);
  await assert.rejects(g.operatorMessageVisibility(f.reader,{reportId:report.reportId,messageId:message.messageId},hide,{authorize:async()=>f.reader}),{code:'operations_permission_denied'},'stable replay also requires the current action');
- const grant=(await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'未接通的助手许可',executorKind:'ai',mode:'assisted',enabled:true,permissions:['chat-reports.materials.read','content.read'],resourceIds:[report.reportId]},{authorize:async()=>f.admin})).automation;
+ const work=await attachAiWorkFixture({db:f.db,endpoint:f.endpoint,permissions:f.permissions,businessAdmin:f.businessAdmin,authority:{},admin:f.admin,domains:['governance'],codes:['chat-reports.materials.read','content.read'],now:f.now});
+ const grant=(await f.permissions.saveAutomation(f.admin,{aiAccountId:work.ids.governance,operationId:randomUUID(),expectedVersion:0,name:'未接通的助手许可',executorKind:'ai',mode:'assisted',enabled:true,permissions:['chat-reports.materials.read','content.read'],resourceIds:[report.reportId]},{authorize:async()=>f.admin})).automation;
  const intersection=await f.permissions.executionIntersection({grantId:grant.id,person:f.reader,actions:['chat-reports.materials.read','accounts.read'],resourceIds:[report.reportId]});assert.deepEqual(intersection.permissions,['chat-reports.materials.read']);assert.equal(intersection.executionAvailable,false);
  await assert.rejects(f.permissions.executionIntersection({grantId:grant.id,person:f.reader,actions:['chat-reports.materials.read'],resourceIds:[randomUUID()]}),{code:'operations_automation_scope_denied'});
 });
@@ -95,7 +98,7 @@ test('delegated publishing rechecks PG grants after preparation and cannot activ
  const publisher={current:async()=>null,prepare:async()=>{prepared++;await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),id:assignment.id,expectedVersion:1,operatorId:f.reader.operatorId,roleId:role.id,enabled:false},{authorize:async()=>f.admin});return{siteVersion:'synthetic-version'};},activate:async()=>{activated++;}};
  const worker=createContentPublicationWorker({db:f.db,endpoint:f.endpoint,jobs,publisher,businessAdmin:f.businessAdmin,now:f.now});
  await assert.rejects(worker.execute({publicationId:requested.publication.id}),{code:'site_publication_failed'});assert.equal(prepared,1);assert.equal(activated,0);assert.equal((await f.db.query('SELECT state FROM site_publications_v1 WHERE id=$1',[requested.publication.id])).rows[0].state,'failed');
- const automatic=(await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'程序授权记录',executorKind:'program',mode:'automatic',enabled:true,permissions:['content.read'],resourceIds:[]},{authorize:async()=>f.admin})).automation;assert.equal(automatic.executionAvailable,false);assert.equal(automatic.executionState,'not-connected');
+ const automatic=(await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'程序授权记录',executorKind:'program',mode:'automatic',enabled:true,permissions:['content.read'],resourceIds:[requested.publication.id],resourceScope:{kind:'selected',resourceIds:[requested.publication.id]}},{authorize:async()=>f.admin})).automation;assert.equal(automatic.executionAvailable,false);assert.equal(automatic.executionState,'not-connected');
  await assert.rejects(f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'不能自授管理权',executorKind:'ai',mode:'automatic',enabled:true,permissions:['permissions.roles.write'],resourceIds:[]},{authorize:async()=>f.admin}),{code:'operations_automation_human_boundary'});
 });
 
@@ -110,7 +113,7 @@ test('revoked delegated notice delivery sends nothing and keeps the original rea
 });
 
 test('permission history preserves actual closed deltas without inventing legacy facts or leaking stored prose and scoped intersections reject missing targets',async t=>{
- const {permissionHistoryDeltaLines:lines}=await import(new URL('../../../apps/galaxy-admin/src/lib/permissions-view-model.ts',import.meta.url));
+ const {permissionHistoryDeltaLines:lines}=await import(new URL("../../../apps/galaxy-admin/src/lib/permissions/permissions-view-model.ts",import.meta.url));
  const f=await fixture(t),secret='PRIVATE_HISTORY_FREE_TEXT_SENTINEL',role=await f.makeRole(['content.read'],secret),assignment=await f.assign(role),auth={authorize:async()=>f.admin};
  const roleUpdate=await f.permissions.saveRole(f.admin,{operationId:randomUUID(),id:role.id,expectedVersion:1,name:role.name,description:secret,enabled:false,permissions:['files.read']},auth);
  let roleHistory=await f.permissions.history(f.admin,{resourceId:role.id});
@@ -129,10 +132,10 @@ test('permission history preserves actual closed deltas without inventing legacy
  await assert.rejects(f.permissions.executionIntersection({grantId:grant.automation.id,actions:['content.read'],resourceIds:[]}),{code:'operations_automation_scope_denied'});
  await assert.rejects(f.permissions.executionIntersection({grantId:grant.automation.id,actions:['content.read']}),{code:'operations_automation_scope_denied'});
  const qualified=await f.permissions.executionIntersection({grantId:grant.automation.id,actions:['content.read'],resourceIds:[firstTarget]});assert.deepEqual(qualified.permissions,['content.read']);assert.equal(qualified.executionAvailable,false);assert.equal(qualified.state,'not-connected');
- await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),id:grant.automation.id,expectedVersion:1,name:secret,executorKind:'ai',mode:'assisted',enabled:false,permissions:['files.read'],resourceIds:[nextTarget]},auth);
+ await f.permissions.saveAutomation(f.admin,{operationId:randomUUID(),id:grant.automation.id,expectedVersion:1,name:secret,executorKind:'ai',mode:'assisted',enabled:false,permissions:['files.read'],resourceIds:[nextTarget],resourceScope:{kind:'selected',resourceIds:[nextTarget]}},auth);
  const automationHistory=await f.permissions.history(f.admin,{resourceId:grant.automation.id});
- assert.deepEqual(automationHistory.items[0].delta,{kind:'automation',permissions:{added:['files.read'],removed:['content.read']},enabled:{before:true,after:false},scope:{before:[firstTarget],after:[nextTarget]},mode:{before:'automatic',after:'assisted'},executorKind:{before:'program',after:'ai'}});
- const scopeLine=lines(automationHistory.items[0],operationsPermissionCatalog).find(line=>line.label==='对象范围');assert(scopeLine.text.includes(firstTarget));assert(scopeLine.text.includes(nextTarget));
+ assert.deepEqual(automationHistory.items[0].delta,{kind:'automation',permissions:{added:['files.read'],removed:['content.read']},enabled:{before:true,after:false},scope:{before:{kind:'selected',resourceIds:[firstTarget]},after:{kind:'selected',resourceIds:[nextTarget]}},mode:{before:'automatic',after:'assisted'},executorKind:{before:'program',after:'ai'},aiAccountId:{before:null,after:null}});
+ const scopeLine=lines(automationHistory.items[0],operationsPermissionCatalog).find(line=>line.label==='对象范围');assert(scopeLine.text.includes('指定 1 个对象'));assert.equal(scopeLine.text.includes(firstTarget),false);assert.equal(scopeLine.text.includes(nextTarget),false,'exact object IDs remain in the structured original delta, not the prose scope label');
  // Explicitly model an older event without a delta and dirty retained JSON;
  // none of this fixture mutation changes production records or invents a past.
  await f.db.query("UPDATE operations_permission_events_v1 SET result=result-'delta' WHERE id=$1",[roleHistory.items[1].id]);

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {ChatService} from '../src/chat.mjs';
-import {OutcomeMaterialServiceV2} from '../src/outcome-material-v2.mjs';
+import {ChatService} from "../src/chat/service.mjs";
+import {OutcomeMaterialServiceV2} from "../src/evidence/outcome-material-v2.mjs";
 import {createApi} from '../src/http.mjs';
 import {invite} from './chat-workflow.mjs';
 

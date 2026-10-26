@@ -1,6 +1,6 @@
 import pg from 'pg';
 import {mkdir} from 'node:fs/promises';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {postgresSqlArguments,noSymlinkPath} from '../operations-stack/host.mjs';
 import {replayNativeCurrentFacts} from './current-facts.mjs';
 import {replayDeletionRecoveryContribution} from './deletion-contribution.mjs';

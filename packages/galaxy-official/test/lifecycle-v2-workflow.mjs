@@ -6,8 +6,8 @@ import { executeDeletion, lockDeletionTables } from '../src/operations/deletion-
 import { cleanupProductV2Retention } from '../src/operations/lifecycle-retention-v2.mjs';
 import { productV2ExportDatasets } from '../src/infrastructure/lifecycle-export-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { transaction } from '../src/database.mjs';
-import { SearchIndex } from '../src/search-index.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
+import { SearchIndex } from "../src/discovery/search-index.mjs";
 import { executeDeletionWithTransports } from '../src/operations/deletion-transports.mjs';
 
 const scopes=['binding','consent','case-teaser','assistance','evidence','data-export','data-delete'];

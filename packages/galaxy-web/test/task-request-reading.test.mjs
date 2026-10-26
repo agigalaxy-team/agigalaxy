@@ -15,8 +15,8 @@ import {taskRequestV2Schema} from '../../galaxy-official/src/shared/task-schema-
 const stylesheetHook=registerHooks({load(url,context,nextLoad){return new URL(url).pathname.endsWith('.css')?{format:'module',source:'export {};',shortCircuit:true}:nextLoad(url,context);}});
 let TaskRequestReading,taskReadingSection,taskRequestIntro,selectedRequestAttempts;
 try{
- ({TaskRequestReading,taskReadingSection,taskRequestIntro}=await tsImport('../src/task-request-reading.tsx',import.meta.url));
- ({selectedRequestAttempts}=await tsImport('../src/task-request-background.tsx',import.meta.url));
+ ({TaskRequestReading,taskReadingSection,taskRequestIntro}=await tsImport("../src/features/tasks/task-request-reading.tsx",import.meta.url));
+ ({selectedRequestAttempts}=await tsImport("../src/features/tasks/task-request-background.tsx",import.meta.url));
 }finally{stylesheetHook.deregister();}
 
 const legacy=()=>{

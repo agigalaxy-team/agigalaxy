@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createConfiguredHelpEndpointValidator} from '../src/native-v2/configured-help-endpoint.mjs';
-import {createLocalHelpStoreV2} from '../../galaxy-official/src/local-help-store-v2.mjs';
-import {createHelpRuntimeV2} from '../../galaxy-official/src/help-runtime-v2.mjs';
-import {createTaskClientV2} from '../../galaxy-official/src/task-client-v2.mjs';
-import {createSearchClient} from '../../galaxy-official/src/search-client.mjs';
-import {createProjectDiscoveryClient} from '../../galaxy-official/src/project-discovery-client.mjs';
-import {createHelpSourcesV2} from '../../galaxy-official/src/help-sources-v2.mjs';
+import {createLocalHelpStoreV2} from "../../galaxy-official/src/clients/local/help-store-v2.mjs";
+import {createHelpRuntimeV2} from "../../galaxy-official/src/clients/flows/help-runtime-v2.mjs";
+import {createTaskClientV2} from "../../galaxy-official/src/clients/task-v2.mjs";
+import {createSearchClient} from "../../galaxy-official/src/clients/search.mjs";
+import {createProjectDiscoveryClient} from "../../galaxy-official/src/clients/project-discovery.mjs";
+import {createHelpSourcesV2} from "../../galaxy-official/src/clients/flows/help-sources-v2.mjs";
 import {tmpdir} from 'node:os';
 
 const endpoint='https://127.0.0.1:5242',subjectId='GUID'+'A'.repeat(28);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 test('content tool pages are bounded before the current source read and retain a gap-free real continuation without source bodies',async()=>{

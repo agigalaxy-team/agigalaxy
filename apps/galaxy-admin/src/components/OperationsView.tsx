@@ -7,8 +7,8 @@ import {BusinessUsers} from './BusinessViewClients';
 import {OperationsPage} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 import {RegisteredUsers} from './BusinessViewClients';
-import {registeredUsersLocation,registeredUsersQuery} from '../lib/registered-users-view-model';
-import type {RegisteredUserDetail,RegisteredUsersPage} from './registered-users-types';
+import {registeredUsersLocation,registeredUsersQuery} from "../lib/accounts/registered-users-view-model";
+import type {RegisteredUserDetail,RegisteredUsersPage} from "./accounts/registered-users-types";
 import type {AuditPage,LinkedId,TypeHistoryItem,UserDetail,UserPage} from './business-types';
 
 export async function OperationsView(props:AdminViewServerProps){

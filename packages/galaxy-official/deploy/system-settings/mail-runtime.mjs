@@ -3,7 +3,7 @@ import {isAbsolute} from 'node:path';
 import {createHmac} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
-import {createOperationsSmtpTransport} from '../../src/operations-smtp-transport.mjs';
+import {createOperationsSmtpTransport} from "../../src/operations/messaging/smtp-transport.mjs";
 import {systemSettingsMailConfigurationSchema,systemSettingsMailConnectionSchema,systemSettingsCredentialSchema,parseSystemSettings,safeSystemSettingsError} from '../../src/operations/system-settings/schema.mjs';
 import {operationsMailMetadataSchema,operationsMailReceiptSchema,operationsMailReceiptFiles,operationsMailConfiguration} from '../../src/operations/system-settings/mail-consumer.mjs';
 import {operationsSmtpCredentialAlias} from '../../src/operations/system-settings/smtp-credentials.mjs';

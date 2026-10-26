@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setTimeout as delay} from 'node:timers/promises';
-import {coalescedConversationEvents} from '../src/operations-agentos-conversation-stream.mjs';
+import {coalescedConversationEvents} from "../src/operations/agentos/conversation-stream.mjs";
 
 test('transport batching keeps full Unicode semantics and native indices without crossing tools or waiting for completion',async()=>{
  let closed=0;

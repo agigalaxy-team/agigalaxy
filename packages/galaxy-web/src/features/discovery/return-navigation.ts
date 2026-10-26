@@ -1,4 +1,4 @@
-import {profileSubject} from "../../profile-navigation.mjs";
+import {profileSubject} from "../profiles/profile-navigation.mjs";
 
 export function browseReturnPath(fallback:string){
  const value=history.state?.browseReturn;if(typeof value!=='string')return fallback;

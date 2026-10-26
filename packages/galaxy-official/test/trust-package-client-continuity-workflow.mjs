@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {publicationFixture} from './task-publication-continuity-fixture.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
+import {createNativeRecoveryWebFixture} from './native-recovery-web-fixture.mjs';
+import {serviceFixture} from './service-fixture.mjs';
+import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
-import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 
 export async function ordinaryTrustFixture(){
  const x=await publicationFixture(),client=x.runtime.trustPackages;
@@ -84,26 +85,31 @@ export async function verifyOrdinaryLocalReadAba(){
  }finally{await x.close();}
 }
 export async function verifyOrdinaryOwnerSwitch(){
- const x=await ordinaryTrustFixture();let ownerRuntime,otherRuntime,server;
+ // Start from an empty owner journal so the existing Native fixture owns its
+ // controller. Never infer a Native controller from another fixture's handoff.
+ const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),values=new Map();
+ const x={f,values,originalSubject:null,
+  input:()=>({claims:[{id:randomUUID(),text:'synthetic-private-ordinary-trust-claim',authority:'self-asserted',capabilityVerified:false}],selections:[],
+   audience:{kind:'subjects',subjectIds:[x.originalSubject]},expiresAt:Math.floor(Date.now()/1000)+600}),
+  saved:()=>[...values.entries()].filter(([key,value])=>key.endsWith(':trust-package:last-export')&&value),
+  close:()=>f.db.close()};
+ let ownerRuntime,otherRuntime,server;
  try{
-  // A real signed recovery activates another subject. createIdentity while a
-  // holder is active intentionally returns that holder; it is not a switch.
+  // Real Native signed recovery is only a test stimulus for the consumer's
+  // owner fence. This does not restore a production Web recovery coordinator.
   function recoveryStore(values,hook){
    const get=async key=>{const value=structuredClone(values.get(key));await hook?.(key,value);return value;};
    const put=async(key,value)=>{values.set(key,structuredClone(value));};
-   return{get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);},prepareRecovery:async(subjectId,operationId)=>{const key=`pending-recovery:${subjectId}:${operationId}`,old=await get(key);
-    if(old)return old;const value={...await createRecoveryMaterial(subjectId),operationId,saveDeclared:false};await put(key,value);return value;},
-    declareSaved:async(subjectId,operationId)=>{const key=`pending-recovery:${subjectId}:${operationId}`;await put(key,{...await get(key),saveDeclared:true});},
-    recordReceipt:async(subjectId,operationId,receipt)=>{assert.equal(receipt.subjectId,subjectId);assert.equal(receipt.operationId,operationId);
-     const key=`pending-recovery:${subjectId}:${operationId}`;await put(key,{...await get(key),receipt});}};
+   return{get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);}};
   }
   server=createApi({...x.f,browserOrigins:['https://galaxy.example.org'],rateLimit:1000});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const local='http://127.0.0.1:'+server.address().port;
   const fetcher=(url,options)=>{const u=new URL(url);return fetch(local+u.pathname+u.search,{...options,
    headers:{...options.headers,Origin:'https://galaxy.example.org'}});};
-  const config={endpoint:x.runtime.api.endpoint,trustedKeys:x.f.bindings.trustedKeys};let onRead=null;
-  ownerRuntime=await createExistingWebRuntime(config,{store:recoveryStore(x.values,(...args)=>onRead?.(...args)),fetch:fetcher,now:()=>x.f.now});
-  otherRuntime=await createExistingWebRuntime(config,{store:recoveryStore(new Map()),fetch:fetcher,now:()=>x.f.now});
+  const config={endpoint:x.f.access.endpoint,trustedKeys:x.f.bindings.trustedKeys};let onRead=null;
+  ownerRuntime=await createNativeRecoveryWebFixture(config,{store:recoveryStore(x.values,(...args)=>onRead?.(...args)),fetch:fetcher,now:()=>x.f.now});
+  otherRuntime=await createNativeRecoveryWebFixture(config,{store:recoveryStore(new Map()),fetch:fetcher,now:()=>x.f.now});
+  x.originalSubject=(await ownerRuntime.status()).identity.subjectId;
   await otherRuntime.connect({confirmed:true});
   const recovery=await otherRuntime.prepareRecovery();await otherRuntime.saveRecovery({operationId:recovery.operationId,confirmed:true});
   const preview=await ownerRuntime.trustPackages.prepare(x.input());await ownerRuntime.trustPackages.exportPackage(preview,{confirmed:true});

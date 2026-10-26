@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createCapsuleWebClient} from '../../packages/galaxy-web/src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient} from "../../packages/galaxy-web/src/features/capsules/capsule-workspace-client.mjs";
 const subjectId='GUID'+'A'.repeat(28);
 function fixture(phase,change){
  const current={subjectId,bindingId:randomUUID(),generation:1,scopes:['capsules','consent']},store=new Map(),calls=[];

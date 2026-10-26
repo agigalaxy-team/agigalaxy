@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from '../../galaxy-official/test/community-forum-fixture.mjs';
-import {createAccountVerificationClient} from '../src/account-verification-client.mjs';
+import {createAccountVerificationClient} from "../src/features/accounts/account-verification-client.mjs";
 
 async function fixture(t){
  const f=await communityForumFixture();t.after(()=>f.close());const saved=new Map(),writes=[];

@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {createOperationsAgentOsDutyTools} from '../src/operations-agentos-duty-tools.mjs';
-import {OperationsAutonomy} from '../src/operations-autonomy.mjs';
-import {OperationsMessagingService} from '../src/operations-messaging.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {createOperationsAgentOsDutyTools} from "../src/operations/agentos/duty-tools.mjs";
+import {OperationsAutonomy} from "../src/operations/autonomy/index.mjs";
+import {OperationsMessagingService} from "../src/operations/messaging/index.mjs";
 import {P13StrategiesService} from '../src/operations/strategies/service.mjs';
 import {p13EmptyConfiguration} from '../src/shared/p13-strategies-schema.mjs';
 import {aiActionDefinition,aiActionProjection} from '../src/shared/operations-ai-action-registry.mjs';
@@ -58,7 +58,7 @@ test('ordinary verified messaging connects through the real duty tool and origin
  await t.test('discovery and actual injected services advertise only the connected ordinary handlers',async()=>{
   for(const code of ['notices.publish','notices.withdraw']){assert.equal(aiActionDefinition(code).handlerImplemented,true);assert.equal(actions.dutyActionReady(code),true);assert.equal(aiActionProjection(code,{permissions:codes,services:{messaging}}).ready,true);}
   const unavailable=new OperationsAgentOsActionTools({authority,services:{messaging:{get:messaging.get.bind(messaging)}}});assert.equal(unavailable.dutyActionReady('notices.publish'),false);authority.dutyActionReady=code=>actions.dutyActionReady(code);
-  for(const code of ['jobs.retry','jobs.cancel','search.retry']){assert.equal(aiActionDefinition(code).handlerImplemented,false);assert.equal(actions.dutyActionReady(code),false);}
+  for(const code of ['jobs.retry','jobs.cancel','search.retry']){assert.equal(aiActionDefinition(code).handlerImplemented,true);assert.equal(aiActionDefinition(code).handler.service,'jobActions');assert.equal(actions.dutyActionReady(code),false,'Job handlers exist, but this messaging fixture supplies no jobActions service or job permissions');}
   const task=await newTask(),authorized=await autonomy.authorize({taskId:task.taskId,operation:'tool'});assert.ok(authorized.task.tools.includes('execute-operation'));
  });
  await t.test('verified ordinary plans publish and withdraw through prepare, live qualification, business SQL and immutable recovery',async()=>{

@@ -1,12 +1,12 @@
 import {z} from 'zod';
 import {ServiceError} from '../../shared/service-error.mjs';
 import {feedbackQuerySchema,feedbackHistorySchema,feedbackEventAuditSelectionSchema,feedbackEventAuditResultSchema,parseFeedback} from '../../shared/operations-feedback-schema.mjs';
-import {transaction} from '../../database.mjs';
-import {OperationsBusinessDomain,operationsStamp,operationsIso} from '../../operations-content-visibility.mjs';
-import {operationsAnalyticsPeriod} from '../../operations-analytics.mjs';
-import {FeedbackAttachmentsV1Service} from '../../feedback-attachments-v1.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
+import {OperationsBusinessDomain,operationsStamp,operationsIso} from "../public-content/content-visibility.mjs";
+import {operationsAnalyticsPeriod} from "../analytics/service.mjs";
+import {FeedbackAttachmentsV1Service} from "../../community/feedback-attachments-v1.mjs";
 import {hasOperationsPermission as permitted} from '../../operations-permission-catalog.mjs';
-import {operationsOperatorNamesWithin} from '../../operations-history-identities.mjs';
+import {operationsOperatorNamesWithin} from "../accounts/history-identities.mjs";
 
 const columns=`f.*,a.uid,p.display_name,(SELECT count(*)::int FROM feedback_attachments_v1 files WHERE files.endpoint=f.endpoint AND files.feedback_id=f.id) AS attachment_count`;
 const source=`operations_feedback_v1 f JOIN community_accounts a ON a.id=f.account_id AND a.endpoint=f.endpoint

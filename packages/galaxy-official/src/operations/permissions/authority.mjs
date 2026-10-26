@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {operationsPermissionCatalog,operationsPermissionCodes,isOperationsPermission} from "../../operations-permission-catalog.mjs";
 import {fail,identity} from './helpers.mjs';
 import {automationResourceScope,automationEligibleActions,automationResourceIdsSchema} from '../../shared/operations-automation-scope.mjs';

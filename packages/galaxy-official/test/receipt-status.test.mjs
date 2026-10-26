@@ -4,7 +4,7 @@ import { randomBytes, randomUUID, generateKeyPairSync } from 'node:crypto';
 import { CompactSign } from 'jose';
 import { receiptStatusFixture, verifyReceiptStatusExpiredContinuity } from './receipt-status-workflow.mjs';
 import { receiptStatusResponseType } from '../src/shared/receipt-status-schema.mjs';
-import { createReceiptStatusClient, createReceiptStatusDeviceSigner } from '../src/receipt-status-client.mjs';
+import { createReceiptStatusClient, createReceiptStatusDeviceSigner } from "../src/clients/receipt-status.mjs";
 import { signIdentityPayload } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { digest } from '../src/shared/digest.mjs';
 

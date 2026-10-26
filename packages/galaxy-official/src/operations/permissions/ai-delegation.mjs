@@ -1,12 +1,12 @@
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {operationsPermissionCatalog} from '../../operations-permission-catalog.mjs';
 import {aiRoleDelegationSaveSchema,delegatedAiRoleCommandSchema,delegatedAiRolePreparationSchema} from './ai-delegation-schema.mjs';
 import {roleView,roleUsageWithin} from './views.mjs';
 import {fail,parse,identity} from './helpers.mjs';
-import {businessAuditActorContext} from '../../business-admin-audit-attribution.mjs';
+import {businessAuditActorContext} from "../audit/attribution.mjs";
 import {operationsAiWorkScope} from '../../shared/operations-ai-use.mjs';
 
 const subset=(items,ceiling)=>items.every(item=>ceiling.includes(item));

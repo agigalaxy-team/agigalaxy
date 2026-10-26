@@ -9,7 +9,7 @@ import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.m
 import { createConnectionProfile,saveConnectionProfile } from '../../galaxy-core/src/connection-profile.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { createServices } from '../src/services.mjs';
-import { issueKeyring } from '../src/trust-keyring.mjs';
+import { issueKeyring } from "../src/security/trust-keyring.mjs";
 
 test('root-managed host persists revocation, drops old sessions on failed discovery, reconnects explicitly and cannot roll trust back after restart',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'galaxy-trust-recovery-')),f=await serviceFixture(['binding']);

@@ -8,7 +8,7 @@ import {p13Classify} from '../src/operations/strategies/evaluator.mjs';
 import {dispatchP13Strategies} from '../src/adapters/http/operations-strategies-http.mjs';
 import {requestUrl} from '../src/adapters/http/policy.mjs';
 import {operationsReadPath,operationsProxyPolicy} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 
 test('P13 history and version details show the same-endpoint management name while retaining internal attribution',{timeout:60000},async t=>{
  const f=await p13Fixture(t),saved=await f.service.saveDraft(f.admin,{operationId:randomUUID(),expectedRevision:0,configuration:f.configuration(),reason:'核查名称归属，不发布策略'},{authorize:async()=>f.admin});

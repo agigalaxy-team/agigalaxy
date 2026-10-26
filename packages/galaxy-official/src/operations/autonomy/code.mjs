@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {p14Evaluate} from '../rules/evaluator.mjs';
 import {p14EmptyControls} from '../../shared/p14-rules-schema.mjs';
 import {parse,fail} from './contract.mjs';

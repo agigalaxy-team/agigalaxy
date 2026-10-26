@@ -9,8 +9,8 @@ import {fileURLToPath} from 'node:url';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const out = browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);
 const baseline = process.env.GALAXY_CLEANUP_BASELINE === '1';
-const paths = ['packages/galaxy-web/src/task-contact-workspace.tsx', 'packages/galaxy-web/src/task-contact-client.mjs',
-  'packages/galaxy-web/src/task-preparation-client.mjs', 'packages/galaxy-web/scripts/verify-task-contact-cleanup-ui.mjs'];
+const paths = ["packages/galaxy-web/src/features/tasks/contact/task-contact-workspace.tsx", "packages/galaxy-web/src/features/tasks/contact/task-contact-client.mjs",
+  "packages/galaxy-web/src/features/tasks/publish/task-preparation-client.mjs", 'packages/galaxy-web/scripts/verify-task-contact-cleanup-ui.mjs'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sourceHashes = Object.fromEntries(await Promise.all(paths.map(async path => [path, hash(await readFile(resolve(root, path)))])));
 await mkdir(out, {recursive: true});
@@ -18,84 +18,7 @@ await mkdir(out, {recursive: true});
 // This isolated transport/storage fixture exercises the actual React component
 // and its actual guarded contact/preparation clients. It deliberately omits
 // signup, OIDC, physical devices, the full main entry and production services.
-const harness = `
-import React,{useLayoutEffect,useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {TaskContactWorkspace} from './packages/galaxy-web/src/task-contact-workspace.tsx';
-import {sha256Hex} from './packages/galaxy-official/src/shared/web-primitives.mjs';
-const A='GUID'+'A'.repeat(28),B='GUID'+'B'.repeat(28),recipient='GUID'+'C'.repeat(28);
-const firstTask='00000000-0000-4000-8000-000000000001',nextTask='00000000-0000-4000-8000-000000000002';
-const clone=value=>structuredClone(value),local=new Map(),receipts=new Map(),heldReads=[],heldSearches=[];
-let binding={subjectId:A,endpoint:'https://synthetic.invalid',bindingId:'A-1',generation:1},scope={subjectId:A,taskId:firstTask};
-const f=window.fixture={searches:[],writes:[],receiptQueries:[],scopeCommits:[],readErrors:0,refreshCalls:0,heldReads,heldSearches,
- readFailure:false,actionFailure:false,dropAck:false,armCleanup:false,holdSearchTask:null,gateTask:null};
-const taskFor=(subjectId,taskId)=>({taskId,version:1,state:'open',requesterId:subjectId,request:{taskId,
- title:'合成：联系人清理与接续',summary:'仅验证本地最终消费者，非真实任务',goal:'保持原批次与身份归属',
- situation:'隔离UI',participation:'open',enrollmentExpiresAt:Math.floor(Date.now()/1000)+86400},participations:[],
- contacts:{suggestions:{items:[{subjectId:recipient,help:'合成：只向这个对象发送',basis:'合成已保存建议',conditions:'真实意愿未知',sourceRefs:[]}]},
- responses:{applications:[],invitations:[]}}});
-const ownKey=(name,owner=binding.subjectId)=>owner+':'+name;
-const runtime={api:{endpoint:'https://synthetic.invalid',snapshot:()=>({...binding}),
- call:async(path,input)=>{
-  if(path==='/v2/search/query'){
-   const taskId=input.query.context?.taskId??scope.taskId;f.searches.push({taskId,subjectId:binding.subjectId});
-   const result={type:input.type,items:[],nextCursor:null};
-   if(f.holdSearchTask===taskId)return new Promise(ok=>heldSearches.push(()=>ok(result)));
-   return result;
-  }
-  if(path==='/v2/tasks/receipt'){f.receiptQueries.push(clone(input));return clone(receipts.get(input.eventId)??{state:'absent'});}
-  if(path.startsWith('/v2/tasks/')){
-   if(f.actionFailure){f.readFailure=true;throw Error('合成：原邀请准备失败');}
-   return taskFor(binding.subjectId,path.split('/').at(-1));
-  }
-  throw Error('unexpected synthetic endpoint '+path);
- }},
- getLocal:async name=>{
-  const key=ownKey(name),value=clone(local.get(key)??null);
-  if(f.readFailure&&name.startsWith('task-contact-batch:')){f.readErrors++;throw Error('合成：本机批次读取失败');}
-  if(f.gateTask&&['task-contact-batch:','task-room-batch:'].some(prefix=>name===prefix+f.gateTask))
-   return new Promise(ok=>heldReads.push(()=>ok(value)));
-  return value;
- },
- putLocal:async(name,value,owner=binding.subjectId)=>{local.set(ownKey(name,owner),clone(value));},
- updateLocal:async(name,updater,owner=binding.subjectId)=>{
-  const key=ownKey(name,owner),value=clone(updater(clone(local.get(key)??null)));local.set(key,value);return clone(value);
- },
- stoppedTaskOperations:async()=>[],onTaskOperationStopped:()=>()=>{},status:async()=>({active:binding}),
- taskEvent:async(taskId,event)=>{
-  const payloadHash=await sha256Hex(JSON.stringify({taskId,event}));
-  const record={taskId,eventId:event.eventId,payloadHash};
-  local.set(ownKey('task-event:'+taskId),clone(record));f.writes.push(clone(record));
-  const receipt={state:'acknowledged',taskId,eventId:event.eventId,payloadHash,version:2};receipts.set(event.eventId,receipt);
-  if(f.dropAck){f.dropAck=false;throw Error('合成：提交已发生，ACK丢失');}
-  local.set(ownKey('task-event:'+taskId),null);return clone(receipt);
- },
- reconcileTaskEvent:async taskId=>{
-  const key=ownKey('task-event:'+taskId),pending=local.get(key),receipt=receipts.get(pending.eventId);
-  local.set(key,null);return clone(receipt);
- },chat:{}};
-function App(){const [view,setView]=useState(scope);
- useLayoutEffect(()=>{f.scopeCommits.push({...view,body:document.body.innerText});},[view]);
- f.switchScope=(kind)=>{
- const old=scope;scope={subjectId:kind==='binding'?B:A,taskId:nextTask};
- if(kind==='binding')binding={...binding,subjectId:B,bindingId:'B-2',generation:2};
- f.holdSearchTask=nextTask;f.switchedFrom=old;setView({...scope});
- };
- return <TaskContactWorkspace task={taskFor(view.subjectId,view.taskId)} runtime={runtime} subjectId={view.subjectId}
- connected={true} navigate={()=>{}} refresh={async()=>{f.refreshCalls++;if(f.armCleanup){f.armCleanup=false;f.gateTask=view.taskId;}}}/>;
-}
-f.armReadFailure=()=>{f.readFailure=true;};
-f.armActionFailure=()=>{f.actionFailure=true;};
-f.clearFailures=()=>{f.readFailure=false;f.actionFailure=false;};
-f.local=()=>Object.fromEntries(local);
-f.pending=()=>clone(local.get(ownKey('task-contact-batch:'+scope.taskId))??null);
-f.releaseReads=()=>{f.gateTask=null;for(const release of heldReads.splice(0))release();};
-f.releaseSearches=()=>{f.holdSearchTask=null;for(const release of heldSearches.splice(0))release();};
-f.seedPrivateBatch=()=>{const note='PRIVATE_OLD_SCOPE_ONLY';local.set(ownKey('task-contact-batch:'+scope.taskId),{
- batchId:'00000000-0000-4000-8000-000000000003',taskId:scope.taskId,requesterId:scope.subjectId,confirmed:false,
- items:[{eventId:'00000000-0000-4000-8000-000000000004',subjectId:recipient,note,state:'queued',expiresAt:Math.floor(Date.now()/1000)+600}]});};
-createRoot(document.getElementById('root')).render(<App/>);
-`;
+const harness = "\nimport React,{useLayoutEffect,useState} from 'react';\nimport {createRoot} from 'react-dom/client';\nimport {TaskContactWorkspace} from './packages/galaxy-web/src/features/tasks/contact/task-contact-workspace.tsx';\nimport {sha256Hex} from './packages/galaxy-official/src/shared/web-primitives.mjs';\nconst A='GUID'+'A'.repeat(28),B='GUID'+'B'.repeat(28),recipient='GUID'+'C'.repeat(28);\nconst firstTask='00000000-0000-4000-8000-000000000001',nextTask='00000000-0000-4000-8000-000000000002';\nconst clone=value=>structuredClone(value),local=new Map(),receipts=new Map(),heldReads=[],heldSearches=[];\nlet binding={subjectId:A,endpoint:'https://synthetic.invalid',bindingId:'A-1',generation:1},scope={subjectId:A,taskId:firstTask};\nconst f=window.fixture={searches:[],writes:[],receiptQueries:[],scopeCommits:[],readErrors:0,refreshCalls:0,heldReads,heldSearches,\n readFailure:false,actionFailure:false,dropAck:false,armCleanup:false,holdSearchTask:null,gateTask:null};\nconst taskFor=(subjectId,taskId)=>({taskId,version:1,state:'open',requesterId:subjectId,request:{taskId,\n title:'合成：联系人清理与接续',summary:'仅验证本地最终消费者，非真实任务',goal:'保持原批次与身份归属',\n situation:'隔离UI',participation:'open',enrollmentExpiresAt:Math.floor(Date.now()/1000)+86400},participations:[],\n contacts:{suggestions:{items:[{subjectId:recipient,help:'合成：只向这个对象发送',basis:'合成已保存建议',conditions:'真实意愿未知',sourceRefs:[]}]},\n responses:{applications:[],invitations:[]}}});\nconst ownKey=(name,owner=binding.subjectId)=>owner+':'+name;\nconst runtime={api:{endpoint:'https://synthetic.invalid',snapshot:()=>({...binding}),\n call:async(path,input)=>{\n  if(path==='/v2/search/query'){\n   const taskId=input.query.context?.taskId??scope.taskId;f.searches.push({taskId,subjectId:binding.subjectId});\n   const result={type:input.type,items:[],nextCursor:null};\n   if(f.holdSearchTask===taskId)return new Promise(ok=>heldSearches.push(()=>ok(result)));\n   return result;\n  }\n  if(path==='/v2/tasks/receipt'){f.receiptQueries.push(clone(input));return clone(receipts.get(input.eventId)??{state:'absent'});}\n  if(path.startsWith('/v2/tasks/')){\n   if(f.actionFailure){f.readFailure=true;throw Error('合成：原邀请准备失败');}\n   return taskFor(binding.subjectId,path.split('/').at(-1));\n  }\n  throw Error('unexpected synthetic endpoint '+path);\n }},\n getLocal:async name=>{\n  const key=ownKey(name),value=clone(local.get(key)??null);\n  if(f.readFailure&&name.startsWith('task-contact-batch:')){f.readErrors++;throw Error('合成：本机批次读取失败');}\n  if(f.gateTask&&['task-contact-batch:','task-room-batch:'].some(prefix=>name===prefix+f.gateTask))\n   return new Promise(ok=>heldReads.push(()=>ok(value)));\n  return value;\n },\n putLocal:async(name,value,owner=binding.subjectId)=>{local.set(ownKey(name,owner),clone(value));},\n updateLocal:async(name,updater,owner=binding.subjectId)=>{\n  const key=ownKey(name,owner),value=clone(updater(clone(local.get(key)??null)));local.set(key,value);return clone(value);\n },\n stoppedTaskOperations:async()=>[],onTaskOperationStopped:()=>()=>{},status:async()=>({active:binding}),\n taskEvent:async(taskId,event)=>{\n  const payloadHash=await sha256Hex(JSON.stringify({taskId,event}));\n  const record={taskId,eventId:event.eventId,payloadHash};\n  local.set(ownKey('task-event:'+taskId),clone(record));f.writes.push(clone(record));\n  const receipt={state:'acknowledged',taskId,eventId:event.eventId,payloadHash,version:2};receipts.set(event.eventId,receipt);\n  if(f.dropAck){f.dropAck=false;throw Error('合成：提交已发生，ACK丢失');}\n  local.set(ownKey('task-event:'+taskId),null);return clone(receipt);\n },\n reconcileTaskEvent:async taskId=>{\n  const key=ownKey('task-event:'+taskId),pending=local.get(key),receipt=receipts.get(pending.eventId);\n  local.set(key,null);return clone(receipt);\n },chat:{}};\nfunction App(){const [view,setView]=useState(scope);\n useLayoutEffect(()=>{f.scopeCommits.push({...view,body:document.body.innerText});},[view]);\n f.switchScope=(kind)=>{\n const old=scope;scope={subjectId:kind==='binding'?B:A,taskId:nextTask};\n if(kind==='binding')binding={...binding,subjectId:B,bindingId:'B-2',generation:2};\n f.holdSearchTask=nextTask;f.switchedFrom=old;setView({...scope});\n };\n return <TaskContactWorkspace task={taskFor(view.subjectId,view.taskId)} runtime={runtime} subjectId={view.subjectId}\n connected={true} navigate={()=>{}} refresh={async()=>{f.refreshCalls++;if(f.armCleanup){f.armCleanup=false;f.gateTask=view.taskId;}}}/>;\n}\nf.armReadFailure=()=>{f.readFailure=true;};\nf.armActionFailure=()=>{f.actionFailure=true;};\nf.clearFailures=()=>{f.readFailure=false;f.actionFailure=false;};\nf.local=()=>Object.fromEntries(local);\nf.pending=()=>clone(local.get(ownKey('task-contact-batch:'+scope.taskId))??null);\nf.releaseReads=()=>{f.gateTask=null;for(const release of heldReads.splice(0))release();};\nf.releaseSearches=()=>{f.holdSearchTask=null;for(const release of heldSearches.splice(0))release();};\nf.seedPrivateBatch=()=>{const note='PRIVATE_OLD_SCOPE_ONLY';local.set(ownKey('task-contact-batch:'+scope.taskId),{\n batchId:'00000000-0000-4000-8000-000000000003',taskId:scope.taskId,requesterId:scope.subjectId,confirmed:false,\n items:[{eventId:'00000000-0000-4000-8000-000000000004',subjectId:recipient,note,state:'queued',expiresAt:Math.floor(Date.now()/1000)+600}]});};\ncreateRoot(document.getElementById('root')).render(<App/>);\n";
 
 const bundle = await build({stdin: {contents: harness, resolveDir: root, loader: 'tsx'}, bundle: true, write: false,
   platform: 'browser', format: 'iife', jsx: 'automatic', alias: {'@': root}, loader: {'.css': 'empty'}});

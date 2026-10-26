@@ -1,608 +1,85 @@
-"""Typed native tools; Node owns current permissions, source scope and effects."""
+"""Native conversation tool adapters; Node owns permissions, source scope and effects."""
 import json
-from datetime import datetime
-from typing import Annotated, Literal, Union
+from typing import Annotated
+from pydantic import Field
 from uuid import UUID
 
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .gateway import AuthorityDenied
 from .conversation_references import selected_query_reference, tool_public_reference, current_public_references
 
-
-Topic = Literal["technology", "arts", "learning", "life", "galaxy", "unclassified"]
-Reason = Annotated[str, Field(min_length=3, max_length=1600)]
-Deadline = Annotated[int, Field(strict=True, gt=0)]
-
-
-class ClosedArguments(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-
-Module = Literal["accounts", "content", "cases", "chat-reports", "feedback", "files",
-    "resources", "analytics", "recommendations", "search", "messaging", "strategies",
-    "rules", "maintenance", "audit", "runs", "jobs", "permissions", "registered-users", "system-settings"]
-View = Literal["list", "summary", "sections", "tags", "projects", "methods", "overview",
-    "business", "retention", "paths", "account", "history", "plans", "runs", "recipients",
-    "versions", "records", "backups", "logs", "roles", "personnel", "automation",
-    "cleanup-candidates", "cleanup-plans", "general", "mail", "service-connections", "advanced"]
-ReadKind = Literal["account", "account-summary", "post", "reply", "section", "case",
-    "chat-report", "feedback", "chat-file", "forum-file", "project", "method",
-    "message-plan", "message-run", "rule", "strategy-run", "ai-run", "backup-point",
-    "restore-plan", "role", "file-cleanup-plan", "file-cleanup-operation", "registered-user"]
-VIEWS = {"accounts": {"list", "summary"}, "content": {"list", "sections", "tags"},
-    "cases": {"list"}, "chat-reports": {"list"}, "feedback": {"list"},
-    "files": {"list", "summary", "cleanup-candidates", "cleanup-plans"}, "resources": {"projects", "methods"},
-    "analytics": {"overview", "business", "retention", "paths", "account"},
-    "recommendations": {"overview", "history"}, "search": {"overview", "history"},
-    "messaging": {"plans", "runs", "recipients", "history"},
-    "strategies": {"overview", "versions", "records"}, "rules": {"overview", "versions"},
-    "maintenance": {"overview", "backups", "plans", "logs"}, "audit": {"list"},
-    "runs": {"list"}, "jobs": {"list"}, "permissions": {"roles", "personnel", "automation"},
-    "registered-users": {"list"}, "system-settings": {"overview", "general", "mail", "service-connections", "advanced"}}
-Token = Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]{1,80}$")]
-
-
-class QueryFilters(ClosedArguments):
-    """Finite filter fields; Node further validates the exact module/view schema.
-
-    Pagination values and IDs come from tool results. These are neither SQL
-    filters nor a general HTTP parameter bag. Null optional values are omitted.
-    """
-    after: Annotated[str, Field(max_length=1024)] | None = None
-    limit: Annotated[int, Field(strict=True, ge=1, le=100, description="Requested page size, not a total. content/list applies at most 20 rows; use separate kind=post and kind=reply queries for separate samples.")] | None = None
-    query: Annotated[str, Field(max_length=320)] | None = None
-    subjectType: Literal["person", "organization", "agent", "unknown"] | None = None
-    restriction: Literal["normal", "restricted"] | None = None
-    days: Annotated[Annotated[int, Field(strict=True, ge=1, le=90)] | Literal["all"] | None,
-        Field(description="Relative window: analytics accepts integers 1..90 (default 7); recommendations/overview accepts 7,30,90 (default 30); search/overview accepts 7,30,90 (default 7); content/list and feedback/list accept 7,28,all (default 7). Explicitly pass the requested supported window; defaults differ by module. Returned period/basis is authoritative.")] = None
-    kind: Annotated[Literal["post", "reply", "chat", "forum", "all", "business", "reads"] | None,
-        Field(description="content/list accepts post or reply; omission returns one mixed page, not a separate page for each kind. Other modules retain their declared kinds.")] = None
-    topic: Topic | None = None
-    visibility: Literal["visible", "hidden", "unavailable"] | None = None
-    pinned: bool | None = None
-    featured: bool | None = None
-    state: Token | None = None
-    category: Topic | Literal["problem", "suggestion"] | None = None
-    roomId: UUID | None = None
-    module: Literal["account", "community", "chat", "work", "discovery", "other"] | None = None
-    processing: Literal["scan", "cleanup"] | None = None
-    issue: Literal["any", "scan", "cleanup", "all", "no-results", "no-recorded-click",
-        "scan-limited", "unmeasured"] | None = None
-    scope: Literal["accounts"] | None = None
-    accountId: UUID | None = None
-    planId: UUID | None = None
-    runId: UUID | None = None
-    channel: Annotated[Literal["inapp", "email"], Field(
-        description="Official messaging recipients view only; pass its real runId.")] | None = None
-    strategyId: UUID | None = None
-    key: Literal["resource-budget", "community-quota", "forum-quota", "business-controls"] | None = None
-    component: Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")] | None = None
-    level: Literal["all", "info", "warn", "error"] | None = None
-    period: Literal["15m", "1h", "24h"] | None = None
-    before: Annotated[str, Field(max_length=64)] | None = None
-    resourceId: UUID | None = None
-    targetId: UUID | None = None
-    action: Token | None = None
-    day: Annotated[str, Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-        description="Business audit list date only; analytics does not accept a calendar day.")] | None = None
-    page: Annotated[int, Field(strict=True, ge=1, le=100000)] | None = None
-    pageSize: Literal[20, 50, 100] | None = None
-    source: Literal["all", "registered", "business-only"] | None = None
-    business: Literal["formed", "not-formed"] | None = None
-    login: Literal["enabled", "disabled"] | None = None
-    emailVerified: Literal["yes", "no"] | None = None
-    participation: Literal["restricted", "unrestricted"] | None = None
-    registeredFrom: Annotated[str, Field(max_length=64)] | None = None
-    registeredTo: Annotated[str, Field(max_length=64)] | None = None
-    sort: Literal["registered-desc", "registered-asc"] | None = None
-    domain: Literal["overview", "governance", "messaging", "discovery", "maintenance"] | None = None
-    queue: Literal["information-watch", "search-recovery", "content-publication", "account-notice",
-        "retention-cleanup", "messaging-run", "messaging-delivery"] | None = None
-
-
-class AccountSummaryReadFilters(ClosedArguments):
-    """Only account-summary reads accept a selected 7 or 28 day window."""
-    days: Annotated[int, Field(strict=True, json_schema_extra={"enum": [7, 28]})] | None = None
-
-    @model_validator(mode="after")
-    def selected_window(self):
-        if self.days not in {None, 7, 28}:
-            raise ValueError("account-summary read days must be 7 or 28")
-        return self
-
-
-class FeedbackMetadataFilters(ClosedArguments):
-    """The feedback/list route exposes metadata filters, never prose search."""
-    category: Literal["unclassified", "problem", "suggestion"] | None = None
-    module: Literal["account", "community", "chat", "work", "discovery", "other"] | None = None
-    state: Literal["pending", "processing", "closed"] | None = None
-    days: Literal[7, 28, "all"] | None = None
-    after: Annotated[str, Field(pattern=r"^[1-9][0-9]{0,18}$", max_length=19)] | None = None
-    limit: Annotated[int, Field(strict=True, ge=1, le=100)] | None = None
-
-    @model_validator(mode="after")
-    def sequence_boundary(self):
-        if self.after is not None and int(self.after) > 9223372036854775807:
-            raise ValueError("agentos_feedback_cursor_invalid")
-        return self
-
-
-class Visibility(ClosedArguments):
-    targetId: UUID
-    action: Literal["hide", "restore"]
-    until: Deadline | None = None
-    reason: Reason
-
-    @model_validator(mode="after")
-    def exact_deadline(self):
-        if (self.action == "hide") != (self.until is not None):
-            raise ValueError("agentos_hide_deadline_required")
-        return self
-
-
-class ContentVisibility(Visibility):
-    kind: Literal["content-visibility"]
-    targetKind: Literal["post", "reply"]
-
-
-class PublicContentItem(ClosedArguments):
-    kind: Literal["post", "reply"]
-    id: UUID
-
-
-class PublicContentBatch(ClosedArguments):
-    kind: Literal["public-content-batch"]
-    items: Annotated[list[PublicContentItem], Field(min_length=1, max_length=25)]
-    action: Literal["hide", "restore"]
-    until: Deadline | None = None
-    reason: Reason
-
-    @model_validator(mode="after")
-    def bounded_selection(self):
-        if len({(item.kind, item.id) for item in self.items}) != len(self.items):
-            raise ValueError("agentos_duplicate_selected_object")
-        if (self.action == "hide") != (self.until is not None):
-            raise ValueError("agentos_hide_deadline_required")
-        return self
-
-
-class PrivateCaseMessage(ClosedArguments):
-    kind: Literal["private-case-message"]
-    reportId: UUID
-    messageId: UUID
-    action: Literal["hide", "restore", "keep"]
-    summary: Annotated[str, Field(min_length=1, max_length=1600)]
-
-
-class SectionVisibility(Visibility):
-    kind: Literal["section-visibility"]
-
-
-class ResourceVisibility(Visibility):
-    kind: Literal["resource-visibility"]
-    targetKind: Literal["projects", "methods"]
-
-
-class ContentCuration(ClosedArguments):
-    kind: Literal["content-curation"]
-    targetKind: Literal["post", "reply"]
-    targetId: UUID
-    topic: Topic | None = Field(default=None, description=(
-        "Omit topic to leave the existing operational category override unchanged. "
-        "Explicit topic=null clears that override and uses the current source author's "
-        "originalTopic; it does not set an unclassified category or edit the source. "
-        "Read the current object and originalTopic before preparing this change."))
-    pinned: bool | None = None
-    featured: bool | None = None
-    tagIds: Annotated[list[UUID], Field(max_length=8)] | None = None
-    reason: Reason
-
-    @model_validator(mode="after")
-    def changed_field(self):
-        if not any(name in self.model_fields_set and (name == "topic" or getattr(self, name) is not None)
-                for name in ("topic", "pinned", "featured", "tagIds")):
-            raise ValueError("agentos_ordinary_change_required")
-        if self.tagIds is not None and len(set(self.tagIds)) != len(self.tagIds):
-            raise ValueError("agentos_tool_arguments_invalid")
-        return self
-
-
-class SectionClassification(ClosedArguments):
-    kind: Literal["section-classification"]
-    targetId: UUID
-    category: Topic
-    reason: Reason
-
-
-class FeedbackUpdate(ClosedArguments):
-    kind: Literal["feedback-update"]
-    targetId: UUID
-    category: Literal["problem", "suggestion"] | None = None
-    module: Literal["account", "community", "chat", "work", "discovery", "other"] | None = None
-    state: Literal["pending", "processing", "closed"] | None = None
-    note: Annotated[str, Field(min_length=1, max_length=2000,
-        description="Adds an internal note as a separate business change. Omit unless the user explicitly requests that note. Restoring category/module/state does not authorize adding a reason or note; omission keeps existing notes unchanged.")] | None = None
-
-    @model_validator(mode="after")
-    def changed_field(self):
-        if not any(name in self.model_fields_set and (name == "category" or getattr(self, name) is not None)
-                for name in ("category", "module", "state", "note")):
-            raise ValueError("agentos_ordinary_change_required")
-        return self
-
-
-class FileScanRetry(ClosedArguments):
-    kind: Literal["file-scan-retry"]
-    targetKind: Literal["chat", "forum"]
-    targetId: UUID
-    reason: Reason
-
-
-class FileCleanupApprove(ClosedArguments):
-    kind: Literal["file-cleanup-approve"]
-    planId: UUID
-
-
-class AccountRestriction(ClosedArguments):
-    kind: Literal["account-restriction"]
-    targetId: UUID
-    action: Literal["apply", "release"]
-    reason: Annotated[str, Field(min_length=3, max_length=2000)]
-    until: Annotated[str, Field(max_length=64,
-        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")] | None = None
-
-    @model_validator(mode="after")
-    def explicit_deadline(self):
-        if self.action == "apply":
-            if self.until is None:
-                raise ValueError("agentos_account_restriction_deadline_required")
-            # Preserve the exact ISO string. Node owns the authoritative clock,
-            # current account revision, deadline eligibility and actual effect.
-            parsed = datetime.fromisoformat(self.until)
-            if parsed.utcoffset() is None:
-                raise ValueError("agentos_account_restriction_deadline_required")
-        elif self.until is not None:
-            raise ValueError("agentos_account_release_has_no_deadline")
-        return self
-
-
-class FileAccess(ClosedArguments):
-    kind: Literal["file-access"]
-    targetKind: Literal["chat", "forum"]
-    targetId: UUID
-    action: Literal["stop", "restore"]
-    reason: Reason
-    until: Annotated[int, Field(strict=True, gt=0, le=253402300799)] | None = None
-
-    @model_validator(mode="after")
-    def explicit_stop_deadline(self):
-        if self.action == "stop" and self.until is None:
-            raise ValueError("agentos_file_access_deadline_required")
-        if self.action == "restore" and self.until is not None:
-            raise ValueError("agentos_file_access_restore_has_no_deadline")
-        return self
-
-
-class CaseResolve(ClosedArguments):
-    kind: Literal["case-resolve"]
-    targetId: UUID
-    resolution: Literal["accepted", "dismissed", "needs-review"]
-    summary: Reason
-    restrictionAction: Literal["keep", "release", "hide"] | None = None
-    hideUntil: Deadline | None = None
-
-    @model_validator(mode="after")
-    def restriction_deadline(self):
-        effect = self.restrictionAction or ("hide" if self.hideUntil is not None else "keep")
-        if (effect == "hide") != (self.hideUntil is not None):
-            raise ValueError("agentos_hide_deadline_required")
-        return self
-
-
-class MessagingState(ClosedArguments):
-    kind: Literal["messaging-state"]
-    targetId: UUID
-    action: Literal["activate", "pause", "resume", "stop", "withdraw"]
-
-
-class StrategyControl(ClosedArguments):
-    kind: Literal["strategy-control"]
-    action: Literal["pause", "resume"]
-    reason: Reason
-
-
-class StrategyContinue(ClosedArguments):
-    kind: Literal["strategy-continue"]
-    runId: UUID
-    decision: Literal["proceed", "no-action"]
-
-
-class OrdinaryParameterEdit(ClosedArguments):
-    path: Annotated[list[Annotated[int, Field(ge=0, le=19)]], Field(min_length=1, max_length=6)]
-    value: Annotated[int, Field(ge=0)]
-
-
-class OrdinaryStrategyDraft(ClosedArguments):
-    kind: Literal["ordinary-strategy-draft"]
-    strategyId: UUID
-    parameterEdits: Annotated[list[OrdinaryParameterEdit], Field(max_length=30)] = Field(default_factory=list)
-    mode: Literal["code-automatic", "ai-autonomous", "ai-human-participation", "human-led"] | None = None
-    enabled: bool | None = None
-
-    @model_validator(mode="after")
-    def changed_field(self):
-        if not self.parameterEdits and self.mode is None and self.enabled is None:
-            raise ValueError("agentos_ordinary_change_required")
-        return self
-
-
-class OrdinaryStrategyPublish(ClosedArguments):
-    kind: Literal["ordinary-strategy-publish"]
-    strategyId: UUID
-    versionId: UUID
-
-
-SearchReason = Annotated[str, Field(min_length=1, max_length=500)]
-
-
-class JobCancel(ClosedArguments):
-    kind: Literal["job-cancel"]
-    queue: Literal["information-watch", "search-recovery", "content-publication", "account-notice", "retention-cleanup", "messaging-run", "messaging-delivery"]
-    targetId: UUID
-    reason: Reason
-
-
-class JobRetry(JobCancel):
-    kind: Literal["job-retry"]
-
-
-class SearchRetry(ClosedArguments):
-    kind: Literal["search-retry"]
-    targetId: UUID
-    reason: Reason
-
-
-class SearchApply(ClosedArguments):
-    kind: Literal["search-apply"]
-    reason: SearchReason
-
-
-class SearchRestore(ClosedArguments):
-    kind: Literal["search-restore"]
-    versionId: UUID
-    reason: SearchReason
-
-
-RecommendationThemeKey = Annotated[str, Field(max_length=80,
-    pattern=r"^(?:category:(?:technology|arts|learning|life|galaxy|unclassified)|(?:tag|theme):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$")]
-
-
-class RecommendationDirection(ClosedArguments):
-    kind: Literal["recommendation-direction"]
-    themeKey: RecommendationThemeKey
-    direction: Literal["increase", "keep", "decrease"]
-    reason: SearchReason
-
-
-RuleKey = Literal["resource-budget", "community-quota", "forum-quota", "business-controls"]
-RuleReason = Annotated[str, Field(min_length=1, max_length=500)]
-
-
-class RulePublish(ClosedArguments):
-    kind: Literal["rule-publish"]
-    key: RuleKey
-    reason: RuleReason
-
-
-class RuleRestore(ClosedArguments):
-    kind: Literal["rule-restore"]
-    key: RuleKey
-    versionId: UUID
-    reason: RuleReason
-
-
-from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave
-from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
-
-
-_BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
-    SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
-    FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
-    OrdinaryStrategyDraft, OrdinaryStrategyPublish,
-    SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
-DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
-PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
-
-
-def _preparation_type(domain):
-    """Role permission is authoritative; a domain name is only task context."""
-    if domain is not None and (not isinstance(domain, str) or domain not in {
-            "overview", "governance", "messaging", "discovery", "maintenance"}):
-        raise ValueError("agentos_conversation_domain_invalid")
-    return PreparedOperation
-
-
-def _prepared_arguments(operation):
-    """Omit only optional nonnullable Node fields; keep real clearing nulls."""
-    value = operation.model_dump(mode="json", exclude_unset=True)
-    optional_only = {
-        "content-visibility": ("until",), "section-visibility": ("until",),
-        "public-content-batch": ("until",),
-        "resource-visibility": ("until",),
-        "account-restriction": ("until",), "file-access": ("until",),
-        "content-curation": ("pinned", "featured", "tagIds"),
-        "feedback-update": ("module", "state", "note"),
-        "case-resolve": ("restrictionAction", "hideUntil"),
-        "ordinary-strategy-draft": ("mode", "enabled"),
-    }
-    for name in optional_only.get(value["kind"], ()):
-        if value.get(name) is None:
-            value.pop(name, None)
-    if value["kind"] == "ai-role-command" and value["command"]["kind"] == "assignment-save":
-        if value["command"].get("id") is None:
-            value["command"].pop("id", None)
-    # topic=null and category=null remain explicit business clearing intents.
-    return value
-
-
-# Exact affected Node read schemas. These are argument diagnostics only;
-# Node still owns current permissions, defaults, page caps and period/basis.
-_QUERY_FILTER_CONTRACTS = {
-    ("recommendations", "overview"): {
-        "allowedFilters": ["days", "query"], "allowedDays": [7, 30, 90],
-        "defaultDays": 30,
-    },
-    ("search", "overview"): {
-        "allowedFilters": ["days", "query", "issue", "after", "limit"],
-        "allowedDays": [7, 30, 90], "defaultDays": 7,
-    },
-    ("content", "list"): {
-        "allowedFilters": ["query", "targetId", "kind", "topic", "visibility",
-            "pinned", "featured", "days", "after", "limit"],
-        "allowedDays": [7, 28, "all"], "defaultDays": 7,
-        "allowedKinds": ["post", "reply"], "maxReturnedItems": 20,
-    },
-}
-
-
-_FEEDBACK_FILTER_KEYS = ["category", "module", "state", "days", "after", "limit"]
-_FEEDBACK_FILTER_ENUMS = {
-    "category": ["unclassified", "problem", "suggestion"],
-    "module": ["account", "community", "chat", "work", "discovery", "other"],
-    "state": ["pending", "processing", "closed"], "days": [7, 28, "all"],
-}
-
-
-# Exact F14 agentOsQueryArgumentsSchema routes that actually accept days.
-# Requiring a choice here prevents provider-generated omissions from silently
-# selecting different Node defaults. It never infers a window from prose.
-_WINDOW_DAYS = {
-    ("accounts", "summary"): [7, 28],
-    ("content", "list"): [7, 28, "all"],
-    ("feedback", "list"): [7, 28, "all"],
-    ("recommendations", "overview"): [7, 30, 90],
-    ("search", "overview"): [7, 30, 90],
-    **{("analytics", view): list(range(1, 91))
-        for view in ("overview", "business", "retention", "paths", "account")},
-}
-
-# Derived from F14 agentOsQueryArgumentsSchema.parse(...).filters.days;
-# the exact defaults are checked against the actual Node schemas locally.
-_WINDOW_DEFAULT_DAYS = {
-    ("accounts", "summary"): 7, ("content", "list"): 7, ("feedback", "list"): 7,
-    ("recommendations", "overview"): 30, ("search", "overview"): 7,
-    ("analytics", "overview"): 7, ("analytics", "business"): 7,
-    ("analytics", "retention"): 7, ("analytics", "paths"): 7, ("analytics", "account"): 7,
-}
-
-
-def _window_filter_feedback(module, view, values):
-    allowed = _WINDOW_DAYS.get((module, view))
-    if allowed is None:
-        return None
-    supplied = values.get("days")
-    if "days" in values and type(supplied) in {int, str} and supplied in allowed:
-        return None
-    return {"state": "invalid-request", "reason": "agentos_query_window_required" if "days" not in values else "agentos_query_window_invalid",
-        "module": module, "view": view, "requiredFilterKeys": ["days"], "allowedDays": list(allowed),
-        "defaultDays": _WINDOW_DEFAULT_DAYS[(module, view)],
-        "windowRequired": True, "dataRead": False, "effectExecuted": False,
-        "nextStep": "supply-explicit-supported-days-matching-user-request",
-        "explanation": "该视图必须显式传days。用户指定范围时逐项匹配；未指定时间时可显式采用本视图已发布defaultDays并在答复标注，无需追问。本工具不自动填入范围，也不推断用户意图。"}
-
-
-def _analysis_constraints(result, *, module=None, view=None, filters=None):
-    """Add fixed interpretation limits; preserve every original source value."""
-    constraints = {"requestedDays": (filters or {}).get("days") if (module, view) in _WINDOW_DAYS else None,
-        "rules": [
-            "逐项核对原返回period/basis/coverage；请求days不证明每个指标都采用同一窗口，固定周留存、终身值和当前存量必须分别标明。",
-            "统计0只表示该返回口径观察到0；不能据此排除采集故障、漏报、覆盖不足，或断言确实没有人使用。",
-            "null/unknown不是0；有样本也可能unknown。原因只按来源明确reason/status说明，不猜没样本、未到期、未运行或未定型。",
-            "比例须同时核分子、分母、时间和覆盖范围；高CTR或小样本不能推出用户意愿、兴趣或需求极高。",
-            "feedback业务状态与共同task状态、model状态、人工决定状态分别说明；task/model completed不能证明feedback已关闭或业务处理完成。",
-        ]}
-    if module == "maintenance" and view == "logs":
-        constraints["runtimeEventMeanings"] = {"runtime_event_rejected":
-            "Node runtimeLogEvent对非事件名allowlist输入的安全归一化名称；该名称本身不表示反向代理、访问拦截或非法访问。具体HTTP/安全原因仅认来源明确字段。"}
-    return {**result, "analysisConstraints": constraints}
-
-
-def _feedback_filter_feedback(values):
-    try:
-        FeedbackMetadataFilters.model_validate(values)
-        return None
-    except ValidationError as error:
-        # Only schema-owned paths and closed codes reach the model. Neither
-        # supplied values nor an unknown user-provided key is echoed back.
-        issues = []
-        for issue in error.errors(include_input=False, include_context=False, include_url=False)[:5]:
-            field = next((part for part in issue["loc"] if part in _FEEDBACK_FILTER_KEYS), None)
-            issues.append({"path": "filters." + field if field else "filters",
-                "code": "unsupported-filter" if issue["type"] == "extra_forbidden" else "invalid-filter-value"})
-        return {"state": "invalid-request", "reason": "agentos_tool_arguments_invalid",
-            "module": "feedback", "view": "list", "allowedFilterKeys": _FEEDBACK_FILTER_KEYS,
-            "filterEnums": _FEEDBACK_FILTER_ENUMS, "defaults": {"days": 7, "limit": 30},
-            "issues": issues, "scope": "feedback-metadata-only", "dataRead": False,
-            "effectExecuted": False, "nextStep": "use-metadata-filters-or-read-selected-feedback"}
-
-
-def _query_filter_feedback(module, view, values):
-    window_feedback = _window_filter_feedback(module, view, values)
-    if window_feedback is not None:
-        return window_feedback
-    if (module, view) == ("feedback", "list"):
-        return _feedback_filter_feedback(values)
-    contract = _QUERY_FILTER_CONTRACTS.get((module, view))
-    if contract is None:
-        return None
-    invalid = (bool(set(values) - set(contract["allowedFilters"]))
-        or "days" in values and values["days"] not in contract["allowedDays"]
-        or "allowedKinds" in contract and "kind" in values
-        and values["kind"] not in contract["allowedKinds"])
-    if not invalid:
-        return None
-    return {"state": "invalid-request", "reason": "agentos_tool_arguments_invalid",
-        "module": module, "view": view, **contract, "effectExecuted": False}
-
-
-def _preparation_feedback(result):
-    """Explain the original receipt without changing it or inferring effects."""
-    card = result.get("card")
-    state = result.get("state")
-    card_id = card.get("cardId") if isinstance(card, dict) else None
-    try:
-        valid_card = isinstance(card_id, str) and str(UUID(card_id)) == card_id
-    except (ValueError, TypeError, AttributeError):
-        valid_card = False
-    if state in {"unknown", "processing"}:
-        feedback = {"state": state, "cardPrepared": None,
-            "nextStep": "query-original-operation", "mayClaimPrepared": False,
-            "report": "结果仍未知或处理中；只能核对原operation，不得重发prepare或声称已制卡、已执行。"}
-    elif state == "prepared" and isinstance(card, dict) and card.get("state") == "prepared" and valid_card:
-        feedback = {"state": "prepared", "cardPrepared": True,
-            "nextStep": "review-returned-card", "mayClaimPrepared": True,
-            "report": "原Node回执已返回prepared卡及card.cardId；可说明卡已准备，仍须人工确认，不能声称业务已执行。"}
-    elif state == "prepared":
-        feedback = {"state": "unknown", "cardPrepared": None,
-            "nextStep": "query-original-operation", "mayClaimPrepared": False,
-            "report": "prepared回执缺少可核对的card.state/card.cardId；不能声称制卡成功，只查原operation，不重发。"}
-    elif result.get("code") == "operations_ai_prompt_no_change" or result.get("reason") == "operations_ai_prompt_no_change":
-        feedback = {"state": "not-prepared", "cardPrepared": False,
-            "nextStep": "explain-no-change-needed", "mayClaimPrepared": False,
-            "report": "原回执明确无变化，无新卡且没有本次变更效果；说明无需变更，不得称准备成功或自动重试。"}
-    elif state == "completed" or isinstance(card, dict) and card.get("state") == "completed":
-        feedback = {"state": "original-receipt-required", "cardPrepared": False,
-            "nextStep": "read-original-card-receipt", "mayClaimPrepared": False,
-            "report": "这是原卡/原处理结果；只能依据原业务回执说明结果，不得把本次prepare当新卡或新执行。"}
-    else:
-        feedback = {"state": "not-prepared", "cardPrepared": False,
-            "nextStep": "explain-original-refusal", "mayClaimPrepared": False,
-            "report": "本次未返回已准备的真实卡；如实说明原拒绝或限制，不得声称制卡成功，也不猜被隐去的具体原因。"}
-    return {**result, "preparationFeedback": {**feedback,
-        "businessEffect": "not-proven-by-preparation", "automaticRetry": False}}
+# Retain the established import surface for runtime callers and contract consumers.
+from .conversation_tool_contracts import (
+    Topic,
+    Reason,
+    Deadline,
+    ClosedArguments,
+    Module,
+    View,
+    ReadKind,
+    VIEWS,
+    Token,
+    QueryFilters,
+    AccountSummaryReadFilters,
+    FeedbackMetadataFilters,
+    Visibility,
+    ContentVisibility,
+    PublicContentItem,
+    PublicContentBatch,
+    PrivateCaseMessage,
+    SectionVisibility,
+    ResourceVisibility,
+    ContentCuration,
+    SectionClassification,
+    FeedbackUpdate,
+    FileScanRetry,
+    FileCleanupApprove,
+    AccountRestriction,
+    FileAccess,
+    CaseResolve,
+    MessagingState,
+    StrategyControl,
+    StrategyContinue,
+    OrdinaryParameterEdit,
+    OrdinaryStrategyDraft,
+    OrdinaryStrategyPublish,
+    SearchReason,
+    JobCancel,
+    JobRetry,
+    SearchRetry,
+    SearchApply,
+    SearchRestore,
+    RecommendationThemeKey,
+    RecommendationDirection,
+    RuleKey,
+    RuleReason,
+    RulePublish,
+    RuleRestore,
+    _BusinessOperation,
+    DutyPreparedOperation,
+    PreparedOperation,
+    _preparation_type,
+    _prepared_arguments,
+    MessageDraftCreate,
+    MessageDraftSave,
+    AiWorkPromptSave,
+    AiRoleCommand,
+)
+
+from .conversation_tool_feedback import (
+    _QUERY_FILTER_CONTRACTS,
+    _FEEDBACK_FILTER_KEYS,
+    _FEEDBACK_FILTER_ENUMS,
+    _WINDOW_DAYS,
+    _WINDOW_DEFAULT_DAYS,
+    _window_filter_feedback,
+    _analysis_constraints,
+    _feedback_filter_feedback,
+    _query_filter_feedback,
+    _preparation_feedback,
+)
 
 
 def conversation_tools(gateway, *, domain=None):

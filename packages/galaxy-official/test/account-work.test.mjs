@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {AccountWorkService} from '../src/account-work.mjs';
+import {AccountWorkService} from "../src/accounts/work.mjs";
 import {projectWorkHistoryForUpload} from '../../galaxy-core/src/upload-privacy.mjs';
 
 async function browserAccount(f,name){

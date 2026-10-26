@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createApi as currentCreateApi} from '../src/http.mjs';
-import {OperationsAgentOsGateway} from '../src/operations-agentos-gateway.mjs';
+import {OperationsAgentOsGateway} from "../src/operations/agentos/gateway.mjs";
 import {defaultRequestQuotaPolicy} from '../src/adapters/http/request-quotas.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 

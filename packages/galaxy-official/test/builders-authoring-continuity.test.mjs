@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {buildersContinuityFixture} from './builders-client-continuity-workflow.mjs';
-import {createBuildersWebClient} from '../../galaxy-web/src/builders-client.mjs';
+import {createBuildersWebClient} from "../../galaxy-web/src/features/builders/builders-client.mjs";
 
 const pendingKey=f=>'builder-web-v2:'+f.api.endpoint+':'+f.f.actor.subjectId;
 const otherClient=f=>createBuildersWebClient(f.runtime,{subjectId:f.f.actor.subjectId,now:()=>f.f.now,locks:null});

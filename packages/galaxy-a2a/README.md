@@ -16,7 +16,6 @@ package.json 的实际导出为：
 
 实现按运行职责组织：`protocol/` 处理固定 A2A 接口和卡片发现，`hosts/` 接入已有 Native／宿主工作，`facts/` 映射银河事实与对端报告，`storage/` 保存原操作日志。宿主不直接操作日志文件，协议层也不自行取得宿主授权。
 
-旧的 `src/bridge.mjs`、`card-discovery.mjs`、`facts-v2.mjs`、`host-flow.mjs`、`host-flow-v2.mjs` 和 `worker-pack-flow-v2.mjs` 只转出同一实现，供已有 Native／宿主源码入口继续使用。包导出和包内引用使用上表的新位置；新代码不通过这些兼容入口倒接内部模块。
 
 对端卡片、接口、授权和期限依据所选配置固定。读取、准备、执行、取消及导入分别处理；结果未知时查询原任务和操作，不能换 ID 重复派发。停止本地等待不等于已取消远程任务。
 

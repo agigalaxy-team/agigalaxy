@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTrustPackageClient } from '../src/trust-package-client.mjs';
+import { createTrustPackageClient } from "../src/clients/trust-package.mjs";
 import { trustCanonical } from '../src/shared/trust-package-crypto.mjs';
 import { trustSubjectUri } from '../src/shared/trust-package-vc-jose.mjs';
 import { vcJoseClientFixture } from './trust-package-vc-jose-workflow.mjs';

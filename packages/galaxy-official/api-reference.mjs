@@ -9,7 +9,7 @@ const fields=(...names)=>({fields:names});
 const schema=name=>({schema:'src/shared/'+name});
 const optional={authentication:'optional-galaxy-session'};
 
-for(const name of ['providers','begin','status','cancel','confirm','query','revoke'])add('POST','/v1/identity/'+name,'identity',name,'binding',name==='providers'?fields():{schema:'src/identity-links.mjs:'+name},'docs/technical/interfaces.md');
+for(const name of ['providers','begin','status','cancel','confirm','query','revoke'])add('POST','/v1/identity/'+name,'identity',name,'binding',name==='providers'?fields():{schema:"src/identity/links.mjs:"+name},'docs/technical/interfaces.md');
 add('GET','/v1/identity/callback/{providerId}','identity','callback',null,{query:['code','state','iss','error','error_description','error_uri','session_state'],meaning:'OIDC callback tied to an existing pending login; duplicate/unrecognized query keys rejected.'},'docs/technical/interfaces.md',{condition:'selected-oidc-provider'});
 add('POST','/v1/binding-challenges','bindings','challenge',null,fields('subjectId','genesisProof','installationId','scopes'),'docs/technical/interfaces.md',{status:201});
 add('POST','/v1/bindings','bindings','bind',null,fields('challenge','signature','clientSession'),'docs/technical/interfaces.md');
@@ -55,9 +55,9 @@ add('POST','/v1/qualification/evaluate','qualification','evaluate','assistance',
 const moderationRows=[['config','config',fields()],['reports','report',publication],['reports/query','query',schema('moderation-schema.mjs')],['reports/{id}/read','get',fields()],['reports/{id}/events','event',publication]];
 for(const [path,operation,input] of moderationRows)add('POST','/v1/moderation/'+path,'moderation',operation,'moderation',input,'docs/technical/interfaces.md');
 add('POST','/v1/honor/rules','honor','list',null,fields(),'docs/technical/interfaces.md');
-add('POST','/v1/honor/rule-history','honor','ruleHistory',null,{schema:'src/honor.mjs:ruleHistory'},'docs/technical/interfaces.md');
+add('POST','/v1/honor/rule-history','honor','ruleHistory',null,{schema:"src/records/honor.mjs:ruleHistory"},'docs/technical/interfaces.md');
 add('POST','/v1/honor/ranking','honor','ranking',null,fields('ruleId','ruleVersion'),'docs/technical/interfaces.md');
-add('POST','/v1/honor/query','honor','query','history',{schema:'src/honor.mjs:query'},'docs/technical/interfaces.md',optional);
+add('POST','/v1/honor/query','honor','query','history',{schema:"src/records/honor.mjs:query"},'docs/technical/interfaces.md',optional);
 add('GET','/v1/honor/{subjectId}/{ruleId}/{ruleVersion}','honor','query','history',null,'docs/technical/interfaces.md',optional);
 for(const [path,operation] of [['events','publish'],['uses','recordUse']])add('POST','/v1/capsules/'+path,'capsules',operation,'capsules',publication,'docs/technical/interfaces.md');
 for(const [path,operation] of [['read','get'],['query','query'],['uses/query','uses']])add('POST','/v1/capsules/'+path,'capsules',operation,'capsules',schema('capsule-schema.mjs'),'docs/technical/interfaces.md',optional);

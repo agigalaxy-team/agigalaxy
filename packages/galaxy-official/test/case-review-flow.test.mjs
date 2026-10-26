@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createCaseReviewFlow } from '../src/case-review-flow.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createCaseReviewFlow } from "../src/clients/flows/case-review.mjs";
 
 test('Case review flow verifies ownership, exact source version and transitions before signing and cancels during Consent',async()=>{
   const scopes=['binding','consent','case-teaser','history'],f=await serviceFixture(scopes),other=await serviceFixture(scopes,f.db,{migrateDatabase:false});

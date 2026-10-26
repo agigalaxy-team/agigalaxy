@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {autonomyDefaults,parse,fail} from './contract.mjs';
 export const autonomySettingsSchema=z.strictObject({operationId:z.uuid(),expectedRevision:z.number().int().positive(),concurrency:z.number().int().min(1).max(2),healthSeconds:z.number().int().min(10).max(300),startGraceSeconds:z.number().int().min(30).max(1800),roundSeconds:z.number().int().min(60).max(3600),eventCoalesceSeconds:z.number().int().min(1).max(300)});
 export async function runtimeSettingsWithin(service,db){

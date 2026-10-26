@@ -1,7 +1,7 @@
-import {TaskMaterialServiceV1} from '../task-material-v1.mjs';
-import {CommunityForumV1} from '../community-forum-v1.mjs';
+import {TaskMaterialServiceV1} from "../tasks/v2/material-v1.mjs";
+import {CommunityForumV1} from "../community/community-forum-v1.mjs";
 import {recordContentErasure} from './lifecycle-product-v2.mjs';
-import {forumStamp} from '../community-forum-permissions-v1.mjs';
+import {forumStamp} from "../community/community-forum-permissions-v1.mjs";
 
 export async function eraseTaskMaterialWithin(db,row,{at,reason,requestId=null}){
  if(row.erased_at||!row.body_text)return false;

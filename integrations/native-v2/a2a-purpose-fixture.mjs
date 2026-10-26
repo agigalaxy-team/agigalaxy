@@ -11,7 +11,7 @@ import {createApi} from '../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../packages/galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import {createNativeToolServer} from '../../packages/galaxy-edge-mcp/src/native-v2/server.mjs';
-import {createNativeA2aHostV2} from '../../packages/galaxy-a2a/src/host-flow-v2.mjs';
+import {createNativeA2aHostV2} from "../../packages/galaxy-a2a/src/hosts/host-flow-v2.mjs";
 const require=createRequire(new URL('../../packages/galaxy-official/package.json',import.meta.url));
 const{Client,InMemoryTransport}=await import(pathToFileURL(require.resolve('@modelcontextprotocol/client')).href);
 const hash=text=>createHash('sha256').update(text).digest('hex');

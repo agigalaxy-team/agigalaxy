@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyHonorV2Workflow} from '../honor-v2-workflow.mjs';
 test('Honor v2 actual PostgreSQL API role and HTTP enforce independent selected projection permissions and live invalidation',{timeout:60000},async()=>{

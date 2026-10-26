@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createDeletionClient } from '../src/deletion-client.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createDeletionClient } from "../src/clients/deletion.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 import { reviewDeletionRequest } from '../src/operations/deletion-review.mjs';
-import { createRetirementController } from '../src/retirement.mjs';
+import { createRetirementController } from "../src/privacy/retirement.mjs";
 import { retirementFixturePolicy } from './retirement-workflow.mjs';
 
 export async function verifyDeletionWorkflow(database = null, options = {}) {

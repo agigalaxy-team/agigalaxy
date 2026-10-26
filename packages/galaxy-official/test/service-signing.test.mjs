@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { createServices } from '../src/services.mjs';
-import { verifyEnvelope } from '../src/signed-envelope.mjs';
+import { verifyEnvelope } from "../src/security/signed-envelope.mjs";
 
 test('production composition gives each service only its signing purposes and honors live revocation', async () => {
   const key = generateKeyPairSync('ed25519');

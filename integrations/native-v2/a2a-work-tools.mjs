@@ -1,7 +1,7 @@
 import {randomUUID,createHash} from 'node:crypto';
 import * as z from 'zod/v4';
 import {a2aPrepareSchema} from './a2a-tools.mjs';
-import {createA2aFactsV2} from '../../packages/galaxy-a2a/src/facts-v2.mjs';
+import {createA2aFactsV2} from "../../packages/galaxy-a2a/src/facts/facts-v2.mjs";
 import {workerPanelResult} from './compact-app/worker-result.mjs';
 
 const digest=value=>createHash('sha256').update(value).digest('hex');

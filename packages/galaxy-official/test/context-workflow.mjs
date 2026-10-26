@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createContextClient } from '../src/context-client.mjs';
-import { createDataExportClient } from '../src/data-export-client.mjs';
-import { createContextFlow } from '../src/context-flow.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createContextClient } from "../src/clients/context.mjs";
+import { createDataExportClient } from "../src/clients/data-export.mjs";
+import { createContextFlow } from "../src/clients/flows/context.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 
 export async function verifyContextWorkflow(db = null, options = {}) {
   const scopes = ['binding', 'consent', 'case-teaser', 'assistance', 'context', 'data-export'];

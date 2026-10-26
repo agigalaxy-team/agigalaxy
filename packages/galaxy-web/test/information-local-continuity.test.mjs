@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createInformationClientV2} from '../src/information-client-v2.mjs';
+import {createInformationClientV2} from '../src/features/information/client.mjs';
 
 function fixture() {
   const endpoint = 'https://isolated-information.example', subjectId = 'GUID1501M4G06EBK9BEKWK2BYEHW7QSA', rows = new Map(), calls = [];

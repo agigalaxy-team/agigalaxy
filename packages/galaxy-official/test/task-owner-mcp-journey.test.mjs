@@ -9,14 +9,15 @@ import {createApi} from '../src/http.mjs';
 import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
+import {createNativeRecoveryWebFixture} from './native-recovery-web-fixture.mjs';
 
 const names=['galaxy_task_v2_owner_read_prepare','galaxy_task_v2_owner_read',
  'galaxy_task_v2_owner_control_prepare','galaxy_task_v2_owner_control'];
 const content=result=>result.content[0].text;
 // Actual local HTTP, MCP SDK transport, device recovery, JWS and PGlite facts.
-// Local device storage is a Map contract fixture, not a physical browser/IDB.
+// Test-only Native signatures drive control HTTP and a real Web handoff.
+// The consumer under test is ordinary MCP; this does not restore or validate
+// the retired Web recovery coordinator. Web storage is a Map contract fixture.
 // serviceFixture explicitly isolates unrelated public Account quota checks.
 async function fixture(){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),runtimes=[],hosts=[];
@@ -32,11 +33,8 @@ async function fixture(){
   const origin=`http://127.0.0.1:${api.address().port}`,mcpUrl=new URL(`http://127.0.0.1:${mcp.address().port}`);
   async function device(){
    const values=new Map(),get=async k=>structuredClone(values.get(k)),put=async(k,v)=>values.set(k,structuredClone(v));let credential;
-   const store={get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);},async prepareRecovery(subjectId,operationId){const key=`pending-recovery:${subjectId}:${operationId}`;
-    let v=await get(key);if(!v){v={...await createRecoveryMaterial(subjectId),operationId};await put(key,v);}return v;},
-    async declareSaved(subjectId,id){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),saveDeclared:true});},
-    async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),receipt});}};
-   const runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+   const store={get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);}};
+   const runtime=await createNativeRecoveryWebFixture({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
     fetch:(url,options)=>{const authorization=new Headers(options?.headers).get('authorization');if(authorization)credential=authorization.replace(/^Bearer /,'');
      return fetch(origin+new URL(url).pathname,options);}});runtimes.push(runtime);
    await runtime.connect({confirmed:true});
@@ -68,7 +66,7 @@ async function fixture(){
 }
 const readPreview=(host,task,eventIds)=>host.call(names[0],{taskId:task.taskId,operationId:randomUUID(),...(eventIds?{eventIds}:{})});
 const permit=(h,who,p)=>h.sign(who,p.payloadJson,'task.owner-read',JSON.parse(p.payloadJson).operationId,{expiresAt:p.expiresAt});
-const controlPreview=(host,task,kind='cancel',operationId=randomUUID())=>host.call(names[2],{taskId:task.taskId,operationId,kind,reason:'Explicit synthetic owner decision'});
+const controlPreview=(host,task,kind='cancel',operationId=randomUUID())=>host.call(names[2],{taskId:task.taskId,operationId,kind,reason:'Explicit synthetic owner decision',...(kind==='close'?{terminationIntent:'terminate-task'}:{})});
 const controlPermit=(h,who,p,options={})=>h.sign(who,p.payloadJson,'assistance.publish',p.operationId,{expiresAt:p.expiresAt,...options});
 
 test('ordinary MCP returns precise partial authored facts after recovery and separately cancels once with original receipt recovery',async()=>{

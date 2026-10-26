@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createBuilderClient } from '../src/builder-client.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createBuilderClient } from "../src/clients/builder.mjs";
 import { conformanceChecks } from '../src/shared/builders-schema.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export function builderDeclaration(type,ownerId){
   const common={type,name:`Synthetic ${type}`,scope:'Fixture only',policy:'https://builder.example/policy',contact:'https://builder.example/contact',

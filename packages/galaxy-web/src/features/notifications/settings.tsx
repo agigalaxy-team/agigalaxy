@@ -1,4 +1,4 @@
-import { ReadingDetails, ReadingSummary } from '../../reading-details';
+import { ReadingDetails, ReadingSummary } from "../../shared/reading/reading-details";
 import React,{useCallback,useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -6,9 +6,9 @@ import {Bell,BriefcaseBusiness,MessageSquare,X} from 'lucide-react';
 import {z} from 'zod/v4';
 import {inboxOptionsSchema} from '../../../../galaxy-official/src/shared/notification-inbox-schema.mjs';
 import type {createWebRuntime} from '../../runtime.mjs';
-import {createConversationDirectory} from '../../conversation-directory';
-import {MemberAvatar,memberName,useMemberNames} from '../../conversation-ui';
-import {useGovernanceDraft} from '../../governance-presentation';
+import {createConversationDirectory} from "../chat/conversation-directory";
+import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
+import {useGovernanceDraft} from "../governance/governance-presentation";
 import {applyNotificationChanges,hasNotificationChanges,notificationSettingsSatisfied,saveNotificationSelection} from './settings-model.mjs';
 import './settings.css';
 

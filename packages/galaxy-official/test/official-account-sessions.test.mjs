@@ -4,9 +4,9 @@ import {PGlite} from '@electric-sql/pglite';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,dirname,basename} from 'node:path';
-import {migrate} from '../src/database.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOfficialAccountPortal} from '../src/official-account.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOfficialAccountPortal} from "../src/accounts/official-account.mjs";
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 
 const endpoint='https://official.example.org',websiteOrigin='https://galaxy.example.org';

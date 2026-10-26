@@ -7,7 +7,7 @@ import {operationsRead,readOperatorSession} from '../lib/operations.mjs';
 import {SitePublication} from './BusinessViewClients';
 import {OperationsPage} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
-import type {PublicationPage,SnapshotSummary} from './publication-types';
+import type {PublicationPage,SnapshotSummary} from "./site-publication/publication-types";
 export async function PublicationView(props:AdminViewServerProps){
   const {initPageResult}=props,req=initPageResult.req,searchParams=props.searchParams??{};
   if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent('/admin/site-publication'));

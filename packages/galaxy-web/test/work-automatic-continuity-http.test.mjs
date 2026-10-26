@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {privacyConsumerFixture} from "../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs";
 import {getFactClient} from "../src/features/work-records/client.mjs";
-import {createCapsuleWebClient} from "../src/capsule-workspace-client.mjs";
+import {createCapsuleWebClient} from "../src/features/capsules/capsule-workspace-client.mjs";
 import {taskCaseContainerSummary} from "../../galaxy-official/src/shared/cases-schema.mjs";
 
 async function fixture(t){const f=await privacyConsumerFixture();t.after(()=>f.close());return f;}

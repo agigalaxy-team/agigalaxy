@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {OperationsPermissionsService} from '../src/operations/permissions/service.mjs';
 import {operationsPermissionCatalog as catalog,operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
-import {copyRoleDraft,roleDraft,roleMerge,permissionFilterItems,permissionSelectScope,permissionScopeState,permissionRoleTemplates,personPermissionImpact,permissionOperationResult,permissionOperationSelection,permissionHistoryQuery,permissionsLocation,automationDraft,automationSaveBody,permissionScopeLabel,permissionHistoryDeltaLines} from '../../../apps/galaxy-admin/src/lib/permissions-view-model.ts';
+import {copyRoleDraft,roleDraft,roleMerge,permissionFilterItems,permissionSelectScope,permissionScopeState,permissionRoleTemplates,personPermissionImpact,permissionOperationResult,permissionOperationSelection,permissionHistoryQuery,permissionsLocation,automationDraft,automationSaveBody,permissionScopeLabel,permissionHistoryDeltaLines} from "../../../apps/galaxy-admin/src/lib/permissions/permissions-view-model.ts";
 
 // Real local PostgreSQL semantics and galaxy_api column rights. Only the current
 // upstream management directory is an explicit double. Pure UI helpers consume
@@ -40,15 +40,18 @@ test('permission management preserves scoped drafts and current impacts, filters
  const impact=personPermissionImpact(personBefore,[management,viewing,notices],{assignment:{roleId:notices.id,enabled:false}});
  assert.deepEqual(impact.removed,['notices.read']);assert(impact.retained.includes('content.read'));
  assert.equal(personPermissionImpact({...personBefore,authorizationState:'unknown',effective:null},[viewing,notices],{assignment:{roleId:notices.id,enabled:false}}).state,'unknown');
- assert.equal(personPermissionImpact({...personBefore,effective:{...personBefore.effective,source:'upstream-administrator'}},[viewing,notices],{role:{...viewing,enabled:false}}).state,'upstream');
+ assert.equal(personPermissionImpact({...personBefore,effective:{...personBefore.effective,source:'upstream-administrator'}},[viewing,notices],{role:{...viewing,enabled:false}}).state,'unknown');
+ assert.equal(personPermissionImpact({...personBefore,effective:{...personBefore.effective,source:'preconfigured-root'}},[viewing,notices],{role:{...viewing,enabled:false}}).state,'root');
  const draft=roleDraft(notices);draft.name='我的名称';draft.permissions.push('jobs.read');
  const current={...notices,version:2,name:'其他人的名称',description:'其他人补充说明',permissions:[...notices.permissions,'resources.read']};
  const conflict=roleMerge(draft,current);assert.equal(conflict.unresolved,1);assert.equal(conflict.conflicts[0].key,'name');assert.equal(draft.baseVersion,1);
  const merged=roleMerge(draft,current,{name:'mine'});assert.equal(merged.unresolved,0);assert.equal(merged.draft.baseVersion,2);assert.equal(merged.draft.name,'我的名称');assert.equal(merged.draft.description,'其他人补充说明');assert(merged.draft.permissions.includes('resources.read'));assert(merged.draft.permissions.includes('jobs.read'));
  const copied=copyRoleDraft(notices);assert.equal(copied.id,null);assert.equal(copied.baseVersion,0);assert.deepEqual(copied.permissions,notices.permissions);assert.notEqual(copied.permissions,notices.permissions);assert.equal('assignments' in copied,false);
- const legacyGrant={id:randomUUID(),name:'旧范围',executorKind:'ai',mode:'assisted',enabled:false,version:2,permissions:['content.read'],resourceIds:[],executionState:'not-connected',executionAvailable:false,createdAt:time,updatedAt:time};
- const legacyDraft=automationDraft(legacyGrant);assert.equal(legacyDraft.resourceScope.kind,'unresolved');assert.equal(automationSaveBody({...legacyDraft,name:'仅改名称'},catalog).resourceScope.kind,'unresolved');
+ const legacyAiId=randomUUID(),legacyAiOptions={state:'available',items:[{id:legacyAiId,permissions:['content.read']}]};
+ const legacyGrant={aiAccountId:legacyAiId,id:randomUUID(),name:'旧范围',executorKind:'ai',mode:'assisted',enabled:false,version:2,permissions:['content.read'],resourceIds:[],executionState:'not-connected',executionAvailable:false,createdAt:time,updatedAt:time};
+ const legacyDraft=automationDraft(legacyGrant);assert.equal(legacyDraft.resourceScope.kind,'unresolved');assert.equal(automationSaveBody({...legacyDraft,name:'仅改名称'},catalog,legacyAiOptions).resourceScope.kind,'unresolved');
  assert.equal(automationSaveBody({...automationDraft(),name:'未选范围'},catalog),null);
+ assert.equal(automationSaveBody({...legacyDraft,aiAccountId:null},catalog,legacyAiOptions),null,'an unassigned legacy grant cannot acquire an implicit AI account');
  assert.equal(permissionScopeLabel([]),'对象范围未确定');assert(permissionScopeLabel({kind:'eligible'}).includes('后续新对象'));
  const oldDelta={delta:{kind:'automation',permissions:{added:[],removed:[]},enabled:{before:false,after:false},scope:{before:[],after:{kind:'eligible'}},mode:{before:'assisted',after:'assisted'},executorKind:{before:'ai',after:'ai'}}};
  const scopeLine=permissionHistoryDeltaLines(oldDelta,catalog).find(line=>line.label==='对象范围');assert(scopeLine.text.includes('未确定'));assert(scopeLine.text.includes('后续新对象'));

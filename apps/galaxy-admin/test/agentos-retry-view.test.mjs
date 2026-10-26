@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeConversationDisplayRuns,nativeConversationPreviousAttempts} from '../src/lib/agentos-client.ts';
+import {nativeConversationDisplayRuns,nativeConversationPreviousAttempts} from "../src/lib/workbench/agentos-client.ts";
 
 test('regeneration presents one logical question while unrelated identical questions remain distinct',()=>{
  const failed={runId:'first',userInput:'核对当前情况',status:'REGENERATED'};

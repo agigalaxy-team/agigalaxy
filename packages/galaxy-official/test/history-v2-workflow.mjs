@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { HistoryV2Service } from '../src/history-v2.mjs';
+import { HistoryV2Service } from "../src/records/history-v2.mjs";
 
 const scopes = ['binding', 'consent', 'case-teaser', 'assistance', 'evidence', 'proof', 'history'];
 const cg = (f, payload, viewers = [], publicView = false) => f.authorize(payload, 'case.teaser.publish', {

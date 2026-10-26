@@ -2,10 +2,10 @@ import React,{useContext,useEffect,useEffectEvent,useLayoutEffect,useRef,useStat
 import {Bookmark,MessageCircle,FileText} from "lucide-react";
 import type {z} from "zod/v4";
 import {readingBookmarksPageSchema,readingBookmarkKey,readingBookmarkPath} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
-import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../directory-reading-state.mjs";
-import {useOfficialAccountSession,OfficialAccountStatus} from "../../official-account-panel";
-import {useReadTasks} from "../../use-read-task";
-import {LoadingFeedback,ReadFailure} from "../../interaction-feedback";
+import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../shared/reading/directory-reading-state.mjs";
+import {useOfficialAccountSession,OfficialAccountStatus} from "../accounts/official-account-panel";
+import {useReadTasks} from "../../shared/reading/use-read-task";
+import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import './workspace.css';
 import {AccountContext,ReadingBookmarksAccountProvider,errorText,scopeOf,useBookmarkClient,SaveForLaterButton} from './controls';
 import type {ReadingBookmarkReference,BookmarkState,AccountModel,ContextProps} from './controls';

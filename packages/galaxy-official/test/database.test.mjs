@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
-import { migrate, transaction, validateMigrationRoles } from '../src/database.mjs';
+import { migrate, transaction, validateMigrationRoles } from "../src/infrastructure/database.mjs";
 import { migrations } from '../src/infrastructure/migrations.mjs';
 
 test('PostgreSQL schema migration is repeatable and rejects unknown future schemas', async () => {

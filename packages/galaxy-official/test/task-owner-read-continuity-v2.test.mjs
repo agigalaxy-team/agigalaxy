@@ -4,14 +4,15 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createRecoveryMaterial,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
-import {TaskOwnerReadServiceV2} from '../src/task-owner-read-v2.mjs';
+import {createNativeRecoveryWebFixture} from './native-recovery-web-fixture.mjs';
+import {TaskOwnerReadServiceV2} from "../src/tasks/v2/owner-read-v2.mjs";
 import {digest} from '../src/shared/digest.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 
-// Actual HTTP, PGlite, Binding, device control and JWS. The local device store
-// implements its contract with a Map; this is not physical-browser/IDB evidence.
+// Actual HTTP, PGlite, Binding, device control and JWS. A test-only Native
+// signer supplies recovery/revocation and the real Web handoff; the consumer
+// under test is production owner-read, not the retired Web recovery coordinator.
+// The Web store is a Map contract, not physical-browser/IDB evidence.
 async function fixture({retiring=false}={}) {
   const now=Math.floor(Date.now()/1000);let retirementNow=now;
   const retirement=retiring?createRetirementController({version:1,id:'owner-read-test',endpoint:'https://official.example.org',operator:'Synthetic fixture',
@@ -22,13 +23,10 @@ async function fixture({retiring=false}={}) {
   f.taskOwnerRead??=new TaskOwnerReadServiceV2(f.access,f.consents);
   const api=createApi({...f,rateLimit:1000}),values=new Map(),peers=[];let runtime;
   const get=async k=>structuredClone(values.get(k)),put=async(k,v)=>values.set(k,structuredClone(v));
-  const store={get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);},async prepareRecovery(subjectId,operationId){const key=`pending-recovery:${subjectId}:${operationId}`;
-    let v=await get(key);if(!v){v={...await createRecoveryMaterial(subjectId),operationId};await put(key,v);}return v;},
-    async declareSaved(subjectId,id){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),saveDeclared:true});},
-    async recordReceipt(subjectId,id,receipt){const key=`pending-recovery:${subjectId}:${id}`;await put(key,{...await get(key),receipt});}};
+  const store={get,put,async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);return structuredClone(committed);}};
   try{
     await new Promise(resolve=>api.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${api.address().port}`;
-    runtime=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
+    runtime=await createNativeRecoveryWebFixture({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{store,now:()=>f.now,
       fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});
     await runtime.connect({confirmed:true});
     const recovery=await runtime.prepareRecovery();await runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
@@ -50,17 +48,13 @@ async function fixture({retiring=false}={}) {
     const preview=(task,eventIds)=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-read/prepare`,{operationId:randomUUID(),...(eventIds?{eventIds}:{})});
     const permit=async p=>sign(p.payloadJson,'task.owner-read',JSON.parse(p.payloadJson).operationId,{expiresAt:p.expiresAt});
     const read=(task,request)=>runtime.api.call(`/v2/tasks/${task.taskId}/owner-read`,request);
-    const peer=async()=>{const data=new Map(),r=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
+    const peer=async()=>{const data=new Map(),r=await createNativeRecoveryWebFixture({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
       store:{get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)},now:()=>f.now,
       fetch:(url,options)=>fetch(origin+new URL(url).pathname,options)});peers.push(r);
       await r.connect({confirmed:true});return r;};
     const raw=async(path,input,credential)=>{const response=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',
       ...(credential?{authorization:`Bearer ${credential}`}:{})},body:JSON.stringify(input)});return {status:response.status,body:await response.json()};};
-    const revokeDevice=async()=>{const owner=(await runtime.status()).identity,state=await runtime.publicControl(owner.subjectId);
-      const material=await get(`device:${owner.subjectId}:${owner.deviceId}`),device=state.devices.find(d=>d.device_id===owner.deviceId);
-      const challenge=await runtime.api.call('/v2/identity/control/challenges',{version:2,operationId:randomUUID(),subjectId:owner.subjectId,
-        kind:'revoke-device',expectedEpoch:state.epoch,previousEventHash:state.chainHead,signerKeyId:device.key_id,deviceId:owner.deviceId},{authenticated:false});
-      await runtime.api.call('/v2/identity/control/commit',{operationId:challenge.operationId,controllerSignature:await signIdentityPayload(challenge.challenge,material.privateKey)},{authenticated:false});};
+    const revokeDevice=()=>runtime.revokeSelectedWebDevice({confirmed:true});
     return {f,runtime,sign,publish,recover,preview,permit,read,peer,raw,revokeDevice,retirePhase:offset=>{retirementNow=now+offset;},
       close:async()=>{runtime.close();for(const p of peers)p.close();api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await f.db.close();}};
   }catch(error){runtime?.close();api.closeAllConnections();await new Promise(resolve=>api.close(resolve));await f.db.close();throw error;}

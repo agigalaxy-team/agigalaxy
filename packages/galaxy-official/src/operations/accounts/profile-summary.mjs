@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {ServiceError} from '../../shared/service-error.mjs';
 import {businessSummaryQuerySchema} from '../../shared/business-admin-schema.mjs';
 import {hasOperationsPermission} from '../../operations-permission-catalog.mjs';
-import {operationsAnalyticsPeriod} from '../../operations-analytics.mjs';
+import {operationsAnalyticsPeriod} from "../analytics/service.mjs";
 import {DiscoveryAccountProfile,emptyAccountProfileAnalysis} from '../../discovery-runtime/account-profile.mjs';
 
 /** Normal-purpose account observations. It owns no long-running transaction,

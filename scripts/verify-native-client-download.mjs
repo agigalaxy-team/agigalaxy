@@ -3,7 +3,7 @@
 import { resolve } from 'node:path';
 import { downloadedLocal as local,nativeArtifactFilename } from './native-download-inputs.mjs';
 import { calculateJwkThumbprint, importJWK } from 'jose';
-import { verifyRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
+import { verifyRelease } from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 
 const publisher = 'https://agigalaxy.org', kid = 'galaxy-release-20260911';
 const thumbprint = 'mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4';

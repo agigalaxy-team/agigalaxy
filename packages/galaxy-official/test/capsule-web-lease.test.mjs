@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createCapsuleWebClient} from '../../galaxy-web/src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient} from "../../galaxy-web/src/features/capsules/capsule-workspace-client.mjs";
 const subjectId='GUID'+'A'.repeat(28);
 function fixture(family){const state={bindingId:randomUUID(),generation:1,bumpRead:false,bumpLoad:false,bumpSave:false},store=new Map(),calls=[];let _last;
  const api={endpoint:'https://official.example.org',snapshot:()=>({subjectId,bindingId:state.bindingId,generation:state.generation,scopes:['capsules','history','case-teaser','evidence']}),prepareAuthorization:async(payloadJson,options)=>{calls.push('sign');return{payloadJson,intent:{id:randomUUID(),...options}};},submitAuthorization:async p=>({consentId:p.intent.id,payloadJson:p.payloadJson}),call:async(path,input)=>{calls.push(path);if(state.bumpRead){state.generation++;return{privateBody:'old lease body'};}if(path.endsWith('/receipt')||path.endsWith('calculation-receipt'))return{state:'acknowledged',operationId:input.operationId};_last=input;return{};}};

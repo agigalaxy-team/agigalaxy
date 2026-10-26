@@ -3,10 +3,10 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {useOperationsRead} from '../../lib/use-operations-read';
-import type {AgentOsCommand,AgentOsDomain,AgentOsOptions} from '../../lib/agentos-client';
-import {authorizedPreparation,automationContentLabel,grantIncludesContent,preparationUntil,preparedContentHref,type AuthorizedPreparationBody,type AuthorizedPreparationDraft} from '../../lib/authorized-preparation-model';
-import type {PublicContentDetail,PublicContentKind} from '../public-content-types';
-import {AutomationContentPicker} from '../AutomationContentPicker';
+import type {AgentOsCommand,AgentOsDomain,AgentOsOptions} from "../../lib/workbench/agentos-client";
+import {authorizedPreparation,automationContentLabel,grantIncludesContent,preparationUntil,preparedContentHref,type AuthorizedPreparationBody,type AuthorizedPreparationDraft} from "../../lib/workbench/authorized-preparation-model";
+import type {PublicContentDetail,PublicContentKind} from "../content-governance/public-content-types";
+import {AutomationContentPicker} from "../permissions/AutomationContentPicker";
 import {ReadStatus} from '../OperationControls';
 import './authorized-preparation.css';
 

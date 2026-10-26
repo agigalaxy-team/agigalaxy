@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createChatClient} from '../src/chat-client.mjs';
+import {createChatClient} from "../src/features/chat/chat-client.mjs";
 
 const receipt=(roomId,input,state)=>({roomId,...input,state,checkedAt:new Date().toISOString(),currentAccessGranted:false,contentReturned:false,
  othersReadStatus:'not-asserted',acceptedByRoom:state==='accepted',...(['absent','conflict'].includes(state)?{}:{messageId:crypto.randomUUID(),revision:1,

@@ -1,8 +1,8 @@
 import 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
-import {reserveOfficialAccountWithin} from '../../official-account-registration.mjs';
+import {reserveOfficialAccountWithin} from "../../accounts/registration.mjs";
 import {RegisteredUsersReadModel,registeredTargetVersion,registeredStamp} from './registered-read-model.mjs';
 import {registeredUsersParse as parse,registeredUserIdSchema,registeredUserCommandSchema,registeredCommandActions} from './registered-schema.mjs';
 

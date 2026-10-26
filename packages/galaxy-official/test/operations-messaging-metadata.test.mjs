@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {failureRoute} from '../src/adapters/http/failure-audit.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import {dispatchOperationsMessaging} from '../src/adapters/http/operations-messaging-http.mjs';
 import {messagingCreateSchema,messagingParse} from '../src/shared/operations-messaging-schema.mjs';
 

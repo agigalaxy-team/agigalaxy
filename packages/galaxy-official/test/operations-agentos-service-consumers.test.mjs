@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {systemSettingsNativeOverviewSchema} from '../src/operations/system-settings/read-model.mjs';
 import {serviceConnectionKinds,serviceConnectionsConfigurationSchema} from '../src/operations/system-settings/service-connections-schema.mjs';
-import {systemConnectionsQuery} from '../src/operations-agentos-query-extensions-view.mjs';
+import {systemConnectionsQuery} from "../src/operations/agentos/query-extensions-view.mjs";
 
 test('actual service current target and credential metadata survive the safe AI projection',()=>{
  const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');

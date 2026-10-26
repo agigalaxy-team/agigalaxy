@@ -6,7 +6,7 @@ import {dispatchP14Rules} from '../src/adapters/http/operations-rules-http.mjs';
 import {requestUrl} from '../src/adapters/http/policy.mjs';
 import {operationsReadPath,operationsProxyPolicy,operationsRequestBodyLimit} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
 import {p14Fixture} from './p14-rules-fixture.mjs';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 
 test('P14 exact HTTP/BFF routes keep fresh CSRF and strict parameters while actual SQL roles cannot mutate immutable rule history',async t=>{
  const f=await p14Fixture(t),origin='https://admin.example.invalid',base='/v1/operations/rules',headers=new Headers({origin,'sec-fetch-site':'same-origin'}),calls=[];

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createOperationsAgentOsDutyTools} from '../src/operations-agentos-duty-tools.mjs';
+import {createOperationsAgentOsDutyTools} from "../src/operations/agentos/duty-tools.mjs";
 
 // Bridge-only assertions. Full WeakMap, current-role, delegation, SQL and
 // version checks are exercised by operations-ai-prompt-management.test.mjs.

@@ -1,5 +1,5 @@
-import type {WorkbenchAiPromptReview} from '../../lib/ai-work-prompt';
-import {aiWorkPromptSourceLabel} from '../../lib/ai-work-prompt';
+import type {WorkbenchAiPromptReview} from "../../lib/ai-work-accounts/ai-work-prompt";
+import {aiWorkPromptSourceLabel} from "../../lib/ai-work-accounts/ai-work-prompt";
 
 export function WorkbenchPromptReview({review}:{review:WorkbenchAiPromptReview}){
  return <section className="wb-prompt-review" aria-label="岗位工作要求完整变更">

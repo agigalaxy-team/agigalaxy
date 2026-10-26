@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {CaseService,caseEventSchema,caseEventV2Schema} from '../src/cases.mjs';
+import {CaseService,caseEventSchema,caseEventV2Schema} from "../src/cases/index.mjs";
 import {caseFactsV2MigrationSql} from '../src/infrastructure/case-facts-v2-migration.mjs';
 import {digest} from '../src/shared/digest.mjs';
 

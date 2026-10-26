@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {open} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import {createWebRuntime,loadWebConfiguration} from '../packages/galaxy-web/src/runtime.mjs';
-import {verifyTrustPackage} from '../packages/galaxy-official/src/trust-package.mjs';
+import {verifyTrustPackage} from "../packages/galaxy-official/src/verification/trust-package.mjs";
 
 // Authorized, explicitly synthetic public-service probe. This never opens the
 // user's browser database, account credentials, files or a model service.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCurrentOfficialAccount,sameOfficialSession} from '../src/official-account-reading.mjs';
+import {createCurrentOfficialAccount,sameOfficialSession} from "../src/features/accounts/official-account-reading.mjs";
 
 const session=(expiresAt=200)=>({state:'signed-in',account:{id:'account-a',uid:'GALAXY01',displayName:'成员',email:null,emailVerified:true},linkedIds:[],nextAfter:null,expiresAt,csrfToken:'synthetic-csrf',galaxyAuthorization:false});
 

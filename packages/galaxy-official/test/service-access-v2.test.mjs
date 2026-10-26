@@ -7,7 +7,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createGalaxyGenesis} from '../../galaxy-core/src/galaxy-guid.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 import {createIncidentController} from '../src/operations/incident.mjs';
 import {retirementFixturePolicy} from './retirement-workflow.mjs';
 import {retainTaskContactAgent} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';

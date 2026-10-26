@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes,randomUUID } from 'node:crypto';
-import { createSearchClient } from '../src/history-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSearchClient } from "../src/clients/history.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 const endpoint='https://official.example.org';
 function setup(send,scopes=['history','proof','capsules']){
   const sessions=createSessionMemory({now:()=>1000,isCurrent:async()=>true});

@@ -1,5 +1,5 @@
 import {once} from 'node:events';
-import {browserConversationEvent} from '../../operations-agentos-conversation-stream.mjs';
+import {browserConversationEvent} from "../../operations/agentos/conversation-stream.mjs";
 
 // This connection observes one already-recorded turn. Disconnecting it never
 // submits/cancels a run, and no native event body crosses this response.

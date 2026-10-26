@@ -1,4 +1,4 @@
-import {operationsIso,operationsFail} from '../../operations-content-visibility.mjs';
+import {operationsIso,operationsFail} from "../public-content/content-visibility.mjs";
 
 // A position in a processing lifecycle, not a download token or object key.
 export function fileProcessingVersion(row){const error=typeof row.last_error==='string'&&/^attachment_[a-z0-9_]{1,70}$/.test(row.last_error)?row.last_error:row.last_error?'unrecognized-processing-error':null;

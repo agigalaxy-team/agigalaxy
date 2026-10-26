@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { serviceFixture } from '../service-fixture.mjs';
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 25));

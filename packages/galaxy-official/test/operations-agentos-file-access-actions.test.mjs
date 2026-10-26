@@ -4,18 +4,18 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
 import {OperationsFileAccessService} from '../src/operations/files/access-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
-import {workbenchActionCatalog,workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
+import {AgentOsConversationTools} from "../src/operations/agentos/conversation-tools.mjs";
+import {workbenchActionCatalog,workbenchPrepareSchemas} from "../src/operations/agentos/action-catalog.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {workbenchActionCards,workbenchCardReason} from '../../../apps/galaxy-admin/src/lib/workbench-action-cards.ts';
+import {workbenchActionCards,workbenchCardReason} from "../../../apps/galaxy-admin/src/lib/workbench/workbench-action-cards.ts";
 
 // Real PG/API role, current grants, attachment preparation/upload/scan, access
 // overlays and durable card/receipt stores. The management directory, scanner,
@@ -44,7 +44,7 @@ test('workbench file access cards preserve explicit human scope, actual attachme
  const request=(file,action='stop',extra={})=>({kind:'file-access',targetKind:file.kind,targetId:file.id,action,reason:'本次人工决定单个文件访问',...(action==='stop'?{until:f.now()+600}:{}),...extra}),
   prepare=(value,actor=admin,domain='maintenance')=>tools.prepareFor(actor,domain,value),effectCount=async operationId=>(await f.db.query('SELECT count(*)::int AS n FROM operations_file_access_events_v1 WHERE endpoint=$1 AND operation_id=$2',[f.endpoint,operationId])).rows[0].n,
   card=proposal=>({cardId:randomUUID(),operationId:randomUUID(),kind:proposal.kind,domain:proposal.domain,target:proposal.target,title:proposal.title,impact:proposal.impact,basis:proposal.basis,requiredAction:proposal.requiredAction,capability:{canConfirm:true},state:'prepared',checkedAt:f.now(),readExpiresAt:f.now()+30});
- assert.deepEqual(workbenchActionCatalog.map(item=>item.kind).sort((a,b)=>a<b?-1:a>b?1:0),['ai-role-command','ai-work-prompt-save','message-draft-create','message-draft-save','ordinary-strategy-draft','ordinary-strategy-publish','private-case-message','public-content-batch','recommendation-direction','content-visibility','content-curation','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-access','file-cleanup-approve','case-resolve','messaging-state','strategy-control','strategy-continue','search-apply','search-restore','rule-publish','rule-restore'].sort((a,b)=>a<b?-1:a>b?1:0));
+ assert.deepEqual(workbenchActionCatalog.map(item=>item.kind).sort((a,b)=>a<b?-1:a>b?1:0),['job-cancel','job-retry','search-retry','ai-role-command','ai-work-prompt-save','message-draft-create','message-draft-save','ordinary-strategy-draft','ordinary-strategy-publish','private-case-message','public-content-batch','recommendation-direction','content-visibility','content-curation','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-access','file-cleanup-approve','case-resolve','messaging-state','strategy-control','strategy-continue','search-apply','search-restore','rule-publish','rule-restore'].sort((a,b)=>a<b?-1:a>b?1:0));
  assert.deepEqual(workbenchActionCatalog.find(item=>item.kind==='file-access'),{kind:'file-access',domain:'maintenance',label:'停止或恢复单文件访问',read:'files.read',actions:['files.access.stop','files.access.restore'],handler:{service:'fileAccess',methods:['get','change']},humanOnly:false,conditions:['ordinary','current-source','prior-automatic-decision']});
  const input=request(chat),{until:_until,...withoutUntil}=input;
  assert.equal(workbenchPrepareSchemas['file-access'].safeParse(withoutUntil).success,false);assert.equal(workbenchPrepareSchemas['file-access'].safeParse({...input,action:'restore'}).success,false);

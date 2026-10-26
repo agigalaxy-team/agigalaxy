@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {selectedTaskMaterial,taskMaterialPath,contextMaterialMatchesWork} from '../src/task-context-reading.mjs';
+import {selectedTaskMaterial,taskMaterialPath,contextMaterialMatchesWork} from "../src/features/tasks/context/task-context-reading.mjs";
 
 test('material reading keeps only one valid locator in its exact task and materials view',()=>{
   const task=randomUUID(),grant=randomUUID(),location={pathname:`/app/tasks/${task}`,search:`?section=collaboration&view=materials&material=${grant}`};

@@ -1,11 +1,12 @@
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {p14Fixture} from './p14-rules-fixture.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {workbenchActionCatalog,workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
-import {workbenchActionCards} from '../../../apps/galaxy-admin/src/lib/workbench-action-cards.ts';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {workbenchActionCatalog,workbenchPrepareSchemas} from "../src/operations/agentos/action-catalog.mjs";
+import {workbenchActionCards} from "../../../apps/galaxy-admin/src/lib/workbench/workbench-action-cards.ts";
 
 // Real PGlite rule revisions, current business grants, account directory,
 // publication and receipt recovery. Native model and deployment are not used.
@@ -13,6 +14,7 @@ test('workbench rule cards show actual complete changes and publish or restore o
  const f=await p14Fixture(t),authority=new OperationsAgentOsAuthority({...f,permissions:f.permissions}),tools=new OperationsAgentOsActionTools({authority,services:{rules:f.rules,accounts:f.businessAdmin}}),
   kind='business-controls',request={kind:'rule-publish',key:kind,reason:'发布已经审阅的实际草稿'},prepare=(x=request,actor=f.admin,domain='overview')=>tools.prepareFor(actor,domain,x),
   save=async(key,policy)=>{const current=await f.rules.get(f.admin,key);return f.rules.saveDraft(f.admin,key,{operationId:randomUUID(),expectedRevision:current.revision,policy,reason:'服务端保存说明不复制到卡片'},{authorize:f.authorize});};
+ await attachAiWorkFixture({db:f.db,endpoint:f.endpoint,permissions:f.permissions,businessAdmin:f.businessAdmin,authority,admin:f.admin,domains:['overview','governance'],codes:['rules.read','rules.write','accounts.read'],now:f.now});
  assert.deepEqual(workbenchActionCatalog.filter(x=>x.kind.startsWith('rule-')).map(({kind,domain,read})=>({kind,domain,read})),[{kind:'rule-publish',domain:'overview',read:'rules.read'},{kind:'rule-restore',domain:'overview',read:'rules.read'}]);
  const active=await f.rules.get(f.admin,kind),policy=structuredClone(active.active.policy),listId=randomUUID(),ruleId=randomUUID();
  policy.lists=[{id:listId,name:'审核词条',kind:'keyword',enabled:true,entries:['需要审阅']}];policy.rules=[{id:ruleId,name:'新增内容检查',enabled:true,targets:['forum-post'],conditions:{combinator:'and',rules:[{field:'accountTier',operator:'eq',value:'new'},{field:'keywordList',operator:'matches',value:listId}]},action:'reject',exceptions:[{id:randomUUID(),name:'明确例外',enabled:true,accountIds:[f.people[0].accountId]}]}];
@@ -47,7 +49,7 @@ test('workbench rule cards show actual complete changes and publish or restore o
  await assert.rejects(prepare({...restoration,versionId:(await f.rules.get(f.admin,kind)).draft.id}),{code:'operations_rule_version_not_published'});
  assert.equal(workbenchPrepareSchemas['rule-publish'].safeParse({...request,expectedRevision:999}).success,false);assert.equal(workbenchPrepareSchemas['rule-publish'].safeParse({...request,versionId:publishedA.id}).success,false);
  await assert.rejects(prepare(request,f.admin,'governance'),{code:'operations_agentos_domain_mismatch'});
- const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'规则读取',description:'',enabled:true,permissions:['workbench.read','rules.read']},{authorize:f.authorize})).role;
+ const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'规则读取',description:'',enabled:true,permissions:['workbench.read','ai.use.overview','rules.read']},{authorize:f.authorize})).role;
  await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),expectedVersion:0,operatorId:f.reader.operatorId,roleId:role.id,enabled:true},{authorize:f.authorize});await assert.rejects(prepare(request,f.reader),{code:'operations_agentos_operation_unavailable'});
  f.roles.delete(f.admin.operatorId);await assert.rejects(tools.recoverPrepared(f.admin,restore,restoreId),{code:'business_admin_denied',status:403});
 });

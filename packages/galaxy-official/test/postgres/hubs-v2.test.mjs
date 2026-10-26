@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {peeringWorkflow} from '../hub-peering-workflow.mjs';
 import {cleanupHubsWithin} from '../../src/operations/hub-retention-v2.mjs';
 import {lockDeletionTables} from '../../src/operations/deletion-execute.mjs';
-import {transaction} from '../../src/database.mjs';
+import {transaction} from "../../src/infrastructure/database.mjs";
 import {checkHubLifecycle} from '../hub-lifecycle-check.mjs';
 test('Hub and direct peering use restricted PG API role, actual HTTP and worker lifecycle',{timeout:120000},async()=>{
   assert.equal(process.env.GALAXY_TEST_PG_ISOLATED,'1');

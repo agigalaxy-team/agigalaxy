@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildersContinuityFixture } from './builders-client-continuity-workflow.mjs';
 import { configurationExample } from './configuration-v2-workflow.mjs';
-import { createConfigurationClient } from '../../galaxy-web/src/configuration-client.mjs';
+import { createConfigurationClient } from "../../galaxy-web/src/features/tools/configuration-client.mjs";
 
 const clientFor = (f, api = f.runtime.api) => createConfigurationClient({ api,
   subjectId:f.f.actor.subjectId,now:()=>f.f.now,

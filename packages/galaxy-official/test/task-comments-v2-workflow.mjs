@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 import { taskCommentsV2MigrationSql } from '../src/infrastructure/task-comments-v2-schema.mjs';
-import { TaskCommentServiceV2 } from '../src/task-comments-v2.mjs';
-import { CommentGovernanceServiceV2 } from '../src/comment-governance-v2.mjs';
+import { TaskCommentServiceV2 } from "../src/tasks/v2/comments-v2.mjs";
+import { CommentGovernanceServiceV2 } from "../src/governance/comment-governance-v2.mjs";
 import { digest } from '../src/shared/digest.mjs';
 
 export async function verifyTaskCommentsV2({

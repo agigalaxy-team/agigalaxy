@@ -38,25 +38,25 @@ export interface StableHostApi {
     DialogSelect(input: { title: string; skipFilter: boolean; options: { title: string; description?: string; value: string; disabled: boolean; onSelect: Action }[] }): unknown;
   };
 }
-export type ConnectionController = ReturnType<typeof import('../../../packages/galaxy-official/src/host-connection-controller.mjs').createHostConnectionController> & {
-  createContextDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['createContextDraft'];
-  getContextDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['getContextDraft'];
-  previewContextFile?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['previewContextFile'];
-  saveContextDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['saveContextDraft'];
-  rebaseContextDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['rebaseContextDraft'];
-  listContextDrafts?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['listContextDrafts'];
-  forgetContextDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['forgetContextDraft'];
-  getLocalContextOperation?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['getLocalContextOperation'];
-  listBindingReceipts?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['listBindingReceipts'];
-  createAssistanceDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['createAssistanceDraft'];
-  createAssistanceEventDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['createAssistanceEventDraft'];
-  rebaseAssistanceDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['rebaseAssistanceDraft'];
-  getAssistanceDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['getAssistanceDraft'];
-  saveAssistanceDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['saveAssistanceDraft'];
-  listAssistanceDrafts?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['listAssistanceDrafts'];
-  forgetAssistanceDraft?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['forgetAssistanceDraft'];
-  querySearchFeedback?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['querySearchFeedback'];
-  editSearchFeedback?: ReturnType<typeof import('../../../packages/galaxy-official/src/local-host-runtime.mjs').createLocalHostRuntime>['controller']['editSearchFeedback'];
+export type ConnectionController = ReturnType<typeof import("../../../packages/galaxy-official/src/clients/flows/host-connection-controller.mjs").createHostConnectionController> & {
+  createContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createContextDraft'];
+  getContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getContextDraft'];
+  previewContextFile?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['previewContextFile'];
+  saveContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['saveContextDraft'];
+  rebaseContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['rebaseContextDraft'];
+  listContextDrafts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listContextDrafts'];
+  forgetContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['forgetContextDraft'];
+  getLocalContextOperation?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getLocalContextOperation'];
+  listBindingReceipts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listBindingReceipts'];
+  createAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createAssistanceDraft'];
+  createAssistanceEventDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createAssistanceEventDraft'];
+  rebaseAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['rebaseAssistanceDraft'];
+  getAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getAssistanceDraft'];
+  saveAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['saveAssistanceDraft'];
+  listAssistanceDrafts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listAssistanceDrafts'];
+  forgetAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['forgetAssistanceDraft'];
+  querySearchFeedback?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['querySearchFeedback'];
+  editSearchFeedback?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['editSearchFeedback'];
 };
 export type DiscoverySource = ReturnType<typeof import('./configured-runtime.mjs').createConfiguredRuntime>;
 export type BindingReceiptView = { endpoint: string; bindingId: string; subjectId: string; installationId: string; scopes: string[];

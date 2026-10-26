@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rulesClone,rulesHref,rulesIsControls,rulesLocation,rulesMerge,rulesNewDraft,rulesNewRule,rulesPath,rulesQuery,rulesSampleFacts,rulesSetNumeric,rulesTraceLabel,rulesValidation} from '../src/lib/rules-view-model.ts';
+import {rulesClone,rulesHref,rulesIsControls,rulesLocation,rulesMerge,rulesNewDraft,rulesNewRule,rulesPath,rulesQuery,rulesSampleFacts,rulesSetNumeric,rulesTraceLabel,rulesValidation} from "../src/lib/rules/rules-view-model.ts";
 import {p14RulesCatalog} from '../../../packages/galaxy-official/src/operations/rules/catalog.mjs';
 
 const ruleId='84309cc7-b49a-4233-83b6-079edfd6c804',listId='899fd0f4-c1f1-412b-b64a-39a56050d292',otherId='da7d64fa-ac81-4e49-9dc8-032b71106aa0';

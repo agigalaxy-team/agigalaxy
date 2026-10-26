@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {createOperationsAgentOsDutyTools} from '../src/operations-agentos-duty-tools.mjs';
-import {originalOperationTarget} from '../src/operations-agentos-duty-receipts.mjs';
+import {createOperationsAgentOsDutyTools} from "../src/operations/agentos/duty-tools.mjs";
+import {originalOperationTarget} from "../src/operations/agentos/duty-receipts.mjs";
 
 const fixture=()=>{
  const task={id:randomUUID(),ai_account_id:randomUUID()},actor={kind:'operations-ai-service',taskId:null,aiAccountId:null};

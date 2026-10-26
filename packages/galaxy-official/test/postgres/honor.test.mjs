@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { workerReads } from '../../src/infrastructure/worker-reads.mjs';
 import { serviceFixture } from '../service-fixture.mjs';
-import { HonorService } from '../../src/honor.mjs';
-import { EvidenceService } from '../../src/evidence.mjs';
-import { ConsentReader } from '../../src/consent-reader.mjs';
-import { inspectGithubRun } from '../../src/github-evidence.mjs';
-import { createHonorClient } from '../../src/honor-client.mjs';
+import { HonorService } from "../../src/records/honor.mjs";
+import { EvidenceService } from "../../src/evidence/evidence.mjs";
+import { ConsentReader } from "../../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../../src/evidence/github-evidence.mjs";
+import { createHonorClient } from "../../src/clients/honor.mjs";
 import { createApi } from '../../src/http.mjs';
 
 test('PostgreSQL Honor scans all source pages and retries a concurrent withdrawal without mixed totals',async()=>{

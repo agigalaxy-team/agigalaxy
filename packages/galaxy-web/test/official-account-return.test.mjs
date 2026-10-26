@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rememberOfficialAccountReturn,restoredOfficialAccountReturn} from '../src/official-account-return.mjs';
+import {rememberOfficialAccountReturn,restoredOfficialAccountReturn} from "../src/features/accounts/official-account-return.mjs";
 const website='https://galaxy.example.org',id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',target='/app/settings/identity?section=account';
 const storage=()=>{const rows=new Map();return{getItem:key=>rows.get(key)??null,setItem:(key,value)=>rows.set(key,value),rows};};
 

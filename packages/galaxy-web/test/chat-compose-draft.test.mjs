@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createChatComposeDraft} from '../src/chat-compose-draft.ts';
+import {createChatComposeDraft} from "../src/features/chat/chat-compose-draft.ts";
 
 function fixture(){
  const rows=new Map(),roomId=crypto.randomUUID(),subjectId='GUID'+'A'.repeat(28);let generation=1,failNext=false;

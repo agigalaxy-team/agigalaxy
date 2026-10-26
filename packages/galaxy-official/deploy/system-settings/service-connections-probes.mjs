@@ -1,5 +1,5 @@
 import {MeilisearchClient,GorseClient,OpenPanelClient} from '../../src/discovery-runtime/native-clients.mjs';
-import {OperationsAgentOsClient} from '../../src/operations-agentos-client.mjs';
+import {OperationsAgentOsClient} from "../../src/operations/agentos/client.mjs";
 import {AttachmentClamAV} from '../../src/infrastructure/attachment-clamav.mjs';
 import {serviceConnectionSchema,serviceCredentialSchemas,serviceConnectionTestSchema} from '../../src/operations/system-settings/service-connections-schema.mjs';
 

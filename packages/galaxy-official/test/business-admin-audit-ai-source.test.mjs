@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {migrate,transaction} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {OperationsMessagingService} from '../src/operations-messaging.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
-import {auditItem} from '../src/operations-agentos-query-view.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {OperationsMessagingService} from "../src/operations/messaging/index.mjs";
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
+import {auditItem} from "../src/operations/agentos/query-view.mjs";
 
 // Actual current migrations, PG constraints, galaxy_api privileges, business
 // services, role reload and process-attested AI identity. Only the approved

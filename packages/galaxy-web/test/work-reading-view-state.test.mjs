@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createMaterialDeadline} from '../src/outcome-material-deadline.ts';
-import {checkedOutcomeDraft,hasMaterialAttempt} from '../src/outcome-material-view-types.ts';
-import {ownerRecordBody} from '../src/task-owner-read-view-types.ts';
+import {createMaterialDeadline} from "../src/features/outcome-materials/outcome-material-deadline.ts";
+import {checkedOutcomeDraft,hasMaterialAttempt} from "../src/features/outcome-materials/outcome-material-view-types.ts";
+import {ownerRecordBody} from "../src/features/tasks/owner/task-owner-read-view-types.ts";
 
 function clock(start=1000){
  let now=start,id=0;const pending=new Map();

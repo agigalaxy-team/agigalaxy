@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {capsuleWebContinuityFixture} from '../../galaxy-official/test/capsule-web-continuity-fixture.mjs';
-import {createCapsuleWebClient} from '../src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient} from "../src/features/capsules/capsule-workspace-client.mjs";
 import {ServiceError} from '../../galaxy-official/src/shared/service-error.mjs';
 
 const writes=f=>({consents:f.requests.filter(r=>r.path==='/v1/consents').length,

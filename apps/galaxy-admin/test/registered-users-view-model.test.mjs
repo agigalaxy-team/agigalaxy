@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {registeredCanCommand,registeredDateFromInput,registeredDateInput,registeredEmailLabel,registeredLoginLabel,registeredParticipationLabel,registeredReceiptLabel,registeredReceiptMatches,registeredSourceMessage,registeredUserName,registeredUsersHref,registeredUsersLocation,registeredUsersQuery} from '../src/lib/registered-users-view-model.ts';
+import {registeredCanCommand,registeredDateFromInput,registeredDateInput,registeredEmailLabel,registeredLoginLabel,registeredParticipationLabel,registeredReceiptLabel,registeredReceiptMatches,registeredSourceMessage,registeredUserName,registeredUsersHref,registeredUsersLocation,registeredUsersQuery} from "../src/lib/accounts/registered-users-view-model.ts";
 
 const registrationId='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',operationId='33333333-3333-4333-8333-333333333333';
 const native=()=>({registrationId,identity:{source:'keycloak-website',issuer:null,subject:null,displayName:'身份源姓名',email:null,emailVerified:false,enabled:true,registeredAt:'2026-10-24T00:12:34.567Z',presence:'present',readState:'not-authorized'},business:null,stage:{state:'unknown',basis:'not-read'},observedAt:'2026-10-24T00:12:34Z'});

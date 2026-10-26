@@ -17,7 +17,7 @@ import {registerNativeCompactApps} from './server.mjs';
 import {registerNativeWorkerTools} from '../worker-tools.mjs';
 import {workerPanelResult} from './worker-result.mjs';
 import {createNativeWorkerPackAdapter} from '../../../packages/galaxy-edge-mcp/src/native-v2/adapters/worker-pack.mjs';
-import {createWorkerPackHostFlowV2} from '../../../packages/galaxy-a2a/src/worker-pack-flow-v2.mjs';
+import {createWorkerPackHostFlowV2} from "../../../packages/galaxy-a2a/src/hosts/worker-pack-flow-v2.mjs";
 
 const compact=fileURLToPath(new URL('.',import.meta.url)),out=fileURLToPath(new URL('../../../outputs/compact-host-view-state/tmp/',import.meta.url));await mkdir(out,{recursive:true});
 const directory=await mkdtemp(join(tmpdir(),'galaxy-host-view-browser-')),f=await serviceFixture(browserScopes),checks=[],errors=[],calls=[];

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { HonorService } from '../src/honor.mjs';
+import { HonorService } from "../src/records/honor.mjs";
 import { createApi } from '../src/http.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHonorClient } from '../src/honor-client.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHonorClient } from "../src/clients/honor.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export async function verifyHonorCorrection(database=null,options={}){
   const endpoint=options.endpoint??'https://correction-honor.example.org',scopes=['binding','consent','case-teaser','assistance','history','evidence','proof','moderation'];

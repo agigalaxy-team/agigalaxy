@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {verifySharedSummaryWorkflow} from './chat-shared-summary-workflow.mjs';
-import {prepareRoomSummaryShare} from '../src/chat-shared-summary-client.mjs';
+import {prepareRoomSummaryShare} from "../src/clients/chat-shared-summary.mjs";
 test('explicit shared version, stable room message and current source lifecycle',async()=>verifySharedSummaryWorkflow());
 test('selection preparation never uploads private unselected content',async()=>{
  const roomId=randomUUID(),first=randomUUID(),second=randomUUID(),content={generator:{kind:'manual'},coverage:{fromSequence:'0',throughSequence:'1',complete:true},

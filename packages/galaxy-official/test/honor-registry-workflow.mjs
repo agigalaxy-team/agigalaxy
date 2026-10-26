@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { HonorService } from '../src/honor.mjs';
+import { HonorService } from "../src/records/honor.mjs";
 import { createApi } from '../src/http.mjs';
-import { createHonorClient } from '../src/honor-client.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createHonorClient } from "../src/clients/honor.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 import { recordRuntimeConfig,runtimeConfigSnapshot,verifyRuntimeConfigEvent } from '../src/operations/runtime-config-audit.mjs';
 import { approveFixtureDeletion } from './deletion-execute-workflow.mjs';
 import { executeDeletion } from '../src/operations/deletion-execute.mjs';

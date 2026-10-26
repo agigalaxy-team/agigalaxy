@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, createHash } from 'node:crypto';
-import { signRelease, verifyRelease } from '../src/release-artifact.mjs';
+import { signRelease, verifyRelease } from "../src/infrastructure/release-artifact.mjs";
 
 test('release JWS binds exact package/report and caller-pinned publisher/key lifetime', async () => {
   const sha = bytes => createHash('sha256').update(bytes).digest('hex');

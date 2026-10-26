@@ -12,8 +12,8 @@ const canonical='packages/galaxy-official/src/adapters/mcp/personal/';
 const tools=(await readdir(resolve(root,canonical,'tools'))).filter(name=>name.endsWith('.mjs')).sort();
 assert(tools.length>0,'The MCP tools directory must contain runtime sources');
 for(const [old,current] of [
- ['packages/galaxy-official/src/personal-mcp.mjs',canonical+'handler.mjs'],
- ['packages/galaxy-official/src/personal-mcp-config.mjs',canonical+'configuration.mjs'],
+ ["packages/galaxy-official/src/adapters/mcp/personal/handler.mjs",canonical+'handler.mjs'],
+ ["packages/galaxy-official/src/adapters/mcp/personal/configuration.mjs",canonical+'configuration.mjs'],
 ]){
  const entry=await import(pathToFileURL(resolve(root,old)));
  const implementation=await import(pathToFileURL(resolve(root,current)));

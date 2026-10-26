@@ -3,10 +3,10 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { CompactSign } from 'jose';
 import { serviceFixture } from './service-fixture.mjs';
 import { createGalaxyGenesis } from '../../galaxy-core/src/galaxy-guid.mjs';
-import { createRetirementController } from '../src/retirement.mjs';
+import { createRetirementController } from "../src/privacy/retirement.mjs";
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createDataExportClient } from '../src/data-export-client.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createDataExportClient } from "../src/clients/data-export.mjs";
 import { deletionPreview } from '../src/operations/deletion-preview.mjs';
 
 export const retirementFixturePolicy = (base = 2000000000) => ({ version: 1, id: 'synthetic-exit-v1', endpoint: 'https://official.example.org',

@@ -9,7 +9,7 @@ import { digest } from '../src/shared/digest.mjs';
 import { createApi } from '../src/http.mjs';
 import { workerPackUseToolDefinitions } from '../src/adapters/mcp/personal/tools/worker-pack-uses-v2.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';
-import { createWorkerPackUseClient } from '../../galaxy-web/src/worker-pack-use-client.mjs';
+import { createWorkerPackUseClient } from "../../galaxy-web/src/features/tools/worker-pack-use-client.mjs";
 import { approveFixtureDeletion } from './deletion-execute-workflow.mjs';
 import { executeDeletion } from '../src/operations/deletion-execute.mjs';
 const scopes = [

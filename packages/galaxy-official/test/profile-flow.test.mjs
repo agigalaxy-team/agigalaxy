@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createProfileFlow } from '../src/profile-flow.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createProfileFlow } from "../src/clients/flows/profile.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 
 test('Profile signed host flow does not overwrite intervening edits or publish after cancellation during authorization',async()=>{
   const scopes=['binding','history','consent'],f=await serviceFixture(scopes),endpoint=f.access.endpoint;

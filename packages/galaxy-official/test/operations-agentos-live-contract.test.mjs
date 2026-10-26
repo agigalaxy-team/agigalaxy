@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsAgentOsClient} from '../src/operations-agentos-client.mjs';
+import {OperationsAgentOsClient} from "../src/operations/agentos/client.mjs";
 
 test('native current-authority outage remains unavailable while an actual denial remains a denial in the conversation client',async()=>{
  const conversation={id:randomUUID(),domain:'overview',mode:'conversation',sessionId:randomUUID()},calls=[];

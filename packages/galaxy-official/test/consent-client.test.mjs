@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
-import { createConsentClient } from '../src/consent-client.mjs';
-import { postPublicJson } from '../src/public-fetch.mjs';
+import { createConsentClient } from "../src/clients/consent.mjs";
+import { postPublicJson } from "../src/infrastructure/public-fetch.mjs";
 import { serviceFixture } from './service-fixture.mjs';
 
 const endpoint = 'https://official.example.org';

@@ -1,8 +1,8 @@
 'use client';
 
 import {Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
-import type {AnalyticsSeriesPoint} from '../analytics-types';
-import {analyticsDate,analyticsNumber} from '../../lib/analytics-view-model';
+import type {AnalyticsSeriesPoint} from "./analytics-types";
+import {analyticsDate,analyticsNumber} from "../../lib/analytics/analytics-view-model";
 
 export function UsageTrendPlot({data,gradientId:id}:{data:readonly AnalyticsSeriesPoint[];gradientId:string}){
  return <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{width:640,height:230}}>

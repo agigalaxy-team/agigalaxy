@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {searchQualityLocation,searchQualitySearchKeys} from '../lib/search-quality-view-model';
+import {searchQualityLocation,searchQualitySearchKeys} from "../lib/search/search-quality-view-model";
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 import {SearchQuality} from './BusinessViewClients';

@@ -1,5 +1,5 @@
 import { PgBoss } from 'pg-boss';
-import { createOperationsJobs, operationsDatabase } from '../src/operations-jobs.mjs';
+import { createOperationsJobs, operationsDatabase } from "../src/operations/jobs/service.mjs";
 
 export function queueFixture(db) {
   const boss = new PgBoss({ db: operationsDatabase(db), schema: 'galaxy_jobs', migrate: false,

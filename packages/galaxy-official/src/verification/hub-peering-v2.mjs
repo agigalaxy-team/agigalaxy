@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {verifyEnvelope} from '../signed-envelope.mjs';
+import {verifyEnvelope} from "../security/signed-envelope.mjs";
 import {ciProofV2Schema,describeCiProofV2} from '../shared/ci-observation-v2-schema.mjs';
 import {contributionSourceRefSchema} from '../shared/contribution-sharing-v2-schema.mjs';
 import {digest} from '../shared/digest.mjs';

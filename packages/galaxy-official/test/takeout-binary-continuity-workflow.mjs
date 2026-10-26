@@ -4,9 +4,9 @@ import {Readable} from 'node:stream';
 import {serviceFixture} from './service-fixture.mjs';
 import {attachmentContractFixture} from './chat-attachments-workflow.mjs';
 import {approveOutcomeCopy} from './outcome-material-lifecycle-continuity-workflow.mjs';
-import {OutcomeMaterialServiceV2} from '../src/outcome-material-v2.mjs';
+import {OutcomeMaterialServiceV2} from "../src/evidence/outcome-material-v2.mjs";
 import {createApi} from '../src/http.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 import {serviceAccessV2} from '../src/operations/service-access-v2.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');

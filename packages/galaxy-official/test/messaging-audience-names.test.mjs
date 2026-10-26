@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {messagingAudienceAccountsWithin} from '../src/operations/messaging/views.mjs';
 
 // Actual migrations, endpoint-bound PostgreSQL query and the existing API role.

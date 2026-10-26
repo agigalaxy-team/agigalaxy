@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskOwnerReadClient } from '../src/task-owner-read-client.mjs';
+import { createTaskOwnerReadClient } from "../src/features/tasks/owner/task-owner-read-client.mjs";
 import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
 
 const now = 2000000000, taskId = crypto.randomUUID(), rootId = crypto.randomUUID();

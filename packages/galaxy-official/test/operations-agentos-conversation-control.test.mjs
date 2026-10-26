@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
 import {bindOperationsAiUse,withOperationsAiWork} from '../src/shared/operations-ai-use.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';

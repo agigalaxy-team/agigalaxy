@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { defaultResourceBudgetPolicy,subjectResourceUsage } from '../src/infrastructure/resource-budgets.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 const rootFor=subjectId=>({id:randomUUID(),kind:'case',localRef:randomUUID(),title:'资源测试',summary:'Synthetic resource budget',source:{kind:'local',reference:randomUUID()},participants:[{subjectId,role:'requester'}]});
 export async function verifyResourceBudgets(database=null,options={}){
   const policy={...defaultResourceBudgetPolicy,maxActiveExportsPerSubject:1,maxQueuedJobsPerSubject:1,maxActiveJobsGlobal:1,maxActiveJobsPerSubject:1};

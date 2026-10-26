@@ -1,13 +1,13 @@
 import React,{useCallback,useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Bell,Check} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {OfficialAccountStatus,type OfficialAccountModel,type OfficialSession} from '../../official-account-panel';
-import {AccountSessionScope,useAccountSessionModel} from '../../account-session-scope';
-import {forumVersionPath} from '../../community-forum-origin.mjs';
-import type {ForumNotification} from '../../community-forum-view-types';
-import {MemberAvatar} from '../../conversation-ui';
-import {LoadingFeedback,ReadFailure} from '../../interaction-feedback';
-import {useReadTasks} from '../../use-read-task';
+import {OfficialAccountStatus,type OfficialAccountModel,type OfficialSession} from "../accounts/official-account-panel";
+import {AccountSessionScope,useAccountSessionModel} from "../accounts/account-session-scope";
+import {forumVersionPath} from "../community-forum/community-forum-origin.mjs";
+import type {ForumNotification} from "../community-forum/community-forum-view-types";
+import {MemberAvatar} from "../../shared/people/conversation-ui";
+import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
+import {useReadTasks} from "../../shared/reading/use-read-task";
 
 type Model=OfficialAccountModel;
 type Props={endpoint?:string;navigate:(path:string)=>void;secondary?:boolean};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {caseDecisionBody,caseHideDurations,caseSourceLink,casesHref,casesNextHref,casesPreviousHref,casesReadPath,filterCases,normalizeCaseFilters} from '../src/components/cases-types.ts';
+import {caseDecisionBody,caseHideDurations,caseSourceLink,casesHref,casesNextHref,casesPreviousHref,casesReadPath,filterCases,normalizeCaseFilters} from "../src/components/content-governance/cases-types.ts";
 
 const id='11111111-1111-4111-8111-111111111111',next='22222222-2222-4222-8222-222222222222',post='33333333-3333-4333-8333-333333333333';
 const report=(change={})=>({id,target:{kind:'post-version',postId:post,versionId:next},version:3,state:'pending',reporterAccountId:null,reporterId:null,targetAuthorAccountId:null,targetAuthorId:null,operationsDisclosed:true,createdAt:'2026-10-22T01:00:00Z',closedAt:null,restrictedUntil:null,canModerate:true,maxHideSeconds:3600,knownPartyConflict:false,checkedAt:1000,source:{locator:{kind:'post-version',postId:post,versionId:next},availability:'available',content:{title:'公开标题',body:'来源正文不得用于本页标识检索',links:[]},publishedUntil:4600},...change});

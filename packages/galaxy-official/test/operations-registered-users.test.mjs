@@ -4,14 +4,14 @@ import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 import {OperationsRegisteredUsersService} from '../src/operations/accounts/registered-service.mjs';
-import {createKeycloakWebsiteDirectory} from '../src/keycloak-website-directory.mjs';
-import {createOfficialAccountPortal} from '../src/official-account.mjs';
-import {OfficialAccountSessionStore} from '../src/official-account-session-store.mjs';
-import {createAccountUid,upsertOfficialAccountWithin,ensureOfficialAccountProfileWithin} from '../src/official-account-uid.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {createKeycloakWebsiteDirectory} from "../src/identity/authentication/keycloak-website-directory.mjs";
+import {createOfficialAccountPortal} from "../src/accounts/official-account.mjs";
+import {OfficialAccountSessionStore} from "../src/accounts/session-store.mjs";
+import {createAccountUid,upsertOfficialAccountWithin,ensureOfficialAccountProfileWithin} from "../src/accounts/uid.mjs";
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import {registeredUsersPermissionCodes} from '../src/infrastructure/operations-registered-users-v1-schema.mjs';
 
 function nativeFixture(users,issuer='https://website-auth.example/realms/galaxy'){
@@ -47,18 +47,18 @@ function nativeFixture(users,issuer='https://website-auth.example/realms/galaxy'
  return {directory,state,privateValue,transport};
 }
 
-// Real PG authority, old released <=119 plus 121 (held120 deliberately absent),
+// Real PG authority and current schema including registered-users121 (held120 deliberately absent),
 // and real API/worker SQL roles. Native Keycloak HTTP is an explicit transport
 // double. This is not a live realm or production account-management test.
 test('registered directory counts the complete observed generation and original commands preserve current identity, permissions, business and session boundaries',{timeout:120000},async t=>{
  const db=new PGlite();t.after(()=>db.close());
- const selected=migrations.filter(row=>row.version<=119||row.version===121);
+ const selected=migrations;
  assert(selected.some(row=>row.version===121),'central must register the complete 119-to-121 migration before this group runs');
  await db.exec('CREATE TABLE schema_migrations(version integer PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
  for(const row of selected){await db.exec(row.sql);await db.query('INSERT INTO schema_migrations(version) VALUES($1)',[row.version]);}
  assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name='operations_automation_grants_v1' AND column_name='ai_domains'")).rows[0].n,0,'held120 was not applied');
  const apiRoleFile=process.env.GALAXY_REGISTERED_USERS_API_ROLE_FILE??new URL('../src/infrastructure/api-role.sql',import.meta.url);
- const apiSql=await readFile(apiRoleFile,'utf8');assert(!/\bai_domains\b/.test(apiSql),'use the released119-to-121 role baseline, not held120 permissions');await db.exec(apiSql);
+ const apiSql=await readFile(apiRoleFile,'utf8');assert(!/\bai_domains\b/.test(apiSql),'use the current released role baseline, not held120 permissions');await db.exec(apiSql);
  const workerRoleFile=process.env.GALAXY_REGISTERED_USERS_WORKER_ROLE_FILE??new URL('../src/infrastructure/worker-role.sql',import.meta.url);await db.exec(await readFile(workerRoleFile,'utf8'));
  const endpoint='https://registered-users.example',issuer='https://website-auth.example/realms/galaxy',clock=Date.parse('2030-01-01T00:00:00.000Z')/1000,now=()=>clock,at=new Date(clock*1000).toISOString();
  const admin={kind:'business-operator',operatorId:'registered-admin',role:'administrator',endpoint},reader={...admin,operatorId:'registered-reader',role:'reader'},basic={...reader,operatorId:'registered-basic'},ungranted={...reader,operatorId:'registered-ungranted'};
@@ -164,7 +164,7 @@ test('website management transport projects only metadata, uses separate clients
 
 test('registered website session revocation fences a delayed verified callback atomically while allowing a genuinely later login',{timeout:90000},async t=>{
  const db=new PGlite();t.after(()=>db.close());await db.exec('CREATE TABLE schema_migrations(version integer PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
- const selected=migrations.filter(row=>row.version<=119||row.version===121);assert(selected.some(row=>row.version===121));
+ const selected=migrations;assert(selected.some(row=>row.version===121));
  for(const row of selected){await db.exec(row.sql);await db.query('INSERT INTO schema_migrations(version) VALUES($1)',[row.version]);}
  const apiSql=await readFile(process.env.GALAXY_REGISTERED_USERS_API_ROLE_FILE??new URL('../src/infrastructure/api-role.sql',import.meta.url),'utf8');assert(!/\bai_domains\b/.test(apiSql));await db.exec(apiSql);await db.exec('SET ROLE galaxy_api');
  const endpoint='https://registered-fence.example',issuer='https://website-auth.example/realms/galaxy',principal={issuer,externalSubject:'native-delayed-subject'},now=()=>Math.floor(Date.now()/1000);

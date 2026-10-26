@@ -4,17 +4,17 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
-import {FeedbackAttachmentsV1Service} from '../src/feedback-attachments-v1.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFeedbackService} from "../src/operations/feedback/service.mjs";
+import {FeedbackAttachmentsV1Service} from "../src/community/feedback-attachments-v1.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
 import {AttachmentS3Store} from '../src/infrastructure/attachment-s3-store.mjs';
 import {defaultAttachmentPolicy} from '../src/shared/chat-attachments-schema.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {createOfficialAccountPortal} from '../src/official-account.mjs';
+import {createOfficialAccountPortal} from "../src/accounts/official-account.mjs";
 import {createApi} from '../src/http.mjs';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 
 async function fixture(t,{policy=defaultAttachmentPolicy,feedbackPolicy}={}){
  const f=await accountChatFixture();t.after(f.close);const objects=new Map(),store={keyId:'synthetic-feedback-only',

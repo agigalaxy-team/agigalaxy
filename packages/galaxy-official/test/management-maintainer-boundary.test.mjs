@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 import {OperationsManagementAccountsService} from '../src/operations/accounts/management-service.mjs';
-import {createStoredOperatorAuthorization,createStoredManagementMaintainerAuthorization} from '../src/operations-config.mjs';
-import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
+import {createStoredOperatorAuthorization,createStoredManagementMaintainerAuthorization} from "../src/operations/configuration.mjs";
+import {createOperationsManagementSessions} from "../src/operations/accounts/management-sessions.mjs";
 import {managementMaintainerPermissionCodes} from '../src/shared/operations-management-maintainer-actions.mjs';
 import {managementId} from '../src/operations/accounts/management-schema.mjs';
 
@@ -23,14 +23,14 @@ const readable=['management.accounts.read','permissions.read','content.read'];
 const denied=code=>error=>error?.code===code&&error.status===403;
 const writeCaps=['canEditProfile','canDisableLogin','canRestoreLogin','canResetPassword','canRevokeSessions','canDelete','canAssignRoles','canChangeEmail','canChangeAdmission'];
 
-// One new boundary leaf. Actual PGlite122, SQL roles, immutable-principal lookup,
+// Actual current PGlite including the management122 boundary, SQL roles and immutable-principal lookup,
 // local active gate, permission/service/read-model and command transactions.
 // Native role-directory and management-directory I/O are explicit doubles.
-// No browser/HTTP/SMTP/provider or schema123/held120 is involved.
+// No browser/HTTP/SMTP/provider or held120 is involved.
 test('management maintenance intersects immutable principal, current native admission and role; ordinary grants and forged actor roles cannot bypass the boundary',
  {timeout:90000},async t=>{
-  assert.equal(migrations.at(-1).version,122);
-  assert.equal(migrations.some(row=>row.version===120||row.version===123),false);
+  assert.equal(migrations.some(row=>row.version===122),true);
+  assert.equal(migrations.some(row=>row.version===120),false);
   assert.deepEqual([...managementMaintainerPermissionCodes],expectedCodes);
   const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api']});
   const now=()=>Math.floor(Date.now()/1000),at=()=>new Date(now()*1000).toISOString();

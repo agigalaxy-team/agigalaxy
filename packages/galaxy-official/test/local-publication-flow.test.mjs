@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serviceFixture } from './service-fixture.mjs';
 import { initializeGalaxyIntegration, createCaseDraft } from '../../galaxy-core/src/local-store.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createLocalPublicationFlow } from '../src/local-publication-flow.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createLocalPublicationFlow } from "../src/clients/local/publication-flow.mjs";
 
 test('local publication previews once, preserves Consent after lost response and completes real service writes', async () => {
   const f = await serviceFixture();

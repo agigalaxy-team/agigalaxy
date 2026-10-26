@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {DiscoveryRuntime} from '../src/discovery-runtime/runtime.mjs';
 import {OpenPanelClient} from '../src/discovery-runtime/native-clients.mjs';
 import {OperationsAccountUsageSummary} from '../src/operations/accounts/usage-summary.mjs';
-import {queryProjection} from '../src/operations-agentos-query-view.mjs';
+import {queryProjection} from "../src/operations/agentos/query-view.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 
 // Real PG/API role, grants, account lookup, DiscoveryRuntime and OpenPanel

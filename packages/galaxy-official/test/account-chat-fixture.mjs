@@ -1,12 +1,12 @@
 import {randomUUID,createHash} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {AccessService} from '../src/access.mjs';
-import {ChatService} from '../src/chat.mjs';
-import {ChatAttachmentsService} from '../src/chat-attachments.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
-import {PublicWriteService} from '../src/public-writes.mjs';
-import {chatActorRef,isAccountChatRef} from '../src/chat-actors.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {AccessService} from "../src/security/access.mjs";
+import {ChatService} from "../src/chat/service.mjs";
+import {ChatAttachmentsService} from "../src/chat/chat-attachments.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
+import {PublicWriteService} from "../src/publishing/public-writes.mjs";
+import {chatActorRef,isAccountChatRef} from "../src/chat/chat-actors.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 // SQL authorization, quota and chat logic are real. This transport/store/scanner

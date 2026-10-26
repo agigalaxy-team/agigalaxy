@@ -8,7 +8,7 @@ import { createTaskV2, applyTaskV2, proposeParticipationV2, applyParticipationV2
 import { taskRequestV2Schema } from '../src/shared/task-schema-v2.mjs';
 import { assistanceRequestSchema } from '../src/shared/assistance-schema.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { transaction } from '../src/database.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
 import { createApi } from '../src/http.mjs';
 
 const id = () => randomUUID();

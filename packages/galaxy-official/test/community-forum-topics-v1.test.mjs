@@ -2,13 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 import {forumTopics} from '../src/shared/community-forum-topics-v1.mjs';
 import {forumCreatePostSchema} from '../src/shared/community-forum-v1-schema.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {PGlite} from '@electric-sql/pglite';
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {migrate} from '../src/database.mjs';
 import {serviceFixture} from './service-fixture.mjs';
 
 const policy={...defaultForumPolicy,new:{...defaultForumPolicy.new,post:60},normal:{...defaultForumPolicy.normal,post:60}};
@@ -114,7 +113,9 @@ test('actual schema81 -> 82/83 migration preserves old event JSON/hash, signed C
   });
   const before={post:(await db.query('SELECT * FROM forum_posts_v1')).rows,event:(await db.query('SELECT * FROM forum_events_v1')).rows,version:(await db.query('SELECT * FROM forum_versions_v1')).rows,
    consent:(await db.query('SELECT * FROM consents WHERE id=$1',[intent.id])).rows};
-  assert.equal(await migrate(db),83);
+  // Exercise this exact historical upgrade before later schema additions.
+  for(const migration of migrations.filter(value=>value.version>81&&value.version<=83)){await db.exec(migration.sql);await db.query('INSERT INTO schema_migrations(version) VALUES($1)',[migration.version]);}
+  assert.equal((await db.query('SELECT max(version) n FROM schema_migrations')).rows[0].n,83);
   assert.deepEqual((await db.query('SELECT * FROM forum_posts_v1')).rows,before.post);assert.deepEqual((await db.query('SELECT * FROM forum_events_v1')).rows,before.event);
   assert.equal(digest(JSON.stringify((await db.query('SELECT * FROM consents WHERE id=$1',[intent.id])).rows)),digest(JSON.stringify(before.consent)));
   const version=(await db.query('SELECT * FROM forum_versions_v1')).rows[0],{topic,...unchanged}=version;assert.equal(topic,null);assert.deepEqual(unchanged,before.version[0]);

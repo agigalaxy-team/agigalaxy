@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {analyticsLocation,analyticsSearchKeys} from '../lib/analytics-view-model';
+import {analyticsLocation,analyticsSearchKeys} from "../lib/analytics/analytics-view-model";
 import {Analytics} from './BusinessViewClients';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';

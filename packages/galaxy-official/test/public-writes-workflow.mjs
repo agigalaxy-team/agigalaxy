@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { CommunityAccountRegistry } from '../src/community-accounts.mjs';
-import { PublicWriteService } from '../src/public-writes.mjs';
+import { CommunityAccountRegistry } from "../src/accounts/community-accounts.mjs";
+import { PublicWriteService } from "../src/publishing/public-writes.mjs";
 import { accountQuotaMigrationSql } from '../src/infrastructure/account-quota-schema-v2.mjs';
-import { migrate, transaction } from '../src/database.mjs';
+import { migrate, transaction } from "../src/infrastructure/database.mjs";
 import { digest } from '../src/shared/digest.mjs';
 
 // All identities and account facts here are synthetic database fixtures.
@@ -49,7 +49,8 @@ export async function verifyPublicWrites(db, { migrateDatabase = true, concurren
       await consume(one, candidates[1]).then(value => ({status:'fulfilled',value}),reason=>({status:'rejected',reason}))];
   assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
   assert.equal(results.find(r => r.status === 'rejected').reason.code, 'community_quota_exceeded');
-  assert.equal((await consume(two, first)).used, 2, 'another GUID retries same operation without a second charge');
+  assert.equal((await consume(one, first)).used, 2, 'the original GUID retries the same operation without a second charge');
+  await assert.rejects(consume(two, first), {code:'public_write_conflict'}, 'a shared Account quota does not transfer another GUID’s operation identity');
   await assert.rejects(consume(one, { ...first, payloadHash: digest('changed') }), { code: 'public_write_conflict' });
   const failed = op('comment');
   await assert.rejects(transaction(db, async conn => {
@@ -61,7 +62,7 @@ export async function verifyPublicWrites(db, { migrateDatabase = true, concurren
   assert.equal((await consume(two, lastComment)).used, 20);
   await assert.rejects(consume(one, op('comment')), { code:'community_quota_exceeded' });
   const restarted = new PublicWriteService(access, new CommunityAccountRegistry(access, [{describe:()=>({issuer,clientId:'synthetic'})}]));
-  assert.equal((await transaction(db,conn=>restarted.consumeWithin(conn,one,lastComment))).used,20);
+  assert.equal((await transaction(db,conn=>restarted.consumeWithin(conn,two,lastComment))).used,20);
   const taskId = randomUUID(), recipientId = 'synthetic-other-recipient';
   await consume(one, op('invitation',{taskId,recipientId}));
   await assert.rejects(consume(two, op('invitation',{taskId:randomUUID(),recipientId})), {code:'invitation_cooldown'});

@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
-import {inspectGithubRun} from '../src/github-evidence.mjs';
+import {inspectGithubRun} from "../src/evidence/github-evidence.mjs";
 export async function createPeeringProof(f,root,intervention){
   const result={schemaVersion:2,eventId:randomUUID(),caseId:root.caseId,expectedVersion:2,actorId:f.actor.subjectId,kind:'result-recorded',
     origin:{kind:'intervention',id:intervention.eventId,version:1},scopeVersion:1,deliverableRefs:[],reportedOutcome:'partial',summary:'Private report',limitations:'Only observed synthetic CI',supersedes:null};

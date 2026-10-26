@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { verifyPublicWrites } from '../public-writes-workflow.mjs';
 
 test('real PostgreSQL serializes public writes across account GUIDs and independent connections', {timeout:60000}, async () => {

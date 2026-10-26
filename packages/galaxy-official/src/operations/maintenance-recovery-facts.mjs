@@ -1,4 +1,4 @@
-import {transaction} from '../database.mjs';
+import {transaction} from "../infrastructure/database.mjs";
 
 const fail=code=>Object.assign(Error(code),{code});
 const quote=name=>{if(!/^[a-z][a-z0-9_]*$/.test(name))throw fail('maintenance_recovery_identifier_invalid');return '"'+name+'"';};

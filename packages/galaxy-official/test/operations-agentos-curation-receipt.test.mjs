@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
 
 test('curation ACK and original audit recovery bind the same operation and curation revision, without confusing the independent visibility revision',async()=>{
  const operationId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',target='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';

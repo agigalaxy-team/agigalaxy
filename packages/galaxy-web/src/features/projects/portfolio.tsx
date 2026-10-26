@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from "react";
 import {} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../directory-reading-state.mjs";
-import type {AccountRuntime,ProfileProject} from "../../account-workspace-types";
+import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../shared/reading/directory-reading-state.mjs";
+import type {AccountRuntime,ProfileProject} from "../accounts/account-workspace-types";
 import "./portfolio.css";
 
 type PortfolioItem={projectId:string;ownerId:string;document:{title:string;summary:string;kind:string;functions:string[];technologies?:string[];sourceUrl?:string}};

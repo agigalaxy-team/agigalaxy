@@ -4,7 +4,7 @@ import {z} from 'zod';
 import {digest} from '../../shared/digest.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';
 import {feedbackSubmitSchema,feedbackEventSchema,parseFeedback} from '../../shared/operations-feedback-schema.mjs';
-import {operationsStamp,operationsIso} from '../../operations-content-visibility.mjs';
+import {operationsStamp,operationsIso} from "../public-content/content-visibility.mjs";
 import {OperationsFeedbackReadModel} from './read-model.mjs';
 
 // Product feedback intake and operator commands preserve the original SQL, IDs and authorization chain.

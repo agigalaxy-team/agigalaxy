@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {generateKeyPair,exportJWK,SignJWT,CompactSign} from 'jose';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {createExternalCredentialsService} from '../src/external-credentials.mjs';
-import {createExternalCredentialVerifier} from '../src/external-credentials-verifier.mjs';
-import {validateExternalCredentialsConfiguration} from '../src/external-credentials-config.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createExternalCredentialsService} from "../src/identity/authentication/external-credentials.mjs";
+import {createExternalCredentialVerifier} from "../src/identity/authentication/external-credentials-verifier.mjs";
+import {validateExternalCredentialsConfiguration} from "../src/identity/authentication/external-credentials-config.mjs";
 
 async function fixture() {
   const {privateKey,publicKey}=await generateKeyPair('EdDSA',{extractable:true});

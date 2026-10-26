@@ -2,16 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate,transaction} from '../src/database.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAutonomy} from '../src/operations-autonomy.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
-import {workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAutonomy} from "../src/operations/autonomy/index.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
+import {workbenchPrepareSchemas} from "../src/operations/agentos/action-catalog.mjs";
 import {defaultConfiguration} from '../src/operations/autonomy/contract.mjs';
 
 // Real130 ->131 DDL, galaxy_api, current human/AI roles, delegation, durable

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {verifyRecruitmentOperationReceipt} from './recruitment-receipt-continuity-workflow.mjs';
 import {serviceFixture} from './service-fixture.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 import {serviceAccessV2} from '../src/operations/service-access-v2.mjs';
 import {recruitmentOperationReceiptResultSchema} from '../src/shared/recruitment-schema-v2.mjs';
 

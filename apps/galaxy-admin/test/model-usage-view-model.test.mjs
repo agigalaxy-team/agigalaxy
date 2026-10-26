@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {modelUsage,modelUsageNumber,modelUsageCoverage,modelUsageCallSegments,modelUsageRows} from '../src/lib/model-usage-view-model.ts';
+import {modelUsage,modelUsageNumber,modelUsageCoverage,modelUsageCallSegments,modelUsageRows} from "../src/lib/models/model-usage-view-model.ts";
 const id='11111111-1111-4111-8111-111111111111',calls={total:4,completed:2,failed:1,unknown:1},tokens={input:100,output:20,total:null,cachedInput:0,reasoning:null};
 const value=()=>({availability:{state:'available'},days:7,from:'2026-10-23T05:00:00+00:00',to:'2026-10-23T09:00:00+00:00',coverageFrom:'2026-10-23T05:00:00+00:00',coversWholeWindow:false,calls,tokens,unknownUsageCalls:1,byScenario:[{domain:'discovery',calls,tokens,unknownUsageCalls:1}],byModel:[{modelRecordId:id,calls,tokens,unknownUsageCalls:1}],basis:{source:'native-model-gateway-ledger',billing:'not-provided'},checkedAt:1792746000,readExpiresAt:1792746030,metadataOnly:true});
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createChatClient,chatSendRequestHash,chatEditRequestHash} from '../../galaxy-web/src/chat-client.mjs';
+import {createChatClient,chatSendRequestHash,chatEditRequestHash} from "../../galaxy-web/src/features/chat/chat-client.mjs";
 
 function fixture(call){const rows=new Map(),calls=[];let current={subjectId:'GUID0000000000000000000000000001',bindingId:randomUUID(),generation:1};
  const configuration={api:{endpoint:'https://chat.example.org',snapshot:()=>({...current}),call:async(path,input)=>{calls.push({path,input});return call(path,input);}},

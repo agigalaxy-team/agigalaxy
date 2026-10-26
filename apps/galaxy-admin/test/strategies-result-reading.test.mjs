@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {strategiesRunDetail,strategyRunAuditHref} from '../src/lib/strategies-view-model.ts';
+import {strategiesRunDetail,strategyRunAuditHref} from "../src/lib/strategies/strategies-view-model.ts";
 import {normalizeAuditFilters,auditReadPath} from '../src/lib/audit-view-model.ts';
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');

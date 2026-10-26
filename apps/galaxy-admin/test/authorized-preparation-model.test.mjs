@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorizedPreparation,authorizedCommandMatches,preparationUntil,selectedContentPermissions} from '../src/lib/authorized-preparation-model.ts';
+import {authorizedPreparation,authorizedCommandMatches,preparationUntil,selectedContentPermissions} from "../src/lib/workbench/authorized-preparation-model.ts";
 
 test('an explicit assisted preparation stays in its current domain and selected object, freezes fresh versions, has no default deadline and verifies its original receipt',()=>{
  const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',operationId='33333333-3333-4333-8333-333333333333',grantId='44444444-4444-4444-8444-444444444444';

@@ -8,8 +8,8 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createNativeRecoveryWebFixture as createExistingWebRuntime} from './native-recovery-web-fixture.mjs';
-import {createTaskOwnerReadClient} from '../../galaxy-web/src/task-owner-read-client.mjs';
-import {createTaskOwnerControlClient} from '../../galaxy-web/src/task-owner-control-client.mjs';
+import {createTaskOwnerReadClient} from "../../galaxy-web/src/features/tasks/owner/task-owner-read-client.mjs";
+import {createTaskOwnerControlClient} from "../../galaxy-web/src/features/tasks/owner/task-owner-control-client.mjs";
 import {createRecoveryMaterial} from '../../galaxy-core/src/domain/identity-material.mjs';
 
 const changed=error=>error.code==='task_owner_control_connection_changed',deferred=()=>{let resolve;return{promise:new Promise(r=>{resolve=r;}),resolve:()=>resolve()};};

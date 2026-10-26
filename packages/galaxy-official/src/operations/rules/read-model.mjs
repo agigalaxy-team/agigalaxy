@@ -1,4 +1,4 @@
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {hasOperationsPermission} from "../../operations-permission-catalog.mjs";
 import {p14RuleKeys,p14KeySchema,p14PageSchema,p14PublishSchema,p14Parse as parse} from "../../shared/p14-rules-schema.mjs";

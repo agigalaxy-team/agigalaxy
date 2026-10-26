@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {mkdtemp,writeFile,unlink,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname,resolve} from 'node:path';
-import {loadOperationsConfiguration,loadOperationsWorkerAuthorization,loadOperationsAccountDirectory} from '../src/operations-config.mjs';
+import {loadOperationsConfiguration,loadOperationsWorkerAuthorization,loadOperationsAccountDirectory} from "../src/operations/configuration.mjs";
 
 test('management email bridge uses only the protected management writer; workers do not load it',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'galaxy-management-loader-'));

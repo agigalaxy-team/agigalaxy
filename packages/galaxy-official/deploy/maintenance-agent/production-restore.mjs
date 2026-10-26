@@ -1,5 +1,5 @@
 import {lstat} from 'node:fs/promises';
-import {maintenanceModuleIds,maintenanceOpeningConditions} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceModuleIds,maintenanceOpeningConditions} from "../../src/operations/maintenance/catalog.mjs";
 import {changeWriter,writerIsRunning,postgresSqlArguments,atomicWrite,ensureDirectory} from '../operations-stack/host.mjs';
 import {createOperationsStackPreparation} from './host-restore.mjs';
 import {captureDeletionRecoveryContribution} from './deletion-contribution.mjs';

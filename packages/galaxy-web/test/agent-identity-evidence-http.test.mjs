@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {migrate} from '../../galaxy-official/src/database.mjs';
+import {migrate} from "../../galaxy-official/src/infrastructure/database.mjs";
 import {createServices} from '../../galaxy-official/src/services.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
@@ -12,7 +12,7 @@ import {createIdentityControlClient} from '../../galaxy-core/src/domain/identity
 import {createIdentityDeviceHandoff} from '../../galaxy-core/src/domain/identity-device-handoff.mjs';
 import {createBrowserGenesis} from '../../galaxy-core/src/domain/guid-browser-adapter.mjs';
 import {createDeviceMaterial,identityKeyId,signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
-import {taskDraft,ordinaryPublicationFromDraft} from '../src/task-bounty-client.mjs';
+import {taskDraft,ordinaryPublicationFromDraft} from "../src/features/tasks/task-bounty-client.mjs";
 
 const website='https://galaxy.example.org',bridgeOrigin='http://127.0.0.1:39841',allScopes=['manage-identity',...browserScopes];
 const {PGlite}=createRequire(new URL('../../galaxy-official/package.json',import.meta.url))('@electric-sql/pglite');

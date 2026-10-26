@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {applicationResults,exactApplicationOrigin,matchingPriorApplications,originConfigurationRefs,applicationEnvironment} from '../../galaxy-web/src/capsule-application-model.mjs';
+import {applicationResults,exactApplicationOrigin,matchingPriorApplications,originConfigurationRefs,applicationEnvironment} from "../../galaxy-web/src/features/capsules/capsule-application-model.mjs";
 const subjectId='GUID'+'A'.repeat(28),other='GUID'+'B'.repeat(28);
 function fixture(){const intervention={id:randomUUID(),version:1,actorId:subjectId,sourceRefs:[]},result={id:randomUUID(),version:1,actorId:subjectId,origin:{kind:'intervention',id:intervention.id,version:1},reportedOutcome:'partial'},history={caseId:randomUUID(),interventions:[intervention],results:[result]},detail={capsuleId:randomUUID(),versionId:randomUUID()},origin=exactApplicationOrigin(history,result,subjectId);return{intervention,result,history,detail,origin};}
 test('Intervention actual result is selectable without inventing Attempt or environment equivalence',()=>{const f=fixture();assert.deepEqual(applicationResults(f.history,subjectId),[f.result]);assert.equal(f.origin.kind,'intervention');assert.deepEqual(f.origin.ref,f.result.origin);assert.deepEqual(applicationEnvironment(f.origin),{name:'unknown',version:'unknown'});assert.equal('attemptRef' in f.origin,false);});

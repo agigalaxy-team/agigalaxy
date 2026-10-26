@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createBindingStatusClient } from '../src/binding-status-client.mjs';
-import { createConnectionClient } from '../src/connection-client.mjs';
+import { createBindingStatusClient } from "../src/clients/binding-status.mjs";
+import { createConnectionClient } from "../src/clients/connection.mjs";
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 import { serviceFixture } from './service-fixture.mjs';
 
 test('confirmed connection runs four HTTP steps, verifies receipts and releases a credential only on complete success', async () => {

@@ -6,10 +6,10 @@ import { serviceFixture } from './service-fixture.mjs';
 import { chatFixture } from './chat-workflow.mjs';
 import { attachmentContractFixture } from './chat-attachments-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { ChatAttachmentsService } from '../src/chat-attachments.mjs';
+import { ChatAttachmentsService } from "../src/chat/chat-attachments.mjs";
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import { createAttachmentsClient } from '../../galaxy-web/src/chat-attachments-client.mjs';
+import { createAttachmentsClient } from "../../galaxy-web/src/features/chat/attachments/chat-attachments-client.mjs";
 
 // B diagnostic only: real signed Binding/WebRuntime/HTTP/PGlite. The local
 // device store, attachment object store/scanner and chat transport are explicit

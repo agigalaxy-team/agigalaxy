@@ -4,7 +4,7 @@ import {Readable} from 'node:stream';
 import {once} from 'node:events';
 import canonicalize from 'canonicalize';
 import {chatFixture,invite} from './chat-workflow.mjs';
-import {ChatAttachmentsService} from '../src/chat-attachments.mjs';
+import {ChatAttachmentsService} from "../src/chat/chat-attachments.mjs";
 import {createApi} from '../src/http.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 const digest=x=>createHash('sha256').update(x).digest('hex');

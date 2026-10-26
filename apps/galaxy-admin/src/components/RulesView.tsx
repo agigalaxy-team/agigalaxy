@@ -3,7 +3,7 @@ import {OperationsPage,operationsPageContext} from './OperationsPage';
 import {Rules} from './BusinessViewClients';
 import {hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
-import {rulesLocation} from '../lib/rules-view-model';
+import {rulesLocation} from "../lib/rules/rules-view-model";
 export async function RulesView(props:AdminViewServerProps){
   const {session,searchParams}=await operationsPageContext(props,'/admin/operations/rules');
   if(!hasOperatorPermission(session.operator,'rules.read'))return <OperationsPage page={props}><OperationsPermissionNotice permission="rules.read"/></OperationsPage>;

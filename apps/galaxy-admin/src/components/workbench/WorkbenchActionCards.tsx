@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import type {WorkbenchActionCard} from '../../lib/workbench-action-cards';
-import {workbenchCardReason} from '../../lib/workbench-action-cards';
+import type {WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
+import {workbenchCardReason} from "../../lib/workbench/workbench-action-cards";
 import {WorkbenchPromptReview} from './WorkbenchPromptReview';
 
 export function WorkbenchActionCards({cards,verified,busy,pendingCardId,pendingDismissCardId=null,dismissBusy=false,onConfirm,onDismiss,now,label='相关处理'}:{cards:WorkbenchActionCard[];verified:boolean;busy:boolean;pendingCardId:string|null;pendingDismissCardId?:string|null;dismissBusy?:boolean;onConfirm:(card:WorkbenchActionCard)=>void;onDismiss?:(card:WorkbenchActionCard)=>void;now:number;label?:string}){

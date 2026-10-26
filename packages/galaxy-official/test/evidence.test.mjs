@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { CaseService } from '../src/cases.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun, githubSourceKey } from '../src/github-evidence.mjs';
-import { verifyEnvelope } from '../src/signed-envelope.mjs';
+import { CaseService } from "../src/cases/index.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun, githubSourceKey } from "../src/evidence/github-evidence.mjs";
+import { verifyEnvelope } from "../src/security/signed-envelope.mjs";
 import { createApi } from '../src/http.mjs';
 
 test('CI observation stays limited, source duplicates collapse and queued revocation blocks collection', async () => {

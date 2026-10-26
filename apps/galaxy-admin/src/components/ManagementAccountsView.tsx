@@ -4,8 +4,8 @@ import {operationsRead} from '../lib/operations.mjs';
 import {OperationsPage,operationsPageContext} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 import {ManagementAccounts} from './BusinessViewClients';
-import {managementAccountsBase,managementAccountsLocation,managementAccountsQuery,managementAccountsRoute} from '../lib/management-accounts-view-model';
-import type {ManagementAccountDetail,ManagementAccountsPage} from './management-accounts-types';
+import {managementAccountsBase,managementAccountsLocation,managementAccountsQuery,managementAccountsRoute} from "../lib/management-accounts/management-accounts-view-model";
+import type {ManagementAccountDetail,ManagementAccountsPage} from "./management-accounts/management-accounts-types";
 
 export async function ManagementAccountsView(props:AdminViewServerProps){
   const {session,requestHeaders,searchParams}=await operationsPageContext(props,managementAccountsRoute);

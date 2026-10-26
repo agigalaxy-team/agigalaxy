@@ -1,5 +1,5 @@
 import { AgentCard } from '@a2a-js/sdk';
-import { fetchPublicJson, validatePublicUrl } from '../../../galaxy-official/src/public-fetch.mjs';
+import { fetchPublicJson, validatePublicUrl } from "../../../galaxy-official/src/infrastructure/public-fetch.mjs";
 import { hash } from '../storage/journal.mjs';
 
 // Discovery does not enroll a peer. The chosen trust policy supplies a current

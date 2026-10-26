@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOidcTransactionStore} from '../src/oidc-transaction-store.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOidcTransactionStore} from "../src/identity/authentication/oidc-transaction-store.mjs";
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 
 test('shared private OIDC transactions work with fresh providers and consume exactly once, with namespace/state/expiry isolation', {timeout:60000},async t=>{

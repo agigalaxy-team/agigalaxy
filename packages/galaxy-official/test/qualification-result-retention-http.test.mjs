@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {fixture,nativeWork,target,cg,ag} from './qualification-v2-workflow.mjs';
-import {HonorService} from '../src/honor.mjs';
-import {HonorV2Service} from '../src/honor-v2.mjs';
+import {HonorService} from "../src/records/honor.mjs";
+import {HonorV2Service} from "../src/records/honor-v2.mjs";
 import {createApi} from '../src/http.mjs';
 
 async function setup(){

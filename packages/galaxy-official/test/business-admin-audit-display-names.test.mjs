@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 
 test('business audit resolves current same-endpoint human names without attributing an executor or changing private metadata and paging',{timeout:60000},async t=>{
  const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api']});

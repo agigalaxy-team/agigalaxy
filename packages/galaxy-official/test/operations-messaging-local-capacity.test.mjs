@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {OperationsMessagingService} from '../src/operations/messaging/service.mjs';
-import {OperationsSmtpService} from '../src/operations-smtp.mjs';
+import {OperationsSmtpService} from "../src/operations/messaging/smtp.mjs";
 import {createSmtpCredentialResolver} from '../src/infrastructure/operations-smtp-credentials.mjs';
 import {queueFixture} from './operations-jobs-fixture.mjs';
 

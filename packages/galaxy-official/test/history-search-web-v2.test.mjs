@@ -6,8 +6,8 @@ import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
 import {handoffExistingWebIdentity,existingWebFixtureWebsite} from './existing-web-identity-fixture.mjs';
-import {createHistoryClient,prepareHistoryQuery} from '../../galaxy-web/src/history-client.mjs';
-import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
+import {createHistoryClient,prepareHistoryQuery} from "../../galaxy-web/src/features/work-records/history-client.mjs";
+import {createHelpSearchClient} from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
 
 test('history browser queries real visible facts and more than 64 loaded search results preserve only the explicit comparison',async()=>{
   // The fixture clock is fixed while database timestamps continue advancing

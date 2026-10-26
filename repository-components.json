@@ -62,7 +62,8 @@
         "Source modules used by Native/A2A; no standalone npm package is declared"
       ],
       "files": [
-        "scripts/check-core-runtime.mjs"
+        "scripts/check-core-runtime.mjs",
+        "test/local-identity-upload-history.test.mjs"
       ]
     },
     {
@@ -128,7 +129,7 @@
         "packages/galaxy-official/src/content-publisher.mjs"
       ],
       "configurationInputs": [
-        "packages/galaxy-official/src/operations-config.mjs",
+        "packages/galaxy-official/src/operations/configuration.mjs",
         "packages/galaxy-official/deploy/runtime-settings.example.json"
       ],
       "artifact": "node-service-family-source",
@@ -160,7 +161,8 @@
         "docs/operations/examples/slo/pilot-profile.json",
         "docs/operations/examples/slo/pilot.rules.json",
         "docs/operations/examples/monitoring/external.rules.test.json",
-        "docs/operations/examples/slo/pilot.rules.test.json"
+        "docs/operations/examples/slo/pilot.rules.test.json",
+        "test/forum-attachments-v1.test.mjs"
       ]
     },
     {
@@ -170,7 +172,8 @@
         "packages/galaxy-node",
         "packages/galaxy-edge-mcp",
         "integrations/native-v2",
-        "integrations/host-adapters"
+        "integrations/host-adapters",
+        "integrations/codex/plugins/galaxy-integration-pack"
       ],
       "dependsOn": [
         "core",
@@ -206,7 +209,8 @@
       ],
       "configurationInputs": [
         "integrations/native-v2/prepare-service-config.mjs",
-        "integrations/native-v2/host-capabilities.json"
+        "integrations/native-v2/host-capabilities.json",
+        "opencode.json"
       ],
       "artifact": "unsigned-native-candidate",
       "dataOwner": "Local ID controls local identity, history, work files and upload scope; account grants remain separate.",
@@ -250,14 +254,27 @@
         "test/native-local-panel-state.test.mjs",
         "test/native-public-account-tools.test.mjs",
         "docs/technical/native-client.md",
-        "scripts/test/client-artifact.test.mjs"
+        "scripts/test/client-artifact.test.mjs",
+        "scripts/client-release.mjs",
+        "scripts/test/native-client-release.test.mjs",
+        "scripts/test/native-retained-receipt-candidate.test.mjs",
+        "scripts/test/native-candidate-case-receipts.test.mjs",
+        "scripts/test/native-candidate-full-review.test.mjs",
+        "scripts/test/native-candidate-moderation-receipt.test.mjs",
+        "scripts/test/native-client-installed-host-probe.test.mjs",
+        "scripts/test/native-download-inputs.test.mjs",
+        "scripts/test/native-host-release.test.mjs",
+        "scripts/test/native-license-notices.test.mjs",
+        "scripts/test/native-owner-candidate.test.mjs",
+        "test/native-local-loading.test.mjs"
       ]
     },
     {
       "id": "a2a",
       "kind": "client",
       "roots": [
-        "packages/galaxy-a2a"
+        "packages/galaxy-a2a",
+        "integrations/reference-worker-pack"
       ],
       "dependsOn": [
         "core",
@@ -326,10 +343,12 @@
         "packages/galaxy-web/src/main.tsx"
       ],
       "configurationInputs": [
-        "scripts/serve-product.mjs"
+        "scripts/serve-product.mjs",
+        "components.json"
       ],
       "files": [
-        "scripts/test/capsule-lease-independent-review.test.mjs"
+        "scripts/test/capsule-lease-independent-review.test.mjs",
+        "test/content-share-continuation.test.mjs"
       ],
       "artifact": "static-web-assets",
       "dataOwner": "Browser drafts and account context; local ID creation/control remains Native-owned.",
@@ -366,14 +385,18 @@
       ],
       "configurationInputs": [
         "apps/galaxy-site/release-data.json",
-        "apps/galaxy-site/public-archive.json"
+        "apps/galaxy-site/public-archive.json",
+        "next.config.ts",
+        "vite.config.ts"
       ],
       "artifact": "static-site-with-web-assets",
       "dataOwner": "Public documents and assets; original download bytes and CMS publication identity remain distinct.",
       "interfaces": [
         "Public routes, shared Web shell and fixed historical public asset catalog"
       ],
-      "files": []
+      "files": [
+        "scripts/test/browser-demo.test.mjs"
+      ]
     },
     {
       "id": "auth",
@@ -608,7 +631,8 @@
     ".oxlintrc.json",
     "scripts/test/check.test.mjs",
     "scripts/test/conformance-runner.test.mjs",
-    "scripts/test/version-contract.test.mjs"
+    "scripts/test/version-contract.test.mjs",
+    "scripts/test/verify-layers.test.mjs"
   ],
   "sourceRoots": [
     "apps",
@@ -650,7 +674,8 @@
     ".oxlintrc.json",
     ".oxfmtrc.json",
     "RIGHTS.md",
-    "WORK_STATUS.md"
+    "WORK_STATUS.md",
+    "opencode.json"
   ],
   "sourceExtensions": [
     ".mjs",
@@ -790,6 +815,11 @@
     "test/test_public_docs_tools.py",
     "scripts/check-requirements.mjs",
     "test/test_docs.py",
-    ".github/ISSUE_TEMPLATE/config.yml"
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/bug-report.yml",
+    ".github/ISSUE_TEMPLATE/feature-request.yml",
+    ".github/workflows/runner-healthcheck.yml",
+    ".github/workflows/runner-smoke.yml",
+    ".oxfmtrc.json"
   ]
 }

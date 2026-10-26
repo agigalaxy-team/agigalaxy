@@ -2,18 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsGateway} from '../src/operations-agentos-gateway.mjs';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {workbenchActionCatalog} from '../src/operations-agentos-action-catalog.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsGateway} from "../src/operations/agentos/gateway.mjs";
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {workbenchActionCatalog} from "../src/operations/agentos/action-catalog.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 test('workbench action tools use actual owned PG authority and frozen commands, preserve one effect/audit, and separate the human card from executor authority',{timeout:60000},async t=>{

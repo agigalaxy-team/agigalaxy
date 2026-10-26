@@ -1,6 +1,6 @@
-import {chatActorRef} from "../../chat-actors.mjs";
-import {lockControllerMappingsWithin} from "../../controller-mapping-lock.mjs";
-import {OperationsChatMessageVisibilityService} from "../../operations-chat-messages.mjs";
+import {chatActorRef} from "../chat-actors.mjs";
+import {lockControllerMappingsWithin} from "../../identity/controller-mapping-lock.mjs";
+import {OperationsChatMessageVisibilityService} from "../../operations/chat/messages.mjs";
 import {hasOperationsPermission as permitted} from "../../operations-permission-catalog.mjs";
 import {fail} from './helpers.mjs';
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { CompactSign } from 'jose';
 import { initializeGalaxyIntegration, createCaseDraft } from '../../galaxy-core/src/local-store.mjs';
 import { createConnectionProfile, saveConnectionProfile } from '../../galaxy-core/src/connection-profile.mjs';
-import { createLocalHostRuntime } from '../src/local-host-runtime.mjs';
+import { createLocalHostRuntime } from "../src/clients/local/host-runtime.mjs";
 import { verifyNetworkManifest } from '../src/verification/manifest.mjs';
 import { createApi } from '../src/http.mjs';
 import { serviceFixture } from './service-fixture.mjs';

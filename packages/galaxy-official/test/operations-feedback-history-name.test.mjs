@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFeedbackService} from "../src/operations/feedback/service.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 
 test('feedback history resolves current same-endpoint management labels without relabelling executors or changing stored events',{timeout:60000},async t=>{

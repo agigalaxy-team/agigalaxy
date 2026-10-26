@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHelpRuntimeV2 } from '../src/help-runtime-v2.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHelpRuntimeV2 } from "../src/clients/flows/help-runtime-v2.mjs";
 
 test('signed private Project participant declarations survive actual HTTP Discovery and local Help without granting control or creating success', { timeout: 90000 }, async t => {
   const now = Math.floor(Date.now() / 1000), scopes = ['binding', 'consent', 'case-teaser', 'history', 'assistance', 'notifications'];

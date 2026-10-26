@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {strategiesLocation,strategiesSearchKeys} from '../lib/strategies-view-model';
+import {strategiesLocation,strategiesSearchKeys} from "../lib/strategies/strategies-view-model";
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 import {Strategies} from './BusinessViewClients';

@@ -2,17 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {operationsOperatorNamesWithin} from '../src/operations-history-identities.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {OperationsForumContentService} from '../src/operations-forum-content.mjs';
-import {OperationsSearchQualityService} from '../src/operations-search-quality.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {operationsOperatorNamesWithin} from "../src/operations/accounts/history-identities.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {OperationsForumContentService} from "../src/operations/public-content/service.mjs";
+import {OperationsSearchQualityService} from "../src/operations/search-quality/service.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
 import {searchQualityFixedConstraints,nativeSearchSettings} from '../src/shared/operations-search-quality-schema.mjs';
-import {OperationsRecommendationService} from '../src/operations-recommendation.mjs';
+import {OperationsRecommendationService} from "../src/operations/recommendations/service.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {recommendationHistory} from '../../../apps/galaxy-admin/src/lib/recommendation-view-model.ts';
+import {recommendationHistory} from "../../../apps/galaxy-admin/src/lib/recommendation/recommendation-view-model.ts";
 
 test('history labels use current same-endpoint principals, preserve immutable IDs and never add names to withheld or ordinary-account chat views',{timeout:60000},async t=>{
  const db=new PGlite();t.after(()=>db.close());await migrate(db,{roles:['api']});

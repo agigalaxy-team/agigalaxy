@@ -4,7 +4,7 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import { createChatAgentClient } from '../../galaxy-web/src/chat-agent-client.mjs';
+import { createChatAgentClient } from "../../galaxy-web/src/features/chat/agents/chat-agent-client.mjs";
 
 async function fixture() {
   const f = await serviceFixture(browserScopes, null, { now: Math.floor(Date.now() / 1000) });

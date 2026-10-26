@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile,writeFile,mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { workerReads } from '../../src/infrastructure/worker-reads.mjs';
 import { verifyOperationalMetrics } from '../metrics-workflow.mjs';

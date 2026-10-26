@@ -1,6 +1,6 @@
-import {aiWorkReadPath,aiWorkWritePath,aiWorkQueryAllowed} from './ai-work-proxy-policy.mjs';
-import {systemSettingsReadPath,systemSettingsWritePath,systemSettingsQueryAllowed} from './system-settings-proxy-policy.mjs';
-import {autonomyReadPath,autonomyWritePath,autonomyQueryAllowed} from './autonomy-proxy-policy.mjs';
+import {aiWorkReadPath,aiWorkWritePath,aiWorkQueryAllowed} from "./ai-work-accounts/ai-work-proxy-policy.mjs";
+import {systemSettingsReadPath,systemSettingsWritePath,systemSettingsQueryAllowed} from "./system-settings/system-settings-proxy-policy.mjs";
+import {autonomyReadPath,autonomyWritePath,autonomyQueryAllowed} from "./autonomy/autonomy-proxy-policy.mjs";
 const uuid='[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const userReadPath=new RegExp('^/v1/operations/users(?:/summary|/'+uuid+'(?:/(?:summary|audit|links|type-history|operations/'+uuid+'))?)?$','i');
 const userOperationReadPath=new RegExp('^/v1/operations/users/'+uuid+'/operations/'+uuid+'$','i');

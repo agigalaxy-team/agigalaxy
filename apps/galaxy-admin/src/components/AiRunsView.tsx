@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {aiRunsLocation,aiRunsSearchKeys} from '../lib/ai-runs-view-model';
+import {aiRunsLocation,aiRunsSearchKeys} from "../lib/autonomy/ai-runs-view-model";
 import {AiRuns} from './BusinessViewClients';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';

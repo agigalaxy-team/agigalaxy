@@ -1,17 +1,18 @@
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsGateway} from '../src/operations-agentos-gateway.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsGateway} from "../src/operations/agentos/gateway.mjs";
 import {operationsAgentOsV1MigrationSql} from '../src/infrastructure/operations-agentos-v1-schema.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import {DiscoveryRuntime} from '../src/discovery-runtime/runtime.mjs';
 
 async function fixture(t){
@@ -24,11 +25,12 @@ async function fixture(t){
   authority=new OperationsAgentOsAuthority({db:f.db,endpoint:f.endpoint,permissions,now:f.now}),businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,permissions,executorAuthority:authority,now:f.now}),
   forum=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),governance=new CommunityForumGovernanceV1(f.access,null,forum,{accounts:f.accounts}),community=new OperationsCommunityService({businessAdmin,forum,governance,now:f.now}),
   gateway=new OperationsAgentOsGateway({authority,content:community.content,serviceKey:'synthetic-internal-service-key-not-production'});businessAdmin.executorGateway=gateway;
- const r=(await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name:'合成工作台治理',description:'',enabled:true,permissions:['workbench.read','content.read','content.hide','content.restore','audit.read']},{authorize:async()=>admin})).role;
+ const work=await attachAiWorkFixture({db:f.db,endpoint:f.endpoint,permissions,businessAdmin,authority,admin,domains:['governance'],codes:['content.read','content.hide','content.restore'],now:f.now});
+ const r=(await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name:'合成工作台治理',description:'',enabled:true,permissions:['workbench.read','ai.use.governance','content.read','content.hide','content.restore','audit.read']},{authorize:async()=>admin})).role;
  await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:reader.operatorId,roleId:r.id,enabled:true},{authorize:async()=>admin});
  async function post(){const owner=f.people[0],payload=await bindForumIds('create-post','account:'+owner.accountId,{schemaVersion:1,operationId:randomUUID(),postId:randomUUID(),versionId:randomUUID(),expectedHeadVersion:0,accountId:owner.accountId,
   title:'已获准公开合成内容',body:'SYNTHETIC_PUBLIC_ONLY',links:[],topic:'technology',audience:{read:{kind:'everyone'},participate:{kind:'accounts'}},publishedUntil:f.now()+3600});await forum.publish(owner,{payloadJson:JSON.stringify(payload)});return payload;}
- async function grant(ids,{mode='assisted',executorKind='ai'}={}){return (await permissions.saveAutomation(admin,{operationId:randomUUID(),expectedVersion:0,name:'明确对象合成助手',executorKind,mode,enabled:true,permissions:['content.read','content.hide','content.restore'],resourceIds:ids},{authorize:async()=>admin})).automation;}
+ async function grant(ids,{mode='assisted',executorKind='ai'}={}){return (await permissions.saveAutomation(admin,{operationId:randomUUID(),expectedVersion:0,name:'明确对象合成助手',executorKind,mode,enabled:true,...(executorKind==='ai'?{aiAccountId:work.ids.governance}:{}),permissions:['content.read','content.hide','content.restore'],resourceIds:ids},{authorize:async()=>admin})).automation;}
  async function execution(grant,ids,preparedCommand=null,who=reader){return (await authority.create(who,{operationId:randomUUID(),grantId:grant.id,expectedGrantVersion:grant.version,domain:'governance',actions:['content.read','content.hide','content.restore'],resourceIds:ids,preparedCommand},{authorize:async()=>who})).execution;}
  return {...f,admin,reader,roles,permissions,authority,businessAdmin,forum,content:community.content,gateway,post,grant,execution};
 }

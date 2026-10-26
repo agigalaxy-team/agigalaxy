@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {managementId,managementStamp,managementSafeCode} from './management-schema.mjs';
 

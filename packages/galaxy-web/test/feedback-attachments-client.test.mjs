@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createOfficialAccountClient} from '../src/official-account-client.mjs';
+import {createOfficialAccountClient} from "../src/features/accounts/official-account-client.mjs";
 import {createFeedbackAttachmentsClient,feedbackDraftAttachmentsSchema} from '../src/features/feedback/attachments-client.mjs';
 
 const endpoint='https://official.example.org',website='https://galaxy.example.org',now=()=>2000000000;

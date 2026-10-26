@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {analyticsAudienceBasis,analyticsHref,analyticsLocation,analyticsPath,analyticsRetention} from '../src/lib/analytics-view-model.ts';
+import {analyticsAudienceBasis,analyticsHref,analyticsLocation,analyticsPath,analyticsRetention} from "../src/lib/analytics/analytics-view-model.ts";
 
 const accountId='00256f3b-63a7-4419-9a80-68ed83b31231';
 const sourceUrl='https://agigalaxy.org/open-source/openpanel-public2-galaxy-accounts-20261023/source.tar.gz';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {groupHistoryVersions} from '../src/history-versions.mjs';
+import {groupHistoryVersions} from "../src/features/work-records/history-versions.mjs";
 
 test('one attempt stays one reading group while earlier authorized versions remain in order',()=>{
  const first={id:'attempt-a',version:1,strategy:'初次尝试'},updated={id:'attempt-a',version:3,strategy:'修订内容'},middle={id:'attempt-a',version:2,strategy:'补充内容'},other={id:'attempt-b',version:1,strategy:'另一项尝试'};

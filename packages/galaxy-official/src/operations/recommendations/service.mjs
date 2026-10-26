@@ -1,6 +1,6 @@
 import {randomUUID} from "node:crypto";
 import canonicalize from "canonicalize";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {digest} from "../../shared/digest.mjs";
 import {recommendationPolicySaveSchema,recommendationThemeSaveSchema,parseRecommendation,normalizeRecommendationTerm} from "../../shared/operations-recommendation-schema.mjs";
 import {iso,fail,diff,themeView} from './helpers.mjs';

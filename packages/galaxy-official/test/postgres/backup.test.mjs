@@ -15,13 +15,13 @@ import { DatabaseSync } from 'node:sqlite';
 import pg from 'pg';
 import { serviceFixture } from '../service-fixture.mjs';
 import { migrations } from '../../src/infrastructure/migrations.mjs';
-import { IdentityLinkService } from '../../src/identity-links.mjs';
+import { IdentityLinkService } from "../../src/identity/links.mjs";
 import { syntheticIdentityProvider,syntheticIdentityCallback } from '../identity-test-provider.mjs';
 import { ownerExportDatasets } from '../../src/shared/data-export-schema.mjs';
-import { SearchIndex } from '../../src/search-index.mjs';
-import { EvidenceService } from '../../src/evidence.mjs';
-import { ConsentReader } from '../../src/consent-reader.mjs';
-import { inspectGithubRun } from '../../src/github-evidence.mjs';
+import { SearchIndex } from "../../src/discovery/search-index.mjs";
+import { EvidenceService } from "../../src/evidence/evidence.mjs";
+import { ConsentReader } from "../../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../../src/evidence/github-evidence.mjs";
 import { assertRecoveryReady } from '../../src/infrastructure/recovery-state.mjs';
 import { createBackup, restoreBackup, initializeBackupRepository, copyBackupSnapshot,
   backupRepositoryCheck, retentionPreview, runBackupCommand } from '../../src/operations/backup.mjs';

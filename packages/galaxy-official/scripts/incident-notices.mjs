@@ -1,7 +1,7 @@
 import { readFile,lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import { openDatabase } from '../src/database.mjs';
-import { assertRuntimeEnvironment } from '../src/runtime-environment.mjs';
+import { openDatabase } from "../src/infrastructure/database.mjs";
+import { assertRuntimeEnvironment } from "../src/infrastructure/runtime-environment.mjs";
 import { assertSupportedSchema } from '../src/infrastructure/migrations.mjs';
 import { deliverIncidentNotices } from '../src/operations/incident-notices.mjs';
 let db;

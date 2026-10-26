@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {oidcProviderFixture} from '../../galaxy-official/test/oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../../galaxy-official/src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 
@@ -23,7 +23,7 @@ const report={actualFullMain:true,actualBrowser:true,actualWebCryptoIndexedDB:tr
  physicalDeviceOrHostAcceptance:false,humanAcceptance:false,checks,pageErrors,sourceHashes};
 try{
  api=createApi({...f,browserOrigins:['https://galaxy-ui.example.org'],rateLimit:10000});await new Promise(ok=>api.listen(0,'127.0.0.1',ok));const apiOrigin='http://127.0.0.1:'+api.address().port;
- const bundle=await build({stdin:{contents:`import './packages/galaxy-web/src/main.tsx';import {createWebRuntime,loadWebConfiguration} from './packages/galaxy-web/src/runtime.mjs';import {taskDraft,publicationFromDraft} from './packages/galaxy-web/src/task-bounty-client.mjs';window.fixtureRuntime=async(connected=false)=>{const rt=await createWebRuntime(await loadWebConfiguration());if(connected)await rt.connect({confirmed:true});return rt;};window.fixtureRequest=title=>publicationFromDraft(taskDraft({title,summary:'仅合成入口接续任务，不代表真人工作',goal:title,situation:'隔离浏览器组合'}),[]);`,resolveDir:root,loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',alias:{'@':root},loader:{'.css':'empty'},metafile:true});
+ const bundle=await build({stdin:{contents:"import './packages/galaxy-web/src/main.tsx';import {createWebRuntime,loadWebConfiguration} from './packages/galaxy-web/src/runtime.mjs';import {taskDraft,publicationFromDraft} from './packages/galaxy-web/src/features/tasks/task-bounty-client.mjs';window.fixtureRuntime=async(connected=false)=>{const rt=await createWebRuntime(await loadWebConfiguration());if(connected)await rt.connect({confirmed:true});return rt;};window.fixtureRequest=title=>publicationFromDraft(taskDraft({title,summary:'仅合成入口接续任务，不代表真人工作',goal:title,situation:'隔离浏览器组合'}),[]);",resolveDir:root,loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',alias:{'@':root},loader:{'.css':'empty'},metafile:true});
  for(const name of Object.keys(bundle.metafile.inputs).filter(name=>!name.includes('node_modules')&&!name.startsWith('<')))sourceHashes[resolve(name)]=sha(await readFile(resolve(name)));
  sourceHashes[fileURLToPath(import.meta.url)]=sha(await readFile(fileURLToPath(import.meta.url)));
  const cssDir=resolve(root,'packages/galaxy-web/dist/assets'),cssNames=[...((await readFile(resolve(root,'packages/galaxy-web/dist/index.html'),'utf8')).matchAll(/href="\/app\/assets\/([A-Za-z0-9_.-]+\.css)"/g))].map(x=>x[1]);assert.ok(cssNames.length);report.builtStyleFiles=cssNames;

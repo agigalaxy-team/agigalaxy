@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {aiDelegationActionKeys} from '../src/components/ai-delegation-types.ts';
+import {aiDelegationActionKeys} from "../src/components/ai-work-accounts/ai-delegation-types.ts";
 import {createSettingsDraftMemory} from '../src/lib/settings-draft-memory.ts';
-import {workbenchAiPromptReview,workbenchAiPromptReceipt} from '../src/lib/ai-work-prompt.ts';
-import {aiManagementCapabilities,aiManagementFeatureLabel} from '../src/lib/ai-management-capabilities.ts';
-import {workbenchActionCards} from '../src/lib/workbench-action-cards.ts';
+import {workbenchAiPromptReview,workbenchAiPromptReceipt} from "../src/lib/ai-work-accounts/ai-work-prompt.ts";
+import {aiManagementCapabilities,aiManagementFeatureLabel} from "../src/lib/workbench/ai-management-capabilities.ts";
+import {workbenchActionCards} from "../src/lib/workbench/workbench-action-cards.ts";
 import {WorkbenchActionCards} from '../src/components/workbench/WorkbenchActionCards.tsx';
 import {WorkbenchManagementCapabilities} from '../src/components/workbench/WorkbenchManagementCapabilities.tsx';
 

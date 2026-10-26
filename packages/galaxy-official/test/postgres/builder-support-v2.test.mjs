@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyBuilderSupportV2Workflow} from '../builder-support-v2-workflow.mjs';
 test('Builder support actual PostgreSQL galaxy_api + HTTP + scoped reports',{timeout:90000},async()=>{

@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {createApi} from '../src/http.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {failureRoute} from '../src/adapters/http/failure-audit.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import {operationsProxyPolicy,operationsReadPath,operationsRequestBodyLimit} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
 
 // Actual registered Node HTTP, URL, BFF and audit projections. Authorization

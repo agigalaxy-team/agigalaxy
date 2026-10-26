@@ -10,8 +10,8 @@ const source=process.env.GALAXY_NATIVE_TEST_SOURCE,candidate=process.env.GALAXY_
 assert.ok(source&&candidate,'Fixed source and built native artifact required');
 const fixed=name=>import(pathToFileURL(join(source,name)).href);
 const {receiptStatusFixture}=await fixed('packages/galaxy-official/test/receipt-status-workflow.mjs');
-const {createHelpSearchClient}=await fixed('packages/galaxy-web/src/help-search-client.mjs');
-const {createChoiceSyncClient}=await fixed('packages/galaxy-web/src/choice-sync-client.mjs');
+const {createHelpSearchClient}=await fixed("packages/galaxy-web/src/features/help-search/help-search-client.mjs");
+const {createChoiceSyncClient}=await fixed("packages/galaxy-web/src/features/choice-sync/choice-sync-client.mjs");
 const {createNativeRuntime}=await import(pathToFileURL(join(candidate,'runtime.js')).href);
 const {createNativeToolServer}=await import(pathToFileURL(join(candidate,'server.js')).href);
 

@@ -1,4 +1,4 @@
-import {useCurrentTaskMaterialTree} from '../../task-material-view';
+import {useCurrentTaskMaterialTree} from "../tasks/materials/task-material-view";
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {mergeNotificationItems,notificationRows,markNotificationRowRead} from './merge.mjs';
@@ -7,10 +7,10 @@ import {leaseNotificationItems,currentNotificationItems} from './read-lease.mjs'
 import {PageLoading} from '../../site-shell';
 import {notificationTarget} from './target.mjs';
 import {Bell,BellOff,Check,FileText,MessageCircle,Settings2,X} from 'lucide-react';
-import {MessageNavigation,readableTime,useMemberNames,memberName} from '../../conversation-ui';
+import {MessageNavigation,readableTime,useMemberNames,memberName} from "../../shared/people/conversation-ui";
 import {NotificationSettings} from './settings';
 import {AccountReplyNotifications} from './account-replies';
-import '../../selected-messages.css';
+import "../chat/selected-messages.css";
 import {applyNotificationChanges,saveNotificationSelection} from './settings-model.mjs';
 type Runtime=Awaited<ReturnType<typeof import('../../runtime.mjs').createWebRuntime>>;
 type Item={id:string;at:string;read:boolean;quiet:boolean;interruptiveEligible:boolean;presented:boolean;eventKind:string;title:string;actorId?:string;sourceExpiresAt?:string;object:{type:string;id:string;messageId?:string;roomId?:string}};

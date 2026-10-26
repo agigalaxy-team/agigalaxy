@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {ReadingBookmarksV1} from '../src/reading-bookmarks-v1.mjs';
+import {ReadingBookmarksV1} from "../src/accounts/reading-bookmarks-v1.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 // Real account/SQL/source authorization. The fixture transport is an explicit

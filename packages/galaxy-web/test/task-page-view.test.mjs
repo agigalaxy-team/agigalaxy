@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTaskPageView} from '../src/task-page-view.ts';
+import {createTaskPageView} from "../src/features/tasks/task-page-view.ts";
 
 /** @returns {PromiseWithResolvers<{title:string}>} */
 function deferred(){return Promise.withResolvers();}

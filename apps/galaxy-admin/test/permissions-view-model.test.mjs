@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {automationDraft,automationSaveBody,nextPermissionHistory,permissionDifference,permissionHistoryQuery,permissionReadCurrent,permissionsHref,permissionsLocation,personPermissionSources,previousPermissionHistory,roleDraft,roleDraftChanged,roleSaveBody} from '../src/lib/permissions-view-model.ts';
+import {automationDraft,automationSaveBody,nextPermissionHistory,permissionDifference,permissionHistoryQuery,permissionReadCurrent,permissionsHref,permissionsLocation,personPermissionSources,previousPermissionHistory,roleDraft,roleDraftChanged,roleSaveBody} from "../src/lib/permissions/permissions-view-model.ts";
 
 const id='a1111111-1111-4111-8111-111111111111',other='b2222222-2222-4222-8222-222222222222';
 const actor='a'.repeat(64),time='2026-10-23T02:00:00.000Z';

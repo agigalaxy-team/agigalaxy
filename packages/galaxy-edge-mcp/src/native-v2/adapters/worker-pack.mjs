@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { createWorkerPackUseClient } from '../../../../galaxy-web/src/worker-pack-use-client.mjs';
+import { createWorkerPackUseClient } from "../../../../galaxy-web/src/features/tools/worker-pack-use-client.mjs";
 import { caseEventV2Schema } from '../../../../galaxy-official/src/shared/cases-schema.mjs';
 
 const resultAuthorization = z.strictObject({

@@ -7,7 +7,7 @@ import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 import {digest} from '../src/shared/digest.mjs';
 import {verificationOperationReceiptResultSchema} from '../src/shared/verification-record-schema.mjs';
 

@@ -1,23 +1,23 @@
-import {ReadingDetails,ReadingSummary} from "../../reading-details";
-import {useCurrentTaskMaterialTree} from "../../task-material-view";
+import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
+import {useCurrentTaskMaterialTree} from "../tasks/materials/task-material-view";
 import {useEffect,useEffectEvent,useMemo,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Search,UsersRound,X} from "lucide-react";
-import {FactDetails} from "../../fact-details";
+import {HistoryFacts} from "../work-records/history";
 import {OpportunityContactWorkspace} from "./contacts/opportunity";
 import {projectQueryMemory,projectViewScope,opportunityUnavailable} from "./clients/views.mjs";
-import {useGovernanceDraft} from "../../governance-presentation";
-import {MemberLink,memberName,useMemberNames} from "../../conversation-ui";
+import {useGovernanceDraft} from "../governance/governance-presentation";
+import {MemberLink,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {DiscoveryTabs,discoveryTarget} from "../discovery/navigation";
-import {helpOriginLocator} from "../../help-origin-client.mjs";
+import {helpOriginLocator} from "../help-search/help-origin-client.mjs";
 import {discoveryQueryV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
 import "./discovery.css";
 import type {ProjectRuntime,DiscoveryPage,Opportunity,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail,DiscoveryQuery} from "./contracts";
-import {bodyFreeOpportunity,contactDraftRuntime} from "../../help-contact-view-types";
-import type {DiscoveryInput} from "../../help-contact-view-types";
-import {useReadTasks} from "../../use-read-task";
-import {LoadingFeedback,ReadFailure} from "../../interaction-feedback";
+import {bodyFreeOpportunity,contactDraftRuntime} from "../help-search/help-contact-view-types";
+import type {DiscoveryInput} from "../help-search/help-contact-view-types";
+import {useReadTasks} from "../../shared/reading/use-read-task";
+import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import {purposes,tags,errorMessage,discoveryMemory} from "./query-memory";
 
 type Props={runtime:ProjectRuntime|null;connected:boolean;navigate:(path:string)=>void};
@@ -109,7 +109,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
     <LoadingFeedback active={busy&&!detail&&!detailError} label="正在加载项目介绍…" scopeKey={scope+':'+(opened.current?.id??'detail')}/>
    {detailError&&<ReadFailure message={detailError} onRetry={()=>{if(opened.current)void inspect(opened.current,historyPages.current);}} retrying={busy}/>}
     {detail&&detail.experience&&!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={person(detail.opportunity)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><h2>{detail.opportunity.project.title}</h2><p className="discovery-intro reading-prose">{detail.opportunity.project.summary}</p>{detail.opportunity.help.statement!==detail.opportunity.project.summary&&<p className="reading-prose">{detail.opportunity.help.statement}</p>}
-    <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><ReadingDetails key={item.key}><ReadingSummary>{item.title??'这项工作'}</ReadingSummary><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></ReadingDetails>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
+    <section className="discovery-experience"><h3>工作经历</h3>{detail.experience.items.map(item=><ReadingDetails key={item.key}><ReadingSummary>{item.title??'这项工作'}</ReadingSummary><HistoryFacts record={item} runtime={runtime} connected={connected} subjectId={subjectId} navigate={go}/></ReadingDetails>)}{!detail.experience.items.length&&<p>对方暂未分享可读的工作经历。</p>}{(detail.experience.nextCursor??detail.experience.nextAfter)&&<button type="button" className="text-link" disabled={busy} onClick={()=>void inspect(detail.opportunity,historyPages.current+1)}>更多经历</button>}</section>
    </>}
    {detail&&<OpportunityContactWorkspace runtime={runtime} connected={connected} subjectId={subjectId} query={displayQuery} opportunity={detail.opportunity} navigate={go} onSourceUnavailable={()=>hideSource(detail.opportunity)} onNeedIdentity={()=>go('/app/settings/identity')}/>}
   </dialog>

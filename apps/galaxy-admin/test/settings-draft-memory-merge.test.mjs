@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {searchQualityDraft,searchQualityMerge,searchQualityFixed} from '../src/lib/search-quality-view-model.ts';
-import {recommendationGlobalPolicyDraft,recommendationThemePolicyDraft,recommendationMergePolicy,recommendationThemeDraft,recommendationMergeTheme} from '../src/lib/recommendation-view-model.ts';
+import {searchQualityDraft,searchQualityMerge,searchQualityFixed} from "../src/lib/search/search-quality-view-model.ts";
+import {recommendationGlobalPolicyDraft,recommendationThemePolicyDraft,recommendationMergePolicy,recommendationThemeDraft,recommendationMergeTheme} from "../src/lib/recommendation/recommendation-view-model.ts";
 
 test('returned search draft merges against its original settings instead of only replacing the revision',()=>{
  const base={synonyms:[{term:'协作',alternatives:['合作']}],rankingMode:'relevance',fixedConstraints:{...searchQualityFixed}};

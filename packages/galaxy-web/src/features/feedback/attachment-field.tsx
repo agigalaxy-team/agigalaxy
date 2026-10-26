@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Paperclip} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import type {OfficialAccountModel} from '../../official-account-panel';
-import type {useAccountConnection} from '../../account-center';
+import type {OfficialAccountModel} from "../accounts/official-account-panel";
+import type {useAccountConnection} from "../accounts/account-center";
 import {createFeedbackAttachmentsClient,feedbackAttachmentError,feedbackDraftAttachmentsSchema,feedbackAttachmentSpecificationSchema} from './attachments-client.mjs';
 
 export type FeedbackDraftAttachment=ReturnType<typeof feedbackDraftAttachmentsSchema.parse>[number];

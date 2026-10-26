@@ -4,8 +4,7 @@ import {randomUUID} from "node:crypto";
 import {serviceFixture} from "./service-fixture.mjs";
 import {createApi} from "../src/http.mjs";
 import {browserScopes,createBrowserClient} from "../src/browser-client.mjs";
-import { createExistingWebRuntime } from "./existing-web-identity-fixture.mjs";
-import {createRecoveryMaterial} from "../../galaxy-core/src/domain/identity-material.mjs";
+import { createNativeRecoveryWebFixture } from "./native-recovery-web-fixture.mjs";
 import {getProjectContactClient} from "../../galaxy-web/src/features/projects/clients/operations.mjs";
 import {digest} from "../src/shared/digest.mjs";
 import {verifyContactsV2} from "./contacts-v2-workflow.mjs";
@@ -16,22 +15,10 @@ function memoryStore(values,{get,put}={}){
     async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);await put?.(key,committed);return structuredClone(committed);},
     get:async key=>{const value=structuredClone(values.get(key));await get?.(key,value);return value;},
     put:async(key,value)=>{values.set(key,structuredClone(value));await put?.(key,value);},
-    async prepareRecovery(subjectId,operationId){
-      const key=`pending-recovery:${subjectId}:${operationId}`,old=await store.get(key);if(old)return old;
-      const value={...await createRecoveryMaterial(subjectId),operationId,saveDeclared:false,status:'local-pending-registration'};
-      await store.put(key,value);return value;
-    },
-    async declareSaved(subjectId,operationId){
-      const key=`pending-recovery:${subjectId}:${operationId}`,value=await store.get(key);assert.ok(value);
-      await store.put(key,{...value,saveDeclared:true});
-    },
-    async recordReceipt(subjectId,operationId,receipt){
-      assert.equal(receipt.subjectId,subjectId);assert.equal(receipt.operationId,operationId);assert.equal(receipt.state,'committed');
-      const key=`pending-recovery:${subjectId}:${operationId}`,value=await store.get(key);assert.ok(value);
-      await store.put(key,{...value,receipt,status:value.saveDeclared?'registered-save-declared':'registered-awaiting-save-declaration'});
-    },
   };return store;
 }
+// Recovery is a test-only installed-Native signing stimulus for owner changes.
+// It does not restore a production Web recovery coordinator or cover that flow.
 // Real WebRuntime, device JWS, canonical HTTP and PGlite. Journal uses a
 // declared Map fixture. Private Project tests do not exercise Account quotas.
 async function fixture(){
@@ -39,7 +26,7 @@ async function fixture(){
   const server=createApi({...f,rateLimit:1000}),data=new Map(),writes=[],clients=[];let runtime,onGet,onPut,lose=false;
   try{
     await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
-    const makeRuntime=async store=>{const client=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
+    const makeRuntime=async store=>{const client=await createNativeRecoveryWebFixture({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{
       now:()=>f.now,store,fetch:async(url,options)=>{const path=new URL(url).pathname;
         if(path==='/v1/consents'||path==='/v2/projects')writes.push(path);
         const response=await fetch(origin+path,options);

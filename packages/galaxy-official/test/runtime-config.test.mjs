@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
-import { migrate } from '../src/database.mjs';
+import { migrate } from "../src/infrastructure/database.mjs";
 import { verifyRuntimeConfigWorkflow } from './runtime-config-workflow.mjs';
 import { recordRuntimeConfig,runtimeConfigSnapshot } from '../src/operations/runtime-config-audit.mjs';
 test('runtime config observation records role changes and archives only fixed metadata',async()=>{

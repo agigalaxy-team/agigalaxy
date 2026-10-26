@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createNotificationsClient } from '../src/notifications-client.mjs';
-import { createAssistanceClient } from '../src/assistance-client.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createNotificationsClient } from "../src/clients/notifications.mjs";
+import { createAssistanceClient } from "../src/clients/assistance.mjs";
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 import { applyAssistance,createAssistance } from '../src/domain/assistance.mjs';
 import { digest } from '../src/shared/digest.mjs';
 

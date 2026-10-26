@@ -1,6 +1,6 @@
 import { verifyEnvelope } from './envelope.mjs';
 import { ciProofDataSchema,describeCiProof,summarizeCiProofViews } from '../shared/ci-provenance.mjs';
-import { validatePublicUrl } from '../public-fetch.mjs';
+import { validatePublicUrl } from "../infrastructure/public-fetch.mjs";
 
 export async function verifyCiProof(signed,{endpoint,trustedKeys,now=Math.floor(Date.now()/1000)}){
   if(validatePublicUrl(endpoint).origin!==endpoint)throw new Error('Canonical issuer endpoint required.');

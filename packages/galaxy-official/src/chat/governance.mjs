@@ -1,10 +1,10 @@
-import {chatActorRef,isAccountChatRef,ensureChatParticipantWithin} from "../chat-actors.mjs";
+import {chatActorRef,isAccountChatRef,ensureChatParticipantWithin} from "./chat-actors.mjs";
 import {ServiceError} from "../shared/service-error.mjs";
 import {bindingControl} from "../infrastructure/identity-control-repository.mjs";
-import {targetRestrictionsWithin,assertTargetOperation} from "../target-governance-restrictions-v2.mjs";
+import {targetRestrictionsWithin,assertTargetOperation} from "../governance/target-governance-restrictions-v2.mjs";
 import {chatCreateSchema,chatDecisionSchema,chatJoinSchema} from "../shared/chat-schema.mjs";
-import {roomRule,roomRuleHash,administrators,assertGovernanceProposal,invitationRule,requireOriginalRule,successionLive} from "../chat-room-governance.mjs";
-import {lockControllerMappingsWithin} from "../controller-mapping-lock.mjs";
+import {roomRule,roomRuleHash,administrators,assertGovernanceProposal,invitationRule,requireOriginalRule,successionLive} from "./chat-room-governance.mjs";
+import {lockControllerMappingsWithin} from "../identity/controller-mapping-lock.mjs";
 import {day,stamp,hash,fail,parse,uuid} from './helpers.mjs';
 import {ChatReadModel} from './read-model.mjs';
 

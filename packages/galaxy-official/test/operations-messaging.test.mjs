@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {OperationsMessagingService} from '../src/operations/messaging/service.mjs';
 import {messagingRecoveryPolicy} from '../src/operations/messaging/policy.mjs';
-import {OperationsNotices,createOperationsNoticeWorker} from '../src/operations-notices.mjs';
-import {createAccountUid} from '../src/official-account-uid.mjs';
+import {OperationsNotices,createOperationsNoticeWorker} from "../src/operations/messaging/notices.mjs";
+import {createAccountUid} from "../src/accounts/uid.mjs";
 import {OperationsAiWorkAccountsService} from '../src/operations/accounts/ai-work-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {transaction} from '../src/database.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {transaction} from "../src/infrastructure/database.mjs";
 
 // Real PGlite migrations, committed permissions, plan/run SQL and old account
 // inbox. Only management/recipient directories, queue/clock and SMTP are

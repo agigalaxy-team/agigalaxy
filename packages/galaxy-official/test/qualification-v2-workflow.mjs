@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {ExperienceReviewService} from '../src/experience-review.mjs';
-import {QualificationService} from '../src/qualification.mjs';
-import {QualificationV2Service} from '../src/qualification-v2.mjs';
+import {ExperienceReviewService} from "../src/evidence/experience-review.mjs";
+import {QualificationService} from "../src/qualifications/qualification.mjs";
+import {QualificationV2Service} from "../src/qualifications/qualification-v2.mjs";
 import {experienceReviewMigrationSql} from '../src/infrastructure/experience-review-schema.mjs';
-import {QualificationCalculationService} from '../src/qualification-calculation.mjs';
+import {QualificationCalculationService} from "../src/qualifications/qualification-calculation.mjs";
 import {createApi} from '../src/http.mjs';
 import {qualificationToolDefinitions} from '../src/adapters/mcp/personal/tools/qualification-v2.mjs';
 export const scopes=['binding','consent','case-teaser','assistance','evidence','proof','capsules'];

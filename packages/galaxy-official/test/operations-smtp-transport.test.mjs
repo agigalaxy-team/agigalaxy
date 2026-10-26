@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:net';
 import {randomUUID} from 'node:crypto';
-import {createOperationsSmtpTransport} from '../src/operations-smtp-transport.mjs';
+import {createOperationsSmtpTransport} from "../src/operations/messaging/smtp-transport.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 async function smtpFixture(t){

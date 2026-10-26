@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createAuditClient } from '../src/audit-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createAuditClient } from "../src/clients/audit.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 
 export async function verifyAuditWorkflow(database = null, options = {}) {
   const scopes = ['binding', 'audit', 'audit-review'];

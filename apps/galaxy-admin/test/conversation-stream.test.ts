@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {conversationEventStream,parseConversationStreamEvent} from '../src/lib/conversation-stream';
+import {conversationEventStream,parseConversationStreamEvent} from "../src/lib/workbench/conversation-stream";
 import {operationsProxyPolicy,operationsReadPath} from '../src/lib/proxy-policy.mjs';
 
 test('browser stream reads exact indexed Unicode once and admits only original-turn closed routes and fields',async()=>{

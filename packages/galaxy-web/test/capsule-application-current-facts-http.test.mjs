@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {capsuleWebContinuityFixture} from '../../galaxy-official/test/capsule-web-continuity-fixture.mjs';
-import {isCapsuleCaseFacts,applicationResults,exactApplicationOrigin} from '../src/capsule-application-model.mjs';
+import {isCapsuleCaseFacts,applicationResults,exactApplicationOrigin} from "../src/features/capsules/capsule-application-model.mjs";
 
 test('application preview accepts the real current Case read without the history-list kind wrapper, retaining the exact result and origin',async t=>{
  const f=await capsuleWebContinuityFixture();t.after(()=>f.close());

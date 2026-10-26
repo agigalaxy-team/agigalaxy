@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
-import {operationsParse as parse,operationsFail as fail,operationsStamp as stamp,operationsIso as iso} from '../../operations-content-visibility.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
+import {operationsParse as parse,operationsFail as fail,operationsStamp as stamp,operationsIso as iso} from "../public-content/content-visibility.mjs";
 import {operationsFileAccessChangeSchema,operationsFileAccessOperationSchema} from '../../shared/operations-file-access-schema.mjs';
 import {OperationsFilesReadModel} from './read-model.mjs';
 import {fileProcessingVersion} from './processing.mjs';

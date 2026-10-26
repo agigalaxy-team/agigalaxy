@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
-import {reserveOfficialAccountWithin} from '../../official-account-registration.mjs';
+import {reserveOfficialAccountWithin} from "../../accounts/registration.mjs";
 
 const stamp=value=>value?new Date(value).toISOString():null;
 const safeCode=error=>['registered_identity_read_forbidden','registered_identity_client_unavailable','registered_identity_response_invalid','registered_directory_source_changed'].includes(error?.code)?error.code:'registered_identity_unavailable';

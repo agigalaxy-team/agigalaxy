@@ -1,6 +1,6 @@
 import {randomUUID} from "node:crypto";
 import canonicalize from "canonicalize";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {digest} from "../../shared/digest.mjs";
 import {canonicalSearchSettings,nativeSearchSettings,editableSearchSettings,sameNativeSettings} from "../../shared/operations-search-quality-schema.mjs";
 import {iso,fail,phases,changes,nativeFailure} from './helpers.mjs';

@@ -1,10 +1,10 @@
-import {chatActorRef,chatActorView} from "../chat-actors.mjs";
+import {chatActorRef,chatActorView} from "./chat-actors.mjs";
 import {chatPeopleSchema} from "../shared/chat-schema.mjs";
 import {digest} from "../shared/digest.mjs";
 import {ServiceError} from "../shared/service-error.mjs";
 import {chatPageSchema,chatDirectorySchema,chatDirectoryCursorSchema,chatContextSchema} from "../shared/chat-schema.mjs";
-import {roomRule,roomRuleHash,administrators} from "../chat-room-governance.mjs";
-import {chatMessageOperationsBlockedWithin,chatMessageOperationsBlockedSql} from "../chat-message-operations-gate.mjs";
+import {roomRule,roomRuleHash,administrators} from "./chat-room-governance.mjs";
+import {chatMessageOperationsBlockedWithin,chatMessageOperationsBlockedSql} from "./chat-message-operations-gate.mjs";
 import {stamp,fail,parse,uuid} from './helpers.mjs';
 import {ChatAuthority} from './base.mjs';
 

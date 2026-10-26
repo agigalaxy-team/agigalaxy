@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {cp, lstat, mkdir, readFile, readdir, realpath, symlink, writeFile} from 'node:fs/promises';
 import {dirname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createFilesystemContentPublisher, loadContentPublisherConfiguration} from '../src/content-publisher-files.mjs';
+import {createFilesystemContentPublisher, loadContentPublisherConfiguration} from "../src/publishing/content-publisher-files.mjs";
 import {adminOrigin, endpoint, publicPage, publicSnapshot, temporaryDirectory} from './operations-management-fixture.mjs';
 
 const renderer = fileURLToPath(new URL('./content-publisher-renderer-fixture.mjs', import.meta.url));

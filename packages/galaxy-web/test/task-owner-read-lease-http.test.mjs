@@ -8,8 +8,8 @@ import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { createRecoveryMaterial } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { createExistingWebRuntime } from '../../galaxy-official/test/existing-web-identity-fixture.mjs';
-import { createTaskOwnerReadClient } from '../src/task-owner-read-client.mjs';
-import { publicationFromDraft, taskDraft } from '../src/task-bounty-client.mjs';
+import { createTaskOwnerReadClient } from "../src/features/tasks/owner/task-owner-read-client.mjs";
+import { publicationFromDraft, taskDraft } from "../src/features/tasks/task-bounty-client.mjs";
 
 test('actual signed HTTP owner projection refuses stale metadata, signing, Consent ACK and event bodies across same-ID rebinds', { timeout: 90000 }, async () => {
   const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';

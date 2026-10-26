@@ -1,5 +1,5 @@
 import {randomUUID} from "node:crypto";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {p14RuleKeys,p14EmptyControls,p14Parse as parse} from "../../shared/p14-rules-schema.mjs";
 import {iso} from './views.mjs';

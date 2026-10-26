@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {terminalStates,nextDue,iso} from './contract.mjs';
 import {scheduleAutonomyStrategiesWithin} from './strategy.mjs';
 import {refreshTaskModelUsageWithin} from './workbench.mjs';

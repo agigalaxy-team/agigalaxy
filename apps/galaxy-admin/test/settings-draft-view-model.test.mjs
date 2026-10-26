@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {modelSettingsNewModel,modelSettingsEmpty,modelSettingsWithFormat,modelSettingsValidBaseUrl,modelSettingsValidation} from '../src/lib/model-settings-view-model.ts';
-import {strategiesNewDefinition,strategiesMerge} from '../src/lib/strategies-view-model.ts';
-import {recommendationThemePolicyDraft,recommendationGlobalPolicyDraft,recommendationComposePolicyDraft,recommendationAfterPolicySaved} from '../src/lib/recommendation-view-model.ts';
+import {modelSettingsNewModel,modelSettingsEmpty,modelSettingsWithFormat,modelSettingsValidBaseUrl,modelSettingsValidation} from "../src/lib/models/model-settings-view-model.ts";
+import {strategiesNewDefinition,strategiesMerge} from "../src/lib/strategies/strategies-view-model.ts";
+import {recommendationThemePolicyDraft,recommendationGlobalPolicyDraft,recommendationComposePolicyDraft,recommendationAfterPolicySaved} from "../src/lib/recommendation/recommendation-view-model.ts";
 import {modelSettingsModelSchema} from '../../../packages/galaxy-official/src/shared/operations-model-settings-schema.mjs';
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');

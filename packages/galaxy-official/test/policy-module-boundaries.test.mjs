@@ -12,28 +12,7 @@ const root=fileURLToPath(new URL('../../../',import.meta.url));
 
 test('shared policy contracts load without database initialization while existing runtime loaders preserve exact policy semantics',async t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const check=await promisify(execFile)(process.execPath,['--input-type=module','-e',`
-  import assert from 'node:assert/strict';
-  await import('./packages/galaxy-official/src/operations-agentos-query-tools.mjs');
-  const pureBudget=await import('./packages/galaxy-official/src/shared/policies/resource-budget.mjs');
-  const budget=await import('./packages/galaxy-official/src/infrastructure/resource-budgets.mjs');
-  const pureForum=await import('./packages/galaxy-official/src/shared/policies/forum-quota.mjs');
-  const forum=await import('./packages/galaxy-official/src/community-forum-policy-v1.mjs');
-  assert.equal(budget.resourceBudgetPolicySchema,pureBudget.resourceBudgetPolicySchema);
-  assert.equal(budget.defaultResourceBudgetPolicy,pureBudget.defaultResourceBudgetPolicy);
-  assert.equal(forum.forumPolicySchema,pureForum.forumPolicySchema);
-  assert.equal(forum.defaultForumPolicy,pureForum.defaultForumPolicy);
-  assert.equal(forum.forumPolicyHash,pureForum.forumPolicyHash);
-  assert.deepEqual(await budget.loadResourceBudgetPolicy(),pureBudget.defaultResourceBudgetPolicy);
-  assert.deepEqual(await forum.loadForumPolicy(),pureForum.defaultForumPolicy);
-  const cloned=await budget.loadResourceBudgetPolicy();cloned.maxQueuedJobsPerSubject++;
-  assert.notEqual(cloned.maxQueuedJobsPerSubject,pureBudget.defaultResourceBudgetPolicy.maxQueuedJobsPerSubject);
-  assert.equal(pureBudget.resourceBudgetPolicySchema.safeParse({...pureBudget.defaultResourceBudgetPolicy,maxQueuedJobsPerSubject:0}).success,false);
-  assert.equal(pureBudget.resourceBudgetPolicySchema.safeParse({...pureBudget.defaultResourceBudgetPolicy,role:'administrator'}).success,false);
-  assert.equal(pureForum.forumPolicySchema.safeParse({...pureForum.defaultForumPolicy,maxBodyCodePoints:0}).success,false);
-  assert.equal(pureForum.forumPolicySchema.safeParse({...pureForum.defaultForumPolicy,role:'administrator'}).success,false);
-  console.log(JSON.stringify({queryImportReady:true,compatibilityExportsIdentical:true,databasePreload:false}));
- `],{cwd:root,env,windowsHide:true,timeout:15000});
+ const check=await promisify(execFile)(process.execPath,['--input-type=module','-e',"\n  import assert from 'node:assert/strict';\n  await import('./packages/galaxy-official/src/operations/agentos/query-tools.mjs');\n  const pureBudget=await import('./packages/galaxy-official/src/shared/policies/resource-budget.mjs');\n  const budget=await import('./packages/galaxy-official/src/infrastructure/resource-budgets.mjs');\n  const pureForum=await import('./packages/galaxy-official/src/shared/policies/forum-quota.mjs');\n  const forum=await import('./packages/galaxy-official/src/community/community-forum-policy-v1.mjs');\n  assert.equal(budget.resourceBudgetPolicySchema,pureBudget.resourceBudgetPolicySchema);\n  assert.equal(budget.defaultResourceBudgetPolicy,pureBudget.defaultResourceBudgetPolicy);\n  assert.equal(forum.forumPolicySchema,pureForum.forumPolicySchema);\n  assert.equal(forum.defaultForumPolicy,pureForum.defaultForumPolicy);\n  assert.equal(forum.forumPolicyHash,pureForum.forumPolicyHash);\n  assert.deepEqual(await budget.loadResourceBudgetPolicy(),pureBudget.defaultResourceBudgetPolicy);\n  assert.deepEqual(await forum.loadForumPolicy(),pureForum.defaultForumPolicy);\n  const cloned=await budget.loadResourceBudgetPolicy();cloned.maxQueuedJobsPerSubject++;\n  assert.notEqual(cloned.maxQueuedJobsPerSubject,pureBudget.defaultResourceBudgetPolicy.maxQueuedJobsPerSubject);\n  assert.equal(pureBudget.resourceBudgetPolicySchema.safeParse({...pureBudget.defaultResourceBudgetPolicy,maxQueuedJobsPerSubject:0}).success,false);\n  assert.equal(pureBudget.resourceBudgetPolicySchema.safeParse({...pureBudget.defaultResourceBudgetPolicy,role:'administrator'}).success,false);\n  assert.equal(pureForum.forumPolicySchema.safeParse({...pureForum.defaultForumPolicy,maxBodyCodePoints:0}).success,false);\n  assert.equal(pureForum.forumPolicySchema.safeParse({...pureForum.defaultForumPolicy,role:'administrator'}).success,false);\n  console.log(JSON.stringify({queryImportReady:true,compatibilityExportsIdentical:true,databasePreload:false}));\n "],{cwd:root,env,windowsHide:true,timeout:15000});
  assert.equal(JSON.parse(check.stdout).queryImportReady,true);
 
  const result=await build({absWorkingDir:root,
@@ -47,7 +26,7 @@ test('shared policy contracts load without database initialization while existin
  assert(paths.some(path=>path.endsWith('/policies/forum-quota.mjs')));
 
  const budget=await import('../src/infrastructure/resource-budgets.mjs');
- const forum=await import('../src/community-forum-policy-v1.mjs');
+ const forum=await import("../src/community/community-forum-policy-v1.mjs");
  const directory=await mkdtemp(join(tmpdir(),'galaxy-pure-policy-'));
  const budgetPath=join(directory,'budget.json'),forumPath=join(directory,'forum.json');
  t.after(async()=>{await unlink(budgetPath);await unlink(forumPath);await rmdir(directory);});

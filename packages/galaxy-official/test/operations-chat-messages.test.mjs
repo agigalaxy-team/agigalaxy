@@ -4,9 +4,9 @@ import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
-import {chatMessageOperationsBlockedWithin} from '../src/chat-message-operations-gate.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
+import {chatMessageOperationsBlockedWithin} from "../src/chat/chat-message-operations-gate.mjs";
 
 async function fixture(t){
  const f=await accountChatFixture();t.after(f.close);

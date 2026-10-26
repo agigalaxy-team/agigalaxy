@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createDeviceMaterial, signIdentityPayload } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { createBrowserGenesis } from '../../galaxy-core/src/domain/guid-browser-adapter.mjs';
-import { prepareTrustPackage, sealTrustPackage, verifyTrustPackage } from '../src/trust-package.mjs';
+import { prepareTrustPackage, sealTrustPackage, verifyTrustPackage } from "../src/verification/trust-package.mjs";
 import { trustHash, trustCanonical } from '../src/shared/trust-package-crypto.mjs';
 
 async function identity() {

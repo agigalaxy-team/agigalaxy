@@ -1,5 +1,5 @@
 import { builderDeclaration } from './builders-workflow.mjs';
-import { verifyNodeControlProof } from '../src/builder-client.mjs';
+import { verifyNodeControlProof } from "../src/clients/builder.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, generateKeyPairSync } from 'node:crypto';
@@ -8,10 +8,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { initializeGalaxyIntegration, resetGalaxyIntegration, createCaseDraft } from '../../galaxy-core/src/local-store.mjs';
 import { createConnectionProfile, saveConnectionProfile, revokeConnectionScope } from '../../galaxy-core/src/connection-profile.mjs';
-import { createLocalHostRuntime } from '../src/local-host-runtime.mjs';
+import { createLocalHostRuntime } from "../src/clients/local/host-runtime.mjs";
 import { serviceFixture } from './service-fixture.mjs';
-import { BINDING_RECEIPTS_FILE } from '../src/local-binding-receipts.mjs';
-import { IdentityLinkService } from '../src/identity-links.mjs';
+import { BINDING_RECEIPTS_FILE } from "../src/clients/local/binding-receipts.mjs";
+import { IdentityLinkService } from "../src/identity/links.mjs";
 import { syntheticIdentityProvider,syntheticIdentityCallback } from './identity-test-provider.mjs';
 
 async function fixture(t) {

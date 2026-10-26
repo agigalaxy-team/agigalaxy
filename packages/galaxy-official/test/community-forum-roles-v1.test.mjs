@@ -20,8 +20,10 @@ test('actual PostgreSQL kernel API/worker roles permit forum workflow and bounde
   const withdraw={schemaVersion:1,operationId:randomUUID(),postId:p.postId,expectedHeadVersion:1};assert.equal((await f.write(f.owner,'withdraw-post',withdraw)).status,200);
   for(const sql of [
    "UPDATE forum_events_v1 SET payload_text='rewritten'", "DELETE FROM forum_events_v1", "UPDATE forum_permissions_v1 SET signer_public_key='replaced'",
-   "UPDATE forum_permissions_v1 SET authorization_audit_until=now()", "UPDATE community_accounts SET restricted_until=now()", "SELECT public.galaxy_worker_prune_forum_authorizations(now())",
+   "UPDATE forum_permissions_v1 SET authorization_audit_until=now()", "UPDATE community_accounts SET issuer=issuer", "SELECT public.galaxy_worker_prune_forum_authorizations(now())",
   ])await assert.rejects(f.db.query(sql),error=>error.code==='42501',sql);
+  for(const column of ['restricted_until','restriction_reason','restriction_revision'])assert.equal((await f.db.query("SELECT has_column_privilege('galaxy_api','community_accounts',$1,'UPDATE') permitted",[column])).rows[0].permitted,true,column);
+  for(const column of ['id','uid','endpoint','issuer','external_subject','created_at'])assert.equal((await f.db.query("SELECT has_column_privilege('galaxy_api','community_accounts',$1,'UPDATE') permitted",[column])).rows[0].permitted,false,column);
   await f.owner.consents.revoke(f.owner.actor,published.consentId);
   await f.db.exec('RESET ROLE');await f.db.exec('SET ROLE galaxy_evidence_worker');
   const cleaned=await cleanupProductV2Retention(f.db,{now:()=>f.clock.now,forumPolicy:f.forum.policy,endpoint:f.owner.access.endpoint});
@@ -30,9 +32,10 @@ test('actual PostgreSQL kernel API/worker roles permit forum workflow and bounde
   assert.ok((await f.db.query("SELECT 1 FROM lifecycle_erasure_records WHERE table_name='forum_events_v1' AND object_key=$1",[p.operationId])).rows.length);
   for(const sql of [
    "UPDATE forum_reports_v1 SET state='withdrawn'", "UPDATE bindings SET revoked_at=now()", "UPDATE consents SET revoked_at=now()",
-   "DELETE FROM consents", "UPDATE device_authorizations SET status='revoked'", "SELECT signer_public_key FROM forum_permissions_v1",
+   "DELETE FROM consents", "UPDATE device_authorizations SET status='revoked'", "UPDATE forum_permissions_v1 SET signer_public_key=signer_public_key",
    "INSERT INTO forum_events_v1 SELECT * FROM forum_events_v1 WHERE false", "INSERT INTO forum_permissions_v1 SELECT * FROM forum_permissions_v1 WHERE false",
   ])await assert.rejects(f.db.query(sql),error=>error.code==='42501',sql);
+  assert.equal((await f.db.query("SELECT has_column_privilege('galaxy_evidence_worker','forum_permissions_v1','signer_public_key','SELECT') permitted")).rows[0].permitted,true,'current anonymous source reads may verify the stored public signer key');
   await f.db.exec('RESET ROLE');
   assert.equal((await f.ok(`/v2/community/replies/${reply.replyId}`,{authorization:false})).availability,'available');
  }finally{await f.db.exec('RESET ROLE');await f.close();}

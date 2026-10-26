@@ -5,7 +5,7 @@ import { approveFixtureDeletion } from './deletion-execute-workflow.mjs';
 import { executeDeletion,lockDeletionTables } from '../src/operations/deletion-execute.mjs';
 import { cleanupProductV2Retention } from '../src/operations/lifecycle-retention-v2.mjs';
 import { productV2ExportDatasets } from '../src/infrastructure/lifecycle-export-v2.mjs';
-import { transaction } from '../src/database.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
 
 export async function verifyDiscoveryLifecycleV2(database=null,options={}) {
  return verifyContactsV2(database,{...options,afterWorkflow:async({f,p,request,project,contact,contactAcceptance,room,task})=>{

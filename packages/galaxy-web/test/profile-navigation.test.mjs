@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {profilePath,profileSubject,profileNavigationState,profileReturn,profileReturnLabel,profileExperiencePath,profileReturnNavigationState,publicAccountReturn} from '../src/profile-navigation.mjs';
+import {profilePath,profileSubject,profileNavigationState,profileReturn,profileReturnLabel,profileExperiencePath,profileReturnNavigationState,publicAccountReturn} from "../src/features/profiles/profile-navigation.mjs";
 
 const alice='GUID'+'A'.repeat(28),bob='GUID'+'B'.repeat(28),post='/app/community/posts/ee346750-e0b2-43ba-abef-999fd11c8aca?version=2#reply-3';
 const account='/app/accounts/8cc1659c-4d6f-46bb-8313-73bb6e461120';

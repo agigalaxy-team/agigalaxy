@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildersContinuityFixture } from './builders-client-continuity-workflow.mjs';
-import { createBuildersWebClient } from '../../galaxy-web/src/builders-client.mjs';
+import { createBuildersWebClient } from "../../galaxy-web/src/features/builders/builders-client.mjs";
 import { randomUUID } from 'node:crypto';
 import { builderDeclaration } from './builders-workflow.mjs';
 

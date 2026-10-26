@@ -6,7 +6,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion,lockDeletionTables} from '../src/operations/deletion-execute.mjs';
 import {captureDeletionLedger,replayDeletionLedger} from '../src/operations/deletion-ledger.mjs';
-import {transaction} from '../src/database.mjs';
+import {transaction} from "../src/infrastructure/database.mjs";
 import {seedIndependentServiceFacts,assertIndependentServiceFacts} from './deletion-current-service-facts.mjs';
 
 const scopes=['binding','consent','case-teaser','data-delete'];

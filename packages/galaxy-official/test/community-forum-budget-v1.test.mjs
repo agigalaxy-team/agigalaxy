@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {forumAccountUsage} from '../src/community-forum-budget-v1.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {forumAccountUsage} from "../src/community/community-forum-budget-v1.mjs";
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 import {defaultResourceBudgetPolicy,subjectResourceUsage} from '../src/infrastructure/resource-budgets.mjs';
 
 test('atomic terminal/CAS/signature failure cannot grow Consent, accepted audits or records; generic forum grants rejected',async()=>{

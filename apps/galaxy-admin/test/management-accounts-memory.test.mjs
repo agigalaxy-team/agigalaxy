@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSettingsDraftMemory,settingsManagementReceiptPath} from '../src/lib/settings-draft-memory.ts';
-import {managementAccountQualification,managementRecoveredAssignment} from '../src/lib/management-accounts-view-model.ts';
+import {managementAccountQualification,managementRecoveredAssignment} from "../src/lib/management-accounts/management-accounts-view-model.ts";
 
 test('management drafts remain non-secret in the same login and restored operations provide only owned original GET coordinates',()=>{
  const owner='a'.repeat(64),target='b'.repeat(64),version='c'.repeat(64),other='d'.repeat(64);

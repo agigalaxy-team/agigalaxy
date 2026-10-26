@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { linuxDeploymentFiles } from '../deploy/linux-plan.mjs';
 import { environmentFile } from '../deploy/runtime-settings.mjs';
-import { assertRuntimeEnvironment } from '../src/runtime-environment.mjs';
+import { assertRuntimeEnvironment } from "../src/infrastructure/runtime-environment.mjs";
 import { loadRequestQuotaPolicy } from '../src/adapters/http/request-quotas.mjs';
 import { loadResourceBudgetPolicy } from '../src/infrastructure/resource-budgets.mjs';
 import { loadGovernanceForRuntime } from '../src/operations/governance-review.mjs';
-import { loadIdentityProviders } from '../src/identity-config.mjs';
-import { loadNetworkProfile } from '../src/network-profile.mjs';
+import { loadIdentityProviders } from "../src/identity/config.mjs";
+import { loadNetworkProfile } from "../src/network/network-profile.mjs";
 import { loadMetricsConfiguration } from '../src/operations/metrics.mjs';
 
 const release = { filesVerified: true, releaseId: 'fixture-1', configurationVersion: 'fixture-config-1',

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { createApi } from '../src/http.mjs';
-import { handleDocsMcp } from '../src/docs-mcp.mjs';
+import { handleDocsMcp } from "../src/adapters/mcp/personal/docs-mcp.mjs";
 import bundle from '../public-docs.json' with { type: 'json' };
 import { request as httpRequest } from 'node:http';
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {conversationOperationReceipts} from '../src/operations-agentos-operation-receipts.mjs';
+import {conversationOperationReceipts} from "../src/operations/agentos/operation-receipts.mjs";
 
 test('all card kinds use same-owner original receipt reads without any action replay',async()=>{
  const kinds=['search-apply','search-restore','recommendation-direction','rule-publish','rule-restore','content-visibility','account-restriction','message-draft-save','file-access'];

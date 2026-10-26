@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { DiscoveryV2Service } from '../src/discovery-v2.mjs';
+import { DiscoveryV2Service } from "../src/discovery/discovery-v2.mjs";
 
 export async function verifyDiscoveryV2(database = null, options = {}) {
   const scopes = ['binding', 'consent', 'history', 'notifications', 'assistance', 'case-teaser', 'data-delete'];

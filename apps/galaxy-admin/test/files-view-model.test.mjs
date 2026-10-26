@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {fileBytes,fileHistory,fileStatus,fileTitle,filesHref,filesLocation,filesQuery,nextFilesPage,previousFilesPage} from '../src/lib/files-view-model.ts';
+import {fileBytes,fileHistory,fileStatus,fileTitle,filesHref,filesLocation,filesQuery,nextFilesPage,previousFilesPage} from "../src/lib/files/files-view-model.ts";
 
 const first='1a111111-1111-4111-8111-111111111111';
 const second='2b222222-2222-4222-8222-222222222222';

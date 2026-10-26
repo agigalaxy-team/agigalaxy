@@ -30,7 +30,7 @@ test('new profile sharing is independent of natural submission/binding expiry, w
 
 test('profile audience changes, exact consent revocation and source device revocation close current display without losing own edit text',async()=>{
  const f=await profileEditorFixture();try{
-  const owner=await f.actor(),allowed=await f.actor(),other=await f.actor(),editor=owner.editor();
+  const owner=await f.actor({nativeRecovery:true}),allowed=await f.actor(),other=await f.actor(),editor=owner.editor();
   await editor.save(statement({displayName:'Synthetic public name',about:'Public original'}));
   await editor.save(statement({displayName:'Synthetic selected name',about:'Selected replacement'},'Private',[allowed.subjectId],null,1));
   assert.deepEqual((await f.publicProfile(owner.subjectId)).selfDeclared,{});
@@ -43,7 +43,7 @@ test('profile audience changes, exact consent revocation and source device revoc
   assert.equal((await editor.ownerRead()).sharing.status,'revoked');
   await editor.save(statement({about:'Current third version'},'Public',[],null,2));
   const device=(await owner.runtime.status()).identity.deviceId;
-  const code=await owner.runtime.prepareRecovery();await owner.runtime.saveRecovery({operationId:code.operationId,confirmed:true});
+  const code=await owner.native.prepareRecovery();await owner.native.saveRecovery({operationId:code.operationId,confirmed:true});
   const prepared=await owner.runtime.deviceManagement.prepareRevoke({deviceId:device});
   await owner.runtime.deviceManagement.confirm(prepared,{confirmed:true});
   assert.deepEqual((await f.publicProfile(owner.subjectId)).selfDeclared,{},'revoked original signer cannot keep displaying a continuous statement');
@@ -64,7 +64,7 @@ test('sharing/Consent audience mismatch is rejected, unselected viewers get no s
 
 test('explicit binding revocation and real identity recovery stop the original sharing; current owner can still edit their last raw statement',async()=>{
  const f=await profileEditorFixture();try{
-  const owner=await f.actor();let editor=owner.editor();await editor.save(statement({about:'Original binding source'}));
+  const owner=await f.actor({nativeRecovery:true});let editor=owner.editor();await editor.save(statement({about:'Original binding source'}));
   const oldBinding=owner.runtime.api.snapshot().bindingId;
   await owner.runtime.api.call('/v1/bindings/'+oldBinding+'/revoke',{});
   assert.deepEqual((await f.publicProfile(owner.subjectId)).selfDeclared,{});
@@ -72,9 +72,10 @@ test('explicit binding revocation and real identity recovery stop the original s
   assert.equal((await editor.ownerRead()).selfDeclared.about,'Original binding source');
   assert.equal((await editor.ownerRead()).sharing.status,'revoked');
   await editor.save(statement({about:'Before actual same-identity recovery'},'Public',[],null,1));
-  const recovery=await owner.runtime.prepareRecovery();await owner.runtime.saveRecovery({operationId:recovery.operationId,confirmed:true});
-  const restored=await f.actor({initialize:false}),result=await restored.runtime.recover(recovery.code,{confirmed:true});
-  await restored.runtime.confirmRecoveredCode({operationId:result.operationId,confirmed:true});await restored.runtime.connect({confirmed:true});
+  const recovery=await owner.native.prepareRecovery();await owner.native.saveRecovery({operationId:recovery.operationId,confirmed:true});
+  const restored=await f.actor({initialize:false,nativeRecovery:true});assert.equal((await restored.runtime.status()).identity,null);
+  const result=await restored.native.recover(recovery.code,{confirmed:true});
+  await restored.native.confirmRecoveredCode({operationId:result.operationId,confirmed:true});await restored.runtime.connect({confirmed:true});
   assert.equal(restored.subjectId,owner.subjectId);
   assert.deepEqual((await f.publicProfile(owner.subjectId)).selfDeclared,{});
   const current=await restored.editor().ownerRead();assert.equal(current.selfDeclared.about,'Before actual same-identity recovery');assert.equal(current.sharing.status,'revoked');

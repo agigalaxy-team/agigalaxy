@@ -1,7 +1,7 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {Cases} from './BusinessViewClients';
-import {normalizeCaseFilters} from './cases-types';
+import {normalizeCaseFilters} from "./content-governance/cases-types";
 import {hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 

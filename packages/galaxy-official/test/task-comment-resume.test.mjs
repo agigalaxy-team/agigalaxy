@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {sha256Hex} from '../src/shared/web-primitives.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
-import {createTaskCommentClient} from '../../galaxy-web/src/task-comment-client.mjs';
+import {createTaskCommentClient} from "../../galaxy-web/src/features/tasks/comments/task-comment-client.mjs";
 
 async function fixture() {
   const endpoint = 'https://official.example.org', clock = {now: Math.floor(Date.now() / 1000)};

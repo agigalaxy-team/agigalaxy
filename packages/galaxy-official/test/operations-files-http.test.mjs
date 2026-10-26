@@ -2,18 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
+import {OperationsPermissionsService} from '../src/operations/permissions/index.mjs';
 import {PGlite} from '@electric-sql/pglite';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
-import {OperationsFilesService} from '../src/operations-files.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
+import {OperationsFilesService} from "../src/operations/files/service.mjs";
 import {createApi} from '../src/http.mjs';
-import {migrate} from '../src/database.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOidcTransactionStore} from '../src/oidc-transaction-store.mjs';
-import {createOperationsPortal} from '../src/operations-auth.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOidcTransactionStore} from "../src/identity/authentication/oidc-transaction-store.mjs";
+import {createOperationsPortal} from "../src/operations/permissions/auth.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 import {adminOrigin,operatorRoles,request,response,acceptCookies} from './operations-management-fixture.mjs';
@@ -30,9 +31,23 @@ async function fixture(t){
   id:'file-operations',name:'Synthetic file operators',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:callback,
   includeOperatorRoles:true,includeAccountProfile:true,allowLoopbackHttp:true,now,
   transactionStore:createOidcTransactionStore({db:authDb,namespace:'file-operations-http',now})
- }),portal=createOperationsPortal({db:authDb,endpoint:f.endpoint,adminOrigin,provider,now,roles:operatorRoles,
+ });
+ const fixtureAdmin={kind:'business-operator',operatorId:'local-http-permission-maintainer',role:'administrator',endpoint:f.endpoint};
+ for(const db of [f.db,authDb])await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://fixture.invalid',$1,'权限夹具管理员',$3,$3)",[fixtureAdmin.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ const permissionOptions=db=>({db,endpoint:f.endpoint,now:f.now,operatorAuthorization:async(actor,{db:tx}={})=>{
+  if(actor.operatorId===fixtureAdmin.operatorId)return'administrator';
+  const row=(await tx.query('SELECT external_subject FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2',[actor.operatorId,f.endpoint])).rows[0];
+  return row&&roles.get(row.external_subject)?.some(role=>Object.values(operatorRoles).includes(role))?'reader':null;
+ }});
+ const permissions=new OperationsPermissionsService(permissionOptions(f.db)),portalPermissions=new OperationsPermissionsService(permissionOptions(authDb)),roleIds=new Map();
+ for(const authority of [permissions,portalPermissions]){
+  const ids={};for(const [role,codes]of [['reader',['files.read']],['administrator',['files.read', 'files.scan.retry']]])ids[role]=(await authority.saveRole(fixtureAdmin,{operationId:randomUUID(),expectedVersion:0,
+   name:'本文件有限合同 '+role,description:'Synthetic HTTP authority',enabled:true,permissions:codes},{authorize:async()=>fixtureAdmin})).role.id;
+  roleIds.set(authority,ids);
+ }
+ const portal=createOperationsPortal({db:authDb,endpoint:f.endpoint,adminOrigin,provider,now,roles:operatorRoles,permissions:portalPermissions,
   roleDirectory:{async getOperatorRoles({externalSubject}){return [...(roles.get(externalSubject)??[])];}}});
- const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),
+ const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now,permissions}),
   forum=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),
   forumAttachments=new ForumAttachmentsV1Service({forum,store:f.files.store,scanner:f.files.scanner}),
   managed=new OperationsFilesService({businessAdmin,chatAttachments:f.files,forumAttachments,now:f.now});
@@ -40,11 +55,14 @@ async function fixture(t){
   roles.set(subject,[operatorRoles[role]]);issuer.setAccount(subject);const jar=new Map(),started=response();
   await portal.login(request(jar),started,new URL(adminOrigin+'/v1/operations/login'));acceptCookies(jar,started);
   const completed=response();await portal.callback(request(jar),completed,await issuer.authorize(started.headers.get('location')));acceptCookies(jar,completed);
-  const session=await portal.session(request(jar,{origin:adminOrigin}));assert.equal(session.state,'signed-in');assert.equal(session.operator.role,role);
+  const session=await portal.session(request(jar,{origin:adminOrigin}));assert.equal(session.state,'signed-in');assert.equal(session.operator.role,'reader');
   const principal=(await authDb.query('SELECT * FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2',[session.operator.id,f.endpoint])).rows[0];
   await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
    VALUES($1,$2,$3,$4,$5,$6,$6) ON CONFLICT(operator_id) DO NOTHING`,[principal.operator_id,f.endpoint,principal.issuer,principal.external_subject,principal.display_name,new Date(f.now()*1000).toISOString()]);
-  return {jar,session,subject};
+  const assignments=[];
+  for(const authority of [permissions,portalPermissions])assignments.push((await authority.saveAssignment(fixtureAdmin,{operationId:randomUUID(),expectedVersion:0,
+   operatorId:session.operator.id,roleId:roleIds.get(authority)[role],enabled:true},{authorize:async()=>fixtureAdmin})).assignment);
+  return {jar,session,subject,assignments};
  }
  const calls=[],logs=[],control={afterInitial:null},server=createApi({bindings:{endpoint:f.endpoint},businessAdmin,operationsFiles:managed,
   operations:{portal:{authorizeOperator:async(req,options)=>{
@@ -58,7 +76,7 @@ async function fixture(t){
   for(const key of Object.keys(headers))if(headers[key]===null)delete headers[key];
   return fetch(base+path,{method,headers,...(input===undefined?{}:{body:JSON.stringify(input)}),signal:AbortSignal.timeout(10000)});
  };
- return {...f,authDb,portal,roles,issuer,businessAdmin,managed,calls,logs,control,login,call,base};
+ return {...f,permissions,portalPermissions,fixtureAdmin,authDb,portal,roles,issuer,businessAdmin,managed,calls,logs,control,login,call,base};
 }
 
 test('file transit HTTP confines metadata filters and preserves current retry authority',{timeout:90000},async t=>{
@@ -105,7 +123,13 @@ test('file transit HTTP confines metadata filters and preserves current retry au
   const removed=await f.login('files-http-logout','administrator'),beforeRevision=await revision();
   f.control.afterInitial=()=>f.portal.logout(request(removed.jar,{origin:adminOrigin,'x-galaxy-operator-csrf':removed.session.csrfToken},'POST'),response());
   const signedOut=await f.call(retry,removed,input());assert.equal(signedOut.status,401);assert.equal((await signedOut.json()).error,'operations_login_required');
-  const demoted=await f.login('files-http-demoted','administrator');f.control.afterInitial=()=>{f.roles.set(demoted.subject,[operatorRoles.reader]);};
+  const demoted=await f.login('files-http-demoted','administrator');f.control.afterInitial=async()=>{
+   // Admission demotion and committed business-role revocation are independent.
+   f.roles.set(demoted.subject,[operatorRoles.reader]);
+   for(const [index,authority]of [f.permissions,f.portalPermissions].entries()){
+    const assignment=demoted.assignments[index];await authority.saveAssignment(f.fixtureAdmin,{operationId:randomUUID(),id:assignment.id,expectedVersion:assignment.version,operatorId:demoted.session.operator.id,roleId:assignment.roleId,enabled:false},{authorize:async()=>f.fixtureAdmin});
+   }
+  };
   assert.equal((await f.call(retry,demoted,input())).status,403);assert.equal(await revision(),beforeRevision);assert.equal(await auditCount(),0);
   const command=input(),before=f.calls.length,accepted=await f.call(retry,admin,command);assert.equal(accepted.status,200);
   const result=await accepted.json();assert.equal(result.state,'scheduled');assert.equal(result.processingComplete,false);assert.equal(result.file.name,name);

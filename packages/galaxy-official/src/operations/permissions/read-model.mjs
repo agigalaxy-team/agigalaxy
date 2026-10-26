@@ -1,4 +1,4 @@
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {operationsPermissionCatalog} from "../../operations-permission-catalog.mjs";
 import {operationsPermissionsHistorySchema} from "../../shared/operations-permissions-schema.mjs";

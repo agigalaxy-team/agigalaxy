@@ -5,9 +5,9 @@ import {runCommand,resticEnvironment,withJobLock} from '../operations-stack/host
 import {createProductBackup} from '../operations-stack/backup.mjs';
 import {readBackupStatus} from '../../src/operations/backup-status.mjs';
 import {normalizeOperationalRecord} from '../operations-stack/log-record.mjs';
-import {maintenanceModules} from '../../src/operations-maintenance-catalog.mjs';
+import {maintenanceModules} from "../../src/operations/maintenance/catalog.mjs";
 import {maintenanceNativeCommandSchema} from '../../src/shared/operations-maintenance-schema.mjs';
-import {maintenanceRequestSignature} from '../../src/operations-maintenance-native.mjs';
+import {maintenanceRequestSignature} from "../../src/operations/maintenance/native.mjs";
 import {resolveMaintenanceFootprint,maintenanceCaptureConfiguration,maintenanceCaptureContext} from './footprint.mjs';
 import {MaintenanceControlJournal} from './journal.mjs';
 import {MaintenanceRestoreExecutor} from './restore-executor.mjs';

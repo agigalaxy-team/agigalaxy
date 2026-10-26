@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { createBuilderClient } from '../src/builder-client.mjs';
-import { createBuilderFlow } from '../src/builder-flow.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
+import { createBuilderClient } from "../src/clients/builder.mjs";
+import { createBuilderFlow } from "../src/clients/flows/builder.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export async function verifyBuilderWorkEvidence(db=null,options={}){
   const scopes=['binding','consent','builders','case-teaser','evidence','proof','data-export'];

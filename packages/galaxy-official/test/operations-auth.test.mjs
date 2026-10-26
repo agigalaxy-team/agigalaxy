@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOidcTransactionStore} from '../src/oidc-transaction-store.mjs';
-import {createOperationsPortal} from '../src/operations-auth.mjs';
-import {createKeycloakAdminDirectory} from '../src/keycloak-admin-directory.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOidcTransactionStore} from "../src/identity/authentication/oidc-transaction-store.mjs";
+import {createOperationsPortal} from "../src/operations/permissions/auth.mjs";
+import {createKeycloakAdminDirectory} from "../src/identity/authentication/keycloak-admin-directory.mjs";
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
 import {endpoint, adminOrigin, operatorRoles, request, response, acceptCookies, temporaryDirectory} from './operations-management-fixture.mjs';
 
@@ -67,7 +67,9 @@ test('a verified operator login and its original target survive PG reopen and di
     assert.ok(completed.headers.get('set-cookie').every(cookie => /; HttpOnly; Secure; SameSite=Lax;/.test(cookie)));
     const session = await second.session(originated(jar));
     assert.equal(session.state, 'signed-in');
-    assert.equal(session.operator.role, 'administrator');
+    assert.equal(session.operator.role, 'reader', 'native administrator admission does not select the preconfigured root');
+    assert.equal(session.operator.admission, 'administrator');
+    assert.equal(session.operator.rootAdministrator, false);
     assert.equal(session.operator.displayName, '维护者');
     assert.equal((await db.query('SELECT count(*)::int AS n FROM subjects')).rows[0].n, 0, 'operator login does not create a local Galaxy ID');
     const original = new Map(jar), originalExpiry = session.expiresAt;
@@ -81,10 +83,11 @@ test('a verified operator login and its original target survive PG reopen and di
     const accountCookie = jar.get('__Host-galaxy-operator').replace('__Host-galaxy-operator=', '__Host-galaxy-account=');
     assert.equal((await third.session(originated(new Map([['__Host-galaxy-account', accountCookie]])))).state, 'signed-out',
       'a public account cookie name is not an operations session');
-    const action = request(jar, {origin: adminOrigin, 'x-galaxy-operator-csrf': session.csrfToken}, 'POST');
+    const action = request(jar, {origin: adminOrigin, 'x-galaxy-operator-csrf': session.csrfToken});
+    await assert.rejects(third.authorizeOperator({...action,method:'POST'}), hasCode('operations_access_denied'), 'a valid management login and CSRF token do not supply business write authority');
     const actor = await third.authorizeOperator(action, {requestId: 'synthetic-request'});
     assert.deepEqual(actor, {kind: 'business-operator', operatorId: session.operator.id,
-      role: 'administrator', endpoint, httpRequestId: 'synthetic-request'});
+      role: 'reader', endpoint, httpRequestId: 'synthetic-request'});
     await assert.rejects(third.authorizeOperator(request(jar, {origin: 'https://another.example.invalid',
       'x-galaxy-operator-csrf': session.csrfToken}, 'POST')), hasCode('operations_csrf_invalid'));
     await assert.rejects(third.authorizeOperator(request(jar, {origin: adminOrigin}, 'POST')), hasCode('operations_access_denied'));
@@ -92,8 +95,10 @@ test('a verified operator login and its original target survive PG reopen and di
       'x-galaxy-operator-csrf': randomBytes(32).toString('base64url')}, 'POST')), hasCode('operations_access_denied'));
     await assert.rejects(third.authorizeOperator({...action, headers: {...action.headers, authorization: 'Bearer synthetic-not-a-session'}}), hasCode('operations_access_denied'));
     liveRoles = [operatorRoles.reader];
-    assert.equal((await third.session(originated(jar))).operator.role, 'reader', 'current role replaces the role saved at login');
-    await assert.rejects(third.authorizeOperator(action), hasCode('operations_access_denied'));
+    const nativeReader = await third.session(originated(jar));
+    assert.equal(nativeReader.operator.role, 'reader');
+    assert.equal(nativeReader.operator.admission, 'reader', 'current native admission replaces the admission saved at login');
+    await assert.rejects(third.authorizeOperator({...action,method:'POST'}), hasCode('operations_access_denied'));
     liveRoles = [];
     assert.equal((await third.session(originated(jar))).state, 'signed-out');
     liveRoles = [operatorRoles.administrator];

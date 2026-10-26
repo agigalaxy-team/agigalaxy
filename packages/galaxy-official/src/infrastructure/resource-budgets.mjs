@@ -3,7 +3,7 @@ export {resourceBudgetPolicySchema,defaultResourceBudgetPolicy} from '../shared/
 import { lstat,readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../shared/service-error.mjs';
-import {forumSubjectBytesSql} from '../community-forum-budget-v1.mjs';
+import {forumSubjectBytesSql} from "../community/community-forum-budget-v1.mjs";
 
 export async function loadResourceBudgetPolicy(path){
   if(!path)return structuredClone(defaultResourceBudgetPolicy);

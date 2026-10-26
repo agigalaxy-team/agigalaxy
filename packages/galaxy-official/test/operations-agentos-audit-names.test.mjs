@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {auditItem} from '../src/operations-agentos-query-view.mjs';
+import {auditItem} from "../src/operations/agentos/query-view.mjs";
 
 test('AI audit projection uses the resolved human name, preserves unknown and never names a program as a person',()=>{
  const operatorId='a'.repeat(64),base={id:randomUUID(),sequence:'1',action:'feedback-update',actorKind:'business-operator',operatorId,operatorRole:'administrator',

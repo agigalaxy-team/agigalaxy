@@ -1,7 +1,7 @@
 import { verifyEnvelope } from './envelope.mjs';
 import canonicalize from 'canonicalize';
 import { digest } from '../shared/digest.mjs';
-import { validatePublicUrl } from '../public-fetch.mjs';
+import { validatePublicUrl } from "../infrastructure/public-fetch.mjs";
 
 const CAPABILITIES = ['binding', 'sessions', 'docs-mcp'];
 export function validateManifest(data, endpoint) {

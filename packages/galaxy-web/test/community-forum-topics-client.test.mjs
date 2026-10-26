@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCommunityForumClient,newForumDraft,forumDraftPayload} from '../src/community-forum-client.mjs';
-import {defaultForumPolicy} from '../../galaxy-official/src/community-forum-policy-v1.mjs';
+import {createCommunityForumClient,newForumDraft,forumDraftPayload} from "../src/features/community-forum/community-forum-client.mjs";
+import {defaultForumPolicy} from "../../galaxy-official/src/community/community-forum-policy-v1.mjs";
 import {forumTopics} from '../../galaxy-official/src/shared/community-forum-topics-v1.mjs';
 
 test('topic selection enters only newly prepared publication bytes; legacy/unclassified drafts omit the signed field',()=>{

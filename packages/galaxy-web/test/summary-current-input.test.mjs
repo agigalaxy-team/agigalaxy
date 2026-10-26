@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {emptySummary,readSummaryUnavailableSources,filterSummarySources,summaryVersionReadable,summaryError,summaryDraftCleanupNotice} from "../src/features/conversation-notes/native/presentation.ts";
-import {informationLocalTime,informationError,restoredInformationSearch} from "../src/information-workspace-state.ts";
+import {informationLocalTime,informationError,restoredInformationSearch} from "../src/features/information/state.ts";
 
 test('current source checks deduplicate exact versions and keep temporary loss out of the stored projection',async()=>{
  const permanent={messageId:randomUUID(),revision:1},temporary={messageId:randomUUID(),revision:2},personal={id:randomUUID(),kind:'personal-note',text:'自己的文字；同一行保留\n下一行',sourceRefs:[]};

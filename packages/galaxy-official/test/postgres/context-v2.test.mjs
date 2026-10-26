@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import {readFile} from 'node:fs/promises';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyContextV2} from '../context-v2-workflow.mjs';
 test('actual PostgreSQL API role supports independent Context grants without editing originals',{timeout:60000},async()=>{

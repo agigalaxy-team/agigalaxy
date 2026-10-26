@@ -32,6 +32,25 @@ export async function createNativeRecoveryWebFixture(config,options){
  const result={};
  for(const name of Object.keys(web))Object.defineProperty(result,name,{enumerable:true,get:()=>web[name]});
  Object.assign(result,{
+  // Test-only Native control stimulus, never a production Web capability.
+  async revokeSelectedWebDevice({confirmed=false}={}){
+   if(confirmed!==true)throw Error('Fixture Native revocation confirmation required.');
+   const sourceWeb=web,sourceNative=native,selected=(await sourceWeb.status()).identity;
+   const assertSelected=async()=>{
+    const current=(await sourceWeb.status()).identity;
+    if(web!==sourceWeb||native!==sourceNative||!selected||selected.subjectId!==sourceNative.owner.subjectId
+     ||selected.deviceId===sourceNative.owner.deviceId||current?.subjectId!==selected.subjectId||current?.deviceId!==selected.deviceId)
+     throw Error('Fixture Native revocation target changed.');
+   };
+   await assertSelected();await sourceWeb.agentContinuity.requireCurrent();
+   const state=await sourceWeb.publicControl(selected.subjectId),signerKeyId=await identityKeyId(sourceNative.material.publicKeyPem);
+   await assertSelected();
+   const client=createIdentityControlClient({endpoint:config.endpoint,send:sourceWeb.api.send,store:sourceNative.store,now,
+    signController:async text=>{await assertSelected();return signIdentityPayload(text,sourceNative.material.privateKey);}});
+   const prepared=await client.prepare({version:2,kind:'revoke-device',operationId:crypto.randomUUID(),subjectId:selected.subjectId,
+    expectedEpoch:state.epoch,previousEventHash:state.chainHead,signerKeyId,deviceId:selected.deviceId});
+   await assertSelected();return client.confirm(prepared,{confirmed:true});
+  },
   async prepareRecovery(){const material=await createRecoveryMaterial(native.owner.subjectId),operationId=crypto.randomUUID();pending.set(operationId,material);return{code:material.code,subjectId:material.subjectId,operationId};},
   async saveRecovery({operationId,confirmed}){if(!confirmed||!pending.has(operationId))throw Error('Fixture recovery confirmation required.');
    const material=pending.get(operationId),state=await web.publicControl(native.owner.subjectId);

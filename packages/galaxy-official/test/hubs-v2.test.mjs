@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {builderDeclaration} from './builders-workflow.mjs';
-import {HubServiceV2} from '../src/hubs-v2.mjs';
+import {HubServiceV2} from "../src/network/hubs-v2.mjs";
 
 
 import {sampleCharter} from './hubs-workflow.mjs';

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOfficialAccountClient} from '../src/official-account-client.mjs';
-import {exportConversationArchive} from '../src/account-archive-file.mjs';
+import {createOfficialAccountClient} from "../src/features/accounts/official-account-client.mjs";
+import {exportConversationArchive} from "../src/features/accounts/account-archive-file.mjs";
 
 test('account reads pass caller cancellation through the existing request timeout',async()=>{
  const abort=new AbortController();let requestedSignal;

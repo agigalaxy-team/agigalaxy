@@ -3,7 +3,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {serviceFixture} from './service-fixture.mjs';
 import {attachmentContractFixture} from './chat-attachments-workflow.mjs';
-import {OutcomeMaterialServiceV2} from '../src/outcome-material-v2.mjs';
+import {OutcomeMaterialServiceV2} from "../src/evidence/outcome-material-v2.mjs";
 import {createApi} from '../src/http.mjs';
 
 // Actual signed HTTP/PGlite service lifecycle. The object store, scanner and

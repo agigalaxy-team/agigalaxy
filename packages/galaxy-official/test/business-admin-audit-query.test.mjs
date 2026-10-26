@@ -1,16 +1,20 @@
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {dispatchBusinessAdmin} from '../src/adapters/http/business-admin-http.mjs';
 
 test('audit server filters use real SQL scope and only the closed metadata projection',{timeout:60000},async t=>{
  const db=new PGlite();t.after(()=>db.close());await migrate(db);
  const endpoint='https://audit-query.example.org',otherEndpoint='https://another.example.org',account=randomUUID(),otherAccount=randomUUID(),resource=randomUUID(),hiddenResource=randomUUID(),operation=randomUUID(),requestId=randomUUID();
  const actor={kind:'business-operator',operatorId:'synthetic-audit-reader',role:'reader',endpoint,httpRequestId:randomUUID()},now=()=>Math.floor(Date.parse('2026-10-22T08:00:00Z')/1000),service=new BusinessAdminService({db,endpoint,now});
+ const fixtureAdmin={...actor,operatorId:'audit-query-fixture-admin',role:'administrator'};
+ for(const principal of [fixtureAdmin,actor])await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://fixture.invalid',$1,'当前审计读取夹具',$3,$3)",[principal.operatorId,endpoint,new Date(now()*1000)]);
+ await attachOperationsFixtureAuthority({businessAdmin:service,admin:fixtureAdmin,reader:actor,permissions:['audit.read']});
  async function append({action='feedback-update',operator='synthetic-operator',accountId=account,selection={},result={},at='2026-10-22T01:00:00Z',targetEndpoint=endpoint,operationId=null,httpRequestId=null}={}){
   const id=randomUUID();const row=(await db.query(`INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,account_id,operation_id,http_request_id,selection,result,created_at)
    VALUES($1,$2,$3,'administrator',$4,$5,$6,$7,$8,$9,$10) RETURNING sequence`,[id,targetEndpoint,operator,action,accountId,operationId,httpRequestId,JSON.stringify(selection),JSON.stringify(result),at])).rows[0];return{id,sequence:String(row.sequence)};

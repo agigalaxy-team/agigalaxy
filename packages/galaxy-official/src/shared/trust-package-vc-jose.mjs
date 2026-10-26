@@ -1,6 +1,6 @@
 import { CompactSign, decodeProtectedHeader, importSPKI, jwtVerify } from 'jose';
 import * as z from 'zod/v4';
-import { verifyTrustPackage } from '../trust-package.mjs';
+import { verifyTrustPackage } from "../verification/trust-package.mjs";
 import { trustCanonical, trustHash, trustSubject, verifyTrustIdentity } from './trust-package-crypto.mjs';
 import { trustContainerSchema, trustManifestSchema } from './trust-package-schema.mjs';
 import { fromBase64Url } from '../../../galaxy-core/src/domain/identity-material.mjs';

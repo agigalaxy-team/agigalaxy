@@ -7,7 +7,7 @@ from html import escape
 import json
 
 from home_page import render_homepage
-from cms_content import content_slot
+from cms_slots import content_slot
 from release_status import release_status_body
 
 

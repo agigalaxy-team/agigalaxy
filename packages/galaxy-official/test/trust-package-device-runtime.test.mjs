@@ -9,8 +9,8 @@ import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createNativeRuntime} from '../../galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {verifyTrustPackage} from '../src/trust-package.mjs';
-import {createTrustPackageDeviceAdapter} from '../src/trust-package-device-adapter.mjs';
+import {verifyTrustPackage} from "../src/verification/trust-package.mjs";
+import {createTrustPackageDeviceAdapter} from "../src/clients/trust-package-device-adapter.mjs";
 
 test('real native and WebCrypto device runtimes export offline self-claims before or after explicit connection without replacing identity',async()=>{
  const f=await serviceFixture([...browserScopes]),directory=await mkdtemp(join(tmpdir(),'galaxy-trust-runtime-'));

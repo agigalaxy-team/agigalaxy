@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hubsContinuityFixture } from './hubs-client-continuity-workflow.mjs';
-import { createHubsWebClient } from '../../galaxy-web/src/hubs-client.mjs';
+import { createHubsWebClient } from "../../galaxy-web/src/features/hubs/hubs-client.mjs";
 import { randomUUID } from 'node:crypto';
 
 for (const phase of ['local-load', 'authorization-return']) test(

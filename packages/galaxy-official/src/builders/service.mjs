@@ -4,7 +4,7 @@ import {ServiceError} from "../shared/service-error.mjs";
 import {digest} from "../shared/digest.mjs";
 import {recordObjectAudit} from "../infrastructure/object-audit.mjs";
 import {readBuilderWorkSources} from "../domain/builder-work-evidence.mjs";
-import {builderProbeTarget} from "../builder-probe-observer.mjs";
+import {builderProbeTarget} from "./builder-probe-observer.mjs";
 import {randomUUID} from "node:crypto";
 import {BuilderPortableEvidence} from './portable-evidence.mjs';
 

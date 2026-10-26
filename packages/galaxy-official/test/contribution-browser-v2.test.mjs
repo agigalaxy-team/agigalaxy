@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {getContributionClient} from '../../galaxy-web/src/contribution-client.mjs';
+import {getContributionClient} from "../../galaxy-web/src/features/work-records/contribution-client.mjs";
 
 test('actual browser identity and signed contribution operations recover lost Consent, publication and revoke replies without changing selected fields',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();

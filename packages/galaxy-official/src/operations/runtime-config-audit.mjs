@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { governanceConfigSchema } from '../governance-config.mjs';
-import { retirementPolicySchema } from '../retirement.mjs';
-import { transaction } from '../database.mjs';
+import { governanceConfigSchema } from "../governance/governance-config.mjs";
+import { retirementPolicySchema } from "../privacy/retirement.mjs";
+import { transaction } from "../infrastructure/database.mjs";
 import { digest } from '../shared/digest.mjs';
 import { governanceConfigurationHash,governanceReviewRecordSchema } from './governance-review.mjs';
 import { incidentPolicySchema,assertIncidentTransition } from './incident.mjs';

@@ -2,8 +2,8 @@ import React,{useCallback,useEffect,useId,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {createAccountConversationNotes} from "./store.mjs";
-import {LoadingFeedback} from "../../../interaction-feedback";
-import "../../../content-share-flow.css";
+import {LoadingFeedback} from "../../../shared/feedback/interaction-feedback";
+import "../../trust-packages/content-share-flow.css";
 
 export type AccountNotesAuthority=Parameters<typeof createAccountConversationNotes>[0];
 type Saved={version:number;endpoint:string;accountId:string;roomId:string;note:string;noteRevision:number;references:{messageId:string;revision:number}[];draft:{id:string;text:string;baseRevision:number}|null};

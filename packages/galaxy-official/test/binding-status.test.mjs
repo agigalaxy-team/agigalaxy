@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createBindingStatusClient } from '../src/binding-status-client.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createBindingStatusClient } from "../src/clients/binding-status.mjs";
 
 const endpoint = 'https://official.example.org';
 function completed() {

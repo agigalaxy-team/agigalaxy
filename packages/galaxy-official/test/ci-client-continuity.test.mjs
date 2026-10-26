@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import {getCiClient} from '../../galaxy-web/src/ci-client.mjs';
+import {getCiClient} from "../../galaxy-web/src/features/ci/ci-client.mjs";
 const hash=text=>createHash('sha256').update(text).digest('hex');
 // Contract doubles cover clocks and interrupted awaits; ci-browser-v2.test
 // separately exercises real WebRuntime/signatures/HTTP/PGlite and proof bytes.

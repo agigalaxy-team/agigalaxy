@@ -5,7 +5,7 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { createInformationClientV2 } from '../../galaxy-web/src/information-client-v2.mjs';
+import { createInformationClientV2 } from "../../galaxy-web/src/features/information/client.mjs";
 const scopes = [
   'binding',
   'consent',

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeConversationFailure,nativeConversationRetryMessage} from '../src/lib/agentos-client.ts';
+import {nativeConversationFailure,nativeConversationRetryMessage} from "../src/lib/workbench/agentos-client.ts";
 
 test('a new explicit question requires a current bound terminal model failure and positive unstarted ledger evidence',()=>{
  const run={runId:'11111111-1111-4111-8111-111111111111',operationId:'22222222-2222-4222-8222-222222222222',status:'ERROR',content:null,userInput:'  查询当前公开汇总，不作修改。\n',createdAt:1,events:[],awaitingHuman:false,errorCode:'operations_agentos_model_request_failed',failure:{stage:'model-request',category:'timeout',reportedStatus:408,body:'PRIVATE_PROVIDER_CANARY'},businessActivity:{state:'not-started',basis:'same-owner-turn-tool-and-card-ledger'}};

@@ -6,7 +6,8 @@ import tempfile
 import unittest
 
 import chrome
-from cms_content import ContentError, apply_snapshot, slot_content
+from cms_content import apply_snapshot
+from cms_slots import ContentError, slot_content
 from product_pages import render_product_pages
 
 

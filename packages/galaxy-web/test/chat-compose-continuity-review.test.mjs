@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createChatComposeDraft} from '../src/chat-compose-draft.ts';
-import {createChatClient} from '../src/chat-client.mjs';
-import {createChatComposePageId} from '../src/chat-compose-page.ts';
+import {createChatComposeDraft} from "../src/features/chat/chat-compose-draft.ts";
+import {createChatClient} from "../src/features/chat/chat-client.mjs";
+import {createChatComposePageId} from "../src/features/chat/chat-compose-page.ts";
 
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};};
 function fixture(){

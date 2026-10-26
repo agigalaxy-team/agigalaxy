@@ -6,7 +6,7 @@ import {createApi} from '../src/http.mjs';
 import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
 import {handoffExistingWebIdentity,existingWebFixtureWebsite} from './existing-web-identity-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
+import {createHelpSearchClient} from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
 test('Browser help composition and local choice versions use actual API, survive source failure and never imply application or cloud sync',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();
   const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>data.set(k,structuredClone(v)),update:memoryAtomicUpdate(data)};

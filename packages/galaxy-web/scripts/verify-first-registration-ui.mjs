@@ -7,11 +7,11 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
 import {createHash,generateKeyPairSync,randomBytes,randomUUID} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {migrate} from '../../galaxy-official/src/database.mjs';
+import {migrate} from "../../galaxy-official/src/infrastructure/database.mjs";
 import {createServices} from '../../galaxy-official/src/services.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
-import {createOidcLoginProvider} from '../../galaxy-official/src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../../galaxy-official/src/identity/authentication/oidc-login.mjs";
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const out=browserToolOutput(import.meta.url, process.env.GALAXY_REGISTRATION_REPORT_DIR);

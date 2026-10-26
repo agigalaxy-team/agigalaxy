@@ -4,27 +4,29 @@ import {randomUUID} from 'node:crypto';
 import {writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {PGlite} from '@electric-sql/pglite';
-import {operationsOperatorV1MigrationSql} from '../src/infrastructure/operations-operator-schema-v1.mjs';
-import {operationsPermissionsV1MigrationSql} from '../src/infrastructure/operations-permissions-v1-schema.mjs';
-import {operationsMessagingV1MigrationSql} from '../src/infrastructure/operations-messaging-v1-schema.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsMessagingService} from '../src/operations-messaging.mjs';
+import {migrate} from '../src/infrastructure/database.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsMessagingService} from "../src/operations/messaging/index.mjs";
 import {messageHistoryOperator} from '../../../apps/galaxy-admin/src/lib/messaging-view-model.ts';
-import {permissionHistoryOperator,permissionHistoryDeltaLines} from '../../../apps/galaxy-admin/src/lib/permissions-view-model.ts';
+import {permissionHistoryOperator,permissionHistoryDeltaLines} from "../../../apps/galaxy-admin/src/lib/permissions/permissions-view-model.ts";
 
 test('messaging and permissions history resolve only current same-endpoint management names and never render opaque IDs as identity',async t=>{
  const db=new PGlite();t.after(()=>db.close());
- // Use the exact three existing table migrations this read-only change needs;
- // unrelated migration113 / AgentOS work is deliberately not executed here.
- await db.exec(operationsOperatorV1MigrationSql);await db.exec(operationsPermissionsV1MigrationSql);await db.exec(operationsMessagingV1MigrationSql);
+ // Current history projections also resolve AI work-account attribution. Use
+ // the real current schema; this fixture creates no AI account or model work.
+ await migrate(db);
  const endpoint='https://history.example.invalid',foreignEndpoint='https://other.example.invalid',now=()=>2000000000,at=new Date(now()*1000).toISOString();
  const actorId='a'.repeat(64),targetId='b'.repeat(64),missingId='c'.repeat(64),foreignId='d'.repeat(64),blankId='e'.repeat(64);
  for(const [id,scope,name]of [[actorId,endpoint,'合成运营负责人'],[targetId,endpoint,'合成复核维护者'],[foreignId,foreignEndpoint,'不得从其他端点借来的名称'],[blankId,endpoint,'  ']])await db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://management.example.invalid',$1,$3,$4,$4)`,[id,scope,name,at]);
- const actor={kind:'business-operator',operatorId:actorId,role:'administrator',endpoint},permissions=new OperationsPermissionsService({db,endpoint,now,operatorAuthorization:async value=>value.operatorId===actorId?'administrator':null}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,now});
+ const actor={kind:'business-operator',operatorId:actorId,role:'reader',endpoint},permissions=new OperationsPermissionsService({db,endpoint,now,operatorAuthorization:async value=>value.operatorId===actorId?'reader':null}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,now});
  const roleId=randomUUID(),assignmentId=randomUUID();
- await db.query(`INSERT INTO operations_business_roles_v1(id,endpoint,name,description,enabled,version,permissions,created_by,updated_by,created_at,updated_at) VALUES($1,$2,'合成只读角色','',true,1,ARRAY['content.read'],$3,$3,$4,$4)`,[roleId,endpoint,actorId,at]);
+ await db.query(`INSERT INTO operations_business_roles_v1(id,endpoint,name,description,enabled,version,permissions,created_by,updated_by,created_at,updated_at) VALUES($1,$2,'合成只读角色','',true,1,ARRAY['permissions.read','notices.read'],$3,$3,$4,$4)`,[roleId,endpoint,actorId,at]);
  await db.query(`INSERT INTO operations_role_assignments_v1(id,endpoint,operator_id,role_id,enabled,version,created_by,updated_by,created_at,updated_at) VALUES($1,$2,$3,$4,true,1,$5,$5,$6,$6)`,[assignmentId,endpoint,targetId,roleId,actorId,at]);
+ // Seed read authority without command events: the recorded events below are
+ // the subject of the history projection, including its exact page cardinality.
+ await db.query(`INSERT INTO operations_role_assignments_v1(id,endpoint,operator_id,role_id,enabled,version,created_by,updated_by,created_at,updated_at) VALUES($1,$2,$3,$4,true,1,$3,$3,$5,$5)`,[randomUUID(),endpoint,actorId,roleId,at]);
+ assert.deepEqual((await permissions.effective(actor)).permissions,['notices.read','permissions.read']);
  const assignmentDelta={kind:'assignment',operatorId:targetId,roleId,enabled:{before:null,after:true}},assignmentEvent=randomUUID();
  for(const [id,scope,who,kind,resourceId,delta]of [[assignmentEvent,endpoint,actorId,'assignment-save',assignmentId,assignmentDelta],[randomUUID(),endpoint,blankId,'role-save',roleId,null],[randomUUID(),endpoint,foreignId,'role-save',roleId,null],[randomUUID(),foreignEndpoint,foreignId,'role-save',roleId,null]])await db.query(`INSERT INTO operations_permission_events_v1(id,endpoint,operator_id,kind,resource_id,version,changed_fields,input,result,created_at) VALUES($1,$2,$3,$4,$5,1,ARRAY['enabled'],'{}',$6,$7)`,[id,scope,who,kind,resourceId,JSON.stringify({delta}),at]);
  const history=await permissions.history(actor),assigned=history.items.find(item=>item.id===assignmentEvent);

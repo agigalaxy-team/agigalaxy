@@ -70,7 +70,7 @@ test('network loss and HTTP 5xx still automatically resume the same publication;
 test('a definite Task event rejection blocks automatic and legacy retry, then explicitly continues one original event and Consent',async t=>{
  const f=await publicationFixture();t.after(()=>f.close());const task=await f.runtime.publishTask(f.draft,{confirmed:true}),failure=admission(f,'submitTaskEvent');
  const path=`/v2/tasks/${task.taskId}/events`,calls=[];f.hooks.response=(target,response)=>calls.push({target,status:response.status});
- await assert.rejects(f.runtime.taskEvent(task.taskId,{kind:'close',expectedTaskVersion:1,reason:'Explicitly end the synthetic enrollment'},{confirmed:true}),{code:'consent_required'});
+ await assert.rejects(f.runtime.taskEvent(task.taskId,{kind:'stop-enrollment',expectedTaskVersion:1,reason:'Explicitly end the synthetic enrollment'},{confirmed:true}),{code:'consent_required'});
  const original=await f.runtime.getLocal('task-event:'+task.taskId),writes=()=>calls.filter(row=>row.target===path).length,before={business:writes(),consents:f.counts.consents};
  for(let count=0;count<3;count++)await assert.rejects(f.runtime.resumeTaskEvent(task.taskId),{code:'task_operation_business_rejected',reason:'consent_required'});
  await assert.rejects(f.runtime.reconcileTaskEvent(task.taskId,{retry:true}),{code:'task_operation_business_rejected'});

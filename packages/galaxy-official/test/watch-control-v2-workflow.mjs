@@ -8,7 +8,7 @@ import {createBrowserClient,browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {createNativeWatch} from '../../galaxy-edge-mcp/src/native-v2/watch/index.mjs';
 import {createNativeWatchHandoff} from '../../galaxy-edge-mcp/src/native-v2/watch/handoff.mjs';
-import {transaction} from '../src/database.mjs';
+import {transaction} from "../src/infrastructure/database.mjs";
 import {cleanupWatchControlsWithin} from '../src/operations/watch-control-retention-v2.mjs';
 import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion} from '../src/operations/deletion-execute.mjs';

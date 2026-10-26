@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {OperationsAiRunsService} from '../src/operations-ai-runs.mjs';
+import {OperationsAiRunsService} from "../src/operations/agentos/runs.mjs";
 
 test('actual native prompt version metadata is closed, conversation-bound and carries no role body',async()=>{
  const cid='11111111-1111-4111-8111-111111111111',raw={runId:'native-metadata',conversationId:cid,domain:'governance',sessionId:'session-one',componentId:'galaxy-conversation-governance',componentType:'agent',state:'COMPLETED',rolePromptVersion:7,boundaryVersion:'galaxy-conversation-boundary-v3',promptVersion:'galaxy-conversation-v2',prompt:'PRIVATE_WORK_REQUIREMENTS'};

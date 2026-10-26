@@ -10,7 +10,7 @@ import {OpenPanelClient,GorseClient,MeilisearchClient} from '../src/discovery-ru
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {createDiscoveryReadOnlySource} from '../src/discovery-runtime/public-content-source.mjs';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {createDiscoveryClient} from '../../galaxy-web/src/features/discovery/client.mjs';
 import {createDiscoveryHttp} from '../src/discovery-runtime/http.mjs';
@@ -65,7 +65,10 @@ test('concurrent mounted collectors share one visitor handshake and anonymous se
  const first=createDiscoveryClient({endpoint,websiteOrigin,fetcher}),second=createDiscoveryClient({endpoint,websiteOrigin,fetcher});
  await Promise.all([first.record({name:'pageview',pageKey:'home'}),second.recommendations()]);assert.equal(handshakes,1);assert.equal(accepted,1);
  const headers=new Map(),adapter=createDiscoveryHttp({websiteOrigin,visitorSecret:'s'.repeat(40)});let found;
- await adapter.dispatch({discovery:{search:async()=>({items:[]})},request:{method:'GET',headers:{}},response:{setHeader:(key,value)=>headers.set(key,value)},url:new URL(endpoint+'/v1/discovery/search?q=中文'),send:(_status,value)=>{found=value;}});
+ const response={setHeader:(key,value)=>headers.set(key,value),getHeader:key=>headers.get(key)};
+ await adapter.dispatch({discovery:{},request:{method:'GET',headers:{}},response,url:new URL(endpoint+'/v1/discovery/config'),send:()=>{}});
+ const visitorCookie=headers.get('Set-Cookie')[0].split(';')[0];headers.clear();
+ await adapter.dispatch({discovery:{search:async()=>({items:[]})},request:{method:'GET',headers:{cookie:visitorCookie}},response,url:new URL(endpoint+'/v1/discovery/search?q=中文'),send:(_status,value)=>{found=value;}});
  assert.deepEqual(found,{items:[]});assert.equal(headers.has('Set-Cookie'),false);
 });
 

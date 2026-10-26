@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createTaskV2,applyTaskV2,proposeParticipationV2,applyParticipationV2} from '../src/domain/task-v2.mjs';
 import {taskEventV2Schema,participationProposalV2Schema} from '../src/shared/task-schema-v2.mjs';
-import {applicationFromDraft} from '../../galaxy-web/src/task-bounty-client.mjs';
+import {applicationFromDraft} from "../../galaxy-web/src/features/tasks/task-bounty-client.mjs";
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {digest} from '../src/shared/digest.mjs';

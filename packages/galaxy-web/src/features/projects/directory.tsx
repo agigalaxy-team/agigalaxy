@@ -2,7 +2,7 @@ import {useCallback,useEffect,useLayoutEffect,useRef,useState} from "react";
 import {Layers,Search} from "lucide-react";
 import "../discovery/home.css";
 import {SaveForLaterButton} from "../bookmarks/controls";
-import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../directory-reading-state.mjs";
+import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../shared/reading/directory-reading-state.mjs";
 import {directories} from "../discovery/contracts";
 import type {Props,ProjectBrowseItem,BrowsePage} from "../discovery/contracts";
 import {ContentCard} from "../discovery/content-card";

@@ -1,7 +1,7 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {ChatReports} from './BusinessViewClients';
-import {normalizeChatReportFilters} from './chat-report-types';
+import {normalizeChatReportFilters} from "./chat-reports/chat-report-types";
 import {hasAnyOperatorPermission,hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 

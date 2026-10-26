@@ -1,3 +1,4 @@
+import {runtimeLogEvent} from '../src/operations/runtime-log.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
@@ -38,7 +39,13 @@ export async function verifyAdverseRequests(database = null, options = {}) {
     ]) assert.equal((await post('/v1/evidence-submissions', payload, true, headers)).status, expected);
     assert.deepEqual(await counts(), before);
     assert.ok(!JSON.stringify(logs).includes(marker));assert.ok(!JSON.stringify(logs).includes(f.credential));
-    assert.ok(logs.every(event => Object.keys(event).sort((a, b) => a.localeCompare(b)).join(',') === 'code,requestId,status'));
+    assert.ok(logs.length > 0);
+    for (const event of logs) {
+      assert.ok(['http_rejected','http_completed'].includes(event.event));
+      assert.equal(typeof event.requestId,'string');assert.equal(Number.isInteger(event.status),true);
+      assert.deepEqual(event,runtimeLogEvent(event),'the production formatter remains a closed, idempotent metadata projection');
+      for(const field of ['error','message','body','payload','credential','authorization'])assert.equal(Object.hasOwn(event,field),false);
+    }
     // A normal signed request still commits after all rejected payloads.
     const root = { id: randomUUID(), kind: 'case', localRef: randomUUID(), title: 'Valid after rejected input', summary: 'Synthetic',
       source: { kind: 'local', reference: randomUUID() }, participants: [{ subjectId: f.actor.subjectId, role: 'requester' }] };

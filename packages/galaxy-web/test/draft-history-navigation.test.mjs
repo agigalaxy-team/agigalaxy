@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDraftHistoryNavigation} from '../src/draft-history-navigation.mjs';
+import {createDraftHistoryNavigation} from "../src/shared/navigation/draft-history-navigation.mjs";
 
 /** @typedef {{route:string,key:string|null}} Point */
 /** @typedef {Parameters<typeof createDraftHistoryNavigation>[0]['selectLeave']} SelectLeave */

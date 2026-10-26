@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir,lstat} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {transaction} from '../../src/database.mjs';
+import {transaction} from "../../src/infrastructure/database.mjs";
 import {validateDeletionLedger} from '../../src/operations/deletion-ledger.mjs';
 import {noSymlinkPath,runCommand,postgresSqlArguments} from '../operations-stack/host.mjs';
 
@@ -81,7 +81,7 @@ export async function reconcileProsodySqlCandidate(database,{operationId,project
  const transport={erase:async row=>{if(!erased.has(key(row)))throw fail('maintenance_prosody_archive_delete_unconfirmed');return{archiveDeleted:true};}};
  // Native metadata reads must not initialize the complete chat/business kernel
  // (its schema imports are cyclic when this adapter is the process entry).
- const {ChatService}=await import('../../src/chat.mjs');
+ const {ChatService}=await import("../../src/chat/service.mjs");
  const chat=new ChatService({db:database,transport,now:()=>now});
  for(const target of projection.deletedSubjects){let result;
   for(let i=0;i<=Math.ceil(limit/1000);i++){result=await chat.eraseSubject(target.subjectId,{limit:1000});if(result.complete)break;}

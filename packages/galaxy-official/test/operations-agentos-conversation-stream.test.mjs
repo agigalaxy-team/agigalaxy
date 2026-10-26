@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsAgentOsClient} from '../src/operations-agentos-client.mjs';
-import {browserConversationEvent,conversationStreamEvent,nativeSseFrames} from '../src/operations-agentos-conversation-stream.mjs';
+import {OperationsAgentOsClient} from "../src/operations/agentos/client.mjs";
+import {browserConversationEvent,conversationStreamEvent,nativeSseFrames} from "../src/operations/agentos/conversation-stream.mjs";
 
 test('private native SSE preserves exact indexed Unicode text on resume while excluding reasoning, tool payloads and aggregate/error content',async()=>{
  const runId=randomUUID(),operationId=randomUUID(),conversation={id:randomUUID(),sessionId:randomUUID(),domain:'governance',mode:'conversation'},encoder=new TextEncoder();

@@ -4,7 +4,7 @@ import {useEffect,useId,useRef,useState} from 'react';
 import Link from 'next/link';
 import {AdminIcon} from '../AdminIcons';
 import {WorkbenchEmpty,workbenchNumber} from './WorkbenchCharts';
-import {defaultWorkbenchShortcuts,workbenchShortcuts,type WorkbenchPending,workbenchTime,type WorkbenchRecord} from '../../lib/workbench-view-model';
+import {defaultWorkbenchShortcuts,workbenchShortcuts,type WorkbenchPending,workbenchTime,type WorkbenchRecord} from "../../lib/workbench/workbench-view-model";
 
 const pendingGroups=[{id:'all',label:'全部'},{id:'reports',label:'举报'},{id:'feedback',label:'反馈'},{id:'files',label:'文件'},{id:'delivery',label:'发送'},{id:'system',label:'运行'}];
 

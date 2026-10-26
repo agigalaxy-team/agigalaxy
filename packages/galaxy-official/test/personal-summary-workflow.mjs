@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {chatFixture,invite} from './chat-workflow.mjs';
-import {PersonalSummaryService,createSummarySourceReader} from '../src/personal-summaries.mjs';
-import {NotificationService} from '../src/notifications.mjs';
-import {NotificationInboxService} from '../src/notification-inbox.mjs';
+import {PersonalSummaryService,createSummarySourceReader} from "../src/summaries/personal-summaries.mjs";
+import {NotificationService} from "../src/notifications/notifications.mjs";
+import {NotificationInboxService} from "../src/notifications/notification-inbox.mjs";
 import {subjectResourceUsage,defaultResourceBudgetPolicy} from '../src/infrastructure/resource-budgets.mjs';
 export async function summaryFixture(options={}){
  const transport={available:true,project:async()=>{},send:async x=>({archiveId:x.messageId}),erase:async()=>({archiveDeleted:true})};

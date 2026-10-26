@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { saveDataExport } from '../src/local-data-export.mjs';
+import { saveDataExport } from "../src/clients/local/data-export.mjs";
 import { verifyDataExportWorkflow } from './data-export-workflow.mjs';
 
 test('own-data export joins API/client/host, scopes records, preserves historical Proofs and expires download tickets', () => verifyDataExportWorkflow());

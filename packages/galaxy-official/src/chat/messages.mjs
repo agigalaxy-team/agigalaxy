@@ -1,9 +1,9 @@
-import {chatActorRef} from "../chat-actors.mjs";
+import {chatActorRef} from "./chat-actors.mjs";
 import {randomUUID} from "node:crypto";
 import {ServiceError} from "../shared/service-error.mjs";
-import {assertTargetOperation} from "../target-governance-restrictions-v2.mjs";
+import {assertTargetOperation} from "../governance/target-governance-restrictions-v2.mjs";
 import {chatSendSchema,chatEditSchema,chatMessageStatusSchema,chatOperationReceiptSchema} from "../shared/chat-schema.mjs";
-import {chatMessageOperationsBlockedSql} from "../chat-message-operations-gate.mjs";
+import {chatMessageOperationsBlockedSql} from "./chat-message-operations-gate.mjs";
 import {day,stamp,hash,fail,parse,uuid} from './helpers.mjs';
 import {ChatGovernance} from './governance.mjs';
 

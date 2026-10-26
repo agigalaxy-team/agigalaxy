@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createHistoryClient } from '../src/history-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createHistoryClient } from "../src/clients/history.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 
 export async function verifyProfileWorkflow(database=null,options={}){
   const scopes=['binding','consent','history','case-teaser','data-export'];

@@ -2,7 +2,7 @@
 
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {AdminIcon} from '../AdminIcons';
-import type {WorkbenchActionCard} from '../../lib/workbench-action-cards';
+import type {WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchInteraction} from './WorkbenchInteraction';
 
 type Props={domain:string;label:string;cards:WorkbenchActionCard[];verified:boolean;loading:boolean;error:string;denied:boolean;now:number;renderCard:(card:WorkbenchActionCard)=>ReactNode;feedback:ReactNode};

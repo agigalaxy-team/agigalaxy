@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { createGalaxyAdapter } from '../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
 import { createConnectionProfile, saveConnectionProfile } from '../../galaxy-core/src/connection-profile.mjs';
-import { createLocalHostRuntime } from '../src/local-host-runtime.mjs';
+import { createLocalHostRuntime } from "../src/clients/local/host-runtime.mjs";
 import { createApi } from '../src/http.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 

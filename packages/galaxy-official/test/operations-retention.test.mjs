@@ -1,8 +1,8 @@
 import test from 'node:test';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsRetention,createOperationsRetentionWorker} from '../src/operations-retention.mjs';
+import {OperationsRetention,createOperationsRetentionWorker} from "../src/operations/retention/service.mjs";
 import {operationsProductFixture} from './operations-product-fixture.mjs';
 
 async function archive(f,{expired=true}={}){

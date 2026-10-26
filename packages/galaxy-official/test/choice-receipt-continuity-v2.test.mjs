@@ -8,9 +8,9 @@ import {choiceReceiptResultSchema,choicePutIntent} from '../src/shared/choice-sn
 import {digest} from '../src/shared/digest.mjs';
 import canonicalize from 'canonicalize';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
-import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
-import {createRetirementController} from '../src/retirement.mjs';
+import {createHelpSearchClient} from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
+import {createChoiceSyncClient} from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
+import {createRetirementController} from "../src/privacy/retirement.mjs";
 
 // Real HTTP, Binding/JWS, PGlite and WebRuntime. The local-store completion
 // hooks and transport ACK loss are explicit doubles, not physical-device QA.

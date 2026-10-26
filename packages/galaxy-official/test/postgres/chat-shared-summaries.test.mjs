@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import {readFile} from 'node:fs/promises';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {verifySharedSummaryWorkflow} from '../chat-shared-summary-workflow.mjs';
 test('actual PostgreSQL API role preserves shared versions and delivery intents',{timeout:60000},async()=>{
  assert.equal(process.env.GALAXY_TEST_PG_ISOLATED,'1');const database=new pg.Pool({max:8,statement_timeout:10000}),runtimeDb=new pg.Pool({max:8,options:'-c role=galaxy_api',statement_timeout:10000});

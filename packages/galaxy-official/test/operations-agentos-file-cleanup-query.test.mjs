@@ -1,3 +1,4 @@
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -5,8 +6,8 @@ import {Readable} from 'node:stream';
 import {p14Fixture} from './p14-rules-fixture.mjs';
 import {joinAccountConversation} from './account-chat-fixture.mjs';
 import {OperationsFileCleanupService} from '../src/operations/files/cleanup-service.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
 import {agentOsQueryArgumentsSchema,agentOsReadArgumentsSchema} from '../src/shared/operations-agentos-query-schema.mjs';
 
 // Real migrated PG, directory/role/plan services and actual upload/scan flows.
@@ -18,6 +19,7 @@ test('workbench file cleanup queries preserve real candidates, plans and own rec
  const cleanup=new OperationsFileCleanupService({businessAdmin:f.businessAdmin,chatAttachments:f.files,forumAttachments:f.forumFiles,now:f.now}),authority=new OperationsAgentOsAuthority({...f,permissions:f.permissions}),
   tools=new OperationsAgentOsQueryTools({authority,services:{fileCleanup:cleanup}}),query=(view,filters={},actor=f.admin)=>tools.execute({actor,domain:'maintenance',tool:'query-operations',arguments:{module:'files',view,filters}}),
   read=(kind,id,actor=f.admin)=>tools.execute({actor,domain:'maintenance',tool:'read-operation-object',arguments:{kind,id}});
+ await attachAiWorkFixture({db:f.db,endpoint:f.endpoint,permissions:f.permissions,businessAdmin:f.businessAdmin,authority,admin:f.admin,domains:['maintenance'],codes:['files.read'],now:f.now});
  const roomId=await joinAccountConversation(f,f.people[0],f.people[1]);
  for(let n=0;n<2;n++){
   const id=randomUUID(),bytes=Buffer.from('PRIVATE_ATTACHMENT_BODY '+id);await f.files.prepare(f.people[0],{attachmentId:id,roomId,name:'当前文件 '+n+'.txt',mediaType:'text/plain',size:bytes.length,sha256:f.digest(bytes),purpose:'temporary-room-attachment',confirmed:true});
@@ -36,7 +38,7 @@ test('workbench file cleanup queries preserve real candidates, plans and own rec
  const approved=await cleanup.approve(f.admin,planId,{operationId:randomUUID(),expectedRevision:created.plan.revision},{authorize:f.authorize});assert.equal((await read('file-cleanup-plan',planId)).data.state,'queued');
  await f.db.query("UPDATE operations_file_cleanup_plans_v1 SET state='attention' WHERE id=$1",[planId]);await f.db.query("UPDATE operations_file_cleanup_items_v1 SET state='result-unknown',result_code='operations_file_cleanup_result_unknown',attempt_count=3 WHERE plan_id=$1",[planId]);
  const attention=await read('file-cleanup-plan',planId);assert.equal(attention.data.state,'attention');assert.equal(attention.data.counts['result-unknown'],2);assert(attention.data.items.every(x=>x.objectRemoved===null));assert.equal(erases,0);
- const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'查询文件计划',description:'只读',enabled:true,permissions:['workbench.read','files.read']},{authorize:f.authorize})).role;
+ const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'查询文件计划',description:'只读',enabled:true,permissions:['workbench.read','ai.use.maintenance','files.read']},{authorize:f.authorize})).role;
  await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),expectedVersion:0,operatorId:f.reader.operatorId,roleId:role.id,enabled:true},{authorize:f.authorize});
  assert.equal((await read('file-cleanup-plan',planId,f.reader)).data.id,planId);assert.equal((await read('file-cleanup-operation',createdId,f.reader)).data.state,'not-recorded');
  const empty=await read('file-cleanup-operation',randomUUID());assert.equal(empty.data.state,'not-recorded');assert.equal(empty.data.planId,null);

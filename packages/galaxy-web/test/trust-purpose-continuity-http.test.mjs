@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
 import {trustPackagePurposeFixture} from '../../galaxy-official/test/trust-package-purpose-fixture.mjs';
-import {createTrustPackageWorkspaceClient,matchingTrustPermission} from '../src/trust-package-workspace-client.mjs';
-import {createTrustPackageClient} from '../../galaxy-official/src/trust-package-client.mjs';
+import {createTrustPackageWorkspaceClient,matchingTrustPermission} from "../src/features/trust-packages/trust-package-workspace-client.mjs";
+import {createTrustPackageClient} from "../../galaxy-official/src/clients/trust-package.mjs";
 
 const permissionPath='/v2/trust-package/permissions/submit';
 async function originalFixture(t){

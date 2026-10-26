@@ -2,8 +2,8 @@
 
 import {useId} from 'react';
 import dynamic from 'next/dynamic';
-import type {AnalyticsSeriesPoint} from '../analytics-types';
-import {analyticsDate,analyticsNumber} from '../../lib/analytics-view-model';
+import type {AnalyticsSeriesPoint} from "./analytics-types";
+import {analyticsDate,analyticsNumber} from "../../lib/analytics/analytics-view-model";
 import {AdminChartLoading,AdminChartSurface} from '../AdminChartSurface';
 import './analytics-charts.css';
 

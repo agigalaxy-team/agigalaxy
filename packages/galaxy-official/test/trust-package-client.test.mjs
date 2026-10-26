@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {createTrustPackageClient} from '../src/trust-package-client.mjs';
-import {TrustPackagePermissionService} from '../src/trust-package-permissions.mjs';
+import {createTrustPackageClient} from "../src/clients/trust-package.mjs";
+import {TrustPackagePermissionService} from "../src/verification/trust-package-permissions.mjs";
 import {trustPackagePermissionsMigrationSql} from '../src/infrastructure/trust-package-permissions-schema-v1.mjs';
 import {digest} from '../src/shared/digest.mjs';
 

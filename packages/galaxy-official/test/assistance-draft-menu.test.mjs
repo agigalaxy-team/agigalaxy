@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
-import { createLocalAssistanceStore } from '../src/local-assistance-store.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
+import { createLocalAssistanceStore } from "../src/clients/local/assistance-store.mjs";
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
 import { createAssistanceDraftMenu } from '../../../integrations/host-adapters/opencode-stable/assistance-draft-menu.mjs';
 import { createAssistanceMenu } from '../../../integrations/host-adapters/opencode-stable/assistance-menu.mjs';
 

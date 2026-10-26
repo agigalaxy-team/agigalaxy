@@ -1,7 +1,7 @@
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {operationsPermissionCodes,isOperationsPermission} from '../../operations-permission-catalog.mjs';
-import {operationsOperatorNamesWithin} from '../../operations-history-identities.mjs';
+import {operationsOperatorNamesWithin} from "./history-identities.mjs";
 import {automationResourceScope} from '../../shared/operations-automation-scope.mjs';
 import {aiWorkActions,aiWorkDomains,aiWorkDomainSchema,aiWorkHistorySchema,aiWorkOperationSchema,aiWorkParse,aiWorkCapabilities,aiWorkPreparation} from './ai-work-schema.mjs';
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {verifyGovernance,chatFixture,invite} from '../chat-workflow.mjs';
 
 test('PostgreSQL galaxy_api role serializes common governance and stable message operations',{timeout:60000},async()=>{

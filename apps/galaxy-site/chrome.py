@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 from public_reading import public_page_data, reading_tree
-from cms_content import content_slot, home_slots, TEMPLATE_PATH, TOKENS
+from cms_slots import content_slot, home_slots, TEMPLATE_PATH, TOKENS
 
 ORIGIN = "https://agigalaxy.org"
 PREVIEW = True

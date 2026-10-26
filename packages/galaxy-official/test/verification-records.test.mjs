@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {VerificationRecordService} from '../src/verification-records.mjs';
+import {VerificationRecordService} from "../src/evidence/verification-records.mjs";
 import {evidenceVerificationV2MigrationSql} from '../src/infrastructure/evidence-verification-v2-migration.mjs';
 import {factToolDefinitions} from '../src/adapters/mcp/personal/tools/facts-v2.mjs';
 import {PGlite} from '@electric-sql/pglite';

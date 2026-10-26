@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createConnectionClient } from '../src/connection-client.mjs';
-import { createContextFlow } from '../src/context-flow.mjs';
-import { createLocalContextStore } from '../src/local-context-store.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createConnectionClient } from "../src/clients/connection.mjs";
+import { createContextFlow } from "../src/clients/flows/context.mjs";
+import { createLocalContextStore } from "../src/clients/local/context-store.mjs";
 
 test('Context drafts and acknowledgements survive restart and binding renewal without restoring expired or revoked access',async t=>{
   const scopes=['binding','consent','case-teaser','assistance','context'],f=await serviceFixture(scopes),p=await serviceFixture(scopes,f.db);

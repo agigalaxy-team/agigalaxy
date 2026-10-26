@@ -4,8 +4,8 @@ import type {z} from "zod/v4";
 import {createAccountReadingBookmarksClient} from "./client.mjs";
 import {createPublicCommunityFeedback} from "../discovery/public-feedback.mjs";
 import {readingBookmarkReferenceSchema,readingBookmarkStateSchema,readingBookmarkKey} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
-import {useOfficialAccountSession} from "../../official-account-panel";
-import {rememberBookmarkLogin,readBookmarkLogin,claimBookmarkLogin,finishBookmarkLogin} from "../../account-bookmark-pending.mjs";
+import {useOfficialAccountSession} from "../accounts/official-account-panel";
+import {rememberBookmarkLogin,readBookmarkLogin,claimBookmarkLogin,finishBookmarkLogin} from "./account-bookmark-pending.mjs";
 import './workspace.css';
 
 // One shared account context and the original save control; this module does not import the full bookmarks page.

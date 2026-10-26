@@ -1,12 +1,13 @@
+import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OfficialAccountData} from '../src/official-account-data.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OfficialAccountData} from "../src/accounts/data.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
 import {dispatchBusinessAdmin} from '../src/adapters/http/business-admin-http.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 
@@ -26,7 +27,10 @@ async function fixture(t){
  const directory={async findByEmail(email){if(offline)throw Error('directory offline');return[...identities.values()].filter(row=>row.email.toLowerCase()===email.toLowerCase());},async get({issuer:requested,externalSubject}){if(offline)throw Error('directory offline');return requested===issuer?identities.get(externalSubject)??null:null;}};
  const now=()=>clock,service=new BusinessAdminService({db,endpoint,identityDirectory:directory,now});
  const actor={kind:'business-operator',operatorId:issuer+'|synthetic-operator',role:'administrator',endpoint,httpRequestId:randomUUID()};
- return{db,ids,endpoint,now,service,actor,reader:{...actor,role:'reader'},directory,identities,offline:()=>{offline=true;},advance:seconds=>{clock+=seconds;},owner:{kind:'official-account',accountId:ids[0],endpoint}};
+ const reader={...actor,operatorId:issuer+'|synthetic-reader',role:'reader'},other={...actor,operatorId:'another-operator'};
+ for(const principal of [actor,reader,other])await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,$3,$1,'当前权限夹具',$4,$4)",[principal.operatorId,endpoint,issuer,new Date(now()*1000)]);
+ const current=await attachOperationsFixtureAuthority({businessAdmin:service,admin:actor,reader,permissions:['accounts.read','accounts.identity.read','audit.read']});current.roles.set(other.operatorId,'administrator');
+ return{db,ids,endpoint,now,service,actor,reader,other,directory,identities,offline:()=>{offline=true;},advance:seconds=>{clock+=seconds;},owner:{kind:'official-account',accountId:ids[0],endpoint}};
 }
 
 test('operations readers find business accounts by UID, username or verified directory email without gaining private content',{timeout:60000},async t=>{
@@ -41,7 +45,7 @@ test('operations readers find business accounts by UID, username or verified dir
  assert.equal(detail.linkedIds.items.length,0);assert.equal(JSON.stringify(detail).includes('DO_NOT_READ_PRIVATE'),false);
  await assert.rejects(owner.listArchives(f.reader),{code:'official_account_login_required'});
  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM subjects')).rows[0].n,0,'operator access never creates a Galaxy principal');
- const audit=await f.service.audit(f.reader,{accountId:f.ids[0]});assert.equal(audit.items.some(row=>row.action==='user-read'&&row.operatorId===f.actor.operatorId),true);
+ const audit=await f.service.audit(f.reader,{accountId:f.ids[0]});assert.equal(audit.items.some(row=>row.action==='user-read'&&row.operatorId===f.reader.operatorId),true);
  assert.equal(JSON.stringify(await f.service.audit(f.reader)).includes('synthetic-1@example.org'),false,'search audit stores the selection kind, not a copy of the email query');
 });
 
@@ -69,11 +73,11 @@ test('account restrictions are bounded in time, enforced by existing participati
 
 test('reader and ordinary account principals cannot restrict, release or change types; optimistic release preserves a newer restriction',{timeout:60000},async t=>{
  const f=await fixture(t),restriction={operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+3600)*1000).toISOString(),reason:'待处理的测试限制'};
- await assert.rejects(f.service.restrict(f.reader,f.ids[0],restriction),{code:'business_admin_denied'});
+ await assert.rejects(f.service.restrict(f.reader,f.ids[0],restriction),{code:'operations_permission_denied'});
  await assert.rejects(f.service.get(f.owner,f.ids[0]),{code:'business_admin_denied'});
  await assert.rejects(f.service.get({...f.actor,endpoint:'https://other.example.org'},f.ids[0]),{code:'business_admin_denied'});
  await f.service.restrict(f.actor,f.ids[0],restriction);
- await assert.rejects(f.service.releaseRestriction(f.reader,f.ids[0],{operationId:randomUUID(),expectedRevision:1,reason:'测试解除原因'}),{code:'business_admin_denied'});
+ await assert.rejects(f.service.releaseRestriction(f.reader,f.ids[0],{operationId:randomUUID(),expectedRevision:1,reason:'测试解除原因'}),{code:'operations_permission_denied'});
  await assert.rejects(f.service.releaseRestriction(f.actor,f.ids[0],{operationId:randomUUID(),expectedRevision:0,reason:'测试解除原因'}),{code:'account_restriction_changed'});
  const release=await f.service.releaseRestriction(f.actor,f.ids[0],{operationId:randomUUID(),expectedRevision:1,reason:'复核后解除限制'});
  assert.equal(release.restriction.active,false);assert.equal(release.restriction.until,null);assert.equal(release.restriction.revision,2);
@@ -81,7 +85,7 @@ test('reader and ordinary account principals cannot restrict, release or change 
 
 test('operator and owner type changes share revision and evidence rules while recording their actual source',{timeout:60000},async t=>{
  const f=await fixture(t),input={operationId:randomUUID(),expectedRevision:0,subjectType:'organization',reason:'根据用户提出的更正申请',basis:'此账户实际由该组织用于发布和维护内容',preserveHistory:true};
- await assert.rejects(f.service.changeType(f.reader,f.ids[0],input),{code:'business_admin_denied'});
+ await assert.rejects(f.service.changeType(f.reader,f.ids[0],input),{code:'operations_permission_denied'});
  await assert.rejects(f.service.changeType(f.actor,f.ids[0],{...input,basis:'无'}),{code:'invalid_business_admin_request'});
  const changed=await f.service.changeType(f.actor,f.ids[0],input);assert.equal(changed.basisKind,'operator-recorded-statement');assert.equal(changed.permissionsChanged,false);
  assert.equal((await f.service.changeType(f.actor,f.ids[0],input)).replayed,true);
@@ -100,7 +104,7 @@ test('audit pages continue across reads and command IDs cannot be claimed for an
  const f=await fixture(t),input={operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+600)*1000).toISOString(),reason:'测试审计限制记录'};
  await f.service.restrict(f.actor,f.ids[0],input);
  await assert.rejects(f.service.restrict(f.actor,f.ids[1],input),{code:'business_admin_operation_conflict'});
- await assert.rejects(f.service.restrict({...f.actor,operatorId:'another-operator'},f.ids[0],input),{code:'business_admin_operation_conflict'});
+ await assert.rejects(f.service.restrict(f.other,f.ids[0],input),{code:'business_admin_operation_conflict'});
  await f.service.get(f.reader,f.ids[0]);const head=await f.service.audit(f.reader,{limit:1});assert.ok(head.nextAfter);
  const next=await f.service.audit(f.reader,{after:head.nextAfter,limit:10});assert.equal(next.items.some(row=>row.action==='restriction-set'),true);
  await assert.rejects(f.service.audit(f.reader,{after:'9999999999999999999'}),{code:'invalid_business_admin_request'});
@@ -114,7 +118,8 @@ test('operations HTTP always invokes the server authorizer and never accepts a J
  await assert.rejects(dispatch('GET','/v1/operations/users',null,undefined),{code:'business_admin_unavailable'});
  const authorize=async(req,context)=>{calls.push(context);return {...f.reader,httpRequestId:context.requestId};};
  const users=await dispatch('GET','/v1/operations/users?limit=1',null,authorize);assert.equal(users.accepted,true);assert.equal(users.response.body.items.length,1);assert.equal(calls[0].write,false);
- await assert.rejects(dispatch('POST','/v1/operations/users/'+f.ids[0]+'/restriction',{role:'administrator',operatorId:f.actor.operatorId,operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+60)*1000).toISOString(),reason:'伪造请求不能取得权限'},authorize),{code:'business_admin_denied'});
+ await assert.rejects(dispatch('POST','/v1/operations/users/'+f.ids[0]+'/restriction',{role:'administrator',operatorId:f.actor.operatorId,operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+60)*1000).toISOString(),reason:'伪造请求不能取得权限'},authorize),{code:'invalid_business_admin_request'});
+ await assert.rejects(dispatch('POST','/v1/operations/users/'+f.ids[0]+'/restriction',{operationId:randomUUID(),expectedRevision:0,until:new Date((f.now()+60)*1000).toISOString(),reason:'只读身份不能提交实际写操作'},authorize),{code:'operations_permission_denied'});
  assert.equal(calls.at(-1).write,true);assert.equal((await f.service.get(f.reader,f.ids[0])).account.restriction.active,false);
  await assert.rejects(dispatch('GET','/v1/operations/users?role=administrator',null,authorize),{code:'invalid_business_admin_request'});
 });

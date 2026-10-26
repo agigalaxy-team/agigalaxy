@@ -1,4 +1,4 @@
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {decisionSchema,parse,fail,iso,terminalStates} from './contract.mjs';
 import {operationsAiUsePermission} from '../../shared/operations-ai-use.mjs';
 

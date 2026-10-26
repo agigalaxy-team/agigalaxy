@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
-import { createAssistanceClient } from '../src/assistance-client.mjs';
-import { createHonorClient } from '../src/honor-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
+import { createAssistanceClient } from "../src/clients/assistance.mjs";
+import { createHonorClient } from "../src/clients/honor.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 import { recordRuntimeConfig,runtimeConfigSnapshot } from '../src/operations/runtime-config-audit.mjs';
 
 export async function verifyPublicHonor(db=null,options={}){

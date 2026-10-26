@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {messagingIntegrationFixture} from './operations-messaging-integration-fixture.mjs';
-import {migrate,transaction} from '../src/database.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {migrate,transaction} from "../src/infrastructure/database.mjs";
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 import {smtpParse,smtpPageSchema} from '../src/shared/operations-smtp-schema.mjs';
 import {adminOrigin} from './operations-management-fixture.mjs';
 
@@ -73,8 +73,8 @@ test('registered messaging and SMTP central integration keeps live grants, safe 
   assert(rows.length>=2);for(const row of rows){const value=businessAuditMetadata({...row,selection:{...row.selection,password:'PRIVATE_PASSWORD',body:'PRIVATE_BODY',host:'PRIVATE_HOST'},result:{...row.result,rawResponse:'PRIVATE_SMTP_RESPONSE'}});assert(!JSON.stringify(value).includes('PRIVATE_'));}
   assert(!JSON.stringify(f.logs).includes('PRIVATE_'));
  });
- await t.test('migration 104 keeps API mutations precise and worker configuration and original attribution narrowly readable',async()=>{
-  await migrate(f.db,{roles:['api','worker']});
+ await t.test('current migrations preserve API mutation boundaries, worker configuration and original attribution from migration 104',async()=>{
+  const schemaVersion=await migrate(f.db,{roles:['api','worker']});
   const noticeId=randomUUID();await f.businessAdmin.recordWithin(f.db,{...reader.actor,role:'reader'},'notice-publish',{selection:{noticeId,body:'PRIVATE_OLD_NOTICE'},result:{state:'queued'}});
   try{
    await f.db.query('SET ROLE galaxy_api');
@@ -93,7 +93,7 @@ test('registered messaging and SMTP central integration keeps live grants, safe 
    await assert.rejects(f.db.query('DELETE FROM operations_messaging_recipients_v1 WHERE false'),{code:'42501'});
    const recurringId=randomUUID();await f.queue.jobs.schedule('messaging-run','*/10 * * * *',{planId:recurringId,planVersion:1},{key:'role-check',timezone:'Asia/Shanghai',db:f.db});await f.queue.jobs.unschedule('messaging-run','role-check',{db:f.db});
   }finally{await f.db.query('RESET ROLE');}
-  const pgVersion=(await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version;assert.equal(pgVersion,104);
+  const pgVersion=(await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version;assert(schemaVersion>=104);assert.equal(pgVersion,schemaVersion);
  });
  await t.test('native cron and delayed queue operations keep explicit timezone, transactional registration and actual handler context',async()=>{
   const preview=f.queue.jobs.previewSchedule('0 9 * * *',{timezone:'Asia/Shanghai',from:'2026-10-23T00:00:00.000Z',count:2});assert.deepEqual(preview,['2026-10-23T01:00:00.000Z','2026-10-24T01:00:00.000Z']);

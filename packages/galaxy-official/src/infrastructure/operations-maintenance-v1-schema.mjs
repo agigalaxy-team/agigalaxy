@@ -1,4 +1,4 @@
-import {maintenanceAuditActions} from '../operations-maintenance-catalog.mjs';
+import {maintenanceAuditActions} from "../operations/maintenance/catalog.mjs";
 
 // Migration 109. Registration follows the independently owned migration 108.
 // No existing data, repository, timer or retention configuration is changed.

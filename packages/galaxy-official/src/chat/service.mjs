@@ -1,7 +1,7 @@
-import {chatActorRef} from "../chat-actors.mjs";
+import {chatActorRef} from "./chat-actors.mjs";
 import {ServiceError} from "../shared/service-error.mjs";
-import {transaction} from "../database.mjs";
-import {chatMessageOperationsBlockedWithin,chatMessageOperationsBlockedSql} from "../chat-message-operations-gate.mjs";
+import {transaction} from "../infrastructure/database.mjs";
+import {chatMessageOperationsBlockedWithin,chatMessageOperationsBlockedSql} from "./chat-message-operations-gate.mjs";
 import {day,stamp,fail} from './helpers.mjs';
 import {ChatMessages} from './messages.mjs';
 

@@ -8,6 +8,8 @@
 
 PostgreSQL 是业务持久化入口，迁移显式执行；运行 API 不自动修改 schema。API、Worker、migration 与 CMS 使用准确的角色、配置和数据边界。CMS 内容与业务事实分别保存。
 
+`src/`顶层保留启动、服务装配与公共合同。业务实现在accounts、identity、community、tasks、chat及operations等领域；可移植客户端与本机流程在clients，纯合同在shared，数据库和迁移在infrastructure。内部调用直接使用所属实现，不依赖旧根目录转发层；完整定位见主仓库架构正文。
+
 ## 启动入口与配置
 
 | 入口 | 用途 |
@@ -15,8 +17,8 @@ PostgreSQL 是业务持久化入口，迁移显式执行；运行 API 不自动�
 | [server.mjs](src/server.mjs) | API 启动、实际配置加载、权限与路由 |
 | [worker.mjs](src/worker.mjs) | 后台持久任务与业务接续 |
 | [migrate.mjs](src/migrate.mjs) | 显式数据库迁移及所选角色配置 |
-| [database.mjs](src/database.mjs) | 连接、事务和迁移规则 |
-| [runtime-environment.mjs](src/runtime-environment.mjs) | 环境、数据库与签名材料路径约束 |
+| [database.mjs](src/infrastructure/database.mjs) | 连接、事务和迁移规则 |
+| [runtime-environment.mjs](src/infrastructure/runtime-environment.mjs) | 环境、数据库与签名材料路径约束 |
 | [deploy](deploy) / [scripts](scripts) | Linux、代理、消息、监控、备份及运行工具 |
 
 当前服务开发要求 Node.js 24.13+。根 setup 安装本组件锁定依赖。服务运行还需要 PostgreSQL、目标环境、受信签名材料、准确 HTTPS 地址及所用业务配置，不是仅运行 npm start 即可得到完整新实例。

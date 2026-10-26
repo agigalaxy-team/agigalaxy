@@ -5,7 +5,7 @@ import {helpPaths,helpActionPrepareSchema,helpActionExecuteSchema} from '../../.
 import {hostViewOwnerScope} from './host-view-state.mjs';
 import {chatSendSchema} from '../../../packages/galaxy-official/src/shared/chat-schema.mjs';
 import {chatSendRequestHash} from '../../../packages/galaxy-official/src/shared/chat-message-request-hash.mjs';
-import {readProfileDisplayNames} from '../../../packages/galaxy-official/src/profile-display-names.mjs';
+import {readProfileDisplayNames} from "../../../packages/galaxy-official/src/accounts/profile-display-names.mjs";
 
 export const panelInputSchema=z.strictObject({...navigationSchema.shape,object:navigationSchema.shape.object.optional(),helpSessionId:z.uuid().optional()});
 export const panelIdSchema=z.strictObject({viewId:z.uuid()});

@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { buildersContinuityFixture } from './builders-client-continuity-workflow.mjs';
 import { packFor } from './builder-support-v2-workflow.mjs';
 import { configurationExample } from './configuration-v2-workflow.mjs';
-import { preparePackUse } from '../../galaxy-web/src/worker-pack-use-client.mjs';
+import { preparePackUse } from "../../galaxy-web/src/features/tools/worker-pack-use-client.mjs";
 
 // The caller's original host runs a fixed synthetic program. Galaxy has no
 // execution callback, installation trigger, model provider or private inputs.

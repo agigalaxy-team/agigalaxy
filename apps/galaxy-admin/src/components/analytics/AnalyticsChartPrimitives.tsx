@@ -1,8 +1,8 @@
 'use client';
 
-import type {AnalyticsRetentionData} from '../analytics-types';
+import type {AnalyticsRetentionData} from "./analytics-types";
 import {useClientReady} from '../../lib/use-client-ready';
-import {analyticsDate,analyticsNumber,analyticsPercent} from '../../lib/analytics-view-model';
+import {analyticsDate,analyticsNumber,analyticsPercent} from "../../lib/analytics/analytics-view-model";
 import './analytics-charts.css';
 
 export function AnalyticsDaysControl({days,onChange,disabled=false}:{days:number;onChange:(days:number)=>void;disabled?:boolean}){

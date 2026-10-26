@@ -2,7 +2,7 @@ import {createServer} from 'node:http';
 import {mkdir,lstat,chmod,chown,unlink} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {noSymlinkPath,assertTarget} from '../operations-stack/host.mjs';
-import {verifyMaintenanceSignature,maintenanceServiceKeyMatches} from '../../src/operations-maintenance-native.mjs';
+import {verifyMaintenanceSignature,maintenanceServiceKeyMatches} from "../../src/operations/maintenance/native.mjs";
 import {readMaintenanceAgentConfiguration} from './configuration.mjs';
 import {MaintenanceNativeRuntime} from './runtime.mjs';
 import {ModelConfigurationRuntime,readModelConfigurationControl} from './model-configuration.mjs';

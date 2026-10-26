@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { verifyManifest as compatibilityManifest } from '../src/manifest.mjs';
 import { verifyManifest } from '../src/verification/manifest.mjs';
-import { verifyEnvelope as compatibilityEnvelope } from '../src/signed-envelope.mjs';
+import { verifyEnvelope as compatibilityEnvelope } from "../src/security/signed-envelope.mjs";
 import { verifyEnvelope } from '../src/verification/envelope.mjs';
-import { verifyKeyring as compatibilityKeyring } from '../src/trust-keyring.mjs';
+import { verifyKeyring as compatibilityKeyring } from "../src/security/trust-keyring.mjs";
 import { verifyKeyring } from '../src/verification/keyring.mjs';
 
 test('public discovery graph excludes server signing, sessions, identity and database modules', async () => {
@@ -28,7 +28,7 @@ test('public discovery graph excludes server signing, sessions, identity and dat
       }
     }
   }
-  await inspect(new URL('../src/discovery-client.mjs', import.meta.url));
+  await inspect(new URL("../src/clients/discovery.mjs", import.meta.url));
   assert.ok([...visited].some(path => path.endsWith('/verification/keyring.mjs')));
   assert.ok([...visited].some(path => path.endsWith('/verification/manifest.mjs')));
 });

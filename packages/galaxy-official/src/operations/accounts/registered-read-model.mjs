@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
-import {businessRestrictionView} from '../../business-admin-domain.mjs';
+import {businessRestrictionView} from "../permissions/domain.mjs";
 import {RegisteredDirectory} from './registered-directory.mjs';
 import {registeredUsersParse as parse,registeredUsersQuerySchema,registeredUserIdSchema,registeredUsersHistorySchema} from './registered-schema.mjs';
 

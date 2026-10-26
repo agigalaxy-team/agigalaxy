@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';

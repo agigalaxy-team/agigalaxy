@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {summaryFixture} from './personal-summary-workflow.mjs';
-import {createPersonalSummaryLocal} from '../src/personal-summary-local.mjs';
+import {createPersonalSummaryLocal} from "../src/summaries/local/browser.mjs";
 // Explicit deterministic local storage double, independent from real IDB QA.
 function storeFixture(){const records=new Map();let tail=Promise.resolve();return{read:async k=>structuredClone(records.get(k)),update(k,fn){const run=tail.then(()=>{const value=fn(structuredClone(records.get(k)));records.set(k,structuredClone(value));return structuredClone(value);});tail=run.catch(()=>{});return run;}};}
 test('local conflict replicas lose revoked sources and binding changes prevent follow-up deletion',async()=>{

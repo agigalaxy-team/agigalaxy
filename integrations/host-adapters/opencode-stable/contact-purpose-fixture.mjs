@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
 import {serviceFixture} from '../../../packages/galaxy-official/test/service-fixture.mjs';
 import {oidcProviderFixture} from '../../../packages/galaxy-official/test/oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../../../packages/galaxy-official/src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../../../packages/galaxy-official/src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../../../packages/galaxy-official/src/http.mjs';
 import {browserScopes} from '../../../packages/galaxy-official/src/browser-client.mjs';
 import {createNativeRuntime} from '../../../packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';

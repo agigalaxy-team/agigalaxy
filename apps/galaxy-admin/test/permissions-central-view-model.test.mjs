@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {workbenchPending,workbenchInventory,workbenchJobState,workbenchRecords} from '../src/lib/workbench-view-model.ts';
+import {workbenchPending,workbenchInventory,workbenchJobState,workbenchRecords} from "../src/lib/workbench/workbench-view-model.ts";
 import {auditActionLabel,auditAvailableActions,auditMetadata,auditRoleLabel} from '../src/lib/audit-view-model.ts';
 
 test('partial business authority leaves withheld dashboard data unknown and new authorization audit fields remain closed',()=>{

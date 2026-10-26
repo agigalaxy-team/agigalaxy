@@ -1,4 +1,4 @@
-import {createIdentityLinkClient} from '../../../../galaxy-official/src/identity-link-client.mjs';
+import {createIdentityLinkClient} from "../../../../galaxy-official/src/clients/identity-link.mjs";
 import {identityIntentSchema} from '../../../../galaxy-official/src/shared/identity-link-schema.mjs';
 
 const fail=code=>{throw Object.assign(new Error(code),{code});};

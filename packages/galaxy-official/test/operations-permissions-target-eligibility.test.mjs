@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {OperationsPermissionsService} from '../src/operations/permissions/service.mjs';
-import {createStoredOperatorAuthorization,createStoredManagementMaintainerAuthorization} from '../src/operations-config.mjs';
-import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
+import {createStoredOperatorAuthorization,createStoredManagementMaintainerAuthorization} from "../src/operations/configuration.mjs";
+import {createOperationsManagementSessions} from "../src/operations/accounts/management-sessions.mjs";
 import {ManagementAccountsReadModel} from '../src/operations/accounts/management-read-model.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {operationsPermissionCodes} from '../src/operations-permission-catalog.mjs';
 import {managementMaintainerPermissionCodes} from '../src/shared/operations-management-maintainer-actions.mjs';
-import {personPermissionImpact} from '../../../apps/galaxy-admin/src/lib/permissions-view-model.ts';
+import {personPermissionImpact} from "../../../apps/galaxy-admin/src/lib/permissions/permissions-view-model.ts";
 
 // One real PG/API-role/current stored-identity authority leaf. Native identity
 // directory is an explicit per-target double; no browser/OIDC/session token,

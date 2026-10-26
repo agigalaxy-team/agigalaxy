@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp,writeFile,rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadIdentityProviders,identityConfigurationSchema } from '../src/identity-config.mjs';
+import { loadIdentityProviders,identityConfigurationSchema } from "../src/identity/config.mjs";
 
 test('explicit identity config resolves only named per-provider credentials and records a secret-free config hash',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'galaxy-identity-config-'));

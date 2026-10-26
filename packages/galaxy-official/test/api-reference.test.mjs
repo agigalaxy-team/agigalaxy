@@ -10,12 +10,12 @@ import { buildApiReference } from '../../../scripts/build-api-reference.mjs';
 const id='11111111-1111-4111-8111-111111111111',subjectId='GUID'+'0'.repeat(28),endpoint='https://official.example.org';
 const parameters={id,subjectId,providerId:'fixture',ruleId:'synthetic',ruleVersion:'1.0'};
 const expand=path=>path.replace(/\{([^}]+)\}/g,(_match,key)=>parameters[key]);
-const classes={identity:['identity-links','IdentityLinkService'],bindings:['bindings','BindingService'],access:['access','AccessService'],
-  consents:['consents','ConsentService'],cases:['cases','CaseService'],evidence:['evidence','EvidenceService'],proofs:['proofs','ProofService'],
-  history:['history','HistoryService'],profiles:['profile','ProfileService'],discovery:['discovery','DiscoveryService'],search:['search','SearchService'],assistance:['assistance','AssistanceService'],
-  context:['context','ContextService'],notifications:['notifications','NotificationService'],qualification:['qualification','QualificationService'],
-  moderation:['moderation','ModerationService'],honor:['honor','HonorService'],capsules:['capsules','CapsuleService'],builders:['builders','BuilderService'],
-  audit:['audit','AuditService'],dataExport:['data-export','DataExportService'],deletion:['deletion','DeletionService']};
+const classes={identity:['identity/links','IdentityLinkService'],bindings:['identity/bindings','BindingService'],access:['security/access','AccessService'],
+  consents:['consents/consents','ConsentService'],cases:['cases/service','CaseService'],evidence:['evidence/evidence','EvidenceService'],proofs:['evidence/proofs','ProofService'],
+  history:['records/history','HistoryService'],profiles:['profiles/profile','ProfileService'],discovery:['discovery/discovery','DiscoveryService'],search:['discovery/search','SearchService'],assistance:['assistance/assistance','AssistanceService'],
+  context:['context/context','ContextService'],notifications:['notifications/notifications','NotificationService'],qualification:['qualifications/qualification','QualificationService'],
+  moderation:['governance/moderation','ModerationService'],honor:['records/honor','HonorService'],capsules:['capsules/capsules','CapsuleService'],builders:['builders/service','BuilderService'],
+  audit:['audit/audit','AuditService'],dataExport:['privacy/data-export','DataExportService'],deletion:['privacy/deletion','DeletionService']};
 
 test('authored API reference matches real dispatch, concrete service methods and optional/required session scopes',async()=>{
   const calls=[],authentication=[],services={};

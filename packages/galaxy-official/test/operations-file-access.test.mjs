@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {OperationsFileAccessService} from '../src/operations/files/access-service.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
-import {AccountChatGovernanceService} from '../src/account-chat-governance.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
+import {AccountChatGovernanceService} from "../src/chat/reports/service.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {fileItem} from '../src/operations-agentos-query-view.mjs';
-import {createAttachmentsClient} from '../../galaxy-web/src/chat-attachments-client.mjs';
+import {fileItem} from "../src/operations/agentos/query-view.mjs";
+import {createAttachmentsClient} from "../../galaxy-web/src/features/chat/attachments/chat-attachments-client.mjs";
 
 // Actual PG/API/worker roles, current PG grants, upload/scan/bind/source and
 // selected-case checks. Directory, AV, chat transport and bytes are explicit

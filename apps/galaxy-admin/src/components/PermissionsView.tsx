@@ -1,7 +1,7 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
-import {permissionsLocation} from '../lib/permissions-view-model';
-import type {BusinessAuthorization} from './permissions-types';
+import {permissionsLocation} from "../lib/permissions/permissions-view-model";
+import type {BusinessAuthorization} from "./permissions/permissions-types";
 import {Permissions} from './BusinessViewClients';
 
 export async function PermissionsView(props:AdminViewServerProps){

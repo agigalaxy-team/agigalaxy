@@ -6,7 +6,7 @@ import {createServer} from 'node:http';
 import assert from 'node:assert/strict';
 import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 const root=process.cwd(),from=path=>import(pathToFileURL(resolve(root,path))),sha=value=>createHash('sha256').update(value).digest('hex');
-const {build}=await from('node_modules/esbuild/lib/main.js'),{serviceFixture}=await from('packages/galaxy-official/test/service-fixture.mjs'),{oidcProviderFixture}=await from('packages/galaxy-official/test/oidc-provider-fixture.mjs'),{createOidcLoginProvider}=await from('packages/galaxy-official/src/oidc-login.mjs'),{createApi}=await from('packages/galaxy-official/src/http.mjs'),{browserScopes}=await from('packages/galaxy-official/src/browser-client.mjs');
+const {build}=await from('node_modules/esbuild/lib/main.js'),{serviceFixture}=await from('packages/galaxy-official/test/service-fixture.mjs'),{oidcProviderFixture}=await from('packages/galaxy-official/test/oidc-provider-fixture.mjs'),{createOidcLoginProvider}=await from("packages/galaxy-official/src/identity/authentication/oidc-login.mjs"),{createApi}=await from('packages/galaxy-official/src/http.mjs'),{browserScopes}=await from('packages/galaxy-official/src/browser-client.mjs');
 const out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);await mkdir(out,{recursive:true});
 const now=Math.floor(Date.now()/1000),endpoint='https://official.example.org',issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/fixture'],{emailVerified:true});
 const baseProvider=await createOidcLoginProvider({id:'fixture',name:'合成验证服务',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/identity/callback/fixture',allowLoopbackHttp:true,now:()=>now});

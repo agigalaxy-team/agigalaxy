@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
 
 // Real PGlite, current migrations, galaxy_api and fresh PG business grants.
 // Only upstream management eligibility is an explicit local double. No real

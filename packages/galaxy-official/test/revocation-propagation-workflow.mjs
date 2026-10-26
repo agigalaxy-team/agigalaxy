@@ -4,11 +4,11 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createOperationalMetrics } from '../src/operations/metrics.mjs';
 import { operationalSnapshot } from '../src/infrastructure/operational-snapshot.mjs';
-import { SearchIndex } from '../src/search-index.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
+import { SearchIndex } from "../src/discovery/search-index.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export async function verifyRevocationPropagation(db,options){
   const now=Math.floor(Date.now()/1000)+60;

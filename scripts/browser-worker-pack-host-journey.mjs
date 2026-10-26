@@ -11,13 +11,7 @@ import { workerToolsFixture } from '../integrations/native-v2/worker-tools-fixtu
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out=fileURLToPath(new URL('../outputs/worker-pack-host-journey/tmp/',import.meta.url));
 await mkdir(out, { recursive: true });
-const bundle = await build({ stdin: { contents: `
-  import React from 'react';
-  import {createRoot} from 'react-dom/client';
-  import {WorkerPackHostWorkspace} from './packages/galaxy-web/src/worker-pack-host-workspace.tsx';
-  const root=createRoot(document.getElementById('panel'));
-  window.showPack=(pack)=>root.render(<WorkerPackHostWorkspace key={pack.manifestId} pack={pack}/>);
-`, loader: 'tsx', resolveDir: root }, bundle: true, write: false, format: 'iife',
+const bundle = await build({ stdin: { contents: "\n  import React from 'react';\n  import {createRoot} from 'react-dom/client';\n  import {WorkerPackHostWorkspace} from './packages/galaxy-web/src/features/tools/worker-pack-host-workspace.tsx';\n  const root=createRoot(document.getElementById('panel'));\n  window.showPack=(pack)=>root.render(<WorkerPackHostWorkspace key={pack.manifestId} pack={pack}/>);\n", loader: 'tsx', resolveDir: root }, bundle: true, write: false, format: 'iife',
   platform: 'browser', jsx: 'automatic', alias: { '@': root } });
 const css = await readFile(resolve(root, 'packages/galaxy-web/src/workspace.css'), 'utf8');
 const builtAssets = resolve(root, 'packages/galaxy-web/dist/assets');

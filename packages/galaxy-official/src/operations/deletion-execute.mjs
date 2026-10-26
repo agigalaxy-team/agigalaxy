@@ -1,6 +1,6 @@
 import { compactVerify, importSPKI } from 'jose';
 import { z } from 'zod';
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { assertSupportedSchema } from '../infrastructure/migrations.mjs';
 import { deletionIntentSchema } from '../shared/deletion-schema.mjs';
 import { deletionReviewSchema } from './deletion-review.mjs';

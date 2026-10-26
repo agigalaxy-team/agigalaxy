@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {migrate} from '../src/database.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsSmtpService} from '../src/operations-smtp.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsSmtpService} from "../src/operations/messaging/smtp.mjs";
 import {emptySmtpConfiguration} from '../src/shared/operations-smtp-schema.mjs';
 import {OperationsMessagingService} from '../src/operations/messaging/service.mjs';
 import {OperationsRecommendationService} from '../src/operations/recommendations/service.mjs';
-import {OperationsMaintenanceService} from '../src/operations-maintenance.mjs';
-import {maintenanceModuleIds} from '../src/operations-maintenance-catalog.mjs';
+import {OperationsMaintenanceService} from "../src/operations/maintenance/service.mjs";
+import {maintenanceModuleIds} from "../src/operations/maintenance/catalog.mjs";
 
 // Real PGlite migrations/current PG grants/galaxy_api and real domain commands.
 // Upstream management eligibility, queue and native maintenance transport are

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {ProsodyChatTransport} from '../src/infrastructure/prosody-chat.mjs';
-import {ChatSharedSummaryService} from '../src/chat-shared-summaries.mjs';
-import {sharedSummaryRequestHash} from '../src/chat-shared-summary-client.mjs';
+import {ChatSharedSummaryService} from "../src/chat/chat-shared-summaries.mjs";
+import {sharedSummaryRequestHash} from "../src/clients/chat-shared-summary.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {chatFixture,invite} from './chat-workflow.mjs';
 

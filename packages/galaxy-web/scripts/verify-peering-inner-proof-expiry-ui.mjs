@@ -11,7 +11,7 @@ import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {prepareHub,hubScopes} from '../../galaxy-official/test/hub-peering-workflow.mjs';
 import {createPeeringProof} from '../../galaxy-official/test/hub-ci-proof-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
-import {createSigningService} from '../../galaxy-official/src/signing-service.mjs';
+import {createSigningService} from "../../galaxy-official/src/security/signing-service.mjs";
 
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));

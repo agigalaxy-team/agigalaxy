@@ -3,7 +3,7 @@ import {readWithTransientRecovery} from '../../../../../integrations/shared/read
 import {sha256Hex, equalJson} from '../../../../galaxy-official/src/shared/web-primitives.mjs';
 import {readingBookmarkReferenceSchema, readingBookmarkCommandSchema, readingBookmarkStateSchema,
   readingBookmarkReceiptReplySchema, accountReadingBookmarksPageSchema, readingBookmarkKey} from '../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs';
-import {accountBookmarkJournalStore} from '../../account-bookmark-pending.mjs';
+import {accountBookmarkJournalStore} from "./account-bookmark-pending.mjs";
 
 /** @typedef {import('zod/v4').infer<typeof readingBookmarkReferenceSchema>} ReadingBookmarkReference */
 const journalSchema = z.strictObject({operations: z.record(z.string(), z.strictObject({
@@ -16,8 +16,8 @@ const journalSchema = z.strictObject({operations: z.record(z.string(), z.strictO
 const failure = (code, message) => Object.assign(new Error(message), {code});
 
 /** Account ownership never supplies or synthesizes a Galaxy subject credential.
- * @param {{client:ReturnType<typeof import('../../official-account-client.mjs').createOfficialAccountClient>,
- * getSession:()=>import('../../official-account-panel').OfficialSession|null,endpoint:string,
+ * @param {{client:ReturnType<typeof import('../accounts/official-account-client.mjs').createOfficialAccountClient>,
+ * getSession:()=>import('../accounts/official-account-panel').OfficialSession|null,endpoint:string,
  * store?:{getLocal:(name:string,owner:string)=>Promise<unknown>,updateLocal:(name:string,update:(raw:unknown)=>unknown,owner:string)=>Promise<unknown>},
  * locks?:Pick<LockManager,'request'>|null,onAcknowledged?:(receipt:import('zod/v4').infer<typeof readingBookmarkReceiptReplySchema>)=>unknown}} options */
 export function createAccountReadingBookmarksClient({client,getSession,endpoint,store=accountBookmarkJournalStore,locks=globalThis.navigator?.locks??null,onAcknowledged}){

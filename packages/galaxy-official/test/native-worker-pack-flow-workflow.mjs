@@ -16,8 +16,8 @@ import { startReferenceProcess } from './worker-pack-process-v2-workflow.mjs';
 import { createNativeRuntime } from '../../galaxy-edge-mcp/src/native-v2/runtime.mjs';
 import { createNativeWorkerPackAdapter } from '../../galaxy-edge-mcp/src/native-v2/adapters/worker-pack.mjs';
 import { createNativeChoice } from '../../galaxy-edge-mcp/src/native-v2/interaction/choice.mjs';
-import { createNativeA2aHostV2 } from '../../galaxy-a2a/src/host-flow-v2.mjs';
-import { createWorkerPackHostFlowV2 } from '../../galaxy-a2a/src/worker-pack-flow-v2.mjs';
+import { createNativeA2aHostV2 } from "../../galaxy-a2a/src/hosts/host-flow-v2.mjs";
+import { createWorkerPackHostFlowV2 } from "../../galaxy-a2a/src/hosts/worker-pack-flow-v2.mjs";
 import { createReferenceWorkerManifest } from '../../../integrations/reference-worker-pack/manifest.mjs';
 import { registerNativeWorkerTools } from '../../../integrations/native-v2/worker-tools.mjs';
 

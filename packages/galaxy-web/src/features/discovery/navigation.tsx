@@ -1,5 +1,5 @@
 import React from 'react';
-import {carryHelpOrigin} from '../../help-origin-client.mjs';
+import {carryHelpOrigin} from "../help-search/help-origin-client.mjs";
 
 type Destination='/app/find'|'/app/search'|'/app/match';
 export function discoveryTarget(path:Destination,query:string,from=location.pathname+location.search+location.hash){

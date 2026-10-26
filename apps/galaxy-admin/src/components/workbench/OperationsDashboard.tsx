@@ -2,19 +2,19 @@
 
 import {useCallback,useLayoutEffect,useState} from 'react';
 import {useOperationsRead} from '../../lib/use-operations-read';
-import type {OperationsSummary} from '../../lib/admin-analytics-types';
-import {workbenchInventory,workbenchJobState,workbenchPending,workbenchRecords,workbenchTime} from '../../lib/workbench-view-model';
+import type {OperationsSummary} from "../../lib/analytics/admin-analytics-types";
+import {workbenchInventory,workbenchJobState,workbenchPending,workbenchRecords,workbenchTime} from "../../lib/workbench/workbench-view-model";
 import {AdminIcon} from '../AdminIcons';
 import {WorkbenchAnalytics} from './WorkbenchAnalytics';
 import {WorkbenchCommunication} from './WorkbenchCommunication';
 import {WorkbenchOperationsLog} from './WorkbenchOperationsLog';
 import {WorkbenchPendingList,WorkbenchProgress,WorkbenchShortcuts} from './WorkbenchSidebar';
-import {AutonomySummary} from '../AutonomyShared';
-import {autonomyTaskHref,autonomyTaskTitle} from '../../lib/autonomy-view-model';
+import {AutonomySummary} from "../autonomy/AutonomyShared";
+import {autonomyTaskHref,autonomyTaskTitle} from "../../lib/autonomy/autonomy-view-model";
 import './workbench.css';
 import {WorkbenchInteractionProvider} from './WorkbenchInteraction';
 
-export type {OperationsSummary} from '../../lib/admin-analytics-types';
+export type {OperationsSummary} from "../../lib/analytics/admin-analytics-types";
 
 export function OperationsDashboard({initial,initialError}:{initial:OperationsSummary|null;initialError:string}){
   const page=useOperationsRead<OperationsSummary>({path:'/v1/operations/summary?publicActivity=deferred',initial,initialError,failureMessage:'工作台数据暂时无法取得。',clearOnOffline:true});

@@ -15,7 +15,7 @@ const nativeScopes=['binding','consent','case-teaser','history','assistance','co
 const load=path=>import(pathToFileURL(join(repo,path)));
 const [{serviceFixture},{createApi},{browserScopes},{oidcProviderFixture},{createOidcLoginProvider},{IdentityLinkService}]=await Promise.all([
   load('packages/galaxy-official/test/service-fixture.mjs'),load('packages/galaxy-official/src/http.mjs'),load('packages/galaxy-official/src/browser-client.mjs'),
-  load('packages/galaxy-official/test/oidc-provider-fixture.mjs'),load('packages/galaxy-official/src/oidc-login.mjs'),load('packages/galaxy-official/src/identity-links.mjs')]);
+  load('packages/galaxy-official/test/oidc-provider-fixture.mjs'),load("packages/galaxy-official/src/identity/authentication/oidc-login.mjs"),load("packages/galaxy-official/src/identity/links.mjs")]);
 const html=await readFile(join(dist,'index.html'),'utf8');
 const files=[...['main.tsx','account-settings.tsx','runtime.mjs','account-verification-client.mjs'].map(n=>join(repo,'packages/galaxy-web/src',n)),fileURLToPath(import.meta.url),join(dist,'index.html'),...[...html.matchAll(/(?:src|href)="\/app\/(assets\/[^"?]+)"/g)].map(m=>join(dist,m[1]))];
 for(const name of (await readdir(nativeCandidate)).filter(name=>/\.(?:[cm]?js|json)$/.test(name)))files.push(join(nativeCandidate,name));

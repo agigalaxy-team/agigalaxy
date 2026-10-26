@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {hasOperatorPermission} from '../lib/access';
-import {recommendationLocation,recommendationSearchKeys} from '../lib/recommendation-view-model';
+import {recommendationLocation,recommendationSearchKeys} from "../lib/recommendation/recommendation-view-model";
 import {Recommendation} from './BusinessViewClients';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';

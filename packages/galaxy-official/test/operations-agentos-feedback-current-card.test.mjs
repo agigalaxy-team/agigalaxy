@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFeedbackService} from "../src/operations/feedback/service.mjs";
 import {AccountFeedbackDataService} from '../src/operations/feedback/owner-data.mjs';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 
 // Real PGlite SQL/API role, BusinessAdmin, feedback service, query and action

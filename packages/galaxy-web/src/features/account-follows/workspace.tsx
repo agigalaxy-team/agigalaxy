@@ -2,8 +2,8 @@ import React,{useCallback,useEffect,useEffectEvent,useLayoutEffect,useMemo,useRe
 import type {z} from 'zod/v4';
 import {UserRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {AccountEntryPage} from '../../account-center';
-import {useReadTasks} from '../../use-read-task';
+import {AccountEntryPage} from "../accounts/account-center";
+import {useReadTasks} from "../../shared/reading/use-read-task";
 import {accountFollowPageSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
 import {AccountFollowControl,accountFollowMessage,useAccountFollows} from './controls';
 import './account-follows.css';

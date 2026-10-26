@@ -4,9 +4,9 @@ import { operationalSnapshot } from '../src/infrastructure/operational-snapshot.
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { sdkPeer } from '../../galaxy-a2a/test/sdk-peer.mjs';
-import { BuilderProbeWorker } from '../src/builder-probes.mjs';
-import { observeBuilderEndpoint } from '../src/builder-probe-observer.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
+import { BuilderProbeWorker } from "../src/builders/builder-probes.mjs";
+import { observeBuilderEndpoint } from "../src/builders/builder-probe-observer.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
 import { defaultResourceBudgetPolicy } from '../src/infrastructure/resource-budgets.mjs';
 import { approveFixtureDeletion } from './deletion-execute-workflow.mjs';

@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
-import {carryHelpOrigin,helpOriginLocator} from '../src/help-origin-client.mjs';
+import {carryHelpOrigin,helpOriginLocator} from "../src/features/help-search/help-origin-client.mjs";
 import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url)),baseline=process.argv.includes('--baseline');

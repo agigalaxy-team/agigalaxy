@@ -5,7 +5,7 @@ import {mkdtemp,cp,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createNativeClientRelease} from '../native-client-release.mjs';
-import {verifyRelease} from '../../packages/galaxy-official/src/release-artifact.mjs';
+import {verifyRelease} from "../../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 const preparedDirectory=process.env.GALAXY_NATIVE_RELEASE_PREPARED;
 test('actual prepared native archive signs exact protocol evidence; tampered host claim is refused',{skip:!preparedDirectory},async()=>{
  const{privateKey,publicKey}=generateKeyPairSync('ed25519'),now=Math.floor(Date.now()/1000),options={preparedDirectory,publisher:'synthetic-signing-fixture',privateKey,kid:'synthetic',now,lifetime:60};

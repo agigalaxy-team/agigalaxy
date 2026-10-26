@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {OperationsAiRunsService} from '../src/operations-ai-runs.mjs';
+import {OperationsAiRunsService} from "../src/operations/agentos/runs.mjs";
 import {operationsAgentOsConversationsMigrationSql} from '../src/infrastructure/operations-agentos-conversations-v1-schema.mjs';
-import {aiRunError,aiRunInitiator,aiRunTitle,aiRunTrigger,aiSpanLabel,aiRecordedNumber,aiRunsLocation,aiRunsPath} from '../../../apps/galaxy-admin/src/lib/ai-runs-view-model.ts';
+import {aiRunError,aiRunInitiator,aiRunTitle,aiRunTrigger,aiSpanLabel,aiRecordedNumber,aiRunsLocation,aiRunsPath} from "../../../apps/galaxy-admin/src/lib/autonomy/ai-runs-view-model.ts";
 
 test('ordinary workbench runs retain genuine endpoint ownership and safe step metadata throughout the global audit read',async t=>{
  const db=new PGlite();t.after(()=>db.close());

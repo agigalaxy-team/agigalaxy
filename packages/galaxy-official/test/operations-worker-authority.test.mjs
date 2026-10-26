@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {createStoredOperatorAuthorization} from '../src/operations-config.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {createStoredOperatorAuthorization} from "../src/operations/configuration.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 
 test('queued authority uses the stored principal and current action grants, without accepting a payload subject',async t=>{

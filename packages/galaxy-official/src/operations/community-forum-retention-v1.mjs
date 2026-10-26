@@ -1,5 +1,5 @@
-import {CommunityForumPermissionsV1,forumStamp} from '../community-forum-permissions-v1.mjs';
-import {defaultForumPolicy,forumPolicySchema,forumPolicyHash} from '../community-forum-policy-v1.mjs';
+import {CommunityForumPermissionsV1,forumStamp} from "../community/community-forum-permissions-v1.mjs";
+import {defaultForumPolicy,forumPolicySchema,forumPolicyHash} from "../community/community-forum-policy-v1.mjs";
 import {recordContentErasure} from './lifecycle-product-v2.mjs';
 
 const day=86400;

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {ChatReadModel} from '../src/chat/read-model.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
-import {accountAvatarSelection} from '../../galaxy-web/src/account-avatar-assets.mjs';
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
+import {accountAvatarSelection} from "../../galaxy-web/src/features/accounts/account-avatar-assets.mjs";
 
 test('current account avatar/type projection and local stable illustrations',async()=>{
  const db=new PGlite(),endpoint='https://avatar-check.invalid',ids=[

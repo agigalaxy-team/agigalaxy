@@ -36,8 +36,10 @@ function useFor(f, capsule, target, extra = {}) {
 
 test('migration preserves original Attempt bytes and legacy applications; recheck cannot silently substitute a newer Result version', async t => {
   const db = new PGlite(); t.after(() => db.close());
-  // Build the actual previous schema, including its old application constraint.
-  for (const migration of migrations.filter(m => m.version <= 75)) await db.exec(migration.sql);
+  // Keep the actual previous application constraint while current unrelated
+  // source-read tables satisfy the current service contract. Migration 76 is
+  // deliberately withheld until the original legacy application is stored.
+  for (const migration of migrations.filter(m => m.version !== 76)) await db.exec(migration.sql);
   const { f, p } = await fixture(db, { migrateDatabase: false });
   const capsule = await sourceCapsule(f), target = await targetWork(p);
   const use = useFor(f, capsule, target, { attemptRef: { id: target.origin.eventId, version: 1 } });

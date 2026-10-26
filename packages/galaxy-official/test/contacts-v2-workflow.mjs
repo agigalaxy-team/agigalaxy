@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 
 // All participants are synthetic; authentication is real local OIDC code/PKCE,

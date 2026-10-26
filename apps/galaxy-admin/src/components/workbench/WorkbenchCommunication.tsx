@@ -4,8 +4,8 @@ import {useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent} from
 import Link from 'next/link';
 import {createPortal} from 'react-dom';
 import {useRouter,useSearchParams} from 'next/navigation';
-import type {AutonomyTaskRead} from '../autonomy-types';
-import {autonomyTaskHref,autonomyStates} from '../../lib/autonomy-view-model';
+import type {AutonomyTaskRead} from "../autonomy/autonomy-types";
+import {autonomyTaskHref,autonomyStates} from "../../lib/autonomy/autonomy-view-model";
 import {AdminIcon} from '../AdminIcons';
 import {AdminTabs} from '../AdminTabs';
 import {useOperationsRead} from '../../lib/use-operations-read';
@@ -16,11 +16,11 @@ import {WorkbenchManagementCapabilities} from './WorkbenchManagementCapabilities
 import {WorkbenchActionHistory} from './WorkbenchActionHistory';
 import {useWorkbenchInteraction} from './WorkbenchInteraction';
 import {WorkbenchActionCards} from './WorkbenchActionCards';
-import {authorizedCommandMatches} from '../../lib/authorized-preparation-model';
-import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from '../../lib/workbench-action-cards';
-import {useWorkbenchCommand} from '../../lib/use-workbench-command';
-import {useConversationStream} from '../../lib/use-conversation-stream';
-import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from '../../lib/agentos-client';
+import {authorizedCommandMatches} from "../../lib/workbench/authorized-preparation-model";
+import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
+import {useWorkbenchCommand} from "../../lib/workbench/use-workbench-command";
+import {useConversationStream} from "../../lib/workbench/use-conversation-stream";
+import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from "../../lib/workbench/agentos-client";
 
 const domains=[{id:'overview',label:'总控'},{id:'governance',label:'治理'},{id:'messaging',label:'消息'},{id:'discovery',label:'数据与发现'},{id:'maintenance',label:'运维'}];
 const queries=[{label:'今天的变化',text:'总结今天的运营变化，并说明需要关注的事项。'},{label:'待办原因',text:'梳理当前待办的原因，以及需要人工处理的事项。'},{label:'处理进展',text:'查看最近处理进展和仍未解决的问题。'}];

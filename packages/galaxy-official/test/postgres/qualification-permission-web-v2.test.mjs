@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyQualificationPermissionWebV2} from '../qualification-permission-web-v2-workflow.mjs';
 test('Qualification request actual PostgreSQL API/worker roles and signed browser workflow',{timeout:120000},async()=>{

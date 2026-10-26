@@ -1,6 +1,6 @@
 import {randomUUID} from "node:crypto";
 import {isDeepStrictEqual} from "node:util";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {operationsPermissionCatalog} from "../../operations-permission-catalog.mjs";
 import {operationsRoleSaveSchema,operationsAssignmentSaveSchema,operationsAutomationSaveSchema,operationsPermissionsHistorySchema} from "../../shared/operations-permissions-schema.mjs";
 import {fail,parse,identity} from './helpers.mjs';

@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { platform, arch, cpus, totalmem } from 'node:os';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { workerReads } from '../../src/infrastructure/worker-reads.mjs';
 import { serviceFixture } from '../service-fixture.mjs';
@@ -16,9 +16,9 @@ import { createApi } from '../../src/http.mjs';
 import { createOperationalMetrics } from '../../src/operations/metrics.mjs';
 import { defaultRequestQuotaPolicy } from '../../src/adapters/http/request-quotas.mjs';
 import { defaultResourceBudgetPolicy } from '../../src/infrastructure/resource-budgets.mjs';
-import { EvidenceService } from '../../src/evidence.mjs';
-import { ConsentReader } from '../../src/consent-reader.mjs';
-import { inspectGithubRun } from '../../src/github-evidence.mjs';
+import { EvidenceService } from "../../src/evidence/evidence.mjs";
+import { ConsentReader } from "../../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../../src/evidence/github-evidence.mjs";
 
 test('sustained mixed HTTP load overlaps Worker leases and preserves revocation',{timeout:150000},async()=>{
   assert.equal(process.env.GALAXY_TEST_PG_ISOLATED,'1','Use isolated PostgreSQL launcher');

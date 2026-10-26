@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {createWebRuntime} from '../../galaxy-web/src/runtime.mjs';
-import {seedExistingWebIdentity} from './existing-web-identity-fixture.mjs';
+import {createExistingWebRuntime} from './existing-web-identity-fixture.mjs';
 
 test('HTTP connection waits for a near-future signed second without extending expiry or duplicating binding',async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000});
@@ -22,8 +21,8 @@ test('HTTP connection waits for a near-future signed second without extending ex
    }
    return response;
   };
-  await seedExistingWebIdentity({endpoint:f.bindings.endpoint,trustedKeys:f.bindings.trustedKeys},{store,fetch:fetcher,now:()=>clock});
-  runtime=await createWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:new Map([...f.bindings.trustedKeys].map(([id,key])=>[id,{...key,notBefore:f.now-30}]))},
+
+  runtime=await createExistingWebRuntime({endpoint:f.bindings.endpoint,trustedKeys:new Map([...f.bindings.trustedKeys].map(([id,key])=>[id,{...key,notBefore:f.now-30}]))},
    {store,fetch:fetcher,now:()=>clock,waitForClock:async(milliseconds,signal)=>{
     waits++;assert.ok(milliseconds<=2025);if(cancelWait){runtime.disconnect();signal.throwIfAborted();}
     clock+=Math.ceil(milliseconds/1000);

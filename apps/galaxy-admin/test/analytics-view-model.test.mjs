@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {analyticsBusiness,analyticsDate,analyticsDurationSeconds,analyticsFlow,analyticsHref,analyticsLocation,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from '../src/lib/analytics-view-model.ts';
+import {analyticsBusiness,analyticsDate,analyticsDurationSeconds,analyticsFlow,analyticsHref,analyticsLocation,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from "../src/lib/analytics/analytics-view-model.ts";
 
 test('analytics uses the one discovery endpoint and preserves only the supported period context',()=>{
  const location=analyticsLocation({days:'14',kind:'account',accountId:'secret',query:'private',view:'extra'});

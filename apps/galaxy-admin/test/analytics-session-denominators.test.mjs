@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const require=createRequire(new URL('../package.json',import.meta.url));
 const {buildSync}=require('esbuild');
-async function model(name){const result=buildSync({entryPoints:[fileURLToPath(new URL('../src/lib/'+name+'.ts',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));}
+async function model(name){const result=buildSync({entryPoints:[fileURLToPath(new URL('../src/lib/analytics/'+name+'.ts',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));}
 const overview=await model('analytics-view-model'),account=await model('account-usage-analysis-view-model');
 test('session-dependent metrics require their known denominator while real and unknown zero values stay distinct',()=>{
  const accountId='00000000-0000-4000-8000-000000000001',checkedAt=1792799000,readExpiresAt=checkedAt+30;

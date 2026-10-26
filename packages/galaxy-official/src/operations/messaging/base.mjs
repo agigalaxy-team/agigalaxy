@@ -1,6 +1,6 @@
 import {isDeepStrictEqual} from "node:util";
 import {z} from "zod";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {messagingParse as parse} from "../../shared/operations-messaging-schema.mjs";
 import {permission,auditAction,same,fail,iso} from './policy.mjs';

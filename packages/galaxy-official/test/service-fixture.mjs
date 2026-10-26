@@ -2,7 +2,7 @@ import { generateKeyPairSync, randomUUID, randomBytes } from 'node:crypto';
 import { CompactSign } from 'jose';
 import { PGlite } from '@electric-sql/pglite';
 import { createGalaxyGenesis } from '../../galaxy-core/src/galaxy-guid.mjs';
-import { migrate } from '../src/database.mjs';
+import { migrate } from "../src/infrastructure/database.mjs";
 import { digest } from '../src/shared/digest.mjs';
 import { createServices } from '../src/services.mjs';
 

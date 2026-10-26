@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOfficialAccountClient} from '../src/official-account-client.mjs';
+import {createOfficialAccountClient} from "../src/features/accounts/official-account-client.mjs";
 
 const endpoint='https://official.example.org',website='https://galaxy.example.org',now=()=>1800000000;
 const subjectId='GUID15'+'0'.repeat(26);

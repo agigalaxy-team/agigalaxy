@@ -5,8 +5,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serviceFixture } from './service-fixture.mjs';
-import { createLocalHelpStoreV2 } from '../src/local-help-store-v2.mjs';
-import { createHelpActionFlowV2 } from '../src/help-action-flow-v2.mjs';
+import { createLocalHelpStoreV2 } from "../src/clients/local/help-store-v2.mjs";
+import { createHelpActionFlowV2 } from "../src/clients/flows/help-action-v2.mjs";
 import { digest } from '../src/shared/digest.mjs';
 
 test('expired exact help authorization renews only its request ID after an absent receipt; stale preview and unknown renewal are refused', async () => {

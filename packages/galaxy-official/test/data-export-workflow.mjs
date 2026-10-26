@@ -5,15 +5,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createDataExportClient } from '../src/data-export-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
-import { saveDataExport } from '../src/local-data-export.mjs';
+import { createDataExportClient } from "../src/clients/data-export.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
+import { saveDataExport } from "../src/clients/local/data-export.mjs";
 import { ownerExportDatasets as exportDatasets } from '../src/shared/data-export-schema.mjs';
 import { cleanupExpiredExports } from '../src/infrastructure/export-retention.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export async function verifyDataExportWorkflow(database = null, options = {}) {
   const scopes = ['binding', 'consent', 'case-teaser', 'evidence', 'proof', 'data-export'];

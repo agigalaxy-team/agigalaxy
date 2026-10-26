@@ -4,11 +4,11 @@ import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import {useRouter} from 'next/navigation';
 import {useOperationsRead} from '../../lib/use-operations-read';
-import {analyticsAudienceBasis,analyticsBusiness,analyticsDurationSeconds,analyticsFlow,analyticsHref,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from '../../lib/analytics-view-model';
+import {analyticsAudienceBasis,analyticsBusiness,analyticsDurationSeconds,analyticsFlow,analyticsHref,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from "../../lib/analytics/analytics-view-model";
 import {AdminIcon} from '../AdminIcons';
 import type {AdminIconName} from '../AdminIcons';
 import {AnalyticsDaysControl,AnalyticsObjectControl,BusinessVolumeChart,RetentionGrid,UsageFlowChart,UsageTrendChart} from './AnalyticsCharts';
-import type {AnalyticsEnvelope,AnalyticsLocation} from '../analytics-types';
+import type {AnalyticsEnvelope,AnalyticsLocation} from "./analytics-types";
 import './analytics.css';
 
 type AnalyticsRead={loading:boolean;error:string;value:AnalyticsEnvelope|null;read:()=>Promise<unknown>};

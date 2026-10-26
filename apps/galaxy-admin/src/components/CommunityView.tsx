@@ -3,8 +3,8 @@ import {OperationsPage,operationsPageContext,operationsSearch} from './Operation
 import {Community} from './BusinessViewClients';
 import {CasesView} from './CasesView';
 import {uuidPattern} from './operations-task-types';
-import type {PublicContentFilters,PublicContentTab,PublicContentTopic} from './public-content-types';
-import {publicContentTopics,publicContentTabs} from './public-content-types';
+import type {PublicContentFilters,PublicContentTab,PublicContentTopic} from "./content-governance/public-content-types";
+import {publicContentTopics,publicContentTabs} from "./content-governance/public-content-types";
 import {hasAnyOperatorPermission,hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 export async function CommunityView(props:AdminViewServerProps){

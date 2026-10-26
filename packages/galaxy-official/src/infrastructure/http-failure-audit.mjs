@@ -1,5 +1,5 @@
 import { boundedFailureAudit } from '../adapters/http/failure-audit.mjs';
-import { transaction } from '../database.mjs';
+import { transaction } from "./database.mjs";
 import { failureActor } from '../shared/http-failure-context.mjs';
 
 export function createHttpFailureAudit(db, endpoint, bounds) {

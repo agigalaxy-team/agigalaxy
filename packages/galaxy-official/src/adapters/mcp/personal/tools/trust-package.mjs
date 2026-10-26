@@ -1,5 +1,5 @@
 import {trustPermissionPreviewSchema,trustPermissionMutationSchema,trustPermissionLookupSchema,
- trustPermissionRevokeSchema,trustPermissionQuerySchema,trustSelectionSchema} from '../../../../trust-package-permissions.mjs';
+ trustPermissionRevokeSchema,trustPermissionQuerySchema,trustSelectionSchema} from "../../../../verification/trust-package-permissions.mjs";
 
 export function trustPackageToolDefinitions(services,actor){
  if(!services.trustPackages)return {};

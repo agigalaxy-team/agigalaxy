@@ -2,8 +2,8 @@ import type {AdminViewServerProps} from 'payload';
 import {Feedback} from './BusinessViewClients';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
 import {uuidPattern} from './operations-task-types';
-import {feedbackModules,feedbackStates} from './feedback-types';
-import type {FeedbackCategoryFilter,FeedbackDays,FeedbackModule,FeedbackState} from './feedback-types';
+import {feedbackModules,feedbackStates} from "./feedback/feedback-types";
+import type {FeedbackCategoryFilter,FeedbackDays,FeedbackModule,FeedbackState} from "./feedback/feedback-types";
 import {hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 

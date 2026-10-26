@@ -3,7 +3,7 @@
 import {useCallback,useLayoutEffect,useRef,useState} from 'react';
 import {AdminIcon} from './AdminIcons';
 import {operationsFailure,OperationsRequestError} from '../lib/operations-client';
-import type {PublicContentAttachment} from './public-content-types';
+import type {PublicContentAttachment} from "./content-governance/public-content-types";
 
 const imageTypes=new Set(['image/png','image/jpeg','image/webp','image/gif']);
 const uuid='[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';

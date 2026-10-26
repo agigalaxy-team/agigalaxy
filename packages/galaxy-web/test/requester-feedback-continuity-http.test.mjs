@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {createRequesterFeedbackClient,requesterFeedbackAvailable} from '../src/requester-feedback-client.mjs';
+import {createRequesterFeedbackClient,requesterFeedbackAvailable} from "../src/features/tasks/feedback/requester-feedback-client.mjs";
 import {ServiceError} from '../../galaxy-official/src/shared/service-error.mjs';
 
 // Real Ed25519 Consent, HTTP, Task transactions and PGlite; local Map hooks

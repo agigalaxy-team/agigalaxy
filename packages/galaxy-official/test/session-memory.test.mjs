@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 
 const endpoint = 'https://official.example.org';
 test('session memory accepts all current declared scopes including export and deletion without silently expanding smaller sessions', async () => {

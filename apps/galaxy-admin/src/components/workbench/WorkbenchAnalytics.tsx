@@ -4,14 +4,14 @@ import {useEffect,useRef} from 'react';
 import Link from 'next/link';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {useOperationsRead} from '../../lib/use-operations-read';
-import {analyticsDate,analyticsLocation,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from '../../lib/analytics-view-model';
-import type {OperationsSummary} from '../../lib/admin-analytics-types';
-import {workbenchTime} from '../../lib/workbench-view-model';
+import {analyticsDate,analyticsLocation,analyticsNumber,analyticsOverview,analyticsPath,analyticsPercent,analyticsRetention} from "../../lib/analytics/analytics-view-model";
+import type {OperationsSummary} from "../../lib/analytics/admin-analytics-types";
+import {workbenchTime} from "../../lib/workbench/workbench-view-model";
 import {AdminTabs} from '../AdminTabs';
 import {ReadStatus} from '../OperationControls';
 import {AnalyticsDaysControl,RetentionGrid} from '../analytics/AnalyticsChartPrimitives';
 import {UsageTrendChart} from '../analytics/UsageTrendChart';
-import type {AnalyticsEnvelope} from '../analytics-types';
+import type {AnalyticsEnvelope} from "../analytics/analytics-types";
 import {WorkbenchActivityChart,WorkbenchEmpty,WorkbenchInventoryChart,WorkbenchMetrics} from './WorkbenchCharts';
 import type {WorkbenchInventory,WorkbenchMetric} from './WorkbenchCharts';
 

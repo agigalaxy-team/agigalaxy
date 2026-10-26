@@ -5,8 +5,8 @@ import https from 'node:https';
 import dns from 'node:dns/promises';
 import { readFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
-import { BuilderProbeWorker } from '../../src/builder-probes.mjs';
-import { SearchIndex } from '../../src/search-index.mjs';
+import { BuilderProbeWorker } from "../../src/builders/builder-probes.mjs";
+import { SearchIndex } from "../../src/discovery/search-index.mjs";
 
 assert.equal(process.env.GALAXY_TEST_PG_ISOLATED, '1');
 assert.equal(typeof process.send, 'function');

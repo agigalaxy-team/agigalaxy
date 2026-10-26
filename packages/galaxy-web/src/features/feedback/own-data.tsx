@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {ReadingSurface} from '../../reading-details';
+import {ReadingSurface} from "../../shared/reading/reading-details";
 import {createFeedbackOwnDataClient,feedbackOwnDataError,feedbackOwnDataIntentSchema} from './own-data-client.mjs';
 import './own-data.css';
 

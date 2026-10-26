@@ -7,8 +7,8 @@ import { randomUUID } from 'node:crypto';
 import canonicalize from 'canonicalize';
 import { receiptStatusFixture } from './receipt-status-workflow.mjs';
 import { createNativeRuntime } from '../../galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import { createHelpSearchClient } from '../../galaxy-web/src/help-search-client.mjs';
-import { createChoiceSyncClient } from '../../galaxy-web/src/choice-sync-client.mjs';
+import { createHelpSearchClient } from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
+import { createChoiceSyncClient } from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
 import { choicePutIntent } from '../src/shared/choice-snapshot-schema-v2.mjs';
 import { digest } from '../src/shared/digest.mjs';
 

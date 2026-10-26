@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
 import {bindOperationsAiUse,withOperationsAiWork,inheritOperationsAiUse,operationsAiUseDomain,operationsAiWorkScope} from '../src/shared/operations-ai-use.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
-import {conversationAccountRestrictionReference,conversationPriorActionTarget} from '../src/operations-agentos-tool-evidence.mjs';
+import {AgentOsConversationTools} from "../src/operations/agentos/conversation-tools.mjs";
+import {conversationAccountRestrictionReference,conversationPriorActionTarget} from "../src/operations/agentos/tool-evidence.mjs";
 
 // Real SQL/API role, stored human grants, business restriction writes/audits,
 // fixed-AI FK, conversation ownership, card class and source projection.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createManagementEmailChanges } from '../src/management-email-changes.mjs';
+import { createManagementEmailChanges } from "../src/identity/authentication/management-email-changes.mjs";
 
 test('management email adapter binds the fixed native protocol and never retries uncertain mail', async () => {
   const issuer = 'https://admin.example.test/realms/galaxy-operations';

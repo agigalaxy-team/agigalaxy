@@ -3,9 +3,9 @@ import { randomUUID,verify } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { createBuilderClient,verifyNodeControlSnapshot,verifyNodeControlProof } from '../src/builder-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createNodeControlProofFlow } from '../src/node-control-proof-flow.mjs';
+import { createBuilderClient,verifyNodeControlSnapshot,verifyNodeControlProof } from "../src/clients/builder.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createNodeControlProofFlow } from "../src/clients/flows/node-control-proof.mjs";
 
 export async function verifyNodeControlProofWorkflow(database=null,options={}){
   const scopes=['binding','consent','builders'],f=await serviceFixture(scopes,database,options),node=await serviceFixture(scopes,f.db,{...options,migrateDatabase:false}),other=await serviceFixture(scopes,f.db,{...options,migrateDatabase:false});

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {availableChatMessages,chatMessageAvailable,nextChatMessageExpiry} from '../../galaxy-web/src/chat-workspace-types.ts';
-import {emptyAgentForm,hasAgentGrantInput,agentGrantEditorInput,retainedAgentExpiry,sameAgentOperation} from '../../galaxy-web/src/chat-agent-types.ts';
-import {availableForumContent,assertForumPrepared,forumSourceTarget} from '../../galaxy-web/src/community-forum-view-types.ts';
-import {createCommunityForumClient,newForumDraft,forumDraftPayload} from '../../galaxy-web/src/community-forum-client.mjs';
+import {availableChatMessages,chatMessageAvailable,nextChatMessageExpiry} from "../../galaxy-web/src/features/chat/chat-workspace-types.ts";
+import {emptyAgentForm,hasAgentGrantInput,agentGrantEditorInput,retainedAgentExpiry,sameAgentOperation} from "../../galaxy-web/src/features/chat/agents/chat-agent-types.ts";
+import {availableForumContent,assertForumPrepared,forumSourceTarget} from "../../galaxy-web/src/features/community-forum/community-forum-view-types.ts";
+import {createCommunityForumClient,newForumDraft,forumDraftPayload} from "../../galaxy-web/src/features/community-forum/community-forum-client.mjs";
 
 test('chat reads withhold expired or unknown-deadline bodies while preserving the original messages and selection',()=>{
  const now=1_700_000_000_000,selected={messageId:randomUUID(),sequence:'12345678901234567890',text:'original selected message',expiresAt:new Date(now+500).toISOString()};

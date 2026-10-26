@@ -2,7 +2,7 @@ import * as z from 'zod/v4';
 import {randomUUID,createHash} from 'node:crypto';
 import {contactEventV2Schema} from '../../packages/galaxy-official/src/shared/contacts-schema-v2.mjs';
 import {queryContextV2Schema,opportunityRefV2Schema} from '../../packages/galaxy-official/src/shared/discovery-schema-v2.mjs';
-import {readProfileDisplayNames} from '../../packages/galaxy-official/src/profile-display-names.mjs';
+import {readProfileDisplayNames} from "../../packages/galaxy-official/src/accounts/profile-display-names.mjs";
 
 const digest=text=>createHash('sha256').update(text).digest('hex');
 const fail=code=>{throw Object.assign(Error(code),{code});};

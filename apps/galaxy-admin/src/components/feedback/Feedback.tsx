@@ -10,12 +10,12 @@ import {FeedbackAttachments} from './FeedbackAttachments';
 import {CommandFeedback,ReadStatus} from '../OperationControls';
 import {SettingsDraftBoundary,useSettingsDraftState} from '../SettingsDraftBoundary';
 import {useSettingsDraftMemory} from '../../lib/use-settings-draft-memory';
-import {useFeedbackCommand} from '../../lib/use-feedback-command';
-import {feedbackDraft as createDraft,feedbackDraftChanged as changed} from '../../lib/feedback-draft-memory';
-import type {FeedbackDraft as Draft} from '../../lib/feedback-draft-memory';
+import {useFeedbackCommand} from "../../lib/feedback/use-feedback-command";
+import {feedbackDraft as createDraft,feedbackDraftChanged as changed} from "../../lib/feedback/feedback-draft-memory";
+import type {FeedbackDraft as Draft} from "../../lib/feedback/feedback-draft-memory";
 import {useOperationsRead} from '../../lib/use-operations-read';
-import type {FeedbackCategory,FeedbackDetail,FeedbackEvent,FeedbackItem,FeedbackModule,FeedbackPage,FeedbackProps,FeedbackSaved,FeedbackState,FeedbackSummary} from '../feedback-types';
-import {feedbackCategoryLabel,feedbackCategoryLabels,feedbackModuleLabels,feedbackModules,feedbackStateLabels,feedbackStates} from '../feedback-types';
+import type {FeedbackCategory,FeedbackDetail,FeedbackEvent,FeedbackItem,FeedbackModule,FeedbackPage,FeedbackProps,FeedbackSaved,FeedbackState,FeedbackSummary} from "./feedback-types";
+import {feedbackCategoryLabel,feedbackCategoryLabels,feedbackModuleLabels,feedbackModules,feedbackStateLabels,feedbackStates} from "./feedback-types";
 import './feedback.css';
 
 const route='/admin/operations/feedback';

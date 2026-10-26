@@ -28,7 +28,7 @@ const native=await build({absWorkingDir:root,entryPoints,
  metafile:true,write:false,sourcemap:false});
 const inputs=new Set(Object.keys(native.metafile.inputs).map(path=>path.replaceAll('\\','/')));
 for(const path of moved)assert(inputs.has(path),'Actual Native entry graph omits '+path);
-const webEntry='packages/galaxy-web/src/agent-work-continuation.tsx';
+const webEntry="packages/galaxy-web/src/features/local-galaxy/agent-work-continuation.tsx";
 const web=await build({absWorkingDir:root,entryPoints:[webEntry],
  outfile:resolve(root,'outputs/native-layout-memory-only/web-continuation.js'),bundle:true,
  platform:'browser',format:'esm',target:'es2022',packages:'external',metafile:true,write:false});

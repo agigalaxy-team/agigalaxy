@@ -1,4 +1,4 @@
-import { createSigningService } from './signing-service.mjs';
+import { createSigningService } from "./security/signing-service.mjs";
 import { digest } from './shared/digest.mjs';
 import { validateNetworkManifest } from './verification/manifest.mjs';
 export { validateManifest, verifyManifest,validateHubManifest,verifyHubManifest,hubManifestDigest } from './verification/manifest.mjs';

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { issueKeyring, verifyKeyring } from '../src/trust-keyring.mjs';
-import { signEnvelope, verifyEnvelope } from '../src/signed-envelope.mjs';
-import { acceptKeyring } from '../src/trust-store.mjs';
+import { issueKeyring, verifyKeyring } from "../src/security/trust-keyring.mjs";
+import { signEnvelope, verifyEnvelope } from "../src/security/signed-envelope.mjs";
+import { acceptKeyring } from "../src/security/trust-store.mjs";
 import { mkdtemp, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

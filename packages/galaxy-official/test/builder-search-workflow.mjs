@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSearchClient } from '../src/search-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { SearchIndex } from '../src/search-index.mjs';
+import { createSearchClient } from "../src/clients/search.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { SearchIndex } from "../src/discovery/search-index.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
 
 export async function verifyBuilderSearch(database=null,options={}){

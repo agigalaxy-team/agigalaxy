@@ -1,8 +1,8 @@
 import { readDeletionEventPayload } from '../shared/deletion-event-payload.mjs';
 import { z } from 'zod';
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { digest } from '../shared/digest.mjs';
-import { deletionReceipt } from '../deletion.mjs';
+import { deletionReceipt } from "../privacy/deletion.mjs";
 const basis = z.string().min(1).max(2000);
 const plan = z.object({ policyId: z.string().min(1).max(100), policyVersion: z.string().min(1).max(80),
   primary: z.object({ action: z.literal('delete-owned-data'), notBefore: z.number().int().nonnegative(), basis }).strict(),

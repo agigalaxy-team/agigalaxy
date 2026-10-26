@@ -2,8 +2,8 @@ import {randomUUID} from "node:crypto";
 import {isDeepStrictEqual} from "node:util";
 import {z} from "zod";
 import {digest} from "../../shared/digest.mjs";
-import {operationsParse,operationsFail,operationsIso,operationsStamp} from "../../operations-content-visibility.mjs";
-import {forumTagView} from "../../operations-forum-curation.mjs";
+import {operationsParse,operationsFail,operationsIso,operationsStamp} from "./content-visibility.mjs";
+import {forumTagView} from "./forum-curation.mjs";
 import {operationsContentVisibilitySchema,operationsContentCurationSchema,operationsTagCreateSchema,operationsTagUpdateSchema} from "../../shared/operations-forum-content-schema.mjs";
 import {PublicContentReadModel} from './read-model.mjs';
 

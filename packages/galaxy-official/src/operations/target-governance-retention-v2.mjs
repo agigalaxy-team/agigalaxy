@@ -1,4 +1,4 @@
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 // Separate original-body retention from operational restrictions. At 180 days
 // after closure, even the maximum 30-day restriction has expired. No MAM delete.
 export async function purgeTargetGovernanceV2(db, now) {

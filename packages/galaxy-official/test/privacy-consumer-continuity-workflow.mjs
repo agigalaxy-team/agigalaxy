@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import { createRecoveryMaterial } from '../../galaxy-core/src/domain/identity-material.mjs';
+import { createNativeRecoveryWebFixture } from './native-recovery-web-fixture.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createServices } from '../src/services.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 
+// Recovery is a test-only installed-Native signing stimulus for owner changes.
+// It does not restore a production Web recovery coordinator or cover that flow.
 // Real signed HTTP/service transactions; this journal is an explicit Map
 // double, not evidence for Chromium IndexedDB, production data or accounts.
 function memoryStore() {
@@ -15,20 +16,6 @@ function memoryStore() {
     async update(key,fn){const next=fn(structuredClone(values.get(key)));if(next&&typeof next.then==='function'){if(next instanceof Promise)void next.catch(()=>{});throw Error('local_update_async_callback');}const committed=structuredClone(next);values.set(key,committed);await hooks.put?.(key,committed);return structuredClone(committed);},
     get: async key => { const value = structuredClone(values.get(key)); await hooks.get?.(key, value); return value; },
     put: async (key, value) => { values.set(key, structuredClone(value)); await hooks.put?.(key, value); },
-    async prepareRecovery(subjectId, operationId) {
-      const key = `pending-recovery:${subjectId}:${operationId}`, old = await store.get(key); if (old) return old;
-      const value = { ...await createRecoveryMaterial(subjectId), operationId, saveDeclared: false, status: 'local-pending-registration' };
-      await store.put(key, value); return value;
-    },
-    async declareSaved(subjectId, operationId) {
-      const key = `pending-recovery:${subjectId}:${operationId}`, value = await store.get(key); assert.ok(value);
-      await store.put(key, { ...value, saveDeclared: true });
-    },
-    async recordReceipt(subjectId, operationId, receipt) {
-      assert.equal(receipt.subjectId, subjectId); assert.equal(receipt.operationId, operationId); assert.equal(receipt.state, 'committed');
-      const key = `pending-recovery:${subjectId}:${operationId}`, value = await store.get(key); assert.ok(value);
-      await store.put(key, { ...value, receipt, status: value.saveDeclared ? 'registered-save-declared' : 'registered-awaiting-save-declaration' });
-    },
   };
   return { store, values, hooks };
 }
@@ -50,7 +37,7 @@ export async function privacyConsumerFixture() {
     const response = await fetch(local + path, options); await wireHooks.after?.(path, response); return response;
   };
   const makeRuntime = async journal => {
-    const runtime = await createExistingWebRuntime(config, { store: journal.store, fetch: wire, now: () => at }); clients.push(runtime); return runtime;
+    const runtime = await createNativeRecoveryWebFixture(config, { store: journal.store, fetch: wire, now: () => at }); clients.push(runtime); return runtime;
   };
   const close = async () => { clients.forEach(client => client.close()); api.closeAllConnections(); await new Promise(resolve => api.close(resolve)); await f.db.close(); };
   try {

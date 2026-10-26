@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {aiDuration,aiRecordedNumber,aiRunDetailPath,aiRunDomainLabel,aiRunsHref,aiRunsLocation,aiRunsPath,aiRunStateLabel,aiRunTime,aiRunTrigger,aiSpanInterval,aiSpanRows,aiTimelineRange} from '../src/lib/ai-runs-view-model.ts';
+import {aiDuration,aiRecordedNumber,aiRunDetailPath,aiRunDomainLabel,aiRunsHref,aiRunsLocation,aiRunsPath,aiRunStateLabel,aiRunTime,aiRunTrigger,aiSpanInterval,aiSpanRows,aiTimelineRange} from "../src/lib/autonomy/ai-runs-view-model.ts";
 
 const stamp='2026-10-23T01:00:00.000Z';
 function span(id,parent,start,end,trace='trace_1'){return {spanId:id,parentSpanId:parent,traceId:trace,name:id,state:'OK',startTime:new Date(Date.parse(stamp)+start).toISOString(),endTime:new Date(Date.parse(stamp)+end).toISOString(),durationMs:end-start,tokens:{input:null,output:null,total:null},input:{state:'not-recorded',value:null},output:{state:'not-recorded',value:null}};}

@@ -6,8 +6,8 @@ import {createServices} from '../src/services.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {requesterFeedbackPreview,submitRequesterFeedback} from '../../galaxy-web/src/requester-feedback-client.mjs';
-import {retainTaskContactAgent,taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
+import {requesterFeedbackPreview,submitRequesterFeedback} from "../../galaxy-web/src/features/tasks/feedback/requester-feedback-client.mjs";
+import {taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 import {memoryAtomicUpdate} from './memory-atomic-update.mjs';
 
 test('browser requester feedback preserves private author scope, superseded history and committed operation after lost acknowledgement',async()=>{
@@ -24,9 +24,11 @@ test('browser requester feedback preserves private author scope, superseded hist
     drop=false;assert.equal(response.status,200);throw Error('Synthetic lost committed feedback acknowledgement');}
    return response;};
   const config={endpoint:f.access.endpoint,trustedKeys};runtime=await createExistingWebRuntime(config,{store,fetch:wire,now:()=>f.now,website:taskContactWebsite});
-  await runtime.connect({confirmed:true});const subjectId=(await runtime.status()).identity.subjectId;
-  assert.equal((await runtime.agentContinuity.status()).state,'required');
-  await retainTaskContactAgent(runtime,store,f.now);
+  await runtime.connect({confirmed:true});const identity=(await runtime.status()).identity,subjectId=identity.subjectId;
+  // The positive fixture completes a real device handoff and retains its signed receipt.
+  const continuity=await runtime.agentContinuity.requireCurrent();
+  assert.equal((await runtime.agentContinuity.status()).state,'verified');
+  assert.equal(continuity.subjectId,subjectId);assert.equal(continuity.deviceId,identity.deviceId);
   const taskId=randomUUID(),open={taskId,operationId:randomUUID(),caseId:null,intent:'collaboration',title:'Synthetic cooperation feedback',summary:'Selected private task',workContext:{goal:'Review collaboration',currentSituation:'No failure history required',attemptRefs:[]},visibility:'Private',collaboration:'open-assistance',enrollmentExpiresAt:f.now+3600};
   await f.assistance.createTask(f.actor,await f.authorize(open,'assistance.publish',{objectId:open.operationId,viewers:[subjectId]}));
   const proposal={kind:'propose',eventId:randomUUID(),participationId:randomUUID(),expectedTaskVersion:1,subjectId,role:'advice',scopeVersion:1,agreedScope:'Specific synthetic review'};

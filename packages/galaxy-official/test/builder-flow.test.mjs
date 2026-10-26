@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { createApi } from '../src/http.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
-import { createBuilderFlow } from '../src/builder-flow.mjs';
-import { createBuilderClient } from '../src/builder-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createBuilderFlow } from "../src/clients/flows/builder.mjs";
+import { createBuilderClient } from "../src/clients/builder.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 test('builder host flow signs one reviewed payload, derives private report recipients and refuses stale edits',async()=>{
   const scopes=['binding','consent','builders'],f=await serviceFixture(scopes),a=await serviceFixture(scopes,f.db);
   f.builders.assessorIds.add(a.actor.subjectId);

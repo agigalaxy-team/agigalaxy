@@ -3,8 +3,8 @@ import { isDeepStrictEqual } from 'node:util';
 import * as z from 'zod/v4';
 import { createA2aBridge } from '../protocol/bridge.mjs';
 import { hash } from '../storage/journal.mjs';
-import { createConsentClient } from '../../../galaxy-official/src/consent-client.mjs';
-import { createCaseClient } from '../../../galaxy-official/src/case-client.mjs';
+import { createConsentClient } from "../../../galaxy-official/src/clients/consent.mjs";
+import { createCaseClient } from "../../../galaxy-official/src/clients/case.mjs";
 
 // Supply this factory explicitly to createLocalHostRuntime. Peer configuration
 // is secret-free; credential resolution is a separate host callback, never UI.

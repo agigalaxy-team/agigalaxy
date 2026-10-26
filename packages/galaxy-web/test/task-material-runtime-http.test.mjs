@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {publicationFixture} from '../../galaxy-official/test/task-publication-continuity-fixture.mjs';
 import {ServiceError} from '../../galaxy-official/src/shared/service-error.mjs';
-import {createCommunityForumClient} from '../src/community-forum-client.mjs';
-import {createTaskMaterialClient,materialTaskText,taskMaterialProjectionKey,withholdTaskMaterialTree} from '../src/task-material-client.mjs';
+import {createCommunityForumClient} from "../src/features/community-forum/community-forum-client.mjs";
+import {createTaskMaterialClient,materialTaskText,taskMaterialProjectionKey,withholdTaskMaterialTree} from "../src/features/tasks/materials/task-material-client.mjs";
 
 // Production WebRuntime, signed HTTP, verified synthetic account and PGlite.
 // The fixture's local Map and deliberate admission/ACK failures are test doubles.

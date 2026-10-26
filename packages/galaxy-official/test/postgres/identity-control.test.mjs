@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import {readFile} from 'node:fs/promises';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {verifyIdentityControlLifecycle} from '../identity-control-workflow.mjs';
 
 test('real PostgreSQL serializes identity recovery and denies stale transactional writers',{timeout:60000},async()=>{

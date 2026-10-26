@@ -5,7 +5,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import {createApi} from '../src/http.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createBuildersWebClient} from '../../galaxy-web/src/builders-client.mjs';
+import {createBuildersWebClient} from "../../galaxy-web/src/features/builders/builders-client.mjs";
 import {builderDeclaration} from './builders-workflow.mjs';
 import {supportFor,packFor} from './builder-support-v2-workflow.mjs';
 test('Builder webpage actual device signatures reconcile a lost response without duplicate declaration or runtime work',async()=>{

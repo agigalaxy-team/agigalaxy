@@ -3,12 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { executeDeletion } from '../src/operations/deletion-execute.mjs';
 import { reviewDeletionRequest } from '../src/operations/deletion-review.mjs';
-import { createDeletionStatusClient } from '../src/deletion-client.mjs';
+import { createDeletionStatusClient } from "../src/clients/deletion.mjs";
 import { createApi } from '../src/http.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
 import { workerReads } from '../src/infrastructure/worker-reads.mjs';
-import { SearchIndex } from '../src/search-index.mjs';
+import { SearchIndex } from "../src/discovery/search-index.mjs";
 
 export async function approveFixtureDeletion(f,db,{auditUntil=f.now}={}) {
   const intent={version:1,id:randomUUID(),endpoint:f.access.endpoint,subjectId:f.actor.subjectId,bindingId:f.actor.bindingId,

@@ -6,11 +6,11 @@ import { resolve } from 'node:path';
 import { browserToolOutput } from '../../galaxy-web/scripts/browser-tool-runtime.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
-import { createTaskCommentClient } from '../../galaxy-web/src/task-comment-client.mjs';
+import { createTaskCommentClient } from "../../galaxy-web/src/features/tasks/comments/task-comment-client.mjs";
 
 const output = browserToolOutput(import.meta.url);
 async function writeObservation(filename, observation) {

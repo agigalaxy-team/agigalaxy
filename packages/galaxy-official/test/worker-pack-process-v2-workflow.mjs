@@ -8,8 +8,8 @@ import { join, resolve, relative, isAbsolute, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildersContinuityFixture } from './builders-client-continuity-workflow.mjs';
 import { configurationExample } from './configuration-v2-workflow.mjs';
-import { createNativeA2aHostV2 } from '../../galaxy-a2a/src/host-flow-v2.mjs';
-import { createWorkerPackHostFlowV2 } from '../../galaxy-a2a/src/worker-pack-flow-v2.mjs';
+import { createNativeA2aHostV2 } from "../../galaxy-a2a/src/hosts/host-flow-v2.mjs";
+import { createWorkerPackHostFlowV2 } from "../../galaxy-a2a/src/hosts/worker-pack-flow-v2.mjs";
 import { createReferenceWorkerManifest } from '../../../integrations/reference-worker-pack/manifest.mjs';
 
 const hash = text => createHash('sha256').update(text).digest('hex');

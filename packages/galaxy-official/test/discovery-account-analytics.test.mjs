@@ -11,7 +11,7 @@ const projectId='11111111-1111-4111-8111-111111111111';
 const accountId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',otherAccount='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const actor={kind:'business-operator',operatorId:'synthetic-operator'};
 const nativeOptions={url:'http://openpanel.invalid',projectId,clientId:'w'.repeat(36),clientSecret:'s'.repeat(40),readClientId:'r'.repeat(36),readClientSecret:'t'.repeat(40)};
-const sourceUrl='https://agigalaxy.org/open-source/openpanel-public2-galaxy-accounts-20261023/source.tar.gz';
+const sourceUrl='https://agigalaxy.org/open-source/openpanel-public2-galaxy-path-memory-20261025-r1/source.tar.gz';
 const pathData={nodes:[],links:[]};
 
 test('account native reads require exact scope/account acknowledgement and preserve empty data and truthful timezone',async()=>{

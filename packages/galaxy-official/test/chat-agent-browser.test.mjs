@@ -4,7 +4,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createChatAgentClient} from '../../galaxy-web/src/chat-agent-client.mjs';
+import {createChatAgentClient} from "../../galaxy-web/src/features/chat/agents/chat-agent-client.mjs";
 
 const store=()=>{const values=new Map();return {get:async key=>structuredClone(values.get(key)),put:async(key,value)=>values.set(key,structuredClone(value)),
  update:async(key,updater)=>{const next=updater(structuredClone(values.get(key)));if(next&&typeof next.then==='function')throw Error('synchronous_update_required');values.set(key,structuredClone(next));return structuredClone(next);}};};

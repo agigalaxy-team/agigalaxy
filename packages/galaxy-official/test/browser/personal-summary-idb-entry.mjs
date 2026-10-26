@@ -1,4 +1,4 @@
-import {openPersonalSummaryStore,createPersonalSummaryLocal} from '../../src/personal-summary-local.mjs';
+import {openPersonalSummaryStore,createPersonalSummaryLocal} from "../../src/summaries/local/browser.mjs";
 const marker='galaxy-personal-summary-idb-qa',output=document.querySelector('pre');
 const assert=(value,message)=>{if(!value)throw new Error(message);};
 async function test(){let stores=[];const prior=JSON.parse(sessionStorage.getItem(marker)||'null');

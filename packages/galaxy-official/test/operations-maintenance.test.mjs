@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsMaintenanceService} from '../src/operations-maintenance.mjs';
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsMaintenanceService} from "../src/operations/maintenance/service.mjs";
 import {operationsMaintenanceMigrationSql} from '../src/infrastructure/operations-maintenance-v1-schema.mjs';
-import {maintenanceModuleIds,maintenanceOpeningConditions} from '../src/operations-maintenance-catalog.mjs';
-import {migrate} from '../src/database.mjs';
+import {maintenanceModuleIds,maintenanceOpeningConditions} from "../src/operations/maintenance/catalog.mjs";
+import {migrate} from "../src/infrastructure/database.mjs";
 
 // Real PGlite migrations, PG business roles, CAS, audit and command ledger.
 // The management directory and native maintenance transport below are doubles;

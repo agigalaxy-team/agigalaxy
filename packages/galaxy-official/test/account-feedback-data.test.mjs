@@ -4,13 +4,13 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFeedbackService} from '../src/operations-feedback.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFeedbackService} from "../src/operations/feedback/service.mjs";
 import {AccountFeedbackDataService} from '../src/operations/feedback/owner-data.mjs';
-import {FeedbackAttachmentsV1Service} from '../src/feedback-attachments-v1.mjs';
-import {migrate} from '../src/database.mjs';
+import {FeedbackAttachmentsV1Service} from "../src/community/feedback-attachments-v1.mjs";
+import {migrate} from "../src/infrastructure/database.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {createOfficialAccountPortal} from '../src/official-account.mjs';
+import {createOfficialAccountPortal} from "../src/accounts/official-account.mjs";
 import {createApi} from '../src/http.mjs';
 
 // SQL, exact API/worker roles and cookie/CSRF processing are real. AV and byte

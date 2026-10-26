@@ -6,7 +6,7 @@ import type {AdminTabItem} from './AdminTabs';
 import {adminNavigation,currentAdminArea} from './Navigation';
 import type {AdminArea} from './Navigation';
 import {maintenanceHref,maintenanceLocation,maintenanceTabs} from '../lib/maintenance-view-model';
-import {systemSettingsHref,systemSettingsLocation,systemSettingsTabs} from '../lib/system-settings-view-model';
+import {systemSettingsHref,systemSettingsLocation,systemSettingsTabs} from "../lib/system-settings/system-settings-view-model";
 
 const sectionItems:Partial<Record<AdminArea,readonly AdminTabItem[]>>={
   users:[

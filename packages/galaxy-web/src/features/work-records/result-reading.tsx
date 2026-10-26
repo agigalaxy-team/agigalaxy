@@ -1,9 +1,9 @@
-import {ReadingDetails,ReadingSummary} from "../../reading-details";
+import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
 import React,{useEffect,useState} from 'react';
-import {MemberLink} from "../../conversation-ui";
+import {MemberLink} from "../../shared/people/conversation-ui";
 import type {WorkFacts,WorkResult,WorkFactClient,WorkSourceRef,WorkRecordView} from "./contracts";
 
-const outcomes:Record<string,string>={succeeded:'达到所述结果',partial:'部分达到',failed:'未达到',inconclusive:'尚不明确',conflicting:'存在冲突'};
+import {outcomes} from './record-labels';
 const sourceNames:Record<string,string>={attempt:'尝试过程',intervention:'相关工作',result:'相关结果',evidence:'所附来源',configuration:'使用条件','selected-message':'对话原话','outcome-material':'成果材料'};
 const safeLink=(value:unknown)=>{if(typeof value!=='string')return null;try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&!url.username&&!url.password?url.href:null;}catch{return null;}};
 function EvidenceReading({source,client,revision}:{source:WorkSourceRef;client:WorkFactClient;revision:WorkFacts}){

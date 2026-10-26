@@ -6,7 +6,7 @@ import { prepareHub, hubScopes } from './hub-peering-workflow.mjs';
 import { createPeeringProof } from './hub-ci-proof-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { createSigningService } from '../src/signing-service.mjs';
+import { createSigningService } from "../src/security/signing-service.mjs";
 
 export async function createPeeringExpiryFixture() {
   const now = Math.floor(Date.now() / 1000), a = await serviceFixture(hubScopes, null,

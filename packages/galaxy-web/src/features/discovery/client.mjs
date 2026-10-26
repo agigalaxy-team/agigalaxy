@@ -1,4 +1,4 @@
-import {createOfficialAccountClient} from '../../official-account-client.mjs';
+import {createOfficialAccountClient} from "../accounts/official-account-client.mjs";
 import {readWithTransientRecovery} from '../../../../../integrations/shared/read-task.mjs';
 
 export const discoveryPageKey=(path,search='')=>{

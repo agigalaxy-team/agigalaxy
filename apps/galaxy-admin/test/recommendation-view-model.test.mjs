@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {recommendationLocation,recommendationHref,recommendationOverviewPath,recommendationHistoryPath,recommendationNextPage,recommendationPreviousPage,recommendationOverview,recommendationSubjects,recommendationNumber,recommendationPolicyDraft,recommendationPolicyBody,recommendationPolicyDifferences,recommendationThemeDraft,recommendationThemeBody,recommendationHistory,recommendationHistoryDetails} from '../src/lib/recommendation-view-model.ts';
+import {recommendationLocation,recommendationHref,recommendationOverviewPath,recommendationHistoryPath,recommendationNextPage,recommendationPreviousPage,recommendationOverview,recommendationSubjects,recommendationNumber,recommendationPolicyDraft,recommendationPolicyBody,recommendationPolicyDifferences,recommendationThemeDraft,recommendationThemeBody,recommendationHistory,recommendationHistoryDetails} from "../src/lib/recommendation/recommendation-view-model.ts";
 
 const id='11111111-1111-4111-8111-111111111111',tagId='22222222-2222-4222-8222-222222222222';
 const category={key:'category:technology',id:null,label:'技术与工具',kind:'category',version:0,enabled:true,mapping:{categories:['technology'],tagIds:[],queryTerms:[]},source:'forum-category'};

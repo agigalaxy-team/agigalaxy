@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {managementAccountQualification,managementAccountsHref,managementAccountsLocation,managementAccountsQuery,managementDirectoryStatus,managementProfileMerge,managementProfileRefresh,managementReceiptMatches,managementAiSources,managementCanCommand} from '../src/lib/management-accounts-view-model.ts';
+import {managementAccountQualification,managementAccountsHref,managementAccountsLocation,managementAccountsQuery,managementDirectoryStatus,managementProfileMerge,managementProfileRefresh,managementReceiptMatches,managementAiSources,managementCanCommand} from "../src/lib/management-accounts/management-accounts-view-model.ts";
 
 test('management account context is closed and profile conflicts preserve authored values without granting administrator full permissions',()=>{
  const person='a'.repeat(64),role='11111111-1111-4111-8111-111111111111';

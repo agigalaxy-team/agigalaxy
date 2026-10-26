@@ -5,8 +5,8 @@ import { fixture, task, experience, review, xg, ag, scopes, capabilityId } from 
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { recordRuntimeConfig, runtimeConfigSnapshot } from '../src/operations/runtime-config-audit.mjs';
-import { HonorService } from '../src/honor.mjs';
-import { HonorV2Service } from '../src/honor-v2.mjs';
+import { HonorService } from "../src/records/honor.mjs";
+import { HonorV2Service } from "../src/records/honor-v2.mjs";
 import { digest } from '../src/shared/digest.mjs';
 
 // All identities, policies, reviewer registration and external material are

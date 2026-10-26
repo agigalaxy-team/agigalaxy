@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes,randomUUID } from 'node:crypto';
 import { verifyBindingManagement } from './binding-management-workflow.mjs';
-import { createBindingManagementClient } from '../src/binding-status-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createBindingManagementClient } from "../src/clients/binding-status.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 import { serviceFixture } from './service-fixture.mjs';
 
 test('binding management lists software installations and revokes selected sessions through the real API',()=>verifyBindingManagement());

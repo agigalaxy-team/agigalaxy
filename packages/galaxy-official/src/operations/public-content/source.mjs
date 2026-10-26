@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {OperationsBusinessDomain,operationsParse,operationsFail} from "../../operations-content-visibility.mjs";
+import {OperationsBusinessDomain,operationsParse,operationsFail} from "./content-visibility.mjs";
 
 // Original endpoint ownership, retained public-shape proof and current source/parent qualification. Retained prose never grants read permission.
 export class PublicContentSource extends OperationsBusinessDomain{

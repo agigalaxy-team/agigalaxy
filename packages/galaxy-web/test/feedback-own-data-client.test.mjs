@@ -5,7 +5,7 @@ import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {createOfficialAccountClient} from '../src/official-account-client.mjs';
+import {createOfficialAccountClient} from "../src/features/accounts/official-account-client.mjs";
 import {createFeedbackOwnDataClient} from '../src/features/feedback/own-data-client.mjs';
 
 test('own feedback export uses the exact current account transport, bounded pages and a readable ZIP without operator material',async t=>{

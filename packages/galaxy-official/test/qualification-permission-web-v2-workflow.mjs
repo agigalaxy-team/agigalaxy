@@ -10,15 +10,15 @@ import {
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createBrowserClient } from '../src/browser-client.mjs';
-import { createQualificationPermissionClient } from '../../galaxy-web/src/qualification-permission-client.mjs';
+import { createQualificationPermissionClient } from "../../galaxy-web/src/features/qualification-permissions/qualification-permission-client.mjs";
 import {
   qualificationEvaluationInput,
   applicationFromDraft,
-} from '../../galaxy-web/src/task-bounty-client.mjs';
+} from "../../galaxy-web/src/features/tasks/task-bounty-client.mjs";
 import { digest } from '../src/shared/digest.mjs';
 import { approveFixtureDeletion } from './deletion-execute-workflow.mjs';
 import { executeDeletion } from '../src/operations/deletion-execute.mjs';
-import { transaction } from '../src/database.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
 import { cleanupQualificationRequestsWithin } from '../src/operations/qualification-request-retention-v2.mjs';
 
 // Isolated identities and signed synthetic history. No real experts, operators,

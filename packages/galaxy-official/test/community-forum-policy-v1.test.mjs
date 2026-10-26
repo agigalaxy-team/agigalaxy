@@ -5,7 +5,7 @@ import {mkdtemp,writeFile,unlink,rmdir,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {defaultForumPolicy,forumPolicyHash,forumPolicySchema,loadForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {defaultForumPolicy,forumPolicyHash,forumPolicySchema,loadForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 import {cleanupProductV2Retention} from '../src/operations/lifecycle-retention-v2.mjs';
 import {recordRuntimeConfig,runtimeConfigSnapshot} from '../src/operations/runtime-config-audit.mjs';
 

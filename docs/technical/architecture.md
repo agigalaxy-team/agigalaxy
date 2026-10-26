@@ -36,8 +36,12 @@
 
 Official 的 HTTP 适配位于 `src/adapters/http/`，闭合 schema 与纯合同位于 `src/shared/`，数据库、迁移和加载器位于 `src/infrastructure/`。领域下通常以 `authority`/`base`、`read-model`、`service` 区分授权事务、受权读取和命令，实际文件以源码为准。常用入口：
 
+Official顶层只保留API、Worker、迁移、发布器的启动与服务装配，以及明确的公共浏览器合同；账户、身份、社区、治理、事实、消息和运营实现归各自领域。可在浏览器/Native消费的客户端及本机流程归`src/clients/`，不与服务端事务混放。单目标内部转发文件不作为第二份入口维护。
+
 | 修改目标 | 实现目录或入口 |
 |---|---|
+| 账户、认证与签名边界 | Official `src/accounts/`、`src/identity/`、`src/security/` |
+| 客户端及本机持久流程 | Official `src/clients/`、`clients/flows/`、`clients/local/` |
 | Task/参与、Builder/节点控制 | Official `src/tasks/v2/`、`src/builders/` |
 | 文件、反馈、权限 | Official `src/operations/files/`、`feedback/`、`permissions/` |
 | 规则、策略、三渠道消息 | Official `src/operations/rules/`、`strategies/`、`messaging/` |
@@ -52,6 +56,10 @@ Official 的 HTTP 适配位于 `src/adapters/http/`，闭合 schema 与纯合同
 | 仓库检查 | `scripts/check.mjs` 与 `scripts/checks/` 的测试发现和 runner |
 
 Admin 的 Payload 服务入口继续在 `src/components/Welcome.tsx`、`FeedbackView.tsx`、`SystemSettingsView.tsx`、`AnalyticsView.tsx`，客户端实现分别归 `components/workbench/`、`feedback/`、`system-settings/`、`analytics/`，沿 `BusinessViewClients` 的原动态边界加载。DTO、读/命令hooks、草稿、账户选择与通用控件保持共享，工作台/账户复用同一分析图表，不新造会话状态、轮询或模型客户端。目录拆分不证明首屏性能改进，收起沟通面板保留状态，图表保留原lazy plot导入。
+
+Web的业务实现、类型及同域样式集中在`src/features/`，跨域人物、身份、阅读与操作生命周期在`src/shared/`；根入口保留应用、运行时和全站外壳的真实组合职责。复杂页面由唯一会话控制器持有草稿、权限租约和原操作，子面板只消费受控数据。Admin同样将业务族的页面实现与命令hooks归同域目录，公共读取、账户选择及提交反馈继续共享。
+
+AgentOS的`app.py`装配应用，`surface.py`维护唯一ASGI请求权限边界，运行投影与工具合同分别独立；Node的`operations/agentos/actions/`按准备、执行和原回执核对分工。OpenCode的`galaxy.tui.ts`装配宿主会话，领域菜单消费同一实时会话上下文；不复制代际控制或恢复流程。Site生成与CMS发布共享`cms_slots.py`中的模板合同，页面生成不加载CMS发布应用器。
 
 稳定公共入口可转出实际实现，内部消费者直接引用所属目录。Hub 私有 AgentOS schema不因目录位置而成为公开协议。路径细分和搬移过程属于变更记录。
 

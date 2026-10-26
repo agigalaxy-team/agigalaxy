@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
-import {filesLocation} from '../lib/files-view-model';
+import {filesLocation} from "../lib/files/files-view-model";
 import {Files} from './BusinessViewClients';
 import {hasOperatorPermission} from '../lib/access';
 import {OperationsPermissionNotice} from './OperationsPermissionNotice';

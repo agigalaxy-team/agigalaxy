@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
-import { IdentityLinkService } from '../src/identity-links.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
+import { IdentityLinkService } from "../src/identity/links.mjs";
 import { createApi } from '../src/http.mjs';
-import { CommunityAccountRegistry } from '../src/community-accounts.mjs';
-import { PublicWriteService } from '../src/public-writes.mjs';
+import { CommunityAccountRegistry } from "../src/accounts/community-accounts.mjs";
+import { PublicWriteService } from "../src/publishing/public-writes.mjs";
 
 export async function verifyIdentityLinks(database = null, options = {}) {
   const endpoint = 'https://official.example.org', now = Math.floor(Date.now() / 1000);

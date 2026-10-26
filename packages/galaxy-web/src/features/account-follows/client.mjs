@@ -1,15 +1,15 @@
 import {sha256Hex} from '../../../../galaxy-official/src/shared/web-primitives.mjs';
 import {readWithTransientRecovery} from '../../../../../integrations/shared/read-task.mjs';
 import {accountFollowCommandSchema,accountFollowStatusSchema,accountFollowPageSchema,accountFollowReceiptSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
-import {createCurrentOfficialAccount} from '../../official-account-reading.mjs';
+import {createCurrentOfficialAccount} from "../accounts/official-account-reading.mjs";
 
 const fail=(code)=>{throw Object.assign(Error(code),{code});};
 /** No local storage and no automatic command replay. The current account scope
  * owns only one closed, non-secret original intent per target.
- * @param {{client:ReturnType<typeof import('../../official-account-client.mjs').createOfficialAccountClient>,
- * lease:import('../../online-account-draft-memory').AccountSettingsDraftLease,
- * memory:import('../../online-account-draft-memory').OnlineAccountDraftMemory,
- * getCurrent:()=>import('../../official-account-panel').OfficialAccountModel}} options
+ * @param {{client:ReturnType<typeof import('../accounts/official-account-client.mjs').createOfficialAccountClient>,
+ * lease:import('../accounts/online-account-draft-memory').AccountSettingsDraftLease,
+ * memory:import('../accounts/online-account-draft-memory').OnlineAccountDraftMemory,
+ * getCurrent:()=>import('../accounts/official-account-panel').OfficialAccountModel}} options
  */
 export function createAccountFollowsClient({client,lease,memory,getCurrent}){
  const ownerId=lease.accountId,current=createCurrentOfficialAccount({client,accountId:ownerId,csrfToken:lease.csrfToken,getCurrent});

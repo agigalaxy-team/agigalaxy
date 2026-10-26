@@ -6,11 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
-import { createAssistanceClient } from '../src/assistance-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createConnectionClient } from '../src/connection-client.mjs';
-import { createLocalAssistanceStore } from '../src/local-assistance-store.mjs';
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
+import { createAssistanceClient } from "../src/clients/assistance.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createConnectionClient } from "../src/clients/connection.mjs";
+import { createLocalAssistanceStore } from "../src/clients/local/assistance-store.mjs";
 
 async function fixture(t) {
   const scopes=['binding','consent','case-teaser','assistance'],f=await serviceFixture(scopes);

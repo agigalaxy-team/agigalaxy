@@ -4,8 +4,8 @@ import {randomUUID} from 'node:crypto';
 import canonicalize from 'canonicalize';
 import {digest} from '../src/shared/digest.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
-import {ChatSharedSummaryService} from '../src/chat-shared-summaries.mjs';
-import {createChatSharedSummaryClient,sharedSummaryRequestHash,prepareRoomSummaryShare} from '../src/chat-shared-summary-client.mjs';
+import {ChatSharedSummaryService} from "../src/chat/chat-shared-summaries.mjs";
+import {createChatSharedSummaryClient,sharedSummaryRequestHash,prepareRoomSummaryShare} from "../src/clients/chat-shared-summary.mjs";
 import {chatFixture,invite} from './chat-workflow.mjs';
 
 async function fixture(){

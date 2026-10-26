@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {localGalaxyReturnObject} from '../src/local-galaxy-navigation.mjs';
+import {localGalaxyReturnObject} from "../src/features/local-galaxy/local-galaxy-navigation.mjs";
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',versionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 test('account handoff preserves exact objects already supported by Native navigation',()=>{

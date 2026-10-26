@@ -4,11 +4,11 @@ import { generateKeyPairSync, randomUUID, randomBytes } from 'node:crypto';
 import { CompactSign } from 'jose';
 import { PGlite } from '@electric-sql/pglite';
 import { createGalaxyGenesis } from '../../galaxy-core/src/galaxy-guid.mjs';
-import { migrate, transaction } from '../src/database.mjs';
-import { BindingService, digest } from '../src/bindings.mjs';
-import { AccessService } from '../src/access.mjs';
+import { migrate, transaction } from "../src/infrastructure/database.mjs";
+import { BindingService, digest } from "../src/identity/bindings.mjs";
+import { AccessService } from "../src/security/access.mjs";
 import { createApi } from '../src/http.mjs';
-import { ConsentService, canReadProjection } from '../src/consents.mjs';
+import { ConsentService, canReadProjection } from "../src/consents/consents.mjs";
 
 test('binding validates ownership, consumes once, scopes reads and atomically revokes', async () => {
   const db = new PGlite();

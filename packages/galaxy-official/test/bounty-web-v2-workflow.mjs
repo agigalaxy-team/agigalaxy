@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
-import {QualificationService} from '../src/qualification.mjs';
-import {QualificationV2Service} from '../src/qualification-v2.mjs';
-import {ExperienceReviewService} from '../src/experience-review.mjs';
+import {QualificationService} from "../src/qualifications/qualification.mjs";
+import {QualificationV2Service} from "../src/qualifications/qualification-v2.mjs";
+import {ExperienceReviewService} from "../src/evidence/experience-review.mjs";
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
-import {taskDraft,publicationFromDraft,applicationFromDraft,evidenceFromSelection,policyKey,localDateTime} from '../../galaxy-web/src/task-bounty-client.mjs';
+import {taskDraft,publicationFromDraft,applicationFromDraft,evidenceFromSelection,policyKey,localDateTime} from "../../galaxy-web/src/features/tasks/task-bounty-client.mjs";
 import {retainTaskContactAgent,taskContactWebsite} from '../../galaxy-web/test/task-contact-agent-fixture.mjs';
 
 // Entirely isolated test identities, local OIDC, example.org records and money

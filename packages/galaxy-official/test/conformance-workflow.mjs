@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { createBuilderClient, verifyConformance } from '../src/builder-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createBuilderClient, verifyConformance } from "../src/clients/builder.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 import { digest } from '../src/shared/digest.mjs';
 
 export async function verifyConformanceWorkflow(db=null,options={}) {

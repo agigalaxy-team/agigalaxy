@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fingerprint, deriveChecks, checkFiles, runnerVersion } from './run-conformance.mjs';
-import { signRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
+import { signRelease } from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 

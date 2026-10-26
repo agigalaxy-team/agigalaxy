@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {transaction} from '../database.mjs';
+import {transaction} from "../infrastructure/database.mjs";
 import {ServiceError} from '../shared/service-error.mjs';
 import {discoveryDeliveryTargets} from './purpose.mjs';
 const iso=value=>new Date(value*1000).toISOString();

@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {maintenanceModuleIds,maintenanceOpeningConditions} from '../operations-maintenance-catalog.mjs';
+import {maintenanceModuleIds,maintenanceOpeningConditions} from "../operations/maintenance/catalog.mjs";
 
 const uuid=z.uuid();
 const iso=z.iso.datetime({offset:true});

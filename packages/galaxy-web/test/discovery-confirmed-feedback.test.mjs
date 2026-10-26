@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createPublicCommunityFeedback} from '../src/features/discovery/public-feedback.mjs';
 import {createAccountReadingBookmarksClient} from '../src/features/bookmarks/client.mjs';
-import {createCommunityForumClient,newForumDraft,forumDraftPayload} from '../src/community-forum-client.mjs';
+import {createCommunityForumClient,newForumDraft,forumDraftPayload} from "../src/features/community-forum/community-forum-client.mjs";
 import {sha256Hex} from '../../galaxy-official/src/shared/web-primitives.mjs';
 import {readingBookmarkKey} from '../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs';
-import {defaultForumPolicy} from '../../galaxy-official/src/community-forum-policy-v1.mjs';
+import {defaultForumPolicy} from "../../galaxy-official/src/community/community-forum-policy-v1.mjs";
 import {discoveryEvent,discoveryDeliveryTargets,discoveryItemKey} from '../../galaxy-official/src/discovery-runtime/purpose.mjs';
 
 const endpoint='https://official.example.org',websiteOrigin='https://galaxy.example.org';

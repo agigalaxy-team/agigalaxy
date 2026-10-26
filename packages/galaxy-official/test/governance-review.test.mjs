@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
-import { migrate } from '../src/database.mjs';
+import { migrate } from "../src/infrastructure/database.mjs";
 import { mkdtemp,writeFile,readFile,rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

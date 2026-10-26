@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {AutonomyReadModel} from '../src/operations/autonomy/views.mjs';
 import {proposalTargetTypeSql} from '../src/operations/autonomy/sources.mjs';
-import {originalOperationTarget} from '../src/operations-agentos-duty-receipts.mjs';
+import {originalOperationTarget} from "../src/operations/agentos/duty-receipts.mjs";
 
 test('prompt card and receipt use one real SQL source kind and current metadata permission',async t=>{
  const db=new PGlite();t.after(()=>db.close());

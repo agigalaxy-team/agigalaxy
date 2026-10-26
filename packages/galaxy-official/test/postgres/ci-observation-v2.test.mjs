@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyCiV2} from '../ci-observation-v2-workflow.mjs';
 test('Native CI v2 actual API and observer PostgreSQL roles plus signed HTTP flow',{timeout:60000},async()=>{

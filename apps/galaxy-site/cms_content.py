@@ -21,18 +21,12 @@ from urllib.parse import quote, unquote, urlsplit
 import xml.etree.ElementTree as ET
 
 from public_reading import reading_tree
+from cms_slots import ContentError, TEMPLATE_PATH, TOKENS, content_slot, slot_content, replace_slot
 
 
 ORIGIN = 'https://agigalaxy.org'
-TEMPLATE_PATH = 'assets/cms-page-template.json'
 ROUTES_PATH = 'cms-routes.json'
 READING_INDEX = 'assets/public-pages/index.json'
-TOKENS = {
-    'title': '__GALAXY_CMS_TITLE__',
-    'description': '__GALAXY_CMS_DESCRIPTION__',
-    'path': '__GALAXY_CMS_PATH__',
-    'body': '__GALAXY_CMS_BODY__',
-}
 RESERVED = {'admin', 'api', 'app', 'v1', 'v2', 'preview', 'assets', 'archives',
             'media', 'releases', 'downloads', 'docs', '404'}
 MANAGED_EXISTING = {'/how-it-works/', '/network/', '/privacy/', '/start/',
@@ -45,42 +39,6 @@ IMAGE_TYPES = {
 MAX_SNAPSHOT_BYTES = 32 * 1024 * 1024
 MAX_MEDIA_BYTES = 20 * 1024 * 1024
 MAX_REFERENCED_MEDIA_BYTES = 256 * 1024 * 1024
-
-
-class ContentError(ValueError):
-    """Invalid published content or an unsuitable candidate directory."""
-
-
-def content_slot(name, content=''):
-    if not re.fullmatch(r'[a-z][a-z-]*', name):
-        raise ContentError('Invalid content slot name')
-    return f'<!--galaxy-cms:{name}:start-->{content}<!--galaxy-cms:{name}:end-->'
-
-
-def slot_content(document, name):
-    start, end = f'<!--galaxy-cms:{name}:start-->', f'<!--galaxy-cms:{name}:end-->'
-    if document.count(start) != 1 or document.count(end) != 1:
-        raise ContentError('The prebuilt page is missing its ' + name + ' slot')
-    first = document.index(start) + len(start)
-    last = document.index(end)
-    if last < first:
-        raise ContentError('Invalid content slot order')
-    return document[first:last]
-
-
-def replace_slot(document, name, content):
-    previous = slot_content(document, name)
-    return document.replace(content_slot(name, previous), content_slot(name, content), 1)
-
-
-def home_slots(body):
-    """Mark the authored copy; leave the interactive illustration untouched."""
-    start = body.find('<div class="gh-hero-copy">')
-    following = body.find('<div class="gh-hero-network"', start)
-    if start < 0 or following < 0:
-        raise ContentError('The homepage is missing its authored hero copy')
-    copy = body[start:following]
-    return body[:start] + content_slot('home-hero', copy) + body[following:]
 
 
 def _object(value, label):

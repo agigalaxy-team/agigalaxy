@@ -1,5 +1,5 @@
 import {AdminIcon} from '../AdminIcons';
-import {nativeConversationFailure,type AgentOsNativeRun} from '../../lib/agentos-client';
+import {nativeConversationFailure,type AgentOsNativeRun} from "../../lib/workbench/agentos-client";
 
 export function WorkbenchReplyFailure({run,canSend,busy,onRetry}:{run:AgentOsNativeRun;canSend:boolean;busy:boolean;onRetry:()=>void}){
  const failure=nativeConversationFailure(run);

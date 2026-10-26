@@ -4,7 +4,7 @@ import { randomUUID, verify as verifySignature } from 'node:crypto';
 import { CompactSign, decodeProtectedHeader } from 'jose';
 import { createDeviceMaterial, signIdentityPayload } from '../../galaxy-core/src/domain/identity-material.mjs';
 import { createBrowserGenesis } from '../../galaxy-core/src/domain/guid-browser-adapter.mjs';
-import { prepareTrustPackage, sealTrustPackage } from '../src/trust-package.mjs';
+import { prepareTrustPackage, sealTrustPackage } from "../src/verification/trust-package.mjs";
 import { trustCanonical, trustHash } from '../src/shared/trust-package-crypto.mjs';
 import { prepareTrustPackageVcJose, signTrustPackageVcJose, sealTrustPackageVcJose, verifyTrustPackageVcJose,
   trustSubjectUri } from '../src/shared/trust-package-vc-jose.mjs';

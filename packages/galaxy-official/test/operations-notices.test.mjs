@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsNotices,createOperationsNoticeWorker} from '../src/operations-notices.mjs';
+import {OperationsNotices,createOperationsNoticeWorker} from "../src/operations/messaging/notices.mjs";
 import {operationsProductFixture} from './operations-product-fixture.mjs';
 
 const content=f=>({purpose:'maintenance',title:'服务维护安排',body:'这是合成的普通账户服务通知。',href:'/status/',audience:{kind:'all-accounts'},expiresAt:new Date((f.now()+3600)*1000).toISOString()});
@@ -35,7 +35,7 @@ test('revoked management authority or a cancelled domain cannot deliver; retry u
   const scoped=content(f);scoped.audience={kind:'accounts',accountIds:[f.people[0].accountId]};
   const {notice}=await notices.create(f.actor,{operationId:randomUUID(),content:scoped});
   await notices.publish(f.actor,notice.id,{operationId:randomUUID(),expectedVersion:1});
-  f.setRole('reader');await assert.rejects(worker.execute({noticeId:notice.id}),{code:'business_admin_denied'});
+  f.setRole('reader');await assert.rejects(worker.execute({noticeId:notice.id}),{code:'operations_permission_denied'});
   assert.equal((await notices.get(f.reader,notice.id)).notice.delivery.deliveredCount,0);
   f.setRole(null);await assert.rejects(worker.execute({noticeId:notice.id}),{code:'business_admin_denied'});
   f.setRole('administrator');f.directoryAvailable(false);
@@ -50,5 +50,9 @@ test('revoked management authority or a cancelled domain cannot deliver; retry u
   assert.equal((await worker.execute({noticeId:second.id})).state,'withdrawn');
   f.advance(3601);assert.equal((await notices.accountQuery(f.people[0])).items.length,0);
   const failed=(await f.businessAdmin.audit(f.reader)).items.filter(item=>item.action==='notice-delivery'&&item.result.state==='failed');
-  assert.ok(failed.some(item=>item.selection.reason==='authority_changed'));
+  assert.ok(failed.some(item=>item.selection.noticeId===notice.id&&item.result.deliveredCount===0));
+  // The public audit projection intentionally omits the worker's internal
+  // reason. Check original immutable attribution and authority failures in PG.
+  const recorded=(await f.db.query(`SELECT operator_id,operator_role,selection,result FROM business_admin_audit_v1 WHERE endpoint=$1 AND action='notice-delivery' AND selection->>'noticeId'=$2 AND result->>'state'='failed'`,[f.endpoint,notice.id])).rows;
+  for(const code of ['operations_permission_denied','business_admin_denied'])assert.ok(recorded.some(item=>item.operator_id===f.actor.operatorId&&item.operator_role==='administrator'&&item.selection.reason==='authority_changed'&&item.result.code===code&&item.result.deliveredCount===0));
 });

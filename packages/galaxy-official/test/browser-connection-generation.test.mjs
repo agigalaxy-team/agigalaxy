@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
-import { createWebRuntime } from '../../galaxy-web/src/runtime.mjs';
-import { seedExistingWebIdentity } from './existing-web-identity-fixture.mjs';
+import {createExistingWebRuntime} from './existing-web-identity-fixture.mjs';
 
 test('real HTTP connection generations distinguish rebinds and never revive a disconnected failed or concurrent connect', async () => {
   const f = await serviceFixture(browserScopes, null, { now: Math.floor(Date.now() / 1000) });
@@ -22,8 +21,8 @@ test('real HTTP connection generations distinguish rebinds and never revive a di
       }
       return fetch(local + new URL(url).pathname, options);
     };
-    await seedExistingWebIdentity({ endpoint: f.access.endpoint, trustedKeys: f.bindings.trustedKeys }, { store, fetch: wire, now: () => f.now });
-    runtime = await createWebRuntime({ endpoint: f.access.endpoint, trustedKeys: f.bindings.trustedKeys },
+
+    runtime = await createExistingWebRuntime({ endpoint: f.access.endpoint, trustedKeys: f.bindings.trustedKeys },
       { store, fetch: wire, now: () => f.now });
     await runtime.connect({ confirmed: true });
     const first = runtime.api.snapshot();

@@ -1,5 +1,5 @@
 import {randomUUID} from "node:crypto";
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {recommendationThemeKeys} from "../../discovery-runtime/recommendation-control.mjs";
 import {iso,fail} from './helpers.mjs';
 import {RecommendationState} from './base.mjs';

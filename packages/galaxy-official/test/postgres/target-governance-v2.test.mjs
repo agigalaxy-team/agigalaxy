@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyTargetGovernanceV2} from '../target-governance-v2-workflow.mjs';
 test('PostgreSQL restricted API Task/Room governance, actual HTTP/browser client, independent Account and lifecycle',{timeout:120000},async()=>{

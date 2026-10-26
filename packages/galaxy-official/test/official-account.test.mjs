@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
-import {createOfficialAccountPortal,loadOfficialAccountPortal} from '../src/official-account.mjs';
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
+import {createOfficialAccountPortal,loadOfficialAccountPortal} from "../src/accounts/official-account.mjs";
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,dirname,basename} from 'node:path';
-import {IdentityLinkService} from '../src/identity-links.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
+import {IdentityLinkService} from "../src/identity/links.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
 import {createApi} from '../src/http.mjs';
 
 test('official login is cookie-bound, lists independently signed IDs, and cannot authorize a Galaxy subject', {timeout:60000}, async t => {

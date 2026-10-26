@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {modelSettingsClone,modelSettingsConflictValue,modelSettingsEmpty,modelSettingsMerge,modelSettingsNewModel} from '../src/lib/model-settings-view-model.ts';
+import {modelSettingsClone,modelSettingsConflictValue,modelSettingsEmpty,modelSettingsMerge,modelSettingsNewModel} from "../src/lib/models/model-settings-view-model.ts";
 
 test('model settings merges only resolved configuration choices and retains a temporary credential only with its original connection',()=>{
  const id='f4a43fd1-4eb3-486f-966d-642b06c008cc',keyA='model-key:65ed7357-e6de-425b-9e3a-1a15850a229f',keyB='model-key:75ed7357-e6de-425b-9e3a-1a15850a229f';

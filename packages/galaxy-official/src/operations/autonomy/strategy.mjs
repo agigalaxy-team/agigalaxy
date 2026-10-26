@@ -1,4 +1,4 @@
-import {transaction} from '../../database.mjs';
+import {transaction} from "../../infrastructure/database.mjs";
 import {z} from 'zod';
 import {parse,fail,nextDue,iso} from './contract.mjs';
 export function strategyTaskConfig(cfg,strategy,version){

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
 import {P13StrategiesReadModel} from '../src/operations/strategies/read-model.mjs';
 
 // Exercise the actual strategy read-model DTO producer and query adapter.

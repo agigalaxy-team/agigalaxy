@@ -5,9 +5,9 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {getCiClient,ciSourceFromEvidence} from '../../galaxy-web/src/ci-client.mjs';
+import {getCiClient,ciSourceFromEvidence} from "../../galaxy-web/src/features/ci/ci-client.mjs";
 import {ciSourceMetadata} from '../src/shared/ci-observation-v2-schema.mjs';
-import {inspectGithubRun} from '../src/github-evidence.mjs';
+import {inspectGithubRun} from "../src/evidence/github-evidence.mjs";
 test('CI browser signed workflow keeps exact operations through lost Consent and publication replies',async()=>{
   const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000}),data=new Map();
   const store={get:async k=>structuredClone(data.get(k)),put:async(k,v)=>{data.set(k,structuredClone(v));},

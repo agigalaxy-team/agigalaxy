@@ -1,4 +1,4 @@
-import {transaction} from "../../database.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
 import {accountChatReportSourceSchema,accountChatReportAttachmentSchema} from "../../shared/account-chat-governance-schema.mjs";
 import {iso,fail,parse,deletionStates} from './helpers.mjs';
 import {ChatReportAuthority} from './authority.mjs';

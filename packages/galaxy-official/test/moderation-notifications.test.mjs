@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
-import {ModerationNotificationAdapter} from '../src/moderation-notifications.mjs';
+import {ModerationNotificationAdapter} from "../src/notifications/moderation-notifications.mjs";
 import {moderationNotificationsV2MigrationSql} from '../src/infrastructure/moderation-notifications-v2-schema.mjs';
 
 async function fixture({collidingEventId=false}={}){

@@ -9,8 +9,8 @@ import {createMaintenanceNativeHttpServer} from '../deploy/maintenance-agent/ser
 import {MaintenanceNativeRuntime} from '../deploy/maintenance-agent/runtime.mjs';
 import {MaintenanceControlJournal} from '../deploy/maintenance-agent/journal.mjs';
 import {MaintenanceRestoreExecutor} from '../deploy/maintenance-agent/restore-executor.mjs';
-import {MaintenanceNativeClient,maintenanceRequestSignature} from '../src/operations-maintenance-native.mjs';
-import {maintenanceOpeningConditions} from '../src/operations-maintenance-catalog.mjs';
+import {MaintenanceNativeClient,maintenanceRequestSignature} from "../src/operations/maintenance/native.mjs";
+import {maintenanceOpeningConditions} from "../src/operations/maintenance/catalog.mjs";
 import {resolveMaintenanceFootprint,maintenanceCaptureConfiguration,maintenanceCaptureContext,currentContainerBindings} from '../deploy/maintenance-agent/footprint.mjs';
 import {createProductBackup} from '../deploy/operations-stack/backup.mjs';
 

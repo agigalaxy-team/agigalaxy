@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {randomUUID} from 'node:crypto';
-import {createKeycloakManagementAccounts} from '../src/keycloak-management-accounts.mjs';
+import {createKeycloakManagementAccounts} from "../src/identity/authentication/keycloak-management-accounts.mjs";
 import {dispatchOperationsManagementAccounts} from '../src/adapters/http/operations-management-accounts-http.mjs';
 
 // Native Keycloak and the domain service below are explicit transport doubles.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 
 const event=(reportId,version,kind,extra={})=>({schemaVersion:1,operationId:randomUUID(),governanceEventId:randomUUID(),reportId,expectedReportVersion:version,kind,...extra});
 async function initial(f){

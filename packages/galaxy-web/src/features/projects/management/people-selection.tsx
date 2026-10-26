@@ -1,9 +1,9 @@
-import {ReadingDetails,ReadingSummary} from "../../../reading-details";
+import {ReadingDetails,ReadingSummary} from "../../../shared/reading/reading-details";
 import React,{useEffect,useEffectEvent,useId,useMemo,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {MemberAvatar,memberName,useMemberNames} from "../../../conversation-ui";
-import {useGovernanceDraft} from "../../../governance-presentation";
+import {MemberAvatar,memberName,useMemberNames} from "../../../shared/people/conversation-ui";
+import {useGovernanceDraft} from "../../governance/governance-presentation";
 import "./people-selection.css";
 import {projectErrorFlag,projectErrorText,projectRole} from "../contracts";
 import type {ProjectRuntime,ProjectContactClient,ProjectView,ContactsPage,PendingProjectOperation,ProjectChoice,ProjectSelection,ProjectPeopleForm,ProjectSelectionLocator} from "../contracts";

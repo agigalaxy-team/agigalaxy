@@ -1,7 +1,7 @@
 import {capsuleVersionV2Schema} from "../../shared/capsule-v2-schema.mjs";
 import {CapsuleSourcesV2,capsuleRule as rule,parseCapsuleV2 as parse} from "./sources.mjs";
-import {transaction} from "../../database.mjs";
-import {operationsVisibilityWithin} from "../../operations-content-visibility.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
+import {operationsVisibilityWithin} from "../../operations/public-content/content-visibility.mjs";
 import {capsuleReceiptV2Schema,capsuleVersionsV2Schema,capsulePermissionsQueryV2Schema} from "../../shared/capsule-v2-schema.mjs";
 import {absent,ownControl} from './helpers.mjs';
 

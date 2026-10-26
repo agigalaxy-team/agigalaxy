@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHelpRuntimeV2 } from '../src/help-runtime-v2.mjs';
-import { createLocalHelpStoreV2 } from '../src/local-help-store-v2.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHelpRuntimeV2 } from "../src/clients/flows/help-runtime-v2.mjs";
+import { createLocalHelpStoreV2 } from "../src/clients/local/help-store-v2.mjs";
 
 const id = () => randomUUID();
 

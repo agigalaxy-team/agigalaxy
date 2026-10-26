@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // Match the real server assembly, which initializes the existing database /
 // migration catalog before importing operation-domain readers. No DB is opened.
-import '../src/database.mjs';
+import "../src/infrastructure/database.mjs";
 import {normalizeAnalyticsRetention} from '../src/shared/analytics-retention.mjs';
-import {analyticsRetention} from '../../../apps/galaxy-admin/src/lib/analytics-view-model.ts';
-import {OperationsAgentOsQueryTools} from '../src/operations-agentos-query-tools.mjs';
+import {analyticsRetention} from "../../../apps/galaxy-admin/src/lib/analytics/analytics-view-model.ts";
+import {OperationsAgentOsQueryTools} from "../src/operations/agentos/query-tools.mjs";
 
 test('AI queries and the analytics UI share native cohort maturity, preserve elapsed zero and never report future zero as churn',async()=>{
  const checkedAt=Date.parse('2026-10-24T23:30:00Z')/1000,

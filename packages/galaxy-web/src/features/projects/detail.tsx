@@ -1,13 +1,13 @@
-import { ReadingDetails, ReadingSummary, ReadingSurface } from "../../reading-details";
-import {useCurrentTaskMaterialTree} from "../../task-material-view";
+import { ReadingDetails, ReadingSummary, ReadingSurface } from "../../shared/reading/reading-details";
+import {useCurrentTaskMaterialTree} from "../tasks/materials/task-material-view";
 import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
-import {FactDetails} from "../../fact-details";
-import {MemberLink,memberName,useMemberNames} from "../../conversation-ui";
+import {HistoryFacts} from "../work-records/history";
+import {MemberLink,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {OpportunityContactWorkspace} from "./contacts/opportunity";
 import {browseReturnPath,browseReturnLabel} from "../discovery/return-navigation";
 import {SaveForLaterButton} from "../bookmarks/controls";
-import {AgentWorkContinuation} from "../../agent-work-continuation";
+import {AgentWorkContinuation} from "../local-galaxy/agent-work-continuation";
 import {isDiscoveryPurpose,object,projectErrorText} from "./contracts";
 import type {ProjectRuntime,ProjectView,ProjectViewClient,DiscoveryPurpose,DiscoveryQuery,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail} from "./contracts";
 import {createProjectViewClient,projectQueryMemory,projectViewScope,hasIndependentProject,opportunityUnavailable,opportunityLocator} from "./clients/views.mjs";
@@ -99,7 +99,7 @@ function ProjectDetailView({projectId,runtime,subjectId,connected,navigate}:Prop
   <dialog ref={detailDialog} className="galaxy-dialog project-opportunity-dialog" onCancel={event=>{if(event.target===event.currentTarget)setDetail(null);}}>
    {detail&&<><header className="dialog-heading"><h2>{detail.opportunity.sourceUnavailable?'项目资料已变化':detail.opportunity.project.title}</h2><button type="button" className="text-link" onClick={()=>setDetail(null)}>关闭</button></header>
     {!detail.opportunity.sourceUnavailable&&<><div className="person-line"><MemberLink subjectId={detail.opportunity.subjectId} name={name(detail.opportunity.subjectId)} ownId={subjectId??undefined} navigate={navigate} avatar/></div><p className="reading-prose">{detail.opportunity.project.summary}</p><p>{detail.opportunity.help?.statement}</p>
-     {(detail.experience?.items?.length??0)>0&&<h3>分享的工作经历</h3>}{detail.experience?.items?.map(item=><article className="reading-list-item" key={item.key}><h4>{item.title??'工作记录'}</h4><FactDetails item={item} runtime={runtime} connected={connected} subjectId={subjectId??undefined} navigate={navigate}/>{item.taskId&&<button type="button" className="text-link" onClick={()=>navigate('/app/tasks/'+item.taskId)}>阅读关联工作 </button>}</article>)}
+     {(detail.experience?.items?.length??0)>0&&<h3>分享的工作经历</h3>}{detail.experience?.items?.map(item=><article className="reading-list-item" key={item.key}><h4>{item.title??'工作记录'}</h4><HistoryFacts record={item} runtime={runtime} connected={connected} subjectId={subjectId??undefined} navigate={navigate}/>{item.taskId&&<button type="button" className="text-link" onClick={()=>navigate('/app/tasks/'+item.taskId)}>阅读关联工作 </button>}</article>)}
      {(detail.experience?.nextCursor??detail.experience?.nextAfter)&&<Button type="button" variant="outline" disabled={busy} onClick={()=>run(async commit=>{try{if(!query||!client||!detail.experience)throw Error('请先读取当前项目的查找范围。');const value=await client.detail(query,detail.opportunity.opportunityRef,detail.experience.nextCursor??detail.experience.nextAfter);commit(()=>setDetail(value));}catch(reason){if(opportunityUnavailable(reason))commit(()=>hideSource(detail.opportunity));throw reason;}})}>更多工作经历</Button>}
     </>}
     <OpportunityContactWorkspace runtime={runtime??null} connected={connected} subjectId={subjectId} query={query} opportunity={detail.opportunity} navigate={navigate} onSourceUnavailable={()=>hideSource(detail.opportunity)}/>

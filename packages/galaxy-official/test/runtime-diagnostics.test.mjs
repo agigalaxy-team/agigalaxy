@@ -4,15 +4,15 @@ import {EventEmitter} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {safeRuntimeError,withRuntimeDiagnosticContext} from '../src/shared/runtime-diagnostics.mjs';
 import {runtimeLogEvent,installRuntimeFailureHandlers} from '../src/operations/runtime-log.mjs';
-import {createOperationsJobs} from '../src/operations-jobs.mjs';
-import {openDatabase,transaction} from '../src/database.mjs';
+import {createOperationsJobs} from "../src/operations/jobs/service.mjs";
+import {openDatabase,transaction} from "../src/infrastructure/database.mjs";
 import {createApi} from '../src/http.mjs';
 import {failureRoute} from '../src/adapters/http/failure-audit.mjs';
 
 const secret='private-credential-and-message-must-never-appear';
 function databaseError(){
   const error=Object.assign(new Error(secret),{code:'23505',detail:secret,query:secret,path:secret,password:secret});
-  error.stack=`Error: ${secret}\n    at privateFunction (file:///opt/galaxy/releases/0.1.22/packages/galaxy-official/src/database.mjs:17:9)\n    at privateFunction (https://secret.example/${secret}?code=${secret}:1:2)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)`;
+  error.stack=`Error: ${secret}\n    at privateFunction (file:///opt/galaxy/releases/0.1.22/packages/galaxy-official/src/infrastructure/database.mjs:17:9)\n    at privateFunction (https://secret.example/${secret}?code=${secret}:1:2)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)`;
   return error;
 }
 
@@ -22,7 +22,7 @@ test('diagnostics keep machine cause and source locations without messages, URLs
   const view=safeRuntimeError(error);
   assert.equal(view.errorName,'Error');assert.equal(view.errorCode,'unclassified_error');
   assert.equal(view.cause.errorCode,'23505');
-  assert.deepEqual(view.cause.stackFrames,[{file:'packages/galaxy-official/src/database.mjs',line:17,column:9},
+  assert.deepEqual(view.cause.stackFrames,[{file:"packages/galaxy-official/src/infrastructure/database.mjs",line:17,column:9},
     {file:'node:internal/process/task_queues',line:105,column:5}]);
   assert.doesNotMatch(JSON.stringify(view),new RegExp(secret+'|privateFunction|secret.example|/opt/galaxy'));
   assert.equal(runtimeLogEvent({event:'operations_job_failed',stage:secret,error:cause,body:secret}).stage,undefined);

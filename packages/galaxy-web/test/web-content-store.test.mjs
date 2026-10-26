@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,randomUUID} from 'node:crypto';
 import {createWebRuntime} from '../src/runtime.mjs';
-import {createOfficialChatRuntime} from '../src/official-chat-runtime.mjs';
-import {createCommunityForumClient,newForumDraft} from '../src/community-forum-client.mjs';
+import {createOfficialChatRuntime} from "../src/features/chat/official-chat-runtime.mjs";
+import {createCommunityForumClient,newForumDraft} from "../src/features/community-forum/community-forum-client.mjs";
 import {createWebStorage} from '../src/web-content-store.mjs';
 
 const endpoint='https://official.example.org',prefix=`galaxy-web:${endpoint}:`,server=generateKeyPairSync('ed25519');

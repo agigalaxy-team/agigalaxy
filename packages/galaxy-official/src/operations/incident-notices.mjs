@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { digest } from '../shared/digest.mjs';
 import { verifyRuntimeConfigEvent } from './runtime-config-audit.mjs';
 

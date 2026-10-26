@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { forumBrowsePath, forumBrowseSelection, forumBrowsePosition, readForumBrowsePosition, saveForumBrowsePosition, forumBodyParagraphs, forumLinkLabel, readForumPages } from '../src/community-forum-browse.mjs';
+import { forumBrowsePath, forumBrowseSelection, forumBrowsePosition, readForumBrowsePosition, saveForumBrowsePosition, forumBodyParagraphs, forumLinkLabel, readForumPages } from "../src/features/community-forum/community-forum-browse.mjs";
 
 const scope = { endpoint: 'https://galaxy.example', subjectId: 'reader-a' };
 const route = forumBrowsePath({ topic: 'technology', query: '跨页 资料' });

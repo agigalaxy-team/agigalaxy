@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readLocalContextExcerpt, CONTEXT_FILE_MAX_BYTES } from '../src/local-context-file.mjs';
+import { readLocalContextExcerpt, CONTEXT_FILE_MAX_BYTES } from "../src/clients/local/context-file.mjs";
 
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-file-excerpt-'));

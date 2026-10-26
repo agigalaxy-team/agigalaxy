@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskLocalDraftClient, taskLocalDraftView } from '../src/task-local-draft-client.mjs';
+import { createTaskLocalDraftClient, taskLocalDraftView } from "../src/features/tasks/publish/task-local-draft-client.mjs";
 
 // This is an explicit module model, not a browser/IndexedDB cross-tab claim.
 // It executes comparison and mutation together and allows real Promise gates

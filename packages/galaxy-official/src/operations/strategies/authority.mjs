@@ -1,4 +1,4 @@
-import {OperationsAgentOsAuthority} from '../../operations-agentos-authority.mjs';
+import {OperationsAgentOsAuthority} from "../agentos/authority.mjs";
 import {p13Workflow} from '../../shared/p13-strategies-schema.mjs';
 import {ServiceError} from '../../shared/service-error.mjs';
 

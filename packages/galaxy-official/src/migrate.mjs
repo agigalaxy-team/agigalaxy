@@ -1,6 +1,6 @@
-import { openDatabase, migrate, validateMigrationRoles } from './database.mjs';
+import { openDatabase, migrate, validateMigrationRoles } from "./infrastructure/database.mjs";
 import { createRuntimeLogger,consoleRuntimeLogger,runtimeLogConfiguration } from './operations/runtime-log.mjs';
-import { assertRuntimeEnvironment } from './runtime-environment.mjs';
+import { assertRuntimeEnvironment } from "./infrastructure/runtime-environment.mjs";
 import { runtimeServiceRelease } from './operations/service-release.mjs';
 import { fileURLToPath } from 'node:url';
 

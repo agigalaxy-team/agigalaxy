@@ -1,7 +1,7 @@
 import { readFile,writeFile,stat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import { openDatabase } from '../src/database.mjs';
-import { assertRuntimeEnvironment } from '../src/runtime-environment.mjs';
+import { openDatabase } from "../src/infrastructure/database.mjs";
+import { assertRuntimeEnvironment } from "../src/infrastructure/runtime-environment.mjs";
 import { executeDeletion } from '../src/operations/deletion-execute.mjs';
 let db;
 try{

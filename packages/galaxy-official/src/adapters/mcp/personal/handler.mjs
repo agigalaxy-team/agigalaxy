@@ -3,7 +3,7 @@ import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { z } from 'zod';
 import { body,captureAuthenticatedRequest } from '../../http/request.mjs';
 import { ServiceError } from '../../../shared/service-error.mjs';
-import { oauthScope } from '../../../oauth-resource-access.mjs';
+import { oauthScope } from "../../../identity/authentication/oauth-resource-access.mjs";
 import { historyQuerySchema } from '../../../shared/history-schema.mjs';
 import { searchQuerySchema,searchScope } from '../../../shared/search-schema.mjs';
 import { capsuleQuerySchema,capsuleReadSchema } from '../../../shared/capsule-schema.mjs';

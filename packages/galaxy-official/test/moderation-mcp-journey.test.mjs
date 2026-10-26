@@ -7,9 +7,9 @@ import {NodeStreamableHTTPServerTransport} from '@modelcontextprotocol/node';
 import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createPersonalMcp} from '../src/adapters/mcp/personal/handler.mjs';
-import {createModerationFlow} from '../src/moderation-flow.mjs';
-import {createModerationClient} from '../src/moderation-client.mjs';
-import {createSessionMemory} from '../src/session-memory.mjs';
+import {createModerationFlow} from "../src/clients/flows/moderation.mjs";
+import {createModerationClient} from "../src/clients/moderation.mjs";
+import {createSessionMemory} from "../src/infrastructure/session-memory.mjs";
 import {digest} from '../src/shared/digest.mjs';
 
 const names=['galaxy_moderation_config','galaxy_moderation_query','galaxy_moderation_get','galaxy_moderation_report','galaxy_moderation_event','galaxy_moderation_receipt'];

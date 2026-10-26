@@ -4,14 +4,14 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {communityForumFixture} from './community-forum-fixture.mjs';
 import {accountFollowBrowser} from './account-follows-fixture.mjs';
-import {AccountFollowsV1} from '../src/account-follows-v1.mjs';
+import {AccountFollowsV1} from "../src/accounts/follows-v1.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {failureRoute} from '../src/adapters/http/failure-audit.mjs';
 import {requestQuotaCategory} from '../src/adapters/http/request-quotas.mjs';
 
 test('ordinary-account follows: real cookie/CSRF, API role, private paging and original receipts without Native/contact grants',async()=>{
- assert.equal(migrations.at(-1).version,125);assert.equal(migrations.some(row=>row.version===120),false);
+ assert.equal(migrations.some(row=>row.version===125),true);assert.equal(migrations.some(row=>row.version===120),false);
  const f=await communityForumFixture({officialAccountPortal:true});
  try{
   const a=await accountFollowBrowser(f,'follow-owner'),b=await accountFollowBrowser(f,'follow-author'),c=await accountFollowBrowser(f,'follow-other-owner'),d=await accountFollowBrowser(f,'follow-other-author');

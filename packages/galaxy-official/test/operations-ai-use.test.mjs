@@ -5,14 +5,14 @@ import {createHash,randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {stripTypeScriptTypes} from 'node:module';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
 import {migrations} from '../src/infrastructure/migrations.mjs';
-import {createStoredOperatorAuthorization} from '../src/operations-config.mjs';
-import {createOperationsManagementSessions} from '../src/operations-management-sessions.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsService} from '../src/operations-agentos.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {createStoredOperatorAuthorization} from "../src/operations/configuration.mjs";
+import {createOperationsManagementSessions} from "../src/operations/accounts/management-sessions.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsService} from "../src/operations/agentos/service.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {operationsAiUseDomain} from '../src/shared/operations-ai-use.mjs';
 
 const endpoint='https://human-ai-use.example.invalid',issuer='https://identity.example.invalid/realms/management';
@@ -133,8 +133,8 @@ test('human domain AI permissions gate conversations, receipts, callbacks, cards
   await assert.rejects(authority.nativeAuthorization({executionId:auto.execution.id,operation:'run'}),hasCode('operations_agentos_authority_changed'),'automatic execution still needs its original live grant');
   t.diagnostic('special-task create/replay/owned/list/options/native and automatic-grant distinction exercised with real SQL');
 
-  const helperUrl=new URL('../../../apps/galaxy-admin/src/lib/agentos-client.ts',import.meta.url),sharedUrl=new URL('../src/shared/operations-ai-use.mjs',import.meta.url);
-  const raw=await readFile(helperUrl,'utf8'),code=stripTypeScriptTypes(raw,{mode:'strip'}).replace("'../../../../packages/galaxy-official/src/shared/operations-ai-use.mjs'",JSON.stringify(sharedUrl.href));
+  const helperUrl=new URL("../../../apps/galaxy-admin/src/lib/workbench/agentos-client.ts",import.meta.url);
+  const raw=await readFile(helperUrl,'utf8'),code=stripTypeScriptTypes(raw,{mode:'strip'}).replace(/from\s+(['"])(\.[^'"]+)\1/g,(_match,_quote,specifier)=>'from '+JSON.stringify(new URL(specifier,helperUrl).href));
   const {agentOsCanUseDomain}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
   const session={state:'signed-in',operator:{id:person.operatorId,businessAuthorization:{permissions:[...base,'ai.use.overview']}},csrfToken:'synthetic',expiresAt:now()+300};
   assert.equal(agentOsCanUseDomain(session,'overview'),true);for(const domain of domains.slice(1))assert.equal(agentOsCanUseDomain(session,domain),false);

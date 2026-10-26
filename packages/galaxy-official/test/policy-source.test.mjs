@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { ConsentService } from '../src/consents.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { githubEvidenceSource, inspectGithubRun } from '../src/github-evidence.mjs';
+import { ConsentService } from "../src/consents/consents.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { githubEvidenceSource, inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 test('extension policy cannot bypass mandatory consent rules; source queues and observation boundaries stay isolated', async () => {
   const f = await serviceFixture(['binding', 'consent', 'case-teaser', 'evidence', 'proof']);

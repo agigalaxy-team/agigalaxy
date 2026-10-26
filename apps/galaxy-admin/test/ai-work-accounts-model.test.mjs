@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {aiWorkDomains,aiWorkCommandSchema,aiWorkAssignmentSchema,aiWorkCapabilities,aiWorkQueryPermissions,aiWorkPreparation} from '../../../packages/galaxy-official/src/operations/accounts/ai-work-schema.mjs';
-import {aiWorkLocation,aiWorkHref,aiWorkProfileMerge,aiWorkReceiptMatches,aiWorkRestoredReceiptMatches,aiWorkRoleImpact,aiWorkPermissionUse} from '../src/lib/ai-work-accounts-view-model.ts';
+import {aiWorkLocation,aiWorkHref,aiWorkProfileMerge,aiWorkReceiptMatches,aiWorkRestoredReceiptMatches,aiWorkRoleImpact,aiWorkPermissionUse} from "../src/lib/ai-work-accounts/ai-work-accounts-view-model.ts";
 
 const memorySource=process.env.GALAXY_AI_WORK_MEMORY_SOURCE?pathToFileURL(process.env.GALAXY_AI_WORK_MEMORY_SOURCE).href:new URL('../src/lib/settings-draft-memory.ts',import.meta.url).href;
 const {createSettingsDraftMemory,settingsAiWorkReceiptPath}=await import(memorySource);

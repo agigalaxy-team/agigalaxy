@@ -4,7 +4,7 @@ import https from 'node:https';
 import dns from 'node:dns/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { EventEmitter } from 'node:events';
-import { fetchPublicJson, fetchBindingJson, postPublicJson, postConnectionJson } from '../src/public-fetch.mjs';
+import { fetchPublicJson, fetchBindingJson, postPublicJson, postConnectionJson } from "../src/infrastructure/public-fetch.mjs";
 
 const options = { bodyJson: '{"signedIntent":"synthetic"}', credential: Buffer.alloc(32, 1).toString('base64url') };
 

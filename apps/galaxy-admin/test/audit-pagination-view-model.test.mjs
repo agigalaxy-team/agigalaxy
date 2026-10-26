@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {auditActionLabel,auditAvailableActions,auditFilterHref,auditHref,auditKind,auditMetadata,auditOutcome,auditPageHref,auditPageNumbers,auditReadPath,normalizeAuditFilters} from '../src/lib/audit-view-model.ts';
-import {businessAuditActionCodes} from '../../../packages/galaxy-official/src/business-admin-audit-view.mjs';
-import {businessAuditReadActions} from '../../../packages/galaxy-official/src/business-admin-audit-pages.mjs';
+import {businessAuditActionCodes} from "../../../packages/galaxy-official/src/operations/audit/view.mjs";
+import {businessAuditReadActions} from "../../../packages/galaxy-official/src/operations/audit/pages.mjs";
 
 test('audit result pages preserve the exact snapshot and filters, and every closed action has an honest display category',()=>{
  const id='11111111-1111-4111-8111-111111111111',snapshot='22222222-2222-4222-8222-222222222222';

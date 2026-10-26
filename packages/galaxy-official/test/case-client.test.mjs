@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { createCaseClient } from '../src/case-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
+import { createCaseClient } from "../src/clients/case.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
 
 test('Case client submits confirmed exact payloads and review transitions, reads and explicitly replays IDs', async () => {
   const f = await serviceFixture();

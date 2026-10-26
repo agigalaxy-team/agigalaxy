@@ -3,7 +3,7 @@ import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {p13Fixture} from './p13-strategies-fixture.mjs';
-import {businessAuditMetadata} from '../src/business-admin-audit-view.mjs';
+import {businessAuditMetadata} from "../src/operations/audit/view.mjs";
 
 test('P13 bounded ordinary strategy tools change actual current predicates and daily enablement without expanding authority or replaying pinned effects',{timeout:90000},async t=>{
  const f=await p13Fixture(t),tasks=[];for(let i=0;i<4;i++)tasks.push(await f.task({owner:f.people[i%f.people.length]}));const config=f.configuration(),strategy=config.strategies[0],sid=strategy.id;

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
-import { createTargetGovernanceClientV2 } from '../src/target-governance-client-v2.mjs';
+import { createTargetGovernanceClientV2 } from "../src/clients/target-governance-v2.mjs";
 
 // Diagnostic only: actual synthetic OIDC/PKCE/JWS verified Account, WebRuntime,
 // signed Consent, HTTP/PGlite; explicit Map completion fault, no physical IDB,

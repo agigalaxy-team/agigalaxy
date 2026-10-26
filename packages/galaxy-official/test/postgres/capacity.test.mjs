@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { cpus,totalmem } from 'node:os';
 import pg from 'pg';
-import { migrate } from '../../src/database.mjs';
+import { migrate } from "../../src/infrastructure/database.mjs";
 import { apiReads } from '../../src/infrastructure/api-reads.mjs';
 import { serviceFixture } from '../service-fixture.mjs';
 import { createApi } from '../../src/http.mjs';

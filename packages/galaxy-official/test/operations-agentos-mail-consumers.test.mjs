@@ -4,7 +4,7 @@ import {UnifiedMailAdapter} from '../deploy/system-settings/mail-runtime.mjs';
 import {SystemSettingsRuntime} from '../deploy/system-settings/runtime.mjs';
 import {serviceConnectionKinds} from '../src/operations/system-settings/service-connections-schema.mjs';
 import {systemSettingsNativeOverviewSchema} from '../src/operations/system-settings/read-model.mjs';
-import {systemMailQuery,systemConnectionsQuery} from '../src/operations-agentos-query-extensions-view.mjs';
+import {systemMailQuery,systemConnectionsQuery} from "../src/operations/agentos/query-extensions-view.mjs";
 
 test('actual mail runtime observed and applied targets stay attributable without exposing credential references',async()=>{
  const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),version=id(30);

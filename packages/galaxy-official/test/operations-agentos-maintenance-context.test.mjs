@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {OperationsMaintenanceService} from '../src/operations-maintenance.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {OperationsMaintenanceService} from "../src/operations/maintenance/service.mjs";
 import {AiWorkAccountsReadModel} from '../src/operations/accounts/ai-work-read-model.mjs';
 import {bindOperationsAiUse,withOperationsAiWork,operationsAiWorkScope} from '../src/shared/operations-ai-use.mjs';
 import {operationsPermissionsV1MigrationSql} from '../src/infrastructure/operations-permissions-v1-schema.mjs';
@@ -18,7 +18,7 @@ test('maintenance overview revalidation preserves attested AI context and actual
  await db.exec(operationsAiWorkAccountsV1MigrationSql.split('ALTER TABLE operations_automation_grants_v1')[0]);
  await db.exec("CREATE SCHEMA galaxy_jobs; CREATE TABLE galaxy_jobs.job(name text,state text); INSERT INTO galaxy_jobs.job VALUES('information-watch','failed')");
  // Audit is an explicit fixture sink; authorization and role/AI storage use the actual schemas above.
- await db.exec('CREATE TABLE business_admin_audit_v1(sequence bigserial PRIMARY KEY,id uuid,endpoint text,operator_id text,operator_role text,action text,account_id uuid,operation_id uuid,http_request_id uuid,selection jsonb,result jsonb,created_at timestamptz,actor_kind text,execution_id uuid,grant_id uuid)');
+ await db.exec('CREATE TABLE business_admin_audit_v1(sequence bigserial PRIMARY KEY,id uuid,endpoint text,operator_id text,operator_role text,action text,account_id uuid,operation_id uuid,http_request_id uuid,selection jsonb,result jsonb,created_at timestamptz,actor_kind text,execution_id uuid,grant_id uuid,actor_context jsonb)');
  const accountId=randomUUID(),roleId=randomUUID(),assignmentId=randomUUID();
  await db.query("INSERT INTO operations_business_roles_v1(id,endpoint,name,description,enabled,version,permissions,created_by,updated_by,created_at,updated_at) VALUES($1,$2,'运行诊断协作','',true,1,ARRAY['maintenance.read','maintenance.logs.read'],$3,$3,$4,$4)",[roleId,endpoint,owner,at]);
  await db.query("INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,'maintenance','运维','',true,1,1,$3,$3)",[accountId,endpoint,at]);

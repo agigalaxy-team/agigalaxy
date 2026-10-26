@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { initializeGalaxyIntegration } from '../../galaxy-core/src/local-store.mjs';
 import { createConnectionProfile, saveConnectionProfile, revokeConnectionScope } from '../../galaxy-core/src/connection-profile.mjs';
-import { createLocalHostRuntime } from '../../galaxy-official/src/local-host-runtime.mjs';
+import { createLocalHostRuntime } from "../../galaxy-official/src/clients/local/host-runtime.mjs";
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { a2aHostFactory } from '../src/hosts/host-flow.mjs';
 import { hash } from '../src/storage/journal.mjs';

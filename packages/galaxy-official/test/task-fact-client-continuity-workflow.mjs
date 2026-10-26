@@ -3,9 +3,8 @@ import {randomUUID} from 'node:crypto';
 import {serviceFixture} from "./service-fixture.mjs";
 import {createApi} from "../src/http.mjs";
 import {browserScopes} from "../src/browser-client.mjs";
-import { createExistingWebRuntime } from "./existing-web-identity-fixture.mjs";
+import {createNativeRecoveryWebFixture} from "./native-recovery-web-fixture.mjs";
 import {getFactClient} from "../../galaxy-web/src/features/work-records/client.mjs";
-import {createRecoveryMaterial} from "../../galaxy-core/src/domain/identity-material.mjs";
 
 export const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
 export const outcome=promise=>promise.then(value=>({value}),error=>({error}));
@@ -19,10 +18,7 @@ function memoryStore(values,{get:onGet,put:onPut}={}){
   if(next&&typeof next.then==='function')throw Error('local_atomic_updater_must_be_synchronous');
   values.set(key,structuredClone(next));await onPut?.(key,next);return structuredClone(next);
  };
- return{get,put,update,async prepareRecovery(subjectId,operationId){const key='pending-recovery:'+subjectId+':'+operationId;
-  let v=await get(key);if(!v){v={...await createRecoveryMaterial(subjectId),operationId};await put(key,v);}return v;},
-  async declareSaved(subjectId,id){const key='pending-recovery:'+subjectId+':'+id;await put(key,{...await get(key),saveDeclared:true});},
-  async recordReceipt(subjectId,id,receipt){const key='pending-recovery:'+subjectId+':'+id;await put(key,{...await get(key),receipt});}};
+ return{get,put,update};
 }
 // Real WebRuntime/device JWS/Consent/HTTP/PGlite. Journal is deliberately a
 // Map contract fixture, not IndexedDB. Account quotas are an explicit fixture;
@@ -31,7 +27,7 @@ export async function factContinuityFixture(){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:2000}),data=new Map(),calls=[],runtimes=[];
  let runtime,origin,onGet,onPut,fault=null,offline=false;
  const start=async store=>{
-  const r=await createExistingWebRuntime({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,store,fetch:async(url,options)=>{
+  const r=await createNativeRecoveryWebFixture({endpoint:f.access.endpoint,trustedKeys:f.bindings.trustedKeys},{now:()=>f.now,store,fetch:async(url,options)=>{
    const parsed=new URL(url),path=parsed.pathname;calls.push({path,method:options.method??'GET'});
    if(offline&&path.endsWith('/receipt'))throw new Error('Fictional readonly receipt offline');
    const selected=fault?.path===path;if(selected&&fault.mode==='before'){fault=null;throw new Error('Fictional failure before dispatch');}

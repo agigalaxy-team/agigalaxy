@@ -1,7 +1,7 @@
 import { readFile,writeFile,lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import { openDatabase } from '../src/database.mjs';
-import { assertRuntimeEnvironment } from '../src/runtime-environment.mjs';
+import { openDatabase } from "../src/infrastructure/database.mjs";
+import { assertRuntimeEnvironment } from "../src/infrastructure/runtime-environment.mjs";
 import { captureDeletionLedger,replayDeletionLedger } from '../src/operations/deletion-ledger.mjs';
 const read=async(path,max)=>{if(!isAbsolute(path))throw new Error();const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||info.size>max)throw new Error();return readFile(path,'utf8');};
 let db;

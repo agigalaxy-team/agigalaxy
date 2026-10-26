@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {createOfficialChatRuntime} from '../src/official-chat-runtime.mjs';
+import {createOfficialChatRuntime} from "../src/features/chat/official-chat-runtime.mjs";
 import {chatSendSchema} from '../../galaxy-official/src/shared/chat-schema.mjs';
 
 function fixture(){

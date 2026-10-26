@@ -3,16 +3,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
-import {OperationsAgentOsAuthority} from '../src/operations-agentos-authority.mjs';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
-import {AgentOsConversationTools} from '../src/operations-agentos-conversation-tools.mjs';
-import {workbenchActionCatalog,workbenchPrepareSchemas} from '../src/operations-agentos-action-catalog.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
+import {OperationsAgentOsAuthority} from "../src/operations/agentos/authority.mjs";
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
+import {AgentOsConversationTools} from "../src/operations/agentos/conversation-tools.mjs";
+import {workbenchActionCatalog,workbenchPrepareSchemas} from "../src/operations/agentos/action-catalog.mjs";
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
-import {workbenchActionCards,workbenchCardReason} from '../../../apps/galaxy-admin/src/lib/workbench-action-cards.ts';
+import {workbenchActionCards,workbenchCardReason} from "../../../apps/galaxy-admin/src/lib/workbench/workbench-action-cards.ts";
 
 // Actual API-role PG, current grants, account restrictions, card persistence
 // and original receipts. Only the upstream management-role lookup is a local
@@ -34,7 +34,7 @@ test('workbench account restriction cards preserve explicit deadlines, human dec
  await attachAiWorkFixture({db:db,endpoint:endpoint,permissions:current.permissions,businessAdmin:accounts,authority,admin,domains:['governance','overview'],codes:["accounts.read","accounts.restriction.apply","accounts.restriction.release"],now:now});
  await attachAiWorkFixture({db:db,endpoint:endpoint,permissions:current.permissions,businessAdmin:accounts,authority,admin,domains:['messaging'],codes:[],now:now});
  await db.exec('SET ROLE galaxy_api');assert.equal((await db.query('SELECT current_user AS role')).rows[0].role,'galaxy_api');
- assert.deepEqual(workbenchActionCatalog.filter(item=>item.kind!=='file-access').map(item=>item.kind).sort((a,b)=>a<b?-1:a>b?1:0),['ai-role-command','ai-work-prompt-save','message-draft-create','message-draft-save','ordinary-strategy-draft','ordinary-strategy-publish','private-case-message','public-content-batch','recommendation-direction','content-visibility','content-curation','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-cleanup-approve','case-resolve','messaging-state','strategy-control','strategy-continue','search-apply','search-restore','rule-publish','rule-restore'].sort((a,b)=>a<b?-1:a>b?1:0));
+ assert.deepEqual(workbenchActionCatalog.filter(item=>item.kind!=='file-access').map(item=>item.kind).sort((a,b)=>a<b?-1:a>b?1:0),['job-cancel','job-retry','search-retry','ai-role-command','ai-work-prompt-save','message-draft-create','message-draft-save','ordinary-strategy-draft','ordinary-strategy-publish','private-case-message','public-content-batch','recommendation-direction','content-visibility','content-curation','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-cleanup-approve','case-resolve','messaging-state','strategy-control','strategy-continue','search-apply','search-restore','rule-publish','rule-restore'].sort((a,b)=>a<b?-1:a>b?1:0));
  assert.deepEqual(workbenchActionCatalog.find(item=>item.kind===request.kind),{kind:'account-restriction',domain:'governance',label:'限制或解除单账户参与',read:'accounts.read',actions:['accounts.restriction.apply','accounts.restriction.release'],handler:{service:'accounts',methods:['get','restrict','releaseRestriction']},humanOnly:false,conditions:['ordinary','prior-automatic-decision']});
  for(const extra of [{expectedRevision:8},{operationId:randomUUID()},{role:'administrator'},{durationSeconds:3600},{path:'/arbitrary'},{scope:'all'}])assert.equal(workbenchPrepareSchemas[request.kind].safeParse({...request,...extra}).success,false);
  const {until:_until,...withoutUntil}=request;assert.equal(workbenchPrepareSchemas[request.kind].safeParse(withoutUntil).success,false);assert.equal(workbenchPrepareSchemas[request.kind].safeParse({...request,action:'release'}).success,false);

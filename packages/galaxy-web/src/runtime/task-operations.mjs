@@ -1,9 +1,11 @@
+import { createParticipationCompose } from './task-operations/participation-compose.mjs';
+import { createPublicationMaterials } from './task-operations/publication-materials.mjs';
+import { createTaskOperationJournal } from './task-operations/operation-journal.mjs';
 import {taskRequestV2Schema,taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2Schema} from "../../../galaxy-official/src/shared/task-schema-v2.mjs";
 import {equalJson,sha256Hex} from "../../../galaxy-official/src/shared/web-primitives.mjs";
-import {normalizeForumOrigin} from "../community-forum-origin.mjs";
-import {taskLocalDraftView} from "../task-local-draft-client.mjs";
-import {createTaskMaterialClient} from "../task-material-client.mjs";
-import {taskMaterialBodySchema,taskMaterialSubmissionSchema,hasTaskMaterials} from "../../../galaxy-official/src/shared/task-material-v1-schema.mjs";
+import {normalizeForumOrigin} from "../features/community-forum/community-forum-origin.mjs";
+import {taskLocalDraftView} from "../features/tasks/publish/task-local-draft-client.mjs";
+import {taskMaterialBodySchema,hasTaskMaterials} from "../../../galaxy-official/src/shared/task-material-v1-schema.mjs";
 
 // Per-runtime task journals and once-only flows. The identity getters remain live
 // across every await; neither a copied identity nor a new authority is created.
@@ -24,219 +26,20 @@ export function createWebTaskOperations({api,prefix,store,captureTaskDraftLease,
     try { result = await action(); } catch (error) { checkOperationLease(lease); throw error; }
     checkOperationLease(lease); return result;
   }
-  let taskQueueTail = Promise.resolve();
   const taskStopListeners = new Set();
   const onTaskOperationStopped = callback => { taskStopListeners.add(callback); return () => { taskStopListeners.delete(callback); }; };
-  const withTaskQueue = fn => { const operation = taskQueueTail.then(fn); taskQueueTail = operation.catch(() => {}); return operation; };
-  const sameTaskOperation = (left, right) => left && right && left.payloadHash === right.payloadHash
-    && (left.eventId ?? left.payload?.operationId) === (right.eventId ?? right.payload?.operationId);
   const taskQueueName = taskId => taskId ? `task-event:${taskId}` : 'task-publication';
   const stoppedQueueName = taskId => `task-stopped-operations:${taskId ?? 'publication'}`;
-  const taskUuid = value => /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value ?? '');
-  const participationDraftIssue = code => { throw Object.assign(new Error(code), { code }); };
-  function participationComposeKey(lease, taskId, participationId) {
-    if (!lease.subjectId || !taskUuid(taskId) || !taskUuid(participationId)) participationDraftIssue('participation_compose_scope_required');
-    return prefix + lease.subjectId + `:participation-compose:${taskId}:${participationId}`;
-  }
-  function checkedParticipationCompose(value, taskId, participationId) {
-    if (value == null) return null;
-    if (value.version !== 1 || value.taskId !== taskId || value.participationId !== participationId
-      || !taskUuid(value.revision) || value.eventId != null && !taskUuid(value.eventId)
-      || !value.value || typeof value.value !== 'object' || Array.isArray(value.value) || value.value.kind !== 'deliver')
-      participationDraftIssue('participation_compose_invalid');
-    return value;
-  }
-  function updateParticipationCompose(lease, taskId, participationId, change) {
-    const key = participationComposeKey(lease, taskId, participationId);
-    if (typeof store.update !== 'function') participationDraftIssue('local_atomic_update_unavailable');
-    return taskAwait(lease, () => store.update(key, current => {
-      checkOperationLease(lease); return change(checkedParticipationCompose(current, taskId, participationId));
-    }));
-  }
-  /** @param {string} taskId @param {string} participationId @param {any} input @param {{expectedRevision?:string|null}} options */
-  function saveParticipationComposeDraft(taskId, participationId, input, { expectedRevision } = {}) {
-    const lease = captureTaskDraftLease(), value = structuredClone(input);
-    if (!value || typeof value !== 'object' || Array.isArray(value) || value.kind !== 'deliver'
-      || ['prepared','submission','authorization','payloadJson','signedIntent','proofJson','signature','confirmed'].some(key => Object.hasOwn(value, key)))
-      participationDraftIssue('participation_compose_invalid');
-    return updateParticipationCompose(lease, taskId, participationId, current => {
-      if (expectedRevision !== undefined && (current?.revision ?? null) !== expectedRevision && !(current && equalJson(current.value, value)))
-        participationDraftIssue('participation_compose_changed');
-      return current && equalJson(current.value, value) ? current : {
-        version: 1, taskId, participationId, revision: crypto.randomUUID(), value, eventId: null,
-      };
-    });
-  }
-  /** @param {string} taskId @param {string} participationId @param {{revision?:string}} options */
-  function clearParticipationComposeDraft(taskId, participationId, { revision } = {}) {
-    const lease = captureTaskDraftLease();
-    return updateParticipationCompose(lease, taskId, participationId, current => revision && current?.revision !== revision ? current : null);
-  }
-  async function readParticipationComposeDraft(taskId, participationId) {
-    const lease = captureTaskDraftLease(), key = participationComposeKey(lease, taskId, participationId);
-    const draft = checkedParticipationCompose(await taskAwait(lease, () => store.get(key)), taskId, participationId);
-    if (!draft) return null;
-    const original = await taskAwait(lease, () => store.get(prefix + lease.subjectId + `:task-event:${taskId}`));
-    const eventId = draft.eventId ?? (original?.composeRevision === draft.revision && original.participationId === participationId ? original.eventId : null);
-    const accepted = eventId ? await taskAwait(lease, () => store.get(prefix + lease.subjectId + `:task-event-receipt:${eventId}`)) : null;
-    if (accepted?.state === 'acknowledged' && accepted.taskId === taskId && accepted.participationId === participationId
-      && accepted.composeRevision === draft.revision && accepted.eventId === eventId && /^[a-f0-9]{64}$/.test(accepted.payloadHash)) {
-      const kept = await updateParticipationCompose(lease, taskId, participationId, current =>
-        current?.revision === draft.revision && (current.eventId === eventId || current.eventId === null) ? null : current);
-      return kept ? { ...kept, submission: kept.eventId ? 'result-unknown' : 'draft' } : null;
-    }
-    const history = eventId ? await taskAwait(lease, () => store.get(prefix + lease.subjectId + ':' + stoppedQueueName(taskId))) ?? [] : [];
-    return { ...draft, eventId, submission: eventId ? history.some(row => row.eventId === eventId) ? 'stopped-local' : 'result-unknown' : 'draft' };
-  }
-  async function rememberParticipationAcknowledgement(record, receipt, lease) {
-    if (!record.composeRevision) return;
-    checkOperationLease(lease);
-    // Only query coordinates are retained. This cannot resend a delivery or
-    // grant access to the result, evidence or original work.
-    await taskAwait(lease, () => store.put(prefix + lease.subjectId + `:task-event-receipt:${record.eventId}`, {
-      taskId: record.taskId, participationId: record.participationId, eventId: record.eventId, payloadHash: record.payloadHash,
-      composeRevision: record.composeRevision, state: 'acknowledged', checkedAt: receipt.checkedAt ?? now(), currentAccessGranted: false,
-    }));
-  }
-  async function settleParticipationCompose(record, lease) {
-    if (!record.composeRevision) return { state: 'not-recorded' };
-    const kept = await updateParticipationCompose(lease, record.taskId, record.participationId, current =>
-      current?.revision === record.composeRevision && (current.eventId === record.eventId || current.eventId === null) ? null : current);
-    return { state: kept ? 'retained' : 'cleared' };
-  }
-  async function acknowledgeTaskEvent(key, record, receipt, lease) {
-    await rememberParticipationAcknowledgement(record, receipt, lease);
-    await updateTaskQueue(key, record, null, lease);
-    const localDraftCleanup = await settleParticipationCompose(record, lease);
-    return { ...receipt, ...(record.composeRevision ? { localDraftCleanup } : {}) };
-  }
-  function checkedParticipationReceipt(record, receipt) {
-    if (record.composeRevision && (receipt.taskId !== record.taskId || receipt.eventId !== record.eventId
-      || receipt.payloadHash !== record.payloadHash || !['absent','acknowledged','conflict','unknown'].includes(receipt.state)))
-      participationDraftIssue('participation_receipt_mismatch');
-    return receipt;
-  }
-  function preserveTaskQueue(current,next) {
-    if(next===null)return null;
-    const value=structuredClone(next),erased=[...new Set([...(current.materialErasedIds??[]),...(value.materialErasedIds??[])])];
-    if(erased.length){value.materialErasedIds=erased;value.materialBodies=(value.materialBodies??[]).filter(body=>!erased.includes(body.materialId));}
-    if(current.automaticRetryBlock)value.automaticRetryBlock=current.automaticRetryBlock;
-    return value;
-  }
-  async function updateTaskQueue(key, operation, next, lease = null) {
-    return withTaskQueue(async () => {
-      if(typeof store.update==='function'){
-        let matched=false;
-        const update=()=>store.update(key,current=>{
-          if(lease)checkOperationLease(lease);
-          if(!sameTaskOperation(current,operation)){
-            if(next===null)return current;
-            throw new Error('原操作已停止本机重试或队列已改变；不会重新放回发送队列。');
-          }
-          matched=true;return preserveTaskQueue(current,next);
-        });
-        if(lease)await taskAwait(lease,update);else await update();return matched;
-      }
-      const current = lease ? await taskAwait(lease, () => store.get(key)) : await store.get(key);
-      if (!sameTaskOperation(current, operation)) {
-        if (next === null) return false;
-        throw new Error('原操作已停止本机重试或队列已改变；不会重新放回发送队列。');
-      }
-      const preserved = preserveTaskQueue(current,next);
-      if (lease) await taskAwait(lease, () => store.put(key, preserved)); else await store.put(key, preserved);
-      return true;
-    });
-  }
-  function materialClientFor(lease) {
-    return createTaskMaterialClient({ api, taskDraftScope, receiptStatus }, { subjectId: lease.subjectId, now });
-  }
-  async function currentPublicationMaterials(record, lease, { rebuild = false, requireAvailable = false } = {}) {
-    if (!record || !hasTaskMaterials(record.payload)) return record;
-    checkOperationLease(lease);
-    const client = materialClientFor(lease), key = prefix + lease.subjectId + ':task-publication';
-    try {
-      const result = await taskAwait(lease, () => client.verifySubmission(record.payload, record.materialBodies ?? [], { rebuild }));
-      let current = record;
-      if (result.changed || result.erased.length) {
-        if (typeof store.update !== 'function') throw new Error('local_atomic_update_unavailable');
-        current = await taskAwait(lease, () => store.update(key, previous => {
-          checkOperationLease(lease);
-          if (!sameTaskOperation(previous, record)) throw new Error('原发布队列已变化，请重新核对。');
-          const erased = [...new Set([...(previous.materialErasedIds ?? []), ...result.erased])];
-          const bodies = (previous.materialBodies ?? []).filter(body => !erased.includes(body.materialId));
-          for (const body of result.value.materialBodies) if (!erased.includes(body.materialId) && !bodies.some(item => item.materialId === body.materialId)) bodies.push(body);
-          const next = { ...previous, materialBodies: bodies, materialErasedIds: erased };
-          if (next.submission?.materialBodies) { next.submission = { ...next.submission }; delete next.submission.materialBodies; }
-          return next;
-        }));
-      }
-      if (requireAvailable && (!result.allowed || (current.materialErasedIds ?? []).some(id => record.payload.materials.some(material => material.materialId === id))))
-        throw Object.assign(new Error('原发布材料当前不可用或编辑文字已清理。可以继续查询原回执，或明确停止本机重试；不会替换原内容、编号或期限。'), { code: 'task_material_unavailable' });
-      return { ...current, materialBodies: result.view.materialBodies.filter(body => !(current.materialErasedIds ?? []).includes(body.materialId)), materialStates: result.states };
-    } finally { client.close(); }
-  }
-  async function readTaskPublication(originalSubjectId) {
-    const lease = captureTaskDraftLease(), owner = originalSubjectId ?? lease.subjectId ?? 'visitor';
-    if (owner !== (lease.subjectId ?? 'visitor')) throw new Error('本机发布记录不属于当前身份。');
-    const record = await taskAwait(lease, () => store.get(prefix + owner + ':task-publication'));
-    return currentPublicationMaterials(record, lease);
-  }
-  function taskBusinessRejected(record) {
-    const publication = !!record.payload, block = record.automaticRetryBlock;
-    return Object.assign(new Error('服务未接受上次内容，已停止自动发送。原内容仍保留。'), {
-      code: publication ? 'publication_business_rejected' : 'task_operation_business_rejected',
-      reason: block.code, status: block.status, rejectedAt: block.rejectedAt,
-      ...(block.retryAt ? { retryAt: block.retryAt } : {}),
-    });
-  }
-  const isTaskBusinessRejection = error => error?.outcome === 'rejected'
-    && Number.isInteger(error.status) && error.status >= 400 && error.status < 500
-    && ![401, 408, 429].includes(error.status)
-    && !['unauthorized', 'binding_revoked', 'invalid_session', 'session_expired', 'access_denied'].includes(error.code);
-  async function changeTaskDispatch(key, record, lease, change) {
-    return withTaskQueue(async () => {
-      const update = current => {
-        checkOperationLease(lease);
-        if (!sameTaskOperation(current, record)) throw new Error('原操作已停止本机重试或队列已改变；不会重新放回发送队列。');
-        return change(current);
-      };
-      if (typeof store.update === 'function') return taskAwait(lease, () => store.update(key, update));
-      const current = await taskAwait(lease, () => store.get(key)), next = update(current);
-      await taskAwait(lease, () => store.put(key, next)); return next;
-    });
-  }
-  async function dispatchTaskBusiness(key, record, lease, path, { explicitRetry = false } = {}) {
-    // Check the persisted slot at the send boundary too: another page may have
-    // received a definite rejection after this page read the original journal.
-    const sending = await changeTaskDispatch(key, record, lease, current => {
-      if (current.automaticRetryBlock && (!explicitRetry
-        || current.automaticRetryBlock.retryAt && Date.parse(current.automaticRetryBlock.retryAt) > now() * 1000))
-        throw taskBusinessRejected(current);
-      const next = { ...current, state: 'result-unknown' }; delete next.automaticRetryBlock; return next;
-    });
-    try {
-      const current=sending.payload&&hasTaskMaterials(sending.payload)?await currentPublicationMaterials(sending,lease,{rebuild:true,requireAvailable:true}):sending;
-      const submission=current.payload&&hasTaskMaterials(current.payload)?taskMaterialSubmissionSchema.parse({...current.submission,materialBodies:current.materialBodies}):current.submission;
-      return await taskAwait(lease, () => api.call(path, submission));
-    }
-    catch (error) {
-      // HTTP 5xx, timeouts and network failures cannot prove non-acceptance.
-      // They keep the existing unknown-result automatic continuation.
-      if (isTaskBusinessRejection(error)) await changeTaskDispatch(key, sending, lease, current => ({ ...current,
-        state: 'business-rejected', automaticRetryBlock: {
-          code: error.code, status: error.status, rejectedAt: now(),
-          ...(typeof error.retryAt === 'string' && Number.isFinite(Date.parse(error.retryAt)) ? { retryAt: error.retryAt } : {}),
-        },
-      }));
-      throw error;
-    }
-  }
-  const continuedTaskReceipt = (receipt, payloadHash) => ({ ...receipt,
-    ...(receipt.state && receipt.state !== 'acknowledged' ? { businessState: receipt.state } : {}),
-    ...(payloadHash ? { payloadHash } : {}), state: 'acknowledged' });
-  const minimalTaskReceipt = receipt => ({ state: receipt.state, checkedAt: receipt.checkedAt ?? now(),
-    ...(Number.isSafeInteger(receipt.version) ? { version: receipt.version } : {}),
-    ...(Number.isSafeInteger(receipt.participationVersion) ? { participationVersion: receipt.participationVersion } : {}) });
+  const { withTaskQueue, sameTaskOperation, updateTaskQueue, taskBusinessRejected, dispatchTaskBusiness, continuedTaskReceipt, minimalTaskReceipt } = createTaskOperationJournal({
+    api, store, now, taskAwait, checkOperationLease,
+    currentPublicationMaterials: (...args) => currentPublicationMaterials(...args),
+  });
+  const { materialClientFor, currentPublicationMaterials, readTaskPublication } = createPublicationMaterials({
+    api, prefix, store, taskDraftScope, receiptStatus, now, taskAwait, checkOperationLease, sameTaskOperation, captureTaskDraftLease,
+  });
+  const { taskUuid,participationDraftIssue,participationComposeKey,checkedParticipationCompose,updateParticipationCompose,saveParticipationComposeDraft,clearParticipationComposeDraft,readParticipationComposeDraft,rememberParticipationAcknowledgement,settleParticipationCompose,acknowledgeTaskEvent,checkedParticipationReceipt } = createParticipationCompose({
+    prefix, store, captureTaskDraftLease, taskAwait, checkOperationLease, stoppedQueueName, now, updateTaskQueue,
+  });
   /** @param {string|null} taskId */
   async function reviewTaskStop(taskId = null) {
     const publicationLease = taskId === null ? captureTaskDraftLease() : null;

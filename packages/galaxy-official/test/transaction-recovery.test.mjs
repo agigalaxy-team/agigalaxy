@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { transaction } from '../src/database.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
 
 test('failed rollback discards the uncertain connection and preserves the operation failure', async () => {
   const original = new Error('business write failed');

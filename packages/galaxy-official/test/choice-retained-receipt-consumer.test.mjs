@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { receiptStatusFixture } from './receipt-status-workflow.mjs';
-import { createChoiceSyncClient } from '../../galaxy-web/src/choice-sync-client.mjs';
+import { createChoiceSyncClient } from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
 
 async function fixture() { const t = await receiptStatusFixture();
   // This service fixture has an explicit additional receipt-purpose authority;

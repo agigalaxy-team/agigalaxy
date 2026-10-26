@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checker = fileURLToPath(new URL('../tools/docs.py', import.meta.url));
+/** @type {Array<[string, string[]]>} */
 const candidates = process.env.GALAXY_PYTHON
   ? [[process.env.GALAXY_PYTHON, []]]
   : process.platform === 'win32' ? [['py', ['-3']], ['python', []]] : [['python3', []]];

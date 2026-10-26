@@ -11,10 +11,10 @@ import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import pg from 'pg';
 import { serviceFixture } from '../service-fixture.mjs';
-import { EvidenceService } from '../../src/evidence.mjs';
-import { ConsentReader } from '../../src/consent-reader.mjs';
-import { inspectGithubRun } from '../../src/github-evidence.mjs';
-import { transaction, migrate } from '../../src/database.mjs';
+import { EvidenceService } from "../../src/evidence/evidence.mjs";
+import { ConsentReader } from "../../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../../src/evidence/github-evidence.mjs";
+import { transaction, migrate } from "../../src/infrastructure/database.mjs";
 
 test('isolated PostgreSQL: concurrent binding, idempotency, worker leases, revocation, rollback and restore', async () => {
   assert.equal(process.env.GALAXY_TEST_PG_ISOLATED, '1', 'Run scripts/test-postgres.mjs; external DBs are not accepted.');

@@ -3,8 +3,8 @@ import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { createBrowserClient, browserScopes } from '../src/browser-client.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { createBuildersWebClient } from '../../galaxy-web/src/builders-client.mjs';
-import { createWorkerPackUseClient } from '../../galaxy-web/src/worker-pack-use-client.mjs';
+import { createBuildersWebClient } from "../../galaxy-web/src/features/builders/builders-client.mjs";
+import { createWorkerPackUseClient } from "../../galaxy-web/src/features/tools/worker-pack-use-client.mjs";
 import { builderDeclaration } from './builders-workflow.mjs';
 
 // Synthetic identity and local durable-store substitute; transport, signature,

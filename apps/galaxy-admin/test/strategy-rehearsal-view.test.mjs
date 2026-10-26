@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {StrategyRehearsalResult} from '../src/components/StrategyRehearsalResult.tsx';
-import {AutonomyTaskControls} from '../src/components/AutonomyTaskControls.tsx';
+import {StrategyRehearsalResult} from "../src/components/strategies/StrategyRehearsalResult.tsx";
+import {AutonomyTaskControls} from "../src/components/autonomy/AutonomyTaskControls.tsx";
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');
 test('execution preview describes actual failed checks and per-action eligibility without exposing long identifiers',()=>{

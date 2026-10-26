@@ -3,11 +3,11 @@ import { randomBytes,randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
 import { digest } from '../src/shared/digest.mjs';
-import { transaction } from '../src/database.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createBindingManagementClient } from '../src/binding-status-client.mjs';
+import { transaction } from "../src/infrastructure/database.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createBindingManagementClient } from "../src/clients/binding-status.mjs";
 import { createIncidentController } from '../src/operations/incident.mjs';
-import { createRetirementController } from '../src/retirement.mjs';
+import { createRetirementController } from "../src/privacy/retirement.mjs";
 import { retirementFixturePolicy } from './retirement-workflow.mjs';
 
 export async function verifyBindingManagement(database=null,options={}){

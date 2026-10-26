@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture} from './account-chat-fixture.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
+import {OperationsPermissionsService} from '../src/operations/permissions/index.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
 import {dispatchBusinessAdmin} from '../src/adapters/http/business-admin-http.mjs';
-import {operationsAnalyticsPeriod,publicForumActivityWithin} from '../src/operations-analytics.mjs';
+import {operationsAnalyticsPeriod,publicForumActivityWithin} from "../src/operations/analytics/service.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 
 const everyone={read:{kind:'everyone'},participate:{kind:'accounts'}};
@@ -18,10 +19,19 @@ test('account and workbench summaries count exact current public facts, keep oth
  const f=await accountChatFixture();t.after(f.close);
  const forum=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),
   governance=new CommunityForumGovernanceV1(f.access,null,forum,{accounts:f.accounts}),
-  service=new BusinessAdminService({db:f.db,endpoint:f.endpoint,forum,now:f.now}),
-  admin={kind:'business-operator',operatorId:'analytics-synthetic-admin',role:'administrator',endpoint:f.endpoint},reader={...admin,role:'reader'};
- await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
-  VALUES($1,$2,'https://operations.example.org','separate-operator','合成运营人员',$3,$3)`,[admin.operatorId,f.endpoint,new Date(f.now()*1000)]);
+  admin={kind:'business-operator',operatorId:'analytics-synthetic-admin',role:'administrator',endpoint:f.endpoint},
+  reader={...admin,operatorId:'analytics-synthetic-reader',role:'reader'};
+ // Current management eligibility is explicit; reader data rights come from
+ // committed business roles rather than its supplied role label.
+ const roles=new Map([[admin.operatorId,'administrator'],[reader.operatorId,'reader']]),
+  operatorAuthorization=async actor=>roles.get(actor.operatorId)??null,
+  permissions=new OperationsPermissionsService({db:f.db,endpoint:f.endpoint,operatorAuthorization,now:f.now}),
+  service=new BusinessAdminService({db:f.db,endpoint:f.endpoint,forum,permissions,operatorAuthorization,now:f.now});
+ for(const actor of [admin,reader])await f.db.query(`INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at)
+  VALUES($1,$2,'https://operations.example.org',$1,'合成运营人员',$3,$3)`,[actor.operatorId,f.endpoint,new Date(f.now()*1000)]);
+ const role=(await permissions.saveRole(admin,{operationId:randomUUID(),expectedVersion:0,name:'合成汇总只读角色',description:'当前公开来源统计合同',enabled:true,
+  permissions:['accounts.read','analytics.read','workbench.read','content.read','audit.read']},{authorize:async()=>admin})).role;
+ await permissions.saveAssignment(admin,{operationId:randomUUID(),expectedVersion:0,operatorId:reader.operatorId,roleId:role.id,enabled:true},{authorize:async()=>admin});
  const community=new OperationsCommunityService({businessAdmin:service,forum,governance,now:f.now});
  await f.db.query("UPDATE official_account_profiles_v1 SET subject_type='organization' WHERE account_id=$1",[f.people[1].accountId]);
  await f.db.query('UPDATE official_account_profiles_v1 SET subject_type=NULL WHERE account_id=$1',[f.people[2].accountId]);
@@ -77,7 +87,7 @@ test('account and workbench summaries count exact current public facts, keep oth
  const hidden=await service.accountSummary(reader,f.people[1].accountId);assert.equal(hidden.usage.publicContributions,1);
  const summary=await community.summary(reader);
  assert.equal(summary.analytics.available,false);assert.equal(summary.analytics.visitors,null);assert.equal(summary.analytics.activeAccounts,null);assert.equal(summary.analytics.returnRate,null);
- assert.deepEqual(summary.businessActivity.totals,{posts:1,replies:1});assert.equal(summary.ai.state,'not-connected');assert.deepEqual(summary.ai.logs,[]);
+ assert.deepEqual(summary.businessActivity.totals,{posts:1,replies:1});assert.equal(summary.ai,null);assert.equal(summary.availability.ai,'not-authorized');
  assert.equal(summary.recentOperations.some(row=>row.action==='community-report-resolve'),true);
  assert.equal(summary.recentOperations.some(row=>row.action==='user-read'),false);
  assert.equal(JSON.stringify(summary).includes('CASE_EVIDENCE_ANALYTICS_MARKER'),false);assert.equal(JSON.stringify(summary).includes('CASE_DECISION_ANALYTICS_MARKER'),false);

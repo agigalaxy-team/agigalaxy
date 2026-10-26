@@ -7,10 +7,10 @@ import { join } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { builderDeclaration } from './builders-workflow.mjs';
 import { createApi } from '../src/http.mjs';
-import { createBuilderFlow } from '../src/builder-flow.mjs';
-import { createConnectionClient } from '../src/connection-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createLocalBuilderJournal } from '../src/local-builder-journal.mjs';
+import { createBuilderFlow } from "../src/clients/flows/builder.mjs";
+import { createConnectionClient } from "../src/clients/connection.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createLocalBuilderJournal } from "../src/clients/local/builder-journal.mjs";
 
 test('durable Builder retries survive restart and new bindings while retaining one exact event',async t=>{
   const scopes=['binding','consent','builders'],f=await serviceFixture(scopes),directory=await mkdtemp(join(tmpdir(),'galaxy-builder-retry-'));

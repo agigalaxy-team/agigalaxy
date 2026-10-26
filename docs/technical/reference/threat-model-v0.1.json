@@ -42,7 +42,7 @@
       "current_control": "旧挑战一次消费与事务幂等；OIDC登录与可选OAuth资源入口独立校验，不能回退尝试其他令牌",
       "gap": "真实AS配置、第三方客户端及正式认证服务运行仍待验收",
       "tasks": "C00-04,C00-06",
-      "source": "packages/galaxy-official/src/oauth-resource-access.mjs",
+      "source": "packages/galaxy-official/src/identity/authentication/oauth-resource-access.mjs",
       "test": "packages/galaxy-official/test/personal-mcp.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
@@ -54,7 +54,7 @@
       "current_control": "事务内重查binding/credential/Consent；搜索候选、导出、Profile、Honor和Context继续按当前受众/来源过滤",
       "gap": "真实宿主跨用户流程及外部副本不能以单元证据代替",
       "tasks": "C00-04,C00-05",
-      "source": "packages/galaxy-official/src/data-export.mjs",
+      "source": "packages/galaxy-official/src/privacy/data-export.mjs",
       "test": "packages/galaxy-official/test/data-export.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
@@ -66,7 +66,7 @@
       "current_control": "共享公网HTTPS限制、固定解析地址、重定向/大小/超时与取消；仅允许受约束来源适配器",
       "gap": "新增来源须明确注册和验证；未提供任意远程代码适配器",
       "tasks": "C00-04",
-      "source": "packages/galaxy-official/src/public-fetch.mjs",
+      "source": "packages/galaxy-official/src/infrastructure/public-fetch.mjs",
       "test": "packages/galaxy-official/test/public-transport.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
@@ -78,7 +78,7 @@
       "current_control": "CI明确有限来源强度；参与者验证声明、Case纠正和独立角色复核分别存储，Proof读时重新核对",
       "gap": "声明验证不证明独立性；真实任务效果、外部证据与独立验证者仍需人工/业务验收",
       "tasks": "C00-04",
-      "source": "packages/galaxy-official/src/proofs.mjs",
+      "source": "packages/galaxy-official/src/evidence/proofs.mjs",
       "test": "packages/galaxy-official/test/case-moderation.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
@@ -102,7 +102,7 @@
       "current_control": "敏感字段政策、精确预览和脱敏日志；Case/自述/资格举报、隔离、补证与申诉已接入追加处置",
       "gap": "自由文本不能保证自动识别全部秘密或滥用；公开运营审核/处理时限仍未指定",
       "tasks": "C00-04,C00-05,C16-06",
-      "source": "packages/galaxy-official/src/moderation.mjs",
+      "source": "packages/galaxy-official/src/governance/moderation.mjs",
       "test": "packages/galaxy-official/test/case-moderation.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"

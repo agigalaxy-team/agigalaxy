@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsFilesService} from '../src/operations-files.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
+import {CommunityForumV1} from '../src/community/community-forum-v1.mjs';
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsFilesService} from "../src/operations/files/service.mjs";
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
 import {ServiceError} from '../src/shared/service-error.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 
@@ -15,7 +16,7 @@ import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.
 async function fixture(t){
  const f=await accountChatFixture();t.after(f.close);
  const businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),
-  forum=new ForumAttachmentsV1Service({db:f.db,accounts:f.accounts,now:f.now,store:f.files.store,scanner:f.files.scanner}),
+  forum=new ForumAttachmentsV1Service({forum:new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),store:f.files.store,scanner:f.files.scanner}),
   files=new OperationsFilesService({businessAdmin,chatAttachments:f.files,forumAttachments:forum,now:f.now}),
   admin={kind:'business-operator',operatorId:'file-test-administrator',role:'administrator',endpoint:f.endpoint,httpRequestId:randomUUID()},
   reader={...admin,operatorId:'file-test-reader',role:'reader'};
@@ -31,7 +32,7 @@ async function prepared(f,{id=randomUUID(),name='当前文件名.txt',bytes=Buff
 }
 
 test('file metadata summary covers the full authorized selection, counts reservations rather than stored bytes and separates unknown cleanup from scan errors',async t=>{
- const f=await fixture(t),{input,bytes}=await prepared(f),chatIds=[input.attachmentId,...Array.from({length:29},()=>randomUUID())],forumIds=[input.attachmentId,...Array.from({length:6},()=>randomUUID())];
+ const f=await fixture(t),{input,bytes}=await prepared(f,{name:'资料  包.txt'}),chatIds=[input.attachmentId,...Array.from({length:29},()=>randomUUID())],forumIds=[input.attachmentId,...Array.from({length:6},()=>randomUUID())];
  await f.db.query(`INSERT INTO chat_attachments(id,room_id,subject_id,request_hash,name,media_type,byte_size,sha256,storage_key,encryption_key_id,created_at,prepare_expires_at)
   SELECT next_id,room_id,subject_id,request_hash,name,media_type,byte_size,sha256,'attachments/'||next_id::text,encryption_key_id,created_at,prepare_expires_at
   FROM chat_attachments CROSS JOIN unnest($2::uuid[]) AS next_id WHERE id=$1`,[input.attachmentId,chatIds.slice(1)]);
@@ -50,13 +51,14 @@ test('file metadata summary covers the full authorized selection, counts reserva
  await f.db.query('UPDATE chat_attachments SET revoked_at=$2,purge_pending=true WHERE id=$1',[chatIds[7],at]);
  // A foreign endpoint account does not acquire metadata visibility merely by
  // sharing the same physical DB. These rows are deliberate fixture metadata.
- const foreign=f.people[2].accountId,foreignChat=randomUUID(),foreignForum=randomUUID();
+ const foreign=randomUUID(),foreignChat=randomUUID(),foreignForum=randomUUID();
+ await f.db.query(`INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at)
+  VALUES($1,'https://foreign.example.invalid','https://login.example.org','foreign-file-owner','external-account',$2,$2)`,[foreign,at]);
  await f.db.query("INSERT INTO chat_participants_v3(actor_ref,kind,account_id) VALUES($1,'official-account',$2) ON CONFLICT DO NOTHING",['account:'+foreign,foreign]);
  await f.db.query(`INSERT INTO chat_attachments(id,room_id,subject_id,request_hash,name,media_type,byte_size,sha256,storage_key,encryption_key_id,created_at,prepare_expires_at)
   SELECT $2::uuid,room_id,$3,request_hash,'foreign chat name',media_type,byte_size,sha256,'attachments/'||$2::text,encryption_key_id,created_at,prepare_expires_at FROM chat_attachments WHERE id=$1`,[input.attachmentId,foreignChat,'account:'+foreign]);
  await f.db.query(`INSERT INTO forum_attachments_v1(id,account_id,request_hash,name,media_type,byte_size,sha256,storage_key,encryption_key_id,created_at,prepare_expires_at)
   SELECT $2::uuid,$3,request_hash,'foreign forum name',media_type,byte_size,sha256,'forum-attachments/'||$2::text,encryption_key_id,created_at,prepare_expires_at FROM forum_attachments_v1 WHERE id=$1`,[forumIds[0],foreignForum,foreign]);
- await f.db.query('UPDATE community_accounts SET endpoint=$2 WHERE id=$1',[foreign,'https://foreign.example.invalid']);
  const noBytes=async()=>{throw Error('A metadata read must never fetch or erase bytes.');};f.files.store.get=noBytes;f.files.store.head=noBytes;f.files.store.erase=noBytes;
  const first=await f.operationsFiles.list(f.reader,{limit:25}),summary=await f.operationsFiles.summary(f.reader);
  assert.equal(first.items.length,25);assert(first.nextAfter);assert.equal(summary.totals.records,37);assert.equal(summary.totals.reservedBytes,36*bytes.length);assert.equal(summary.totals.actualStoredBytes,null);

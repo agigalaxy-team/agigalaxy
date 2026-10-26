@@ -5,8 +5,8 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
-import {createHelpSearchClient} from '../../galaxy-web/src/help-search-client.mjs';
-import {createChoiceSyncClient} from '../../galaxy-web/src/choice-sync-client.mjs';
+import {createHelpSearchClient} from "../../galaxy-web/src/features/help-search/help-search-client.mjs";
+import {createChoiceSyncClient} from "../../galaxy-web/src/features/choice-sync/choice-sync-client.mjs";
 test('Two real web runtimes retain draft base, reconcile lost sync response and restore a separate authorized choice branch',async()=>{
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)}),api=createApi({...f,rateLimit:1000});let a,b,ha,hb,ca,cb,drop=false;const writes=[];
  try{

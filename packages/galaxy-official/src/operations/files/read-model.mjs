@@ -1,9 +1,9 @@
 import {z} from 'zod';
 import {hasOperationsPermission as permitted} from '../../operations-permission-catalog.mjs';
-import {OperationsBusinessDomain,operationsParse,operationsFail,operationsIso} from '../../operations-content-visibility.mjs';
+import {OperationsBusinessDomain,operationsParse,operationsFail,operationsIso} from "../public-content/content-visibility.mjs";
 import {operationsFilesQuerySchema,operationsFilesSummaryQuerySchema} from '../../shared/operations-business-schema.mjs';
 import {fileProcessingVersion,fileRetryState,fileProcessingFacts} from './processing.mjs';
-import {operationsOperatorNamesWithin} from '../../operations-history-identities.mjs';
+import {operationsOperatorNamesWithin} from "../accounts/history-identities.mjs";
 import {fileAccessWithin,fileAccessRestorationWithin} from './access-gate.mjs';
 
 const safeSize=value=>{const n=Number(value);return Number.isSafeInteger(n)&&n>=0?n:null;};

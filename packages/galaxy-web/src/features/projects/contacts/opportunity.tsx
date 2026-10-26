@@ -1,17 +1,17 @@
-import { ReadingDetails, ReadingSummary, ReadingSurface } from "../../../reading-details";
+import { ReadingDetails, ReadingSummary, ReadingSurface } from "../../../shared/reading/reading-details";
 import React,{useEffect,useEffectEvent,useId,useMemo,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {createProjectViewClient,projectViewScope,projectQueryMemory,hasIndependentProject} from "../clients/views.mjs";
 import {ContactSourceLinks} from "./origin";
-import {AccountVerificationPrompt,needsAccountVerification} from "../../../account-verification-prompt";
-import {MemberAvatar,memberName,readableTime,useMemberNames} from "../../../conversation-ui";
+import {AccountVerificationPrompt,needsAccountVerification} from "../../accounts/account-verification-prompt";
+import {MemberAvatar,memberName,readableTime,useMemberNames} from "../../../shared/people/conversation-ui";
 import "./compose.css";
 import type {ProjectRuntime,DiscoveryQuery,DiscoveryPurpose,VisibleOpportunity,ContactView,ProjectContinuation,OperationWait,OriginalProjectOperation} from "../contracts";
 import {object,projectErrorText,projectErrorFlag,projectErrorNumber,isDiscoveryPurpose} from "../contracts";
-import type {ContactComposeValue,ContactComposeRecord,OpportunityClient} from "../../../help-contact-view-types";
-import {checkedContactCompose,contactMessage} from "../../../help-contact-view-types";
+import type {ContactComposeValue,ContactComposeRecord,OpportunityClient} from "../../help-search/help-contact-view-types";
+import {checkedContactCompose,contactMessage} from "../../help-search/help-contact-view-types";
 
 const purposeNames:Record<string,string>={conversation:'交流想法',reuse:'了解复用',collaboration:'共同协作',recruitment:'了解招募'};
 const states:Record<string,string>={sent:'已发送，等待回应',accepted:'双方已接受交流',declined:'对方已拒绝',withdrawn:'已撤回邀请',expired:'邀请已到期',awaiting_distinct_control:'等待独立控制主体确认'};

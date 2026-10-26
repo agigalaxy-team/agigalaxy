@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verifyContextV2} from './context-v2-workflow.mjs';
 import {createBrowserClient} from '../src/browser-client.mjs';
-import {createContextClientV2} from '../src/context-v2-client.mjs';
+import {createContextClientV2} from "../src/clients/context-v2.mjs";
 import {digest} from '../src/shared/digest.mjs';
 
 test('browser protocol client persists exact signed operations and requires renewed consent only after explicit review',{timeout:60000},async()=>{

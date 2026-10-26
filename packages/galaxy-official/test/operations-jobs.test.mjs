@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
-import { migrate, transaction } from '../src/database.mjs';
+import { migrate, transaction } from "../src/infrastructure/database.mjs";
 import { queueFixture } from './operations-jobs-fixture.mjs';
 
 test('real PG queue commits with its business transaction and survives process replacement', async () => {

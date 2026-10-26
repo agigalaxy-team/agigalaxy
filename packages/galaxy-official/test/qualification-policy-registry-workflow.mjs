@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { QualificationService } from '../src/qualification.mjs';
+import { QualificationService } from "../src/qualifications/qualification.mjs";
 import { recordRuntimeConfig,runtimeConfigSnapshot,exportRuntimeConfigPage } from '../src/operations/runtime-config-audit.mjs';
 
 export async function verifyQualificationPolicyRegistry(database=null,options={}){

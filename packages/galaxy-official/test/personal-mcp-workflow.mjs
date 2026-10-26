@@ -4,15 +4,15 @@ import { createServer,request as httpRequest } from 'node:http';
 import { Client,StreamableHTTPClientTransport,auth,LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/client';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
-import { createOAuthIntrospection } from '../src/oauth-introspection.mjs';
-import { createOAuthResourceAccess } from '../src/oauth-resource-access.mjs';
-import { IdentityLinkService } from '../src/identity-links.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
+import { createOAuthIntrospection } from "../src/identity/authentication/oauth-introspection.mjs";
+import { createOAuthResourceAccess } from "../src/identity/authentication/oauth-resource-access.mjs";
+import { IdentityLinkService } from "../src/identity/links.mjs";
 import { createPersonalMcpHandler } from '../src/adapters/mcp/personal/handler.mjs';
 import { createApi } from '../src/http.mjs';
-import { handleDocsMcp } from '../src/docs-mcp.mjs';
+import { handleDocsMcp } from "../src/adapters/mcp/personal/docs-mcp.mjs";
 import { httpFailureWriter } from '../src/infrastructure/http-failure-audit.mjs';
-import { AccessService } from '../src/access.mjs';
+import { AccessService } from "../src/security/access.mjs";
 
 export async function verifyPersonalMcp(database=null,options={}) {
   const endpoint='https://official.example.org',resource=endpoint+'/mcp/personal',otherResource=endpoint+'/different-resource';

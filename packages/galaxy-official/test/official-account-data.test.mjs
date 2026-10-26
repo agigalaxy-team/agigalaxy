@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {OfficialAccountData} from '../src/official-account-data.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {OfficialAccountData} from "../src/accounts/data.mjs";
 import {cleanupPrivateConversationsWithin} from '../src/operations/private-conversation-retention.mjs';
 
 test('account settings and complete private archives retain ownership, history, retries and independent retention',{timeout:60000},async t=>{

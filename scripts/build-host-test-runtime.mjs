@@ -28,7 +28,7 @@ const manifestBytes = await readFile(resolve(release, 'service-release.json'));
 const manifest = JSON.parse(manifestBytes), lock = JSON.parse(await readFile(clientLock, 'utf8'));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const entries = ['packages/galaxy-core/src/local-store.mjs', 'packages/galaxy-core/src/connection-profile.mjs',
-  'packages/galaxy-official/src/local-host-runtime.mjs', 'packages/galaxy-official/src/verification/manifest.mjs'];
+  "packages/galaxy-official/src/clients/local/host-runtime.mjs", 'packages/galaxy-official/src/verification/manifest.mjs'];
 const files = new Map(), dependencies = new Set();
 async function visit(name) {
   if (files.has(name)) return;

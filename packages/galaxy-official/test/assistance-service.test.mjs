@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { createAssistanceFlow } from '../src/assistance-flow.mjs';
-import { createAssistanceClient } from '../src/assistance-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHostConnectionController } from '../src/host-connection-controller.mjs';
+import { createAssistanceFlow } from "../src/clients/flows/assistance.mjs";
+import { createAssistanceClient } from "../src/clients/assistance.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHostConnectionController } from "../src/clients/flows/host-connection-controller.mjs";
 import { createApi } from '../src/http.mjs';
 
 test('assistance API persists multi-party consent, hides competing offers and validates delivery references', async () => {

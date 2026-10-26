@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {AgentOsConversations} from '../src/operations-agentos-conversations.mjs';
+import {AgentOsConversations} from "../src/operations/agentos/conversations.mjs";
 
 function fixture({configuration={prompt:'Only the current role work requirements.'},version=3,denyAt=0}={}){
  const row={id:randomUUID(),domain:'overview',session_id:randomUUID(),operator_id:'owned-reader'},calls=[];

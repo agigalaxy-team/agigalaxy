@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {aiManagementCapabilities,aiManagementFeatureLabel,type AiManagementFeature} from '../../lib/ai-management-capabilities';
+import {aiManagementCapabilities,aiManagementFeatureLabel,type AiManagementFeature} from "../../lib/workbench/ai-management-capabilities";
 
 function Feature({label,value}:{label:string;value:AiManagementFeature}){
  return <span className={'wb-management-feature'+(value.available?' is-available':'')}><strong>{label}</strong><span>{aiManagementFeatureLabel(value)}</span></span>;

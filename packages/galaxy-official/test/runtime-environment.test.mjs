@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { assertRuntimeEnvironment, assertRuntimePaths } from '../src/runtime-environment.mjs';
+import { assertRuntimeEnvironment, assertRuntimePaths } from "../src/infrastructure/runtime-environment.mjs";
 
 test('runtime stages reject mixed databases and inherited signing material without exposing secrets', () => {
   for (const stage of ['local', 'integration', 'pilot']) {
@@ -43,7 +43,9 @@ test('all executable entrypoints fail before connections with missing environmen
       { env, encoding: 'utf8', timeout: 10000 });
     assert.equal(result.status, 1);
     assert.ok(!result.stderr.includes('never-print-this'));
-    if (name === 'server') assert.equal(JSON.parse(result.stderr.trim()).phase, 'environment');
+    const records=result.stderr.trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
+    if (name === 'server') {const failure=records.filter(entry=>entry.event==='startup_failed');assert.equal(failure.length,1);assert.equal(failure[0].phase,'environment');}
+    assert.equal(records.some(entry=>entry.stage==='database-connect'||entry.event==='database_pool_failed'),false,'missing environment fails before any database connection attempt');
     assert.match(result.stderr, /"event":"(?:startup_failed|worker_startup_failed|migration_failed)"/);
   }
 });

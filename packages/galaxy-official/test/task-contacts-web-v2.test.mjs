@@ -3,18 +3,18 @@ import { retainTaskContactAgent, taskContactWebsite } from '../../galaxy-web/tes
 import assert from 'node:assert/strict';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import {
   taskDraft,
   publicationFromDraft,
-} from '../../galaxy-web/src/task-bounty-client.mjs';
+} from "../../galaxy-web/src/features/tasks/task-bounty-client.mjs";
 import {
   createTaskContactClient,
   contactCandidates,
-} from '../../galaxy-web/src/task-contact-client.mjs';
+} from "../../galaxy-web/src/features/tasks/contact/task-contact-client.mjs";
 
 test(
   'Task contact browser: real signed HTTP, lost ACK/reentry, independent recipients and current-member room decisions',

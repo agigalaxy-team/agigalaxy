@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import {createWebRuntime,loadWebConfiguration} from '../packages/galaxy-web/src/runtime.mjs';
-import {createConfigurationClient} from '../packages/galaxy-web/src/configuration-client.mjs';
+import {createConfigurationClient} from "../packages/galaxy-web/src/features/tools/configuration-client.mjs";
 
 const release=process.argv[2],reportPath=process.argv[3];
 assert.match(release??'',/^official-2026\.09\.13-product-v2-r[1-9][0-9]*$/);

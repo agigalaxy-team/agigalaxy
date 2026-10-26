@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatClient } from '../../galaxy-web/src/chat-client.mjs';
+import { createChatClient } from "../../galaxy-web/src/features/chat/chat-client.mjs";
 
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const connection = { subjectId: 'synthetic-A', endpoint: 'https://official.example.org', bindingId: 'binding-A', generation: 1 };

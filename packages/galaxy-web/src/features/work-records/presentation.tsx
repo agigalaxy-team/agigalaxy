@@ -1,6 +1,6 @@
-import { ReadingDetails, ReadingSummary } from "../../reading-details";
+import { ReadingDetails, ReadingSummary } from "../../shared/reading/reading-details";
 import React from 'react';
-import {memberName} from "../../conversation-ui";
+import {memberName} from "../../shared/people/conversation-ui";
 import type {InterventionOpinionsView,ResolutionDecision} from "./presentation-types";
 
 const resolutionNames: Record<string, string> = {

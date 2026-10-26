@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsAgentOsActionTools} from '../src/operations-agentos-action-tools.mjs';
+import {OperationsAgentOsActionTools} from "../src/operations/agentos/action-tools.mjs";
 import {aiWorkCapabilities} from '../src/shared/operations-ai-work-capabilities.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
 
@@ -38,7 +38,7 @@ test('grant-bound directory results do not decide human preparation; current hum
   assert.deepEqual((await tools.listAuthorizedWork(caller,'governance')).humanPreparation.availableKinds,[],denied);
  }
  human=['content.read','content.curate'];ai=[...human];
- assert.deepEqual((await tools.listAuthorizedWork(caller,'maintenance')).humanPreparation.availableKinds,[],'another domain cannot inherit governance cards');
+ assert.deepEqual((await tools.listAuthorizedWork(caller,'maintenance')).humanPreparation.availableKinds,['content-curation'],'the same current role permissions expose the same preparable kinds across domains');
  lateRevoke=true;assert.deepEqual((await tools.listAuthorizedWork(caller,'governance')).humanPreparation.availableKinds,[],'late role removal is observed after directory read');lateRevoke=false;ai=[...human];
  denyAll=true;await assert.rejects(tools.listAuthorizedWork(caller,'governance'),{code:'operations_permission_denied'});denyAll=false;
  const clear={kind:'content-curation',targetKind:'post',targetId:id,topic:null,reason:'按当前来源清除这次分类覆盖'};

@@ -1,17 +1,17 @@
-import {AccountFollowsV1} from '../src/account-follows-v1.mjs';
+import {AccountFollowsV1} from "../src/accounts/follows-v1.mjs";
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,generateKeyPairSync} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../src/http.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
 import {forumWriteSpec} from '../src/shared/community-forum-v1-schema.mjs';
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {digest} from '../src/shared/digest.mjs';
 import {createServices} from '../src/services.mjs';
-import {createOfficialAccountPortal} from '../src/official-account.mjs';
+import {createOfficialAccountPortal} from "../src/accounts/official-account.mjs";
 
 export async function communityForumFixture({policy,resourceBudgetPolicy,officialAccountPortal=false,endpoint='https://official.example.org',scopes=['binding','consent','assistance','moderation','data-export','data-delete','history','case-teaser','context','notifications'],database=null,migrateDatabase=true}={}){
  const clock={now:Math.floor(Date.now()/1000)};

@@ -14,7 +14,7 @@
 | AgentOS/Gateway/Discovery | 各自 README、固定上游/锁与显式运行配置；不因目录存在而启用 |
 | 运维 | 按配置启用监控、日志、接收者、备份与所需恢复能力 |
 
-只启所需组件，不机械拆成微服务。API/Worker/migration 的环境约束由 [`runtime-environment.mjs`](../../packages/galaxy-official/src/runtime-environment.mjs) 执行：
+只启所需组件，不机械拆成微服务。API/Worker/migration 的环境约束由 [`runtime-environment.mjs`](../../packages/galaxy-official/src/infrastructure/runtime-environment.mjs) 执行：
 
 | 约束 | 要求 |
 |---|---|

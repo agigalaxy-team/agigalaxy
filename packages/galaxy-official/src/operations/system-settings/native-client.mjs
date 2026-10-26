@@ -1,6 +1,6 @@
 import {request as httpRequest} from 'node:http';
 import {randomUUID} from 'node:crypto';
-import {MaintenanceNativeClient,maintenanceRequestSignature,loadMaintenanceNativeConfiguration} from '../../operations-maintenance-native.mjs';
+import {MaintenanceNativeClient,maintenanceRequestSignature,loadMaintenanceNativeConfiguration} from "../maintenance/native.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 import {systemSettingsNativeCommandSchema,parseSystemSettings,systemSettingsErrorCodes} from './schema.mjs';
 

@@ -1,4 +1,4 @@
-import {readGeneralSettings,saveGeneralSettings,applyGeneralSettings,readGeneralSettingsOperation} from '../../../../../../lib/system-settings-general.mjs';
+import {readGeneralSettings,saveGeneralSettings,applyGeneralSettings,readGeneralSettingsOperation} from "../../../../../../lib/system-settings/system-settings-general.mjs";
 import {adminLog,requestCorrelation} from '../../../../../../lib/runtime-log.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';

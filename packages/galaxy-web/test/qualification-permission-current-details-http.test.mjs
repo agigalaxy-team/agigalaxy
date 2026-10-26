@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {privacyConsumerFixture} from '../../galaxy-official/test/privacy-consumer-continuity-workflow.mjs';
-import {createQualificationPermissionClient} from '../src/qualification-permission-client.mjs';
-import {getContributionClient} from '../src/contribution-client.mjs';
+import {createQualificationPermissionClient} from "../src/features/qualification-permissions/qualification-permission-client.mjs";
+import {getContributionClient} from "../src/features/work-records/contribution-client.mjs";
 
 async function fixture(t){
  const f=await privacyConsumerFixture();t.after(()=>f.close());const {runtime:peer}=await f.makeOther(),peerId=(await peer.status()).identity.subjectId,

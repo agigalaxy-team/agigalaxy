@@ -1,4 +1,4 @@
-import { transaction } from '../database.mjs';
+import { transaction } from "../infrastructure/database.mjs";
 import { migrations,assertSupportedSchema } from '../infrastructure/migrations.mjs';
 import { digest } from '../shared/digest.mjs';
 import { readDeletionEventPayload,retainedPayloadHash } from '../shared/deletion-event-payload.mjs';
@@ -6,7 +6,7 @@ import { deletionMinimizationSchema,deletionMinimizationEventSchema } from '../s
 import { deletionReviewSchema,retainedOperatorPayload } from './deletion-review.mjs';
 import { deletionLedgerColumns,validateDeletionLedger } from './deletion-ledger.mjs';
 import { lockDeletionTables } from './deletion-execute.mjs';
-import { deletionReceipt } from '../deletion.mjs';
+import { deletionReceipt } from "../privacy/deletion.mjs";
 
 export async function minimizeDeletionReceipt(database,input,{now=()=>Math.floor(Date.now()/1000)}={}){
   const command=deletionMinimizationSchema.parse(input),commandHash=digest(JSON.stringify(command));

@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {OperationsAgentOsGateway} from '../../operations-agentos-gateway.mjs';
+import {OperationsAgentOsGateway} from "../agentos/gateway.mjs";
 import {ServiceError} from '../../shared/service-error.mjs';
 
 const request=z.strictObject({executionId:z.uuid(),tool:z.enum(['read-selected-strategy','save-selected-strategy-draft','publish-selected-strategy']),arguments:z.record(z.string(),z.unknown()),runId:z.string().min(1).max(128),callId:z.string().min(1).max(128)});

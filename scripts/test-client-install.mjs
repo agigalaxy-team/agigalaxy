@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { buildClient } from './build-client.mjs';
 import { createGalaxyGenesis } from '../packages/galaxy-core/src/galaxy-guid.mjs';
 import { createClientRelease } from './client-release.mjs';
-import { verifyRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
+import { verifyRelease } from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 
 // Reusable package/install/sign pipeline. A production caller supplies its own
 // pinned release configuration; only the CLI test wrapper creates fixture keys.

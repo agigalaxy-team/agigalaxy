@@ -69,7 +69,7 @@ test('independent exact expiry, single-version/reply withdrawal and current expo
   assert.equal((await f.write(f.responder,'create-reply',await f.reply(p))).status,403);
   const withdrawVersion={schemaVersion:1,operationId:randomUUID(),postId:p.postId,versionId:p.versionId,expectedHeadVersion:2};assert.equal((await f.write(f.owner,'withdraw-version',withdrawVersion)).status,200);
   assert.equal((await f.ok(`/v2/community/posts/${p.postId}`,{authorization:false})).payload.versionId,q.versionId);
-  const withdrawReply={schemaVersion:1,operationId:randomUUID(),replyId:r.replyId,expectedRevision:1};assert.equal((await f.write(f.owner,'withdraw-reply',withdrawReply)).status,404);assert.equal((await f.write(f.responder,'withdraw-reply',withdrawReply)).status,200);
+  const withdrawReply={schemaVersion:1,operationId:randomUUID(),replyId:r.replyId,expectedRevision:1};assert.equal((await f.write(f.owner,'withdraw-reply',withdrawReply)).status,403);assert.equal((await f.write(f.responder,'withdraw-reply',withdrawReply)).status,200);
   assert.equal((await f.ok(`/v2/community/replies/${r.replyId}/owned`,{who:f.responder})).state,'withdrawn');
   assert.deepEqual(Object.keys(await f.ok(`/v2/community/replies/${r.replyId}`,{authorization:false})).sort(),['availability','checkedAt','locator']);
   const cleaned=await cleanupProductV2Retention(f.db,{now:()=>f.clock.now,forumPolicy:f.forum.policy,endpoint:f.owner.access.endpoint});assert.equal(cleaned.removed.forumBodies,2);

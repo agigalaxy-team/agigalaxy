@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {p13Fixture} from './p13-strategies-fixture.mjs';
+import {attachAiWorkFixture} from './fixtures/ai-work.mjs';
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {operationsAutomationScopeV1MigrationSql} from '../src/infrastructure/operations-automation-scope-v1-schema.mjs';
 import {automationScopeForSave,automationResourceScope} from '../src/shared/operations-automation-scope.mjs';
@@ -30,6 +31,11 @@ test('explicit eligible automation covers future qualified objects while legacy 
  // and P13 ordinary commands. The fixture's native transport is an explicit
  // double; this group never calls a model, Prosody or a production service.
  const f=await p13Fixture(t);f.authority.content=f.content;
+ // This group's later assisted read has an explicit AI work identity and role.
+ // Program grants above it remain independent of human AI-use rights.
+ const {ids:aiIds}=await attachAiWorkFixture({db:f.db,endpoint:f.endpoint,permissions:f.permissions,
+  businessAdmin:f.businessAdmin,authority:f.authority,admin:f.admin,domains:['governance'],
+  codes:['workbench.read','content.read'],now:f.now});
  const legacyEmptyId=randomUUID(),legacySelectedId=randomUUID(),legacyObject=randomUUID(),at=new Date(f.now()*1000);
  for(const [id,resourceIds] of [[legacyEmptyId,[]],[legacySelectedId,[legacyObject]]])await f.db.query(`INSERT INTO operations_automation_grants_v1
   (id,endpoint,name,executor_kind,mode,enabled,version,permissions,resource_ids,created_by,updated_by,created_at,updated_at)
@@ -118,9 +124,9 @@ test('explicit eligible automation covers future qualified objects while legacy 
  const options=await f.authority.options(f.admin);assert.ok(Array.isArray(options.items));
 
  // Assisted grants still intersect the real person's current PG roles.
- const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'仅当前合成读取者',description:'',enabled:true,permissions:['workbench.read','content.read']},{authorize:async()=>f.admin})).role;
+ const role=(await f.permissions.saveRole(f.admin,{operationId:randomUUID(),expectedVersion:0,name:'仅当前合成读取者',description:'',enabled:true,permissions:['workbench.read','content.read','ai.use.governance']},{authorize:async()=>f.admin})).role;
  const assignment=(await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),expectedVersion:0,operatorId:f.reader.operatorId,roleId:role.id,enabled:true},{authorize:async()=>f.admin})).assignment;
- const assisted=(await save(grantInput(['content.read'],{mode:'assisted',executorKind:'ai'}))).automation,assistedExecution=(await create(assisted,[sample.post.postId],{actions:['content.read'],who:f.reader})).execution;
+ const assisted=(await save(grantInput(['content.read'],{mode:'assisted',executorKind:'ai',aiAccountId:aiIds.governance}))).automation,assistedExecution=(await create(assisted,[sample.post.postId],{actions:['content.read'],who:f.reader})).execution;
  assert.deepEqual((await f.authority.options(f.reader)).items.find(row=>row.id===assisted.id).resourceScope,{kind:'eligible'});
  const assistedActor=await f.authority.actor(assistedExecution.id);
  await f.permissions.saveAssignment(f.admin,{operationId:randomUUID(),id:assignment.id,expectedVersion:assignment.version,operatorId:f.reader.operatorId,roleId:role.id,enabled:false},{authorize:async()=>f.admin});

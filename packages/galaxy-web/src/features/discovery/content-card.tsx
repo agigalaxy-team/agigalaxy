@@ -1,6 +1,6 @@
 import React from "react";
 import {BookOpen} from "lucide-react";
-import {TaskCurrentCard,TaskMaterialNotice,taskViewTitle} from "../../task-material-view";
+import {TaskCurrentCard,TaskMaterialNotice,taskViewTitle} from "../tasks/materials/task-material-view";
 import "./home.css";
 import {labels} from "./contracts";
 import type {Props,ContentEntry} from "./contracts";

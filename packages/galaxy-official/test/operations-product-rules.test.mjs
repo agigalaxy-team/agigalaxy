@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {OperationsProductRules,createOperationsPolicyRuntime} from '../src/operations-product-rules.mjs';
+import {OperationsProductRules,createOperationsPolicyRuntime} from "../src/operations/rules/product-rules.mjs";
 import {defaultResourceBudgetPolicy} from '../src/infrastructure/resource-budgets.mjs';
-import {defaultCommunityPolicy,PublicWriteService} from '../src/public-writes.mjs';
-import {defaultForumPolicy} from '../src/community-forum-policy-v1.mjs';
+import {defaultCommunityPolicy,PublicWriteService} from "../src/publishing/public-writes.mjs";
+import {defaultForumPolicy} from "../src/community/community-forum-policy-v1.mjs";
 import {operationsProductFixture} from './operations-product-fixture.mjs';
-import {apiOperationsPolicyConsumers} from '../src/operations-policy-consumers.mjs';
+import {apiOperationsPolicyConsumers} from "../src/operations/rules/policy-consumers.mjs";
 
 test('rule revisions persist across processes, reject stale writers and become applied only in the real consumer',{timeout:60000},async t=>{
   const f=await operationsProductFixture(t),rules=new OperationsProductRules(f);

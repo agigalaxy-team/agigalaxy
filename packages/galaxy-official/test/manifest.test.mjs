@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { ManifestService, verifyManifest } from '../src/manifest.mjs';
-import { isPublicAddress, validatePublicUrl, fetchPublicJson } from '../src/public-fetch.mjs';
+import { isPublicAddress, validatePublicUrl, fetchPublicJson } from "../src/infrastructure/public-fetch.mjs";
 import { createApi } from '../src/http.mjs';
 
 test('anonymous Manifest endpoint caches signed data without asserting a binding', async () => {

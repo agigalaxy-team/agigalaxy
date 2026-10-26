@@ -4,15 +4,15 @@ import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture} from './account-chat-fixture.mjs';
 import {communityForumFixture} from './community-forum-fixture.mjs';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {OperationsPermissionsService} from '../src/operations-permissions.mjs';
-import {CommunityForumV1} from '../src/community-forum-v1.mjs';
-import {CommunityForumGovernanceV1} from '../src/community-forum-governance-v1.mjs';
-import {OperationsCommunityService} from '../src/operations-community.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {OperationsPermissionsService} from "../src/operations/permissions/index.mjs";
+import {CommunityForumV1} from "../src/community/community-forum-v1.mjs";
+import {CommunityForumGovernanceV1} from "../src/community/community-forum-governance-v1.mjs";
+import {OperationsCommunityService} from "../src/operations/community/service.mjs";
 import {OperationsForumContentService} from '../src/operations/public-content/service.mjs';
-import {ForumAttachmentsV1Service} from '../src/forum-attachments-v1.mjs';
-import {ReadingBookmarksV1} from '../src/reading-bookmarks-v1.mjs';
+import {ForumAttachmentsV1Service} from "../src/community/forum-attachments-v1.mjs";
+import {ReadingBookmarksV1} from "../src/accounts/reading-bookmarks-v1.mjs";
 import {bindForumIds} from '../src/shared/community-forum-ids-v1.mjs';
 import {createApi} from '../src/http.mjs';
 import {ServiceError} from '../src/shared/service-error.mjs';
@@ -133,7 +133,7 @@ test('valid subject-only signed forum sources remain manageable under their exac
  await f.db.query('UPDATE forum_replies_v1 SET account_id=NULL WHERE id=$1',[reply.replyId]);
  await f.db.query('UPDATE forum_events_v1 SET account_id=NULL WHERE id=ANY($1::uuid[])',[[post.operationId,reply.operationId,withdrawn.operationId,withdrawal.operationId]]);
  await f.db.query('UPDATE forum_permissions_v1 SET account_id=NULL WHERE event_id=ANY($1::uuid[])',[[post.operationId,reply.operationId,withdrawn.operationId,withdrawal.operationId]]);
- const now=()=>f.clock.now,endpoint=f.owner.access.endpoint,admin=await operator(f.db,endpoint,now),businessAdmin=new BusinessAdminService({db:f.db,endpoint,now}),service=new OperationsForumContentService({businessAdmin,forum:f.forum,now});
+ const now=()=>f.clock.now,endpoint=f.owner.access.endpoint,{admin,businessAdmin}=await contentOperators(f.db,endpoint,now),service=new OperationsForumContentService({businessAdmin,forum:f.forum,now});
  assert.equal((await f.forum.getPost(post.postId)).availability,'available');assert.equal((await f.forum.getReply(reply.replyId)).availability,'available');
  const page=await service.list(admin,{days:'all'});assert.equal(page.summary.total,3);assert.equal(page.summary.unavailable,1);
  const legacy=page.items.find(item=>item.id===post.postId);assert.equal(legacy.author.accountId,null);assert.equal(legacy.author.uid,null);assert.equal(legacy.author.subjectId,f.owner.actor.subjectId);
@@ -146,7 +146,7 @@ test('valid subject-only signed forum sources remain manageable under their exac
  assert.equal(retained[0].title,null);assert.deepEqual(retained[0].author,{accountId:null,uid:null,displayName:null,subjectId:null});
  assert.equal((await service.get(admin,'post',withdrawn.postId)).content.body,null);
  assert.equal((await service.list(admin,{days:'all',query:withdrawn.title})).items.length,0);
- const foreign=new OperationsForumContentService({businessAdmin:new BusinessAdminService({db:f.db,endpoint:'https://foreign.example.org',now}),forum:f.forum,now}),foreignActor={...admin,endpoint:'https://foreign.example.org'};
+ const foreign=new OperationsForumContentService({businessAdmin:new BusinessAdminService({db:f.db,endpoint:'https://foreign.example.org',now,permissions:businessAdmin.permissions}),forum:f.forum,now}),foreignActor={...admin,endpoint:'https://foreign.example.org'};
  await assert.rejects(foreign.get(foreignActor,'post',post.postId),{code:'business_admin_denied'});
  await assert.rejects(foreign.rawWithin(f.db,'post',post.postId),{code:'not_found'});
 });
@@ -276,8 +276,8 @@ test('public content directory retains authorized unavailable metadata without o
 
 test('a missing current forum version uses only the latest retained public metadata and keeps oversized directory totals unknown',{timeout:60000},async t=>{
  const f=await accountChatFixture();t.after(f.close);
- const forum=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),businessAdmin=new BusinessAdminService({db:f.db,endpoint:f.endpoint,now:f.now}),
-  admin=await operator(f.db,f.endpoint,f.now),service=new OperationsForumContentService({businessAdmin,forum,now:f.now}),owner=f.people[0];
+ const forum=new CommunityForumV1(f.access,null,{accounts:f.accounts,publicWrites:f.publicWrites}),{businessAdmin,admin}=await contentOperators(f.db,f.endpoint,f.now),
+  service=new OperationsForumContentService({businessAdmin,forum,now:f.now}),owner=f.people[0];
  async function publish(title,extra={}){
   const kind=extra.expectedHeadVersion?'publish-version':'create-post',x=await bindForumIds(kind,'account:'+owner.accountId,{schemaVersion:1,operationId:randomUUID(),postId:randomUUID(),versionId:randomUUID(),
    expectedHeadVersion:0,accountId:owner.accountId,title,body:title+'_PROSE',links:[],topic:'technology',audience:everyone,publishedUntil:f.now()+3600,...extra});

@@ -6,7 +6,7 @@
 
 | 边界 | 权威入口 | 必须保留 |
 |---|---|---|
-| Hub 服务族 | `packages/galaxy-official/src/operations-config.mjs`、`deploy/runtime-settings.example.json`、`release-resources.json` | 四入口同发行、完整迁移列表、业务库及角色分离 |
+| Hub 服务族 | `packages/galaxy-official/src/operations/configuration.mjs`、`deploy/runtime-settings.example.json`、`release-resources.json` | 四入口同发行、完整迁移列表、业务库及角色分离 |
 | Web/Native | Official `browser-client.mjs`、`src/shared/`，Web runtime 与 Native handoff | 账户登录、本机控制、连接 scope、来源 Consent 各自有效；网页不因登录创建/恢复本机 ID |
 | Admin/BFF | `apps/galaxy-admin/.env.example`、`lib/access/`、Node 运营路由 | 独立管理会话，当前人权与所选 AI 角色交集，后端事务内重新核权 |
 | AgentOS | `services/galaxy-operations-agentos/runtime.env.example`、`config.py`、`tool_schemas.py` | 私有 service key/JWT，Node 签发控制与原操作归因；服务 key 不等于业务角色 |

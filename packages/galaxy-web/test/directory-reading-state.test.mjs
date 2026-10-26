@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {directoryReadingState,rememberDirectoryReading} from '../src/directory-reading-state.mjs';
+import {directoryReadingState,rememberDirectoryReading} from "../src/shared/reading/directory-reading-state.mjs";
 
 test('visible return recovers navigation depth and selected object while preserving shell state and isolating route, binding and owner',()=>{
   const old={history:globalThis.history,location:globalThis.location,sessionStorage:globalThis.sessionStorage};

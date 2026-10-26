@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeGalaxyIntegration, createCaseDraft } from '../../galaxy-core/src/local-store.mjs';
-import { listLocalPublicationCases, prepareLocalCasePublication, recordLocalCasePublication } from '../src/local-case-publication.mjs';
+import { listLocalPublicationCases, prepareLocalCasePublication, recordLocalCasePublication } from "../src/clients/local/case-publication.mjs";
 
 test('local publication persists one frozen event per identity/endpoint/case and records exact acknowledgements', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-publication-'));

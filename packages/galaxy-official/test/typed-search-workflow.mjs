@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSearchClient } from '../src/history-client.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { EvidenceService } from '../src/evidence.mjs';
-import { ConsentReader } from '../src/consent-reader.mjs';
-import { inspectGithubRun } from '../src/github-evidence.mjs';
+import { createSearchClient } from "../src/clients/history.mjs";
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { EvidenceService } from "../src/evidence/evidence.mjs";
+import { ConsentReader } from "../src/consents/consent-reader.mjs";
+import { inspectGithubRun } from "../src/evidence/github-evidence.mjs";
 
 export async function verifyTypedSearch(database=null,options={}){
   const scopes=['binding','consent','case-teaser','evidence','proof','history','capsules'];

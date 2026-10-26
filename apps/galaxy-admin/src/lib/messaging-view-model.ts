@@ -1,4 +1,4 @@
-import type {MessageCommandEffects,MessageOperationKind,MessageOriginalReceipt,MessageAudience,MessageDraft,MessagePlan,MessageRecipient,MessageRecurrence,MessageSchedule,MessagingConfig,MessagingLocation} from '../components/messaging-types';
+import type {MessageCommandEffects,MessageOperationKind,MessageOriginalReceipt,MessageAudience,MessageDraft,MessagePlan,MessageRecipient,MessageRecurrence,MessageSchedule,MessagingConfig,MessagingLocation} from "../components/messaging/messaging-types";
 import type {AccountPickerKnownAccount} from '../components/AccountPicker';
 
 export const messageChannels={announcement:'公告',inapp:'站内信',email:'系统邮件'} as const;

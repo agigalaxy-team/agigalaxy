@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {createNativeA2aHostV2} from '../../../../galaxy-a2a/src/host-flow-v2.mjs';
+import {createNativeA2aHostV2} from '../../../../galaxy-a2a/src/hosts/host-flow-v2.mjs';
 
 const authentication = z.discriminatedUnion('mode', [
  z.strictObject({mode:z.literal('none')}),

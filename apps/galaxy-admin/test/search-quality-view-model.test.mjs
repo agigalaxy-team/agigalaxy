@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {searchQualityLocation,searchQualityHref,searchQualityOverviewPath,searchQualityHistoryPath,searchQualityOperationPath,searchQualityNext,searchQualityPrevious,searchQualityOverview,searchQualityHistory,searchQualityDraft,searchQualityDraftBody,searchQualityDifferences,searchQualityOperationResult,searchQualityPhase,searchQualitySettings,searchQualityNumber,searchQualityPercent} from '../src/lib/search-quality-view-model.ts';
+import {searchQualityLocation,searchQualityHref,searchQualityOverviewPath,searchQualityHistoryPath,searchQualityOperationPath,searchQualityNext,searchQualityPrevious,searchQualityOverview,searchQualityHistory,searchQualityDraft,searchQualityDraftBody,searchQualityDifferences,searchQualityOperationResult,searchQualityPhase,searchQualitySettings,searchQualityNumber,searchQualityPercent} from "../src/lib/search/search-quality-view-model.ts";
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');
 const stamp='2026-10-23T07:00:00.000Z',lease={checkedAt:1792738800,readExpiresAt:1792738830,metadataOnly:true};

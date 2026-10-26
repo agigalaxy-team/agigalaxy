@@ -1,9 +1,9 @@
 import React,{useCallback,useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import type {z} from 'zod/v4';
 import {Button} from '@/components/ui/button';
-import {useAccountSessionModel,useOnlineAccountDraftMemory} from '../../account-session-scope';
-import {useAccountConnection} from '../../account-center';
-import {useReadTasks} from '../../use-read-task';
+import {useAccountSessionModel,useOnlineAccountDraftMemory} from "../accounts/account-session-scope";
+import {useAccountConnection} from "../accounts/account-center";
+import {useReadTasks} from "../../shared/reading/use-read-task";
 import {accountFollowRelationshipSchema,type accountFollowStatusSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
 import {createAccountFollowsClient} from './client.mjs';
 import './account-follows.css';

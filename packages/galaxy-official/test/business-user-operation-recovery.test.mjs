@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createServer} from 'node:http';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 import {dispatchBusinessAdmin} from '../src/adapters/http/business-admin-http.mjs';
 import {requestUrl} from '../src/adapters/http/policy.mjs';
 import {attachOperationsFixtureAuthority} from './fixtures/operations-authority.mjs';
 import {operationsProxyRequestPolicy,operationsReadPath} from '../../../apps/galaxy-admin/src/lib/proxy-policy.mjs';
-import {businessUserEmptyDraft,businessUserOriginalReceipt,businessUserPendingReceipt,businessUserReceiptPath,businessUserReviewType,businessUserWriteResult,businessUsersDraftSnapshot} from '../../../apps/galaxy-admin/src/lib/business-users-draft-memory.ts';
+import {businessUserEmptyDraft,businessUserOriginalReceipt,businessUserPendingReceipt,businessUserReceiptPath,businessUserReviewType,businessUserWriteResult,businessUsersDraftSnapshot} from "../../../apps/galaxy-admin/src/lib/accounts/business-users-draft-memory.ts";
 
 // Real PG migrations/API role/current PG role permissions, original business
 // methods, exact receipt queries and loopback HTTP adapter. Only the upstream

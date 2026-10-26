@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {hubsContinuityFixture} from './hubs-client-continuity-workflow.mjs';
-import {createHubsWebClient} from '../../galaxy-web/src/hubs-client.mjs';
+import {createHubsWebClient} from "../../galaxy-web/src/features/hubs/hubs-client.mjs";
 
 test('Hub journal locator is durably attached before HTTP, then the exact unsubmitted content resumes', {timeout:60000}, async()=>{
  const f=await hubsContinuityFixture();try{

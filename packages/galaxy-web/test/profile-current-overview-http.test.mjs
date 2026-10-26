@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
-import {HonorService} from '../../galaxy-official/src/honor.mjs';
+import {HonorService} from "../../galaxy-official/src/records/honor.mjs";
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
-import {readProfileDisplayNames} from '../../galaxy-official/src/profile-display-names.mjs';
-import {createProfileClient} from '../src/profile-client.mjs';
-import {createHistoryClient} from '../src/history-client.mjs';
+import {readProfileDisplayNames} from "../../galaxy-official/src/accounts/profile-display-names.mjs";
+import {createProfileClient} from "../src/features/profiles/profile-client.mjs";
+import {createHistoryClient} from "../src/features/work-records/history-client.mjs";
 
 async function fixture(t){
  const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000)+30}),

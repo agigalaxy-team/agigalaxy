@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {OperationsPermissionsService} from '../../src/operations-permissions.mjs';
+import {OperationsPermissionsService} from "../../src/operations/permissions/index.mjs";
 
 // The native directory is an explicit local fixture. Business action grants
 // are saved and checked by the real PG service, never copied from actor JSON.

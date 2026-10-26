@@ -1,10 +1,10 @@
 import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {CheckCircle2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {AccountEntryPage,useAccountConnection} from '../../account-center';
-import {useAccountSessionModel} from '../../account-session-scope';
-import {OfficialAccountStatus,type OfficialAccountModel} from '../../official-account-panel';
-import {LoadingFeedback} from '../../interaction-feedback';
+import {AccountEntryPage,useAccountConnection} from "../accounts/account-center";
+import {useAccountSessionModel} from "../accounts/account-session-scope";
+import {OfficialAccountStatus,type OfficialAccountModel} from "../accounts/official-account-panel";
+import {LoadingFeedback} from "../../shared/feedback/interaction-feedback";
 import {FeedbackAttachmentField,type FeedbackDraftAttachment} from './attachment-field';
 import {feedbackDraftAttachmentsSchema,feedbackAttachmentError} from './attachments-client.mjs';
 import './form.css';

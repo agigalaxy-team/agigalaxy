@@ -6,7 +6,7 @@ import { ServiceError } from '../src/shared/service-error.mjs';
 
 import { informationToolDefinitions } from '../src/adapters/mcp/personal/tools/information-v2.mjs';
 import { cleanupInformationWatchesWithin } from '../src/operations/information-watch-retention-v2.mjs';
-import { createInformationClientV2 } from '../../galaxy-web/src/information-client-v2.mjs';
+import { createInformationClientV2 } from "../../galaxy-web/src/features/information/client.mjs";
 import { createBrowserClient } from '../src/browser-client.mjs';
 import { digest } from '../src/shared/digest.mjs';
 import { productV2ExportSources } from '../src/infrastructure/lifecycle-export-v2.mjs';

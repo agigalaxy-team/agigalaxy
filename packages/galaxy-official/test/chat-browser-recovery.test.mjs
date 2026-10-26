@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatClient,chatSendRequestHash } from '../../galaxy-web/src/chat-client.mjs';
+import { createChatClient,chatSendRequestHash } from "../../galaxy-web/src/features/chat/chat-client.mjs";
 
 function exactReceipt(roomId,input,state='accepted') { return {roomId,...input,state,checkedAt:new Date().toISOString(),currentAccessGranted:false,contentReturned:false,othersReadStatus:'not-asserted',acceptedByRoom:state==='accepted',
  ...(!['absent','conflict'].includes(state)?{messageId:crypto.randomUUID(),revision:1,sentAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString(),historicalAcceptanceRecorded:state!=='pending',archiveCleanupState:'not-requested'}:{})}; }

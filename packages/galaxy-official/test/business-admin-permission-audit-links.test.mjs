@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
-import {withPermissionAuditLinks} from '../src/business-admin-permission-audit-links.mjs';
-import {auditItem} from '../src/operations-agentos-query-view.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
+import {withPermissionAuditLinks} from "../src/operations/audit/business-admin-permission-audit-links.mjs";
+import {auditItem} from "../src/operations/agentos/query-view.mjs";
 import {auditObjects,auditMetadata,auditObjectRecordsHref,normalizeAuditFilters} from '../../../apps/galaxy-admin/src/lib/audit-view-model.ts';
 
 // One actual migrated PGlite/galaxy_api read-model leaf. Authorization is an

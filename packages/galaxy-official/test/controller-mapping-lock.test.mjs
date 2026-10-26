@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {lockControllerMappingsWithin,controllerMappingLockKeys} from '../src/controller-mapping-lock.mjs';
-import {CommunityAccountRegistry} from '../src/community-accounts.mjs';
+import {lockControllerMappingsWithin,controllerMappingLockKeys} from "../src/identity/controller-mapping-lock.mjs";
+import {CommunityAccountRegistry} from "../src/accounts/community-accounts.mjs";
 import {chatFixture,invite} from './chat-workflow.mjs';
 
 test('controller lock keys cover absent associations and batch duplicates in stable subject order',async()=>{
@@ -17,12 +17,17 @@ test('controller lock keys cover absent associations and batch duplicates in sta
 });
 
 test('verified association takes the same exclusive subject key before account upsert even for a first link',async()=>{
- const endpoint='https://official.example.org',subjectId='synthetic-first-association',linkId=randomUUID(),calls=[];
- const access={endpoint,now:()=>1000},registry=new CommunityAccountRegistry(access,[{describe:()=>({issuer:'https://issuer.example',clientId:'client'})}]);
- const db={query:async(sql,args)=>{calls.push({sql,args});if(sql.includes('FROM external_identity_links'))return{rows:[{issuer:'https://issuer.example',client_id:'client'}]};if(sql.includes('RETURNING id'))return{rows:[{id:randomUUID()}]};return{rows:[]};}};
- await registry.linkVerifiedWithin(db,{subjectId,linkId,endpoint,issuer:'https://issuer.example',externalSubject:'synthetic-account',verifiedAt:1000,verificationMethod:'email'});
- assert.ok(calls[0].sql.includes('pg_advisory_xact_lock('));assert.equal(calls[0].args[1],controllerMappingLockKeys(endpoint,[subjectId])[0]);
- assert.ok(calls.findIndex(call=>call.sql.includes('INSERT INTO community_accounts'))>0);
+ const f=await chatFixture();try{
+  const actor=f.people[0],endpoint=f.chat.access.endpoint,subjectId=actor.subjectId,linkId=randomUUID(),calls=[];
+  const issuer='https://issuer.example',externalSubject='synthetic-first-association';
+  await f.db.query("INSERT INTO external_identity_links(id,subject_id,binding_id,endpoint,provider_id,issuer,external_subject,client_id,payload_text,payload_hash,signature,created_at) VALUES($1,$2,$3,$4,'synthetic',$5,$6,'client','{}',$7,'synthetic-not-authentication',$8)",[linkId,subjectId,actor.bindingId,endpoint,issuer,externalSubject,'a'.repeat(64),new Date(f.now()*1000)]);
+  const registry=new CommunityAccountRegistry(f.chat.access,[{describe:()=>({issuer,clientId:'client'})}]);
+  await f.db.transaction(tx=>registry.linkVerifiedWithin({query:async(sql,args)=>{calls.push({sql,args});return tx.query(sql,args);}},{subjectId,linkId,endpoint,issuer,externalSubject,verifiedAt:f.now(),verificationMethod:'email'}));
+  assert.ok(calls[0].sql.includes('pg_advisory_xact_lock('));assert.equal(calls[0].args[1],controllerMappingLockKeys(endpoint,[subjectId])[0]);
+  assert.ok(calls.findIndex(call=>call.sql.includes('INSERT INTO community_accounts'))>0);
+  const registered=(await f.db.query('SELECT r.account_id,r.uid,a.id FROM official_account_registrations_v1 r JOIN community_accounts a ON a.id=r.account_id AND a.uid=r.uid WHERE r.endpoint=$1 AND r.issuer=$2 AND r.external_subject=$3',[endpoint,issuer,externalSubject])).rows;
+  assert.equal(registered.length,1);assert.equal(registered[0].id,registered[0].account_id);assert.match(registered[0].uid,/^G[A-Z0-9]{10}[0-9]$/);
+ }finally{await f.close();}
 });
 
 test('actual room reads and writes acquire the complete controller batch before resolution without read-side row updates',async()=>{

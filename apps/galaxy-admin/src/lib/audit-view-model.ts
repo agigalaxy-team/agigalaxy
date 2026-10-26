@@ -1,6 +1,6 @@
 import type {AuditEvent} from '../components/business-types';
 import {paginationPageNumbers} from './pagination-model';
-import {systemSettingsOriginalHref} from './system-settings-view-model';
+import {systemSettingsOriginalHref} from "./system-settings/system-settings-view-model";
 
 export type AuditKind='all'|'business'|'reads';
 export type AuditPageSize=20|30|50|100;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRetirementController, loadRetirementController } from '../src/retirement.mjs';
+import { createRetirementController, loadRetirementController } from "../src/privacy/retirement.mjs";
 import { retirementFixturePolicy, verifyRetirementWorkflow } from './retirement-workflow.mjs';
 
 test('retirement API allows takeout and revocation, clips downloads, closes enrollment and reports remaining deletion work', () => verifyRetirementWorkflow());

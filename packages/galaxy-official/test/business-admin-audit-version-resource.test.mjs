@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../src/database.mjs';
-import {BusinessAdminService} from '../src/business-admin.mjs';
+import {migrate} from "../src/infrastructure/database.mjs";
+import {BusinessAdminService} from "../src/operations/audit/service.mjs";
 
 // One real migrated PGlite/galaxy_api leaf. Current audit.read authorization is
 // an explicit double, not an OIDC/Keycloak or live business-grant claim.
@@ -41,5 +41,5 @@ test('both audit read contracts find only exact closed selection version IDs wit
  const hidden=await service.audit(actor,{query:'PRIVATE_VERSION_PROSE_MUST_NOT_LEAVE',kind:'business',page:1,pageSize:20});assert.equal(hidden.pagination.total,0);
  assert(!JSON.stringify({cursor,page,repeated,byOther,hidden}).includes('PRIVATE_VERSION_PROSE_MUST_NOT_LEAVE'));
  assert.deepEqual((await db.query("SELECT id,selection,result,created_at,operation_id FROM business_admin_audit_v1 WHERE action<>'audit-read' ORDER BY id")).rows,original,'Read projection does not rewrite old audits');
- assert(checks>=14);assert.equal((await db.query('SELECT max(version) AS n FROM schema_migrations')).rows[0].n,124);
+ assert(checks>=14);assert.equal((await db.query('SELECT count(*)::int AS n FROM schema_migrations WHERE version=124')).rows[0].n,1);
 });

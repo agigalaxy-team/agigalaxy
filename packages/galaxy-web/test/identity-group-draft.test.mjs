@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {identityGroupDraftKey,settleIdentityGroupDrafts,rebindIdentityGroupDrafts} from '../src/identity-group-draft.mjs';
+import {identityGroupDraftKey,settleIdentityGroupDrafts,rebindIdentityGroupDrafts} from "../src/features/identity-groups/identity-group-draft.mjs";
 
 const endpoint='https://identity-group.example',subjectId='GUID0000000000000000000000000001';
 const original={endpoint,ownerId:subjectId,operationId:'11111111-1111-4111-8111-111111111111',groupId:'22222222-2222-4222-8222-222222222222',proofId:'33333333-3333-4333-8333-333333333333',payloadHash:'a'.repeat(64)};

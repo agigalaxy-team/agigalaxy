@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
-import {RequesterHistoryV2Service} from '../src/requester-history-v2.mjs';
+import {RequesterHistoryV2Service} from "../src/records/requester-history-v2.mjs";
 import {digest} from '../src/shared/digest.mjs';
 
 const orderedId=value=>`00000000-0000-4000-8000-${String(value).padStart(12,'0')}`;

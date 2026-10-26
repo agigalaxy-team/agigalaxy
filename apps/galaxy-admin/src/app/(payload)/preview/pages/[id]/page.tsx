@@ -3,7 +3,7 @@ import {notFound,redirect} from 'next/navigation';
 import Link from 'next/link';
 import {authenticatedCMS} from '../../../../../lib/cms';
 import {projectBlocks} from '../../../../../lib/content-model.mjs';
-import {SiteContent,type ContentBlock,type SiteMedia} from '../../../../../components/SiteContent';
+import {SiteContent,type ContentBlock,type SiteMedia} from "../../../../../components/site-publication/SiteContent";
 export const dynamic='force-dynamic';
 export default async function PreviewPage({params}:{params:Promise<{id:string}>}){
   const {id}=await params;

@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
 import {chatFixture} from './chat-workflow.mjs';
-import {chatActorRef} from '../src/chat-actors.mjs';
+import {chatActorRef} from "../src/chat/chat-actors.mjs";
 import {chatHttpActor} from '../src/adapters/http/chat-http.mjs';
 
 test('account-only chat preserves invitations, group consent, messages, files and current source access without creating identities',async t=>{

@@ -5,9 +5,9 @@ import {builderDeclaration} from './builders-workflow.mjs';
 import {sampleCharter} from './hubs-workflow.mjs';
 import {createApi} from '../src/http.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import {postHubPeeringJson} from '../src/public-fetch.mjs';
+import {postHubPeeringJson} from "../src/infrastructure/public-fetch.mjs";
 import {createPeeringProof} from './hub-ci-proof-fixture.mjs';
-import {samePeeringMaterial} from '../../galaxy-web/src/peering-material.mjs';
+import {samePeeringMaterial} from "../../galaxy-web/src/features/hubs/peering-material.mjs";
 export const hubScopes=['binding','consent','builders','case-teaser','evidence','proof','history','data-export','data-delete'];
 export async function prepareHub(f){const hubId=randomUUID(),d={id:randomUUID(),builderId:hubId,kind:'declare',expectedRevision:0,
   declaration:{...builderDeclaration('hub',f.actor.subjectId),endpoint:f.access.endpoint}};

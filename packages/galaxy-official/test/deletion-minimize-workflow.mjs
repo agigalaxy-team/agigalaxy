@@ -8,8 +8,8 @@ import { minimizeDeletionReceipt } from '../src/operations/deletion-minimize.mjs
 import { captureDeletionLedger,replayDeletionLedger } from '../src/operations/deletion-ledger.mjs';
 import { readDeletionEventPayload } from '../src/shared/deletion-event-payload.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createDeletionClient } from '../src/deletion-client.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createDeletionClient } from "../src/clients/deletion.mjs";
 
 export async function verifyDeletionMinimization(database=null,options={}){
   const scopes=['binding','consent','case-teaser','data-delete'];

@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { calculateJwkThumbprint, importJWK } from 'jose';
-import { verifyRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
+import { verifyRelease } from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 
 const publisher = 'https://agigalaxy.org';
 const kid = 'galaxy-release-20260911';

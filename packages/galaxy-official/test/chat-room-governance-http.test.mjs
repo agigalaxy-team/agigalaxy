@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {serviceFixture} from './service-fixture.mjs';
 import {oidcProviderFixture} from './oidc-provider-fixture.mjs';
-import {createOidcLoginProvider} from '../src/oidc-login.mjs';
+import {createOidcLoginProvider} from "../src/identity/authentication/oidc-login.mjs";
 import {createApi} from '../src/http.mjs';
 import {nativeHttpDefinitions} from '../../galaxy-edge-mcp/src/native-v2/tools/http.mjs';
 

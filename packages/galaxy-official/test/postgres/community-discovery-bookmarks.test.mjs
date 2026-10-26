@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import pg from 'pg';
-import {migrate,transaction} from '../../src/database.mjs';
+import {migrate,transaction} from "../../src/infrastructure/database.mjs";
 import {migrations} from '../../src/infrastructure/migrations.mjs';
 import {digest} from '../../src/shared/digest.mjs';
 import {communityForumFixture} from '../community-forum-fixture.mjs';
@@ -47,7 +47,7 @@ test('real PostgreSQL81 ->83 preserves accepted forum facts and permits only nor
    for(const migration of prefix){await db.query(migration.sql);await db.query('INSERT INTO schema_migrations(version) VALUES($1)',[migration.version]);}
   });await mark('exact-head81-schema-applied');
   legacy=await communityForumFixture({database:admin,migrateDatabase:false});await legacy.login(legacy.owner,'real-pg-legacy-forum-author');
-  const {CommunityForumV1:HeadForum}=await headModule('packages/galaxy-official/src/community-forum-v1.mjs');
+  const {CommunityForumV1:HeadForum}=await headModule("packages/galaxy-official/src/community/community-forum-v1.mjs");
   const originalForum=new HeadForum(legacy.owner.access,legacy.owner.consents,{accounts:legacy.owner.communityAccounts,publicWrites:legacy.owner.publicWrites});
   const p=await legacy.post({title:'[Synthetic local] Retained pre82 original post',body:'This exact old signed post remains available after the new topic/index and private bookmark migration.'}),input=await legacy.authorize(legacy.owner,'create-post',p);
   const published=await originalForum.publish(legacy.owner.actor,input);assert.equal(published.acknowledged,true);assert.equal((await originalForum.getPost(p.postId)).payload.body,p.body);

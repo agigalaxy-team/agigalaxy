@@ -1,5 +1,5 @@
-import {transaction} from "../../database.mjs";
-import {operationsOperatorNamesWithin} from "../../operations-history-identities.mjs";
+import {transaction} from "../../infrastructure/database.mjs";
+import {operationsOperatorNamesWithin} from "../accounts/history-identities.mjs";
 import {recommendationOverviewSchema,recommendationHistorySchema,parseRecommendation,normalizeRecommendationTerm} from "../../shared/operations-recommendation-schema.mjs";
 import {recommendationThemeKeys} from "../../discovery-runtime/recommendation-control.mjs";
 import {iso,stamp,unknownMetrics} from './helpers.mjs';

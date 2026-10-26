@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { serviceFixture } from './service-fixture.mjs';
-import { HonorService } from '../src/honor.mjs';
+import { HonorService } from "../src/records/honor.mjs";
 import { createApi } from '../src/http.mjs';
 
 export async function verifyReciprocalContributionWorkflow(database=null,options={}){

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { resolve, join, isAbsolute, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { signRelease, verifyRelease } from '../packages/galaxy-official/src/release-artifact.mjs';
+import { signRelease, verifyRelease } from "../packages/galaxy-official/src/infrastructure/release-artifact.mjs";
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');

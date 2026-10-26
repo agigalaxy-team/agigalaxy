@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { serviceFixture } from './service-fixture.mjs';
 import { createApi } from '../src/http.mjs';
-import { createSessionMemory } from '../src/session-memory.mjs';
-import { createHelpRuntimeV2 } from '../src/help-runtime-v2.mjs';
+import { createSessionMemory } from "../src/infrastructure/session-memory.mjs";
+import { createHelpRuntimeV2 } from "../src/clients/flows/help-runtime-v2.mjs";
 
 const id = () => randomUUID();
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import {migrate} from '../../src/database.mjs';
+import {migrate} from "../../src/infrastructure/database.mjs";
 import {apiReads} from '../../src/infrastructure/api-reads.mjs';
 import {verifyCapsuleWebV2} from '../capsule-web-v2-workflow.mjs';
 test('Capsule web actual PostgreSQL API role, exact browser HTTP receipts and source permission views',{timeout:120000},async()=>{

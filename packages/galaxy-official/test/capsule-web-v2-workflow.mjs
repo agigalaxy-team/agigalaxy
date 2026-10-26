@@ -4,7 +4,7 @@ import {serviceFixture} from './service-fixture.mjs';
 import {createApi} from '../src/http.mjs';
 import {createBrowserClient} from '../src/browser-client.mjs';
 import {digest} from '../src/shared/digest.mjs';
-import {createCapsuleWebClient,capsuleCaseSources,currentCapsuleFacts} from '../../galaxy-web/src/capsule-workspace-client.mjs';
+import {createCapsuleWebClient,capsuleCaseSources,currentCapsuleFacts} from "../../galaxy-web/src/features/capsules/capsule-workspace-client.mjs";
 import {capsuleToolDefinitions} from '../src/adapters/mcp/personal/tools/capsules-v2.mjs';
 
 const scopes=['binding','consent','case-teaser','history','capsules','evidence','proof'];

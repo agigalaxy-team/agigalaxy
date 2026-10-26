@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {conversationSummary} from '../src/operations-agentos-conversations.mjs';
+import {conversationSummary} from "../src/operations/agentos/conversations.mjs";
 import {aiWorkCapabilities} from '../src/shared/operations-ai-work-capabilities.mjs';
 
 const taskId='02f8bc15-aa57-41ce-b82c-d3cc8c250975';

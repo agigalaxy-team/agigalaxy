@@ -1,11 +1,11 @@
 import {z} from "zod";
 import {digest} from "../../shared/digest.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
-import {operationsParse,operationsFail,operationsIso,operationsStamp,operationsVisibilityWithin} from "../../operations-content-visibility.mjs";
-import {operationsAnalyticsPeriod} from "../../operations-analytics.mjs";
-import {forumCurationWithin,forumTagView} from "../../operations-forum-curation.mjs";
+import {operationsParse,operationsFail,operationsIso,operationsStamp,operationsVisibilityWithin} from "./content-visibility.mjs";
+import {operationsAnalyticsPeriod} from "../analytics/service.mjs";
+import {forumCurationWithin,forumTagView} from "./forum-curation.mjs";
 import {hasOperationsPermission as permitted} from "../../operations-permission-catalog.mjs";
-import {operationsOperatorNamesWithin} from "../../operations-history-identities.mjs";
+import {operationsOperatorNamesWithin} from "../accounts/history-identities.mjs";
 import {operationsContentQuerySchema,operationsContentHistorySchema} from "../../shared/operations-forum-content-schema.mjs";
 import {sixTopics,key,visibilityState,candidates} from './helpers.mjs';
 import {PublicContentSource} from './source.mjs';

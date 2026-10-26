@@ -1,6 +1,6 @@
 import {digest} from "../../shared/digest.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
-import {operationsParse} from "../../operations-content-visibility.mjs";
+import {operationsParse} from "./content-visibility.mjs";
 import {operationsContentBatchSchema,operationsContentBatchPreviewSchema} from "../../shared/operations-forum-content-schema.mjs";
 import {key} from './helpers.mjs';
 import {PublicContentCommands} from './commands.mjs';

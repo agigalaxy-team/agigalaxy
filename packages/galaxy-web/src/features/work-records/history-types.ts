@@ -1,4 +1,4 @@
-import type {useMemberNames} from "../../conversation-ui";
+import type {useMemberNames} from "../../shared/people/conversation-ui";
 import type {InterventionOpinionsView,ResolutionDecision} from "./presentation-types";
 
 /** Only the display contract; the original authorized object is kept for export. */

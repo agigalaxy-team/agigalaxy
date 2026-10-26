@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {createTaskMaterialClient,materialTaskText,adoptPreparedTaskMaterials,literalTaskText,replaceLiteralTaskText,
-  localTaskTextView,withholdTaskMaterialTree,withholdTaskMaterialProjection,independentTaskLabel,taskMaterialProjectionKey,taskMaterialDerivedView} from '../src/task-material-client.mjs';
-import {taskDraft,publicationFromDraft} from '../src/task-bounty-client.mjs';
-import {createTaskPreparationClient} from '../src/task-preparation-client.mjs';
-import {createHelpOriginClient} from '../src/help-origin-client.mjs';
+  localTaskTextView,withholdTaskMaterialTree,withholdTaskMaterialProjection,independentTaskLabel,taskMaterialProjectionKey,taskMaterialDerivedView} from "../src/features/tasks/materials/task-material-client.mjs";
+import {taskDraft,publicationFromDraft} from "../src/features/tasks/task-bounty-client.mjs";
+import {createTaskPreparationClient} from "../src/features/tasks/publish/task-preparation-client.mjs";
+import {createHelpOriginClient} from "../src/features/help-search/help-origin-client.mjs";
 const hash=text=>createHash('sha256').update(text).digest('hex');
 function fixture(){
  const now={value:100},scope={key:'A:binding:1',subjectId:'GUID1000000000000000000000000000'}, endpoint='https://official.example.org';

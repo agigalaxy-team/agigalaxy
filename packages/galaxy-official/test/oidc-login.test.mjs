@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createOidcLoginProvider } from '../src/oidc-login.mjs';
+import { createOidcLoginProvider } from "../src/identity/authentication/oidc-login.mjs";
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
 
 test('real OIDC issuer discovery, S256 code exchange and signed identity stay independent from Galaxy authorization', { timeout: 45000 }, async t => {

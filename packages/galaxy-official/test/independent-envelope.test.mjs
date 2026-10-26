@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { verifyIndependent } from '../examples/verify-envelope-independent.mjs';
-import { signEnvelope, verifyEnvelope } from '../src/signed-envelope.mjs';
+import { signEnvelope, verifyEnvelope } from "../src/security/signed-envelope.mjs";
 
 const keys = generateKeyPairSync('ed25519');
 const publicKeyPem = keys.publicKey.export({ type: 'spki', format: 'pem' });

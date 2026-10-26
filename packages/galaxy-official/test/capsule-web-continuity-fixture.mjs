@@ -3,8 +3,8 @@ import {communityForumFixture} from './community-forum-fixture.mjs';
 import {browserScopes} from '../src/browser-client.mjs';
 import { createExistingWebRuntime } from './existing-web-identity-fixture.mjs';
 import {signIdentityPayload} from '../../galaxy-core/src/domain/identity-material.mjs';
-import {createCapsuleWebClient} from '../../galaxy-web/src/capsule-workspace-client.mjs';
-import {createCapsuleVisibilityClient} from '../../galaxy-web/src/capsule-visibility-client.mjs';
+import {createCapsuleWebClient} from "../../galaxy-web/src/features/capsules/capsule-workspace-client.mjs";
+import {createCapsuleVisibilityClient} from "../../galaxy-web/src/features/capsules/capsule-visibility-client.mjs";
 import {digest} from '../src/shared/digest.mjs';
 
 // HTTP, identity/OIDC, Ed25519 Consent, source permission and database behavior
