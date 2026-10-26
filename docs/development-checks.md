@@ -19,6 +19,8 @@
 
 统一测试 CLI 接受明确的 `.test.mjs` 文件；只运行所选文件，不再忽略附加路径后回退全套。可在 `test:core`、`test:official` 或 `test:a2a` 后同样追加本包文件。未知选项、无效文件或缺少专用环境会直接说明问题，不以全套执行掩盖选择错误。实现见 [check.mjs](../scripts/check.mjs) 及 [checks](../scripts/checks)。
 
+根 lint 检查 `app/`、`packages/`、`scripts/` 和 `lib/browser-demo.mjs`，保留通用 correctness、React Hooks、可访问性和类型感知规则。Next 规则只用于 `app/` 的 Next/vinext 演示；当前未启用 React Compiler，因此不运行其专用规则。完整 TypeScript 类型检查使用对应模块的 `tsc`/`types` 入口，不由 oxlint 的 `typeCheck` 代替。已捆绑的 DiceBear 生成模块 `packages/galaxy-web/src/vendor/account-avatar-generator.mjs` 按[第三方来源说明](../packages/galaxy-web/THIRD_PARTY_AVATARS.md)精确排除，人工维护的调用代码仍检查。
+
 ## 完整与环境专用检查
 
 `npm test` 无路径时保留普通全范围测试；`npm run check` 再包含根 lint。仅在本阶段确需整体回归时选用一次，不与相同范围的局部结果重复堆叠。`check:layers` 是包含重叠范围和真实环境前提的整体验收编排，不能作为日常开发的默认起点；需要某一层时直接 `node scripts/verify-layers.mjs --layers=<所需层>`。

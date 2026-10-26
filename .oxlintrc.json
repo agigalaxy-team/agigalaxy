@@ -7,8 +7,7 @@
     "oxc",
     "react",
     "import",
-    "jsx-a11y",
-    "nextjs"
+    "jsx-a11y"
   ],
   "categories": {
     "correctness": "error"
@@ -20,7 +19,7 @@
   },
   "options": {
     "typeAware": true,
-    "typeCheck": true
+    "typeCheck": false
   },
   "ignorePatterns": [
     "**/node_modules/**",
@@ -31,7 +30,8 @@
     "**/dist/**",
     "**/dist-*/**",
     "coverage/**",
-    "next-env.d.ts"
+    "next-env.d.ts",
+    "packages/galaxy-web/src/vendor/account-avatar-generator.mjs"
   ],
   "rules": {
     "no-array-constructor": "error",
@@ -43,7 +43,7 @@
     "react/display-name": "error",
     "react/jsx-no-comment-textnodes": "error",
     "react/no-unescaped-entities": "error",
-    "react/react-compiler": "error",
+    "react/react-compiler": "off",
     "react/require-render-return": "error",
     "react/rules-of-hooks": "error",
     "typescript/ban-ts-comment": "error",
@@ -57,10 +57,8 @@
   },
   "overrides": [
     {
-      "files": ["packages/galaxy-web/**/*"],
-      "rules": {
-        "nextjs/no-html-link-for-pages": "off"
-      }
+      "files": ["app/**/*"],
+      "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import", "jsx-a11y", "nextjs"]
     },
     {
       "files": ["**/*.test.mjs"],
