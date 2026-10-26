@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {CheckCircle2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {AccountEntryPage,useAccountConnection} from '../../account-center';
@@ -65,8 +65,12 @@ function FeedbackEditor({draftKey,ownerId,model,connection,client,navigate}:{dra
   try{sessionStorage.removeItem(draftKey);}catch{/* An unresolved stored intent resumes through its original GET only. */}
   setDeleted(value.deleted===true);setSubmitted(true);setError('');
  }
+ const pendingSubmission=useEffectEvent(()=>draft.pending);
+ const readSubmission=useEffectEvent((operationId:string,signal:AbortSignal)=>client.call('/v1/account/feedback/operations/'+operationId,undefined,{method:'GET',session:connection.authority.requireSession(ownerId,csrf),signal}));
+ const completeSubmission=useEffectEvent(complete);
+ const refreshAccount=useEffectEvent(()=>model.refresh());
  useEffect(()=>{
-  const pending=draft.pending;
+  const pending=pendingSubmission();
   if(!pending||submitted||busy||!available)return;
   let closed=false,checking=false,attempt=0;
   let timer:ReturnType<typeof setTimeout>|undefined;
@@ -78,11 +82,10 @@ function FeedbackEditor({draftKey,ownerId,model,connection,client,navigate}:{dra
    if(navigator.onLine===false||document.visibilityState==='hidden'){schedule();return;}
    checking=true;
    try{
-    const session=connection.authority.requireSession(ownerId,csrf);
-    const value=await client.call('/v1/account/feedback/operations/'+pending!.operationId,undefined,{method:'GET',session,signal:controller.signal});
+    const value=await readSubmission(pending!.operationId,controller.signal);
     if(closed||!active.current||current.current.pending?.operationId!==pending!.operationId)return;
     const recorded=submissionReceipt(value,pending!.operationId,true);
-    if(recorded){complete(recorded);return;}
+    if(recorded){completeSubmission(recorded);return;}
     const original=value as {state?:unknown;operationId?:unknown}|null;
     if(original?.state!=='not-recorded'||original.operationId!==pending!.operationId)throw Error('feedback_response_invalid');
     setError('');
@@ -90,7 +93,7 @@ function FeedbackEditor({draftKey,ownerId,model,connection,client,navigate}:{dra
     if(closed||!active.current)return;
     setError(failureMessage(reason,true));
     const code=reason&&typeof reason==='object'&&'code'in reason?String(reason.code):'';
-    if(['official_account_session_expired','official_account_changed','account_csrf_invalid'].includes(code))void model.refresh();
+    if(['official_account_session_expired','official_account_changed','account_csrf_invalid'].includes(code))void refreshAccount();
    }finally{checking=false;if(!closed)schedule();}
   }
   const wake=()=>{if(!closed&&!checking){if(timer)clearTimeout(timer);timer=setTimeout(()=>void readOriginal(),0);}};
@@ -127,14 +130,14 @@ function FeedbackEditor({draftKey,ownerId,model,connection,client,navigate}:{dra
  }
  return <section className="feedback-page"><header className="account-page-heading"><h1>使用反馈</h1><p>告诉我们遇到的问题，或你希望改进的地方。</p></header>
   {!available&&<OfficialAccountStatus model={model} navigate={navigate} returnTo="/app/feedback" compact/>}
-  {submitted?<div className="feedback-submitted" role="status"><CheckCircle2 size={30} aria-hidden="true"/><h2>{deleted?'这份反馈已删除':'反馈已提交'}</h2><p>{deleted?'没有重新提交。':'感谢你的反馈。'}</p><div className="button-row"><Button variant="outline" onClick={()=>navigate('/app/account')}>返回账户</Button><button className="text-link" type="button" onClick={()=>{retain(freshDraft());setSubmitted(false);setDeleted(false);setError('');}}>再写一条</button></div></div>:<form className="feedback-form" onSubmit={event=>void submit(event)} aria-busy={busy}>
+  {submitted?<output className="feedback-submitted" style={{display:'block'}}><CheckCircle2 size={30} aria-hidden="true"/><h2>{deleted?'这份反馈已删除':'反馈已提交'}</h2><p>{deleted?'没有重新提交。':'感谢你的反馈。'}</p><div className="button-row"><Button variant="outline" onClick={()=>navigate('/app/account')}>返回账户</Button><button className="text-link" type="button" onClick={()=>{retain(freshDraft());setSubmitted(false);setDeleted(false);setError('');}}>再写一条</button></div></output>:<form className="feedback-form" onSubmit={event=>void submit(event)} aria-busy={busy}>
    <fieldset className="feedback-kind" disabled={busy||!!draft.pending}><legend>反馈类型</legend>{([['problem','问题'],['suggestion','建议']] as const).map(([value,label])=><label key={value}><input type="radio" name="feedback-category" value={value} checked={draft.category===value} onChange={()=>edit({category:value})}/><span>{label}</span></label>)}</fieldset>
    <label className="feedback-body-label" htmlFor="feedback-body">反馈内容</label><textarea id="feedback-body" name="body" required maxLength={6000} rows={10} value={draft.body} onChange={event=>edit({body:event.target.value})} disabled={busy||!!draft.pending} aria-describedby="feedback-body-help" placeholder="可以描述出现问题的位置、操作经过，或希望改进的内容。"/>
    <div className="feedback-body-help" id="feedback-body-help"><span>请勿填写密码或验证码。</span><span>{draft.body.length} / 6000</span></div>
    <FeedbackAttachmentField key={draft.operationId} operationId={draft.operationId} attachments={draft.attachments} ownerId={ownerId} csrf={csrf} client={client} connection={connection} available={available} disabled={busy||!!draft.pending} onChange={editAttachments} onBusy={fileBusy}/>
-   {storageFailed&&<p className="feedback-storage-warning" role="status">当前无法暂存草稿，请保留此页面。</p>}
+   {storageFailed&&<p className="feedback-storage-warning" ><output>当前无法暂存草稿，请保留此页面。</output></p>}
    {error&&<p className="feedback-error" role="alert">{error}</p>}
-   {!error&&draft.pending&&!busy&&<p className="feedback-pending" role="status">正在确认提交结果，连接恢复后会继续，原内容已保留。</p>}
+   {!error&&draft.pending&&!busy&&<p className="feedback-pending" ><output>正在确认提交结果，连接恢复后会继续，原内容已保留。</output></p>}
    <footer className="feedback-actions"><Button type="submit" disabled={busy||!!draft.pending||attachmentBusy||!available||!draft.body.trim()||draft.attachments.some(item=>item.state!=='available')}>{busy?'正在提交…':draft.pending?'正在确认…':'提交反馈'}</Button><LoadingFeedback active={busy} label="正在提交反馈…" detail="正在确认提交结果，请稍候。" scopeKey={draft.operationId}/></footer>
   </form>}
  </section>;

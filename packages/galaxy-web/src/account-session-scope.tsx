@@ -13,7 +13,7 @@ export function AccountSessionScope({endpoint,children}:{endpoint?:string;childr
 function OwnedAccountSession({endpoint,children}:{endpoint?:string;children:React.ReactNode}){
  const model=useOfficialAccountSession(endpoint);
  const latest=useRef(model);latest.current=model;
- const draftMemory=useMemo(()=>createOnlineAccountDraftMemory(()=>latest.current),[endpoint]);
+ const draftMemory=useMemo(()=>({endpoint,memory:createOnlineAccountDraftMemory(()=>latest.current)}),[endpoint]).memory;
  useLayoutEffect(()=>{draftMemory.activate();return()=>draftMemory.close();},[draftMemory]);
  useLayoutEffect(()=>{draftMemory.synchronize();},[draftMemory,model.phase,model.client,model.session]);
  return <AccountSessionContext.Provider value={{endpoint,model,draftMemory}}>{children}</AccountSessionContext.Provider>;

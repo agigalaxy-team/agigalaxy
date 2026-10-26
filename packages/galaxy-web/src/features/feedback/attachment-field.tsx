@@ -26,7 +26,7 @@ export function FeedbackAttachmentField({operationId,attachments,ownerId,csrf,cl
   call:(path,input,options)=>client.call(path,input,{session:connection.authority.requireSession(ownerId,csrf),signal:options?.signal}),
   transfer:(path,input,options)=>client.transfer(path,input,{session:connection.authority.requireSession(ownerId,csrf),method:options?.method,signal:options?.signal}),
  }}),[client,connection.authority,ownerId,csrf]);
- useEffect(()=>{active.current=true;return()=>{active.current=false;controller.current?.abort();callbacks.current.onBusy(false);files.current.clear();};},[]);
+ useEffect(()=>{const selectedFiles=files.current;active.current=true;return()=>{active.current=false;controller.current?.abort();callbacks.current.onBusy(false);selectedFiles.clear();};},[]);
  useEffect(()=>{let live=true;if(!available)return;setConfigError('');void source.config().then(value=>{if(live)setLimits(value);},reason=>{if(live){setLimits(null);setConfigError(feedbackAttachmentError(reason));}});return()=>{live=false;};},[source,available]);
  function publish(items:FeedbackDraftAttachment[]){if(!active.current)return;current.current=items;callbacks.current.onChange(items);}
  function replace(item:FeedbackDraftAttachment){publish(current.current.map(value=>value.id===item.id?item:value));}

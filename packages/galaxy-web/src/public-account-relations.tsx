@@ -37,7 +37,7 @@ function usePublicPage<T>(endpoint:string|undefined,identity:string,reader:(clie
  },[endpoint,identity]);
  return{value,error,loading,busy,refresh:()=>void reload.current?.(),more:()=>void reload.current?.(true)};
 }
-function ReadingState({state}:{state:ReturnType<typeof usePublicPage>}){return <>{state.loading&&<output>正在读取…</output>}{state.error&&<p role="status">{state.error}<Button type="button" variant="ghost" disabled={state.busy} onClick={state.refresh}>重新读取</Button></p>}</>;}
+function ReadingState({state}:{state:ReturnType<typeof usePublicPage>}){return <>{state.loading&&<output>正在读取…</output>}{state.error&&<p ><output>{state.error}<Button type="button" variant="ghost" disabled={state.busy} onClick={state.refresh}>重新读取</Button></output></p>}</>;}
 function More({state,label}:{state:ReturnType<typeof usePublicPage>;label:string}){return state.value?.nextAfter?<Button type="button" variant="outline" disabled={state.busy} onClick={state.more}>{state.busy?'正在读取…':label}</Button>:null;}
 
 export function PublicLinkedIds({accountId,endpoint,navigate}:Props&{accountId:string}){

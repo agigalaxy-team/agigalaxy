@@ -61,6 +61,7 @@ const targetPath = (locator: ForumLocator|null|undefined) => locator?.replyId ? 
 function Body({body,code=false}:{body:string;code?:boolean}) {
   if(!code)return <div className="forum-prose">{forumBodyParagraphs(body).map((paragraph:string,index:number)=><p key={index}>{paragraph}</p>)}</div>;
   return <div className="forum-prose forum-prose--content">{forumBodyBlocks(body).map((block,index)=>block.kind==='code'
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Scrollable code must remain reachable by keyboard.
     ? <pre key={index} tabIndex={0} aria-label={block.language?block.language+' 代码':'代码'}><code data-language={block.language??undefined}>{block.text}</code></pre>
     : <p key={index}>{block.text}</p>)}</div>;
 }
@@ -212,17 +213,18 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const contentDeadline=Math.min(...[detail,parent,replyDetail,...items,...replies].flatMap(value=>value?.availability==='available'&&typeof value.publishedUntil==='number'&&value.publishedUntil>now?[value.publishedUntil]:[]),...notifications.filter(value=>noticeDeadline(value)>now).map(noticeDeadline));
   useEffect(()=>{if(!Number.isFinite(contentDeadline))return;const timer=window.setTimeout(()=>setNow(Math.floor(Date.now()/1000)),Math.min(2147483647,Math.max(0,contentDeadline*1000-Date.now()+1)));return()=>window.clearTimeout(timer);},[contentDeadline]);
   const current = useCallback(() => { if (!alive.current || !client) return false; try { client.check(); return true; } catch { return false; } },[client]);
+  const hasForm=!!form;
   // Explicit actions request focus after React has committed the actual node.
   // Quiet reads never set this target, so they cannot move typing or reading.
   useLayoutEffect(()=>{
-    if(!focusTarget||focusTarget==='editor'&&(!form||!editorOpen||busy)||focusTarget==='error'&&!error)return;
+    if(!focusTarget||focusTarget==='editor'&&(!hasForm||!editorOpen||busy)||focusTarget==='error'&&!error)return;
     const target=focusTarget==='error'?actionError.current:editor.current;
     if(!target)return;
     target.scrollIntoView({block:focusTarget==='editor'?'start':'nearest'});
     if(focusTarget==='error')target.focus({preventScroll:true});
     else target.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="file"]),textarea,select')?.focus({preventScroll:true});
     setFocusTarget(null);
-  },[focusTarget,form?.id,editorOpen,busy,error]);
+  },[focusTarget,form?.id,hasForm,editorOpen,busy,error]);
   const leaveAction=useCallback((action:()=>void)=>{if(!client||!formRef.current){action();return;}void client.draft.flush().then(()=>{if(current())action();}).catch(reason=>{if(current()){setSaveFailed(true);setSaveMessage(forumError(reason));setError('输入尚未保存，先留在本页。可以保留文字后重试恢复草稿。');}});},[client,current]);
   useLayoutEffect(()=>registerShellNavigation?.(current,leaveAction),[registerShellNavigation,current,leaveAction]);
   function rememberBrowse(target?:string) {
@@ -481,10 +483,11 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const clearPrivateReading=useEffectEvent(clearReading);
   const readFailure=useEffectEvent((reason:unknown)=>{if(current())displayError(reason);});
   const initialFailure=useEffectEvent((reason:unknown,ticket:number)=>{if(current()&&ticket===readEpoch.current){clearReading();displayError(reason);setReading(false);}});
+  const readFirstCurrent=useEffectEvent(readFirst);
   useEffect(()=>{
     const life=alive,readingVersion=readEpoch,draftVersion=draftEpoch;life.current=true;
     if(client&&current()&&(connected||!reportId&&(postId||replyId||memberSectionId||!privatePage))){const ticket=++readingVersion.current;
-      void readFirst().then(outcome=>{if(outcome.status==='success')return refreshLatest({first:outcome.value,ticket});if(outcome.status==='error')initialFailure(outcome.error,ticket);}).catch(reason=>initialFailure(reason,ticket));
+      void readFirstCurrent().then(outcome=>{if(outcome.status==='success')return refreshLatest({first:outcome.value,ticket});if(outcome.status==='error')initialFailure(outcome.error,ticket);}).catch(reason=>initialFailure(reason,ticket));
     }
     if(client&&accountReady&&current())void client.pending().then(restoreInput).catch(readFailure);
     const tick=()=>{if(!document.hidden){setNow(Math.floor(Date.now()/1000));void tickLatest().catch(readFailure);}};
@@ -557,10 +560,12 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       }
     }
   }
-  useEffect(()=>{if(!next||!moreFeed.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current)void run(()=>loadMore());},{rootMargin:'300px'});observer.observe(moreFeed.current);return()=>observer.disconnect();},[next,busy]);
+  const loadMoreCurrent=useEffectEvent(()=>run(()=>loadMore()));
+  useEffect(()=>{if(!next||!moreFeed.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current)void loadMoreCurrent();},{rootMargin:'300px'});observer.observe(moreFeed.current);return()=>observer.disconnect();},[next,busy]);
   const morePosts=<div ref={moreFeed} className="forum-load-more">{next&&<Button variant="ghost" disabled={busy} onClick={()=>run(()=>loadMore(true))}>更多内容</Button>}</div>;
   async function readMoreReplies(){if(replyNext)await loadDiscussion(detailSource.current,replyNext);}
-  useEffect(()=>{if(!replyNext||!moreReplies.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current&&!repliesReading)void readMoreReplies();},{rootMargin:'250px'});observer.observe(moreReplies.current);return()=>observer.disconnect();},[replyNext,busy,repliesReading]);
+  const readRepliesCurrent=useEffectEvent(readMoreReplies);
+  useEffect(()=>{if(!replyNext||!moreReplies.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting)&&!working.current&&!repliesReading)void readRepliesCurrent();},{rootMargin:'250px'});observer.observe(moreReplies.current);return()=>observer.disconnect();},[replyNext,busy,repliesReading]);
   async function readNotice(value:ForumNotification,open=false){try{await client!.readNotification(value.replyId);if(current()){setNotifications(old=>old.map(item=>item.replyId===value.replyId?{...item,read:true}:item));if(open)go(forumVersionPath(value.postId,value.postVersionId)+'#reply-'+value.replyId);}}catch(reason){if(current())setNotifications(old=>old.filter(item=>item.replyId!==value.replyId));throw reason;}}
   function resumeDraft(){setEditorOpen(true);setDiscardDraft(false);setFocusTarget('editor');}
   async function keepDraft(){await client!.draft.flush();if(!current())return;setEditorOpen(false);setDiscardDraft(false);setNotice('草稿已留在此浏览器，可以稍后继续。');if(compose)go(feedPath);}

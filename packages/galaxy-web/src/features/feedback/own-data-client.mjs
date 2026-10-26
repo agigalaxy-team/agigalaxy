@@ -62,7 +62,7 @@ export function createFeedbackOwnDataClient({accountId,call,transfer,assertCurre
         if(bytes.length!==file.byteSize)throw error('attachment_storage_integrity_failed');
         const digest=Array.from(new Uint8Array(await guard(()=>crypto.subtle.digest('SHA-256',bytes))),value=>value.toString(16).padStart(2,'0')).join('');
         if(digest!==file.sha256)throw error('attachment_storage_integrity_failed');
-        const safeName=file.name.replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g,'_').replace(/^\.+/,'_')||'附件';
+        const safeName=Array.from(file.name,character=>/[\\/:*?"<>|]/.test(character)||character.charCodeAt(0)<32||character.charCodeAt(0)===127?'_':character).join('').replace(/^\.+/,'_')||'附件';
         exported.archivePath='attachments/'+item.id+'/'+file.id+'-'+safeName;entries.push({name:exported.archivePath,bytes});files++;
        }catch(reason){if([404,409,410].includes(reason?.status)){exported.availability='unavailable';exported.state='unavailable';}else throw reason;}
       }

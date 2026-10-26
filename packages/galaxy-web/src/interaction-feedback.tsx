@@ -16,7 +16,7 @@ export function LoadingFeedback({active=true,label='正在读取…',scopeKey=''
     return()=>{window.clearTimeout(appear);window.clearTimeout(slow);};
   },[active,key,delayMs,slowAfterMs]);
   if(!active||state.key!==key||!state.visible)return null;
-  return <div className={'interaction-loading '+className} role="status" aria-live="polite" aria-atomic="true" data-waiting={state.slow?'slow':'pending'}><GalaxyMark/><div><span>{label}</span>{state.slow&&detail&&<small>{detail}</small>}</div></div>;
+  return <output className={'interaction-loading '+className}  aria-live="polite" aria-atomic="true" data-waiting={state.slow?'slow':'pending'}><GalaxyMark/><div><span>{label}</span>{state.slow&&detail&&<small>{detail}</small>}</div></output>;
 }
 
 type FailureProps={message?:string|null;onRetry?:()=>void|Promise<unknown>;retrying?:boolean;retryLabel?:string;className?:string};

@@ -41,7 +41,8 @@ export function scopeOf(props:ContextProps,account:AccountModel|null){
 
 export function useBookmarkClient(props:ContextProps,account:AccountModel|null):BookmarkClient|null{
   const accountClient=account?.client,accountId=account?.session?.account.id,token=account?.session?.csrfToken;
-  const lease=useMemo(()=>({session:account?.session??null}),[accountClient,accountId,token]);
+  const leaseKey=JSON.stringify([accountId,token]);
+  const lease=useMemo(()=>({key:leaseKey,client:accountClient,session:null as AccountModel['session']}),[accountClient,leaseKey]);
   useLayoutEffect(()=>{lease.session=account?.session??null;return()=>{lease.session=null;};},[lease,account?.session]);
   return useMemo(()=>{
     if(!accountClient||!accountId)return null;
@@ -90,15 +91,16 @@ function SaveForLaterSession(props:SaveProps&{model:AccountModel|null}){
     }catch(caught){if(alive.current)setError(errorText(caught));}
     finally{working.current=false;if(alive.current)setBusy(false);}
   }
+  const hasInitialState=!!initialState;
   const reread=useEffectEvent(()=>{if(!document.hidden)return refresh();});
   useEffect(()=>{
     alive.current=true;
-    if(initialState)return()=>{alive.current=false;};
+    if(hasInitialState)return()=>{alive.current=false;};
     void reread();
     const observe=()=>void reread(),timer=window.setInterval(observe,15000);
     window.addEventListener('focus',observe);window.addEventListener('online',observe);
     return()=>{alive.current=false;window.clearInterval(timer);window.removeEventListener('focus',observe);window.removeEventListener('online',observe);};
-  },[client,!!initialState]);
+  },[client,hasInitialState]);
   function login(){
     if(model?.phase!=='signed-out'||!model.client){void model?.refresh();return;}
     try{const target=rememberBookmarkLogin(reference,{saved:!(displayed?.saved??false)});location.assign(model.client.loginUrl('login',target));}catch(caught){setError(errorText(caught));}
@@ -127,6 +129,6 @@ function SaveForLaterSession(props:SaveProps&{model:AccountModel|null}){
       {displayed?.saved?<BookmarkCheck size={16}/>:<Bookmark size={16}/>}{busy?'正在保存…':displayed?.saved?'取消收藏':'收藏'}
     </button>
     {pending&&<span className="reading-bookmark-message">收藏正在保存。<button type="button" disabled={busy} onClick={()=>void change(true)}>重试</button></span>}
-    {error&&<span className="reading-bookmark-message" role="status">{error}<button type="button" disabled={busy} onClick={()=>void change(true)}>重试</button></span>}
+    {error&&<output className="reading-bookmark-message" >{error}<button type="button" disabled={busy} onClick={()=>void change(true)}>重试</button></output>}
   </span>;
 }

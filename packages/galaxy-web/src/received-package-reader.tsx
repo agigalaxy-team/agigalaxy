@@ -15,7 +15,8 @@ type Reading={container:TrustContainer;report:TrustReport;name:string};
 export function ReceivedPackageReader({file,runtime=null,subjectId,connected=false,returnTo,navigate,onClose}:Props){
   const [reading,setReading]=useState<Reading|null>(null),[online,setOnline]=useState<TrustOnline|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const sequence=useRef(0),alive=useRef(true);
-  useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
+  const invalidateRequest=useEffectEvent(()=>{sequence.current++;});
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;invalidateRequest();};},[]);
   async function open(selected:Blob){const token=++sequence.current;setBusy(true);setError('');setReading(null);setOnline(null);
     try{if(selected.size>4500000)throw Error('这份文件超过可读取的资料包大小。');const text=await selected.text(),container=trustContainerSchema.parse(JSON.parse(text)),report=await verifyTrustPackage(text);
       if(alive.current&&token===sequence.current)setReading({container,report,name:'name'in selected&&typeof selected.name==='string'?selected.name:'收到的资料'});

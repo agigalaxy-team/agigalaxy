@@ -5,7 +5,7 @@ import {createCurrentOfficialAccount,sameOfficialSession} from '../src/official-
 const session=(expiresAt=200)=>({state:'signed-in',account:{id:'account-a',uid:'GALAXY01',displayName:'成员',email:null,emailVerified:true},linkedIds:[],nextAfter:null,expiresAt,csrfToken:'synthetic-csrf',galaxyAuthorization:false});
 
 test('a verified account reader uses the live renewed session without changing its owner',async()=>{
- let live=session(),seen=[];
+ const live=session(),seen=[];
  const client={call:async(_path,_input,options)=>{seen.push(options.session);return {items:['current']};}};
  let model={phase:'signed-in',session:live,client};
  const account=createCurrentOfficialAccount({client,accountId:'account-a',csrfToken:live.csrfToken,getCurrent:()=>model,now:()=>100000});

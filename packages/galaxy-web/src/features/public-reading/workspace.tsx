@@ -18,7 +18,7 @@ function ReadingCode({attributes,children,text,scope,instanceId}:{attributes:Rec
     return()=>{if(copy.current===target)copy.current=null;target.dispose();};
   },[text,scope,instanceId]);
   const command=React.Children.toArray(children).some(child=>React.isValidElement<{className?:string}>(child)&&/language-(?:bash|sh|shell|powershell|ps1|cmd|console)\b/i.test(child.props.className??''));
-  return <div className="guide-code-block"><div className="guide-code-actions"><button ref={button} type="button" className="guide-code-copy" onClick={()=>void copy.current?.copy()}>{command?'复制命令':'复制内容'}</button><span className="guide-code-status" role="status" aria-live="polite">{copyStatusText[status]}</span></div><pre {...attributes} ref={pre}>{children}</pre></div>;
+  return <div className="guide-code-block"><div className="guide-code-actions"><button ref={button} type="button" className="guide-code-copy" onClick={()=>void copy.current?.copy()}>{command?'复制命令':'复制内容'}</button><output className="guide-code-status"  aria-live="polite">{copyStatusText[status]}</output></div><pre {...attributes} ref={pre}>{children}</pre></div>;
 }
 function content(nodes:Node[],scope:string,position:{region:string;next:number}):React.ReactNode{return nodes.map((node,index)=>{
   if(typeof node==='string')return node;

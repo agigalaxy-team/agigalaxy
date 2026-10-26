@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {z} from 'zod/v4';
 import {UserRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -18,6 +18,7 @@ export function AccountFollowsWorkspace({endpoint,navigate,search=''}:{endpoint?
  const tasks=useReadTasks('account-follow-page:'+(client?.ownerId??'visitor')+':'+(model.session?.csrfToken??'')+':'+(after??''));
  const refresh=useCallback(()=>readPage.current?.(),[]);
  useLayoutEffect(()=>{if(page&&returnFocus.current){if(document.activeElement===document.body||document.activeElement===returnFocus.current)heading.current?.focus({preventScroll:true});returnFocus.current=null;}},[page]);
+ const refreshAccount=useEffectEvent(()=>model.refresh());
  useEffect(()=>{
   let active=true,working=false,timer:ReturnType<typeof setTimeout>|undefined,expiry:ReturnType<typeof setTimeout>|undefined,blocked=false;
   setPage(null);setError('');setBusy(false);setPendingCount(client?.pendingAll().length??0);
@@ -26,7 +27,7 @@ export function AccountFollowsWorkspace({endpoint,navigate,search=''}:{endpoint?
    working=true;setBusy(true);
    void tasks.run({lane:'page',key:after??'first'},({signal})=>client.query(after?{after}:{},{signal}),{
     onSuccess:value=>{setPage(value);setError('');setPendingCount(client.pendingAll().length);if(expiry)clearTimeout(expiry);expiry=setTimeout(()=>{if(active)setPage(null);},Math.max(0,value.readExpiresAt*1000-Date.now()));},
-    onError:problem=>{setPage(null);setError(accountFollowMessage(problem));const status=problem&&typeof problem==='object'&&'status'in problem?Number(problem.status):0;if(status===401||status===403){blocked=true;void model.refresh();}},
+    onError:problem=>{setPage(null);setError(accountFollowMessage(problem));const status=problem&&typeof problem==='object'&&'status'in problem?Number(problem.status):0;if(status===401||status===403){blocked=true;void refreshAccount();}},
     onSettled:()=>{working=false;setBusy(false);if(active&&!blocked)timer=setTimeout(read,client.pendingAll().length?5000:25000);},
    });
   };
@@ -41,9 +42,9 @@ export function AccountFollowsWorkspace({endpoint,navigate,search=''}:{endpoint?
  const link=(path:string,label:string,before?:()=>void)=><a href={path} onClick={event=>{if(plain(event)){event.preventDefault();before?.();navigate(path);}}}>{label}</a>;
  return <section className="account-follows-page" aria-busy={busy}>
   <header className="account-page-heading"><h1 ref={heading} tabIndex={-1}>我的关注</h1></header>
-  {!available&&model.phase!=='loading'&&<div className="message" role="status"><p>{model.phase==='offline'?'暂时离线，联网后继续读取。':'账户暂时无法连接。'}</p><Button type="button" variant="outline" onClick={()=>void model.refresh()}>重试读取</Button></div>}
+  {!available&&model.phase!=='loading'&&<output className="message" ><p>{model.phase==='offline'?'暂时离线，联网后继续读取。':'账户暂时无法连接。'}</p><Button type="button" variant="outline" onClick={()=>void model.refresh()}>重试读取</Button></output>}
   {!page&&!error&&(available||model.phase==='loading')&&<output>正在读取关注…</output>}
-  {error&&<div className="message" role="status"><p>{error}</p><Button type="button" variant="outline" onClick={refresh}>重试读取</Button></div>}
+  {error&&<output className="message" ><p>{error}</p><Button type="button" variant="outline" onClick={refresh}>重试读取</Button></output>}
   {available&&pendingCount>0&&<output className="account-follow-message">正在保存关注…</output>}
   {page&&page.items.length===0&&<p>{after?'这页已没有关注。':'还没有关注的账户。可以从公开资料页关注想继续阅读的作者。'}</p>}
   {page&&page.items.length>0&&<ul className="account-follows-list">{page.items.map(item=>{

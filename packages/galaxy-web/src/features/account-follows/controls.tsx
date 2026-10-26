@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useEffectEvent,useMemo,useRef,useState} from 'react';
 import type {z} from 'zod/v4';
 import {Button} from '@/components/ui/button';
 import {useAccountSessionModel,useOnlineAccountDraftMemory} from '../../account-session-scope';
@@ -31,6 +31,7 @@ export function AccountFollowControl({targetAccountId,endpoint,initialRelationsh
  const tasks=useReadTasks('account-follow-control:'+targetAccountId+':'+(client?.ownerId??'visitor')+':'+(model.session?.csrfToken??'')),
   working=useRef(false),button=useRef<HTMLButtonElement>(null),read=useRef<(()=>void)|null>(null),changed=useRef(onChanged);changed.current=onChanged;
  const ownerGeneration=useMemo(()=>({client,targetAccountId,available}),[client,targetAccountId,available]),latestGeneration=useRef(ownerGeneration);latestGeneration.current=ownerGeneration;
+ const refreshAccount=useEffectEvent(()=>model.refresh());
  useEffect(()=>{
   let active=true,blocked=false,timer:ReturnType<typeof setTimeout>|undefined;
   working.current=false;setValue(null);setError('');setBusy(false);setPending(!!client?.pending(targetAccountId));
@@ -43,7 +44,7 @@ export function AccountFollowControl({targetAccountId,endpoint,initialRelationsh
    },{onSuccess:result=>{setValue(result.status);setPending(!!client.pending(targetAccountId));setError('');if(result.recovered)changed.current?.(result.status.relationship.following,false);},
     onError:problem=>{setValue(null);setPending(!!client.pending(targetAccountId));setError(accountFollowMessage(problem));
      const status=problem&&typeof problem==='object'&&'status'in problem?Number(problem.status):0;
-     if(status===401||status===403){blocked=true;void model.refresh();}
+     if(status===401||status===403){blocked=true;void refreshAccount();}
     },onSettled:()=>{working.current=false;if(active&&!blocked&&(!initialRelationship||client.pending(targetAccountId)))timer=setTimeout(update,client.pending(targetAccountId)?3000:30000);}});
   };
   read.current=()=>{blocked=false;if(timer)clearTimeout(timer);update();};
@@ -75,7 +76,7 @@ export function AccountFollowControl({targetAccountId,endpoint,initialRelationsh
   </Button>
   {pending&&<output className="account-follow-message">{client?.pending(targetAccountId)?.command.following===false?'正在取消关注…':'正在保存关注…'}</output>}
   {showDirectoryLink&&value&&<a className="text-link" href="/app/account?section=following">我的关注</a>}
-  {error&&<span className="account-follow-message" role="status">{error} <button type="button" className="text-link" disabled={busy} onClick={()=>read.current?.()}>重试读取</button></span>}
+  {error&&<output className="account-follow-message" >{error} <button type="button" className="text-link" disabled={busy} onClick={()=>read.current?.()}>重试读取</button></output>}
   {value&&!value.canFollow&&!value.relationship.following&&!error&&<span className="account-follow-message">此账户当前无法关注。</span>}
  </div>;
 }

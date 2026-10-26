@@ -1,6 +1,5 @@
-import { ReadingDetails, ReadingSummary } from './reading-details';
 import React,{useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {Copy,Sparkles} from 'lucide-react';
+import {Sparkles} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import type {z} from 'zod/v4';
 import {createWorkContinuationLink,workContinuationPrompt,workContinuationObjectSchema} from '../../galaxy-edge-mcp/src/native-v2/work/continuation-link.mjs';
