@@ -24,6 +24,7 @@ test('shared check and setup entrypoints select the complete component set',()=>
 });
 test('declared configuration inputs participate in ownership and propagation',()=>{
  assert.equal(ownerOf(catalog,'scripts/serve-product.mjs'),'web');assert(plan('scripts/serve-product.mjs').affected.includes('site'));
+ assert.equal(ownerOf(catalog,'scripts/test/capsule-lease-independent-review.test.mjs'),'web');
 });
 test('root tools and shared UI imports are read as actual source edges',async()=>{
  assert(imports.imports.some(e=>e.source==='scripts/build-native-v2.mjs'&&e.target==='scripts/release-identifiers.mjs'));
