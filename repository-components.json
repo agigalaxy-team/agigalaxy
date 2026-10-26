@@ -9,7 +9,12 @@
       ],
       "files": [
         "packages/galaxy-official/src/browser-client.mjs",
-        "packages/galaxy-official/src/operations-permission-catalog.mjs"
+        "packages/galaxy-official/src/operations-permission-catalog.mjs",
+        "docs/api-error-catalog-v0.1.json",
+        "docs/data-inventory-v0.1.json",
+        "docs/development-api-reference-v1.json",
+        "docs/threat-model-v0.1.json",
+        "docs/version-contract.json"
       ],
       "dependsOn": [],
       "build": [],
@@ -136,7 +141,9 @@
       "files": [
         "packages/galaxy-official/src/shared/operations-agentos-schema.mjs",
         "packages/galaxy-official/src/shared/operations-tool-call-id.mjs",
-        "scripts/build-api-reference.mjs"
+        "scripts/build-api-reference.mjs",
+        "docs/alerts/galaxy.rules.json",
+        "docs/alerts/galaxy.rules.test.json"
       ]
     },
     {
@@ -213,7 +220,15 @@
         "scripts/verify-native-download.mjs",
         "scripts/verify-native-v2-candidate.mjs",
         "scripts/verify-public-configuration-v2.mjs",
-        "scripts/verify-public-trust-package-v2.mjs"
+        "scripts/verify-public-trust-package-v2.mjs",
+        "integrations/shared/read-task.mjs",
+        "scripts/structure/check-mcp-layout.mjs",
+        "scripts/structure/check-native-layout.mjs",
+        "test/content-context-notes.test.mjs",
+        "test/native-local-cloud-sync.test.mjs",
+        "test/native-local-continuity.test.mjs",
+        "test/native-local-panel-state.test.mjs",
+        "test/native-public-account-tools.test.mjs"
       ]
     },
     {
@@ -329,6 +344,9 @@
       "dataOwner": "Public documents and assets; original download bytes and CMS publication identity remain distinct.",
       "interfaces": [
         "Public routes, shared Web shell and fixed historical public asset catalog"
+      ],
+      "files": [
+        "tools/build_reader_bundle.py"
       ]
     },
     {
@@ -543,7 +561,9 @@
     ".gitattributes",
     ".dockerignore",
     "scripts/test/components.test.mjs",
-    ".oxlintrc.json"
+    ".oxlintrc.json",
+    ".editorconfig",
+    "scripts/test/check.test.mjs"
   ],
   "sourceRoots": [
     "apps",
