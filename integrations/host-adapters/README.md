@@ -12,7 +12,7 @@ OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设�
 
 ## 范围与兼容
 
-[随版宿主指南](https://agigalaxy.org/docs/native-client/0.1.16/hosts/)与生成目录 INSTALL.md 是安装入口。MCP Apps 小面板取决于宿主支持；没有输入返回接口时给出可读内容与来源，不冒称已经写回宿主。
+[随版宿主指南](https://agigalaxy.org/docs/native-client/0.1.19/hosts/)与生成目录 INSTALL.md 是安装入口。MCP Apps 小面板取决于宿主支持；没有输入返回接口时给出可读内容与来源，不冒称已经写回宿主。
 
 已有 OpenCode 1.18.31 实际 TUI 和隔离配置记录。合同镜像、MCP / HTTP / AppBridge 检查、真实物理宿主与真实模型运行各自说明范围，不能合并成全部宿主验收。
 

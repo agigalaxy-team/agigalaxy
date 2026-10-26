@@ -18,15 +18,15 @@
 
 ![三种使用方式与客户端本地先行路径](assets/client-entry.svg)
 
-当前核对的 Native 开发版是 **0.1.16**，需要已有 AI 宿主和 **Node.js 22.13+**。从[官网下载页](https://agigalaxy.org/downloads/)取得当前发行及指南，让 AI 发现实际环境、核验并安装相应包，保留原模型、其他连接及已有银河资料；你只处理本次确实需要的宿主、资料位置和本机准备选择。
+当前核对的 Native 开发版是 **0.1.19**，需要已有 AI 宿主和 **Node.js 22.13+**。从[官网下载页](https://agigalaxy.org/downloads/)取得当前发行及指南，让 AI 发现实际环境、核验并安装相应包，保留原模型、其他连接及已有银河资料；你只处理本次确实需要的宿主、资料位置和本机准备选择。
 
 OpenCode 的安装工具在同一次确认中合并 TUI、MCP、Skill 并准备本机身份，之后照常启动即可。其他宿主使用相应插件或生成的 MCP／Skill 配置，按其实际能力完成初始化。安装与本地身份创建不要求先部署 Keycloak、PostgreSQL、Prosody 或学习 A2A。
 
-需要手动安装或排障时，按[随版安装指南镜像](native-client/0.1.16/installation.md)执行同一套下载、核验、依赖安装与 `setup.mjs` 步骤；发行入口和后续版本以[官网指南](https://agigalaxy.org/docs/native-client/0.1.16/installation/)为准。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
+需要手动安装或排障时，按[随版安装指南镜像](native-client/0.1.19/installation.md)执行同一套下载、核验、依赖安装与 `setup.mjs` 步骤；发行入口和后续版本以[官网指南](https://agigalaxy.org/docs/native-client/0.1.19/installation/)为准。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
 
 ## 宿主兼容范围
 
-[随版宿主说明](https://agigalaxy.org/docs/native-client/0.1.16/hosts/)列出 OpenCode、Claude Code、GitHub Copilot / VS Code Agent、Codex、Cursor 及其他支持的连接方式。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
+[随版宿主说明](https://agigalaxy.org/docs/native-client/0.1.19/hosts/)列出 OpenCode、Claude Code、GitHub Copilot / VS Code Agent、Codex、Cursor 及其他支持的连接方式。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
 
 支持 MCP Apps 的宿主可以使用相应小面板；其他环境按其支持的工具结果和来源阅读。只使用适合当前宿主的一套配置，避免重复连接；不能把一种宿主的自动采集或界面表现直接套用到其他宿主。
 
@@ -43,6 +43,6 @@ OpenCode 的安装工具在同一次确认中合并 TUI、MCP、Skill 并准备�
 
 ## 使用、升级与移除
 
-日常使用见[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.16/runtime/)。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
+日常使用见[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.19/runtime/)。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
 
 需要帮助时，见[帮助与反馈](../SUPPORT.md)。公开反馈提供版本、宿主和最小复现步骤即可；完整私聊、账户资料和本地目录内容通常不需要公开。

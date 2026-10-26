@@ -40,9 +40,9 @@
 | 技术栈与组成 | [technology.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md) |
 | 当前状态 | [status.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md) |
 | 文档目录 | [docs/README.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) |
-| 0.1.16 安装指南镜像 | [installation.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md) |
-| 0.1.16 宿主说明镜像 | [hosts.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md) |
-| 0.1.16 运行与数据说明镜像 | [runtime.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md) |
+| 0.1.16 安装指南镜像 | [installation.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md) |
+| 0.1.16 宿主说明镜像 | [hosts.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md) |
+| 0.1.16 运行与数据说明镜像 | [runtime.md](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md) |
 | Capsule 结构示例 | [capsule-v2.json](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/examples/capsule-v2.json) |
 
 随版指南镜像注明原始官网地址和核对日期；内容属于对应版本，不会被后续版本自动替换。官网优先入口仍是[客户端下载页](https://agigalaxy.org/downloads/)。

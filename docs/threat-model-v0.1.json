@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "current-source-controls-reviewed-shared-operational-gates-pending",
+  "status": "dated-20260911-control-observations-plus-current-review-gaps-not-a-completed-current-security-audit",
   "timestamp": "2026-09-11T06:35:03.479279+08:00",
   "boundaries": [
     "本地私钥与Core数据→可信宿主",
@@ -144,5 +144,27 @@
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
     }
   ],
-  "release_gate": "每个适用威胁的剩余风险需有处置与证据；本文件不证明试点安全已验收"
+  "release_gate": "每个适用威胁的剩余风险需有处置与证据；本文件不证明试点安全已验收",
+  "current_documentation_review": {
+    "recordedAt": "2026-10-24T12:44:28.684Z",
+    "original_observations_at": "2026-09-11T06:35:03.479279+08:00",
+    "current_boundaries_requiring_evidence": [
+      "Separate website/management/root identities",
+      "Human and AI-work-account role intersection",
+      "Independent automation scope and source pinning",
+      "Conversation action card/current authority/CAS",
+      "Private native gateway admission",
+      "Purpose-limited analytics/recommendation inputs",
+      "Protected settings and runtime adoption",
+      "Whole-site restore preserving current identity/security state"
+    ],
+    "all_threats_reaudited": false,
+    "current_source_guides": [
+      "docs/operations-account-management-v1.md",
+      "docs/operations-system-settings-v1.md",
+      "services/galaxy-operations-agentos/README.md",
+      "docs/operations-stack.md"
+    ],
+    "rule": "The original per-threat current_control text describes its original dated review, not newly validated production defenses."
+  }
 }
