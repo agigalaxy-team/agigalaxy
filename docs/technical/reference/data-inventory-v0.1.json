@@ -1,135 +1,11 @@
 {
   "version": 2,
-  "status": "dated-schema124-source-declaration-index-not-current-lifecycle-or-production-audit",
-  "reviewed_at": "2026-10-24T12:44:28.684Z",
-  "schema": 124,
-  "migrationVersions": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    23,
-    24,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31,
-    32,
-    33,
-    34,
-    35,
-    36,
-    37,
-    38,
-    39,
-    40,
-    41,
-    42,
-    43,
-    44,
-    45,
-    46,
-    47,
-    48,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
-    55,
-    56,
-    57,
-    58,
-    59,
-    60,
-    61,
-    62,
-    63,
-    64,
-    65,
-    66,
-    67,
-    68,
-    69,
-    70,
-    71,
-    72,
-    73,
-    74,
-    75,
-    76,
-    77,
-    78,
-    79,
-    80,
-    81,
-    82,
-    83,
-    84,
-    85,
-    86,
-    87,
-    88,
-    89,
-    90,
-    91,
-    92,
-    93,
-    94,
-    95,
-    96,
-    97,
-    98,
-    99,
-    100,
-    101,
-    102,
-    103,
-    104,
-    105,
-    106,
-    107,
-    108,
-    109,
-    110,
-    111,
-    112,
-    113,
-    114,
-    115,
-    116,
-    117,
-    118,
-    119,
-    121,
-    122,
-    123,
-    124
-  ],
+  "status": "schema131-source-inventory-with-isolated-deletion-and-recovery-authority-checks-not-production-audit",
+  "reviewed_at": "2026-10-26T10:52:36.724456+00:00",
+  "schema": 131,
+  "migrationVersions": 130,
   "migration120Applied": false,
-  "table_count": 272,
+  "table_count": 292,
   "tables": [
     {
       "table": "access_credentials",
@@ -195,6 +71,20 @@
       "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
+    },
+    {
+      "table": "account_follow_operations_v1",
+      "introducedByMigration": 125,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "account_follows_v1",
+      "introducedByMigration": 125,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "account_operations_notices_v1",
@@ -1602,6 +1492,13 @@
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
+      "table": "official_account_registrations_v1",
+      "introducedByMigration": 127,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
       "table": "official_account_sessions_v1",
       "introducedByMigration": 93,
       "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
@@ -1686,6 +1583,27 @@
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
+      "table": "operations_ai_duty_operations_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_ai_role_delegation_events_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_ai_role_delegations_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
       "table": "operations_ai_work_accounts_v1",
       "introducedByMigration": 123,
       "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
@@ -1712,6 +1630,104 @@
       "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
+    },
+    {
+      "table": "operations_autonomy_commands_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_configs_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_decisions_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_event_consumers_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_events_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_health_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_receipts_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_runtime_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_runtime_versions_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_strategy_schedules_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_tasks_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_tool_calls_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_versions_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
+    },
+    {
+      "table": "operations_autonomy_workbench_runs_v1",
+      "introducedByMigration": 129,
+      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "coverage": "registered-source-table-not-production-database-readback",
+      "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_business_roles_v1",
@@ -2764,7 +2780,7 @@
     }
   ],
   "coverage": {
-    "source": "CREATE/DROP TABLE declarations in registered migration SQL plus database bootstrap; not an executed database or per-table retention audit",
+    "source": "Registered migration CREATE/DROP TABLE declarations through schema131; isolated PGlite deletion locks and independent-record regressions; not production database readback or complete retention audit",
     "business_database_only": true,
     "excluded_separate_stores": [
       "CMS database",
@@ -2778,7 +2794,8 @@
       "user-device local stores"
     ],
     "live_table_equality_verified": false,
-    "all_table_lifecycle_review_complete": false
+    "all_table_lifecycle_review_complete": false,
+    "isolated_schema131_deletion_verified": true
   },
   "export": {
     "implementation": "packages/galaxy-official/src/shared/data-export-schema.mjs",
@@ -2946,10 +2963,10 @@
   "current_source_boundary": {
     "as_of": "2026-10-26",
     "registered_schema": 131,
-    "inventory_schema": 124,
-    "inventory_extended_to_current_schema": false,
-    "deletion_inventory_missing_tables": 39,
-    "deletion_execution": "fail-closed before mutation for unclassified current tables",
+    "inventory_schema": 131,
+    "inventory_extended_to_current_schema": true,
+    "deletion_inventory_missing_tables": 0,
+    "deletion_execution": "Closed explicit schema131 table categories; 39 formerly missing tables retain nonempty independent account/authentication/operator records in isolated deletion and quarantine replay; unknown tables rejected before mutation.",
     "production_restore_enabled": false,
     "guide": "docs/operations/recovery-adapters.md"
   }

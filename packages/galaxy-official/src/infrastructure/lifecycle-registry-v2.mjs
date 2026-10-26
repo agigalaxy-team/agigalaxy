@@ -70,6 +70,7 @@ export const subjectDeletionServiceTables = Object.freeze({
     'official_account_sessions_v1','account_operations_notices_v1',
     'operations_feedback_v1','operations_feedback_events_v1','feedback_attachments_v1',
     'account_feedback_data_operations_v1','account_feedback_data_items_v1',
+    'account_follows_v1','account_follow_operations_v1','official_account_registrations_v1',
   ],
   // Source bodies are erased by prepareProductV2Deletion, while these receipts
   // prevent an old upload/operation from restoring the same deleted scope.
@@ -86,6 +87,12 @@ export const subjectDeletionServiceTables = Object.freeze({
   independentAuthentication: [
     'oidc_login_transactions_v1','official_account_logins_v1',
     'operations_operator_principals_v1','operations_operator_logins_v1','operations_operator_sessions_v1',
+    // These directories and login fences belong to external account identities,
+    // never to an associated local GUID, even if their opaque IDs coincide.
+    'operations_registered_commands_v1','operations_registered_directory_v1','operations_registered_entries_v1',
+    'operations_registered_generations_v1','operations_registered_login_fences_v1','operations_registered_subjects_v1',
+    'operations_management_accounts_v1','operations_management_commands_v1','operations_management_directory_v1',
+    'operations_management_entries_v1','operations_management_generations_v1','operations_management_login_fences_v1',
   ],
   operatorConfigurationAndAudit: [
     'business_admin_audit_v1','site_publications_v1','operations_content_visibility_v1',
@@ -109,6 +116,18 @@ export const subjectDeletionServiceTables = Object.freeze({
     'operations_model_settings_state_v1','operations_model_settings_versions_v1','operations_model_settings_operations_v1',
     'operations_p14_rule_heads_v1','operations_p14_rule_versions_v1','operations_p14_rule_commands_v1','operations_p14_rule_events_v1','operations_p14_rule_decisions_v1',
     'operations_p13_strategy_heads_v1','operations_p13_strategy_versions_v1','operations_p13_strategy_commands_v1','operations_p13_strategy_rehearsals_v1','operations_p13_strategy_runs_v1','operations_p13_strategy_events_v1',
+    // Stable AI principals, approved configuration and task/audit history are
+    // operator-owned records. A local subject erasure must not restore or revoke
+    // these independent authorities; their own lifecycle remains responsible.
+    'operations_ai_work_accounts_v1','operations_ai_work_assignments_v1','operations_ai_work_commands_v1',
+    'operations_system_general_publications_v1','operations_system_settings_commands_v1',
+    'operations_system_settings_heads_v1','operations_system_settings_versions_v1',
+    'operations_ai_duty_operations_v1','operations_ai_role_delegation_events_v1','operations_ai_role_delegations_v1',
+    'operations_autonomy_commands_v1','operations_autonomy_configs_v1','operations_autonomy_decisions_v1',
+    'operations_autonomy_event_consumers_v1','operations_autonomy_events_v1','operations_autonomy_health_v1',
+    'operations_autonomy_receipts_v1','operations_autonomy_runtime_v1','operations_autonomy_runtime_versions_v1',
+    'operations_autonomy_strategy_schedules_v1','operations_autonomy_tasks_v1','operations_autonomy_tool_calls_v1',
+    'operations_autonomy_versions_v1','operations_autonomy_workbench_runs_v1',
   ],
   // These facts belong to an account/visitor, not an associated GUID. Keep the
   // index queue too: deleting it could lose removal of an erased public source.

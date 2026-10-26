@@ -4,7 +4,18 @@ const fail=code=>Object.assign(Error(code),{code});
 const quote=name=>{if(!/^[a-z][a-z0-9_]*$/.test(name))throw fail('maintenance_recovery_identifier_invalid');return '"'+name+'"';};
 const normalize=value=>JSON.parse(JSON.stringify(value));
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// Current identity, revocation and original-command authority. System business
+// settings and autonomous strategy configuration are point data, not included
+// merely because they were introduced by the same migrations.
+export const recoveryIdentityAuthorityTables=Object.freeze([
+ 'official_account_registrations_v1',
+ 'operations_registered_subjects_v1','operations_registered_generations_v1','operations_registered_entries_v1','operations_registered_directory_v1','operations_registered_commands_v1','operations_registered_login_fences_v1',
+ 'operations_management_accounts_v1','operations_management_generations_v1','operations_management_entries_v1','operations_management_directory_v1','operations_management_commands_v1','operations_management_login_fences_v1',
+ 'operations_ai_work_accounts_v1','operations_ai_work_assignments_v1','operations_ai_work_commands_v1',
+ 'operations_ai_role_delegations_v1','operations_ai_role_delegation_events_v1','operations_ai_duty_operations_v1',
+]);
 export const recoveryAuthorityTables=Object.freeze([
+ ...recoveryIdentityAuthorityTables,
  'subjects','subject_control_events','subject_control_heads','device_authorizations','recovery_authorizations','identity_control_operations',
  'binding_challenges','bindings','consents','external_identity_links','community_accounts','community_account_links','official_account_profiles_v1','official_account_type_history_v1',
  'chat_rooms','chat_memberships','chat_participants_v3','chat_decisions','chat_agent_grants',
@@ -112,6 +123,7 @@ async function seedFoundation(db,schema,facts){
  await db.query('UPDATE chat_memberships SET left_at=COALESCE(left_at,$1)',[new Date(facts.capturedAt*1000)]);
  await db.query('UPDATE chat_agent_grants SET revoked_at=COALESCE(revoked_at,$1)',[new Date(facts.capturedAt*1000)]);
  await db.query('UPDATE external_identity_links SET revoked_at=COALESCE(revoked_at,$1)',[new Date(facts.capturedAt*1000)]);
+ for(const table of ['operations_ai_work_accounts_v1','operations_ai_work_assignments_v1','operations_ai_role_delegations_v1'])await db.query('UPDATE '+quote(table)+' SET enabled=false');
  for(const table of ['operations_business_roles_v1','operations_role_assignments_v1','operations_automation_grants_v1'])await db.query('UPDATE '+quote(table)+' SET enabled=false');
  // Temporary names only exist inside this recovery transaction, avoiding a
  // legitimate old/current role-name permutation colliding during row upserts.
@@ -123,6 +135,11 @@ async function seedFoundation(db,schema,facts){
  await copyCurrentTables(db,schema,facts,recoveryAuthorityTables);
  await db.query("UPDATE operations_agentos_executions_v1 SET state='paused',updated_at=$1 WHERE state='active'",[new Date(facts.capturedAt*1000)]);
  await pauseRestoredStrategyRuns(db,new Date(facts.capturedAt*1000));
+ // Old ordinary work is never a new execution grant. Keep terminal receipts,
+ // but suspend queued/running/retryable tasks until current operation-specific
+ // effects and permissions have been reconciled by the original consumer.
+ await db.query('UPDATE operations_autonomy_configs_v1 SET enabled=false');
+ await db.query("UPDATE operations_autonomy_tasks_v1 SET state='blocked',code='restore-current-authorization-required',lease_owner=NULL,lease_until=NULL,updated_at=$1 WHERE state NOT IN ('completed','stopped')",[new Date(facts.capturedAt*1000)]);
  for(const table of ['official_account_sessions_v1','official_account_logins_v1','operations_operator_sessions_v1','operations_operator_logins_v1','oidc_login_transactions_v1'])await db.query('DELETE FROM '+quote(table));
  await db.query('UPDATE access_credentials SET revoked_at=COALESCE(revoked_at,$1)',[new Date(facts.capturedAt*1000)]);
 }

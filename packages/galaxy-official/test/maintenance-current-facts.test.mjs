@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {accountChatFixture,joinAccountConversation} from './account-chat-fixture.mjs';
-import {captureCurrentRecoveryFacts,currentRecoveryFactsCaptureSql,reconcileCurrentRecoveryFacts} from '../src/operations/maintenance-recovery-facts.mjs';
+import {serviceFixture} from './service-fixture.mjs';
+import {seedIndependentServiceFacts} from './deletion-current-service-facts.mjs';
+import {recoveryIdentityAuthorityTables,captureCurrentRecoveryFacts,currentRecoveryFactsCaptureSql,reconcileCurrentRecoveryFacts} from '../src/operations/maintenance-recovery-facts.mjs';
 
-// Real current 110 schema, SQL capture and restored older database. The room
+// Real current schema131, SQL capture and restored older database. The room
 // transport is the existing explicit fixture double. No host, SMTP or storage
 // action occurs and all credentials/subjects here are synthetic.
 test('maintenance merges current security and model versions, source gates and outbound effects into an exact older quarantine',async t=>{
@@ -45,5 +47,47 @@ test('maintenance merges current security and model versions, source gates and o
  const delivery=(await restored.query('SELECT id,state,retryable FROM operations_messaging_recipients_v1 ORDER BY id')).rows;
  assert.equal(delivery.find(x=>x.id===recipients[0]).state,'submitted');assert.equal(delivery.find(x=>x.id===recipients[1]).state,'unknown');assert.equal(delivery.find(x=>x.id===recipients[1]).retryable,false);
  assert.equal((await restored.query('SELECT state FROM operations_messaging_plans_v1')).rows[0].state,'paused');assert.equal((await restored.query('SELECT state FROM galaxy_jobs.job WHERE id=$1',[job])).rows[0].state,'cancelled');
+ assert.equal((await restored.query('SELECT status FROM recovery_state')).rows[0].status,'quarantined');
+});
+
+// Identity security is current authority; unrelated system business settings
+// remain the selected point's data. This uses isolated PGlite only.
+test('schema131 restore retains current identity fences and AI disable/revocation without restoring current business settings or restarting point work',async t=>{
+ const f=await serviceFixture(['binding','consent','data-delete']);t.after(()=>f.db.close());
+ const at=new Date(f.now*1000),account=randomUUID();
+ await f.db.query("INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1::uuid,$2,'https://synthetic.invalid',($1::uuid)::text,'email',$3,$3)",[account,f.access.endpoint,at]);
+ const protectedRows=await seedIndependentServiceFacts(f,account);
+ const snapshot=await f.db.dumpDataDir();
+ await f.db.query('UPDATE operations_ai_work_accounts_v1 SET enabled=false,authorization_version=3,version=2');
+ await f.db.query('UPDATE operations_ai_role_delegations_v1 SET enabled=false,version=2');
+ await f.db.query('UPDATE operations_management_accounts_v1 SET login_blocked=true,version=3');
+ await f.db.query("UPDATE operations_registered_login_fences_v1 SET revoked_before=$1",[new Date((f.now+60)*1000)]);
+ await f.db.query('UPDATE operations_system_settings_versions_v1 SET configuration=$1',[JSON.stringify({currentBusinessValue:true})]);
+ const facts=await captureCurrentRecoveryFacts(f.db,{endpoint:f.access.endpoint,now:()=>f.now+60});
+ assert.equal(facts.schema,131);
+ for(const table of recoveryIdentityAuthorityTables)assert.ok(facts.tables[table],table+' captured');
+ assert.equal(facts.tables.operations_system_settings_versions_v1,undefined);
+ const sql=currentRecoveryFactsCaptureSql(f.access.endpoint);
+ for(const table of recoveryIdentityAuthorityTables)assert.ok(sql.includes(table),table+' included in native SQL capture');
+ const restored=new PGlite({loadDataDir:snapshot});t.after(()=>restored.close());
+ // These old grants represent the unsafe point that must never become current.
+ await restored.query('UPDATE operations_ai_work_accounts_v1 SET enabled=true,authorization_version=1');
+ await restored.query('UPDATE operations_ai_work_assignments_v1 SET enabled=true');
+ await restored.query('UPDATE operations_ai_role_delegations_v1 SET enabled=true');
+ await restored.query('UPDATE operations_management_accounts_v1 SET login_blocked=false');
+ const pointOnlyAi=randomUUID();await restored.query("INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,'governance','Point-only AI','Revoked since point',true,1,1,$3,$3)",[pointOnlyAi,f.access.endpoint,at]);
+ await restored.query("UPDATE operations_autonomy_tasks_v1 SET state='queued'");
+ const recoveryId=randomUUID();await restored.query("INSERT INTO recovery_state(singleton,recovery_id,snapshot_id,status) VALUES(true,$1,$2,'quarantined')",[recoveryId,'f'.repeat(64)]);
+ await reconcileCurrentRecoveryFacts(restored,facts,{recoveryId,endpoint:f.access.endpoint,now:()=>f.now+120});
+ assert.equal((await restored.query("SELECT enabled,authorization_version FROM operations_ai_work_accounts_v1 WHERE domain='overview'")).rows[0].enabled,false);
+ assert.equal((await restored.query("SELECT authorization_version FROM operations_ai_work_accounts_v1 WHERE domain='overview'")).rows[0].authorization_version,3);
+ assert.equal((await restored.query('SELECT enabled FROM operations_ai_work_assignments_v1')).rows[0].enabled,false);
+ assert.equal((await restored.query('SELECT enabled FROM operations_ai_role_delegations_v1')).rows[0].enabled,false);
+ assert.equal((await restored.query('SELECT login_blocked FROM operations_management_accounts_v1')).rows[0].login_blocked,true);
+ assert.equal((await restored.query('SELECT enabled FROM operations_ai_work_accounts_v1 WHERE id=$1',[pointOnlyAi])).rows[0].enabled,false,'point-only AI authorization cannot revive');
+ assert.deepEqual((await restored.query('SELECT result FROM operations_registered_commands_v1')).rows[0].result,{disabled:true},'original external-command result retained');
+ assert.equal(new Date((await restored.query('SELECT revoked_before FROM operations_registered_login_fences_v1')).rows[0].revoked_before).getTime(),(f.now+60)*1000);
+ assert.deepEqual((await restored.query('SELECT configuration FROM operations_system_settings_versions_v1')).rows[0].configuration,protectedRows.operations_system_settings_versions_v1[0].value.configuration);
+ assert.equal((await restored.query('SELECT state FROM operations_autonomy_tasks_v1')).rows[0].state,'blocked');
  assert.equal((await restored.query('SELECT status FROM recovery_state')).rows[0].status,'quarantined');
 });

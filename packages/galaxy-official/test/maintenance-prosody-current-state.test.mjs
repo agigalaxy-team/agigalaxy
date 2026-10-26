@@ -10,7 +10,6 @@ import {captureDeletionLedger} from '../src/operations/deletion-ledger.mjs';
 import {executedProsodyDeletionSubjects,prosodyProjectionWithin,prosodyProjectionCaptureSql,prosodyProjectionFromRows,
  reconcileProsodySqlCandidate,verifyProsodyState,MaintenanceProsodyCurrentState} from '../deploy/maintenance-agent/prosody-current-state.mjs';
 import {createProductionRestoreAdapters,maintenanceNativeAuthorityGaps} from '../deploy/maintenance-agent/production-restore.mjs';
-import {runCommand} from '../deploy/operations-stack/host.mjs';
 
 const linux={skip:process.platform!=='linux'?'The native private candidate uses Linux/Docker.':false};
 const uuid=()=>randomUUID();
@@ -49,9 +48,10 @@ test('Prosody restore contribution validates actual signed executed deletion, cu
 });
 
 test('Prosody 13.0.6 native internal driver merges current native identities and MUC ACLs, erases only eligible keys and proves native absence without exporting bodies',linux,async()=>{
- // This is a single short-lived native process from the CURRENT fixed image.
+ // This is a single short-lived native process from the explicitly supplied image.
  // It has no network, production mount, configuration, credential or daemon.
- const image=(await runCommand('/usr/bin/docker',['inspect','--format','{{.Image}}','galaxy-chat-pilot-chat-1'],{timeout:10000,maxOutput:1024})).stdout.trim();assert.match(image,/^sha256:[a-f0-9]{64}$/);
+ const image=process.env.GALAXY_TEST_PROSODY_IMAGE;
+ assert.match(image??'',/^sha256:[a-f0-9]{64}$/,'Environment not configured: GALAXY_TEST_PROSODY_IMAGE must be the explicitly approved local Prosody13.0.6 image ID; no production container inspection or fallback exists.');
  const source=await readFile(new URL('../deploy/maintenance-agent/prosody-storage.lua',import.meta.url),'utf8');assert(!source.includes(']====]'));
  const room=uuid(),ids=Array.from({length:7},uuid),now=2000000000,op=uuid();
  const data={room,ids,now,op,identity,other,requestId:uuid()};

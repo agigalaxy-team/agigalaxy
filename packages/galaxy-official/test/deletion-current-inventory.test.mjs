@@ -7,6 +7,7 @@ import {approveFixtureDeletion} from './deletion-execute-workflow.mjs';
 import {executeDeletion,lockDeletionTables} from '../src/operations/deletion-execute.mjs';
 import {captureDeletionLedger,replayDeletionLedger} from '../src/operations/deletion-ledger.mjs';
 import {transaction} from '../src/database.mjs';
+import {seedIndependentServiceFacts,assertIndependentServiceFacts} from './deletion-current-service-facts.mjs';
 
 const scopes=['binding','consent','case-teaser','data-delete'];
 const stamp=f=>new Date(f.now*1000).toISOString();
@@ -39,9 +40,11 @@ async function currentSources(f,other){
  await f.db.query(`INSERT INTO discovery_usage_events_v1(endpoint,id,account_id,visitor_id,profile_id,name,purpose,payload,created_at)
   VALUES($1,$2,$3,$4,$5,'search','site-usage-analytics','{"query":"Account usage fact"}',$6)`,[f.access.endpoint,eventId,accountId,randomUUID(),'account:'+accountId,at]);
  await f.db.query("INSERT INTO discovery_delivery_outbox_v1(endpoint,event_id,target) VALUES($1,$2,'openpanel')",[f.access.endpoint,eventId]);
- return{accountId,workId,scopeId,archiveId,archiveScope,independentArchive,credentialId,auditId,eventId};
+ const independentFacts=await seedIndependentServiceFacts(f,accountId);
+ return{accountId,workId,scopeId,archiveId,archiveScope,independentArchive,credentialId,auditId,eventId,independentFacts};
 }
 async function assertSources(db,f,s){
+ await assertIndependentServiceFacts(db,s.independentFacts);
  assert.equal((await db.query('SELECT state,data FROM account_work_v1 WHERE account_id=$1 AND work_id=$2',[s.accountId,s.workId])).rows[0].data,null);
  const work=(await db.query('SELECT * FROM account_work_scopes_v1 WHERE account_id=$1 AND scope_id=$2',[s.accountId,s.scopeId])).rows[0];
  assert.equal(work.deleted_reason,'owner-deleted');assert.equal(work.deleted_by_subject_id,f.actor.subjectId);
@@ -57,10 +60,10 @@ async function assertSources(db,f,s){
  assert.equal((await db.query('SELECT 1 FROM discovery_delivery_outbox_v1 WHERE event_id=$1',[s.eventId])).rows.length,1);
 }
 
-test('schema110 deletion maps origin uploads while retaining independent account/operator facts, audit and delegated file locators',async t=>{
+test('schema131 deletion maps origin uploads while retaining independent account/operator facts, audit and delegated file locators',async t=>{
  const f=await serviceFixture(scopes);t.after(()=>f.db.close());
  const other=await serviceFixture(scopes,f.db,{migrateDatabase:false}),s=await currentSources(f,other),at=stamp(f);
- assert.equal((await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version,110);
+ assert.equal((await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version,131);
  await transaction(f.db,db=>lockDeletionTables(db));
  // A newly added, unmapped table still fails closed; there is no wildcard skip.
  await f.db.query('CREATE TABLE synthetic_unmapped_subject_data(id uuid PRIMARY KEY,body text)');
@@ -88,7 +91,7 @@ test('schema110 deletion maps origin uploads while retaining independent account
  await assertSources(f.db,f,s);
 });
 
-test('schema110 old snapshots replay executed deletion into quarantine without reviving origin data or deleting independent owners',async t=>{
+test('schema131 old snapshots replay executed deletion into quarantine without reviving origin data or deleting independent owners',async t=>{
  const f=await serviceFixture(scopes);t.after(()=>f.db.close());
  const other=await serviceFixture(scopes,f.db,{migrateDatabase:false}),s=await currentSources(f,other);
  const item={id:randomUUID(),kind:'case',localRef:randomUUID(),title:'Old source',summary:'Owned text',source:{kind:'local',reference:randomUUID()},participants:[{subjectId:f.actor.subjectId,role:'requester'}]};

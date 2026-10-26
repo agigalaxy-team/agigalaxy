@@ -15,7 +15,6 @@ import {verifyMaintenanceSignature} from '../src/operations-maintenance-native.m
 import {createMaintenanceProsodyProbe} from '../deploy/maintenance-agent/prosody-live-client.mjs';
 import {executedObjectDeletionSubjects,attachmentPointersWithin,attachmentPointerCaptureSql,attachmentPointersFromRows,buildObjectDeletionPlan,reconcileExactOwnedObjects,MaintenanceObjectDeletion,objectReceiptArguments} from '../deploy/maintenance-agent/object-deletion.mjs';
 import {createProductionRestoreAdapters} from '../deploy/maintenance-agent/production-restore.mjs';
-import {readOperationsConfiguration} from '../deploy/operations-stack/configuration.mjs';
 import {runCommand} from '../deploy/operations-stack/host.mjs';
 
 const stamp=n=>new Date(n*1000).toISOString(),hash='a'.repeat(64);
@@ -47,6 +46,8 @@ test('maintenance live Prosody probe uses only the already authenticated XMPP st
 });
 
 test('maintenance exact Garage contribution uses executed signed identity scope and current PG references, resolves exact lost ACK and never expires unrelated objects',linux,async t=>{
+ const fixtureContainer=process.env.GALAXY_TEST_POSTGRES_CONTAINER;
+ assert.match(fixtureContainer??'',/^galaxy-recovery-test-[a-z0-9-]+$/,'Environment not configured: GALAXY_TEST_POSTGRES_CONTAINER must name this run\'s isolated galaxy-recovery-test-* PostgreSQL container; no production default exists.');
  const directory=await mkdtemp(join(tmpdir(),'galaxy-maintenance-objects-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  const f=await serviceFixture(['binding','consent','data-delete']);t.after(()=>f.db.close());const other=await serviceFixture(['binding'],f.db,{migrateDatabase:false,now:f.now});
  const operationId=randomUUID(),room=randomUUID(),account=randomUUID(),created=stamp(f.now),future=stamp(f.now+3600);
@@ -101,8 +102,8 @@ test('maintenance exact Garage contribution uses executed signed identity scope 
  assert.equal((await adapter.verify(context)).confirmedAbsent,3);
  // Exercise the actual docker/psql stdin route with a literal read-only
  // statement, never the synthetic mutation script or any current object ID.
- const operations=await readOperationsConfiguration('/etc/galaxy/operations/configuration.json'),args=objectReceiptArguments(operations.postgres.find(x=>x.id==='business'));
- const native=await runCommand(operations.tools.docker,args,{input:"BEGIN READ ONLY; SELECT 'fixed-stdin-roundtrip'; COMMIT;",timeout:15000,maxOutput:1024});
+ const args=objectReceiptArguments({id:'business',container:fixtureContainer,socketPath:'/var/run/postgresql',administrator:'postgres',database:'postgres'});
+ const native=await runCommand('/usr/bin/docker',args,{input:"BEGIN READ ONLY; SELECT 'fixed-stdin-roundtrip'; COMMIT;",timeout:15000,maxOutput:1024});
  assert.equal(native.stdout.trim(),'fixed-stdin-roundtrip');
  // This is real signed deletion + PG source/receipt behavior. S3 is an explicit
  // in-memory transport double: no current Garage object is changed or erased.

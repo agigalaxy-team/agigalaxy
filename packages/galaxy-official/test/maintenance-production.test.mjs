@@ -103,8 +103,9 @@ test('maintenance fixed host protocol keeps IAM/control available, distinguishes
  const noIdentity={apps:{http:{servers:{x:{routes:[]}}}}};
  assert.throws(()=>containedPublicConfiguration(noIdentity),{code:'maintenance_current_identity_route_unknown'});
  let callsToAuthority=0,deny=false;const ids=[];
- const native=new MaintenanceNativeRuntime({configuration:{operations:config,controlDirectory:directory+'/auth',serviceKey:'synthetic-only-service-key-longer-than-thirty-two',authorizationUrl:'http://127.0.0.1:3201/v1/internal/maintenance/authorize'},authorizationWait:async()=>{},authorizationRetryWindowMs:1000,
+ const native=new MaintenanceNativeRuntime({configuration:{operations:config,controlDirectory:directory+'/auth',serviceKey:'synthetic-only-service-key-longer-than-thirty-two',authorizationUrl:'http://127.0.0.1:3201/v1/internal/maintenance/authorize'},
   fetchImpl:async(_url,options)=>{assert.equal(options.headers['x-forwarded-for'],'127.0.0.1');callsToAuthority++;ids.push(options.headers['x-galaxy-request-id']);if(deny)return{ok:false,status:403};if(callsToAuthority===1)return{ok:false,status:503};const x=JSON.parse(options.body);return{ok:true,status:200,text:async()=>JSON.stringify({authorized:true,operationId:x.operationId,operatorId:x.operatorId,kind:x.kind,endpoint:'https://official.example.invalid'})};}});
+ await assert.rejects(native.authorize(approved),{code:'maintenance_current_authorization_denied'});assert.equal(callsToAuthority,1,'an unavailable current authority cannot reuse a result or silently retry');
  assert.equal((await native.authorize(approved)).authorized,true);assert.equal(callsToAuthority,2);assert.notEqual(ids[0],ids[1]);deny=true;await assert.rejects(native.authorize(approved),{code:'maintenance_current_authorization_denied'});assert.equal(callsToAuthority,3,'definite denied authority never uses an earlier successful result or retries');
 });
 
@@ -147,7 +148,13 @@ test('maintenance binds current PG model state to the current protected versions
 
 test('maintenance Caddy control uses the current disabled-admin service with exact runtime files and refuses source changes instead of opening a new management port',linux,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-maintenance-caddy-'));t.after(()=>rm(directory,{recursive:true,force:true}));
- const configuration=directory+'/Caddyfile',runtime=directory+'/run',units=directory+'/units',executable='/opt/galaxy/runtime/caddy-v2.11.4-linux-amd64/caddy';
+ // A synthetic regular executable in a disposable container exercises the real
+ // fixed-path/root-owner check; no production binary or bind mount is used.
+ assert.equal(process.env.GALAXY_TEST_ISOLATED_CONTAINER,'1','Environment not configured: this Caddy fixture requires an explicitly disposable Linux container, never a production filesystem.');
+ const binaryDirectory='/opt/galaxy/runtime/caddy-v0.0.'+Date.now()+'.'+process.pid+'-linux-amd64';
+ await mkdir(binaryDirectory,{recursive:true,mode:0o755});t.after(()=>rm(binaryDirectory,{recursive:true,force:true}));
+ const configuration=directory+'/Caddyfile',runtime=directory+'/run',units=directory+'/units',executable=binaryDirectory+'/caddy';
+ await writeFile(executable,'#!/bin/sh\nexit 99\n',{flag:'wx',mode:0o755});
  const source='{ admin off }\n# Synthetic fixed source; native/systemd effects below are explicit doubles.\n';await writeFile(configuration,source,{mode:0o600});
  const original={admin:{disabled:true},apps:{http:{servers:{s0:{routes:[{match:[{host:['auth.example.invalid']}],handle:[{handler:'reverse_proxy',upstreams:[{dial:'127.0.0.1:18080'}]}]}]}}}}};
  let command=[executable,'run','--config',configuration,'--adapter','caddyfile'];const effects=[];

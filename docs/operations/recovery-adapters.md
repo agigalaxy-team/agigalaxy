@@ -73,9 +73,9 @@ owner/key/hash/size在current/point/canonical须一致，跨对象key复用/独�
 
 Garage激活卷先并当前key/ACL、应用与worker仍停，再逐原key HEAD→重核资格→DeleteObject→HEAD；原对象hash/size须符。Delete ACK丢失只查原key，确认为absence才继续，否则保持关闭；SQL用固定psql stdin写同ID/key/hash/size最小清除事实，不重建行、不处理其他pending/expired。恢复writer后、open前再核这些key仍不可见。桶命名空间absence不证明物理块/外部副本删除。
 
-## 当前schema阻断与检查范围
+## 当前schema删除归属与检查范围
 
-完整schema131的lockDeletionTables缺39张表归属合同，executeDeletion在副作用前拒绝；这同时阻断依赖完整删除重放的生产恢复。精确集合：
+完整schema131的 `lockDeletionTables` 已为此前缺失的39张表加入封闭的逐表归属：网站账户数据随账户维护；registered/management目录、命令和登录fence属于独立认证身份；AI身份、授权、运营配置与审计属于独立运营权威。本地ID删除不因文本相同或账户关联删除这些记录；未知新增表和缺失已登记表仍在副作用前拒绝。隔离PGlite回归在下列全部39表写入非空记录，执行ID删除及旧副本删除重放后逐行比较，另验证所属上传正文被清除和独立ID保留。此前缺口集合及现行归属范围：
 
 | 迁移 | 表（统一前缀保留原名） |
 |---|---|
@@ -85,5 +85,7 @@ Garage激活卷先并当前key/ACL、应用与worker仍停，再逐原key HEAD�
 | 124 | operations_system_general_publications_v1、operations_system_settings_commands_v1、operations_system_settings_heads_v1、operations_system_settings_versions_v1 |
 | 125/127 | account_follow_operations_v1、account_follows_v1；official_account_registrations_v1 |
 | 129 | operations_ai_duty_operations_v1、operations_ai_role_delegation_events_v1、operations_ai_role_delegations_v1；operations_autonomy_commands_v1、configs_v1、decisions_v1、event_consumers_v1、events_v1、health_v1、receipts_v1、runtime_v1、runtime_versions_v1、strategy_schedules_v1、tasks_v1、tool_calls_v1、versions_v1、workbench_runs_v1（该组简写均加operations_autonomy_前缀） |
+
+当前安全态捕获另保留19张新身份安全表：注册预约、registered/management目录和原操作/登录fence、稳定AI工作身份、角色分配与委托撤销、原AI受托操作。旧点中的AI身份、分配和委托先停用，再合并当前值，当前账号禁用、登录撤销和AI停用不倒退。系统业务设置不因同属新迁移就当作当前安全态覆盖，仍随准确恢复计划选择；普通自主策略配置在隔离合并后停用，非终态任务按原operation重新核对前保持blocked，不能恢复后自动重做副作用。配置与密钥原有保护合同继续适用。
 
 不能用旧schema、通配excluded或跳过表绕过。定向测试源为maintenance-production、maintenance-native-authority、maintenance-prosody-current-state及在线/对象贡献相关tests：SQL/PGlite、node:sqlite、tmpfs原生Prosody、临时文件与显式RPC/S3/HTTP doubles分别报告；历史通过数/旧主机只读计数不进入现行结论。具体结果层次见[开发](../technical/development.md#故障定位与未验证范围)。
