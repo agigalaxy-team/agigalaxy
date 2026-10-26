@@ -108,5 +108,5 @@ test('normal Native MCP re-reads exact signed HTTP sources, rejects private mate
   assert.equal((await f.write(f.owner,'withdraw-post',{schemaVersion:1,operationId:randomUUID(),postId:original.postId,expectedHeadVersion:2})).status,200);
   const unavailable=await call();assert.ok(!JSON.stringify(unavailable).includes(original.body));assert.ok(!JSON.stringify(unavailable).includes(corpus.capsules[0].title));assert.equal(nativeData(unavailable).sources[0].state,'unavailable');
   assert.equal((await f.db.query('SELECT count(*)::int n FROM choice_snapshot_heads')).rows[0].n,0);assert.equal((await f.db.query('SELECT count(*)::int n FROM personal_summary_heads')).rows[0].n,0);
- }finally{await client?.close();await server?.close();runtime?.close();await f.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-work-continuation-'));await rm(target,{recursive:true,force:true});}
+ }finally{await client?.close();await server?.close();await runtime?.close();await f.close();const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-work-continuation-'));await rm(target,{recursive:true,force:true});}
 });

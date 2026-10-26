@@ -75,7 +75,7 @@ test('Native saves a private reference with one user choice, recovers lost deliv
   assert.deepEqual(stored.map(row=>row.reference),[reference]);
   assert.equal((await f.db.query('SELECT count(*)::int n FROM task_requests')).rows[0].n,0);
  }finally{
-  await client?.close();await server?.close();runtime?.close();other?.close();await f.close();
+  await client?.close();await server?.close();await runtime?.close();await other?.close();await f.close();
   const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-bookmarks-'));
   await rm(target,{recursive:true,force:true});
  }

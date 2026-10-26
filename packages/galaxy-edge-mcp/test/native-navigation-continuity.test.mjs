@@ -73,7 +73,7 @@ test('direct MCP return preserves original work through real source503/Task403 a
   assert.ok(!JSON.stringify(foreign).includes(origin.workRef));assert.equal(calls.length,beforeOtherReturn,'foreign owner is refused before any remote source read');
   console.log(JSON.stringify({actualMcpClient:true,actualSignedHttp:true,actualSource503:true,actualConsent403:true,actualHeldRebindRejected:true,actualOtherIdentityCopiedLocatorRejected:true,sameNavigation:true,sameOriginalWork:true,existingUnboundGenesisPreserved:true,newBusinessWrites:0,newConsents:0,modelCalls:0,physicalHostAcceptance:false}));
  }finally{
-  await otherClient?.close();await otherServer?.close();otherRuntime?.close();await client?.close();await server?.close();runtime?.close();if(api?.listening)await new Promise(r=>api.close(r));await f.db.close();
+  await otherClient?.close();await otherServer?.close();await otherRuntime?.close();await client?.close();await server?.close();await runtime?.close();if(api?.listening)await new Promise(r=>api.close(r));await f.db.close();
   const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-direct-return-'));await rm(target,{recursive:true,force:true});
  }
 });
@@ -100,7 +100,7 @@ test('real anonymous navigation held during local initialize refuses late comple
   assert.deepEqual((await runtime.navigation.resume(reopened.navigationId)).origin,origin);
   assert.equal(networkCalls,0);
  }finally{
-  release?.();runtime?.close();const target=resolve(directory);
+  release?.();await runtime?.close();const target=resolve(directory);
   assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-direct-return-initialize-'));
   await rm(target,{recursive:true,force:true});
  }

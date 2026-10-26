@@ -1,4 +1,5 @@
 import {assertNoWorkCredentials} from './local-data-redaction.mjs';
+const compareText=(left,right)=>left<right?-1:left>right?1:0;
 
 // Local upload selection only. Online account discovery/public visibility is
 // configured independently and is never inferred from these settings.
@@ -49,7 +50,7 @@ export function selectUploadPrivacy(current, input, updatedAt) {
   }
   const enabled = level === 'conversation-archive' && include;
   if (enabled && sessionIds.length === 0) fail('upload_privacy_session_scope_required');
-  if(old.level===level&&old.includeFullConversations===enabled&&JSON.stringify([...old.sessionIds].sort())===JSON.stringify([...(enabled?sessionIds:[])].sort()))return old;
+  if(old.level===level&&old.includeFullConversations===enabled&&JSON.stringify([...old.sessionIds].sort(compareText))===JSON.stringify([...(enabled?sessionIds:[])].sort(compareText)))return old;
   return {version: 1, revision: old.revision + 1, level, includeFullConversations: enabled,
     sessionIds: enabled ? sessionIds : [], ...(updatedAt ? {updatedAt} : {})};
 }

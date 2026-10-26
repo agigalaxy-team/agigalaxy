@@ -11,7 +11,7 @@ export function redactLocalWorkData(input) {
     let changed=false;
     const remove=()=>{changed=true;return excluded;};
     let result=value.replace(/-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----|$)/g,remove);
-    result=result.replace(/\b(?:Bearer\s+[A-Za-z0-9_.~+\/-]{8,}=*|Basic\s+[A-Za-z0-9+/]{8,}={0,2}|github_pat_[A-Za-z0-9_]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-(?:proj-|ant-)?[A-Za-z0-9_-]{16,}|xox[baprs]-[A-Za-z0-9-]{12,}|AKIA[A-Z0-9]{16})\b/g,remove);
+    result=result.replace(/\b(?:Bearer\s+[A-Za-z0-9_.~+/-]{8,}=*|Basic\s+[A-Za-z0-9+/]{8,}={0,2}|github_pat_[A-Za-z0-9_]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-(?:proj-|ant-)?[A-Za-z0-9_-]{16,}|xox[baprs]-[A-Za-z0-9-]{12,}|AKIA[A-Z0-9]{16})\b/g,remove);
     result=result.replace(/(["']?(?:password|passwd|passphrase|api[_ -]?key|secret[_ -]?access[_ -]?key|client[_ -]?secret|access[_ -]?token|refresh[_ -]?token|密码|口令|私钥)["']?\s*(?:[:=：]|\bis\b)\s*)(?!\[excluded credential\])(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;"'\r\n]+)/gi,(_all,prefix)=>{
       const tail=_all.slice(prefix.length).replace(/^["']|["']$/g,'');if(tail===excluded)return _all;
       changed=true;return prefix+excluded;

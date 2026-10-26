@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+const compareText=(left,right)=>left<right?-1:left>right?1:0;
 import {mkdir,chmod,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import * as z from 'zod/v4';
@@ -19,7 +20,7 @@ const codeOf=e=>/^[a-z0-9_-]{1,100}$/.test(e?.code??e?.message??'')?e.code??e.me
 const parse=(schema,input)=>{const value=schema.safeParse(input);if(!value.success)throw fail('work_sync_input_invalid');return value.data;};
 const exists=async file=>{try{await stat(file);return true;}catch(e){if(e.code==='ENOENT')return false;throw e;}};
 const empty=()=>({enabled:false,targetAccountId:null,choiceId:null,workIds:[],includeExisting:false,includeFutureWork:false,restoreWorkIds:[],excludedWorkIds:[],selectedAt:null});
-const sameSelection=(a,b)=>a.enabled===b.enabled&&(a.targetAccountId??null)===(b.targetAccountId??null)&&a.includeExisting===b.includeExisting&&a.includeFutureWork===b.includeFutureWork&&JSON.stringify([...a.workIds].sort())===JSON.stringify([...b.workIds].sort());
+const sameSelection=(a,b)=>a.enabled===b.enabled&&(a.targetAccountId??null)===(b.targetAccountId??null)&&a.includeExisting===b.includeExisting&&a.includeFutureWork===b.includeFutureWork&&JSON.stringify([...a.workIds].sort(compareText))===JSON.stringify([...b.workIds].sort(compareText));
 const ddl=`CREATE TABLE IF NOT EXISTS work_sync_choices(owner_id TEXT NOT NULL,endpoint TEXT NOT NULL,body_json TEXT NOT NULL,PRIMARY KEY(owner_id,endpoint));
 CREATE TABLE IF NOT EXISTS work_sync_scopes(owner_id TEXT NOT NULL,endpoint TEXT NOT NULL,work_id TEXT NOT NULL,choice_id TEXT NOT NULL,scope_id TEXT NOT NULL,
  baseline_sequence INTEGER NOT NULL,baseline_environment INTEGER NOT NULL,baseline_summary INTEGER NOT NULL,include_existing INTEGER NOT NULL,selected_at TEXT NOT NULL,
@@ -86,7 +87,7 @@ export function createNativeWorkSync({dataDirectory,endpoint,getIdentity,call,no
   async function scopeFor(record,selected){return access(true,selected.galaxyId,(db,owner)=>{
     if(choiceWithin(db,owner).choiceId!==selected.choice.choiceId)return null;
     if(selected.choice.excludedWorkIds?.includes(record.work.workId))return null;
-    let scope=db.prepare('SELECT * FROM work_sync_scopes WHERE owner_id=? AND endpoint=? AND work_id=?').get(owner,endpoint,record.work.workId);
+    const scope=db.prepare('SELECT * FROM work_sync_scopes WHERE owner_id=? AND endpoint=? AND work_id=?').get(owner,endpoint,record.work.workId);
     if(scope?.choice_id===selected.choice.choiceId)return scope;
     if(!selected.choice.includeFutureWork||Date.parse(record.work.startedAt)<Date.parse(selected.choice.selectedAt))return null;
     db.prepare('INSERT INTO work_sync_scopes(owner_id,endpoint,work_id,choice_id,scope_id,baseline_sequence,baseline_environment,baseline_summary,include_existing,selected_at) VALUES(?,?,?,?,?,0,0,0,0,?) ON CONFLICT(owner_id,endpoint,work_id) DO UPDATE SET choice_id=excluded.choice_id,scope_id=excluded.scope_id,baseline_sequence=0,baseline_environment=0,baseline_summary=0,include_existing=0,selected_at=excluded.selected_at,last_token=NULL,blocked=0')

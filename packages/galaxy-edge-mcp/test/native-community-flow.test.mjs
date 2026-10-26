@@ -58,7 +58,7 @@ test('anonymous Native community reading opens the exact discussion and returns 
   assert.ok(calls.every(call=>call.path.startsWith('/v2/community/')));assert.ok(calls.every(call=>!call.authenticated));
   assert.equal((await f.db.query('SELECT count(*)::int n FROM task_requests')).rows[0].n,0);
  }finally{
-  await client?.close();await server?.close();runtime?.close();await f.close();
+  await client?.close();await server?.close();await runtime?.close();await f.close();
   const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-community-'));
   await rm(target,{recursive:true,force:true});
  }

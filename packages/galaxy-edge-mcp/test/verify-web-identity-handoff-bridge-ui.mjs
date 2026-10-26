@@ -173,7 +173,7 @@ document.querySelector('p').textContent='Synthetic public peer; production main 
  if(observedPopup&&!observedPopup.isClosed()){report.popupState=await observedPopup.evaluate(()=>({url:location.href,openerPresent:window.opener!==null,receivedKinds:window.received?.map(item=>item.kind)}));await observedPopup.screenshot({path:join(out,'failure-peer.png'),fullPage:true});}
 }
 finally{
- await browser?.close();webClient?.close();await client?.close();await server?.close();runtime?.close();
+ await browser?.close();webClient?.close();await client?.close();await server?.close();await runtime?.close();
  api?.closeAllConnections();if(api?.listening)await new Promise(r=>api.close(r));await fixture?.db.close();
  for(const url of closedUrls){let available=true;try{await fetch(url);}catch{available=false;}assert.equal(available,false); }
  const target=resolve(directory);assert.ok(target.startsWith(resolve(tmpdir())+sep)&&basename(target).startsWith('galaxy-native-web-popup-'));

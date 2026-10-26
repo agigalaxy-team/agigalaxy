@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+const compareText=(left,right)=>left<right?-1:left>right?1:0;
 import {mkdir,chmod,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import * as z from 'zod/v4';
@@ -63,7 +64,7 @@ export function createNativeArchiveSync({dataDirectory,endpoint,getIdentity,call
   async function choose(input){
     const x=parse(archiveSyncChoiceSchema,input),before=await settings();
     if(!before.galaxyId)throw error('local_identity_required');
-    const unchanged=before.choice.enabled===x.enabled&&before.choice.targetAccountId===(x.targetAccountId??null)&&JSON.stringify([...before.choice.archiveSessionIds].sort())===JSON.stringify([...new Set(x.archiveSessionIds)].sort());
+    const unchanged=before.choice.enabled===x.enabled&&before.choice.targetAccountId===(x.targetAccountId??null)&&JSON.stringify([...before.choice.archiveSessionIds].sort(compareText))===JSON.stringify([...new Set(x.archiveSessionIds)].sort(compareText));
     if(before.choice.choiceId===x.choiceId){if(!unchanged||JSON.stringify(before.choice.restoreArchiveSessionIds??[])!==JSON.stringify(x.restoreArchiveSessionIds))throw error('archive_sync_original_choice_changed');return before;}
     if(unchanged&&!x.restoreArchiveSessionIds.length)return before;
     const ids=[...new Set(x.archiveSessionIds)];

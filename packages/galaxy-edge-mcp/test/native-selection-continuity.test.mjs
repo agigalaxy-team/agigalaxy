@@ -56,5 +56,5 @@ test('cold Native runtime uses saved scopes, does not overwrite selection, and r
   // operation silently rebound to the foreign device or service.
   const scope=createHash('sha256').update(JSON.stringify([options.endpoint,subjectId])).digest('hex');
   const original=JSON.parse(await readFile(join(directory,'help-v2',scope,oldSession.id+'.json'),'utf8'));assert.equal(original.subjectId,subjectId);assert.equal(original.endpoint,options.endpoint);
- }finally{release?.();first?.close();second?.close();foreign?.close();otherService?.close();if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();await cleanup(directory);}
+ }finally{release?.();await first?.close();await second?.close();await foreign?.close();await otherService?.close();if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();await cleanup(directory);}
 });

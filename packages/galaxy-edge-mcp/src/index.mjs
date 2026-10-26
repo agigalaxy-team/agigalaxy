@@ -346,9 +346,9 @@ function createServer() {
   }});
   localWork.startMaintenance();
   const close=server.close.bind(server);
-  server.close=async()=>{await localWork.close();await localChoice.close();await close();};
+  server.close=async()=>{await localWork.close();await Promise.resolve(localChoice.close());await close();};
   const onclose=server.server.onclose;
-  server.server.onclose=()=>{void localWork.close();void localChoice.close();onclose?.();};
+  server.server.onclose=()=>{void localWork.close(); localChoice.close();onclose?.();};
   registerConnectionTools(server, dataDir);
   return server;
 }

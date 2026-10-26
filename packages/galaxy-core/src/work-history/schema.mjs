@@ -1,4 +1,5 @@
 import * as z from 'zod/v4';
+const compareText=(left,right)=>left<right?-1:left>right?1:0;
 
 const id = z.string().min(1).max(512);
 const owner = {galaxyId: id.optional()};
@@ -33,7 +34,7 @@ export function normalizeWorkEnvironment(value = {}) {
   for (const key of ['host', 'hostVersion', 'platform', 'architecture', 'runtime', 'runtimeVersion', 'configuredModel', 'selectedModel', 'actualModel']) {
     if (typeof value[key] === 'string' && value[key]) result[key] = value[key].slice(0, 256);
   }
-  if (Array.isArray(value.tools)) result.tools = [...new Set(value.tools.filter(x => typeof x === 'string').map(x => x.slice(0, 160)))].sort().slice(0, 256);
+  if (Array.isArray(value.tools)) result.tools = [...new Set(value.tools.filter(x => typeof x === 'string').map(x => x.slice(0, 160)))].sort(compareText).slice(0, 256);
   return result;
 }
 

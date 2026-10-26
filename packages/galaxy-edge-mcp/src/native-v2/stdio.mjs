@@ -15,8 +15,7 @@ export async function startNativeStdio({configPath=process.env.GALAXY_NATIVE_CON
  config=await diagnostics.run('configuration',()=>readNativeConfiguration(configPath));
  runtime=await diagnostics.run('runtime',()=>createNativeRuntime({...config,diagnostics,trustedKeys:new Map(Object.entries(config.trustedKeys)),...(openBrowser?{openBrowser}:{})}));
  const a2aHost=config.a2a?createConfiguredNativeA2a({runtime,directory:config.dataDirectory,configuration:config.a2a}):undefined;
- let compactArtifact;
- compactArtifact=await diagnostics.run('artifact',()=>loadCompactArtifact());
+ const compactArtifact=await diagnostics.run('artifact',()=>loadCompactArtifact());
  // serveStdio may replace a discovery probe with a negotiated instance. Keep
  // every actual product rather than guessing which server the entry owns.
  const instances=new Set(),wire=transport??new StdioServerTransport();let closing;
