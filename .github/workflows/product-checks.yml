@@ -74,7 +74,7 @@ jobs:
         run: node scripts/components.mjs build --component admin --output outputs/build-admin
       - if: matrix.component == 'web'
         run: node node_modules/typescript/bin/tsc --noEmit
-      - if: matrix.component == 'hub' || matrix.component == 'contracts'
+      - if: matrix.component == 'hub'
         run: node --test --test-concurrency=2 packages/galaxy-official/test/task-material-*.test.mjs packages/galaxy-web/test/task-material-client.test.mjs
       - if: matrix.component == 'hub'
         run: node --test packages/galaxy-official/test/service-release-host.test.mjs
