@@ -35,9 +35,10 @@ def useful_response(value, responses=False):
 
 
 class ResponseGuard:
-    def __init__(self, send, *, stream, responses, version, rejected):
+    def __init__(self, send, *, stream, responses, version, rejected, call_id=None):
         self.downstream, self.stream, self.responses = send, stream, responses
         self.version, self.rejected = version, rejected
+        self.call_id = call_id
         self.start = None
         self.started = self.ended = self.bad = False
         self.buffer = bytearray()
@@ -49,10 +50,13 @@ class ResponseGuard:
             self.started = True
             await self.downstream(self.start)
 
-    async def reject(self, *, status=502, code=None):
+    async def reject(self, *, status=502, code=None, reason="invalid-response"):
         if self.ended:
             return
         self.bad = True
+        from .output import emit
+        emit({"event": "model-response-rejected", "callId": self.call_id,
+            "reason": reason, "status": status, "stream": self.stream})
         await self.rejected()
         body = {"error": {"code": code}} if code else ERROR
         data = json.dumps(body, separators=(",", ":")).encode()
@@ -76,13 +80,13 @@ class ResponseGuard:
             if status >= 400:
                 allowed = {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529}
                 return await self.reject(status=status if status in allowed else 502,
-                    code="model_gateway_request_failed")
+                    code="model_gateway_request_failed", reason="upstream-http-error")
             headers = [(k, v) for k, v in message.get("headers", [])
                 if k.lower() in {b"content-type", b"cache-control"}]
             content_type = next((v.decode("latin1").lower().split(";")[0].strip()
                 for k, v in headers if k.lower() == b"content-type"), "")
             if content_type != ("text/event-stream" if self.stream else "application/json"):
-                return await self.reject()
+                return await self.reject(reason="unexpected-content-type")
             self.start = {**message, "headers": headers +
                 [(b"x-galaxy-model-config-version", self.version.encode())]}
             return
@@ -116,7 +120,7 @@ class ResponseGuard:
             await self.frame(bytes(frame) + b"\n\n")
         if not message.get("more_body") and not self.ended:
             if self.buffer.strip() or not (self.useful and self.terminal):
-                return await self.reject()
+                return await self.reject(reason="incomplete-stream")
             await self.begin()
             await self.downstream({"type": "http.response.body", "body": b"", "more_body": False})
             self.ended = True

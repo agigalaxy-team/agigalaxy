@@ -133,7 +133,7 @@ class PrivateSurface:
                     try: await to_thread(self.usage_store.reject_response, metadata["galaxy_call_id"])
                     except Exception: pass
             guard = ResponseGuard(send, stream=payload.get("stream") is True,
-                responses=is_responses, version=self.settings.config_version, rejected=response_rejected)
+                responses=is_responses, version=self.settings.config_version, rejected=response_rejected, call_id=metadata["galaxy_call_id"])
             try:
                 await self.app(scope, receive, guard.send)
                 await guard.complete()
