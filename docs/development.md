@@ -4,7 +4,7 @@
 
 ## 取得源码
 
-默认分支为 `main`。当前仓库为私有仓库，Git 克隆、源码 ZIP 和 Issues 需要对应访问权限。认证使用自己的 GitHub 凭据管理器或既有 HTTPS / SSH 机制，不把令牌写入克隆 URL。
+`main` 是唯一长期集成分支；按实际改动使用短期任务分支，不维护相互漂移的模块主线。当前仓库为私有仓库，Git 克隆、源码 ZIP 和 Issues 需要对应访问权限。认证使用自己的 GitHub 凭据管理器或既有 HTTPS / SSH 机制，不把令牌写入克隆 URL。
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git

@@ -3,7 +3,7 @@ name: Component builds and integration checks
 on:
   pull_request:
   push:
-    branches: [main, reconstruction/full-product-20261012]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
