@@ -16,9 +16,9 @@ DOCUMENTS = [
     "docs/business-and-participation.md",
     "docs/open-components.md",
     "docs/technical-faq.md",
-    "docs/native-client/0.1.16/runtime.md",
-    "docs/native-client/0.1.16/hosts.md",
-    "docs/native-client/0.1.16/installation.md",
+    "docs/native-client/0.1.19/runtime.md",
+    "docs/native-client/0.1.19/hosts.md",
+    "docs/native-client/0.1.19/installation.md",
     "docs/network.md",
     "docs/getting-started.md",
     "docs/privacy.md",
@@ -41,10 +41,9 @@ def main():
         "",
         "Public project and user documentation. Beta; core implementation managed separately.",
         "",
-        "- Network manifesto: " + RAW + "MANIFESTO.md",
-        "- Growth, data and contribution: " + RAW + "docs/growth-and-contribution.md",
-        "- Community governance direction: " + RAW + "docs/community-governance.md",
-        "- Client entry and local identity: " + RAW + "docs/client-entry.md",
+        "Choose documents for the current question. The combined bundle is optional, not a required reading sequence.",
+        "For source development, use that checkout's AGENTS.md and relevant component guide; this public bundle is not a development checklist.",
+        "",
         "- Reading guide: " + RAW + "docs/ai-reading.md",
         "- Combined plain text: " + RAW + "llms-full.txt",
         "- Capsule JSON example (synthetic): " + RAW + "examples/capsule-v2.json",
@@ -56,11 +55,12 @@ def main():
         "",
         "Generated from the core repository public-material subset. Links point to the public counterpart repository.",
         "Read the stated dates, release scopes, implementation boundaries and limitations.",
+        "Use this bundle when full public background is needed; source development starts with the checkout's AGENTS.md and relevant component guide.",
         "",
     ]
     for source in DOCUMENTS:
         content = (ROOT / source).read_text(encoding="utf-8").strip()
-        title = content.splitlines()[0].removeprefix("# ")
+        title = next((line[2:] for line in content.splitlines() if line.startswith("# ")), source)
         index.append("- " + title + ": " + RAW + source)
         sections.extend(["---", "", "Public counterpart: " + RAW + source, "", absolute_links(content, source), ""])
     example = "examples/capsule-v2.json"

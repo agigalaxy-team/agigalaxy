@@ -2,6 +2,7 @@
 
 Generated from the core repository public-material subset. Links point to the public counterpart repository.
 Read the stated dates, release scopes, implementation boundaries and limitations.
+Use this bundle when full public background is needed; source development starts with the checkout's AGENTS.md and relevant component guide.
 
 ---
 
@@ -265,7 +266,7 @@ Keycloak、PostgreSQL、Prosody / XMPP、对象存储和扫描服务属于相应
 - **安装时可能联网：** 当前 `setup.mjs` 会从所选官网读取公开服务配置和公钥，下载及安装依赖也可能访问网络。这与注册账户、上传履历和在线连接是不同动作；本页不把完整下载安装过程写成完全离线。
 - **资料默认在本机积累：** 上传预设为“履历概况”，但未接入、未选择目标和范围时不会因此主动上传。完整会话保存或上传另行选择。
 
-具体安装步骤见[0.1.16 安装指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md)，差异见[宿主指南](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md)，字段与传输范围见[实现核对](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。这些说明没有修改冻结的 0.1.16 安装包或其随版指南。
+具体安装步骤见[0.1.16 安装指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md)，差异见[宿主指南](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md)，字段与传输范围见[实现核对](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)。这些说明没有修改冻结的 0.1.16 安装包或其随版指南。
 
 ## 为什么选择客户端作为入口
 
@@ -604,7 +605,7 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 交付 | 当前范围 |
 |---|---|
 | [公开资料仓库 agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public) | 项目、架构、生态和用户资料，图示、合成接口示例及公开资料合并工具；不是完整核心源码发行 |
-| 官网 Native 0.1.16 开发版 | 有实际安装包、发行核验和打包代码；包内选定的 Galaxy 自有代码、Skill、集成辅助工具及随包文档按 **Apache-2.0** 提供 |
+| 官网 Native 0.1.19 开发候选 | 有实际安装包、发行核验和打包代码；包内选定的 Galaxy 自有代码、Skill、集成辅助工具及随包文档按 **Apache-2.0** 提供 |
 | 客户端第三方依赖 | 维持各自原许可；发行内保留锁定版本、许可清单和原始声明，不因银河的许可而统一改成 Apache |
 | 全部服务与自建套件 | 核心服务实现仍另行管理，完整项目没有统一根许可和全套公开独立发行；不能把模块规划当成已可下载部署 |
 
@@ -639,8 +640,8 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 | 账户登录与管理认证 | [Keycloak](https://www.keycloak.org/) / OpenID Connect | 在线账户、本地身份、角色、关联及业务权限 | 现有认证基础；运营管理身份与业务身份分开处理 |
 | 业务数据 | PostgreSQL | 网络对象、事务、版本、权限与当前状态 | 现有业务基础 |
 | 产品界面 | React、TypeScript、Vite、Tailwind CSS | 网络功能、真实内容与完整使用过程 | 现有网站与产品界面基础 |
-| 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已接入源码和候选，完整运营范围继续整合 |
-| 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 已进入工程接线；不以队列存在代替功能交付 |
+| 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已实际运行，完整运营范围与效果继续按功能核对 |
+| 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 持久任务与 worker/publisher 已运行；业务结果仍分别判断 |
 | Hub／官方服务端聊天与归档 | [Prosody / XMPP](https://prosody.im/) | 服务器侧的房间、成员、消息许可与保留规则；向客户端提供银河 HTTPS 业务接口 | 客户端无需部署或配置 XMPP、无需单独 XMPP 账户；该实现不构成跨 Hub 通用资料联邦 |
 | 文件与对象存储 | S3 兼容接口、ClamAV；[Garage](https://garagehq.deuxfleurs.fr/)作为自部署对象存储工程选择 | 上传、业务引用、可见性、扫描与生命周期 | 原有接口与扫描基础保留，自部署标准与运行覆盖继续落实 |
 | 指标、告警与日志 | Prometheus、Alertmanager、Grafana OSS、Loki、Alloy | 业务关联、安全日志和统一维护入口 | 已选定的运行工具组合，真实集中采集覆盖需分别核对 |
@@ -655,9 +656,11 @@ MCP 和 A2A 等是银河采用的接入与协作基础。银河希望把不同�
 
 由官方服务支持公共组织、由基金会或理事会支持开源生态，是新提出的共同建设方向，具体组织与经费仍待落实。开放愿景、真实许可和治理制度分别说明，见[网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)与[治理方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。
 
-## AI 后台引擎仍是候选分析
+## AI 运营引擎与独立交付
 
-更深入的 AI 运营后台，方向包括规则优先、AI 统筹、按策略自动处理和必要的人机协作。Agno／AgentOS、LangGraph.js 与 Deep Agents 及其组合仍在研究和逐项核对；候选稿、局部代码检查或原型不等于正式采用、全站上线或向普通用户提供官方模型。
+运营后台已采用 Agno/AgentOS Native，并通过私有模型网关调用人工配置的模型；五个 AI 工作账户沿当前人类权限和 AI 岗位权限交集工作。有限自动任务已有实现，三个 jobs/search adapters 尚未接通，生产持续值守关闭。LangGraph.js/Deep Agents 等仍是研究方向，不能列为全部采用；框架接入不代表完整计划已验收。
+
+Discovery 保留固定 OpenPanel 修改、对应上游许可与构建说明，完整对应源码以显式提供的准确归档组装，见[源码构建边界](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/services/galaxy-discovery/SOURCE_BUILD.md)。参考目录、补丁与源码归档不是已可独立运行的完整自建套件。
 
 这项建设复用现有业务能力和开源组件，具体模块、执行权限与界面继续按实际决定推进。用户端继续使用自己的 AI 宿主，运营后台引擎是不同范围。
 
@@ -673,9 +676,9 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 
 # Capsule、客户端数据流与 Hub：实现核对说明
 
-[文档目录](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) · [AI 与抓取工具阅读入口](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ai-reading.md) · [客户端 0.1.16 使用指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md)
+[文档目录](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) · [AI 与抓取工具阅读入口](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ai-reading.md) · [客户端 0.1.19 使用指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md)
 
-核对日期：**2026-10-21**。本页回答公开概览没有展开的技术问题：Capsule 保存什么，效果怎样记录，哪些上下文会离开本机，权限如何撤回，以及 Hub 和 XMPP 的关系。
+技术核查日期：**2026-10-21，对应0.1.16**；安装入口维护日期：**2026-10-24，当前公开版本0.1.19开发候选**。当前安装与使用以[0.1.19随版说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md)为准，旧审计的源码比对与摘要不自动外推为0.1.19重新审计或实际宿主验收。本页回答公开概览没有展开的技术问题：Capsule 保存什么，效果怎样记录，哪些上下文会离开本机，权限如何撤回，以及 Hub 和 XMPP 的关系。
 
 这是维护者根据当前实现与公开客户端发行逐项核对的技术说明。字段、工具声明、服务端检查和实际运行效果分别说明；本页不构成第三方独立审计，也不把源码中存在某项机制等同于所有宿主和线上环境都已经完整验收。核心服务实现保留在主代码仓库；公开资料仓库提供本说明与可公开核查的发行入口。
 
@@ -683,7 +686,7 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 
 普通客户端在已有 AI 宿主中通过插件或 Skill＋MCP 接入，AI 可以协助完成环境发现、安装和本机初始化。程序在本机沿用或生成银河 ID，可以跳过官方在线账户注册和关联；Keycloak、PostgreSQL、Prosody 等由相应 Hub／官方服务维护者部署；客户端聊天经银河 HTTPS 业务接口使用，不直接配置 XMPP 连接或单独注册 XMPP 账户。
 
-当前实现中 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 负责本机准备，`galaxy_native_connect` 另行连接所选服务；ID 在 Hub 的接入与在线账户注册不是同一个动作。OpenCode 的 `setup.mjs` 已将本机准备接到同次安装选择，其他宿主按其插件或 MCP／Skill 能力初始化。当前安装工具仍读取所选官网的公开配置，Node.js 22.13+ 也是 0.1.16 的真实运行要求；不据此宣称完整安装完全离线或任何宿主都能一键完成。
+当前实现中 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 负责本机准备，`galaxy_native_connect` 另行连接所选服务；ID 在 Hub 的接入与在线账户注册不是同一个动作。OpenCode 的 `setup.mjs` 已将本机准备接到同次安装选择，其他宿主按其插件或 MCP／Skill 能力初始化。当前安装工具仍读取所选官网的公开配置，0.1.16当时要求Node.js 22.13+；另核0.1.19实际打包package.json仍声明Node.js >=22.13.0；不据此宣称完整安装完全离线或任何宿主都能一键完成。
 
 详细使用路径、账户分工与实现在[客户端入门](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md)。一次求助、找到相关内容或参与交流就可以产生当前价值，Capsule 发布和他人复用是后续可选积累，不是使用网络前必须完成的闭环。
 
@@ -778,7 +781,7 @@ OpenCode 的自动采集依赖其公开事件接口。其他宿主的事件、�
 
 ## 3. MCP 工具与授权、撤回
 
-以下是本次在公开 **0.1.16 发行代码**中能定位到的相关工具名称。它们是有代表性的接口清单；宿主实际通告的工具、可用权限和执行结果，仍以当前环境的 `tools/list` 及调用为准。
+以下工具名称在2026年10月21日的公开 **0.1.16 发行代码**核查中逐项定位；该清单保留本次核查范围。它们是有代表性的接口清单；宿主实际通告的工具、可用权限和执行结果，仍以当前环境的 `tools/list` 及调用为准。
 
 | 用途 | 相关工具 |
 |---|---|
@@ -835,7 +838,7 @@ Hub、Bridge 和有限互联有具体实现基础，多独立运营者、企业�
 
 ## 6. 这些说明的可复核依据
 
-公开客户端入口：[0.1.16 安装包](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip)。本次取得的 ZIP SHA-256 为：
+2026年10月21日核查使用的历史客户端为[0.1.16 安装包](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip)。以下 ZIP SHA-256 仅属于该旧包：
 
 ```text
 46e5c885dcb57641d6e8860a9c1b7de36304ffafecbdb6c60b1afbedf2e820ed
@@ -849,152 +852,327 @@ Hub、Bridge 和有限互联有具体实现基础，多独立运营者、企业�
 
 ---
 
-Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md
 
-> 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：
-> https://agigalaxy.org/docs/native-client/0.1.16/runtime.md
-> 正文保留对应发行内容，仅规范换行并增加本来源说明；后续发行请从官网下载页进入。
+# 银河共享原生客户端（v2 协议）
 
-# 工作记录、资料与原工作接续
+银河在用户原来的 AI 宿主中提供获准的帮助、资料与协作。先阅读与问题有关的内容，再作必要行动，最后将可用内容带回原工作。用户模型仍由宿主提供；客户端不会替换模型配置，也不会因为打开菜单而调用模型。
 
-银河将本地工作记录、你自己的 AI 整理结果和可选线上资料分别管理。先按[安装说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md)接入；不同宿主的交互见[宿主说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md)。
+2026-10-12 的 0.1.10 交付前，已在实际安装的 OpenCode 1.18.31 隔离配置中，从 `/galaxy` 查找并阅读求助，通过本机内容选择页发送一份协助说明，再从原记录将正文与来源带回原未发送输入。服务与身份为本地合成数据，提交经过正常 Native、签名 HTTP 和持久 PGlite；没有调用真实模型或发送真实用户的联系。首次操作已实际发送，随后修正返回接口并通过只读原记录验证返回，没有再发一次协助说明。本次 0.1.11 的社区与收藏增量另以正常签名 HTTP、Native MCP 和隔离网页操作验证，未重做所有真实宿主操作。实际终端、无头选择页和合同测试分别记录，不据此声明全部宿主、真人效果或整产品已经完成。公开发行状态以发布记录为准。
 
-## 阅读工作履历
+这是现有 v2 API 的独立 stdio 客户端。旧 local-only MCP 和旧 OpenCode 冻结发行保持原行为。当前包不依赖开发仓的绝对路径、不包含账号、密钥或已选云地址；它也不承诺八个真实宿主均完成验收。
 
-OpenCode 安装后照常工作，银河在本机积累文字、工具状态、来源和主要环境版本。自己的宿主模型处理新增材料，事实不会等待模型。履历可以查看摘要、过程、来源和当时环境，并回到原会话继续。
+## 在原 AI 宿主中接入
 
-记录保留实际可取得的内容与有限片段，默认不复制全部原会话。模型报告和工具结果保留各自来源；工具完成不自动表示整个目标成功。原文不可取得时，页面显示实际保存范围。
+需要 Node.js 22.13 或更新版本。先按已固定的发行公钥核验归档，解开后进入 `package` 目录：
 
-## 数据与隐私
+```text
+npm ci --ignore-scripts
+node setup.mjs <已选官网-origin>
+```
 
-| 档位 | 允许上传的资料类型 |
+`setup.mjs` 读取所选官网的公开 `galaxy-web-config.json`，取得实际 API 和当前 Ed25519 公钥。检测到 OpenCode 时，直接列出当前配置目录、本地银河资料位置和记录方式，供一次确认；需要组织身份时在同一次选择中输入 `org`。已有本机身份及类型沿用，没有身份时才准备默认个人身份。安装不注册账户、不关联服务，也不启动上传。缺少官网公开配置时保留原资料并说明安装未完成，不猜另一个服务。
+
+确认后，安装工具将运行包保存到所选 OpenCode 配置目录的银河专属子目录，合并银河的 TUI、MCP 和 Skill 条目；保留其他插件、模型设置、项目配置和已有资料，不要求保留下载解压目录。以后照常启动 OpenCode，普通文字与工具工作即可自动记录到本机，无需先打开银河菜单或逐会话确认。初始化协议说明事实、来源及有限片段的本地保存与自己的 AI 整理；默认不另存全部完整会话。默认上传档位为“履历概况”，未接入服务或未选择同步范围时不会主动上传。
+
+需要回看时打开 `/galaxy` 的“本地工作履历”，阅读摘要、过程、环境与可取得的来源，也可直接回到原会话继续工作。手动加载插件但尚未准备本机身份时，宿主会直接提供一次“同意并开始”；选择以后再说会被保留，客户端不会后台替用户创建身份。
+
+“逛社区”“找帮助”“发起求助”“消息”“我的与设置”按需要使用。已有本机身份直接读取；原连接的身份、设备与范围已有效时，TUI 与 MCP 两个进程沿用同一选择，按已保存的原范围恢复连接，无需再点一次连接或重新批准。明确断开、换身份、换设备或换服务会使旧连接和迟到结果失效。在线配置暂不可用时，按安装时保存的位置继续本地记录；真实设备权限变化仍需相应授权。
+
+“找帮助”在有可读取的宿主工作说明时带入查询；宿主没有提供这种公开能力时允许直接填写需要的帮助，不读取隐藏输入。选中求助后先读当前正文、目标与现状。写协助说明只填写希望提供的帮助，真实内容、接收方与范围在本机页作一次明确选择；发送后显示实际结果。该动作不会自动加入共同工作，也不会生成交付或成功履历。选择“带回原工作”会重新读取当前获准内容，在实际支持此接口的 OpenCode 中追加正文和简要来源到原未发送输入，保持原输入且不提交模型。接口不可用时在宿主显示可读内容与来源供继续使用，不冒充已写回输入。
+
+“在官网找相关方法”沿用刚才的搜索方向和原求助，进入带有准确查询的“找帮助”页。系统只为这次方法查找增加方法读取范围，原返回位置仍是同一求助；没有准确方法时显示实际查询结果或空态，不创建方法对象。网页已有同一身份且权限足够时直接沿用；确需新设备获得附加范围时，先核对本机批准，再在官网选择“使用这个设备继续”。这一次本机采用不会新建主体、重新提交已批准的设备操作或删除旧设备钥匙。
+
+普通 MCP 返回先呈现当前有用的内容、动作和简要来源；精确版本、原操作与完整事实保留在 `structuredContent`，模型据此进一步调用，不把内部编号或 JSON 当作用户结果。MCP Apps 小面板按同一目的组织消息与结果；其浏览器合同验证不替代实际宿主验收。
+
+## 把网页里的事情接回自己的 AI
+
+在帖子、求助、项目、人物、方法或对话中选择“用自己的 AI 继续”，可以填写这次希望 AI 做什么，复制一段可直接使用的请求。请求包含同一身份、所选内容和准确版本的定位，以及返回原页面的位置；没有复制私人草稿、全部聊天历史或附件正文。已经连接同一服务和身份的 Agent 使用 `galaxy_work_continue` 读取这段请求中的链接，不要求用户另填对象编号或工具 JSON。
+
+读取会重新核对当前权限。旧帖子和方法保持所选版本，求助分别返回当前目标、已报告的结果和实际限制，不能将“希望取得”当成“已经完成”。暂不可读的材料保持未知；服务、身份或连接改变时停止旧读取，不自动连接另一个身份，也不扩大材料权限。只读接续不会发布、联系、加入工作或记录成功复用。
+
+OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整段请求。客户端读取当前内容后，将正文、必要来源和返回位置追加到原未发送输入；模型何时开始仍由用户决定。普通 MCP 宿主取得可读内容与同一个返回链接。宿主是否支持直接写入输入框须以实际能力为准。
+
+## 浏览社区与收藏
+
+“逛社区”打开同一身份的社区网页，可按主题浏览、搜索标题和正文、阅读或回复，再继续原工作。Agent 可使用 `galaxy_community_topics`、`galaxy_community_query`、`galaxy_community_read`、`galaxy_community_replies`、`galaxy_community_versions` 和 `galaxy_community_owned` 取得实际内容。公开帖子可按服务实际能力匿名读取；本人内容与收藏使用当前身份。查询继续服务给出的游标，不把首批结果当全部，也不把主题或编辑时间猜成作者的原始选择。
+
+明确收藏或取消某条内容时，`galaxy_bookmark_set` 只需要准确引用和 `saved` 选择；客户端自动保留同一次提交，并在结果未知时查询原回执。`galaxy_bookmarks` 读取本人的帖子、准确方法版本、项目和人物收藏，可按种类分页；它不要求填写工作目的、比较理由或开启关注。网页与 Native 沿同一身份共享收藏选择，正文仍按当前来源权限重新读取。
+
+`galaxy_open` 支持 `community`（可选 `topic`、`query`）、`post`（准确帖子，可选版本）和 `bookmarks`，原工作引用留在本机。返回时通过原 navigationId 重新读取当前对象。收藏与历史成功回执不会授予新权限；来源撤回或暂不可核查时保留定位并说明实际状态，不显示已失效正文。以上工具与当前网页的协议检查不表示所有真实宿主都已经独立验收。
+
+## 查阅公开账户与 ID
+
+自己的 Agent 可按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile` 读取公开账户资料，`galaxy_account_public_ids` 查询其公开关联 ID，`galaxy_account_public_credentials` 读取公开外部凭据，`galaxy_account_public_posts` 继续阅读该账户的公开帖子，或用 `galaxy_account_public_by_id` 反向查询公开关联账户。列表沿返回的 `nextAfter` 继续，每页最多 50 项。这些工具只向已配置服务发送匿名 GET，不上传本地工作背景，不创建身份，也不要求新的授权选择。
+
+公开结果由在线账户的查询与披露开关决定；关联 ID 和外部凭据的披露默认关闭。不可读或未返回的关联不代表不存在其他私有关联。使用返回的发行者、来源、当前状态与查询时点说明依据，不补造隐藏资料，不把外部认证说成银河官方认证，也不替查阅者作可信度判断。
+
+## 本地履历、上传范围与私有原会话
+
+正常客户端新建身份默认个人，可额外选择组织；已有身份及其类型沿用，不因为换宿主而重建或改型。需要 Agent 主体时使用 `galaxy_local_worker_identity_create` 的独立 Worker 目录入口。创建这个身份不会启动 Worker、接入服务或调用模型。
+
+兼容的 OpenCode 接入在实际工作事件中积累消息片段、工具状态和主要环境版本，不要求先打开菜单、创建 Case 或连接账户。事实保存不等待模型。自己的宿主模型按未整理增量生成摘要；暂时失败由程序有限重试，新增工作或切换模型时接续待整理材料，不让用户逐段手工提交。摘要与实际观察分开保留，空闲、工具完成或模型报告不自动成为整体成功。其他宿主通过实际提供的 MCP 工具阅读本机记录或补充明确标为自述的笔记，不能以自述冒充未采到的宿主事件。
+
+`galaxy_command` 的 `history` 入口及 `galaxy_local_work_list`、`galaxy_local_work_get` 读取本人本地履历；`galaxy_local_work_pending` 和 `galaxy_local_work_summary` 接续自己的 AI 整理。支持 MCP Apps 的宿主可用 `galaxy_local_panel` 在当前 Agent 旁边查看履历、上传设置及私有原文。普通网页没有本机 RPC；本机面板或普通工具读取真实本地资料。
+
+四档设置由 `galaxy_local_upload_privacy_get`、`galaxy_local_upload_privacy_set` 实际保存和读取，默认第 2 档。未接入或未选择同步目标时不会因这个默认值主动上传。
+
+| 档位 | 允许上传的数据类型 |
+| --- | --- |
+| 第 1 档，仅本机 | 不上传本地工作材料 |
+| 第 2 档，履历概况 | 结构化工作类型、参与角色、时间、实际结果状态、来源标识和主要模型工具版本；不含标题、自由文本摘要、私人项目名、路径或原文 |
+| 第 3 档，工作内容 | 在概况之外，允许所选工作说明、过程摘要及实际保留的材料 |
+| 第 4 档，会话归档 | 另行启用并选择准确原会话范围后，才允许这部分会话上传；只选最高档仍不包含完整会话 |
+
+上传类型与在线账户的对外查询设置分别处理。本人本地阅读及宿主自己的模型调用不因上传档位被禁止；Galaxy 工具向服务发送本地材料则遵守该档位。密码、令牌、API Key 与私钥始终排除，不因第 4 档纳入资料。排除项保留类别与位置说明，不保留秘密值。
+
+私有原会话先由 `galaxy_local_archive_configure` 明确选择宿主和会话，按宿主实际可取得的 message/parts 保存；可选自动清理天数。本人使用 `galaxy_local_archive_list`、`galaxy_local_archive_export`、`galaxy_local_archive_delete` 和 `galaxy_local_archive_cleanup` 管理实际原件。导出标明采集范围、缺口和排除项，不补造早期消息或附件；普通履历的导出只包含实际保留事实与摘要，不能称完整会话。删除本机原件、删除工作事实及删除云端副本是不同动作。重置本机身份配置保留这些独立资料目录，可在重置前使用本人导出或删除入口。
+
+私有云同步先从实际关联账户中选定目标，再选择工作或原会话范围。新工作范围默认只含此后材料，已有资料需另选；每个来源保留自己的同步范围。后续更新沿原有效选择接续，网络中断时保留原操作与快照。本人删除的云来源不会由旧范围自动恢复；到期快照停止重传，但不阻止后续新版本。超出服务容量的范围明确显示未同步，不静默截成完整资料。原会话云导出当前格式为 `galaxy-private-conversation-v1`，包含实际 session、messages、parts、exclusions 和 coverage。
+
+## 专业配置与其他宿主
+
+普通 OpenCode 安装直接使用前述命令。需要选择其他宿主可传 `--host <宿主名称>`；本地资料或 OpenCode 配置位置确需调整时，分别传 `--data-dir <绝对路径>`、`--opencode-config-dir <绝对路径>`。安装确认会显示实际目标。自定义目录未被普通启动加载时，使用工具给出的 `run-opencode.mjs`；它只指定所选配置目录，不替换模型或项目设置。`--organization` 适用于明确的组织用途，已有身份不会因此改型。
+
+需要直接接入 stdio 的宿主使用 `node galaxy.js`，并将 `GALAXY_NATIVE_CONFIG` 指向生成的公开配置。配置字段是 `version:2`、`endpoint`（精确 HTTPS API origin）、`website`（精确 HTTPS 官网 origin）、`dataDirectory`（本人本地绝对目录）、`trustedKeys`（kid 到 publicKeyPem/notBefore/notAfter/revoked 的映射）。不要在配置中加入令牌、恢复码或私钥。源码首次构建尚无锁文件时才使用 `npm install` 形成锁，之后按锁执行 `ci`。
+
+高级接入可单独运行 `node prepare-service-config.mjs <官网-origin> <API-origin> <本机数据目录绝对路径> <新的配置文件绝对路径>`，用于明确核对已知 API 并生成新的公开配置。它不创建身份、数据目录或绑定，不跟随重定向，不覆盖旧文件，也不自动更换已保存信任。普通安装使用前述 `setup.mjs` 自动读取公开 API，不需要手填上述配置对象。
+
+明确执行普通 OpenCode 安装时，`setup.mjs` 在同一次同意中沿用或准备本机身份；后续加载直接使用已有身份，不另建或改型。手动加载插件且没有身份时，宿主直接提供一次本机准备选择，同意后开始记录，不后台创建身份，也不为同一选择重复打开浏览器确认。进入官网不要求重复初始化原 GUID。首次连接由用户选择，后续同一设备可在调用已允许工具时重连。会话令牌只在进程内存。原生设备密钥保存在本机用户目录的独立 PEM 文件，浏览器 IndexedDB CryptoKey 的不可导出特性不适用于此原生文件存储。初次升级旧身份沿用 Genesis 控制密钥，后续新设备通过公开批准协议加入；邮箱不能接管 GUID。恢复材料仍经官网私有输入界面处理。
+
+任务、参与、逐收件人材料、聊天、发现、项目、联系人、招聘、Capsule、事实、通知、摘要、统一搜索、个人选择快照和任务评论工具重用服务端现有 MCP schemas，只将动作映射到现有 HTTP 入口。Capsule 保留精确版本、原操作回执和所选来源许可查询；评论与治理不代替任务交付或能力判定；选择快照的云同步须另行选定具体快照，不能套用摘要同步权限。HelpSession 复用既有帮助引擎，保留四条路径、来源依据、选项与原任务引用。服务端继续负责当前身份、Consent、权限、配额、版本和真实运行条件。查询、读取、已有精确 Consent 重试与当前 Agent 授权行为不重复要求新选择。
+
+新权限范围优先使用 MCP elicitation；宿主缺少能力时返回临时本机审阅链接。它绑定 127.0.0.1 随机端口，显示本次实际内容、用途、接收方和范围，用户点击允许或取消后回到原宿主。原操作与准确字节仍绑定原选择；MCP Agent 沿同一参数继续，当前 Worker 小面板在焦点返回时自动继续同一操作。无需复制确认口令；关闭页面不批准。无名称的身份和所选设备在明确详情中核对，完整原始输入通过来源与诊断下载。页面不接收任意目标、私钥或恢复材料，5 分钟过期，stdio 退出即销毁。它与官网房间不同，不产生第二套云服务。工具不接受模型填入的假确认字段。
+
+`galaxy_open` 只把稳定对象种类和 ID 放入网址，原工作来源留在本机；输出“已请求打开”与实际页面已呈现分开。Task、Room、Capsule、Project 有独立详情路由。Capsule 可选 versionId 对应 `/app/capsules/:id/versions/:versionId`，返回时沿用该版本读取，不擅自改成最新版；也可打开 `/app/capsules` 列表。Project 对应 `/app/projects/:id`，返回重新读取同一项目。`galaxy_return` 刷新同一对象。房间关闭不是离开、取消或撤回。目标官网是否已发布这些页面仍以该服务实际部署记录为准。
+
+返回记录绑定创建时的本机身份、所选 API 和官网。同一身份明确重新连接后，可以沿用原记录；切换身份、服务或官网时不能拿到另一范围的原工作引用。旧发行留下的无归属记录会保留，但不能推断其属于当前身份；从当前身份重新打开准确对象即可建立新的返回记录。创建身份或连接变化期间迟到的旧请求也不能继续展示原范围数据。
+
+原对象目前不可读或服务暂时不可用时，返回结果保留原对象定位和原工作引用，明确标记 `current:false`、`data:null` 与来源错误，不重放缓存正文、不自动授权或重新提交业务。认证或会话本身失效仍按原错误处理。宿主可以据此回到原工作、说明当前缺口，并在条件恢复后再次查询同一对象；历史回执不授予当前正文访问权。HelpSession 刷新或返回遇到发布、参与接受结果未知时，先查询原 operationId 与原载荷摘要，确认后再读取当前任务，不通过另建任务或另一次接受猜测结果。
+
+个人摘要默认本地，不产生模型调用。私有同步和房间分享分别选择。持续关注需要当前连接的房间 Agent grant、限定目的与结束时间；使用 agent_grants/grant/revoke 查看与管理，再由用户宿主执行 check/ack/stop。绑定变化后停止旧关注，需重新选择当前连接授权；不会复制旧权限。并发检查使用本机锁和租约，待处理内容只保存定位信息，每次重新读取来源权限。当前实现不安装后台服务，不会在宿主退出后代替用户运行模型。检查没有新事件时模型调用为零；有事件只返回供用户模型处理的数据。Agent 处理游标与人类已读分开。
+
+安装 Skill 时将 `skills/galaxy` 放到对应宿主认可的 Skill 路径。MCP 配置的 command 指向该机 Node 可执行文件，args 为独立候选中的 `galaxy.js`，env 只含 `GALAXY_NATIVE_CONFIG` 路径。不要同时启用同名旧 Galaxy MCP。切换版本保留原数据目录并关闭旧进程，不重跑初始化。
+
+本包附 `host-configs.mjs`：运行 `node host-configs.mjs <公开配置绝对路径> <尚不存在的输出目录绝对路径>` 生成八端配置与 Skill；只生成新目录，不修改用户配置。参见 HOSTS.md 和 host-capabilities.json。复制到另一台电脑需用该机路径重新生成，恢复身份使用批准流程而非把账号密钥塞入插件。
+
+开发追溯：M15/M16/M17；CUR-02/03、08/09、12、23—32；B10-Q02—04、DISC-ROOT、DISC-HANDOFF 与关注采用决定。原运行记录位于项目 `07-logs/development/native-client-v2.md`。
+
+分发采用独立的 galaxy-native-client-release 签名种类。protocolAcceptance 范围是 local-stdio-http-fixtures，actualHostAcceptance 固定 false；它与旧 OpenCode 真宿主报告互不替代。标准 JWS/Ed25519 绑定发行包与报告的准确字节，公钥由调用者固定，签名最长 30 天。验签通过不表示已经安装、公开发布、运行或完成人工验收。
+
+## 可选 A2A 对端
+
+当前源码新增可选 `a2a: { peers: [...] }`；未配置时不注册 A2A 工具，也不发现或联系对端。每个 peer 使用 `id`、可选 `name`、精确 `endpoint`、可选 `tenant`、`peerPrincipal`、已审阅公开 `agentCard`、`cardHash` 和 `trustExpiresAt`（毫秒）。卡片摘要是 SHA256(JSON.stringify(agentCard))，选择卡片时保存原 JSON 字段顺序。只接受卡片列出的 A2A 1.0 JSONRPC 精确接口；不自动刷新卡片、延长期限或切换接口。
+
+peer 还可携带公开的 `authentication` 选择：默认 `{"mode":"none"}` 适用于无凭据对端；Bearer 对端使用 `{"mode":"bearer-environment","variable":"GALAXY_A2A_PEER_<所选名称>_TOKEN"}`。只给该 MCP 子进程注入所选变量；配置、插件、日志与聊天均不放原始值，不永久导出全局环境。启动与 peers 工具不读取变量，实际调用才读取该精确变量；缺失时报告对端授权不可用，不降级成匿名、不借用 Official token。若宿主不能注入所选变量，先使用已有浏览器衔接或处理该宿主配置，不改变协议信任。OAuth、任意请求头和自动凭据发现尚不支持。
+
+配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。具体生命周期与 Python 互通记录见源码仓 `packages/galaxy-a2a/docs/native-v2-python.md`；源码变化不会自动更新已经签名发布的包。
+
+## 设备清单与明确撤销
+
+### 已有Agent身份接官网（当前开发候选）
+
+本次新增 `galaxy_identity_web_connect` 与 `galaxy_identity_web_connect_status`，最终固定包与实际验证范围以其发行记录为准。先用status读取当前Native已有身份，按真实工具schema传入原对象、可选原工作来源和固定requestId；准备连接不会另建GUID。工具打开受控的临时本机页面，再由用户进入配置中的固定官网。官网生成自己的设备钥；原Native设备只有在本机页明确核对同一GUID、所示设备和范围并批准后才签署授权。模型不能填写确认布尔值代替这次选择。
+
+本机页与官网通过精确窗口和来源交换限定用途的公开证明、设备申请、批准与回执，私钥、恢复码及令牌不跨窗口。URL只携带必要公开定位；原宿主和workRef留在Native本机。新握手有效期为180秒，与原有5分钟普通操作审阅页不同；过期、关闭、弹窗被阻止或窗口引用丢失都不表示已经批准或连接。
+
+已有官网设备在本次持钥证明绑定的同一GUID、deviceId与keyId下可以复用。后续正常刷新沿持久身份读取当前设备控制，不把180秒握手当永久权限，也不要求每次重新初始化。设备当前有效不保证旧任务根Consent继续有效；原Task保留定位，正文无权时返回明确不可用，不重放缓存。
+
+同一GUID的旧网页设备缺少本次所需范围时，远端批准新设备并不自动替换本机当前设备。原操作先核对准确结果，官网随后显示新设备和实际权限变化供本人采用。预览或选择期间发生撤销、身份/连接变化或另一页选择不同设备时，本次旧选择失效，原钥匙、草稿和原操作保留；同一原操作的完成回应丢失时核对并接续，不重新创建设备。
+
+结果未知时保留原requestId、handoffId及已有设备操作journal，用status和原设备reconcile核对；已有未决授权操作不能走复用设备捷径或改ID重建。status中的网页连接报告不等于Native独立观察到了网页会话，工具保持两者的区别。确认页关闭不撤销已经接受的业务事实。
+
+完成网页工作后，使用同一navigationId调用 `galaxy_return` 刷新原对象并接回原工作。当前模型负责向用户说明实际取得的帮助、仍未解决部分和当前来源限制；网页返回、方法引用或设备接续本身都不生成成功履历。
+
+`galaxy_identity_device_native_read` 的 `current`／`list` 返回本机身份在所选服务的当前设备控制，`pending` 读取本机待处理操作，`reconcile` 配合原 `operationId` 核对原回执。读取不会签名、重连或恢复私有资料；本机已有身份时，普通连接断开后仍可核对公共控制状态。
+
+使用 `galaxy_identity_device_native_prepare_revoke` 选择当前清单中的准确 `deviceId`。返回的 `previewId` 仅指向本进程保存的原预览，预览列出目标设备、公钥标识、控制版本、控制链、原请求和挑战摘要、期限及后果。prepare 会登记未签署的挑战，尚未撤销设备。`galaxy_identity_device_native_confirm` 接受这个 `previewId`，再经过真实宿主选择或本机审阅页；模型不能填写确认布尔值替代本人选择。
+
+撤销成功后，所选服务拒绝目标设备的原连接和凭据，GUID 与历史证明保持。它不删除数据、不消耗恢复码，也不声称其他服务同步撤销。最后一个管理设备只有在服务已登记恢复依据时才允许明确自撤；“已登记”不能证明本人仍安全持有恢复码。
+
+连接、控制版本或预览期限改变后重新核对。提交结果未知时保留原 operation、挑战及证明，只查询原状态；不要生成另一份撤销来猜测结果。`galaxy_identity_device_native_stop_retry` 经真实选择仅停止本机继续提交，已签署未知操作仍保留定位，不能称为服务取消。终态历史回执不授予当前访问权。官网“身份与设置”提供同义清单、预览、原回执与本机停止入口。
+
+## 已选 Worker Pack 的原生使用
+
+可选配置 `workerPacks: { workers: [...] }` 把已选择的 Pack 固定版本关联到已有 `a2a.peers`，不安装或启动任意程序。每个 worker 使用以下公开字段：
+
+| 字段 | 含义 |
 |---|---|
-| 仅本地 | 本地工作资料不上传 |
-| 履历概况 | 所选工作的类型、角色、时间、结果状态、来源标识及主要模型工具版本；不含标题、自由摘要、路径或原文 |
-| 工作内容 | 另允许选定工作的说明、过程摘要和选定材料 |
-| 会话归档 | 在另行启用并选定会话后，允许该范围实际保存的会话内容 |
+| `id` | 本机唯一名称，1—80 个字母、数字、下划线或连字符 |
+| `peerId` | 当前配置中已经核对的 A2A peer ID |
+| `pack.builderId` / `pack.manifestId` / `pack.manifestHash` | 真实可读的 Builder、精确 Manifest 及其 SHA-256 |
+| `sourceHash` / `version` | 所选 Pack 内容摘要与版本，执行前再核对 |
 
-默认第 2 档。档位确定允许的数据类别，目标账户和实际工作范围由本人选择；没有接入时不会主动关联或上传。更高档位不会自动纳入全部旧资料、项目文件或会话。凭据始终排除，宿主自身的模型请求仍由宿主管理。
+未配置时不注册 Worker 工具；每个 Worker 必须有对应的显式 A2A peer。配置最多 32 项，不接收 shell command、下载地址或模型传入的程序路径。工具发现不创建身份、连接、执行进程或模型。连接后的本人首次操作才打开按身份隔离的本机记录。
 
-一次保存沿用未变的同步范围，程序处理分页、重试和原操作结果。线上已删除的资料不会因普通保存设置而自动复活。确需恢复时重新明确选择相应来源。
+四个工具为 `galaxy_worker_host_read`、`galaxy_worker_host_prepare`、`galaxy_worker_host_execute`、`galaxy_worker_host_abort_local`。开始使用需本人当前可读的精确 Attempt、Configuration、用途和必要文本。prepare 返回完整预览及本进程句柄，execute 经既有真实选择执行；支持 MCP Apps 的宿主复用同一紧凑资源，不支持的宿主保留可读普通 MCP 预览与同一本机选择页。
 
-## 本人线上资料
+当前 Worker 小面板先显示工作目的、必要输入、处理位置与范围，返回后先显示对端实际输出，再提供可选的结果保留。可识别的结构化内容显示可读字段并提供完整原始内容下载；精确关联、版本与原操作保留在来源与诊断。已知的对端 Task 在面板可见时自动读取进度，已有 Result/PackUse 未确认时自动查原回执；这些读取不会批准、再次派发或自动记录成功。离开页面仍可带当前引用回到原工作。
 
-官网登录独立官方账户后，可以查看本人已上传工作与私有会话，导出实际保存的内容，删除选定副本或设置自动清理。私有资料不因账户公开查询开关而公开。账户对外查询与客户端上传范围分别设置。
+本地 Chromium 与 SDK App/AppBridge 已运行真实 Node 参考 Worker、签名 HTTP 和 PGlite；Native 租约与宿主本地选择存储是显式合同夹具。实际计算、未知初次发送不重发、既有 Task 自动读取、本地取消与真实远端取消分别有检查。它们不证明实体 AI 宿主或独立运营 Worker 的使用效果。
 
-本地原件、宿主原会话和线上副本分别管理。删除某个位置的副本只影响该位置；页面按实际范围说明操作结果。会话导出自动接续所有保存页，缺失的早期内容不补造。
+对端完成、导入 participant-reported Result、记录独立 PackUse 是三个不同事实。后两者各有自己的准确预览、披露选择和回执；对端完成不会自动解决原任务、形成 Verification 或成功履历。丢失回执时查询原关联和原操作，不能重复发送。`abort_local` 只结束本地等待或预览，远端取消需另行准备并确认 CancelTask。仓库中的 reference-worker-pack 是隔离示例，不是已被独立运营者采用的生产 Worker。
 
-## 社区与自己的 AI
+## 本机系统提醒
 
-普通官网账户可以直接登录、发帖、回复和管理内容，无需先安装银河、拥有本地 ID、配置模型或取得外部认证。需要让某个本机身份代表该账户行动时，再完成银河账户关联；多个关联账户按真实上下文确定目标，确有歧义时才选择。
+提醒默认关闭，重启后需要再次明确启用。`galaxy_host_notifications_status` 不启动辅助进程、定时器或模型；`enable` 经过现有真实选择后，每60秒检查当前收件箱，`check` 可在已启用时手工核对，`disable` 停止检查并撤回仍由本进程持有的提醒。退出及断开连接也执行清理。通知展示、人类已读和 Agent 处理游标分别记录。
 
-网页里的“用自己的 AI 继续”保留选定内容与准确来源。在支持实际返回通道的宿主中继续原工作；独立网页没有该通道时提供简短接续请求。读取当前权限不会自动发布、联系他人或开启同步。
+可选公开配置为 `hostNotifications: { kind: "linux-freedesktop", command: "/usr/bin/python3" }`；`kind` 只接受 `linux-freedesktop`、`windows-notify-icon` 或 `macos-user-notifications`，`command` 如提供必须为本机绝对路径。此配置不接受 `enabled`、任意参数、脚本文本或通知正文；MCP 工具也不接受这些字段。省略配置时 Linux、macOS 分别选择对应通道，其余系统选择 Windows 通道；缺少所需辅助程序或系统能力时保留前台收件箱。配置本身不会启用提醒。
 
-## 专业接入与部署 Agent
+Windows 使用固定 NotifyIcon 辅助程序，只有收到 `BalloonTipShown` 才记录客户端观察到的展示。Linux 使用已安装的 Python3、PyGObject/GIO 和当前同一用户的本地 Unix D-Bus；缺依赖或通知服务时保留前台入口，不自动安装、启动 session bus 或切换远端总线。固定辅助进程只收到模式和条目数量，不接收私有标题、正文、网址、收件人或业务对象ID。
 
-直接 MCP 接入使用 `node galaxy.js`，以 `GALAXY_NATIVE_CONFIG` 指向安装生成的公开配置。该配置包含准确官网、API、公钥及本机资料目录，不放入令牌、恢复码或私钥。`v2` 表示协议，发行版本读取包内 `package.json`。
+Linux 的 `Notify` 返回只表示系统接收了请求，输出始终保留 `displayed:false`，不会写成已展示或人类已读。原短生命周期连接固定通知服务的唯一名称和原通知ID；来源撤回、静音、禁用或退出时只请求关闭原提醒，不重连寻找另一条通知。系统实际撤回仍与辅助进程已关闭分开。未知展示保留原尝试记录，重启后不会再发送同一事件来猜测结果。
 
-沿用当前身份、设备和有效范围。服务、身份或权限变化时按真实结果处理，不以重绑、重建身份或重新提交未知操作代替恢复。新增范围使用实际选择；已有原操作由程序核对并接续。
+当前 Windows 环境的 Linux 自动检查使用真实受控 Node 子进程代替 Python/GIO，核验固定命令合同、管道、取消、退出及原ID撤回；它不是物理 Linux 桌面验收。实际宿主显示、焦点与用户体验仍需在对应设备核验。
 
-## 查询开放账户与来源
+macOS 通道当前为源码和协议验证阶段，未提供已编译、签名或公证的辅助程序。默认不启动任何 helper。受信本机配置的 `command` 必须指向绝对路径 `.../GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications`；不会改用 AppleScript 或任意命令。开发者在已有 macOS SDK 的机器上可运行源码目录 `notifications/macos-helper/build.mjs`，传入尚不存在的绝对输出目录。该构建仅生成新目录，不签名、公证、安装、启动或改变系统安全设置；本轮 Windows 测试没有编译 Swift，也没有验证真实 Notification Center。
 
-可以让当前 Agent 按已知 ID 或账户查询公开资料。Native 提供 `galaxy_account_public_by_id`、`galaxy_account_public_profile`、`galaxy_account_public_ids` 和 `galaxy_account_public_credentials`；列表沿 `nextAfter` 继续。请求只读取线上账户明确开放的字段，不附带当前本地工作。外部凭据按实际出具者、范围、日期、签名和撤销状态阅读。
+`galaxy_host_notifications_permission` 使用一次独立的真实宿主选择，仅在 macOS 权限尚未决定时请求系统 alert 权限。已拒绝时只返回当前状态；普通 `status`、`enable` 和自动检查不会触发权限弹窗。此动作不启用或停用已有提醒、不读取业务收件箱、不展示通知、不写人类已读。每次调用重新审阅，审批记录不作为后续调用的授权缓存；浏览器批准在等待本机记录写完之前即被消费，原链接不能再次授权。身份或连接变化时不沿用旧选择；禁用和退出会关闭本次拥有的 helper。
 
-## 在面板中继续使用
+macOS `UNUserNotificationCenter.add` 成功仅表示系统受理，仍返回未知展示及 `displayed:false`。撤回仅请求移除同一辅助进程原 UUID 的 pending/delivered 通知；“请求已发出”和“随后观察到列表中不存在”分别返回，不宣称用户看见、已读或永久删除。真正的系统授权、显示及发行适用性仍需 macOS 环境验证。
 
-“本地工作履历”保留列表与阅读位置。阅读原会话后返回可继续原来的工作；在“数据与隐私”按名称查找并选择需要保存或同步的工作和会话，未保存的其他选择会保留。
+## AI Agent 部署与使用
 
-## 阅读和设置
+部署代理先核对用户所选官网和当前发布公钥，再通过随包 `setup.mjs` 从公开配置读取准确 API；已知专业配置可使用 `prepare-service-config.mjs`。版本从包内 `package.json` 与 `native-v2.json.releaseId` 读取；“v2”指协议，不能当作发行版本。保留原数据目录、旧可用包和已保存信任，依随包锁文件安装依赖。签名和文件摘要必须用已明确固定的发行公钥核验，不从归档内容自行推导信任。原生内部客户端默认仍拒绝非公开端点；仅正常 Native 明确选定的 HTTPS origin 可沿该配置使用，其他 origin、路径、查询参数、嵌入凭据和重定向不因本机模式放行。
 
-本机保存设置可直接调整，账户选项在相关位置读取。读取下一页时可以继续查看已打开的内容。保存确认期间也可以继续阅读其他工作，完成结果保留在原设置项；返回后可接着使用。
+接入后读取 `galaxy_native_status`，操作需要使用的功能。未选择连接时由本人选择，已有有效选择在原范围恢复。Worker 工具缺失时查看 `workerPacks` 与同名 `a2a.peers` 配置。设备预览失效时查询原记录，不能把重绑后的旧句柄当成授权。
+
+本机审阅页只接受准确的 loopback Host 与 Origin。实际浏览器表单使用同源 referrer 策略；Origin 为 `null` 或来自另一来源时仍拒绝，不能为绕开 403 放宽校验。退出时停止接收新调用、使设备预览失效、等待在途回执和本机保存完成，随后关闭协议；未知操作保留在原 journal。
+
+开发方法见源码仓库内的 `CONTRIBUTING.md`，工具入口见源码仓库内的 `development-checks.md`。
+
+
+来源：https://agigalaxy.org/docs/native-client/0.1.19/runtime.md；本地资料同步日期：2026-10-24。保持0.1.19发行范围，实际宿主/人工验收尚未完成。
 
 ---
 
-Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md
 
-> 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：
-> https://agigalaxy.org/docs/native-client/0.1.16/hosts.md
-> 正文保留对应发行内容，仅规范换行并增加本来源说明；后续发行请从官网下载页进入。
+# 八个首批客户端的共享接入
 
-# 宿主与接入方式
+核验日期：2026-09-13。采用现行 M15/M16/M17 范围。下表是已实现的安装配置生成与官方格式依据；真实宿主版本、插件加载、打开页面、返回与关闭仍分别登记。除合成协议客户端外，本机 Codex CLI 0.152.1 的 app-server 与 Claude Code CLI 2.1.266 的 mcp get 已在全新隔离配置中实际发起 MCP 初始化及工具发现，Codex 同时发现 Galaxy Skill。没有调用模型、登录或修改原配置。这项 CLI 发现证据不代表桌面 UI、八端全部业务或后台循环通过；具体候选和工具数量保留在对应探针报告中。
 
-银河使用你原来的 AI 宿主和模型。先按[安装说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md)运行随包安装工具，再使用生成目录中的实际配置。需要复制配置时只合并银河条目，保留现有内容。
+共享客户端在用户机器运行，云端只提供数据和协作。缺少 elicitation 的宿主使用临时本机浏览器审阅，不假设插件侧栏存在。完整房间打开已实现的官网稳定地址。银河不集中提供用户模型。
 
-| 宿主 | 接入方式 |
-|---|---|
-| OpenCode | 安装工具保存本机运行包并合并所选配置。普通启动后自动积累本地工作，`/galaxy` 用于按需阅读、社区、帮助和设置 |
-| Claude Code | 生成 `.mcp.json` 与 `.claude/skills/galaxy`，按项目配置接入 |
-| GitHub Copilot（VS Code Agent） | 生成 `.vscode/mcp.json` 与 `.github/skills/galaxy` |
-| Codex | 选择生成的插件，或 MCP 配置片段加 Skill，启用其中一套 |
-| Cursor | 合并生成的 MCP 配置与银河 Skill |
-| WorkBuddy | 使用生成的本地连接器目录 |
-| TRAE / TraeWork | 使用本地 MCP 配置与项目 Skill |
-| Hermes Agent | 合并生成的配置片段并安装 Skill |
-| DeepSeek Harness | 将生成的 MCP 片段加入本机配置组合，复用现有 Skill 接入 |
+## 当前 OpenCode 普通接入
 
-生成文件说明接入格式，并不表示每个宿主具有相同的侧栏、输入返回或后台事件能力。OpenCode 的自动采集使用其公开事件接口；其他宿主可由自己的 Agent 读取、整理及保存获准材料。
+核验发行签名、解开独立包并执行 `npm ci --ignore-scripts` 后，运行 `node setup.mjs <已选官网-origin>`。安装工具读取所选官网的公开 API 与公钥，检测到 OpenCode 后列出实际配置目录、本地资料位置和记录方式。一次同意即可安装：保存独立运行包，合并银河自己的插件、MCP 与 Skill 条目，保留其他插件、模型及项目设置。已有身份及类型沿用；没有身份时在同一次安装中准备个人身份，组织用途可额外选择。安装本身不关联账户或上传资料。
 
-## 原工作与嵌入页面
+以后照常启动 OpenCode。普通文字和工具工作自动保存本地事实、来源、有限片段及主要环境版本，自己的宿主模型增量整理；模型不可用时事实仍保存，失败由程序有限续作。默认不另存全部完整会话，上传预设“履历概况”，实际同步仍按本人选择的账户和范围执行。需要回看时打开 `/galaxy` 的“本地工作履历”，阅读正文并直接回到原会话；无需先打开菜单或逐会话确认记录。手动加载插件而没有身份时，首次启动直接提供本机准备选择，不要求先寻找初始化入口。
 
-支持 MCP Apps 的宿主可打开与当前 Agent 共存的小面板；其他宿主继续使用普通工具与可读结果。需要新增披露范围时，使用宿主实际支持的选择界面，或临时本机页面。已有有效选择沿用，取消后保留原工作。
+需要在线内容时使用“逛社区／找帮助／发起求助／消息”等入口，原本机身份及当前连接已有范围直接沿用；首次真实连接、设备授权或新增范围才作对应选择。OpenCode 的公开 `client.tui.appendPrompt({text})` 能把所读正文、已发送协助说明和来源追加到原未发送输入，不提交模型；从本地履历返回原工作则直接使用宿主的原会话导航，不以复制请求代替已有接续能力。
 
-OpenCode 本地履历可以直接回到原会话。将线上内容带回时，支持的输入接口追加到原未发送输入，由你继续编辑或提交；不支持此接口的宿主提供可读内容与来源。
+只有专业自定义配置目录未被普通启动加载时才使用 `run-opencode.mjs`。可用 `--host opencode` 指定宿主，`--data-dir`、`--opencode-config-dir` 指定相应绝对路径；安装确认仍显示所选位置。其他宿主保留各自实际支持的配置安装方式，不将 OpenCode 的自动采集能力外推到它们。
 
-## 给安装 Agent
+从已读求助选择“在官网找相关方法”，会带入当前搜索方向、原求助和返回位置。已有网页设备够用时沿用；缺少方法范围时，正常本机批准页显示所需范围，官网经一次“使用这个设备继续”采用同一身份下获准的新设备。完成后可把当前求助说明、查询方向与网页来源带回原输入。临时页关闭或到期不是批准，也不能用另建身份绕过未完成的原授权。
 
-以生成目录 `INSTALL.md` 和实际宿主配置为准。不要把同名插件与直接 MCP 同时装成两套连接，也不要改动模型凭据。读取、打开、返回和关闭分别依据真实结果；缺少宿主能力时保留同义人工路径，不假称已经操作了宿主界面。
+2026-10-12，0.1.10 交付前实际安装版本为 OpenCode 1.18.31。该轮隔离进程已从正常包加载 TUI 与 MCP，读取同一服务的当前求助，实际批准并发送协助说明；修正 SDK 接口后，只读原已发送记录并在实际终端核对完整说明、来源以及原未发送输入。服务、身份和工作均为合成，本轮没有使用真实模型，没有改用户原宿主配置，也没有以合同镜像替代实际 TUI。早期发送成功但返回失败、后续探针同屏断言失败均保留；当前通过记录与这些失败分开。其他八端的安装生成、CLI 发现和完整用户操作仍按下述各自证据边界登记。
+
+| 产品和本次方式 | 生成内容及安装位置 | 官方依据 |
+| --- | --- | --- |
+| Claude Code：终端、IDE 聊天、本地 Code 桌面任务 | claude-code 下 .mcp.json 合并到项目；.claude/skills/galaxy 安装到同一项目。 | [MCP](https://code.claude.com/docs/en/mcp)、[Skills](https://code.claude.com/docs/en/skills) |
+| GitHub Copilot：本次先覆盖 VS Code Agent 聊天 | .vscode/mcp.json 的 servers.galaxy；.github/skills/galaxy。其他 Copilot 模式不套用此配置形状。 | [IDE MCP](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp)、[Skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) |
+| Codex：终端、IDE 聊天、本地桌面任务 | 可选生成的完整 galaxy-native-v2 插件，或 config.fragment.toml 加 .agents/skills/galaxy；二者只启用一套。没有修改全局配置或市场。 | [MCP](https://developers.openai.com/codex/mcp)、[Skills](https://developers.openai.com/codex/skills) |
+| Cursor：本机 Agent 聊天 | .cursor/mcp.json、.cursor/skills/galaxy；关闭与重启由真实宿主接管。 | [MCP](https://prod.cursor.com/docs/mcp)、[Skills](https://prod.cursor.com/docs/skills) |
+| WorkBuddy：桌面连接器 | connector-meta.json、mcp.json、icon.svg、skills/galaxy；本机审阅包使用已安装 Node 和包路径。元数据最低版本 4.24.0。尚未提交市场，不承诺 source 已获注册。 | [连接器](https://open.workbuddy.cn/docs/connector) |
+| TRAE / TraeWork：桌面本地任务 | 设置 → MCP → 本地 → 手动配置，使用 mcp.local.json；Skill 为项目 .trae/skills/galaxy。不要选云端运行。 | [运行环境](https://docs.trae.cn/work_mcp-overview)、[添加 MCP](https://docs.trae.cn/work_remote-mcp-server)、[Skills](https://docs.trae.cn/work_skills) |
+| Hermes Agent：聊天 | 新生成 config.fragment.yaml 的 mcp_servers.galaxy 合并到本人当前配置；skills/galaxy 按宿主 Skill 安装路径放置。没有读取本机 Hermes 资料。 | [MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)、[Skills](https://hermes-agent.nousresearch.com/docs/guides/work-with-skills) |
+| DeepSeek Harness：本机 Harness 网页与聊天 | 将 mcp-plugin.fragment.json 作为一项加入实际插件组合；Skill 安装到项目 .dsh/skills/galaxy，复用现有 Skill registry/filesystem/consumer。 | [MCP 插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)、[Skill 文件源](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/skill-filesystem/README.md) |
+
+Claude 桌面的 Chat 与 Code 需分别标注。当前官方文档说明，本地 Code 会话也加载 claude_desktop_config.json，遇到同名配置有优先级；独立 CLI 不直接读取该文件。生成的 claude-desktop-chat 只是可合并片段，不能把 Chat、Code 和远程会话都标为同一种验收。[桌面说明](https://code.claude.com/docs/en/desktop)
+
+Claude Code 的前台 Skill + MCP 接入与后台 reader 分别核验。2026-10-02 本机 CLI 为 2.1.266；本轮只执行 `--version`、`--help` 和配置来源的本机元数据检查，没有发送真实模型 prompt。正式本机配置已接受 `claude-code`，可在原服务配置中增加以下 `watchHost` 片段。两条路径须替换为本人实际的 Claude 原生可执行文件和已授权工作目录的绝对路径；它不代替宿主连接 Galaxy MCP 的 `.mcp.json`。
+
+```json
+{
+  "watchHost": {
+    "kind": "claude-code",
+    "command": "C:\\Tools\\ClaudeCode\\claude.exe",
+    "cwd": "C:\\Work\\my-project"
+  }
+}
+```
+
+`galaxy_watch_host_capabilities` 通过这个正式入口查询版本和帮助，不创建模型会话、不启用 Watch。当前会分别说明固定 reader 参数是否有文档依据，以及有效配置是否已确认：`readerProfileDocumented` 可以为 `true`，但 `readerConfigurationConfirmed`、`effectiveManagedPolicyConfirmed` 和 `backgroundReaderSupported` 仍为 `false`。配置不接受额外启动参数、认证环境变量或“已经验证”的布尔声明。
+
+缺少完整有效配置证据时，明确选择 `galaxy_watch_host_activate` 也会返回 `foreground-fallback`，通常原因是 `host_reader_configuration_unconfirmed`；后台模型未启用，模型调用为零。用户仍可在现有 Claude 前台会话使用 Galaxy MCP，读取 `galaxy_watch_check` 返回的授权工作，实际处理完成后再明确 `galaxy_watch_ack`，只更新 Agent 游标。原未知执行通过 `galaxy_watch_host_reconcile` 查询时保持 `unknown`，不会另建会话或重放工作；这也不是原模型已停止的证明。
+
+这个限制来自当前有效配置的证据边界：官方说明 `--restricted` 保留 managed settings，`--safe-mode` 仍可保留 managed hooks、status line 和 file-suggestion commands，managed settings 的优先级高于 `--settings`。本机 managed 文件或注册表键缺席也不能证明远端或动态 policy 缺席。因此，旗标存在、零 turn 握手、工具发现和协议替身测试都不作为后台 reader 已完成的依据；当前正式入口提供诊断和前台回退，Claude 后台持续协作仍待可验证的官方配置能力及真实宿主验收。[CLI 参数](https://code.claude.com/docs/en/cli-reference)、[配置优先级](https://code.claude.com/docs/en/settings)、[managed 来源](https://code.claude.com/docs/en/managed-settings)
+
+TRAE 的 command 字段官方明确要求不含空格。生成器为其单独使用 node 命令，必须在实际宿主 PATH 中解析到合适 Node；也可传已核对且不含空格的完整路径。不要将带空格的 Windows 安装路径强塞进去。此次该页面对普通 User-Agent 返回 400，按网站要求以真实模型名称 User-Agent 读取到 200 的正文，确认其属于 TraeWork 桌面文档。[添加 MCP](https://docs.trae.cn/work_remote-mcp-server)
+
+客户端 MCP Apps 小面板已经过浏览器合同检查；Cursor 中的实际呈现与银河侧栏仍需各自验收。DSH 的浮动窗口和宿主后台运行也是独立后续适配项，不能从“插件能连接 MCP”推导为完成。能力登记使用 host-capabilities.json；目前只直接确认上述两种 CLI 的本机版本，其余端仍待真实宿主验收。
+
+## 接续网页内容
+
+当前客户端提供 `galaxy_work_continue`，从用户在网页选择的帖子、求助、项目、人物、方法或对话继续处理。普通 MCP 返回可读正文、当前结果与原页面链接；它只沿当前同一身份和许可读取。OpenCode 菜单中的“接着网页里的事情”接受整段继续请求，把当前内容追加到原未发送输入，不自动提交模型。其他宿主的输入框写回能力和实际操作范围分别验证，不能由一个共享工具推导为八端全部通过。
+
+## 本地工作与嵌入入口
+
+当前源码的普通工作自动采集和自己的模型增量整理接在 OpenCode 实际事件适配中；基础事实不等待模型或网络。共享 Native MCP 提供真实本地列表、详情、未整理增量、原会话管理和四档上传设置。其他宿主没有事件适配时，工具可以阅读已有本地资料或保留明确来源的陈述，不能宣称已经自动采集该宿主完整工作。
+
+支持 MCP Apps 的宿主使用 `galaxy_local_panel` 打开与当前 Agent 共存的本机小面板；面板不提供全屏覆盖入口。没有 Apps 时继续用普通 MCP 的同义功能。网页入口与本机读取分别处理，不能把手机样式网页或窄屏截图当作真实宿主联动。安装包需要包含本次 compact-app 构建，源码说明不改变旧包的界面。
+
+正常身份默认个人、可额外选组织；Agent 主体由独立 Worker 身份入口准备。四档默认第 2 档只允许结构化履历概况，完整会话仍须另外明确选择。准确工具与私有资料管理见随包 README 的“本地履历、上传范围与私有原会话”。
+
+## AI Agent 安装与使用
+
+1. 先核验发行签名，在独立包执行 `npm ci --ignore-scripts`，再运行 `node setup.mjs <已选官网-origin>` 读取实际 API 与公钥。OpenCode 安装经一次明确同意，将运行包保存到所选配置目录并合并银河自己的条目；已有身份和类型沿用，没有身份时在同次安装中准备默认个人身份，组织用途另选。保留无关插件、模型、项目配置和本地资料；安装本身不关联服务或上传。已知专业配置可单独使用 `prepare-service-config.mjs`；不得把身份私钥、令牌、恢复码或旧 Hermes 资料加入配置。
+2. OpenCode 安装到正常配置位置后照常启动，普通工作自动记录，无需再从菜单创建身份；只有专业自定义目录未被普通启动加载时才使用生成的启动器。其他宿主按生成目录 `INSTALL.md` 接入，保存或合并配置时保留无关内容。专业调用 `host-configs.mjs` 仍只生成全新目录。若同名旧 MCP 已启用，先明确切换并保留原数据，不启用重复连接。
+3. 在实际宿主读取 `galaxy_native_status`，有本机身份时沿用，不重复初始化。原连接选择仍有效时按原设备与原范围恢复，明确断开后不自动连接。OpenCode 的 `/galaxy` 目的菜单提供按需准备与首次连接；本地准备不连接，新增连接选择或范围仍需真实选择。旧 local-only 安装的流程与当前包分开，不将其五阶段菜单作为普通用户必经步骤。
+4. 打开需要使用的实际对象，并返回原工作；Project 入口为 `/app/projects/:id`，Capsule 沿用所选版本。页面或宿主能力暂不可用时说明实际问题，保留原工作。
+5. 需要新范围时审阅所示数据；取消必须没有业务提交。同一未知操作保留原 ID、载荷及 Consent 查询回执，不把刷新网页当再次授权。
+6. 如需持续关注，选择当前连接的 Agent grant 和结束条件，宿主按返回 nextCheckAt 调度。无新事件不启用模型，处理完成后更新 Agent 游标；停止关注时由宿主结束相应模型工作。
+
+移除本次安装只移除本次服务器配置与 Skill；本地身份、摘要和原任务不会因此自动删除。停止 stdio 进程会使当前临时审阅页失效。离开房间、撤销设备、删除数据是独立显式业务操作。
+
+本次 0.1.11 的社区浏览与私有收藏增量经过正常签名 HTTP、Native MCP 与隔离网页操作检查；没有据此扩大旧真实宿主验收范围。
+
+
+来源：https://agigalaxy.org/docs/native-client/0.1.19/hosts.md；本地资料同步日期：2026-10-24。保持0.1.19发行范围，实际宿主/人工验收尚未完成。
 
 ---
 
-Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md
-
-> 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：
-> https://agigalaxy.org/docs/native-client/0.1.16/installation.md
-> 正文保留对应发行内容，仅规范换行并增加本来源说明；后续发行请从官网下载页进入。
+Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md
 
 # 安装银河客户端
 
-在原来的 AI 宿主中查找帮助、阅读资料和接续工作。OpenCode 还可以自动积累本地工作记录，由你在宿主中选用的模型整理。需要 Node.js 22.13 或更新版本；客户端不安装或替换 AI 宿主。
+本页对应开发版 0.1.19。客户端在原来的 AI 宿主中提供获准的资料、工作与协作，不替换宿主或模型。需要 Node.js 22.13 或更新版本。
 
-## 下载与安装
+## 下载与核验
 
-下载[安装包](https://agigalaxy.org/downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip)并解压。包内已包含客户端、核验材料与核验程序，无需分别下载。
-
-在该目录运行：
+下载[完整安装包](https://agigalaxy.org/downloads/native-client/0.1.19/galaxy-native-client-0.1.19-install.zip)，解压后在该目录运行：
 
 ```text
 node verify-native-client-download.mjs .
-tar -xzf galaxy-native-client-0.1.16.tgz
+tar -xzf galaxy-native-client-0.1.19.tgz
 cd package
 npm ci --ignore-scripts
 node setup.mjs https://agigalaxy.org
 ```
 
-核验程序按银河发行公钥检查下载，失败时保留现有安装并核对来源、版本和系统时间。安装工具从官网公开配置取得服务地址与公钥，在同一次选择中显示实际宿主、配置目录、资料位置和记录方式。
+核验程序使用银河公开发行公钥，检查签名、有效期和准确包内容。核验失败时保留原安装，核对来源、当前公钥状态和系统时间；不关闭校验或改用另一个身份。
 
-## 在 OpenCode 中使用
+## 安装到原来的工具
 
-一次同意后，安装工具保存运行包、合并银河自己的接入条目，保留其他插件与模型设置。已有银河身份和类型继续使用；没有身份时准备个人身份，组织用途可在同一次选择中指定。以后照常启动 OpenCode，无需保留下载解压目录，也无需先打开银河菜单才记录工作。
+安装工具读取所选官网的公开 API 与公钥，显示实际宿主、配置目录、本地资料位置和记录方式。沿用已有银河身份和资料目录，保留其他插件、项目与模型设置。安装本身不注册账户、不关联服务，也不启动上传。
 
-普通文字和工具工作保留本地事实、来源、有限片段及主要环境版本。自己的模型增量整理；模型暂不可用时，事实仍然保存。需要回看时，在 `/galaxy` 打开“本地工作履历”，阅读记录或回到原会话。
-
-上传预设“履历概况”。安装不关联线上账户，也不启动资料上传；完整会话默认不另存。需要同步或保存完整会话时，在“数据与隐私”选定账户和实际范围。四档及本人资料管理见[使用说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md)。
-
-## 其他宿主与自定义位置
-
-其他宿主按生成目录的 `INSTALL.md` 合并对应配置，保留已有设置。不同宿主的可用交互见[宿主说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md)；OpenCode 自动采集不能直接套用于其他宿主。
-
-OpenCode 使用不被普通启动加载的自定义配置目录时，可以使用生成的 `run-opencode.mjs`。高级安装参数为 `--host opencode`、`--data-dir` 和 `--opencode-config-dir`，路径使用本机绝对路径。
+OpenCode 的普通接入与其他宿主的能力边界见[宿主说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md)。本地记录、同步选择、退出与专业配置见[使用说明](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md)。其他宿主按随包生成的安装说明合并自己的接入配置，不能据工具发现推断全部业务已经完成。
 
 ## 升级与移除
 
-升级时使用新发行包，继续选择原资料目录。保留旧可用包，不为升级重新创建身份。移除宿主中的银河接入不会自动删除本地资料、线上副本或撤销设备；这些操作在对应设置完成。
+公开新下载不会自动更新已经安装的客户端。需要新版时主动下载、核验并运行安装，继续使用原资料目录，不为升级重新创建身份。保留原可用包，确认新接入后再切换宿主。移除宿主接入不会自动删除本地资料、云端副本或撤销设备。
+
+## 发行范围
+
+0.1.19 的正式准备记录通过四项签名 HTTP 合同与三项实际候选 stdio 合同，共七项必要发行检查，数据为本地合成材料；它们不代表所有真实宿主、真实业务、真人效果或稳定发行验收。本包仍为 development-candidate，actualHostAcceptance、humanAcceptance、stableRelease 均为 false。原始运行与宿主说明来自此准确签名包，保留其中历史验证的时间和范围。
 
 ## 给安装 Agent
 
-先读取本机 Node 与宿主位置，使用用户所选官网及当前发行公钥，再运行随包 `setup.mjs`。沿用已有授权完成安装，不覆盖无关配置，不把令牌、私钥或恢复材料写进插件配置。公开配置不可用时说明实际问题，不猜另一个服务或更换信任。
+先查看当前 Node 和宿主位置，用用户选定的官网与当前发行公钥核验，再使用包内 setup.mjs。已有授权和有效选择直接接续，不覆盖无关设置，不把令牌、私钥或恢复材料写进插件配置。公开配置不可用时报告实际问题，不猜另一服务或更换信任。安装、工具加载、模型执行和业务结果分别以实际发生情况判断。
 
-安装后读取当前身份和本地状态，按实际宿主能力打开相关内容并返回原工作。安装、工具加载、模型执行和业务结果各按实际发生情况判断，不把工具发现当作功能完成。
+
+来源：https://agigalaxy.org/docs/native-client/0.1.19/installation.md；本地资料同步日期：2026-10-24。保持0.1.19发行范围，实际宿主/人工验收尚未完成。
 
 ---
 
@@ -1086,15 +1264,15 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 
 ![三种使用方式与客户端本地先行路径](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/assets/client-entry.svg)
 
-当前核对的 Native 开发版是 **0.1.16**，需要已有 AI 宿主和 **Node.js 22.13+**。从[官网下载页](https://agigalaxy.org/downloads/)取得当前发行及指南，让 AI 发现实际环境、核验并安装相应包，保留原模型、其他连接及已有银河资料；你只处理本次确实需要的宿主、资料位置和本机准备选择。
+当前核对的 Native 开发版是 **0.1.19**，需要已有 AI 宿主和 **Node.js 22.13+**。从[官网下载页](https://agigalaxy.org/downloads/)取得当前发行及指南，让 AI 发现实际环境、核验并安装相应包，保留原模型、其他连接及已有银河资料；你只处理本次确实需要的宿主、资料位置和本机准备选择。
 
 OpenCode 的安装工具在同一次确认中合并 TUI、MCP、Skill 并准备本机身份，之后照常启动即可。其他宿主使用相应插件或生成的 MCP／Skill 配置，按其实际能力完成初始化。安装与本地身份创建不要求先部署 Keycloak、PostgreSQL、Prosody 或学习 A2A。
 
-需要手动安装或排障时，按[随版安装指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md)执行同一套下载、核验、依赖安装与 `setup.mjs` 步骤；发行入口和后续版本以[官网指南](https://agigalaxy.org/docs/native-client/0.1.16/installation/)为准。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
+需要手动安装或排障时，按[随版安装指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md)执行同一套下载、核验、依赖安装与 `setup.mjs` 步骤；发行入口和后续版本以[官网指南](https://agigalaxy.org/docs/native-client/0.1.19/installation/)为准。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
 
 ## 宿主兼容范围
 
-[随版宿主说明](https://agigalaxy.org/docs/native-client/0.1.16/hosts/)列出 OpenCode、Claude Code、GitHub Copilot / VS Code Agent、Codex、Cursor 及其他支持的连接方式。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
+[随版宿主说明](https://agigalaxy.org/docs/native-client/0.1.19/hosts/)列出 OpenCode、Claude Code、GitHub Copilot / VS Code Agent、Codex、Cursor 及其他支持的连接方式。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
 
 支持 MCP Apps 的宿主可以使用相应小面板；其他环境按其支持的工具结果和来源阅读。只使用适合当前宿主的一套配置，避免重复连接；不能把一种宿主的自动采集或界面表现直接套用到其他宿主。
 
@@ -1111,7 +1289,7 @@ OpenCode 的安装工具在同一次确认中合并 TUI、MCP、Skill 并准备�
 
 ## 使用、升级与移除
 
-日常使用见[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.16/runtime/)。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
+日常使用见[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.19/runtime/)。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
 
 需要帮助时，见[帮助与反馈](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/SUPPORT.md)。公开反馈提供版本、宿主和最小复现步骤即可；完整私聊、账户资料和本地目录内容通常不需要公开。
 
@@ -1123,9 +1301,9 @@ Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-p
 
 [文档目录](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) · [开始使用](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/getting-started.md) · [官网隐私说明](https://agigalaxy.org/privacy/)
 
-这份说明帮助使用者理解账户、本地客户端、资料外发和公开反馈的区别。具体发行行为以[随版使用指南](https://agigalaxy.org/docs/native-client/0.1.16/runtime/)为准，网站处理范围以官网隐私说明及实际界面为准。
+这份说明帮助使用者理解账户、本地客户端、资料外发和公开反馈的区别。具体发行行为以[随版使用指南](https://agigalaxy.org/docs/native-client/0.1.19/runtime/)为准，网站处理范围以官网隐私说明及实际界面为准。
 
-公开的逐项实现说明见[客户端数据流、上传范围、脱敏与删除](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)；官网不可被工具读取时，可以使用[0.1.16 随版使用指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md)或[合并纯文本阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)。
+公开的逐项实现说明见[客户端数据流、上传范围、脱敏与删除](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md)；官网不可被工具读取时，可以使用[0.1.19 随版使用指南镜像](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md)或[合并纯文本阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)。
 
 ## 账户、本地身份与设备
 
@@ -1204,7 +1382,7 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 | Hub／官方服务端聊天 | Prosody / XMPP | 服务器内部的消息传输与归档；客户端经银河 HTTPS 业务接口使用，无需安装、配置 XMPP 或单独注册 XMPP 账户 |
 | Hub／官方服务端文件 | S3 兼容存储、ClamAV | 由服务维护者配置对象存储和文件安全扫描 |
 
-表中技术来自当前实现采用的依赖与组件，各项不一定在每种入口中同时运行。安装客户端也不要求用户先部署完整网站配套服务。公开客户端 0.1.16 要求 Node.js 22.13+，其他组成部分的运行版本独立管理。
+表中技术来自当前实现采用的依赖与组件，各项不一定在每种入口中同时运行。安装客户端也不要求用户先部署完整网站配套服务。公开客户端 0.1.19 要求 Node.js 22.13+，其他组成部分的运行版本独立管理。
 
 ## 接入与开放方向
 
@@ -1218,7 +1396,7 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 
 运营后台已经采用 Payload、Next.js 与银河业务扩展的工程组合，pg-boss 提供持久任务基础；存储、监测、日志和统一备份恢复继续复用成熟工具。现有源码接线、候选、实际部署与完整功能验收分别处理，不把依赖存在写成全站能力完成。
 
-组件列表、当前整合范围、原始开放模块与实际许可见[开放组件与开源复用](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)。Agno／AgentOS、LangGraph.js 与 Deep Agents 等后台引擎仍是研究候选，不能混入已采用技术栈。
+组件列表与许可见[开放组件与开源复用](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)。Agno原生与已接专门服务属于实际运营实现；LangGraph.js/Deep Agents仍是备选，普通用户仍自带模型。
 
 公开资料不把正在评估的框架列为已采用能力，也不以框架选型代替产品效果。更深层的发现、协作和自建网络能力以[当前状态](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md)及后续实际发行资料为准。
 
@@ -1226,64 +1404,15 @@ Keycloak、PostgreSQL、Prosody、对象存储与扫描工具是服务端相应�
 
 Public counterpart: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md
 
-# 当前状态与范围
+# 状态与发行信息
 
-[文档目录](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/README.md) · [网络功能](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/network.md) · [开始使用](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/getting-started.md)
+银河处于 Beta 持续开发阶段。当前有网站、Hub、运营管理、后台 Native 和用户端客户端的实际实现，各自按准确发行与使用范围判断。
 
-资料核对日期：**2026-10-21**。银河处于 Beta 阶段，客户端、网站、服务与文档可以分别更新；版本不同不必然代表异常，具体能力以对应入口与随版说明为准。
+维护者记录的带日期发行观察、本地整合候选、尚未完成事项及旧公开入口/CI 记录统一见[项目状态与版本边界](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/project-status.md)，本页不另维护第二份版号表。实时公开信息从[官网状态](https://agigalaxy.org/status/)和[发行核验材料](https://agigalaxy.org/downloads/verification/)读取。
 
-## 本次公开入口读回
+客户端下载、安装与真实宿主边界见[开始使用](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/getting-started.md)和[0.1.19随版指南](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md)。用户端模型仍来自原有宿主，后台运营引擎是独立范围；运行完成、业务成功、答案质量与长期效果分别表达。
 
-| 观察对象 | 2026-10-21 本次读到的结果 | 能说明的范围 |
-|---|---|---|
-| [官网发行信息](https://agigalaxy.org/release.json) | 网站标识 `0.1.34`，Native 下载指向 `0.1.16` | 对应时点公开发行元数据与下载指向 |
-| [API 健康接口](https://official.agigalaxy.org/healthz)和[就绪接口](https://official.agigalaxy.org/readyz) | 均返回 HTTP 200，响应头 `X-Galaxy-Release: 0.1.22` | 当次服务健康／就绪响应及运行标识，不代替全部业务路径验收 |
-| [客户端下载](https://agigalaxy.org/downloads/)与随版资料 | 0.1.16 安装 ZIP 和安装、宿主、运行指南可匿名取得 | 发行材料可取得；宿主和真人使用效果仍按各自证据说明 |
-
-当次官网发行文件中的后端关联字段为 `0.1.21`，与 API 健康响应头 `0.1.22` 不同。本页保留这项差异，不用旧静态字段覆盖现场服务响应，也不宣称所有发行资料已经同步。服务可能继续更新，实时影响仍从官网状态及实际使用核对。
-
-## 已具备的基础与继续发展的方向
-
-| 领域 | 已有的产品与实现基础 | 仍需深化或验证 |
-|---|---|---|
-| 帮助与参与 | 查询、请求、回应、邀请、参与、沟通背景、工作与结果反馈 | 各宿主中的自然使用深度、实际供给和真实帮助效果 |
-| 项目与机会 | 项目介绍、招募、功能标签及目的等结构化匹配、联系与讨论 | 深层语义发现、双向被动触发、持续机会推送 |
-| 社区与沟通 | 内容阅读、发帖与回复、聊天室、通知、文件与收藏等基础 | 完整依赖组合下的稳定性、规模与长期运营 |
-| 方法与工具 | Capsule、受控的 Agent 和工具接入基础 | 持续运行、第三方能力供给及真实复用效果 |
-| 自建与互联 | Hub、Bridge 与开放接口基础 | 独立运营环境、企业场景及多 Hub 实际互通 |
-
-“有实现基础”描述建设范围，不表示每个入口、宿主或使用场景都已完整验收。普通网站参与、安装客户端、配置外部服务和完整网络运行分别验证。
-
-## 当前继续推进的工作
-
-运营后台已接入 Payload、独立管理认证、内容与部分业务管理以及持久任务等工程基础。完整后台范围、真实运行覆盖和专业运维工具继续整合；更深入的 AI 策略后台与引擎仍在研究、逐项沟通。候选框架不等于已经采用或接入生产。
-
-独立 Hub 交付、广泛第三方能力供给、完整跨网发现、可选 Relay 和正式增值套餐仍不能按已有局部实现推定完成。愿景、当前实现与商业候选分别见[项目架构](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md)、[Hub 运作](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md)、[开放交付](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)和[服务方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md)。
-
-## 冷启动、贡献激励与共同治理
-
-新增的[网络宣言](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md)、[冷启动与贡献激励](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md)及[共同治理方向](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)，结合原始讨论和本轮补充说明长期建设关系。当前已有本地接入、社区、参与和有限贡献认可的实现基础；完整头衔、积分、等级机制及其长期效果仍需继续设计和交付。
-
-基金会／理事会、官方服务支持公共组织及生态资助属于拟议方向；组织形式、章程、席位、预算和资助规则尚未确定。这次发布没有宣称组织已经设立、全部模块已经开源，或已经形成固定奖励和收入分配制度。
-
-## 发行与公开材料
-
-- 本次核对的官网 Native 客户端开发版为 **0.1.16**，安装要求与宿主差异见[下载与安装指南](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/getting-started.md)。后续版本从[官网下载页](https://agigalaxy.org/downloads/)取得。
-- 官网的文档、[发行核验材料](https://agigalaxy.org/downloads/verification/)与[状态页面](https://agigalaxy.org/status/)是对应公开信息入口。仓库介绍不会代替实时服务状态。
-- [公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)提供介绍、图示和用户指引。本主代码仓库包含核心实现与开发历史，仍需访问权限；两者的源码或资料 ZIP 都不是官网 Native 安装包。
-- 各发行材料的许可按其实际声明处理，本主代码仓库和公开资料均未据此为核心源码或独立发行物授予统一许可，见[资料使用范围](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/RIGHTS.md)。
-
-## 产品边界
-
-银河面向多个领域。帮助、项目与协作能力和普通兴趣交流可以并存；早期的软件工程使用场景不代表全项目只面向开发者。
-
-用户端 AI 来自用户已有宿主，不把后台建设或技术接入描述成已向所有用户提供集中模型服务。发现候选不自动建立合作，工具调用完成不自动代表整体目标解决。
-
-参与事实、作品、作者陈述、有限认可和正式资格分别表达，不合成为通用能力或可信度总分。当前阶段也不以实现目录、协议测试或页面示例替代长期用户效果。
-
-## 如何反馈状态不一致
-
-如文档与公开页面或发行版本不一致，可在 [Issues](https://github.com/agigalaxy-team/agigalaxy-public/issues) 提供页面地址、客户端版本、所用宿主和可公开的复现步骤。请区分实际看到的行为与希望支持的行为，便于核对并修正文档或定位问题。
+愿景、现有实现、开放交付与制度候选见[项目架构](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/vision-and-architecture.md)、[Hub运作](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ecosystem-and-hubs.md)、[开放组件](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md)和[共同治理](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md)。发现资料与行为不一致时，可在[公开Issues](https://github.com/agigalaxy-team/agigalaxy-public/issues)提供准确页面、版本、宿主和可公开的复现步骤，不上传私聊或凭据。
 
 ---
 

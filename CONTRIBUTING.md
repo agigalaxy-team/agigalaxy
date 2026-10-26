@@ -1,6 +1,6 @@
 # 参与银河开发
 
-先阅读 [README](README.md)、[项目概览](docs/project-overview.md)、[架构](docs/architecture.md)和[当前状态](docs/project-status.md)。开发环境及[文件与文档归属](docs/development.md#仓库组织与文档归属)见同一份开发指南。项目处于 Beta，已有源码、发行与候选范围应分别说明。
+开发环境及[文件与文档归属](docs/development.md#仓库组织与文档归属)从同一份开发指南进入，再读取相关组件 README。产品背景、架构与[当前状态](docs/project-status.md)按本次问题取阅。项目处于 Beta，已有源码、发行与候选范围应分别说明。
 
 ## 不同领域都可以贡献
 
@@ -18,7 +18,7 @@
 
 默认分支为 main。使用独立分支，围绕完整目的提交小而连贯的改动；不要混入无关工作、依赖目录、运行配置或生成制品。
 
-提交前核对准确远端的默认与保护状态，GitHub/CNB 的同名 main 不代表相同提交。组件、锁文件、局部构建和 CI 入口见[组件目录](docs/component-catalog.md)；实际维护主体见 [MAINTAINERS](MAINTAINERS.md)，敏感问题按[安全说明](SECURITY.md)处理。不要按目录建立长期模块分支作为边界，也不在共享工作目录切换分支或整理他人的索引。
+正式推送或合并前核对所用远端、目标分支及保护要求，GitHub/CNB 的同名 main 不代表相同提交；本地开发和提交不因此反复查询远端。组件、锁文件、局部构建和 CI 入口见[组件目录](docs/component-catalog.md)；实际维护主体见 [MAINTAINERS](MAINTAINERS.md)，敏感问题按[安全说明](SECURITY.md)处理。不要按目录建立长期模块分支作为边界，也不在共享工作目录切换分支或整理他人的索引。
 
 PR 说明具体触发问题、修改后行为、验证结果和仍未验证部分。涉及页面时提供能说明实际行为的截图；合成数据需注明。涉及数据结构或权限时说明迁移、兼容、当前来源检查和失败后的接续方式。
 

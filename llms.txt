@@ -2,10 +2,9 @@
 
 Public project and user documentation. Beta; core implementation managed separately.
 
-- Network manifesto: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/MANIFESTO.md
-- Growth, data and contribution: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/growth-and-contribution.md
-- Community governance direction: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/community-governance.md
-- Client entry and local identity: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/client-entry.md
+Choose documents for the current question. The combined bundle is optional, not a required reading sequence.
+For source development, use that checkout's AGENTS.md and relevant component guide; this public bundle is not a development checklist.
+
 - Reading guide: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/ai-reading.md
 - Combined plain text: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt
 - Capsule JSON example (synthetic): https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/examples/capsule-v2.json
@@ -20,11 +19,11 @@ Public project and user documentation. Beta; core implementation managed separat
 - 参与者的价值、收益与官方服务方向: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/business-and-participation.md
 - 开放组件、开源复用与当前交付: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/open-components.md
 - Capsule、客户端数据流与 Hub：实现核对说明: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technical-faq.md
-- > 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/runtime.md
-- > 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/hosts.md
-- > 官网 Native 0.1.16 随版指南镜像。核对日期：2026-10-21。原文：: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.16/installation.md
+- 银河共享原生客户端（v2 协议）: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/runtime.md
+- 八个首批客户端的共享接入: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/hosts.md
+- 安装银河客户端: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/native-client/0.1.19/installation.md
 - 银河网络的功能与使用场景: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/network.md
 - 开始使用与下载: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/getting-started.md
 - 数据与隐私: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/privacy.md
 - 技术栈与产品组成: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/technology.md
-- 当前状态与范围: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md
+- 状态与发行信息: https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/docs/status.md

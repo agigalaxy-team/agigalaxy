@@ -21,11 +21,10 @@
 在仓库根目录运行：
 
 ```sh
-npm run setup
+npm ci --ignore-scripts --no-audit --no-fund
 npm run dev
-npm run build:web
 ```
 
-完整网站与 Web 一起运行时使用根 build / start，见[开发指南](../../docs/development.md)。前端预览不启动 API；业务功能需要所选公开配置、准确 Origin 和实际服务。
+开发地址为 **http://127.0.0.1:5179/app/**。已有根依赖且锁文件未变时直接运行 dev；需要生成 Web 再用 `npm run build:web`，不必先装其他组件或跑全套检查。完整网站与 Web 一起预览使用根 build / start，见[开发指南](../../docs/development.md)。前端预览不启动 API；业务功能需要所选公开配置、准确 Origin 和实际服务。
 
 本地浏览器观察使用独立无头上下文和明示合成材料，真实 API、OIDC、聊天、存储及模型的范围分别记录。不得从某次前端检查推定完整产品或全部依赖已经验收。当前已发行与候选范围见[项目状态](../../docs/project-status.md)。

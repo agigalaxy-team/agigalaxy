@@ -22,12 +22,22 @@ test('combined runner includes service and client failures and rejects an empty 
     }
     const failure = join(root, 'packages/galaxy-official/test/fail.test.mjs');
     await writeFile(failure, "import test from 'node:test'; test('official fails', () => { throw Error('fixture failure'); });\n");
-    const run = (mode, selected = {}) => {
+    const run = (mode, selected = {}, files = []) => {
       const env = { ...process.env };
       for (const key of ['GALAXY_TEST_CHAT_ISOLATED', 'GALAXY_NATIVE_TEST_SOURCE', 'GALAXY_NATIVE_TEST_CANDIDATE']) delete env[key];
-      return spawnSync(process.execPath, ['scripts/check.mjs', mode], { cwd: root, encoding: 'utf8', timeout: 15000, env: { ...env, ...selected } });
+      return spawnSync(process.execPath, ['scripts/check.mjs', mode, ...files], { cwd: root, encoding: 'utf8', timeout: 15000, env: { ...env, ...selected } });
     };
     assert.equal(run('core').status, 0);
+    const selectedCore = run('test', {}, ['packages/galaxy-core/test/pass.test.mjs', 'packages/galaxy-core/test/pass.test.mjs']);
+    assert.equal(selectedCore.status, 0);
+    assert.match(selectedCore.stdout, /1 files/);
+    assert.doesNotMatch(selectedCore.stdout, /official fails|a2a passes/);
+    assert.equal(run('core', {}, ['packages/galaxy-official/test/fail.test.mjs']).status, 2);
+    assert.equal(run('test', {}, ['--unknown']).status, 2);
+    assert.equal(run('test', {}, ['scripts/check.mjs']).status, 2);
+    assert.equal(run('test', {}, ['../outside.test.mjs']).status, 2);
+    assert.equal(run('test', {}, ['scripts/test/missing.test.mjs']).status, 2);
+    assert.equal(run('lint', {}, ['packages/galaxy-core/test/pass.test.mjs']).status, 2);
     const failed = run('test');
     assert.equal(failed.status, 1);
     assert.match(failed.stdout, /official fails/);
@@ -46,6 +56,10 @@ test('combined runner includes service and client failures and rejects an empty 
     const ordinary = run('test');
     assert.equal(ordinary.status, 0);
     assert.match(ordinary.stdout, /separate environment\/artifact acceptance \(not executed by this run\)/);
+    assert.equal(run('test', {}, ['scripts/test/native-candidate-case-receipts.test.mjs']).status, 2);
+    assert.equal(run('test', {}, ['packages/galaxy-official/test/chat-shared-summary-prosody.test.mjs']).status, 2);
+    const selectedCandidate = run('test', { GALAXY_NATIVE_TEST_SOURCE: root, GALAXY_NATIVE_TEST_CANDIDATE: root }, ['scripts/test/native-candidate-case-receipts.test.mjs']);
+    assert.equal(selectedCandidate.status, 1); assert.match(selectedCandidate.stdout, /selected artifact acceptance ran/);
     const candidate = run('test', { GALAXY_NATIVE_TEST_SOURCE: root, GALAXY_NATIVE_TEST_CANDIDATE: root });
     assert.equal(candidate.status, 1); assert.match(candidate.stdout, /selected artifact acceptance ran/);
     const prosody = run('official', { GALAXY_TEST_CHAT_ISOLATED: '1' });

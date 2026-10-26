@@ -4,21 +4,27 @@
 
 先连续完成一批实质改动，形成阶段成果后由主会话合并最小必要检查。相同输入已有有效结果直接复用；失败只回查受影响处，不按文件、提交、成员或交接重复运行。交接带上准确源码、结果、已有检查及未查部分，不要求每名成员各跑一套。避免阅读证明、指纹、门禁和巡检工具；真实业务的身份、权限、签名和事务机制保持。
 
-统一 CLI 保持 `scripts/check.mjs`；其测试发现和执行实现分别位于 `scripts/checks/test-discovery.mjs` 与 `scripts/checks/runner.mjs`。普通范围仍只发现原包的顶层 `.test.mjs`，独立 Prosody／已捕获 Native 制品检查仍需要原明确前提；新子目录不意味着可以省略环境准备或自动改跑全部测试。
+## 按改动选择
 
-| 检查 | 命令 | 范围与前提 |
-|---|---|---|
-| 相关模块测试 | `node --test <相关测试文件>` | 优先选择受影响业务、权限或恢复路径 |
-| 根 lint | `npm run lint` | 由 scripts/check.mjs 定义；当前目标为 app、packages、scripts 及 lib/browser-demo.mjs，不能外推管理应用全部源码 |
-| 根 TypeScript | `node node_modules/typescript/bin/tsc --noEmit` | 按根 tsconfig.json 的实际包含范围 |
-| 网页构建 | `npm run build:web` | 当前 React 工作区 |
-| 官网构建 | `npm run build:site` | Python 3.11+；首次构建需要公开归档资源 |
-| 统一产品前端构建 | `npm run build` | 网页与官网，不启动 API 或运行业务验收 |
-| Core | `npm run test:core` | 统一 runner 的 Core 范围 |
-| PostgreSQL | `npm run test:postgres` | 需要独立实际 PostgreSQL 配置 |
-| Native 安装 | `npm run test:client-install` | 按对应脚本前置和范围，不等于所有物理宿主 |
-| 管理应用 | 在 apps/galaxy-admin 中运行 `npm run types`、`npm run test`、`npm run build` | 独立依赖与配置，不属于根产品构建的全部覆盖 |
+下表是选项，不是每次都要执行的清单。只跑能回答本次改动是否正确的项目；没有相关行为改变的文案或格式调整不需要业务验收。
 
-CI 具体范围由[组件目录](component-catalog.md)与[实际 YAML](../.github/workflows/product-checks.yml)按变更选择，不在本页复制另一份固定执行清单。在前一步失败后跳过的步骤没有结果。管理端、真实邮件、存储扫描、Prosody、真实模型和整站恢复需要相应环境，不由该工作流名称推定已经检查。
+| 需要确认的变化 | 局部入口 |
+|---|---|
+| JS 业务、权限、恢复逻辑 | `npm test -- packages/galaxy-official/test/相关文件.test.mjs`，也可指定多个文件 |
+| 单个工具或 Core | `npm test -- scripts/test/相关文件.test.mjs` 或指定 Core 测试路径 |
+| Web 打包或类型变化 | 按问题选择 `npm run build:web` 或 `node node_modules/typescript/bin/tsc --noEmit` |
+| 相关代码 lint | `node node_modules/oxlint/bin/oxlint <相关文件或目录>`；需要根范围时用 `npm run lint` |
+| 官网生成 | `npm run build:site`；只改 Web 不必重取官网公开材料 |
+| 管理应用 | 在 `apps/galaxy-admin` 按变化选择 `npm run types`、相关测试或 `npm run build`；不要求每次三项都跑 |
 
-文档与图示修改可集中核对链接、资源和呈现，无需据此重复整套业务验收。源码、权限或行为改变时运行对应必要检查。
+统一测试 CLI 接受明确的 `.test.mjs` 文件；只运行所选文件，不再忽略附加路径后回退全套。可在 `test:core`、`test:official` 或 `test:a2a` 后同样追加本包文件。未知选项、无效文件或缺少专用环境会直接说明问题，不以全套执行掩盖选择错误。实现见 [check.mjs](../scripts/check.mjs) 及 [checks](../scripts/checks)。
+
+## 完整与环境专用检查
+
+`npm test` 无路径时保留普通全范围测试；`npm run check` 再包含根 lint。仅在本阶段确需整体回归时选用一次，不与相同范围的局部结果重复堆叠。`check:layers` 是包含重叠范围和真实环境前提的整体验收编排，不能作为日常开发的默认起点；需要某一层时直接 `node scripts/verify-layers.mjs --layers=<所需层>`。
+
+Prosody、PostgreSQL、Native 安装／捕获制品、代理、TLS、真实模型和整站恢复需要各自明确环境，选择相关专用入口即可。普通测试保留现有隔离环境要求；指定文件也不会绕过它们。制品生成中的签名、来源完整性和未知操作恢复属于实际产品机制，不能为减少检查而删掉。
+
+`check:requirements` 仅供带完整项目资料的维护工作区核对文档，不是独立源码克隆的开发前提。`prepare:client` 用于正式客户端候选制品准备，不是普通编辑后必跑命令。
+
+CI 范围由[组件目录](component-catalog.md)与[实际 YAML](../.github/workflows/product-checks.yml)按变更选择，本页不复制固定全套清单。交接直接说明已有结果和未检查边界；不为交接、提交或“追绿”重新启动相同输入的检查。

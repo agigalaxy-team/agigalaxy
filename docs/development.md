@@ -26,7 +26,7 @@ cd agigalaxy
 | 业务运行 | PostgreSQL、准确服务配置与信任材料；按功能增加认证、聊天、对象存储和扫描器 |
 | 浏览器观察 | 使用任务隔离的无头浏览器与合成资料，避免复用个人浏览器状态 |
 
-根目录 `npm run setup` 顺序安装根依赖、`packages/galaxy-official`、`packages/galaxy-a2a` 和 `integrations/native-v2/compact-app` 的锁定依赖。它不安装独立管理应用，也不启动服务器或创建数据库。
+只安装本次组件需要的锁定依赖。根目录 `npm run setup` 是批量入口，会顺序安装根、`packages/galaxy-official`、`packages/galaxy-a2a` 和 `integrations/native-v2/compact-app`；只做网页时不需要这四次安装。它不安装独立管理应用，也不启动服务器或创建数据库。
 
 ## 仓库组织与文档归属
 
@@ -47,28 +47,24 @@ cd agigalaxy
 
 ## 官网与网页工作区
 
-```sh
-npm run setup
-npm run build
-npm start
-```
-
-打开 **http://127.0.0.1:5179/**。预览服务器只监听本机，默认端口可由 `GALAXY_PREVIEW_PORT` 选择。`npm run build` 先生成 Web，再把相应入口交给官网，输出分别位于：
-
-- `packages/galaxy-web/dist`
-- `apps/galaxy-site/dist`
-
-首次官网构建会获取固定的公开历史文档和下载文件，并使用被 Git 忽略的缓存。已有缓存可以使用官网构建参数 `--offline`；全新克隆没有缓存时不能宣称可完全离线构建。
-
-只处理某部分时使用：
+网页日常开发只需根依赖和 Vite：
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 npm run dev
-npm run build:web
-npm run build:site
 ```
 
-统一构建入口是 [build-product.mjs](../scripts/build-product.mjs)，预览与公开配置入口是 [serve-product.mjs](../scripts/serve-product.mjs)。根 `app/` 与 `dev:demo`、`build:demo` 等脚本属于早期演示。
+打开 **http://127.0.0.1:5179/app/**；依赖已安装且锁文件未变时直接运行 dev。未构建的官网静态页不影响这个网页开发入口，不必先运行产品 build 或检查命令。
+
+| 需要的结果 | 命令 |
+|---|---|
+| 仅生成 Web | `npm run build:web` |
+| 仅生成官网 | `npm run build:site` |
+| 官网与 Web 完整预览 | `npm run build` 后 `npm start`，打开 **http://127.0.0.1:5179/** |
+
+这些构建入口不附带全套业务检查。统一构建输出 `packages/galaxy-web/dist` 与 `apps/galaxy-site/dist`；首次官网构建会获取固定公开历史文档和下载文件，并使用 Git 忽略的缓存。已有缓存可用官网构建参数 `--offline`；全新克隆需要首次获取。
+
+统一构建入口是 [build-product.mjs](../scripts/build-product.mjs)，预览与公开配置入口是 [serve-product.mjs](../scripts/serve-product.mjs)。预览只监听本机，默认端口可由 `GALAXY_PREVIEW_PORT` 选择；Vite 开发端口由其配置决定。根 `app/` 与 `dev:demo`、`build:demo` 属于早期演示。
 
 ## 连接实际 API
 

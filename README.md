@@ -27,7 +27,7 @@
 
 开发与独立部署入口见[组件目录与局部构建](docs/component-catalog.md)、[配置和接口](docs/component-interfaces.md)、[AI Agent 部署说明](docs/agent-deployment.md)及[许可与源码范围](docs/licensing-and-source.md)。源码目录的边界、现有跨目录引用和运行服务边界分别列明，组件之间继续使用既有合同。
 
-完整源码与开发资料在本仓库维护；对外介绍另有[可匿名访问的公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)。本页和下列专题同步解释同一项目，源码访问与公开阅读各按实际权限处理。AI 或抓取工具可直接使用[合并阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)，或阅读仓库内的 [llms.txt](llms.txt) 和 [llms-full.txt](llms-full.txt)。
+完整源码与开发资料在本仓库维护；对外介绍另有[可匿名访问的公开资料仓库](https://github.com/agigalaxy-team/agigalaxy-public)。本页和下列专题同步解释同一项目，源码访问与公开阅读各按实际权限处理。公开资料按 [llms.txt](llms.txt) 取阅，[合并阅读包](llms-full.txt)供需要完整公开背景时使用；源码开发从 [AGENTS](AGENTS.md) 和[开发指南](docs/development.md)进入，无需先读完整资料包。
 
 ## 冷启动、贡献与共同建设
 
@@ -190,31 +190,22 @@ Hub 可以由企业、社区或服务提供者独立组织参与者、规则、�
 
 ## 本地开发
 
-准备 Node.js **24.13+**、npm、Python **3.12** 和 Git，在仓库根目录运行：
+网页开发需要 Node.js **24.13+**、npm 和 Git。在仓库根目录安装根锁定依赖后直接启动：
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
-
-npm run setup
-npm run build
-npm start
+npm ci --ignore-scripts --no-audit --no-fund
+npm run dev
 ```
 
-默认预览地址为 **http://127.0.0.1:5179/**。统一构建生成官网与网页工作区；首次官网构建会获取固定的公开历史文档和下载材料，需要网络。
+网页开发入口为 **http://127.0.0.1:5179/app/**。已有依赖且锁文件未变时直接运行 dev；不必每次重新安装、先构建全站或运行全套检查。管理应用、Hub、Native 等按[组件目录](docs/component-catalog.md)安装各自需要的依赖；根 `npm run setup` 是根、Hub、A2A 与 Compact App 的批量安装入口。
 
-上述命令启动前端预览。连接真实业务服务还需要 `GALAXY_WEB_CONFIG_FILE` 指向所选 API 的公开配置，并由该 API 允许准确的网站 Origin。数据库、API、Worker、认证和聊天分别部署，配置与排障见[开发指南](docs/development.md)及[部署指南](docs/deployment.md)。
+需要官网与 Web 的完整静态预览时，使用 `npm run build` 后 `npm start`，打开 **http://127.0.0.1:5179/**。官网生成器需要 Python **3.11+**，首次构建还会获取固定公开历史文档及下载材料；只改 Web 可单独 `npm run build:web`，只改官网可 `npm run build:site`。
 
-```sh
-npm run dev                  # Vite 开发入口
-npm run build:web            # 仅构建网页工作区
-npm run build:site           # 仅构建官网
-npm run lint
-node node_modules/typescript/bin/tsc --noEmit
-node --test <相关测试文件>
-```
+前端预览不启动完整业务服务。实际业务数据使用 `GALAXY_WEB_CONFIG_FILE` 指向所选 API 的公开配置，并由 API 允许准确的网站 Origin。API、Worker、认证和聊天的接线见[开发指南](docs/development.md)及[部署指南](docs/deployment.md)。
 
-按改动选择相关检查，范围见[开发检查](docs/development-checks.md)。[GitHub Actions](https://github.com/agigalaxy-team/agigalaxy/actions/workflows/product-checks.yml) 显示当前提交的实际结果；历史批次通过记录不替代当前检查。
+先完成一批相关改动，再按影响选择最小必要检查，例如 `npm test -- packages/galaxy-core/test/相关文件.test.mjs`。完整检查与环境专用命令的用途见[开发检查](docs/development-checks.md)；无需逐文件、逐提交或逐成员重复运行。[GitHub Actions](https://github.com/agigalaxy-team/agigalaxy/actions/workflows/product-checks.yml) 按实际组件与当前提交报告结果。
 
 一次有用的查询、具体帮助、项目发现或普通交流都可以服务当前目的；Capsule 沉淀与他人复用是后续可选积累，不是所有使用者必须走完的流程。真实供给、回应和效果仍需实际使用验证。
 
@@ -235,7 +226,7 @@ node --test <相关测试文件>
 | 使用与安装 | [官网指南](https://agigalaxy.org/docs/) · [客户端与宿主](docs/downloads.md) |
 | 理解网络与项目 | [网络功能](docs/network-functions.md) · [项目概览](docs/project-overview.md) · [愿景与架构](docs/vision-and-architecture.md) · [源码地图](docs/architecture.md) |
 | Hub、官方与生态 | [角色与信息流](docs/ecosystem-and-hubs.md) · [参与收益与商业方向](docs/business-and-participation.md) · [开放组件](docs/open-components.md) |
-| Capsule、数据流与直接阅读 | [实现核对](docs/technical-faq.md) · [合成 JSON](examples/capsule-v2.json) · [AI 阅读入口](docs/ai-reading.md) · [随版指南镜像](docs/native-client/0.1.16/runtime.md) |
+| Capsule、数据流与直接阅读 | [实现核对](docs/technical-faq.md) · [合成 JSON](examples/capsule-v2.json) · [AI 阅读入口](docs/ai-reading.md) · [客户端指南（开发版 0.1.19）](docs/native-client/0.1.19/runtime.md) |
 | 开发与排障 | [开发指南](docs/development.md) · [检查命令](docs/development-checks.md) |
 | 自部署与 AI Agent 接续 | [部署指南](docs/deployment.md) · [后台部署](apps/galaxy-admin/README.md) |
 | 具体业务与接口 | [技术索引](docs/TECHNICAL_REFERENCE_INDEX.md) · [开发 API 目录](docs/development-api-reference-v1.md) |

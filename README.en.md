@@ -12,7 +12,7 @@ When your own AI cannot make progress, the network provides ways to seek diagnos
 
 Identity, history, sources and permissions support these activities. Real participation gradually makes the network more useful for future discovery and collaboration.
 
-The core source repository is private. Project, architecture and user materials are also maintained in the anonymously readable [public documentation repository](https://github.com/agigalaxy-team/agigalaxy-public). The [combined plain-text reading bundle](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt) provides the detailed topics and versioned client guides in one request; copies are included here as [llms.txt](llms.txt) and [llms-full.txt](llms-full.txt).
+The core source repository is private. Project, architecture and user materials are also maintained in the anonymously readable [public documentation repository](https://github.com/agigalaxy-team/agigalaxy-public). Choose relevant public topics from [llms.txt](llms.txt); the [combined bundle](llms-full.txt) is optional when full background is needed. Source development starts with [AGENTS](AGENTS.md) and the [development guide](docs/development.md), without reading the entire public bundle first.
 
 ## A broader collaboration and knowledge network
 
@@ -99,7 +99,7 @@ Potential value-added services include separately selected **private cloud stora
 
 The original logical modules are `galaxy-core-spec`, `galaxy-sdk`, `galaxy-edge-core`, `galaxy-worker`, `galaxy-hub-core`, `galaxy-bridge` and `galaxy-conformance`; they have not all been published as standalone packages. The [open-components guide](docs/open-components.md) distinguishes released Native code, private core implementation, reused upstream components and remaining delivery work.
 
-The [technical FAQ](docs/technical-faq.md) explains actual Capsule fields and result reporting, the [synthetic JSON example](examples/capsule-v2.json), upload scopes, preparation requests, deletion and Hub protocol limits. Participant outcome reports are not independent proof of effectiveness. Versioned [installation](docs/native-client/0.1.16/installation.md), [host](docs/native-client/0.1.16/hosts.md) and [runtime](docs/native-client/0.1.16/runtime.md) guides are included for direct reading.
+The [technical FAQ](docs/technical-faq.md) explains actual Capsule fields and result reporting, the [synthetic JSON example](examples/capsule-v2.json), upload scopes, preparation requests, deletion and Hub protocol limits. Participant outcome reports are not independent proof of effectiveness. The 0.1.19 development [installation](docs/native-client/0.1.19/installation.md), [host](docs/native-client/0.1.19/hosts.md) and [runtime](docs/native-client/0.1.19/runtime.md) guides are included for direct reading.
 
 ## Components and stack
 
@@ -120,23 +120,22 @@ AgentOS uses locked Agno dependencies, and Gateway preparation uses fixed LiteLL
 
 ## Local development
 
-Full repository development requires **Node.js 24.13+**, npm, **Python 3.12** for service tooling and Git; the website generator also supports Python 3.11+.
-
-The [component catalog](docs/component-catalog.md), [interfaces](docs/component-interfaces.md), [AI deployment guide](docs/agent-deployment.md) and [licensing and source scope](docs/licensing-and-source.md) document the supported build entries, configuration discovery, data ownership and remaining source coupling. CI, component builds, Hub packaging and source archives consume the same catalog.
+Web development needs **Node.js 24.13+**, npm and Git. Install root dependencies once and start Vite directly:
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
-npm run setup
-npm run build
-npm start
+npm ci --ignore-scripts --no-audit --no-fund
+npm run dev
 ```
 
-Open **http://127.0.0.1:5179/**. This starts a frontend preview. API-backed flows additionally require a selected public API configuration through `GALAXY_WEB_CONFIG_FILE` and the exact browser Origin in that API's policy. The first website build fetches fixed public historical assets.
+Open **http://127.0.0.1:5179/app/**. With unchanged installed dependencies, run dev directly; a whole-product build or full test run is not a prerequisite. Other components use their own installation roots in the [component catalog](docs/component-catalog.md). Root `npm run setup` is the optional bulk installer for root, Hub, A2A and Compact App.
 
-The active product entry is `packages/galaxy-web/src/main.tsx`. The root `app/` and demo scripts retain an earlier demonstration. The management application has its own dependencies, configuration and build.
+For a complete static website and Web preview, run `npm run build` then `npm start` and open **http://127.0.0.1:5179/**. The website generator requires Python 3.11+ and fetches fixed public historical assets on its first build. Web-only and website-only builds are `npm run build:web` and `npm run build:site`.
 
-See [checks and their scope](docs/development-checks.md), [current Actions](https://github.com/agigalaxy-team/agigalaxy/actions) and [known status](docs/project-status.md). Earlier successful checks do not establish a passing current branch.
+A frontend preview does not start the business services. API-backed flows use the selected public configuration through `GALAXY_WEB_CONFIG_FILE` and the exact Origin allowed by that API. See the [development guide](docs/development.md) for service configuration and component entries.
+
+Finish a meaningful batch of changes, then choose the smallest relevant checks, such as `npm test -- scripts/test/check.test.mjs`. See [check purposes and scope](docs/development-checks.md); do not repeat the same check per file, commit or agent. [Actions](https://github.com/agigalaxy-team/agigalaxy/actions) reports the selected CI work for its actual commit.
 
 ## Data and project status
 

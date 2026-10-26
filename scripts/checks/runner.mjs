@@ -3,9 +3,9 @@ import {discoverCheckTests} from './test-discovery.mjs';
 
 // The public CLI supplies the repository root. Commands remain fixed local
 // Node checks; no command manifest or arbitrary executable is accepted.
-export function runChecks({root,mode='all',env=process.env}){
- if(!['all','test','core','official','a2a','lint'].includes(mode)){
-  console.error('Usage: node scripts/check.mjs [all|test|core|official|a2a|lint]');
+export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
+ if(!['all','test','core','official','a2a','lint'].includes(mode)||(mode==='lint'&&testFiles.length)){
+  console.error('Usage: node scripts/check.mjs [all|test|core|official|a2a|lint] [related.test.mjs ...]');
   return 2;
  }
  const [major,minor]=process.versions.node.split('.').map(Number);
@@ -27,7 +27,10 @@ export function runChecks({root,mode='all',env=process.env}){
   return 0;
  }
  if(mode!=='lint'){
-  const {packages,files,separate}=discoverCheckTests(root,mode,env);
+  let selection;
+  try{selection=discoverCheckTests(root,mode,env,testFiles);}
+  catch(error){console.error('[galaxy-check] '+error.message);return 2;}
+  const {packages,files,separate}=selection;
   if(separate.length)console.log('[galaxy-check] separate environment/artifact acceptance (not executed by this run): '+separate.join(', '));
   // Bound file processes only; individual tests retain their own concurrency.
   const status=run(`tests (${packages.join(', ')}; ${files.length} files; concurrency 4)`,['--experimental-test-module-mocks','--test','--test-concurrency=4',...files]);
