@@ -17,7 +17,7 @@ const [{serviceFixture},{createApi},{browserScopes},{oidcProviderFixture},{creat
   load('packages/galaxy-official/test/service-fixture.mjs'),load('packages/galaxy-official/src/http.mjs'),load('packages/galaxy-official/src/browser-client.mjs'),
   load('packages/galaxy-official/test/oidc-provider-fixture.mjs'),load("packages/galaxy-official/src/identity/authentication/oidc-login.mjs"),load("packages/galaxy-official/src/identity/links.mjs")]);
 const html=await readFile(join(dist,'index.html'),'utf8');
-const files=[...['main.tsx','account-settings.tsx','runtime.mjs','account-verification-client.mjs'].map(n=>join(repo,'packages/galaxy-web/src',n)),fileURLToPath(import.meta.url),join(dist,'index.html'),...[...html.matchAll(/(?:src|href)="\/app\/(assets\/[^"?]+)"/g)].map(m=>join(dist,m[1]))];
+const files=[...['main.tsx','features/accounts/account-settings.tsx','runtime.mjs','features/accounts/account-verification-client.mjs'].map(n=>join(repo,'packages/galaxy-web/src',n)),fileURLToPath(import.meta.url),join(dist,'index.html'),...[...html.matchAll(/(?:src|href)="\/app\/(assets\/[^"?]+)"/g)].map(m=>join(dist,m[1]))];
 for(const name of (await readdir(nativeCandidate)).filter(name=>/\.(?:[cm]?js|json)$/.test(name)))files.push(join(nativeCandidate,name));
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const hashFiles=async()=>Object.fromEntries(await Promise.all(files.map(async path=>[path,sha(await readFile(path))])));

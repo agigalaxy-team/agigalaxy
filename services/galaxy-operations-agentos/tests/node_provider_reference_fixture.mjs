@@ -19,7 +19,7 @@ registerHooks({resolve(specifier,context,next){
  }
 }});
 const {PGlite}=require('@electric-sql/pglite');
-const {AgentOsConversationTools}=await import(pathToFileURL(join(source,'operations-agentos-conversation-tools.mjs')));
+const {AgentOsConversationTools}=await import(pathToFileURL(join(source,'operations/agentos/conversation-tools.mjs')));
 const {operationsToolCallIdSchema}=await import(pathToFileURL(join(source,'shared/operations-tool-call-id.mjs')));
 const db=new PGlite();
 await db.exec(`CREATE TABLE operations_agentos_conversation_commands_v1(endpoint TEXT,id UUID,conversation_id UUID,operator_id UUID,state TEXT,native_run_id TEXT,result JSONB,PRIMARY KEY(endpoint,id));

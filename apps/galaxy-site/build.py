@@ -125,8 +125,9 @@ def main():
         if cached.is_symlink():
             raise ValueError('Archive cache must contain regular files')
         source = archive_source.joinpath(*relative.parts) if archive_source else None
+        archive_name = 'archives/public/' + name if name in ('docs/index.html', 'downloads/index.html') else name
         if preserved_source:
-            selected = preserved_source / ('archives/public/' + name if name in ('docs/index.html', 'downloads/index.html') else name)
+            selected = preserved_source / archive_name
             if selected.is_symlink() or not selected.is_file() or not resolved_file_path(selected).is_relative_to(preserved_source):
                 raise ValueError('The selected existing release is missing a public file: ' + name)
             raw = selected.read_bytes()
@@ -142,7 +143,7 @@ def main():
         if not preserved_source and (raw is None or hashlib.sha256(raw).hexdigest() != digest):
             if args.offline:
                 raise ValueError('Missing verified archive: ' + name)
-            with urllib.request.urlopen(origin + '/' + urllib.parse.quote(name), timeout=30) as response:
+            with urllib.request.urlopen(origin + '/' + urllib.parse.quote(archive_name), timeout=30) as response:
                 raw = response.read()
             if hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError('Published archive bytes changed: ' + name)
@@ -194,8 +195,8 @@ def main():
         chrome.write('assets/' + name,
                      (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / name).read_text(encoding='utf-8'))
     chrome.write('assets/public-reading.css',
-                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'public-reading.css').read_text(encoding='utf-8')
-                 .replace("'../../../apps/galaxy-site/cms-content.css'", "'/assets/cms-content.css'"))
+                 (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'features' / 'public-reading' / 'workspace.css').read_text(encoding='utf-8')
+                 .replace("'../../../../../apps/galaxy-site/cms-content.css'", "'/assets/cms-content.css'"))
     if chrome.WEB_ASSETS:
         chrome.write('assets/workspace-entry.json', json.dumps(chrome.WEB_ASSETS, indent=2) + '\n')
     copy_example_images(output)

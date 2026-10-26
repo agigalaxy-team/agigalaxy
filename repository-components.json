@@ -197,6 +197,10 @@
       "checks": [
         [
           "{node}",
+          "integrations/native-v2/compact-app/build.mjs"
+        ],
+        [
+          "{node}",
           "--test",
           "integrations/native-v2/setup.test.mjs",
           "integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs"
