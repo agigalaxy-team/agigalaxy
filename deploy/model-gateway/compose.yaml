@@ -1,0 +1,21 @@
+services:
+  model-gateway:
+    image: ${GALAXY_MODEL_GATEWAY_IMAGE:?select an explicitly built gateway image}
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=10002,gid=10002,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file:
+      - /etc/galaxy/model-gateway/runtime.env
+    environment:
+      GALAXY_MODEL_GATEWAY_HOST: 127.0.0.1
+      GALAXY_MODEL_GATEWAY_PORT: '3351'
+      GALAXY_MODEL_GATEWAY_MODELS_FILE: /app/config/models.empty.yaml
+    volumes:
+      - /etc/galaxy/model-gateway/models.yaml:/app/config/models.empty.yaml:ro
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}

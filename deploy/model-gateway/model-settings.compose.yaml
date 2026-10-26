@@ -1,0 +1,55 @@
+services:
+  model-gateway:
+    image: ${GALAXY_MODEL_GATEWAY_IMAGE:?select an explicitly built gateway image}
+    container_name: galaxy-model-gateway
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=10002,gid=10002,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2
+    env_file:
+      - path: /etc/galaxy/model-gateway/runtime.env
+        format: raw
+      - path: /etc/galaxy/model-settings/active.env
+        format: raw
+      - path: /etc/galaxy/model-settings/provider.env
+        format: raw
+    environment:
+      GALAXY_MODEL_GATEWAY_HOST: 127.0.0.1
+      GALAXY_MODEL_GATEWAY_PORT: '3351'
+      GALAXY_MODEL_GATEWAY_MODELS_FILE: /app/config/models.yaml
+      GALAXY_MODEL_GATEWAY_USAGE_FILE: /var/lib/galaxy/model-gateway/usage.sqlite3
+    volumes:
+      - /etc/galaxy/model-settings/models.yaml:/app/config/models.yaml:ro
+      - /var/lib/galaxy/model-gateway:/var/lib/galaxy/model-gateway:rw
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  agentos:
+    image: ${GALAXY_AGENTOS_IMAGE:?select an explicitly built AgentOS image}
+    container_name: galaxy-operations-agentos
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=10001,gid=10001,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2
+    env_file:
+      - path: /etc/galaxy/agentos/runtime.env
+        format: raw
+    environment:
+      GALAXY_AGENTOS_MODEL_BINDINGS_FILE: /app/config/bindings.json
+    volumes:
+      - /etc/galaxy/model-settings/bindings.json:/app/config/bindings.json:ro
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}

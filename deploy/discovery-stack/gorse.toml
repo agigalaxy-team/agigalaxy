@@ -1,0 +1,47 @@
+# Native Gorse v0.5.11 only. Credentials are required environment variables.
+# No LLM, embedding endpoint, external recommender, or file retention policy.
+[database]
+cache_table_prefix = "galaxy_cache_"
+[database.postgres]
+max_open_conns = 8
+max_idle_conns = 4
+[master]
+host = "0.0.0.0"
+port = 8086
+http_host = "0.0.0.0"
+http_port = 8088
+n_jobs = 2
+[server]
+auto_insert_user = false
+auto_insert_item = false
+[recommend]
+cache_size = 100
+context_size = 100
+[recommend.data_source]
+positive_feedback_types = ["bookmark", "participate", "click"]
+read_feedback_types = ["view"]
+[[recommend.item-to-item]]
+name = "neighbors"
+type = "tags"
+column = "item.Labels.tags"
+[recommend.collaborative]
+type = "mf"
+fit_period = "60m"
+optimize_period = "0"
+[recommend.ranker]
+type = "none"
+recommenders = ["collaborative"]
+[recommend.fallback]
+recommenders = ["item-to-item/neighbors", "latest"]
+[tracing]
+enable_tracing = false
+[oidc]
+enable = false
+[blob]
+uri = "/var/lib/gorse/blob"
+[openai]
+base_url = ""
+auth_token = ""
+chat_completion_model = ""
+embedding_model = ""
+log_file = ""

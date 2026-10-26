@@ -409,7 +409,9 @@
       "roots": [
         "services/galaxy-operations-agentos"
       ],
-      "dependsOn": [],
+      "dependsOn": [
+        "model-gateway"
+      ],
       "interfaces": [
         "Versioned private authority HTTP, service key/JWT and Native AgentOS HTTP/SSE"
       ],
@@ -443,13 +445,17 @@
         "services/galaxy-operations-agentos/src/galaxy_agentos/config.py"
       ],
       "artifact": "python-source-compilation-or-separate-docker-image",
-      "dataOwner": "Native run/session tables are separate from Node business facts and command receipts."
+      "dataOwner": "Native run/session tables are separate from Node business facts and command receipts.",
+      "files": [
+        "deploy/model-gateway/agentos.env.example"
+      ]
     },
     {
       "id": "model-gateway",
       "kind": "service",
       "roots": [
-        "services/galaxy-model-gateway"
+        "services/galaxy-model-gateway",
+        "deploy/model-gateway"
       ],
       "dependsOn": [],
       "interfaces": [
@@ -479,7 +485,8 @@
       "id": "discovery",
       "kind": "service-adapter",
       "roots": [
-        "services/galaxy-discovery"
+        "services/galaxy-discovery",
+        "deploy/discovery-stack"
       ],
       "dependsOn": [],
       "build": [],
@@ -535,7 +542,8 @@
     ".gitignore",
     ".gitattributes",
     ".dockerignore",
-    "scripts/test/components.test.mjs"
+    "scripts/test/components.test.mjs",
+    ".oxlintrc.json"
   ],
   "sourceRoots": [
     "apps",

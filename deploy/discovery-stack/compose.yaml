@@ -1,0 +1,188 @@
+name: galaxy-discovery
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 10m, max-file: "2"}
+
+x-openpanel-environment: &openpanel-environment
+  NODE_ENV: production
+  SELF_HOSTED: "true"
+  ALLOW_REGISTRATION: "false"
+  ALLOW_INVITATION: "false"
+  # Upstream batch-flush settings, not Galaxy file/event retention policy.
+  BATCH_SIZE: "100"
+  BATCH_INTERVAL: "1000"
+  DATABASE_URL: postgresql://openpanel:${OPENPANEL_DB_PASSWORD:?required}@op-db:5432/openpanel
+  DATABASE_URL_DIRECT: postgresql://openpanel:${OPENPANEL_DB_PASSWORD:?required}@op-db:5432/openpanel
+  REDIS_URL: redis://op-kv:6379/0
+  CLICKHOUSE_URL: http://default:${OPENPANEL_CH_PASSWORD:?required}@op-ch:8123/openpanel
+  API_URL: http://op-api:3000
+  DASHBOARD_URL: http://127.0.0.1:18001
+  COOKIE_SECRET: ${OPENPANEL_COOKIE_SECRET:?required}
+  # No SMTP/provider/model integration is enabled by this stack.
+  EMAIL_SENDER: ""
+  RESEND_API_KEY: ""
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  LOG_LEVEL: error
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.55.0
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?required}
+      MEILI_NO_ANALYTICS: "true"
+    ports: ["127.0.0.1:17700:7700"]
+    volumes: ["meili-data:/meili_data"]
+    networks: [discovery]
+    logging: *logging
+
+  gorse-db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gorse
+      POSTGRES_DB: gorse
+      POSTGRES_PASSWORD: ${GORSE_DB_PASSWORD:?required}
+    volumes: ["gorse-db-data:/var/lib/postgresql/data"]
+    networks: [gorse-private]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U gorse -d gorse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+  gorse-kv:
+    # Retained for the first attempted cache; not used by Gorse 0.5.11 now.
+    # Keep its existing volume. Do not start a new Redis/RediSearch dependency.
+    profiles: [legacy-cache]
+    image: redis:7.2.5-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes"]
+    volumes: ["gorse-kv-data:/data"]
+    networks: [gorse-private]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+  gorse:
+    image: zhenghaoz/gorse-in-one:0.5.11
+    restart: unless-stopped
+    command: ["-c", "/etc/gorse/config.toml", "--cache-path", "/var/lib/gorse"]
+    environment:
+      GORSE_DATA_STORE: postgres://gorse:${GORSE_DB_PASSWORD:?required}@gorse-db:5432/gorse?sslmode=disable
+      GORSE_CACHE_STORE: postgres://gorse:${GORSE_DB_PASSWORD:?required}@gorse-db:5432/gorse?sslmode=disable
+      GORSE_SERVER_API_KEY: ${GALAXY_GORSE_NATIVE_KEY:?required}
+    volumes: ["./gorse.toml:/etc/gorse/config.toml:ro", "gorse-data:/var/lib/gorse"]
+    networks: [gorse-private]
+    depends_on:
+      gorse-db: {condition: service_healthy}
+    # No native port, including dashboard, is published to host/shared network.
+    logging: *logging
+  gorse-gateway:
+    build:
+      context: ../../services/galaxy-discovery
+      dockerfile: Dockerfile.gorse-gateway
+    restart: unless-stopped
+    environment:
+      GALAXY_GORSE_GATEWAY_KEY: ${GALAXY_GORSE_GATEWAY_KEY:?required}
+      GALAXY_GORSE_NATIVE_KEY: ${GALAXY_GORSE_NATIVE_KEY:?required}
+      GORSE_UPSTREAM: http://gorse:8088
+    ports: ["127.0.0.1:18088:8080"]
+    networks: [discovery, gorse-private]
+    depends_on: [gorse]
+    logging: *logging
+
+  op-db:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openpanel
+      POSTGRES_DB: openpanel
+      POSTGRES_PASSWORD: ${OPENPANEL_DB_PASSWORD:?required}
+    volumes: ["op-db-data:/var/lib/postgresql/data"]
+    networks: [discovery]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U openpanel -d openpanel"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+  op-kv:
+    image: redis:7.2.5-alpine
+    restart: unless-stopped
+    command: [redis-server, --maxmemory-policy, noeviction, --appendonly, "yes"]
+    volumes: ["op-kv-data:/data"]
+    networks: [discovery]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+  op-ch:
+    image: clickhouse/clickhouse-server:25.10.2.65
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: openpanel
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${OPENPANEL_CH_PASSWORD:?required}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - op-ch-data:/var/lib/clickhouse
+      - ./clickhouse-config.xml:/etc/clickhouse-server/config.d/galaxy.xml:ro
+    networks: [discovery]
+    ulimits: {nofile: {soft: 262144, hard: 262144}}
+    logging: *logging
+  op-api:
+    # Public AGPL 2.x line. Resolve and record actual digest on first pull;
+    # root may set image to that digest without selecting supporter-only 3.x.
+    image: ${OPENPANEL_API_IMAGE:-lindesvard/openpanel-api:2}
+    restart: unless-stopped
+    environment:
+      <<: *openpanel-environment
+      OPENPANEL_ORGANIZATION_ID: ${OPENPANEL_ORGANIZATION_ID:?required}
+      OPENPANEL_PROJECT_ID: ${OPENPANEL_PROJECT_ID:?required}
+      OPENPANEL_OWNER_EMAIL: ${OPENPANEL_OWNER_EMAIL:?required}
+      OPENPANEL_WRITE_CLIENT_ID: ${OPENPANEL_WRITE_CLIENT_ID:?required}
+      OPENPANEL_WRITE_CLIENT_SECRET: ${OPENPANEL_WRITE_CLIENT_SECRET:?required}
+      OPENPANEL_READ_CLIENT_ID: ${OPENPANEL_READ_CLIENT_ID:?required}
+      OPENPANEL_READ_CLIENT_SECRET: ${OPENPANEL_READ_CLIENT_SECRET:?required}
+    command: [sh, -ec, "CI=true pnpm -r run migrate:deploy && pnpm start"]
+    ports: ["127.0.0.1:18001:3000"]
+    volumes: ["./bootstrap-openpanel.mjs:/opt/galaxy/bootstrap-openpanel.mjs:ro"]
+    networks: [discovery]
+    depends_on:
+      op-db: {condition: service_healthy}
+      op-kv: {condition: service_healthy}
+      op-ch: {condition: service_started}
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://localhost:3000/healthcheck >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+  op-worker:
+    image: ${OPENPANEL_WORKER_IMAGE:-lindesvard/openpanel-worker:2}
+    restart: unless-stopped
+    environment: *openpanel-environment
+    networks: [discovery]
+    depends_on:
+      op-api: {condition: service_healthy}
+    logging: *logging
+
+networks:
+  discovery: {}
+  gorse-private: {internal: true}
+volumes:
+  meili-data:
+  gorse-db-data:
+  gorse-kv-data:
+  gorse-data:
+  op-db-data:
+  op-kv-data:
+  op-ch-data:
