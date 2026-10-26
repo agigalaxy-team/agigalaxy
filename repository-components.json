@@ -560,7 +560,8 @@
     "examples",
     "test",
     "tools",
-    ".github"
+    ".github",
+    "deploy"
   ],
   "sourceFiles": [
     "README.md",
@@ -586,7 +587,8 @@
     "vite.config.ts",
     "next.config.ts",
     ".oxlintrc.json",
-    ".oxfmtrc.json"
+    ".oxfmtrc.json",
+    "RIGHTS.md"
   ],
   "sourceExtensions": [
     ".mjs",
@@ -687,7 +689,19 @@
     "docs/component-catalog.md",
     "docs/licensing-and-source.md",
     "services/galaxy-model-gateway/SOURCE_PROVENANCE.json",
-    "tools/qa/operations-read-renewal/SOURCE.json"
+    "tools/qa/operations-read-renewal/SOURCE.json",
+    "apps/galaxy-auth/providers/management-email-change/src/main/resources/META-INF/services/org.keycloak.services.resource.RealmResourceProviderFactory",
+    "deploy/discovery-stack/compose.yaml",
+    "deploy/model-gateway/compose.yaml",
+    "deploy/model-gateway/model-settings.compose.yaml",
+    "services/galaxy-discovery/openpanel-account-scope/upstream-reference/pnpm-workspace.yaml",
+    "docs/data-inventory-v0.1.json",
+    "docs/threat-model-v0.1.json",
+    "docs/version-contract.json",
+    "docs/api-error-catalog-v0.1.json",
+    "docs/development-api-reference-v1.json",
+    "docs/alerts/galaxy.rules.json",
+    "docs/alerts/galaxy.rules.test.json"
   ],
   "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog."
 }
