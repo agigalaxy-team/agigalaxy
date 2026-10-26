@@ -11,7 +11,7 @@
 | 交付 | 当前范围 |
 |---|---|
 | [公开资料仓库 agigalaxy-public](https://github.com/agigalaxy-team/agigalaxy-public) | 项目、架构、生态和用户资料，图示、合成接口示例及公开资料合并工具；不是完整核心源码发行 |
-| 官网 Native 0.1.16 开发版 | 有实际安装包、发行核验和打包代码；包内选定的 Galaxy 自有代码、Skill、集成辅助工具及随包文档按 **Apache-2.0** 提供 |
+| 官网 Native 0.1.19 开发候选 | 有实际安装包、发行核验和打包代码；包内选定的 Galaxy 自有代码、Skill、集成辅助工具及随包文档按 **Apache-2.0** 提供 |
 | 客户端第三方依赖 | 维持各自原许可；发行内保留锁定版本、许可清单和原始声明，不因银河的许可而统一改成 Apache |
 | 全部服务与自建套件 | 核心服务实现仍另行管理，完整项目没有统一根许可和全套公开独立发行；不能把模块规划当成已可下载部署 |
 
@@ -46,8 +46,8 @@
 | 账户登录与管理认证 | [Keycloak](https://www.keycloak.org/) / OpenID Connect | 在线账户、本地身份、角色、关联及业务权限 | 现有认证基础；运营管理身份与业务身份分开处理 |
 | 业务数据 | PostgreSQL | 网络对象、事务、版本、权限与当前状态 | 现有业务基础 |
 | 产品界面 | React、TypeScript、Vite、Tailwind CSS | 网络功能、真实内容与完整使用过程 | 现有网站与产品界面基础 |
-| 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已接入源码和候选，完整运营范围继续整合 |
-| 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 已进入工程接线；不以队列存在代替功能交付 |
+| 官网内容与运营后台 | [Payload](https://github.com/payloadcms/payload)、Next.js | 银河业务管理、独立管理认证、受控草稿与发布 | 已实际运行，完整运营范围与效果继续按功能核对 |
+| 持久任务 | [pg-boss](https://github.com/timgit/pg-boss) | 实际业务任务的权限、取消、重试、状态与结果接续 | 持久任务与 worker/publisher 已运行；业务结果仍分别判断 |
 | Hub／官方服务端聊天与归档 | [Prosody / XMPP](https://prosody.im/) | 服务器侧的房间、成员、消息许可与保留规则；向客户端提供银河 HTTPS 业务接口 | 客户端无需部署或配置 XMPP、无需单独 XMPP 账户；该实现不构成跨 Hub 通用资料联邦 |
 | 文件与对象存储 | S3 兼容接口、ClamAV；[Garage](https://garagehq.deuxfleurs.fr/)作为自部署对象存储工程选择 | 上传、业务引用、可见性、扫描与生命周期 | 原有接口与扫描基础保留，自部署标准与运行覆盖继续落实 |
 | 指标、告警与日志 | Prometheus、Alertmanager、Grafana OSS、Loki、Alloy | 业务关联、安全日志和统一维护入口 | 已选定的运行工具组合，真实集中采集覆盖需分别核对 |
@@ -62,9 +62,11 @@ MCP 和 A2A 等是银河采用的接入与协作基础。银河希望把不同�
 
 由官方服务支持公共组织、由基金会或理事会支持开源生态，是新提出的共同建设方向，具体组织与经费仍待落实。开放愿景、真实许可和治理制度分别说明，见[网络宣言](../MANIFESTO.md)与[治理方向](community-governance.md)。
 
-## AI 后台引擎仍是候选分析
+## AI 运营引擎与独立交付
 
-更深入的 AI 运营后台，方向包括规则优先、AI 统筹、按策略自动处理和必要的人机协作。Agno／AgentOS、LangGraph.js 与 Deep Agents 及其组合仍在研究和逐项核对；候选稿、局部代码检查或原型不等于正式采用、全站上线或向普通用户提供官方模型。
+运营后台已采用 Agno/AgentOS Native，并通过私有模型网关调用人工配置的模型；五个 AI 工作账户沿当前人类权限和 AI 岗位权限交集工作。有限自动任务已有实现，三个 jobs/search adapters 尚未接通，生产持续值守关闭。LangGraph.js/Deep Agents 等仍是研究方向，不能列为全部采用；框架接入不代表完整计划已验收。
+
+Discovery 保留固定 OpenPanel 修改、对应上游许可与构建说明，完整对应源码以显式提供的准确归档组装，见[源码构建边界](../services/galaxy-discovery/SOURCE_BUILD.md)。参考目录、补丁与源码归档不是已可独立运行的完整自建套件。
 
 这项建设复用现有业务能力和开源组件，具体模块、执行权限与界面继续按实际决定推进。用户端继续使用自己的 AI 宿主，运营后台引擎是不同范围。
 
