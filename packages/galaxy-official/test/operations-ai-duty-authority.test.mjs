@@ -1,3 +1,5 @@
+import {OperationsJobActions} from '../src/operations-job-actions.mjs';
+import {queueFixture} from './operations-jobs-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -53,6 +55,26 @@ test('stable duty identities, AI-only delegation and original automatic receipts
   await assert.rejects(authority.requireDutyAction(empty,'feedback.read'),{code:'operations_permission_denied'});
   plans.get('governance').enabled=false;await assert.rejects(authority.requireDutyAction(empty,'workbench.read'),{code:'operations_ai_duty_inactive'});plans.get('governance').enabled=true;
   assert.deepEqual(aiActionProjection('jobs.retry',{permissions:codes,handlerReady:false}),{permission:'jobs.retry',permissionAllowed:true,humanRequired:false,humanConditions:[],conditions:['ordinary','bounded-retry'],handlerReady:false,ready:false,reasons:['handler-not-connected']});
+ });
+
+ await t.test('job duty uses the stable AI, exact grant target and immutable original receipt without a second cancel',async()=>{
+  const role=(await permissions.saveRole(admin,roleInput('合成精确任务取消',['jobs.read','jobs.cancel']),adminAuth)).role;
+  await accounts.assignment(admin,'governance',{operationId:randomUUID(),expectedVersion:0,roleId:role.id,enabled:true},adminAuth);
+  const queue=queueFixture(f.db);await queue.jobs.start();
+  try{
+   const targetId=await queue.jobs.enqueue('information-watch',{watchId:randomUUID()},{key:'explicit-duty-job'}),actor=await mint('governance'),
+    grant=(await permissions.saveAutomation(admin,{operationId:randomUUID(),expectedVersion:0,name:'仅取消准确队列任务',executorKind:'ai',mode:'automatic',enabled:true,aiAccountId:ai.governance,permissions:['jobs.cancel'],resourceIds:[targetId],resourceScope:{kind:'selected',resourceIds:[targetId]}},adminAuth)).automation,
+    authorizeOperation=async(_db,operation)=>({allowed:operation.targetId===targetId,grantId:grant.id,grantVersion:grant.version,strategyId:grant.id,strategyVersionId:grant.id}),
+    service=new OperationsJobActions({db:f.db,endpoint:f.endpoint,businessAdmin,jobs:queue.jobs}),tools=new OperationsAgentOsActionTools({authority,services:{jobActions:service},now:f.now}),
+    request={kind:'job-cancel',queue:'information-watch',targetId,reason:'合成已获准取消任务'},operationId=randomUUID();
+   const result=await tools.executeDutyOperation({actor,operationId,arguments:request,authorizeOperation});assert.equal(result.effectState,'completed');assert.equal(result.receipt.state,'cancelled');
+   const audit=(await f.db.query('SELECT actor_kind,operator_id FROM business_admin_audit_v1 WHERE operation_id=$1',[operationId])).rows[0];assert.deepEqual(audit,{actor_kind:'operations-ai-service',operator_id:'ai:'+ai.governance});
+   queue.jobs.cancel=()=>{throw Error('reconciliation must not dispatch again');};
+   assert.equal((await tools.executeDutyOperation({actor,operationId,arguments:request,authorizeOperation,reconcile:true})).effectState,'completed');
+   await assert.rejects(tools.executeDutyOperation({actor,operationId,arguments:{...request,reason:'不同提交'},authorizeOperation,reconcile:true}),{code:'operations_agentos_operation_conflict'});
+   const foreign=await queue.jobs.enqueue('information-watch',{watchId:randomUUID()},{key:'outside-duty-grant'});
+   await assert.rejects(tools.executeDutyOperation({actor,operationId:randomUUID(),arguments:{...request,targetId:foreign},authorizeOperation}),{code:'operations_ai_duty_operation_denied'});
+  }finally{await queue.jobs.stop();}
  });
 
  const targetPermissions=['feedback.read','feedback.update','jobs.retry','accounts.read','accounts.restriction.apply','accounts.restriction.release','strategies.read','strategies.ordinary.configure','strategies.ordinary.publish','content.read','content.batch.hide','content.batch.restore','chat-reports.read','chat-reports.materials.read','chat-messages.hide','chat-messages.restore','chat-messages.keep','notices.read','notices.create','notices.update','notices.publish','notices.withdraw'];
@@ -208,7 +230,7 @@ test('stable duty identities, AI-only delegation and original automatic receipts
 
  await t.test('revocation is checked on every delegated read and cannot be bypassed with an old role snapshot',async()=>{
   await accounts.assignment(admin,'overview',{operationId:randomUUID(),id:(await accounts.assignmentsWithin(f.db,ai.overview))[0].id,expectedVersion:1,roleId:role.id,enabled:false},adminAuth);
-  await assert.rejects(permissions.delegatedDirectory(supervisor),{code:'operations_permission_denied'});
+  await assert.rejects(permissions.delegatedDirectory(supervisor),{code:'operations_ai_delegation_denied'});
   assert.equal((await f.db.query('SELECT enabled FROM operations_ai_work_assignments_v1 WHERE id=$1',[assignment.id])).rows[0].enabled,true,'revoking supervisor authority does not rewrite a different AI assignment');
  });
  await f.db.exec('RESET ROLE');

@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {aiJobQueues,jobActionCommandSchema,searchRetryCommandSchema} from './operations-job-actions.mjs';
 import {operationsContentCurationSchema,operationsContentVisibilitySchema,operationsContentBatchSchema} from './shared/operations-forum-content-schema.mjs';
 import {operationsSectionClassificationSchema,operationsVisibilitySchema,operationsForumDecisionSchema,operationsFileRetrySchema} from './shared/operations-business-schema.mjs';
 import {feedbackEventSchema} from './shared/operations-feedback-schema.mjs';
@@ -37,6 +38,9 @@ const humanReviewDraftConfig=messagingConfigSchema.refine(value=>value.automatio
 export const workbenchAiPromptReviewSchema=z.strictObject({kind:z.literal('ai-work-prompt'),aiAccountId:id,domain:z.enum(['governance','messaging','discovery','maintenance']),name:z.string().max(100),configId:id,
  expectedRevision:z.number().int().positive(),promptVersion:z.number().int().positive(),nextPromptVersion:z.number().int().positive(),scope:z.literal('role-work-requirements'),source:z.enum(['saved-configuration','empty-default']),before:z.string().max(16000),after:z.string().max(16000),effect:z.literal('new-rounds-only')});
 export const workbenchPrepareSchemas=Object.freeze({
+ 'job-cancel':z.strictObject({kind:z.literal('job-cancel'),queue:z.enum(aiJobQueues),targetId:id,reason}),
+ 'job-retry':z.strictObject({kind:z.literal('job-retry'),queue:z.enum(aiJobQueues),targetId:id,reason}),
+ 'search-retry':z.strictObject({kind:z.literal('search-retry'),targetId:id,reason}),
  'ai-work-prompt-save':z.strictObject({kind:z.literal('ai-work-prompt-save'),aiAccountId:id,prompt:z.string().max(16000)}),
  'ai-role-command':z.strictObject({kind:z.literal('ai-role-command'),command:delegatedAiRolePreparationSchema}),
  'content-visibility':z.strictObject({kind:z.literal('content-visibility'),targetKind,targetId:id,...visibility}).superRefine(visibilityValid),
@@ -67,6 +71,7 @@ export const workbenchPrepareSchemas=Object.freeze({
 });
 export const workbenchActionCatalog=aiWorkPreparationRegistry;
 export const workbenchCommandSchemas=Object.freeze({
+ 'job-cancel':jobActionCommandSchema,'job-retry':jobActionCommandSchema,'search-retry':searchRetryCommandSchema,
  'ai-work-prompt-save':delegatedAiPromptSaveSchema.safeExtend({delegationVersion:z.number().int().positive()}),
  'ai-role-command':z.strictObject({operationId:id,command:delegatedAiRolePreparationSchema,delegationVersion:z.number().int().positive()}),
  'content-visibility':operationsContentVisibilitySchema,'content-curation':operationsContentCurationSchema,

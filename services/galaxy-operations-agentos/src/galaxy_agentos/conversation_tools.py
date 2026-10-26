@@ -348,6 +348,23 @@ class OrdinaryStrategyPublish(ClosedArguments):
 SearchReason = Annotated[str, Field(min_length=1, max_length=500)]
 
 
+class JobCancel(ClosedArguments):
+    kind: Literal["job-cancel"]
+    queue: Literal["information-watch", "search-recovery", "content-publication", "account-notice", "retention-cleanup", "messaging-run", "messaging-delivery"]
+    targetId: UUID
+    reason: Reason
+
+
+class JobRetry(JobCancel):
+    kind: Literal["job-retry"]
+
+
+class SearchRetry(ClosedArguments):
+    kind: Literal["search-retry"]
+    targetId: UUID
+    reason: Reason
+
+
 class SearchApply(ClosedArguments):
     kind: Literal["search-apply"]
     reason: SearchReason
@@ -391,7 +408,7 @@ from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave
 from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 
 
-_BusinessOperation = Union[ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
+_BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish,

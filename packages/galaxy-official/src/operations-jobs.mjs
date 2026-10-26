@@ -134,13 +134,14 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
       const jobs = await boss.findJobs(queueName(name), { limit: limit + 1, ...(after ? { after } : {}) });
       return { items: jobs.slice(0, limit).map(operationJobView), nextAfter: jobs.length > limit ? jobs[limit - 1].id : null };
     },
-    async cancel(name, id, {audit,endpoint,authorize} = {}) {
+    async cancel(name, id, {audit,endpoint,authorize,check} = {}) {
       queueName(name);
       if(name.startsWith('autonomy-'))throw new ServiceError('operations_autonomy_task_control_required',409);
       return transaction(db, async tx => {
         await authorize?.(tx);
         const adapter = operationsDatabase(tx);
         const current = await lockedJob(tx,name,id);
+        await check?.(tx,current);
         const cancellable=['created', 'retry', 'active'].includes(current.state);
         const domainCancellation=['content-publication','account-notice','retention-cleanup','messaging-run','messaging-delivery'].includes(name);
         if(domainCancellation&&(cancellable||current.state==='cancelled')){
@@ -158,12 +159,13 @@ export function createOperationsJobs({ db, boss: suppliedBoss, onError = () => {
         return operationJobView(latest);
       });
     },
-    async retry(name, id, {audit,authorize} = {}) {
+    async retry(name, id, {audit,authorize,check} = {}) {
       queueName(name);
       if(name.startsWith('autonomy-'))throw new ServiceError('operations_autonomy_task_control_required',409);
       return transaction(db,async tx=>{
         await authorize?.(tx);
         const current=await lockedJob(tx,name,id),adapter=operationsDatabase(tx);
+        await check?.(tx,current);
         // Cancellation is an owner's stop, not an automatic retry candidate.
         if(current.state!=='failed')throw new ServiceError('operations_job_not_failed',409);
         await boss.retry(name,id,{db:adapter});

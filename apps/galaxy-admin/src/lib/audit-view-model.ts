@@ -16,6 +16,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const maxCursor=9223372036854775807n;
 
 const actionLabels:Record<string,string>={
+  'ai-prompt-read':'读取岗位工作要求','ai-prompt-save':'保存岗位工作要求',
   'community-section-classify':'调整版块分类','community-section-visibility':'处理版块显示','community-report-resolve':'处理社区举报',
   'operations-summary-read':'读取运营概览','restriction-set':'暂停社区参与','restriction-release':'解除社区参与限制','type-change':'更正账户类型',
   'registered-user-password-reset':'发送用户密码重置邮件','registered-user-login-disable':'停用用户登录','registered-user-login-restore':'恢复用户登录',
@@ -56,7 +57,7 @@ const actionLabels:Record<string,string>={
   'smtp-query':'读取发信服务','smtp-config-save':'保存发信服务配置','smtp-connection-test':'测试发信连接','smtp-delivery-test':'测试邮件投递','smtp-dns-check':'检查发信域名记录',
 };
 const dottedAuditActions=new Set(['recommendations.configure','search-quality.configure','search-quality.publish','search-quality.restore','models.configure','models.apply','strategies.configure','strategies.publish','strategies.control','strategies.run','strategies.ordinary.configure','strategies.ordinary.publish']);
-const readActions=new Set(['operations-summary-read','users-query','user-read','audit-read','feedback-query','feedback-read',
+const readActions=new Set(['ai-prompt-read','operations-summary-read','users-query','user-read','audit-read','feedback-query','feedback-read',
   'chat-reports-query','chat-report-read','chat-report-attachment','community-posts-query','community-post-read','community-sections-query','community-section-read',
   'community-reports-query','community-report-read','resources-query','resource-read','files-query','file-read',
   'community-content-query','community-content-read','community-content-batch-preview','community-tags-query','maintenance-query','maintenance-logs-query',

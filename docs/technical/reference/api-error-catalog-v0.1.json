@@ -7020,31 +7020,31 @@
       "code": "operations_job_not_cancellable",
       "status": 409,
       "source": "packages/galaxy-official/src/operations-jobs.mjs",
-      "line": 154
+      "line": 155
     },
     {
       "code": "operations_job_not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/operations-jobs.mjs",
-      "line": 156
+      "line": 157
     },
     {
       "code": "operations_autonomy_task_control_required",
       "status": 409,
       "source": "packages/galaxy-official/src/operations-jobs.mjs",
-      "line": 163
+      "line": 164
     },
     {
       "code": "operations_job_not_failed",
       "status": 409,
       "source": "packages/galaxy-official/src/operations-jobs.mjs",
-      "line": 168
+      "line": 170
     },
     {
       "code": "operations_job_not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/operations-jobs.mjs",
-      "line": 171
+      "line": 173
     },
     {
       "code": "maintenance_native_unavailable",
@@ -8268,13 +8268,13 @@
       "code": "operations_authorization_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/server.mjs",
-      "line": 212
+      "line": 213
     },
     {
       "code": "operations_authorization_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/server.mjs",
-      "line": 215
+      "line": 216
     },
     {
       "code": "community_restricted",

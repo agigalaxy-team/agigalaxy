@@ -2,9 +2,12 @@ import {operationsPermissionCatalog} from '../operations-permission-catalog.mjs'
 
 // One product action directory. A position's name is context, never an ACL.
 // Permission, human decision and connected handler are separate facts.
-const queryCodes=['accounts.read','accounts.registered.read','system.settings.read','analytics.read','content.read','sections.read','content.tags.read','cases.read','chat-reports.read','feedback.read','files.read','resources.read','recommendations.read','search-quality.read','notices.read','strategies.read','rules.read','maintenance.read','maintenance.logs.read','audit.read','jobs.read','permissions.read','ai.roles.read','ai.prompts.read'];
+const queryCodes=['search.read','accounts.read','accounts.registered.read','system.settings.read','analytics.read','content.read','sections.read','content.tags.read','cases.read','chat-reports.read','feedback.read','files.read','resources.read','recommendations.read','search-quality.read','notices.read','strategies.read','rules.read','maintenance.read','maintenance.logs.read','audit.read','jobs.read','permissions.read','ai.roles.read','ai.prompts.read'];
 queryCodes.push('autonomy.read');
 const definitions=[
+ ['job-cancel','maintenance','取消具体运行任务','jobs.read',['jobs.cancel'],'jobActions',['read','command','operation','qualifyWithin'],['ordinary']],
+ ['job-retry','maintenance','重试具体失败任务','jobs.read',['jobs.retry'],'jobActions',['read','command','operation','qualifyWithin'],['ordinary','bounded-retry']],
+ ['search-retry','discovery','重试具体失败索引代次','search.read',['search.retry'],'jobActions',['read','command','operation','qualifyWithin'],['ordinary','bounded-retry','current-source']],
  ['ai-work-prompt-save','overview','修改获准其他 AI 的岗位工作要求','ai.prompts.read',['ai.prompts.update'],'permissions',['delegatedPrompt','delegatedPromptSave','delegatedManagementOperation'],['explicit-prompt-delegation','other-ai-only','version-cas','role-work-requirements-only']],
  ['ai-role-command','overview','维护获准其他 AI 的专用角色','ai.roles.read',['ai.roles.create','ai.roles.update','ai.roles.assign','ai.roles.revoke'],'permissions',['delegatedDirectory','delegatedRolePreparation','delegatedRoleSave','delegatedManagementOperation'],['delegated-ai-only','version-cas']],
  ['content-visibility','governance','下架或恢复公开内容','content.read',['content.hide','content.restore'],'content',['get','visibility'],['ordinary','current-source','prior-automatic-decision']],
@@ -36,16 +39,13 @@ const definitions=[
 export const aiWorkPreparationRegistry=Object.freeze(definitions.map(([kind,domain,label,read,actions,service,methods,conditions,humanOnly=false])=>Object.freeze({kind,domain,label,read,actions:Object.freeze(actions),handler:Object.freeze({service,methods:Object.freeze(methods)}),humanOnly,conditions:Object.freeze(conditions)})));
 const extra=[
  ['ai.prompts.update','ai.prompts.read','ai-prompt-delegation','permissions',['delegatedPromptSave','delegatedManagementOperation'],['explicit-prompt-delegation','other-ai-only','version-cas','role-work-requirements-only']],
- ['jobs.retry','jobs.read','bounded-job','jobs',['retry'],['ordinary','bounded-retry']],
- ['jobs.cancel','jobs.read','bounded-job','jobs',['cancel'],['ordinary']],
- ['search.retry','search.read','bounded-index-retry','searchRecovery',['retry'],['ordinary','bounded-retry','current-source']],
  ['ai.roles.create','ai.roles.read','ai-role-delegation','permissions',['delegatedRoleSave'],['delegated-ai-only']],
  ['ai.roles.update','ai.roles.read','ai-role-delegation','permissions',['delegatedRoleSave'],['delegated-ai-only']],
  ['ai.roles.assign','ai.roles.read','ai-role-delegation','permissions',['delegatedAssignment'],['delegated-ai-only']],
  ['ai.roles.revoke','ai.roles.read','ai-role-delegation','permissions',['delegatedAssignment'],['delegated-ai-only']],
 ];
 const byPermission=new Map();
-const autonomousAdapters=new Set(['content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation']);
+const autonomousAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation']);
 for(const entry of aiWorkPreparationRegistry)for(const permission of entry.actions)if(!byPermission.has(permission))byPermission.set(permission,{kind:entry.kind,read:entry.read,handler:entry.handler,conditions:entry.conditions,humanOnly:entry.humanOnly});
 for(const [permission,read,kind,service,methods,conditions] of extra)byPermission.set(permission,{kind,read,handler:{service,methods},conditions,humanOnly:false});
 byPermission.set('chat-reports.materials.read',{kind:'private-case-materials',read:'chat-reports.materials.read',handler:{service:'chatReports',methods:['operatorGet','assertDutyCaseWithin']},conditions:['triggered-case','purpose-bound-materials'],humanOnly:false,purposeBoundRead:true});

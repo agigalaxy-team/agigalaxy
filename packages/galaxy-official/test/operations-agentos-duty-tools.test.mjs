@@ -72,7 +72,7 @@ test('a partial batch keeps the immutable per-object outcomes under one original
 
 test('receipt target projection follows current domain proposal kinds and preserves their actual source identity',()=>{
  const id=randomUUID();
- for(const [kind,expected] of [['public-case','community-report'],['message-plan','messaging-plan'],['account','account'],['section','content-section'],['projects','project'],['methods','method'],['rule','rule-key'],['search-configuration','search-quality'],['recommendation-theme','recommendation-policy'],['strategy','strategy'],['strategy-configuration','strategy-configuration'],['strategy-run','strategy-run']])assert.deepEqual(originalOperationTarget({kind,id},{}),{targetType:expected,targetId:id});
+ for(const [kind,expected] of [['queue-job','queue-job'],['search-job','search-job'],['public-case','community-report'],['message-plan','messaging-plan'],['account','account'],['section','content-section'],['projects','project'],['methods','method'],['rule','rule-key'],['search-configuration','search-quality'],['recommendation-theme','recommendation-policy'],['strategy','strategy'],['strategy-configuration','strategy-configuration'],['strategy-run','strategy-run']])assert.deepEqual(originalOperationTarget({kind,id},{}),{targetType:expected,targetId:id});
  assert.deepEqual(originalOperationTarget({kind:'file',id},{targetKind:'chat'}),{targetType:'file-chat',targetId:id});
  assert.deepEqual(originalOperationTarget({kind:'file',id},{targetKind:'forum'}),{targetType:'file-forum',targetId:id});
  assert.deepEqual(originalOperationTarget({kind:'content-batch',id},{}),{targetType:null,targetId:null});

@@ -1,3 +1,4 @@
+import {OperationsJobActions} from './operations-job-actions.mjs';
 import { loadGovernanceForRuntime } from './operations/governance-review.mjs';
 import { loadIdentityProviders } from './identity-config.mjs';
 import {loadOfficialAccountPortal} from './official-account.mjs';
@@ -296,9 +297,10 @@ try {
   const systemSettingsOperationsMail=new SystemSettingsOperationsMailBridge({settings:operationsSystemSettings,operationsSmtp});
   const operationsMessaging=new OperationsMessagingService({db,endpoint,businessAdmin,accounts:services.communityAccounts,jobs:operationsJobs,mailProvider:operationsSmtp});
   const operationsRetention=new OperationsRetention({db,endpoint,businessAdmin,jobs:operationsJobs});
+  const operationsJobActions=new OperationsJobActions({db,endpoint,businessAdmin,jobs:operationsJobs,searchIndex:operationsSearchIndex});
   operationsAgentOs.connectConversationTools({gateway:agentOsGateway,services:{accounts:businessAdmin,registeredUsers,systemSettings:operationsSystemSettings,systemGeneral:systemGeneralPublications,community:operationsCommunity,content:operationsCommunity.content,chatReports:accountChatGovernance,
     feedback:operationsFeedback,files:operationsFiles,fileCleanup:operationsFileCleanup,fileAccess:operationsFileAccess,resources:operationsResources,analytics:discoveryRuntime,recommendations:operationsRecommendation,searchQuality:operationsSearchQuality,
-    messaging:operationsMessaging,strategies,ordinaryStrategies:agentOsGateway.ordinaryStrategies,rules:p14Rules,maintenance:operationsMaintenance,aiRuns:operationsAgentOs.aiRuns,jobs:operationsJobs,permissions:operationsPermissions}});
+    messaging:operationsMessaging,strategies,ordinaryStrategies:agentOsGateway.ordinaryStrategies,rules:p14Rules,maintenance:operationsMaintenance,aiRuns:operationsAgentOs.aiRuns,jobs:operationsJobs,jobActions:operationsJobActions,permissions:operationsPermissions}});
   const operationsAutonomy=new OperationsAutonomy({db,endpoint,businessAdmin,jobs:operationsJobs,authority:agentOsAuthority,client:agentOsClient,aiWorkAccounts,
     queryTools:operationsAgentOs.conversations.tools.query,actionTools:operationsAgentOs.conversations.tools.actions,gateway:agentOsGateway});
   operationsCommunity.autonomy=operationsAutonomy;

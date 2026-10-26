@@ -29,7 +29,7 @@ const safeReceipt=(value)=>({operationId:typeof value?.operationId==='string'?va
  state:['scheduled','active','paused','stopped','draft','resolved','prepared','running','awaiting-human','completed','blocked','no-action','unknown','active-for-new-matters'].includes(value?.state??value?.plan?.state??value?.run?.state)?(value.state??value.plan?.state??value.run?.state):null,
  phase:['prepared','submitting','task-pending','applied','failed','result-unknown'].includes(value?.phase)?value.phase:null,replayed:value?.replayed===true});
 const requestSchema=value=>workbenchPrepareSchemas[value?.kind];
-const requiredActionFor=x=>x.kind==='ai-work-prompt-save'?'ai.prompts.update':x.kind==='ai-role-command'?'ai.roles.'+(x.command.kind==='role-create'?'create':x.command.kind==='role-update'?'update':x.command.enabled?'assign':'revoke'):x.kind==='public-content-batch'?'content.batch.'+x.action:x.kind==='private-case-message'?'chat-messages.'+x.action:x.kind==='ordinary-strategy-draft'?'strategies.ordinary.configure':x.kind==='ordinary-strategy-publish'?'strategies.ordinary.publish':x.kind==='recommendation-direction'?'recommendations.configure':x.kind==='content-visibility'?'content.'+x.action:x.kind==='content-curation'?'content.curate':x.kind==='section-classification'?'sections.classify':x.kind==='section-visibility'?'sections.'+x.action:x.kind==='resource-visibility'?'resources.'+x.action:x.kind==='account-restriction'?'accounts.restriction.'+x.action:x.kind==='feedback-update'?'feedback.update':x.kind==='file-scan-retry'?'files.scan.retry':x.kind==='file-access'?'files.access.'+x.action:x.kind==='file-cleanup-approve'?'files.cleanup.approve':x.kind==='case-resolve'?'cases.resolve':x.kind==='message-draft-create'?'notices.create':x.kind==='message-draft-save'?'notices.update':x.kind==='messaging-state'?(['activate','resume'].includes(x.action)?'notices.publish':'notices.withdraw'):x.kind==='strategy-control'?'strategies.control':x.kind==='strategy-continue'?'strategies.run':['rule-publish','rule-restore'].includes(x.kind)?'rules.write':x.kind==='search-apply'?'search-quality.publish':'search-quality.restore';
+const requiredActionFor=x=>['job-cancel','job-retry'].includes(x.kind)?'jobs.'+(x.kind==='job-cancel'?'cancel':'retry'):x.kind==='search-retry'?'search.retry':x.kind==='ai-work-prompt-save'?'ai.prompts.update':x.kind==='ai-role-command'?'ai.roles.'+(x.command.kind==='role-create'?'create':x.command.kind==='role-update'?'update':x.command.enabled?'assign':'revoke'):x.kind==='public-content-batch'?'content.batch.'+x.action:x.kind==='private-case-message'?'chat-messages.'+x.action:x.kind==='ordinary-strategy-draft'?'strategies.ordinary.configure':x.kind==='ordinary-strategy-publish'?'strategies.ordinary.publish':x.kind==='recommendation-direction'?'recommendations.configure':x.kind==='content-visibility'?'content.'+x.action:x.kind==='content-curation'?'content.curate':x.kind==='section-classification'?'sections.classify':x.kind==='section-visibility'?'sections.'+x.action:x.kind==='resource-visibility'?'resources.'+x.action:x.kind==='account-restriction'?'accounts.restriction.'+x.action:x.kind==='feedback-update'?'feedback.update':x.kind==='file-scan-retry'?'files.scan.retry':x.kind==='file-access'?'files.access.'+x.action:x.kind==='file-cleanup-approve'?'files.cleanup.approve':x.kind==='case-resolve'?'cases.resolve':x.kind==='message-draft-create'?'notices.create':x.kind==='message-draft-save'?'notices.update':x.kind==='messaging-state'?(['activate','resume'].includes(x.action)?'notices.publish':'notices.withdraw'):x.kind==='strategy-control'?'strategies.control':x.kind==='strategy-continue'?'strategies.run':['rule-publish','rule-restore'].includes(x.kind)?'rules.write':x.kind==='search-apply'?'search-quality.publish':'search-quality.restore';
 const humanDraftConfig=config=>({...config,automation:{kind:'human-required',factsConfirmed:false}});
 const unknownFeedbackResult=operationId=>({operationId,state:'unknown',summary:'本次反馈处理结果尚未核实，系统会继续查询原结果。',receipt:null});
 const unknownRecommendationResult=operationId=>({operationId,state:'unknown',summary:'推荐方向保存结果暂未核实，正在查询原结果。',receipt:null});
@@ -46,6 +46,10 @@ function recommendationResult(result,operationId,input,resultSource){
   receipt:{operationId,version:policy.version,themeKey:input.themeKey,direction:input.direction,enabled:policy.enabled,replayed:result.replayed===true}};
 }
 function actionResult(kind,result,operationId,request,command=null,resultSource='ack'){
+ if(['job-cancel','job-retry','search-retry'].includes(kind)){
+  if(result?.jobId!==request.targetId||typeof result.state!=='string'||kind==='search-retry'&&result.generation!==command.expectedGeneration||kind!=='search-retry'&&result.queue!==request.queue)fail('operations_agentos_operation_conflict');
+  return{operationId,state:'completed',summary:kind==='job-cancel'?'这次任务取消已记录。':'已重新安排原失败任务；实际执行结果仍需读取。',receipt:{operationId,...result}};
+ }
  if(kind==='ai-work-prompt-save'){
   const prompt=result?.prompt;if(result?.operationId!==operationId||prompt?.aiAccountId!==request.aiAccountId||prompt.revision!==command.expectedRevision+1||prompt.promptVersion!==command.expectedPromptVersion+1||result.delegationVersion!==command.delegationVersion)fail('operations_agentos_operation_conflict');
   return{operationId,state:'completed',summary:'岗位工作要求已保存，新轮次采用新版本。',receipt:{operationId,aiAccountId:prompt.aiAccountId,configId:prompt.configId,revision:prompt.revision,promptVersion:prompt.promptVersion,delegationVersion:result.delegationVersion,replayed:result.replayed===true}};
@@ -166,10 +170,10 @@ async function ruleDifference(key,before,after,catalog,accountLabel){
 }
 
 // This adapter does not mint an executor or grant. Model tools can discover an
-// already authorized task or prepare a typed human operation. Only the human
-// POST path calls executePrepared, after loading the server's stored proposal.
+// already authorized task or prepare a typed human operation. Execution uses
+// the stored human card or the exact grant-bound duty command.
 export class OperationsAgentOsActionTools{
- constructor({conversations,authority,gateway,services={},now=authority.now}){Object.assign(this,{conversations,authority,gateway,services,now,db:authority.db,endpoint:authority.endpoint});this.dutyKinds=new Set(['content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-access','case-resolve','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state']);authority.dutyActionReady=permission=>this.dutyActionReady(permission);}
+ constructor({conversations,authority,gateway,services={},now=authority.now}){Object.assign(this,{conversations,authority,gateway,services,now,db:authority.db,endpoint:authority.endpoint});this.dutyKinds=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','feedback-update','file-scan-retry','file-access','case-resolve','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state']);authority.dutyActionReady=permission=>this.dutyActionReady(permission);}
  enableDutyKind(kind){if(!workbenchPrepareSchemas[kind]||!workbenchCommandSchemas[kind])fail('operations_agentos_action_not_connected',503);this.dutyKinds.add(kind);}
  dutyActionReady(permission){
   const definition=aiActionDefinition(permission);if(definition?.query)return true;
@@ -193,7 +197,14 @@ export class OperationsAgentOsActionTools{
   const deadline=(until,maximum,sourceUntil=null)=>{if(!Number.isSafeInteger(maximum)||until<=this.now()||until>this.now()+maximum||sourceUntil!==null&&until>sourceUntil)fail('operations_hide_expiry');return new Date(until*1000).toISOString();};
   const expiry=value=>{if(Number.isSafeInteger(value))readExpiresAt=Math.min(readExpiresAt,value);};
   const visibilityCommand=(view,sourceVersion,action)=>({kind:action,expectedVersion:sourceVersion,expectedVisibilityVersion:view.visibility.version,...(x.until===undefined?{}:{until:x.until}),reason:x.reason});
-  if(x.kind==='ai-work-prompt-save'){
+  if(['job-cancel','job-retry','search-retry'].includes(x.kind)){
+   const job=await this.service('jobActions','read').read(actor,x.kind,x);
+   if(x.kind==='search-retry'){cap(job.state==='failed');command={expectedGeneration:job.generation,reason:x.reason};}
+   else{cap(x.kind==='job-retry'?job.state==='failed':['created','retry','active','cancelled'].includes(job.state));command={expectedState:job.state,expectedRetryCount:job.retryCount,reason:x.reason};}
+   target={kind:x.kind==='search-retry'?'search-job':'queue-job',id:x.targetId,label:x.kind==='search-retry'?'失败索引任务的第 '+job.generation+' 代':x.queue+' 队列中的具体任务',href:'/admin/operations/jobs'};
+   title=x.kind==='job-cancel'?'取消这项运行任务':'重新安排这项失败任务';requiredAction=requiredActionFor(x);
+   basis=[{label:'任务 ID',value:x.targetId},{label:x.kind==='search-retry'?'索引代数':'队列',value:x.kind==='search-retry'?String(job.generation):x.queue},{label:'当前状态',value:job.state}];impact=[x.kind==='job-cancel'?'停止这项队列工作；已完成的外部效果不会撤回。':'仅重新安排所选失败任务，不表示索引或业务已经执行成功。','执行前重新检查任务状态及所属业务权限。'];
+  }else if(x.kind==='ai-work-prompt-save'){
    if(this.authority.acceptsDuty?.(actor))fail('operations_agentos_management_card_requires_human',403);
    const item=await this.service('permissions','delegatedPrompt').delegatedPrompt(actor,{aiAccountId:x.aiAccountId}),prompt=item.prompt;expiry(item.readExpiresAt);
    if(prompt.text===x.prompt)fail('operations_ai_prompt_no_change');
@@ -430,7 +441,8 @@ export class OperationsAgentOsActionTools{
    // An identity callback must not start a second PG lease inside that check.
    fresh=({db}={})=>this.authority.acceptsDuty?.(actor)?actor:this.human(actor,'workbench.read',{authorize,db});
   let result;
-  if(x.kind==='ai-work-prompt-save'){
+  if(['job-cancel','job-retry','search-retry'].includes(x.kind))result=await this.service('jobActions','command').command(actor,x.kind,x,input,{authorize:fresh});
+  else if(x.kind==='ai-work-prompt-save'){
    if(this.authority.acceptsDuty?.(actor)||input.aiAccountId!==x.aiAccountId||input.prompt!==x.prompt||proposal.target?.kind!=='ai-work-prompt'||proposal.target.id!==x.aiAccountId)fail('invalid_operations_agentos_action',400);
    const {delegationVersion,...body}=input;result=await this.service('permissions','delegatedPromptSave').delegatedPromptSave(actor,body,{expectedDelegationVersion:delegationVersion});
   }else if(x.kind==='ai-role-command'){
@@ -510,7 +522,9 @@ export class OperationsAgentOsActionTools{
  async qualifyDutyTargetWithin(db,{actor,permission,targetId,request,command,grantId=null}){
   const x=parse(requestSchema(request),request);if(requiredActionFor(x)!==permission||!this.dutyActionReady(permission))fail('operations_agentos_action_not_connected',503);
   const expected=x.targetId??x.reportId??x.strategyId??(x.kind==='public-content-batch'?targetId:x.kind==='recommendation-direction'?x.themeKey:x.kind==='message-draft-create'?command?.planId:command?.versionId);if(expected!==targetId||x.kind==='public-content-batch'&&!x.items.some(item=>item.id===targetId))fail('operations_agentos_scope_denied',403);
-  if(x.kind==='public-content-batch'){
+  if(['job-cancel','job-retry','search-retry'].includes(x.kind)){
+   await this.service('jobActions','qualifyWithin').qualifyWithin(db,actor,x.kind,x,command);
+  }else if(x.kind==='public-content-batch'){
    for(const item of x.items){const service=this.service('content','rawWithin'),source=await service.rawWithin(db,item.kind,item.id);if(!(await service.publicSourceWithin(db,item.kind,source.head,source.source)).available)fail('operations_source_unavailable',409);if(grantId)await this.assertPriorDutyDecisionWithin(db,actor,{kind:'content-visibility',targetId:item.id},grantId);}
   }else if(x.kind==='private-case-message'){
    const g=this.service('chatReports','assertDutyCaseWithin');await g.assertDutyCaseWithin(db,actor,x.reportId);const row=await g.row(db,x.reportId),context=await g.contextWithin(db,row,actor,{operator:true});if(!context.canModerate||g.expired(row))fail('operations_agentos_human_review_required',409);
@@ -603,7 +617,11 @@ export class OperationsAgentOsActionTools{
   // new write must not hide an owned receipt from a currently qualified reader.
   const currentRead=actor=>this.authority.human(actor,{domain:proposal.domain,action:entry.read,purpose:x.kind==='private-case-message'?'prepare':'query'});
   const actor=await currentRead(operator),missing={operationId,state:'not-recorded',summary:'尚未记录本次处理。',receipt:null};let result;
-  if(x.kind==='ai-work-prompt-save'||x.kind==='ai-role-command'){
+  if(['job-cancel','job-retry','search-retry'].includes(x.kind)){
+   const input=parse(workbenchCommandSchemas[x.kind],{...proposal.command,operationId});
+   if(input.reason!==x.reason)fail('operations_agentos_operation_conflict');
+   result=await this.service('jobActions','operation').operation(actor,x.kind,x,proposal.command,operationId);if(!result)return missing;
+  }else if(x.kind==='ai-work-prompt-save'||x.kind==='ai-role-command'){
    const input=parse(workbenchCommandSchemas[x.kind],{...proposal.command,operationId}),body=x.kind==='ai-work-prompt-save'?pick(input,['operationId','aiAccountId','expectedRevision','expectedPromptVersion','prompt']):{...input.command,operationId},kind=x.kind==='ai-work-prompt-save'?'prompt-save':x.command.kind;
    if(x.kind==='ai-work-prompt-save'&&(body.aiAccountId!==x.aiAccountId||body.prompt!==x.prompt)||x.kind==='ai-role-command'&&!isDeepStrictEqual(input.command,x.command))fail('operations_agentos_operation_conflict');
    const saved=await this.service('permissions','delegatedManagementOperation').delegatedManagementOperation(actor,operationId,{kind,input:body});if(saved.state==='not-recorded')return missing;result=saved.result;

@@ -54,7 +54,9 @@ Official `src/adapters/http/` 下各 dispatcher 负责准入和解析，领域�
 
 自动运行由 PostgreSQL/pg-boss 保存计划、任务、领取、版本和回执，Agno 处理模型/工具。新任务冻结工程参数、岗位提示词和策略版本，每次业务写仍重核停用、撤权、接管及对象。PAUSED 仅在原 run/待决调用上接续，CANCELLED/完成不伪称恢复。总并发仅支持1或2，日计划须明确时刻。具体调用次数/token 取真实请求与 SDK 元数据；缺项未知，业务完成取实际业务回执。原任务/工具/稳定身份生成审计 actor_context，拒绝 HTTP/模型自报。
 
-Conversation原provider工具ID只供SDK配对/后续模型请求，Node接收按当前run与完整provider值派生的短UUID5引用，公开元数据不带thought signature；持久化核同run真实已存投影，不能仅凭UUID形状或marker认引用。Duty私有PAUSED保存继续原工具所需坐标，公开读取仍过滤。相关原生持久化与续接见[原生运行](agent-runtime.md#持久化调用与有限恢复)。`jobs.cancel/jobs.retry/search.retry` 的typed命令及原操作恢复适配尚未接通。
+Conversation原provider工具ID只供SDK配对/后续模型请求，Node接收按当前run与完整provider值派生的短UUID5引用，公开元数据不带thought signature；持久化核同run真实已存投影，不能仅凭UUID形状或marker认引用。Duty私有PAUSED保存继续原工具所需坐标，公开读取仍过滤。相关原生持久化与续接见[原生运行](agent-runtime.md#持久化调用与有限恢复)。
+
+`jobs.cancel/jobs.retry/search.retry` 使用已有队列或索引事务与同事务审计。具体操作卡冻结任务状态、重试次数或索引代数；原operation只读恢复，不因任务后续变化重复派发。泛化队列自主处理限已获准的information-watch，发布、消息与清理队列仍经具体人工卡并检查各自业务权限；索引重排继续在后续构建时核当前来源资格。
 
 Task征集与整单终止的业务含义由产品正文维护；工程合同仍共用 `task-schema-v2.mjs`、`task-owner-control-v2-schema.mjs`。stop-enrollment是追加事件，不改原事件；新的close要求 `terminationIntent:"terminate-task"`，缺该字段的旧close只读已接受原回执，不补字段、转换事件或在absent后重发。HTTP/MCP/Web共同升级，沿任务版本CAS/数据库锁，重复原事件回原回执而不增长事实；文档合并不代表该候选已上线。
 

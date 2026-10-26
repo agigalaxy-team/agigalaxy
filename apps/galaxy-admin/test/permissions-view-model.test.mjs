@@ -60,13 +60,13 @@ test('personnel display uses current effective permission facts instead of infer
  assert.deepEqual(personPermissionSources({...person,authorizationState:'not-eligible',effective:null},'content.read',[role]),{state:'unknown',labels:[]});
  const granted={...person,effective:{...person.effective,permissions:['content.read']}};
  assert.deepEqual(personPermissionSources(granted,'content.read',[role]),{state:'granted',labels:['内容维护']});
- assert.deepEqual(personPermissionSources({...granted,effective:{...granted.effective,source:'upstream-administrator'}},'content.read',[role]),{state:'granted',labels:['上游管理资格']});
+ assert.deepEqual(personPermissionSources({...granted,effective:{...granted.effective,source:'upstream-administrator'}},'content.read',[role]),{state:'unknown',labels:['旧上游来源']});
 });
 
 test('automatic grants require explicit object intent and preserve existing scoped objects on ordinary save',()=>{
  const fresh=automationDraft();assert.equal(fresh.enabled,false);assert.equal(fresh.scopeConfirmed,false);
  assert.equal(automationSaveBody({...fresh,name:'内容例行处理',permissions:['content.read']},catalog),null);
- assert.deepEqual(automationSaveBody({...fresh,name:'内容例行处理',scopeConfirmed:true,permissions:['content.read']},catalog).resourceIds,[]);
+ assert.deepEqual(automationSaveBody({...fresh,name:'内容例行处理',scopeConfirmed:true,resourceScope:{kind:'eligible'},permissions:['content.read']},catalog).resourceIds,[]);
  const grant={id,name:'指定对象处理',executorKind:'program',mode:'automatic',enabled:true,version:6,permissions:['content.read'],resourceIds:[other],executionState:'not-connected',executionAvailable:false,createdAt:time,updatedAt:time};
  const draft=automationDraft(grant),body=automationSaveBody({...draft,name:'改名'},catalog);
  assert.equal(body.expectedVersion,6);assert.deepEqual(body.resourceIds,[other]);assert.deepEqual(grant.resourceIds,[other]);

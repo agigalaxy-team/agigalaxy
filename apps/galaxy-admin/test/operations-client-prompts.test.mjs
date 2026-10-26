@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import {runInNewContext} from 'node:vm';
-import ts from 'typescript';
-
-const file=new URL('../src/lib/operations-client.ts',import.meta.url),module={exports:{}};
-runInNewContext(ts.transpileModule(readFileSync(file,'utf8'),{fileName:file.pathname,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:module.exports});
-const {OperationsRequestError,operationsFailure}=module.exports;
+import {OperationsRequestError,operationsFailure} from '../src/lib/operations-client.ts';
 
 test('request failure display separates permission, origin and verification without changing session expiry or leaking unknown codes',()=>{
   const display=(status,code)=>operationsFailure(new OperationsRequestError(status,code),'当前内容暂时无法读取。');

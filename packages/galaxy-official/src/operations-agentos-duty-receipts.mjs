@@ -3,7 +3,7 @@ import {z} from 'zod';
 const types={post:'content-post',reply:'content-reply',section:'content-section',account:'account','public-case':'community-report',case:'community-report','community-report':'community-report','chat-report':'chat-report',feedback:'feedback',
  project:'project',projects:'project',method:'method',methods:'method','chat-file':'file-chat','forum-file':'file-forum','file-cleanup-plan':'file-cleanup-plan','message-plan':'messaging-plan','messaging-plan':'messaging-plan',
  'recommendation-theme':'recommendation-policy','recommendation-policy':'recommendation-policy','search-configuration':'search-quality','search-quality':'search-quality',rule:'rule-key','rule-key':'rule-key',
- strategy:'strategy','strategy-configuration':'strategy-configuration','strategy-run':'strategy-run','ai-work-account':'ai-work-account','ai-work-prompt':'ai-work-account','ai-role':'ai-role','ai-role-assignment':'ai-role-assignment'};
+ 'queue-job':'queue-job','search-job':'search-job',strategy:'strategy','strategy-configuration':'strategy-configuration','strategy-run':'strategy-run','ai-work-account':'ai-work-account','ai-work-prompt':'ai-work-account','ai-role':'ai-role','ai-role-assignment':'ai-role-assignment'};
 
 export function originalOperationTarget(target,request){
  const targetType=target?.kind==='file'?(request?.targetKind==='chat'?'file-chat':request?.targetKind==='forum'?'file-forum':null):types[target?.kind]??null;

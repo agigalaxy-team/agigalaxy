@@ -9,3 +9,13 @@ test('workbench cards retain the server operation and current domain without lea
  assert.equal(workbenchActionCards([{...raw,state:'unknown',target:{...raw.target,href:'/admin/operations/feedback?id=one'}}],'governance')[0].capability.canConfirm,false);
  assert.equal(workbenchCardPath('governance',raw.cardId),'/v1/operations/agentos/conversations/governance/cards/'+raw.cardId);
 });
+
+
+test('typed queue and index cards retain the concrete reviewed target and unknown outcomes cannot confirm again',()=>{
+ for(const kind of ['job-cancel','job-retry','search-retry']){
+  const domain=kind==='search-retry'?'discovery':'maintenance',targetId='33333333-3333-4333-8333-333333333333',
+   raw={cardId:'11111111-1111-4111-8111-111111111111',operationId:'22222222-2222-4222-8222-222222222222',kind,domain,state:'prepared',target:{kind:kind==='search-retry'?'search-job':'queue-job',label:'具体失败任务',href:'/admin/operations/jobs'},title:'处理这项任务',impact:['重试只表示重新排队'],basis:[{label:'任务 ID',value:targetId},{label:'当前状态',value:'failed'}],requiredAction:kind==='search-retry'?'search.retry':kind==='job-cancel'?'jobs.cancel':'jobs.retry',capability:{canConfirm:true},checkedAt:1000,readExpiresAt:1030};
+  const card=workbenchActionCards([raw],domain)[0];assert.equal(card.operationId,raw.operationId);assert.equal(card.basis[0].value,targetId);assert.equal(card.capability.canConfirm,true);
+  assert.equal(workbenchActionCards([{...raw,state:'unknown'}],domain)[0].capability.canConfirm,false);
+ }
+});

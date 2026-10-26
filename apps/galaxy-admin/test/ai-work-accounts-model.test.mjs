@@ -15,12 +15,12 @@ test('AI work account schemas and drafts separate role limits, human decisions, 
  assert.equal(aiWorkCommandSchema.safeParse({operationId,kind:'state-save',expectedVersion:1}).success,false);
  for(const field of ['temporaryPassword','email','actor','aiDomains','apiKey'])assert.equal(aiWorkCommandSchema.safeParse({...command,[field]:'SYNTHETIC_NOT_SECRET'}).success,false);
  assert.equal(aiWorkAssignmentSchema.safeParse({operationId,expectedVersion:0,roleId,enabled:true,operatorId:'a'.repeat(64)}).success,false);
- const allCurrent=[...aiWorkQueryPermissions,...new Set(aiWorkPreparation.flatMap(row=>row.actions))];
- assert.equal(aiWorkCapabilities('overview',allCurrent).preparableKinds.length,18);
+ const allCurrent=[...aiWorkQueryPermissions,...new Set(aiWorkPreparation.flatMap(row=>[row.read,...(Array.isArray(row.actions)?row.actions:[])]))];
+ assert.deepEqual([...aiWorkCapabilities('overview',allCurrent).preparableKinds].sort((a,b)=>a.localeCompare(b)),aiWorkPreparation.map(row=>row.kind).sort((a,b)=>a.localeCompare(b)));
  const diagnostic=aiWorkCapabilities('maintenance',['maintenance.read','maintenance.logs.read','files.read','files.cleanup.approve','models.configure']);
- assert.deepEqual(diagnostic.queryPermissions,['files.read','maintenance.read','maintenance.logs.read']);assert.deepEqual(diagnostic.preparableKinds,['file-cleanup-approve']);assert.deepEqual(diagnostic.autonomousPermissions,[]);
+ assert.deepEqual(diagnostic.queryPermissions,['files.read','maintenance.read','maintenance.logs.read']);assert.deepEqual(diagnostic.preparableKinds,['file-cleanup-approve']);assert.deepEqual(diagnostic.autonomousPermissions,diagnostic.queryPermissions);
  assert.equal(diagnostic.queryPermissions.includes('models.configure'),false);
- assert.deepEqual(aiWorkCapabilities('messaging',allCurrent).autonomousPermissions,[]);
+ assert.deepEqual(aiWorkCapabilities('messaging',allCurrent),aiWorkCapabilities('overview',allCurrent));
  assert.deepEqual(aiWorkCapabilities('governance',['content.read','content.hide','content.restore','rules.write']).autonomousPermissions,['content.read','content.hide','content.restore']);
  const location=aiWorkLocation({domain:'governance',tab:'automation',after:'14',actor:'forged',apiKey:'SYNTHETIC_NOT_SECRET'}),url=new URL(aiWorkHref(location),'https://example.invalid');
  assert.equal(url.pathname,'/admin/operations/ai-work-accounts');assert.deepEqual([...url.searchParams.keys()],['domain','tab']);assert.equal(aiWorkLocation({domain:'arbitrary',after:'9223372036854775808'}).after,'');

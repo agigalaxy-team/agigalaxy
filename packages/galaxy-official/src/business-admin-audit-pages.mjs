@@ -7,7 +7,7 @@ import {withPermissionAuditLinks} from './business-admin-permission-audit-links.
 import {withBusinessAuditAttribution} from './business-admin-audit-attribution.mjs';
 import {hasOperationsPermission} from './operations-permission-catalog.mjs';
 
-export const businessAuditReadActions=Object.freeze(['users-query','user-read','audit-read','chat-reports-query','chat-report-read','chat-report-attachment',
+export const businessAuditReadActions=Object.freeze(['ai-prompt-read','users-query','user-read','audit-read','chat-reports-query','chat-report-read','chat-report-attachment',
  'operations-summary-read','community-posts-query','community-post-read','community-sections-query','community-section-read',
  'community-reports-query','community-report-read','resources-query','resource-read','files-query','file-read','feedback-query','feedback-read',
  'community-content-query','community-content-read','community-content-batch-preview','community-tags-query','maintenance-query','maintenance-logs-query',
