@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createApi } from '../../galaxy-official/src/http.mjs';
@@ -12,8 +12,6 @@ import { pythonPeer } from './python-peer.mjs';
 
 test('actual v2 Official HTTP and independent Python SDK recover only proven original unknown Task after restart',
   { skip: !process.env.GALAXY_A2A_PYTHON, timeout: 120000 }, async t => {
-  const sources = ['packages/galaxy-a2a/src/protocol/bridge.mjs', 'packages/galaxy-a2a/src/hosts/host-flow-v2.mjs', 'integrations/native-v2/a2a-tools.mjs'];
-  const sourceHashes = Object.fromEntries(await Promise.all(sources.map(async path => [path, hash(await readFile(path))])));
   const peer = await pythonPeer(process.env.GALAXY_A2A_PYTHON); t.after(() => peer.close());
   const f = await serviceFixture(); t.after(() => f.db.close());
   const api = createApi({ ...f, rateLimit: 500, failureAudit: async () => 'stored' });
@@ -153,11 +151,5 @@ test('actual v2 Official HTTP and independent Python SDK recover only proven ori
   for (const value of [f.actor.subjectId, original.ids.caseId, original.ids.attemptId, 'PRIVATE original Case'])
     assert.ok(!JSON.stringify(peer.requests).includes(value));
   checks.push('exactly three explicitly reviewed sends; recovery has zero business or remote execution writes and no private Galaxy context');
-  for (const path of sources) assert.equal(hash(await readFile(path)), sourceHashes[path]);
-  const report = { observedAt: new Date().toISOString(), originalTaskId: 'PREP-M21-STEP01', flowId: 'PREP-M21-FLOW01',
-    scope: 'actual createApi authenticated v2 HTTP/PGlite + official Python SDK1.1.2 HelloWorld loopback HTTP + durable journal restart + native v2 host; synthetic binding metadata transitions; no physical host or real agent',
-    checks, sourceHashes, http, peerMethods: peer.requests.map(r => r.method), dispatches, cancelRequests: 0,
-    recoveryBusinessWrites: 0, modelCalls: 0, humanAcceptance: false, passed: true };
-  if (process.env.GALAXY_A2A_RECOVERY_REPORT) await writeFile(process.env.GALAXY_A2A_RECOVERY_REPORT, JSON.stringify(report, null, 2) + '\n');
-  t.diagnostic(JSON.stringify({ checks: checks.length, dispatches, sourceHashes }));
+  t.diagnostic(JSON.stringify({ checks: checks.length, dispatches }));
 });

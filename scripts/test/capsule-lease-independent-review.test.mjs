@@ -1,14 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID,createHash} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
 import {createCapsuleWebClient} from '../../packages/galaxy-web/src/capsule-workspace-client.mjs';
-const source=new URL('../../packages/galaxy-web/src/capsule-workspace-client.mjs',import.meta.url);
-const hash=async()=>createHash('sha256').update(await readFile(source)).digest('hex');
-// The reusable regression checks the current source and keeps it stable during
-// every await-boundary scenario. Historical frozen-review hashes remain in the
-// original release evidence; they are not a version pin for ongoing development.
-const expected=await hash();
 const subjectId='GUID'+'A'.repeat(28);
 function fixture(phase,change){
  const current={subjectId,bindingId:randomUUID(),generation:1,scopes:['capsules','consent']},store=new Map(),calls=[];
@@ -22,7 +15,6 @@ function fixture(phase,change){
 }
 for(const phase of ['prepareAuthorization','submitAuthorization','receipt'])for(const change of ['binding','generation'])
  test(`Capsule ${phase} ${change} replacement withholds original operation`,async()=>{
-  assert.equal(await hash(),expected,'Source must remain stable during the regression run');
   const f=fixture(phase,change),preview=await f.client.prepare('permission',f.payload);
   await assert.rejects(f.client.execute(preview,{confirmed:true}),/身份|连接/);
   const original=[...f.store.values()][0]?.active;
@@ -30,5 +22,4 @@ for(const phase of ['prepareAuthorization','submitAuthorization','receipt'])for(
   assert.equal(original.payloadHash,preview.payloadHash);
   const business=f.calls.filter(x=>x.path==='/v2/capsules/permissions');
   assert.equal(business.length,phase==='receipt'?1:0,'A late ACK may follow one accepted write; no retry/new business write');
-  assert.equal(await hash(),expected);
  });

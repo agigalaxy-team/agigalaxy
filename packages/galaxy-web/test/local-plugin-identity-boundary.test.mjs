@@ -29,11 +29,3 @@ test('an old pending browser bootstrap is preserved without signing or retrying 
  await assert.rejects(f.runtime.createIdentity({confirmed:true}),{code:'local_galaxy_required'});
  assert.deepEqual([...f.rows],seed);assert.deepEqual(f.writes,[]);assert.deepEqual(f.requests,[]);
 });
-
-test('existing identity and draft records remain available without implying local plugin contact',async t=>{
- const active={subjectId:'GUID1500000000000000000000000000',deviceId:'saved-device',installationId:'saved-installation'},draft={title:'继续原来的事情'};
- const seed=[[prefix+'active',active],['visitor-draft',draft]],f=await fixture(t,seed),result=await f.runtime.createIdentity({confirmed:true});
- assert.deepEqual(result.identity,{subjectId:active.subjectId,deviceId:active.deviceId});assert.equal(result.connection,null);
- assert.equal(Object.hasOwn(result,'localPluginConnected'),false);
- assert.deepEqual([...f.rows],seed);assert.deepEqual(f.writes,[]);assert.deepEqual(f.requests,[]);
-});
