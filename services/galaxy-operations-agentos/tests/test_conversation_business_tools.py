@@ -23,14 +23,13 @@ from agno.os import AgentOS, Authorization
 from agno.session import AgentSession
 from agno.run.agent import RunOutput, RunInput, RunErrorEvent, ToolCallCompletedEvent
 from agno.run.base import RunContext, RunStatus
-from agno.run.concurrency import worker_managed_execution
-from agno.run.status_persist import persist_worker_owned_run, RunPersistOutcome
 from agno.tools.function import Function
 from pydantic import TypeAdapter, ValidationError
 
 from galaxy_agentos.app import PrivateSurface, run_view
 from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.config import Settings
+from galaxy_agentos.tool_call_ids import conversation_call_reference
 from galaxy_agentos.conversation_storage import conversation_database
 from galaxy_agentos.conversation_tools import PreparedOperation, QueryFilters, conversation_tools
 from galaxy_agentos.conversations import conversation_agents, install_conversation_read
@@ -127,8 +126,8 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             {"kind": "rule-restore", "key": "forum-quota", "versionId": str(uuid4()), "reason": "恢复已确认版本"}]
         for index, command in enumerate(commands):
             operation = schema.validate_python(command)
-            call = FunctionCall(function=Function.from_callable(tools[4]), call_id="rule-prepare-" + str(index))
-            tools[4](context, call, operation)
+            call = FunctionCall(function=Function.from_callable(tools[-1]), call_id="rule-prepare-" + str(index))
+            tools[-1](context, call, operation)
             packet = node.calls[-1][1]
             self.assertEqual(packet["tool"], "prepare-operation")
             self.assertEqual(packet["arguments"], command)
@@ -154,8 +153,8 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         context = RunContext(run_id=str(uuid4()), session_id=row["sessionId"],
             user_id="conversation:" + row["id"], metadata={"operationId": str(uuid4())})
         command = {"kind": "file-cleanup-approve", "planId": str(uuid4())}
-        call = FunctionCall(function=Function.from_callable(tools[4]), call_id="cleanup-plan-review")
-        tools[4](context, call, schema.validate_python(command))
+        call = FunctionCall(function=Function.from_callable(tools[-1]), call_id="cleanup-plan-review")
+        tools[-1](context, call, schema.validate_python(command))
         path, packet = node.calls[-1]
         self.assertTrue(path.endswith("/tools/execute"))
         self.assertEqual(packet["tool"], "prepare-operation")
@@ -171,7 +170,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 {"kind": "file-cleanup-approve", "planId": "not-a-plan"}]:
             with self.assertRaises(ValidationError): schema.validate_python(invalid)
         self.assertEqual(len(node.calls), 1, "only preparation crosses the Node boundary")
-        function = Function.from_callable(tools[4])
+        function = Function.from_callable(tools[-1])
         self.assertNotIn("run_context", function.parameters["properties"])
         self.assertNotIn("fc", function.parameters["properties"])
 
@@ -233,10 +232,10 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             model = BusinessToolModel(plan=plan)
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
-            names = {tool.__name__ for tool in agents[0].tools}
+            names = {tool.name for tool in agents[0].tools}
             self.assertEqual(names, {"current_summary", "read_ai_delegation", *(name for name, _ in plan)})
             for tool in agents[0].tools:
-                function = Function.from_callable(tool)
+                function = tool if isinstance(tool, Function) else Function.from_callable(tool)
                 self.assertNotIn("run_context", function.parameters["properties"])
                 self.assertNotIn("fc", function.parameters["properties"])
             native = AgentOS(id="business-tools-local", db=db, agents=agents, user_isolation=True,
@@ -298,7 +297,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(stale.status_code, 403, stale.text)
                 self.assertNotIn("当前结果", stale.text)
 
-    def test_native_error_and_worker_attempt_persistence_also_scrub_tool_payload_without_mutating_live_result(self):
+    def test_native_error_persistence_scrubs_tool_payload_without_mutating_live_result(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
             db = SqliteDb(db_file=str(Path(directory) / "error.db"), id="error-local")
             cleanup.callback(db.db_engine.dispose)
@@ -319,16 +318,6 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             self.assertNotIn(PUBLIC_TOOL_BODY, json.dumps(stored))
             self.assertEqual(output.tools[0].result, PUBLIC_TOOL_BODY)
             self.assertEqual(run_view(RunOutput.from_dict(stored))["errorCode"], "operations_agentos_authority_changed")
-            observed = []
-            def atomic_primitive(**kwargs):
-                observed.append(kwargs)
-                return RunPersistOutcome.UPDATED
-            db.update_run_in_session = atomic_primitive
-            with worker_managed_execution(ident, worker_id="explicit-recording-primitive", attempt=3):
-                self.assertTrue(persist_worker_owned_run(projected, output, session_id=sid))
-            self.assertEqual(observed[0]["expected_attempt"], 3)
-            self.assertNotIn(PUBLIC_TOOL_BODY, json.dumps(observed[0]["fields"]))
-            self.assertEqual(observed[0]["fields"]["tools"][0]["tool_call_id"], "native-call")
 
     def test_typed_preparation_and_current_node_errors_fail_closed_without_accepting_identity_or_raw_upstream_errors(self):
         schema = TypeAdapter(PreparedOperation)

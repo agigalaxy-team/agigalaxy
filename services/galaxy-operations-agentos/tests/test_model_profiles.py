@@ -34,7 +34,7 @@ class ModelProfilesTest(unittest.TestCase):
             else:
                 self.assertEqual(params["max_tokens"], 256)
                 self.assertEqual(params["reasoning_effort"], "medium")
-            self.assertEqual(model.timeout, 45)
+            self.assertEqual(model.timeout, 55, 'gateway transport leaves time for the original upstream timeout receipt')
             scenes = {domain: None for domain in DOMAINS}
             scenes["governance"] = {"alias": model.id, "dataPolicyApproved": True, "runtimeProfile": raw}
             with tempfile.TemporaryDirectory() as directory:

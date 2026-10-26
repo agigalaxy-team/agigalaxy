@@ -15,8 +15,8 @@ const parse=(schema,input)=>{const value=schema.safeParse(input);if(!value.succe
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const permissionKey=actor=>hash(JSON.stringify([actor.businessAuthorization.version,[...actor.businessAuthorization.permissions].sort((a,b)=>a<b?-1:a>b?1:0)]));
 const nativeSchema=z.strictObject({conversationId:z.uuid(),operation:z.enum(['read','run']),resourceType:z.enum(['agents','workflows']).nullable().optional(),resourceId:z.string().min(1).max(100).nullable().optional()});
-const conversationRunSchema=agentOsRunSchema.extend({taskId:z.uuid().optional()});
-const turnDigest=x=>hash(x.taskId?JSON.stringify([x.message,x.taskId]):x.message);
+const conversationRunSchema=agentOsRunSchema.extend({taskId:z.uuid().optional(),retryOfOperationId:z.uuid().optional()});
+const turnDigest=x=>hash(x.retryOfOperationId?JSON.stringify([x.message,x.taskId??null,x.retryOfOperationId]):x.taskId?JSON.stringify([x.message,x.taskId]):x.message);
 const rolePromptSchema=z.strictObject({version:z.number().int().positive().max(Number.MAX_SAFE_INTEGER),text:z.string().max(16000)});
 const blocks={overview:['communityReports','chatReports','sections','resources','files','jobs','feedback','search'],governance:['communityReports','chatReports','sections','resources','files','feedback'],messaging:['jobs'],discovery:['sections','search'],maintenance:['files','jobs','search']};
 const countFields={communityReports:['pending','total'],chatReports:['pending','total'],sections:['active','archived'],resources:['projects','methods'],files:['scanPending','scanFailed','cleanupPending','cleanupFailed','cleanupResultUnknown'],jobs:['failed'],feedback:['total','pending','processing','unclassified'],search:['failed']};
@@ -117,7 +117,7 @@ export class AgentOsConversations{
     WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=ANY($4::uuid[])
     AND result->>'cancelledOperationId' IS NULL`,[this.endpoint,row.id,row.operator_id,matched.map(run=>run.operationId)])).rows;
    const byId=new Map(saved.map(item=>[item.id,item]));
-   for(const run of matched){const source=byId.get(run.operationId);if(!source)continue;
+   for(const run of matched){if(run.status==='REGENERATED')continue;const source=byId.get(run.operationId);if(!source)continue;
     const known=source.native_run_id??source.result?.runId;
     if(known&&known!==run.runId)continue;
     await this.updateWorkbenchWithin(db,run.operationId,workbenchRunFact(run));
@@ -339,8 +339,20 @@ export class AgentOsConversations{
   if(old){if(old.operator_id!==operator.operatorId||old.domain!==domain||old.message_digest!==turnDigest(x))fail('operations_agentos_operation_conflict',409);return this.operation(fresh,domain,x.operationId);}
   const status=await this.client.status();if(status.state!=='connected')fail('operations_agentos_not_configured',503);if(status.modelState!=='configured'||Array.isArray(status.configuredDomains)&&!status.configuredDomains.includes(domain))fail('operations_agentos_model_not_configured',503);
   if(![1,2].includes(status.conversationVersion)||!Array.isArray(status.conversationDomains)||!status.conversationDomains.includes(domain))fail('operations_agentos_conversation_not_ready',503);
-  const {row}=await this.session(fresh,domain,{create:true}),receipt={operationId:x.operationId,runId:null,state:'dispatching',native:null,replayed:false,...(x.taskId?{taskId:x.taskId}:{})};
+  const {row}=await this.session(fresh,domain,{create:true});let retry=null;
+  if(x.retryOfOperationId){
+   const parent=(await this.db.query('SELECT * FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=$4',[this.endpoint,row.id,fresh.operatorId,x.retryOfOperationId])).rows[0];
+   if(!parent||parent.result?.cancelledOperationId||parent.message_digest!==turnDigest({message:x.message,taskId:x.taskId,retryOfOperationId:parent.result?.retryOfOperationId}))fail('operations_agentos_retry_unavailable',409);
+   const original=await this.nativeOperation(row,parent),checked=original?(await this.failureActivities(row,[{...original,operationId:parent.id}]))[0]:null;
+   if(checked?.status!=='ERROR'||checked.errorCode!=='operations_agentos_model_request_failed'||checked.businessActivity?.state!=='not-started'||!['rate-limit','timeout','connection','service-unavailable','unknown'].includes(checked.failure?.category??'unknown')||checked.userInput!==x.message)fail('operations_agentos_retry_unavailable',409);
+   retry={retryOfOperationId:parent.id,retryOfRunId:checked.runId,priorFailure:{status:'ERROR',errorCode:checked.errorCode,failure:checked.failure??null}};
+  }
+  const receipt={operationId:x.operationId,runId:null,state:'dispatching',native:null,replayed:false,...(x.taskId?{taskId:x.taskId}:{}),...(retry??{})};
   const inserted=await transaction(this.db,async db=>{await this.authority.human(fresh,{db,domain});await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))',[this.endpoint+':conversation:'+x.operationId]);
+   if(retry){
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))',[this.endpoint+':conversation-retry:'+retry.retryOfOperationId]);
+    if((await db.query("SELECT id FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND result->>'retryOfOperationId'=$4 AND state<>'not-started' AND id<>$5 LIMIT 1",[this.endpoint,row.id,fresh.operatorId,retry.retryOfOperationId,x.operationId])).rows.length)fail('operations_agentos_retry_already_requested',409);
+   }
    const existing=(await db.query('SELECT * FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2',[this.endpoint,x.operationId])).rows[0];
    if(existing){if(existing.operator_id!==fresh.operatorId||existing.conversation_id!==row.id||existing.message_digest!==turnDigest(x))fail('operations_agentos_operation_conflict',409);return false;}
    await db.query('INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[x.operationId,this.endpoint,row.id,fresh.operatorId,turnDigest(x),'dispatching',JSON.stringify(receipt),new Date(this.now()*1000)]);
@@ -349,7 +361,7 @@ export class AgentOsConversations{
   if(!inserted)return this.operation(fresh,domain,x.operationId);
   let result;
   try{const again=await authorize();if(again?.operatorId!==fresh.operatorId||again?.endpoint!==this.endpoint)fail('business_admin_denied');await this.current(row.id,{operator:again});
-   const native=await this.client.runConversation(this.view(row),{runId:x.operationId,message:x.message,stream:status.conversationTransport?.events===true&&status.conversationTransport?.originalRunLookup===true});result={...receipt,runId:native.run_id??native.runId??null,state:'accepted'};
+   const native=await this.client.runConversation(this.view(row),{runId:x.operationId,message:x.message,stream:status.conversationTransport?.events===true&&status.conversationTransport?.originalRunLookup===true,...(retry?{retryOfRunId:retry.retryOfRunId,retryOfOperationId:retry.retryOfOperationId}:{})});result={...receipt,runId:native.run_id??native.runId??null,state:'accepted'};
   }catch(error){result={...receipt,state:error.status===403||error.code==='operations_agentos_model_not_configured'?'not-started':'unknown'};}
   await transaction(this.db,async db=>{
    await db.query('UPDATE operations_agentos_conversation_commands_v1 SET state=$3,result=$4,native_run_id=COALESCE(native_run_id,$5) WHERE endpoint=$1 AND id=$2',[this.endpoint,x.operationId,result.state,JSON.stringify(result),result.runId]);

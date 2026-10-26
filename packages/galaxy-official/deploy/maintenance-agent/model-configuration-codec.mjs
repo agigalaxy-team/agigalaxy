@@ -25,6 +25,7 @@ export function compileModelConfiguration(configuration,versionId,credentials){
   const profile={apiFormat:model.apiFormat,contextWindow:model.contextWindow,maxOutputTokens:model.maxOutputTokens,
    reasoningEffort:model.reasoning.mode==='effort'?model.reasoning.effort:null,timeoutSeconds:model.timeoutSeconds,
    toolCalling:model.toolCalling,structuredOutput:model.structuredOutput};
+  for(const key of ['imageUnderstanding','parallelToolCalls','verbosity'])if(Object.hasOwn(model,key))profile[key]=model[key];
   const domains=modelSettingsDomains.filter(domain=>value.scenarios[domain]?.modelId===model.id);
   if(domains.includes('governance')&&!model.toolCalling)throw fail();
   rows.push({model_name:alias,litellm_params:{model:nativePrefix+'/'+model.modelId,api_base:modelProtocolBase(model.baseUrl,model.apiFormat),
@@ -33,6 +34,21 @@ export function compileModelConfiguration(configuration,versionId,credentials){
    supported_endpoints:[responses?'/v1/responses':'/v1/chat/completions']}});
   profiles[alias]={...profile,scenarios:domains};
   for(const domain of domains)scenarios[domain]={alias,dataPolicyApproved:true,runtimeProfile:{...profile}};
+ }
+ // Backups are model-level choices; a request never follows a backup's own
+ // chain recursively. Grant scenario admission only for an approved direct
+ // fallback of that scenario's explicitly selected primary model.
+ for(const domain of modelSettingsDomains){
+  const binding=value.scenarios[domain];if(!binding)continue;
+  const primary=value.models.find(model=>model.id===binding.modelId),backups=[];
+  for(const item of primary.fallbacks??[]){
+   const alias=modelAlias(item.modelId),profile=profiles[alias];
+   if(!item.dataPolicyApproved||!profile)throw fail();
+   if(!profile.scenarios.includes(domain))profile.scenarios.push(domain);
+   const {scenarios:unused,...runtimeProfile}=profile;
+   backups.push({alias,dataPolicyApproved:true,runtimeProfile});
+  }
+  if(backups.length)scenarios[domain].fallbacks=backups;
  }
  return {configurationVersion:version,modelCount:selected.length,configuredScenarios:modelSettingsDomains.filter(domain=>scenarios[domain]!==null),
   gateway:{model_list:rows,galaxy_profiles:profiles},agentos:{version,scenarios}};

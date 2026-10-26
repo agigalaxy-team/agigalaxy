@@ -30,12 +30,15 @@ class FileAccessToolContract(unittest.TestCase):
         node=RecordingNode();tools=conversation_tools(node)
         context=RunContext(run_id=str(uuid4()),session_id=str(uuid4()),
             user_id="conversation:"+str(uuid4()),metadata={"operationId":str(uuid4())})
-        function=Function.from_callable(tools[4])
+        function=Function.from_callable(tools[-1])
         for index,value in enumerate([stop,restore,{**restore,"until":None}]):
             operation=schema.validate_python(value)
             call=FunctionCall(function=function,call_id="file-review-"+str(index))
-            result=json.loads(tools[4](context,call,operation))
-            self.assertEqual(result,{"state":"prepared","effectExecuted":False})
+            result=json.loads(tools[-1](context,call,operation))
+            self.assertEqual(result["state"],"prepared")
+            self.assertFalse(result["effectExecuted"])
+            self.assertFalse(result["preparationFeedback"]["mayClaimPrepared"])
+            self.assertFalse(result["preparationFeedback"]["automaticRetry"])
             user,name,arguments,actual_context=node.calls[-1]
             self.assertEqual(name,"prepare-operation")
             self.assertEqual(arguments,{key:item for key,item in value.items() if key!="until" or item is not None})
@@ -52,7 +55,7 @@ class FileAccessToolContract(unittest.TestCase):
         for value in bad:
             with self.assertRaises(ValidationError):schema.validate_python(value)
         self.assertEqual(len(node.calls),3)
-        self.assertIn("neither a revoke/delete",tools[4].__doc__)
+        self.assertIn("neither a revoke/delete",tools[-1].__doc__)
         self.assertNotIn("run_context",function.parameters["properties"])
         self.assertNotIn("fc",function.parameters["properties"])
 

@@ -120,7 +120,8 @@ def duty_tools(gateway, allowed):
     from .conversation_ai_management import manage_ai_prompt
     candidates["manage-ai-role"] = manage_ai_role(gateway)
     candidates["manage-ai-prompt"] = manage_ai_prompt(gateway)
-    return [function for name, function in candidates.items() if name in allowed]
+    from .tool_reliability import reliable_function
+    return [reliable_function(function) for name, function in candidates.items() if name in allowed]
 
 
 def duty_factory(*, settings, db, gateway, model_factory=None):

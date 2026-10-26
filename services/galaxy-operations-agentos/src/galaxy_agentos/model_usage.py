@@ -113,6 +113,8 @@ def _begin(model):
     run.metadata = {**(before or {}), "modelCalls": count + 1}
     _record_settings_version(run.metadata, model)
     db = getattr(model, "_galaxy_usage_database", None)
+    if db is None:
+        db = getattr(getattr(model, "_galaxy_usage_parent", None), "_galaxy_usage_database", None)
     method = getattr(db, "update_run_in_session", None)
     if not callable(method):
         # Explicit local SQLite tests and transient native agents retain the

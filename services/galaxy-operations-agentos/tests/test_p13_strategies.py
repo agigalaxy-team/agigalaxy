@@ -25,6 +25,7 @@ from galaxy_agentos.p13_strategies import WORKFLOW_ID, publish_fixed_p13_definit
 class LocalGalaxyContract:
     def __init__(self):
         self.rows, self.effects, self.revoked = {}, {}, set()
+        self.commands = {}
 
     def add(self, route="code", mode="code-automatic"):
         ident, execution = str(uuid4()), str(uuid4())
@@ -50,6 +51,12 @@ class LocalGalaxyContract:
             raise AuthorityDenied()
         self.authorize("execution:" + row["executionId"])
         if path == "p13/context":
+            operation = data.get("continuationOperationId")
+            if operation:
+                command = self.commands.get(operation)
+                if not command or command["runId"] != row["runId"]:
+                    raise AuthorityDenied()
+                return {**row, "continuation": command}
             return dict(row)
         if path != "p13/step":
             raise AuthorityDenied()
@@ -112,6 +119,12 @@ class P13NativeTest(unittest.TestCase):
             "iss": self.settings.issuer, "aud": self.settings.audience}, self.settings.verification_key, algorithm="HS256")
         return {"Authorization": "Bearer " + token}
 
+    def continuation_headers(self, row, paused, **decision):
+        operation = str(uuid4())
+        self.gateway.commands[operation] = {"operationId":operation, "runId":row["runId"],
+            "nativeRunId":paused["runId"], "pauseId":paused["pauseId"], **decision}
+        return {**self.headers(row), "Idempotency-Key":operation}
+
     def wait(self, client, row, status):
         deadline, last = time.monotonic() + 10, None
         while time.monotonic() < deadline:
@@ -153,12 +166,13 @@ class P13NativeTest(unittest.TestCase):
             self.assertNotIn(human["runId"], self.gateway.effects)
         with TestClient(self.app()) as client:
             self.assertEqual(self.wait(client, human, "PAUSED")["runId"], paused["runId"])
+            continuation = self.continuation_headers(human, paused, confirmed=True)
             self.gateway.revoked.add(human["executionId"])
-            response = client.post("/galaxy/p13-strategies/" + human["runId"] + "/continue", data={"session_id": human["sessionId"], "confirmed": "true"}, headers=self.headers(human))
+            response = client.post("/galaxy/p13-strategies/" + human["runId"] + "/continue", data={"session_id": human["sessionId"], "confirmed": "true"}, headers=continuation)
             self.assertEqual(response.status_code, 403)
             self.gateway.revoked.remove(human["executionId"])
             human["approved"] = True  # Explicit Node-current-human contract double.
-            response = client.post("/galaxy/p13-strategies/" + human["runId"] + "/continue", data={"session_id": human["sessionId"], "confirmed": "true"}, headers=self.headers(human))
+            response = client.post("/galaxy/p13-strategies/" + human["runId"] + "/continue", data={"session_id": human["sessionId"], "confirmed": "true"}, headers=continuation)
             self.assertIn(response.status_code, {200, 202}, response.text)
             self.wait(client, human, "COMPLETED")
             self.assertEqual(len(self.gateway.effects), 2)
@@ -178,10 +192,11 @@ class P13NativeTest(unittest.TestCase):
             paused = self.wait(client, row, "PAUSED")
             self.assertEqual(paused["pauseKind"], "input")
             self.assertEqual(self.gateway.effects, {})
-            response = client.post("/galaxy/p13-strategies/" + row["runId"] + "/continue", data={"session_id": row["sessionId"], "input_decision": "arbitrary-code"}, headers=self.headers(row))
+            continuation = self.continuation_headers(row, paused, inputDecision="proceed")
+            response = client.post("/galaxy/p13-strategies/" + row["runId"] + "/continue", data={"session_id": row["sessionId"], "input_decision": "arbitrary-code"}, headers=continuation)
             self.assertEqual(response.status_code, 400)
             row["decision"], row["approved"] = "proceed", True
-            response = client.post("/galaxy/p13-strategies/" + row["runId"] + "/continue", data={"session_id": row["sessionId"], "input_decision": "proceed"}, headers=self.headers(row))
+            response = client.post("/galaxy/p13-strategies/" + row["runId"] + "/continue", data={"session_id": row["sessionId"], "input_decision": "proceed"}, headers=continuation)
             self.assertIn(response.status_code, {200, 202}, response.text)
             self.wait(client, row, "COMPLETED")
             self.assertEqual(len(self.gateway.effects), 1)

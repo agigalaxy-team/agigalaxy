@@ -33,8 +33,10 @@ export class OperationsAgentOsClient {
  }
  read(execution){return this.request(execution,'/galaxy/executions/'+execution.id);}
  readConversation(conversation){return this.request(conversation,'/galaxy/conversations/'+conversation.id);}
- async runConversation(conversation,{runId,message,stream=false}){
-  const path='/agents/galaxy-conversation-'+conversation.domain+'/runs',form={message,stream:String(stream),background:'true',session_id:conversation.sessionId};
+ async runConversation(conversation,{runId,message,stream=false,retryOfRunId=null,retryOfOperationId=null}){
+  const base='/agents/galaxy-conversation-'+conversation.domain+'/runs';
+  const path=retryOfRunId?base+'/'+encodeURIComponent(retryOfRunId)+'/continue':base;
+  const form=retryOfRunId?{regenerate:'true',replace_original:'true',retry_of_operation_id:retryOfOperationId,stream:String(stream),background:'true',session_id:conversation.sessionId}:{message,stream:String(stream),background:'true',session_id:conversation.sessionId};
   if(!stream)return this.request(conversation,path,{idempotencyKey:runId,form});
   const response=await this.conversationStreamRequest(conversation,path,form,{idempotencyKey:runId});
   for await(const frame of nativeSseFrames(response.body)){

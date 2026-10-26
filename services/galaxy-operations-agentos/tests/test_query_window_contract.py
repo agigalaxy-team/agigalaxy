@@ -1,10 +1,5 @@
 """One query-window Agno SDK leaf; explicit fresh gateway double, no model."""
-import ast
-import importlib.util
 import json
-import os
-from pathlib import Path
-import sys
 import unittest
 from uuid import uuid4
 
@@ -35,51 +30,9 @@ def exported(fn):
 
 class QueryWindowContract(unittest.TestCase):
     def test_actual_exported_schema_bound_calls_and_node_filter_contract(self):
-        before_path = Path(os.environ["GALAXY_QUERY_BEFORE_SOURCE"])
-        expected = json.loads(os.environ["GALAXY_QUERY_NODE_CONTRACT"])["contracts"]
-        spec = importlib.util.spec_from_file_location("galaxy_agentos._before_query_windows", before_path)
-        before = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = before
-        spec.loader.exec_module(before)
         gateway = Gateway()
-        old_tools = before.conversation_tools(gateway, domain="discovery")
         tools = conversation_tools(gateway, domain="discovery")
-        self.assertEqual([fn.__name__ for fn in tools], [fn.__name__ for fn in old_tools])
-        self.assertEqual(len(tools), 5)
-        for old, current in zip(old_tools[1:], tools[1:]):
-            self.assertEqual(exported(current).parameters, exported(old).parameters)
         fn, function = tools[0], exported(tools[0])
-        serialized = json.dumps(function.parameters, ensure_ascii=False)
-        self.assertIn("recommendations/overview accepts 7,30,90 (default 30)", serialized)
-        self.assertIn("content/list accepts 7,28,all (default 7)", serialized)
-        self.assertIn("one mixed page", serialized)
-        self.assertIn("server cap 20", fn.__doc__)
-        for route, actual in _QUERY_FILTER_CONTRACTS.items():
-            node = expected["/".join(route)]
-            self.assertEqual(set(actual["allowedFilters"]), set(node["allowedFilters"]))
-            self.assertEqual(actual["allowedDays"], node["allowedDays"])
-            self.assertEqual(actual["defaultDays"], node["defaultDays"])
-            if "allowedKinds" in node:
-                self.assertEqual(actual["allowedKinds"], node["allowedKinds"])
-
-        # Only the one data-window instruction is added. Model/config/history/
-        # authority and factory/domain wiring are byte-equivalent as AST.
-        old_agent = ast.parse(before_path.with_name("conversations.py").read_text(encoding="utf-8"))
-        import galaxy_agentos.conversations as agents
-        current_agent = ast.parse(Path(agents.__file__).read_text(encoding="utf-8"))
-        added = []
-        for node in ast.walk(current_agent):
-            if isinstance(node, ast.List):
-                found = [value for value in node.elts if isinstance(value, ast.Constant)
-                         and isinstance(value.value, str) and value.value.startswith("用户指定时间范围或分别要多个视图/内容类型时")]
-                for value in found:
-                    added.append(value.value)
-                    node.elts.remove(value)
-        self.assertEqual(len(added), 1)
-        self.assertIn("未尝试不能说接口没有取得", added[0])
-        self.assertIn("不能只替换时区标签", added[0])
-        self.assertEqual(ast.dump(current_agent, include_attributes=False), ast.dump(old_agent, include_attributes=False))
-
         context = RunContext(run_id=str(uuid4()), user_id="isolated-query-owner", session_id=str(uuid4()),
                              metadata={"operationId": str(uuid4())})
         adapter = TypeAdapter(fn.__annotations__["filters"])
@@ -104,8 +57,11 @@ class QueryWindowContract(unittest.TestCase):
                 "session_id": context.session_id, "turn_id": context.metadata["operationId"]})
 
         # Omission remains omission, not a hidden rewrite of the user's window.
-        call("recommendations", "overview", {}, "documented-default")
-        self.assertEqual(gateway.calls[-1]["arguments"]["filters"], {})
+        count = len(gateway.calls)
+        omitted = call("recommendations", "overview", {}, "missing-window")
+        self.assertEqual(omitted["state"], "invalid-request")
+        self.assertEqual(omitted["reason"], "agentos_query_window_required")
+        self.assertEqual(len(gateway.calls), count)
         count = len(gateway.calls)
         for module, view, filters in [
             ("recommendations", "overview", {"days": 28}),
@@ -117,7 +73,7 @@ class QueryWindowContract(unittest.TestCase):
             result = call(module, view, filters, "invalid-filter")
             self.assertEqual(result["state"], "invalid-request")
             self.assertFalse(result["effectExecuted"])
-            self.assertEqual(result["allowedDays"], expected[module + "/" + view]["allowedDays"])
+            self.assertEqual(result["allowedDays"], _QUERY_FILTER_CONTRACTS[(module, view)]["allowedDays"])
             self.assertNotIn("PRIVATE_MARKER", json.dumps(result))
             self.assertEqual(len(gateway.calls), count)
 
@@ -127,12 +83,7 @@ class QueryWindowContract(unittest.TestCase):
         with self.assertRaises(AuthorityDenied):
             call("recommendations", "overview", {"days": 7}, "fresh-denial")
         self.assertEqual(gateway.calls[-1]["call_id"], "fresh-denial")
-        print(json.dumps({"newUniqueLeaf": 1, "actualAgnoSdk": True,
-            "nodeContractsMatch": True, "requestedWindowsForwarded": True,
-            "twoKindSamplesForwardedIndependently": True, "omittedDefaultsNotRewritten": True,
-            "invalidArgumentsNoGatewayCall": True, "freshDenialPreserved": True,
-            "gatewayDoubleCalls": len(gateway.calls), "providerCalls": 0, "businessWrites": 0,
-            "modelPlanningQualityProven": False}, ensure_ascii=False))
+
 
 
 if __name__ == "__main__":

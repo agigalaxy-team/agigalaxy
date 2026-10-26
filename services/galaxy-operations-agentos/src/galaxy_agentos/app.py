@@ -1,3 +1,4 @@
+from .model_failover import failover_view
 import asyncio
 import json
 import re
@@ -48,12 +49,14 @@ def run_view(run):
     content = _completed_conversation_content(run, status, content)
     events = []
     error_code = "operations_agentos_run_failed" if str(status).upper() == "ERROR" else None
-    failure = failure_view(run.content) if error_code and getattr(run, "agent_id", None) in {
+    failure = failure_view(run.content) if str(status).upper() in {"ERROR", "REGENERATED"} and getattr(run, "agent_id", None) in {
         "galaxy-conversation-overview", "galaxy-conversation-governance",
         "galaxy-conversation-messaging", "galaxy-conversation-discovery",
         "galaxy-conversation-maintenance"} else None
     if failure:
         error_code = "operations_agentos_model_request_failed"
+        if str(status).upper() == "REGENERATED":
+            content = None
     for event in getattr(run, "events", None) or []:
         event_name = getattr(event, "event", None)
         error_type = getattr(event, "error_type", None)
@@ -83,6 +86,8 @@ def run_view(run):
         calls = None
     return {"runId": run.run_id, "status": status, "content": content,
         "operationId": (getattr(run, "metadata", None) or {}).get("operationId"),
+        "regeneratedFrom": getattr(run, "regenerated_from", None),
+        "retryOfOperationId": (getattr(run, "metadata", None) or {}).get("retryOfOperationId"),
         "userInput": getattr(getattr(run, "input", None), "input_content", None) if isinstance(getattr(getattr(run, "input", None), "input_content", None), str) else None,
         "createdAt": getattr(run, "created_at", None), "events": events,
         "metrics": {"inputTokens": tokens("input_tokens") if reported else None,
@@ -93,6 +98,7 @@ def run_view(run):
             "outputTokens": tokens("output_tokens") if reported else None,
             "totalTokens": tokens("total_tokens") if reported else None, "durationMs": duration_ms},
         "errorCode": error_code, "failure": failure,
+        "modelFallbacks": failover_view(getattr(run, "metadata", None)),
         "awaitingHuman": status == "PAUSED" or str(status).lower() == "paused"}
 
 
@@ -160,7 +166,7 @@ class PrivateSurface:
                 raise AuthorityDenied()
             if native:
                 kind, component, _, action = native.groups()
-                if conversation and (kind != "agents" or action not in {None, "cancel", "resume"}):
+                if conversation and (kind != "agents" or action not in {None, "cancel", "resume", "continue"}):
                     raise AuthorityDenied()
                 expected_component = ("galaxy-conversation-" + row["domain"] if conversation
                     else "galaxy-prepared-review" if kind == "workflows" else "galaxy-" + row["domain"])
@@ -193,7 +199,7 @@ class PrivateSurface:
                     body = b"".join(chunks)
                     ctype = next((v.decode().split(";")[0] for k, v in headers if k == b"content-type"), "")
                     fields = parse_qs(body.decode(), keep_blank_values=True) if ctype == "application/x-www-form-urlencoded" else {}
-                    allowed = ({"last_event_index", "session_id"} if conversation and action == "resume" else set() if conversation and action == "cancel" else
+                    allowed = ({"regenerate", "replace_original", "retry_of_operation_id", "stream", "session_id", "background"} if conversation and action == "continue" else {"last_event_index", "session_id"} if conversation and action == "resume" else set() if conversation and action == "cancel" else
                         {"run_id", "confirmed"} if continue_path else ({"message", "stream", "session_id", "background"} if not action else {"stream", "session_id", "background", "step_requirements", "requirements"}))
                     if (body and ctype != "application/x-www-form-urlencoded" or set(fields) - allowed
                             or any(len(values) != 1 for values in fields.values())):
@@ -204,6 +210,28 @@ class PrivateSurface:
                     if conversation and action == "resume" and (fields.get("session_id") != [expected]
                             or "last_event_index" in fields and not re.fullmatch(r"(?:0|[1-9][0-9]{0,9})", fields["last_event_index"][0])):
                         raise AuthorityDenied()
+                    if conversation and action == "continue":
+                        operation_id = next((value.decode() for key, value in headers if key == b"idempotency-key"), None)
+                        parent_operation = fields.pop("retry_of_operation_id", [None])[0]
+                        if fields.get("regenerate") != ["true"] or fields.get("replace_original") != ["true"] or not isinstance(operation_id, str) or not re.fullmatch(r"[0-9a-f-]{36}", operation_id):
+                            raise AuthorityDenied()
+                        original = await asyncio.to_thread(self.runtime["db"].get_run, run_id=native.groups()[2])
+                        original_status = getattr(getattr(original, "status", None), "value", getattr(original, "status", None))
+                        if (original is None or str(original_status).upper() != "ERROR"
+                                or getattr(original, "user_id", None) != user_id
+                                or getattr(original, "session_id", None) != expected
+                                or getattr(original, "agent_id", None) != component
+                                or (getattr(original, "metadata", None) or {}).get("operationId") != parent_operation):
+                            raise AuthorityDenied()
+                        # Native regenerate truncates at the existing question/tool
+                        # boundary. Never append the question as a second message.
+                        fields["metadata"] = [json.dumps({"domain": row["domain"], "operationId": operation_id,
+                            "retryOfOperationId": parent_operation, "retryOfRunId": original.run_id,
+                            "modelCalls": 0, "modelFallbacks": [], "activeModelFallbackAlias": None,
+                            "promptVersion": "galaxy-conversation-v2"})]
+                        from urllib.parse import urlencode
+                        body = urlencode({key: value[0] for key, value in fields.items()}).encode()
+                        scope["headers"] = [(key, str(len(body)).encode() if key.lower() == b"content-length" else value) for key, value in scope["headers"]]
                     if native and not action:
                         fields["session_id"] = [expected]
                         metadata = {"domain": row["domain"],

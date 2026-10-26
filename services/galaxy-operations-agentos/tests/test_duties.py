@@ -314,14 +314,15 @@ class DutyContracts(unittest.TestCase):
 
     def test_tools_follow_current_whitelist_and_all_domains_share_typed_action_contract(self):
         gateway = CurrentTask()
-        self.assertEqual([fn.__name__ for fn in duty_tools(gateway, {"current-summary"})], ["current_summary"])
+        self.assertEqual([fn.name for fn in duty_tools(gateway, {"current-summary"})], ["current_summary"])
         schemas = []
         for domain in DOMAINS:
             fn = Function.from_callable(conversation_tools(gateway, domain=domain)[-1]); fn.process_entrypoint()
             schemas.append(fn.parameters)
         self.assertTrue(all(value == schemas[0] for value in schemas))
         action = duty_tools(gateway, {"execute-operation"})[0]
-        typ = action.__annotations__["operation"]
+        from galaxy_agentos.conversation_tools import DutyPreparedOperation
+        typ = DutyPreparedOperation
         with self.assertRaises(ValidationError):
             TypeAdapter(typ).validate_python({"kind": "content-curation", "targetKind": "post", "targetId": str(uuid4()), "operationId": str(uuid4())})
         adapter = TypeAdapter(typ)
@@ -350,13 +351,13 @@ class DutyContracts(unittest.TestCase):
         with self.assertRaises(ValidationError):
             adapter.validate_python({"kind": "message-draft-create", "config": {**draft_config, "content": {**draft_config["content"], "href": "https://outside.invalid"}}})
         tool = duty_tools(gateway, {"current-summary"})[0]
-        fn = Function.from_callable(tool); fn.process_entrypoint()
+        fn = tool; fn.process_entrypoint()
         fc = FunctionCall(function=fn, call_id="provider-owned-call")
         context = RunContext(user_id="autonomy:" + gateway.task["taskId"], session_id=gateway.task["sessionId"], run_id="native-run")
-        tool(context, fc); tool(context, fc)
+        tool.entrypoint(context, fc); tool.entrypoint(context, fc)
         self.assertEqual(gateway.calls[-1]["call_id"], gateway.calls[-2]["call_id"])
         gateway.task["tools"] = []
-        with self.assertRaises(AuthorityDenied): tool(context, fc)
+        self.assertEqual(json.loads(tool.entrypoint(context, fc))["state"], "denied")
 
     def test_private_http_requires_service_and_task_claims_and_never_accepts_model_input(self):
         gateway, selected = CurrentTask(), settings()

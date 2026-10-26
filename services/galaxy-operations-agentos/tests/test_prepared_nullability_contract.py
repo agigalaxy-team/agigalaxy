@@ -24,7 +24,7 @@ class PreparedNullabilityContract(unittest.TestCase):
         target = str(uuid4())
         adapter = TypeAdapter(PreparedOperation)
         node = RecordingNode()
-        prepare = conversation_tools(node)[4]
+        prepare = conversation_tools(node)[-1]
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:" + str(uuid4()), metadata={"operationId": str(uuid4())})
         call = FunctionCall(function=Function.from_callable(prepare), call_id="optional-clearing-null")
@@ -49,7 +49,9 @@ class PreparedNullabilityContract(unittest.TestCase):
         ]
         for value in values:
             result = json.loads(prepare(context, call, adapter.validate_python(value)))
-            self.assertEqual(result, {"state": "prepared", "effectExecuted": False})
+            self.assertEqual(result["state"], "prepared")
+            self.assertFalse(result["effectExecuted"])
+            self.assertFalse(result["preparationFeedback"]["mayClaimPrepared"])
             sent = node.calls[-1]
             self.assertEqual(sent["name"], "prepare-operation")
             self.assertEqual(sent["context"], {"run_id": context.run_id, "call_id": call.call_id,

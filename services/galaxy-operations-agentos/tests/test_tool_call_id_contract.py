@@ -69,7 +69,7 @@ class ToolCallIdContractTest(unittest.TestCase):
             "effectExecuted": False})
 
     def execute(self, tool, call_id, arguments=None):
-        function = Function.from_callable(tool)
+        function = tool if isinstance(tool, Function) else Function.from_callable(tool)
         function.process_entrypoint()
         function._run_context = self.context
         call = FunctionCall(function=function, call_id=call_id, arguments=arguments or {})

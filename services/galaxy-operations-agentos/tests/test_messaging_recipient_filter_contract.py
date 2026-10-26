@@ -31,7 +31,8 @@ class MessagingRecipientFilterContract(unittest.TestCase):
         for channel in ["email", "inapp"]:
             value = QueryFilters(runId=run_id, channel=channel, state="failed")
             result = json.loads(query(context, call, "messaging", "recipients", value))
-            self.assertEqual(result, {"state": "available", "effectExecuted": False})
+            self.assertEqual(result["state"], "available")
+            self.assertFalse(result["effectExecuted"])
             self.assertEqual(node.calls[-1][1:3], ("query-operations", {
                 "module": "messaging", "view": "recipients",
                 "filters": {"runId": run_id, "channel": channel, "state": "failed"}}))

@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 """Actual Agno/ASGI/SQLite transport and ownership, with an explicit local model.
 
 The queue row is a synthetic native-SQL fixture, not a durable worker proof.
@@ -79,13 +80,14 @@ class ConversationTransportTest(unittest.TestCase):
         network_attempts = []
 
         def closed_connect(sock, address):
-            if sock.family in {socket.AF_INET, socket.AF_INET6}:
+            if sock.family in {socket.AF_INET, socket.AF_INET6} and address[0] not in {'127.0.0.1', '::1'}:
                 network_attempts.append(True)
                 raise AssertionError('No provider or external network is allowed in this native leaf')
             return original_connect(sock, address)
 
-        with tempfile.TemporaryDirectory() as directory, patch.object(socket.socket, 'connect', closed_connect):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup, patch.object(socket.socket, 'connect', closed_connect):
             db = SqliteDb(db_file=str(Path(directory) / 'transport.sqlite3'), id='synthetic-conversation-transport')
+            cleanup.callback(db.db_engine.dispose)
             settings = Settings(database_url='postgresql+psycopg://not-connected.invalid/synthetic',
                 authority_url='http://127.0.0.1:1/v1/internal/agentos/', service_key='synthetic-service-key-not-production',
                 verification_key='synthetic-signing-key-not-production-at-least-32')

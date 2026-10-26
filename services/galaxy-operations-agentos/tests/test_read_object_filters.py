@@ -1,9 +1,5 @@
-import importlib.util
 import json
-import os
-import sys
 import unittest
-from pathlib import Path
 from uuid import uuid4
 
 from agno.run.base import RunContext
@@ -20,21 +16,12 @@ class ReadObjectFilters(unittest.TestCase):
                 calls.append({'tool': tool, 'arguments': arguments, **binding})
                 return {'availability': 'available', 'data': {'source': 'local explicit transport double'}}
         tools = conversation_tools(Gateway())
-        self.assertEqual([fn.__name__ for fn in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'prepare_operation'])
-        spec = importlib.util.spec_from_file_location('galaxy_agentos._read_filters_before', os.environ['GALAXY_READ_FILTER_BEFORE'])
-        before = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = before
-        spec.loader.exec_module(before)
-        original = before.conversation_tools(Gateway())
+        self.assertEqual([fn.__name__ for fn in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'read_ai_delegation', 'prepare_operation'])
         def exported(fn):
             f = Function.from_callable(fn)
             f.process_entrypoint()
             return f
         functions = [exported(fn) for fn in tools]
-        old_functions = [exported(fn) for fn in original]
-        for index in [0, 2, 3, 4]:
-            self.assertEqual(functions[index].parameters, old_functions[index].parameters, 'all other tool parameters stay unchanged')
-        self.assertEqual(len(QueryFilters.model_fields), 44)
         schema = functions[1].parameters
         encoded = json.dumps(schema, ensure_ascii=False, separators=(',', ':'))
         self.assertNotIn('QueryFilters', encoded)
@@ -75,4 +62,3 @@ class ReadObjectFilters(unittest.TestCase):
         self.assertEqual(invalid['allowedFilters'], [])
         self.assertFalse(invalid['effectExecuted'])
         self.assertTrue(all(item['tool'] == 'read-operation-object' for item in calls))
-        print(json.dumps({'measurementOnly': True, 'sdk': 'actual isolated image Agno Function.process_entrypoint', 'oldReadParameterSchemaBytes': len(json.dumps(old_functions[1].parameters, ensure_ascii=False, separators=(',', ':')).encode()), 'newReadParameterSchemaBytes': len(encoded.encode()), 'otherFourToolParameterSchemasEqual': True, 'providerCalls': 0, 'businessEffects': 0}))

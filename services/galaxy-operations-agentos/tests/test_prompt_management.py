@@ -192,7 +192,7 @@ class ManagementToolNativeTest(unittest.TestCase):
                 calls.append({"user_id": user_id, "tool": tool, "arguments": arguments, **binding})
                 return {"state": "prepared"} if tool == "prepare-operation" else {"items": []}
         tools = conversation_tools(Gateway())
-        self.assertEqual([tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
+        self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
             "list_authorized_work", "run_authorized_work", "read_ai_delegation", "prepare_operation"])
         prepare, read = tools[-1], tools[-2]
         schema = Function.from_callable(prepare)
@@ -256,9 +256,9 @@ class ManagementToolNativeTest(unittest.TestCase):
         gateway = Gateway()
         self.assertEqual(duty_tools(gateway, set()), [])
         tools = duty_tools(gateway, set(gateway.allowed))
-        self.assertEqual([tool.__name__ for tool in tools], ["read_ai_delegation", "manage_ai_prompt"])
+        self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["read_ai_delegation", "manage_ai_prompt"])
         writer = tools[-1]
-        schema = Function.from_callable(writer)
+        schema = writer
         schema.process_entrypoint()
         command_schema = schema.parameters["properties"]["command"]
         self.assertEqual(set(command_schema["properties"]), {"aiAccountId", "expectedRevision", "expectedPromptVersion", "prompt"})
@@ -267,14 +267,13 @@ class ManagementToolNativeTest(unittest.TestCase):
         command = AiPromptCommand.model_validate(payload)
         context = RunContext(run_id=run_id, session_id=session_id, user_id="autonomy:" + task_id)
         call = FunctionCall(function=schema, call_id="prompt-call-1")
-        writer(context, call, command=command)
+        writer.entrypoint(context, call, command=payload)
         self.assertEqual(gateway.calls[-1]["arguments"], payload)
         self.assertEqual(gateway.calls[-1]["tool"], "manage-ai-prompt")
         self.assertEqual(gateway.calls[-1]["call_id"], call_reference(task_id, run_id, call.call_id))
         self.assertEqual(gateway.calls[-1]["run_id"], run_id)
         gateway.allowed = []
-        with self.assertRaises(AuthorityDenied):
-            writer(context, call, command=command)
+        self.assertEqual(json.loads(writer.entrypoint(context, call, command=payload))["state"], "denied")
         self.assertEqual(len(gateway.calls), 1)
         for patch in ({"expectedRevision": 0}, {"expectedPromptVersion": True}, {"operationId": str(uuid4())},
                 {"model": "never-accepted"}, {"prompt": "x" * 16001}):

@@ -70,7 +70,7 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
             domains={"overview": "synthetic"}, active_domains={"overview"}, model_factory=NeverInvokedModel)[0]
         functions = {}
         for tool in agent.tools:
-            function = Function.from_callable(tool)
+            function = tool if isinstance(tool, Function) else Function.from_callable(tool)
             function.process_entrypoint()
             function._run_context = self.context
             functions[function.name] = function
@@ -157,8 +157,8 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
                 "function": {"name": "current_summary", "arguments": "{}"}}, functions)
             self.assertEqual(call.call_id, supplied)
             result = call.execute()
-            self.assertEqual(result.status, "failure")
-            self.assertEqual(result.error, "agentos_native_tool_call_required")
+            self.assertEqual(result.status, "success")
+            self.assertEqual(json.loads(result.result)["state"], "denied")
             self.assertEqual(call.call_id, supplied)
         self.assertEqual(self.requests, [])
 

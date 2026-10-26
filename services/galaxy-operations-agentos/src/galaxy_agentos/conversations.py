@@ -1,11 +1,12 @@
 """Native Agent sessions for a current management reader, not an automation grant."""
 import asyncio
 import json
-from agno.agent import Agent
+from .conversation_retry import ConversationAgent
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
+from .tool_reliability import reliable_function
 from .model_settings import domain_model
 from .conversation_storage import conversation_database
 from .conversation_tools import conversation_tools
@@ -42,13 +43,14 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             else domain_model(settings, domain, gateway))
         model = with_conversation_failures(model)
         model._galaxy_usage_database = conversation_db
-        agents.append(Agent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
-            db=conversation_db, tools=[current_summary, *conversation_tools(gateway, domain=domain)],
+        agents.append(ConversationAgent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
+            db=conversation_db, tools=[reliable_function(fn) for fn in [current_summary, *conversation_tools(gateway, domain=domain)]],
             pre_hooks=[authorized_run], post_hooks=[authorized_run],
             instructions=current_role_instructions(gateway, domain=domain,
                 fixed=reference_aware_instructions(["你是银河工作台的" + label + "助手，和当前管理者连续沟通。",
                 "用户问今天变化、待办原因、处理进展时，先使用当前摘要工具；只按真实结果回答。",
                 "用户问能否维护其他AI岗位、岗位工作提示词或日常策略时，先用current_summary核对本轮实际能力、人工制卡种类和委派范围，再按获准工具读取目标及当前版本。普通岗位工作提示词不是模型配置，也不是代码固定边界，不能把它们混为一谈而完全否认。未取得真实capability时说明尚未核实；无权、范围外或未接通要分别说明，不编造能力。工作台只准备具体人工卡，制卡不等于执行或授权。",
+                "沟通按问题使用清晰段落、Markdown表格或列表。流程与层级可用mermaid的flowchart、graph或mindmap；不用HTML、链接、样式或配置指令。确需收集选择时可用galaxy-form代码块，JSON仅含title和fields，每个字段只含id、label、type（text或select）及select的options，最多8字段。表单只填入提问草稿，不能索取凭据、冒充执行确认或操作卡。",
                 "从任务页接续时，先用current_summary读取本轮boundedTask。该上下文只绑定原任务目标、版本和对象范围，不授予自主执行权；只在返回范围内读取当前对象并prepare_operation形成具体人工确认卡。没有本轮boundedTask时不能从上一轮历史沿用任务绑定。卡准备、模型结束不代表任务业务完成；以原卡实际回执为准。",
                 "摘要未取得、没有权限或没有记录时直接说明当前限制，不猜数字、原因或完成情况。",
                 "摘要availability只描述对应待办计数块。特别是counts.search只表示索引恢复待办，不代表搜索质量。queryAccess.allowedViews按当前人和AI岗位的真实交集列出允许查询的视图，dataRead:false不证明已读取或服务可用；未查询、查询失败和明确无权分别说明，不将局部缺口扩大到整个业务。",

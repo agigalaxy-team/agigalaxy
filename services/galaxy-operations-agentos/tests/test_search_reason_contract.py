@@ -24,7 +24,7 @@ class SearchReasonContract(unittest.TestCase):
     def test_only_search_preparation_uses_existing_trimmed_one_to_five_hundred(self):
         adapter = TypeAdapter(PreparedOperation)
         node = RecordingNode()
-        prepare = conversation_tools(node)[4]
+        prepare = next(tool for tool in conversation_tools(node) if tool.__name__ == "prepare_operation")
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:" + str(uuid4()), metadata={"operationId": str(uuid4())})
         call = FunctionCall(function=Function.from_callable(prepare), call_id="search-reason")
@@ -36,7 +36,10 @@ class SearchReasonContract(unittest.TestCase):
                     value["versionId"] = version
                 operation = adapter.validate_python(value)
                 result = json.loads(prepare(context, call, operation))
-                self.assertEqual(result, {"state": "prepared", "effectExecuted": False})
+                self.assertEqual(result["state"], "prepared")
+                self.assertFalse(result["effectExecuted"])
+                self.assertFalse(result["preparationFeedback"]["mayClaimPrepared"])
+                self.assertFalse(result["preparationFeedback"]["automaticRetry"])
                 expected = {**value, "reason": reason.strip()}
                 self.assertEqual(node.calls[-1][0:2], ("prepare-operation", expected))
                 self.assertEqual(node.calls[-1][2], {"run_id": context.run_id,

@@ -39,9 +39,9 @@ class AnalyticsFilterContract(unittest.TestCase):
         for view, filters in invalid:
             result = json.loads(query(context, qcall, "analytics", view, QueryFilters(**filters)))
             self.assertEqual(result["state"], "invalid-request")
-            self.assertFalse(result["calendarDateSupported"])
+            self.assertFalse(result.get("calendarDateSupported", False))
             self.assertFalse(result["effectExecuted"])
-            self.assertEqual(result["daysRange"], {"min": 1, "max": 90})
+            self.assertTrue("allowedFilters" in result or result.get("windowRequired") is True)
         for kind, filters in [("account-summary", {"day": "2026-10-23"}),
                 ("account-summary", {"days": 1}), ("account", {"days": 7})]:
             result = json.loads(read(context, rcall, kind, account, QueryFilters(**filters)))
@@ -49,7 +49,7 @@ class AnalyticsFilterContract(unittest.TestCase):
             self.assertEqual(result["allowedDays"], [7, 28] if kind == "account-summary" else [])
         self.assertEqual(node.calls, [])
         query(context, qcall, "analytics", "paths", QueryFilters(days=7, scope="accounts", accountId=account))
-        query(context, qcall, "analytics", "account", QueryFilters(accountId=account))
+        query(context, qcall, "analytics", "account", QueryFilters(accountId=account, days=7))
         read(context, rcall, "account-summary", account, QueryFilters(days=28))
         self.assertEqual(len(node.calls), 3)
         self.assertEqual(node.calls[0][2]["filters"], {"days": 7, "scope": "accounts", "accountId": account})

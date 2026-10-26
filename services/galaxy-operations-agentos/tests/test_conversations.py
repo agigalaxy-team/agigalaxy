@@ -5,6 +5,7 @@ acceptance. Node's real PG leaf separately proves at-most-one dispatch.
 """
 import json
 import tempfile
+from contextlib import ExitStack
 import time
 import unittest
 from dataclasses import dataclass
@@ -29,11 +30,14 @@ class LocalModel(Model):
     name: str = "LocalOnly"
     provider: str = "ExplicitSynthetic"
     calls: int = 0
+    observed_summary: bool = False
     def invoke(self, *args, **kwargs):
         self.calls += 1
         if self.calls == 1:
             return ModelResponse(role="assistant", tool_calls=[{"id": "summary", "type": "function",
                 "function": {"name": "current_summary", "arguments": "{}"}}])
+        messages = args[0] if args else kwargs.get("messages", [])
+        self.observed_summary = any(message.role == "tool" and '"pending": 0' in str(message.content) for message in messages)
         return ModelResponse(role="assistant", content="当前摘要没有待处理事项；这是本地合成回复。")
     async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
     def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
@@ -57,8 +61,9 @@ class CurrentReader:
 
 class ConversationNativeTest(unittest.TestCase):
     def test_native_reader_without_grant_uses_only_current_summary_and_owned_session_and_rejects_business_workflow_and_revocation(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as resources:
             db = SqliteDb(db_file=str(Path(directory) / "native.db"), id="conversation-check")
+            resources.callback(db.db_engine.dispose)
             settings = Settings(database_url="postgresql+psycopg://not-connected.invalid/check",
                 authority_url="http://127.0.0.1:1/v1/internal/agentos/",
                 service_key="explicit-synthetic-service-key-not-production",
@@ -67,7 +72,7 @@ class ConversationNativeTest(unittest.TestCase):
             gateway = CurrentReader(row)
             agents = conversation_agents(settings=settings, db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=LocalModel)
-            self.assertEqual([tool.__name__ for tool in agents[0].tools], ["current_summary"])
+            self.assertEqual([tool.name for tool in agents[0].tools], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_ai_delegation", "prepare_operation"])
             native = AgentOS(id="conversation-native-check", db=db, agents=agents, user_isolation=True,
                 authorization=Authorization(verification_keys=[settings.verification_key], algorithm="HS256",
                     verify_audience=True, audience=settings.audience, issuer=settings.issuer,
@@ -89,6 +94,7 @@ class ConversationNativeTest(unittest.TestCase):
                     data={"message": "今天有什么变化？", "stream": "false", "background": "false", "session_id": row["sessionId"]})
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertGreater(gateway.summary_calls, 0)
+                self.assertTrue(agents[0].model.observed_summary)
                 history = client.get("/galaxy/conversations/" + row["id"], headers=headers)
                 self.assertEqual(history.status_code, 200, history.text)
                 self.assertEqual(history.json()["runs"][0]["operationId"], op)

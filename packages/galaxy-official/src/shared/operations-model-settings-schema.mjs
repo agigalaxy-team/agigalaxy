@@ -32,6 +32,9 @@ export const modelSettingsModelSchema=z.strictObject({
  baseUrl,credentialRef:credentialRef.nullable(),contextWindow:z.number().int().positive().max(100000000).nullable(),
  maxOutputTokens:z.number().int().positive().max(100000000).nullable(),timeoutSeconds:z.number().int().min(1).max(1800).nullable(),
  reasoning:modelSettingsReasoningSchema,toolCalling:z.boolean(),structuredOutput:z.boolean(),enabled:z.boolean(),
+ imageUnderstanding:z.boolean().optional(),parallelToolCalls:z.boolean().nullable().optional(),
+ verbosity:z.enum(['low','medium','high']).nullable().optional(),
+ fallbacks:z.array(z.strictObject({modelId:uuid,dataPolicyApproved:z.boolean()})).max(3).refine(items=>new Set(items.map(item=>item.modelId)).size===items.length).optional(),
 }).superRefine((value,ctx)=>{
  if(value.contextWindow!==null&&value.maxOutputTokens!==null&&value.maxOutputTokens>=value.contextWindow)
   ctx.addIssue({code:'custom',path:['maxOutputTokens'],message:'Output limit must leave room for input'});
@@ -39,12 +42,16 @@ export const modelSettingsModelSchema=z.strictObject({
   ctx.addIssue({code:'custom',path:['maxOutputTokens'],message:'Responses output limit must be at least16'});
  if(value.apiFormat==='gemini'&&value.reasoning.mode==='effort'&&!['none','minimal','low','medium','high'].includes(value.reasoning.effort))
   ctx.addIssue({code:'custom',path:['reasoning','effort'],message:'Unsupported Gemini effort'});
+ if(value.verbosity!=null&&!['openai-chat','openai-responses'].includes(value.apiFormat))ctx.addIssue({code:'custom',path:['verbosity'],message:'Verbosity requires an OpenAI-compatible format'});
+ if(value.parallelToolCalls!=null&&!value.toolCalling)ctx.addIssue({code:'custom',path:['parallelToolCalls'],message:'Parallel tools require tool calling'});
+ if(value.fallbacks?.some(item=>item.modelId===value.id))ctx.addIssue({code:'custom',path:['fallbacks'],message:'A model cannot fall back to itself'});
 });
 const binding=z.strictObject({modelId:uuid,dataPolicyApproved:z.boolean()}).nullable();
 export const modelSettingsConfigurationSchema=z.strictObject({
  models:z.array(modelSettingsModelSchema).max(50).refine(models=>new Set(models.map(model=>model.id)).size===models.length),
  scenarios:z.strictObject(Object.fromEntries(modelSettingsDomains.map(domain=>[domain,binding]))),
 }).superRefine((value,ctx)=>{
+ for(const model of value.models)for(const backup of model.fallbacks??[])if(!value.models.some(item=>item.id===backup.modelId))ctx.addIssue({code:'custom',path:['models',model.id,'fallbacks'],message:'Select an existing fallback model'});
  for(const domain of modelSettingsDomains){const selected=value.scenarios[domain];if(selected&&!value.models.some(model=>model.id===selected.modelId))
   ctx.addIssue({code:'custom',path:['scenarios',domain,'modelId'],message:'Select an existing model record'});}
 });
@@ -55,6 +62,12 @@ export function assertModelSettingsApplicable(configuration){
  for(const model of value.models.filter(model=>model.enabled)){
   if([model.modelId,model.baseUrl,model.contextWindow,model.maxOutputTokens,model.timeoutSeconds,model.credentialRef].some(part=>part===null))
    throw new ServiceError('model_settings_model_incomplete',409);
+  for(const backup of model.fallbacks??[]){
+   const target=value.models.find(item=>item.id===backup.modelId);
+   if(!target?.enabled)throw new ServiceError('model_settings_fallback_unavailable',409);
+   if(!backup.dataPolicyApproved)throw new ServiceError('model_settings_fallback_data_policy_unapproved',409);
+   if(model.toolCalling&&!target.toolCalling||model.structuredOutput&&!target.structuredOutput||model.imageUnderstanding&&!target.imageUnderstanding)throw new ServiceError('model_settings_fallback_capability_incompatible',409);
+  }
  }
  for(const domain of modelSettingsDomains){const selected=value.scenarios[domain];if(!selected)continue;
   const model=value.models.find(model=>model.id===selected.modelId);if(!model?.enabled)throw new ServiceError('model_settings_binding_unavailable',409);

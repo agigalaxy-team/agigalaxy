@@ -24,6 +24,7 @@ class SceneBinding:
     approved: bool
     parameters: dict
     runtime_profile: object = None
+    fallbacks: tuple = ()
 
 
 def load_bindings(path):
@@ -42,7 +43,7 @@ def load_bindings(path):
             if binding is None:
                 result[domain] = None
                 continue
-            if (not isinstance(binding, dict) or set(binding) not in ({"alias", "dataPolicyApproved", "parameters"},
+            if (not isinstance(binding, dict) or set(binding)-{'fallbacks'} not in ({"alias", "dataPolicyApproved", "parameters"},
                     {"alias", "dataPolicyApproved", "runtimeProfile"})
                     or not isinstance(binding["alias"], str) or not ALIAS.fullmatch(binding["alias"])
                     or type(binding["dataPolicyApproved"]) is not bool):
@@ -51,10 +52,18 @@ def load_bindings(path):
                 profile = load_runtime_profile(binding["runtimeProfile"])
                 if domain == "governance" and not profile.tool_calling:
                     raise ValueError()
-                result[domain] = SceneBinding(binding["alias"], binding["dataPolicyApproved"], {}, profile)
+                backups=binding.get('fallbacks',[])
+                if not isinstance(backups,list) or len(backups)>3:raise ValueError()
+                parsed=[]
+                for backup in backups:
+                    if not isinstance(backup,dict) or set(backup)!={'alias','dataPolicyApproved','runtimeProfile'} or not isinstance(backup['alias'],str) or not ALIAS.fullmatch(backup['alias']) or backup['dataPolicyApproved'] is not True:raise ValueError()
+                    parsed.append(SceneBinding(backup['alias'],True,{},load_runtime_profile(backup['runtimeProfile'])))
+                if len({item.alias for item in parsed}|{binding['alias']})!=len(parsed)+1:raise ValueError()
+                result[domain] = SceneBinding(binding["alias"], binding["dataPolicyApproved"], {}, profile,tuple(parsed))
                 continue
             if not isinstance(binding["parameters"], dict):
                 raise ValueError()
+            if binding.get('fallbacks'):raise ValueError()
             params = binding["parameters"]
             if set(params) - {"temperature", "top_p", "max_tokens", "max_completion_tokens"}:
                 raise ValueError()
@@ -95,7 +104,8 @@ def model_settings_view(settings):
                 else "configured" if connected_configuration else "gateway-not-configured",
             "alias": binding.alias if binding else None,
             "parameters": dict(binding.parameters) if binding else {},
-            "runtimeProfile": binding.runtime_profile.view() if binding and binding.runtime_profile else None}
+            "runtimeProfile": binding.runtime_profile.view() if binding and binding.runtime_profile else None,
+            "fallbacks":[{"alias":item.alias,"dataPolicyApproved":item.approved,"runtimeProfile":item.runtime_profile.view()} for item in binding.fallbacks] if binding else []}
             for domain, binding in scenes.items()]}
 
 
@@ -144,4 +154,16 @@ def domain_model(settings, domain, gateway):
             raise AuthorityDenied("agentos_model_scenario_denied")
         require_registered_alias(settings, binding.alias, expected_version=version)
     model._galaxy_settings_version = version
-    return with_current_authority(model, gateway, admission=admission)
+    primary=with_current_authority(model, gateway, admission=admission)
+    if not binding.fallbacks:return primary
+    backups=[]
+    for backup in binding.fallbacks:
+        item=native_model(backup.runtime_profile,alias=backup.alias,base_url=gateway_base(settings),api_key=settings.model_gateway_key,headers=headers)
+        item._galaxy_settings_version=version
+        item._galaxy_usage_parent=primary
+        def backup_admission(current,alias=backup.alias):
+            if current.get('execution',{}).get('domain')!=domain:raise AuthorityDenied('agentos_model_scenario_denied')
+            require_registered_alias(settings,alias,expected_version=version)
+        backups.append(with_current_authority(item,gateway,admission=backup_admission))
+    from .model_failover import with_model_failover
+    return with_model_failover(primary,backups)

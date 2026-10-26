@@ -2,12 +2,16 @@
 
 Use the actual AgentOS app/auth middleware plus Galaxy's outer service gate.
 No TestClient lifespan is entered: this metadata-only request neither starts
-the durable worker nor connects to a database, model, provider or network.
+the durable worker nor connects to a provider or network. Code definitions
+are registered in a disposable in-memory SQLite database.
 """
 import unittest
 from uuid import uuid4
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from agno.os.middleware.jwt import AuthMiddleware
+from agno.db.sqlite import SqliteDb
 from fastapi.testclient import TestClient
 
 from galaxy_agentos.app import create_app
@@ -22,9 +26,13 @@ class ModelSettingsHttpTest(unittest.TestCase):
             verification_key="synthetic-agentos-verification-key-for-no-jwt-use",
             model_gateway_url="http://127.0.0.1:3351/v1",
             model_gateway_key="synthetic-gateway-service-key-not-a-provider-key")
-        app = create_app(settings, tracing=False)
+        directory = self.enterContext(TemporaryDirectory())
+        db = SqliteDb(db_file=str(Path(directory) / "metadata.db"), id="metadata-http-local")
+        self.addCleanup(db.db_engine.dispose)
+        app = create_app(settings, tracing=False, db=db)
         self.assertTrue(any(issubclass(item.cls, AuthMiddleware) for item in app.user_middleware))
-        self.assertEqual(app.state.galaxy_runtime["agents"], [])
+        self.assertFalse(app.state.galaxy_runtime["modelConfigured"])
+        self.assertEqual(app.state.galaxy_runtime["configuredDomains"], set())
         client = TestClient(app, raise_server_exceptions=False)
         headers = {"Authorization": "Bearer " + settings.service_key}
         try:

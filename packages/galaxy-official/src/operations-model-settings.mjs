@@ -13,7 +13,7 @@ const pendingPhases=new Set(['prepared','submitting','pending','result-unknown']
 const versionView=row=>row?{id:row.id,version:row.version,configuration:row.configuration,operatorId:row.operator_id,createdAt:stamp(row.created_at)}:null;
 const operationView=(row,replayed=false)=>({operationId:row.operation_id,kind:row.kind,phase:row.phase,versionId:row.version_id,
  modelRecordId:row.input?.modelRecordId??null,credentialRef:row.credential_ref,errorCode:row.error_code,replayed,recordedAt:stamp(row.created_at),updatedAt:stamp(row.updated_at)});
-const modelFields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','reasoning','timeoutSeconds','toolCalling','structuredOutput','enabled'];
+const modelFields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','reasoning','timeoutSeconds','toolCalling','structuredOutput','imageUnderstanding','parallelToolCalls','verbosity','fallbacks','enabled'];
 function configurationChanges(before,after){
  const ids=[...new Set([...before.models,...after.models].map(model=>model.id))].sort();
  return {models:ids.map(id=>{const a=before.models.find(model=>model.id===id)??null,b=after.models.find(model=>model.id===id)??null;
