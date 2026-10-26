@@ -1,0 +1,4899 @@
+{
+  "nativeVersion": "13.2.4",
+  "source": "native-sqlite-pragma-metadata-only",
+  "containsRows": false,
+  "tables": {
+    "alert": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "panel_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "frequency",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "handler",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "severity",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "silenced",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "execution_error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "eval_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "eval_date",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "new_state_date",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "state_changes",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "for",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "alert_configuration": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "alertmanager_configuration",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "configuration_version",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "default",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "configuration_hash",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id"
+        ]
+      ]
+    },
+    "alert_configuration_history": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alertmanager_configuration",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "configuration_hash",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "configuration_version",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "default",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_applied",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "alert_image": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "url",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "token"
+        ]
+      ]
+    },
+    "alert_instance": {
+      "columns": [
+        {
+          "name": "rule_org_id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "rule_uid",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "labels",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "labels_hash",
+          "type": "TEXT",
+          "pk": 3
+        },
+        {
+          "name": "current_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "current_state_since",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_eval_time",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "current_state_end",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "current_reason",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "result_fingerprint",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resolved_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_sent_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "fired_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "annotations",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "evaluation_duration_ns",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "last_result",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "rule_org_id",
+          "rule_uid",
+          "labels_hash"
+        ]
+      ]
+    },
+    "alert_notification": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "is_default",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "frequency",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "send_reminder",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "disable_resolve_message",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "secure_settings",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "alert_notification_state": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alert_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "notifier_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alert_rule_state_updated_version",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "alert_id",
+          "notifier_id"
+        ]
+      ]
+    },
+    "alert_rule": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "condition",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "interval_seconds",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rule_group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "no_data_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "exec_err_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "for",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "annotations",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "labels",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "panel_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "rule_group_idx",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "is_paused",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "notification_settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "record",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "metadata",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "guid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "keep_firing_for",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "missing_series_evals_to_resolve",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "folder_fullpath",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "alert_routing_policy",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "guid"
+        ],
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "alert_rule_state": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "rule_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "rule_uid"
+        ]
+      ]
+    },
+    "alert_rule_tag": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "alert_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "tag_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "alert_id",
+          "tag_id"
+        ]
+      ]
+    },
+    "alert_rule_version": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "rule_org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "rule_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rule_namespace_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rule_group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "parent_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "restored_from",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "condition",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "interval_seconds",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "no_data_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "exec_err_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "for",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "annotations",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "labels",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rule_group_idx",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "is_paused",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "notification_settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "record",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "metadata",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rule_guid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "keep_firing_for",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "missing_series_evals_to_resolve",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alert_routing_policy",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "rule_guid",
+          "version"
+        ],
+        [
+          "rule_org_id",
+          "rule_uid",
+          "rule_guid",
+          "version"
+        ]
+      ]
+    },
+    "annotation": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alert_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "panel_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "category_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "text",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "metric",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "prev_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "new_state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "epoch",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "region_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "tags",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "epoch_end",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "annotation_tag": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "annotation_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "tag_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "annotation_id",
+          "tag_id"
+        ]
+      ]
+    },
+    "anon_device": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "client_ip",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "device_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "device_id"
+        ]
+      ]
+    },
+    "api_key": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "expires",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "service_account_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_used_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "is_revoked",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "name"
+        ],
+        [
+          "key"
+        ]
+      ]
+    },
+    "builtin_role": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "role_id",
+          "role"
+        ]
+      ]
+    },
+    "cache_data": {
+      "columns": [
+        {
+          "name": "cache_key",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "expires",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "cache_key"
+        ],
+        [
+          "cache_key"
+        ]
+      ]
+    },
+    "cloud_migration_resource": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource_type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "error_string",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "snapshot_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "parent_name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "error_code",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "cloud_migration_session": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "auth_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "stack_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "region_slug",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "cluster_slug",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ]
+      ]
+    },
+    "cloud_migration_snapshot": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "session_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "finished",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "upload_url",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "local_directory",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "gms_snapshot_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "encryption_key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "error_string",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource_storage_type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "encryption_algo",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "metadata",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "public_key",
+          "type": "BLOB",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ]
+      ]
+    },
+    "cloud_migration_snapshot_partition": {
+      "columns": [
+        {
+          "name": "snapshot_uid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "partition_number",
+          "type": "INTEGER",
+          "pk": 3
+        },
+        {
+          "name": "resource_type",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "data",
+          "type": "BLOB",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "snapshot_uid",
+          "resource_type",
+          "partition_number"
+        ]
+      ]
+    },
+    "correlation": {
+      "columns": [
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 2
+        },
+        {
+          "name": "source_uid",
+          "type": "TEXT",
+          "pk": 3
+        },
+        {
+          "name": "target_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "config",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "provisioned",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid",
+          "org_id",
+          "source_uid"
+        ]
+      ]
+    },
+    "dashboard": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "gnet_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "plugin_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "folder_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "is_folder",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "has_acl",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "is_public",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "deleted",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "api_version",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "folder_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "dashboard_acl": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "permission",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "dashboard_id",
+          "team_id"
+        ],
+        [
+          "dashboard_id",
+          "user_id"
+        ]
+      ]
+    },
+    "dashboard_provisioning": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "check_sum",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "dashboard_public": {
+      "columns": [
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "time_settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "template_variables",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "access_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "is_enabled",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "annotations_enabled",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "time_selection_enabled",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "share",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "access_token"
+        ],
+        [
+          "uid"
+        ],
+        [
+          "uid"
+        ]
+      ]
+    },
+    "dashboard_snapshot": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "delete_key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "external",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "external_url",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "dashboard",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "expires",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "external_delete_url",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_encrypted",
+          "type": "BLOB",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "delete_key"
+        ],
+        [
+          "key"
+        ]
+      ]
+    },
+    "dashboard_tag": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "term",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "dashboard_version": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "parent_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "restored_from",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "api_version",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "dashboard_id",
+          "version"
+        ]
+      ]
+    },
+    "data_keys": {
+      "columns": [
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "encrypted_data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "name"
+        ]
+      ]
+    },
+    "data_source": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "access",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "url",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "password",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "user",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "database",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "basic_auth",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "basic_auth_user",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "basic_auth_password",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "is_default",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "json_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "with_credentials",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "secure_json_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "read_only",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "is_prunable",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "api_version",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ],
+        [
+          "org_id",
+          "name"
+        ]
+      ]
+    },
+    "file": {
+      "columns": [
+        {
+          "name": "path",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "path_hash",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "parent_folder_path_hash",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "contents",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "etag",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "cache_control",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "content_disposition",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "size",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "mime_type",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "path_hash"
+        ]
+      ]
+    },
+    "file_meta": {
+      "columns": [
+        {
+          "name": "path_hash",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "path_hash",
+          "key"
+        ]
+      ]
+    },
+    "folder": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "parent_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "kv_leases": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "kv_store": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "namespace",
+          "key"
+        ]
+      ]
+    },
+    "library_element": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "folder_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "folder_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "library_element_connection": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "element_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "connection_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "element_id",
+          "kind",
+          "connection_id"
+        ]
+      ]
+    },
+    "login_attempt": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "username",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "ip_address",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "migration_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "migration_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "sql",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "timestamp",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "nats_discovery_peers": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "ngalert_configuration": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "alertmanagers",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "send_alerts_to",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "external_alertmanager_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id"
+        ]
+      ]
+    },
+    "org": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "address1",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "address2",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "city",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "zip_code",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "country",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "billing_email",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "name"
+        ]
+      ]
+    },
+    "org_user": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "user_id"
+        ]
+      ]
+    },
+    "pending_tenant_deletions": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "permission": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "attribute",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "identifier",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "datasource_type",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "action",
+          "scope",
+          "role_id"
+        ]
+      ]
+    },
+    "plugin_setting": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "plugin_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "pinned",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "json_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "secure_json_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "plugin_version",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "plugin_id"
+        ]
+      ]
+    },
+    "preferences": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "home_dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "timezone",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "theme",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "week_start",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "json_data",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "home_dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "provenance_type": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "record_key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "record_type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "provenance",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "manager_kind",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "manager_identity",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "record_type",
+          "record_key",
+          "org_id"
+        ]
+      ]
+    },
+    "query_history": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "datasource_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "comment",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "queries",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "query_history_details": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "query_history_item_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "datasource_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "query_history_star": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "query_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "user_id",
+          "query_uid"
+        ]
+      ]
+    },
+    "quota": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "target",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "limit",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "user_id",
+          "target"
+        ]
+      ]
+    },
+    "resource": {
+      "columns": [
+        {
+          "name": "guid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "resource_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "label_set",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "previous_resource_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "folder",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "namespace",
+          "group",
+          "resource",
+          "name"
+        ],
+        [
+          "guid"
+        ]
+      ]
+    },
+    "resource_blob": {
+      "columns": [
+        {
+          "name": "uuid",
+          "type": "UUID",
+          "pk": 1
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "content_type",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uuid"
+        ]
+      ]
+    },
+    "resource_events": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "resource_history": {
+      "columns": [
+        {
+          "name": "guid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "resource_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "resource",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "label_set",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "previous_resource_version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "folder",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "generation",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "namespace",
+          "group",
+          "resource",
+          "name",
+          "resource_version"
+        ],
+        [
+          "guid"
+        ]
+      ]
+    },
+    "resource_last_import_time": {
+      "columns": [
+        {
+          "name": "group",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "resource",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 3
+        },
+        {
+          "name": "last_import_time",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "group",
+          "resource",
+          "namespace"
+        ]
+      ]
+    },
+    "resource_migration_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "migration_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "sql",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "timestamp",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "resource_stats_aggregates": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "resource_stats_daily": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "resource_version": {
+      "columns": [
+        {
+          "name": "group",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "resource",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "resource_version",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "group",
+          "resource"
+        ]
+      ]
+    },
+    "resource_version_policy": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "role": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "display_name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "group_name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "hidden",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ],
+        [
+          "org_id",
+          "name"
+        ]
+      ]
+    },
+    "search_snapshot_data": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "BLOB",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "search_snapshot_manifest": {
+      "columns": [
+        {
+          "name": "key_path",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "value",
+          "type": "BLOB",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_path"
+        ]
+      ]
+    },
+    "secret_data_key": {
+      "columns": [
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "encrypted_data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ]
+      ]
+    },
+    "secret_encrypted_value": {
+      "columns": [
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 2
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 3
+        },
+        {
+          "name": "encrypted_data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "data_key_id",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "namespace",
+          "name",
+          "version"
+        ]
+      ]
+    },
+    "secret_keeper": {
+      "columns": [
+        {
+          "name": "guid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "annotations",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "labels",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "payload",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "namespace",
+          "name"
+        ],
+        [
+          "guid"
+        ]
+      ]
+    },
+    "secret_migration_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "migration_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "sql",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "timestamp",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "secret_secure_value": {
+      "columns": [
+        {
+          "name": "guid",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "annotations",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "labels",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "keeper",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "decrypters",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "ref",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "owner_reference_api_group",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "owner_reference_api_version",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "owner_reference_kind",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "owner_reference_name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "lease_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "lease_created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "gc_attempts",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "lease_duration",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "namespace",
+          "name",
+          "version"
+        ],
+        [
+          "namespace",
+          "name",
+          "version",
+          "active"
+        ],
+        [
+          "guid"
+        ]
+      ]
+    },
+    "secrets": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "namespace",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "seed_assignment": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "builtin_role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "role_name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "origin",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "builtin_role",
+          "role_name"
+        ],
+        [
+          "builtin_role",
+          "action",
+          "scope"
+        ]
+      ]
+    },
+    "server_lock": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "operation_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_execution",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "operation_uid"
+        ]
+      ]
+    },
+    "session": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "data",
+          "type": "BLOB",
+          "pk": 0
+        },
+        {
+          "name": "expiry",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key"
+        ]
+      ]
+    },
+    "short_url_legacy": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "path",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_seen_at",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ]
+      ]
+    },
+    "signing_key": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "key_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "private_key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "added_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "alg",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key_id"
+        ]
+      ]
+    },
+    "sso_setting": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "pk": 1
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "settings",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "is_deleted",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "id"
+        ]
+      ]
+    },
+    "star": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "dashboard_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "user_id",
+          "dashboard_uid",
+          "org_id"
+        ],
+        [
+          "user_id",
+          "dashboard_id"
+        ]
+      ]
+    },
+    "tag": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "key",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "key",
+          "value"
+        ]
+      ]
+    },
+    "team": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "external_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "is_provisioned",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "uid"
+        ],
+        [
+          "org_id",
+          "name"
+        ]
+      ]
+    },
+    "team_member": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "external",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "permission",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ],
+        [
+          "org_id",
+          "team_id",
+          "user_id"
+        ]
+      ]
+    },
+    "team_role": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "team_id",
+          "role_id"
+        ]
+      ]
+    },
+    "temp_user": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "code",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "invited_by_user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "email_sent",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "email_sent_on",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "remote_addr",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "test_data": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "metric1",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "metric2",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "value_big_int",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "value_double",
+          "type": "REAL",
+          "pk": 0
+        },
+        {
+          "name": "value_float",
+          "type": "REAL",
+          "pk": 0
+        },
+        {
+          "name": "value_int",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "time_epoch",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "time_date_time",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "time_time_stamp",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "unifiedstorage_migration_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "migration_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "sql",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "timestamp",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "user": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "login",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "password",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "salt",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "rands",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "company",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "is_admin",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "email_verified",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "theme",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "updated",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "help_flags1",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "last_seen_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "is_disabled",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "is_service_account",
+          "type": "BOOLEAN",
+          "pk": 0
+        },
+        {
+          "name": "uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "is_provisioned",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "uid"
+        ],
+        [
+          "email"
+        ],
+        [
+          "login"
+        ]
+      ]
+    },
+    "user_auth": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "auth_module",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "auth_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "o_auth_access_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "o_auth_refresh_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "o_auth_token_type",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "o_auth_expiry",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "o_auth_id_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "external_uid",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "user_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "user_auth_token": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "auth_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "prev_auth_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "client_ip",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "auth_token_seen",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "seen_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "rotated_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "revoked_at",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "external_session_id",
+          "type": "INTEGER",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "prev_auth_token"
+        ],
+        [
+          "auth_token"
+        ]
+      ]
+    },
+    "user_external_session": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "user_auth_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "auth_module",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "access_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "id_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "refresh_token",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "session_id_hash",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name_id",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "name_id_hash",
+          "type": "TEXT",
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": 0
+        }
+      ],
+      "unique": []
+    },
+    "user_role": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "pk": 1
+        },
+        {
+          "name": "org_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "pk": 0
+        },
+        {
+          "name": "created",
+          "type": "DATETIME",
+          "pk": 0
+        },
+        {
+          "name": "group_mapping_uid",
+          "type": "TEXT",
+          "pk": 0
+        }
+      ],
+      "unique": [
+        [
+          "org_id",
+          "user_id",
+          "role_id",
+          "group_mapping_uid"
+        ]
+      ]
+    }
+  }
+}

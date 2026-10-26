@@ -1,4 +1,5 @@
 import {assertModelSettingsApplicable,modelSettingsDomains} from '../../src/shared/operations-model-settings-schema.mjs';
+import {modelProtocolBase} from '../../src/shared/model-endpoint.mjs';
 
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const fail=()=>Object.assign(new Error('model_settings_configuration_invalid'),{code:'model_settings_configuration_invalid'});
@@ -26,7 +27,7 @@ export function compileModelConfiguration(configuration,versionId,credentials){
    toolCalling:model.toolCalling,structuredOutput:model.structuredOutput};
   const domains=modelSettingsDomains.filter(domain=>value.scenarios[domain]?.modelId===model.id);
   if(domains.includes('governance')&&!model.toolCalling)throw fail();
-  rows.push({model_name:alias,litellm_params:{model:nativePrefix+'/'+model.modelId,api_base:model.baseUrl,
+  rows.push({model_name:alias,litellm_params:{model:nativePrefix+'/'+model.modelId,api_base:modelProtocolBase(model.baseUrl,model.apiFormat),
    api_key:'os.environ/'+credentialVariable(model.credentialRef)},model_info:{mode:responses?'responses':'chat',
    max_input_tokens:model.contextWindow-model.maxOutputTokens,max_output_tokens:model.maxOutputTokens,
    supported_endpoints:[responses?'/v1/responses':'/v1/chat/completions']}});

@@ -32,8 +32,11 @@ export class MaintenanceRestoreExecutor{
     if(stage==='activate'){
      // Every planned module and each approved opening condition must be ready.
      // A single healthy API or completed database restore cannot open the site.
-     if(!context.checks||intent.moduleIds.some(id=>context.checks.modules?.[id]!==true)||maintenanceOpeningConditions.some(id=>context.checks.conditions?.[id]!==true))throw fail('maintenance_required_modules_not_ready');
-     row.planState='ready-to-open';await this.journal.save(row);
+     if(!context.checks||context.checks.prepared!==true&&(intent.moduleIds.some(id=>context.checks.modules?.[id]!==true)||maintenanceOpeningConditions.some(id=>context.checks.conditions?.[id]!==true)))throw fail('maintenance_required_modules_not_ready');
+     // Staged artifacts may be ready for private activation without claiming
+     // already-running services/public readiness. The final native checks below
+     // remain mandatory before one public opening.
+     row.planState='validating';await this.journal.save(row);
     }
     if(stage==='restore'&&context.currentFacts?.complete!==true)throw fail('maintenance_current_recovery_facts_incomplete');
     const result=await this.adapters[stage](context);
@@ -47,6 +50,7 @@ export class MaintenanceRestoreExecutor{
    // Recheck the same planned module set before the single public opening.
    const final=await this.adapters.validate(context);
    if(intent.moduleIds.some(id=>final.modules?.[id]!==true)||maintenanceOpeningConditions.some(id=>final.conditions?.[id]!==true))throw fail('maintenance_required_modules_not_ready');
+   context.checks=final;row.planState='ready-to-open';await this.journal.save(row);
    const opening={id:'open',state:'running',startedAt:this.now().toISOString(),finishedAt:null};row.steps.push(opening);row.planState='opening';await this.journal.save(row);
    await authorize();openingAttempted=true;const opened=await this.adapters.open(context);if(opened?.publicActivation!==true)throw fail('maintenance_public_activation_unknown');
    opening.state='succeeded';opening.finishedAt=this.now().toISOString();row.publicActivation=true;row.planState='completed';return this.journal.finish(row);

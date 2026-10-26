@@ -12,6 +12,6 @@
 
 已有日程继续使用当前 timer 的日历。若主部署流程要使后续定时备份也采用动态清单，只替换其固定执行命令为同一 release 的 `deploy/maintenance-agent/manage.mjs backup --config /etc/galaxy/maintenance/agent.json`，不修改 timer 日程、retention、仓库位置或旧历史。没有替换时，旧定时入口仍是原覆盖，不能称新增卷已由旧 timer 自动捕获。
 
-新 footprint 已按当前 `galaxy-model-runtime` 的 `galaxy-model-gateway` / `galaxy-operations-agentos` 实际容器名识别；旧 gateway 名只作仍在运行时的兼容发现。`/var/lib/galaxy/model-gateway/usage.sqlite3` 属于非正文 token 账本，随点备份；`/etc/galaxy/model-settings` 的 keys、provider/active env、bindings/models、独立控制账本，以及 PG 中关联模型版本和 credential refs 保留当前。当前模型为零这一事实不能代替未来非空配置的保留检查。
+新 footprint 已按当前 `galaxy-model-runtime` 的 `galaxy-model-gateway` / `galaxy-operations-agentos` 实际容器名识别；旧 gateway 名只作仍在运行时的兼容发现。`/var/lib/galaxy/model-gateway/usage.sqlite3` 属于非正文 token 账本，随点备份；`/etc/galaxy/model-settings` 的 keys、provider/active env、bindings/models、独立控制账本，以及 PG 中关联模型版本和 credential refs 保留当前。初批空模型样例不是当前状态；现有人工模型已非空，保留检查必须针对本次实际配置、版本和凭据引用，不能沿旧样例跳过。
 
 AI-agent 部署注意：只读取 secret 引用与闭合元数据；不打印 `docker inspect .Config.Env`、完整 Caddy config、restic 环境、当前安全贡献或原生 `/keys` 响应。实际恢复仍必须绑定某个 point、范围、损失窗口、批准/CAS 与全部开放条件。中断或丢失 ACK 后查询原 operation，不换 operationId 重做；已发 SMTP 不撤回，DATA 后 unknown 不自动重发。

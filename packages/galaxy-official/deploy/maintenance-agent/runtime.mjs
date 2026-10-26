@@ -12,6 +12,7 @@ import {resolveMaintenanceFootprint,maintenanceCaptureConfiguration,maintenanceC
 import {MaintenanceControlJournal} from './journal.mjs';
 import {MaintenanceRestoreExecutor} from './restore-executor.mjs';
 import {createHostRestoreAdapters} from './host-restore.mjs';
+import {createMaintenanceProsodyProbe} from './prosody-live-client.mjs';
 import {readMaintenanceComponentStatus} from './component-status.mjs';
 
 const fail=code=>Object.assign(new Error(code),{code});
@@ -27,7 +28,7 @@ export class MaintenanceNativeRuntime{
  constructor({configuration,run=runCommand,now=()=>new Date(),journal=null,restoreAdapters=null,fetchImpl=fetch,footprint=resolveMaintenanceFootprint,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
   Object.assign(this,{configuration,config:configuration.operations,run,now,fetchImpl,resolveFootprint:footprint,pause});
   this.journal=journal??new MaintenanceControlJournal({directory:configuration.controlDirectory,now});
-  this.restoreExecutor=new MaintenanceRestoreExecutor({journal:this.journal,adapters:restoreAdapters??createHostRestoreAdapters({config:this.config,run,controlDirectory:configuration.controlDirectory}),now});this.tasks=new Map();
+  this.restoreExecutor=new MaintenanceRestoreExecutor({journal:this.journal,adapters:restoreAdapters??createHostRestoreAdapters({config:this.config,run,controlDirectory:configuration.controlDirectory,productionEnabled:configuration.production?.enabled===true,fetchImpl,prosodyProbe:configuration.production?.enabled===true?createMaintenanceProsodyProbe({configuration,fetchImpl}):null}),now});this.tasks=new Map();
  }
  async footprint({captureProof=false}={}){return this.resolveFootprint(this.config,{run:this.run,captureProof});}
  async restic(args,{timeout=30000,maxOutput=8388608}={}){
@@ -119,10 +120,12 @@ export class MaintenanceNativeRuntime{
   items.sort((a,b)=>BigInt(a.cursor)>BigInt(b.cursor)?-1:BigInt(a.cursor)<BigInt(b.cursor)?1:0);return{items:items.slice(0,query.limit).map(({cursor,...item})=>item),components,nextBefore:items.length>=query.limit?(BigInt(items[query.limit-1].cursor)-1n).toString():null};
  }
  async preview(pointId,moduleIds){
-  const {point,manifest}=await this.point(pointId),footprint=await this.footprint(),caps=this.restoreExecutor.capabilities(moduleIds),blockers=[...caps.blockers];
+  const source=await this.point(pointId),{point,manifest}=source,footprint=await this.footprint(),caps=this.restoreExecutor.capabilities(moduleIds),blockers=[...caps.blockers];
   if(!manifest)blockers.push('maintenance_capture_metadata_invalid');
   if(moduleIds.some(id=>point.coverage.find(x=>x.id===id)?.state!=='covered'))blockers.push('maintenance_point_coverage_incomplete');
   if(point.integrity.state!=='verified')blockers.push('maintenance_point_not_verified');
+  if(typeof this.restoreExecutor.adapters?.inspect==='function')blockers.push(...(await this.restoreExecutor.adapters.inspect({point:source,footprint,moduleIds})).blockers);
+  point.productionRestore={available:blockers.length===0,blockers:[...new Set(blockers)]};
   return{point,moduleIds,footprintDigest:footprint.digest,...caps,blockers:[...new Set(blockers)]};
  }
  async apiReadinessBinding(footprint){

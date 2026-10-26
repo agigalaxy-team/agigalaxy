@@ -94,6 +94,15 @@ async function copyCurrentTables(db,schema,facts,tables){
   if(retry.length&&!progress)throw fail('maintenance_current_reference_not_restored');pending=retry;
  }
 }
+export async function pauseRestoredStrategyRuns(db,at){
+ // P13 configuration is ordinary point data, not a fresh execution grant.
+ // Older supported schemas have neither table. Do not invent 112 on them.
+ const available=(await db.query("SELECT to_regclass('public.operations_p13_strategy_heads_v1') IS NOT NULL AS heads,to_regclass('public.operations_p13_strategy_runs_v1') IS NOT NULL AS runs")).rows[0];
+ if(!available.heads&&!available.runs)return{applied:false};if(!available.heads||!available.runs)throw fail('maintenance_recovery_schema_changed');
+ await db.query('UPDATE operations_p13_strategy_heads_v1 SET paused=true,updated_at=$1',[at]);
+ const result=await db.query("UPDATE operations_p13_strategy_runs_v1 SET state='blocked',code='restore-current-authorization-required',updated_at=$1 WHERE state NOT IN ('completed','no-action') RETURNING id",[at]);
+ return{applied:true,blocked:result.rows.length};
+}
 async function seedFoundation(db,schema,facts){
  // Preserve the current security authority. Disabled/deleted grants from after
  // the recovery point cannot be resurrected by old rows or old command ACKs.
@@ -113,6 +122,7 @@ async function seedFoundation(db,schema,facts){
  for(const table of ['operations_model_settings_state_v1','operations_model_settings_versions_v1','operations_model_settings_operations_v1','operations_smtp_settings_v1','operations_smtp_commands_v1','operations_smtp_events_v1','operations_smtp_tests_v1'])await db.query('DELETE FROM '+quote(table));
  await copyCurrentTables(db,schema,facts,recoveryAuthorityTables);
  await db.query("UPDATE operations_agentos_executions_v1 SET state='paused',updated_at=$1 WHERE state='active'",[new Date(facts.capturedAt*1000)]);
+ await pauseRestoredStrategyRuns(db,new Date(facts.capturedAt*1000));
  for(const table of ['official_account_sessions_v1','official_account_logins_v1','operations_operator_sessions_v1','operations_operator_logins_v1','oidc_login_transactions_v1'])await db.query('DELETE FROM '+quote(table));
  await db.query('UPDATE access_credentials SET revoked_at=COALESCE(revoked_at,$1)',[new Date(facts.capturedAt*1000)]);
 }
