@@ -14,9 +14,9 @@ node packages/galaxy-official/scripts/prepare-linux.mjs <服务发行绝对目�
 
 ## 配置和安装
 
-生成材料依据所选发行与 pins，包含对应环境的配置样例、数据库及角色材料、反向代理和进程管理相关文件。准确成员以本次生成结果为准，不能沿用某次旧记录中的文件数。
+生成材料包含所选发行与 pins 对应的配置示例、数据库角色、反向代理及进程管理文件，以实际生成目录为准。
 
-由部署者在目标环境完成依赖、独立数据库和角色、签名与信任材料、受保护配置、显式迁移、API / Worker、认证与所用外部服务。网站公开配置和准确 Origin 与服务一起核对。
+生成后按[部署指南](deployment.md#linux-部署材料与顺序)配置和应用本次所选组件；本页不重复安装步骤。
 
 [运行环境约束](runtime-environments.md)说明数据库名和角色分离。API 不执行自动 schema 升级；涉及已升级数据库时，回退必须符合发行兼容关系，不删除原数据或盲目降级。
 
@@ -31,4 +31,4 @@ node packages/galaxy-official/scripts/prepare-linux.mjs <服务发行绝对目�
 | 认证主题与验证码 | [认证应用](../apps/galaxy-auth/README.md) |
 | Payload 管理应用 | [后台](../apps/galaxy-admin/README.md) |
 
-准备材料、应用配置、运行健康、外部业务和恢复成功分别取证。常见配置差额及 AI Agent 部署说明见[部署指南](deployment.md)。
+常见配置问题及 AI Agent 接续见[部署指南](deployment.md)；生成材料成功不表示已经应用到服务器。

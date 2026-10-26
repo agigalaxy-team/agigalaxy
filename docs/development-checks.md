@@ -23,8 +23,8 @@
 
 `npm test` 无路径时保留普通全范围测试；`npm run check` 再包含根 lint。仅在本阶段确需整体回归时选用一次，不与相同范围的局部结果重复堆叠。`check:layers` 是包含重叠范围和真实环境前提的整体验收编排，不能作为日常开发的默认起点；需要某一层时直接 `node scripts/verify-layers.mjs --layers=<所需层>`。
 
-Prosody、PostgreSQL、Native 安装／捕获制品、代理、TLS、真实模型和整站恢复需要各自明确环境，选择相关专用入口即可。普通测试保留现有隔离环境要求；指定文件也不会绕过它们。制品生成中的签名、来源完整性和未知操作恢复属于实际产品机制，不能为减少检查而删掉。
+Prosody、PostgreSQL、Native 安装／捕获制品、代理、TLS、真实模型和整站恢复需要各自明确环境，选择相关专用入口即可。普通测试保留现有隔离环境要求；指定文件也不会绕过它们。
 
 `check:requirements` 仅供带完整项目资料的维护工作区核对文档，不是独立源码克隆的开发前提。`prepare:client` 用于正式客户端候选制品准备，不是普通编辑后必跑命令。
 
-CI 范围由[组件目录](component-catalog.md)与[实际 YAML](../.github/workflows/product-checks.yml)按变更选择，本页不复制固定全套清单。交接直接说明已有结果和未检查边界；不为交接、提交或“追绿”重新启动相同输入的检查。
+CI 范围由[组件目录](component-catalog.md)与[实际 YAML](../.github/workflows/product-checks.yml)按变更选择，本页不复制固定全套清单。按实际结果交接，不为提交或交接重复相同输入的检查。
