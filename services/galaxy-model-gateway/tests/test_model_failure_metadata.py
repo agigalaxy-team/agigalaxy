@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -41,7 +42,7 @@ class ModelFailureMetadataTest(unittest.TestCase):
             store = UsageStore(db_file, now=lambda:start+timedelta(seconds=3))
             store.start(call)
             store.finish(failures[0])
-            with sqlite3.connect(db_file) as db:
+            with closing(sqlite3.connect(db_file)) as db:
                 self.assertNotIn('failure', {row[1] for row in db.execute('PRAGMA table_info(calls)')})
                 row = db.execute('SELECT state,input_tokens,total_tokens FROM calls WHERE call_id=?',(call['galaxy_call_id'],)).fetchone()
                 self.assertEqual(row, ('failed',None,None), 'existing durable call/usage schema stays compatible and unknown')

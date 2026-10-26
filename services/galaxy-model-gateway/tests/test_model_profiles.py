@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Thread
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -67,6 +68,10 @@ class ProviderDouble(BaseHTTPRequestHandler):
 
 class ModelProfilesTest(unittest.TestCase):
     def test_01_native_proxy_four_protocols_and_durable_usage_with_local_provider_double(self):
+        environment = patch.dict(os.environ, {"NO_PROXY": "127.0.0.1,localhost,::1", "no_proxy": "127.0.0.1,localhost,::1"})
+        environment.start(); self.addCleanup(environment.stop)
+        for variable in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+            os.environ.pop(variable, None)
         from galaxy_model_gateway.app import create_app
         ProviderDouble.seen = []
         server = ThreadingHTTPServer(("127.0.0.1", 0), ProviderDouble)

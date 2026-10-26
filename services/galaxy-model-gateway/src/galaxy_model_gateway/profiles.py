@@ -9,6 +9,7 @@ FORMATS = frozenset({"openai-chat", "openai-responses", "anthropic", "gemini"})
 EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh", "max"})
 PROFILE_FIELDS = frozenset({"apiFormat", "contextWindow", "maxOutputTokens", "reasoningEffort",
     "timeoutSeconds", "toolCalling", "structuredOutput", "scenarios"})
+OPTIONAL_PROFILE_FIELDS=frozenset({'imageUnderstanding','parallelToolCalls','verbosity'})
 
 
 def load_profiles(path, models):
@@ -22,7 +23,7 @@ def load_profiles(path, models):
     result = {}
     routes = {row["model_name"]: row for row in models}
     for alias, value in raw.items():
-        if not ALIAS.fullmatch(alias) or not isinstance(value, dict) or set(value) != PROFILE_FIELDS:
+        if not ALIAS.fullmatch(alias) or not isinstance(value, dict) or not PROFILE_FIELDS.issubset(value) or set(value)-PROFILE_FIELDS-OPTIONAL_PROFILE_FIELDS:
             raise ValueError("model_gateway_profile_invalid")
         if value["apiFormat"] not in FORMATS:
             raise ValueError("model_gateway_profile_invalid")
@@ -40,6 +41,9 @@ def load_profiles(path, models):
             raise ValueError("model_gateway_profile_invalid")
         if any(type(value[name]) is not bool for name in ("toolCalling", "structuredOutput")):
             raise ValueError("model_gateway_profile_invalid")
+        if 'imageUnderstanding' in value and type(value['imageUnderstanding']) is not bool:raise ValueError('model_gateway_profile_invalid')
+        if value.get('parallelToolCalls') is not None and (type(value['parallelToolCalls']) is not bool or not value['toolCalling']):raise ValueError('model_gateway_profile_invalid')
+        if value.get('verbosity') is not None and (value['verbosity'] not in {'low','medium','high'} or value['apiFormat'] not in {'openai-chat','openai-responses'}):raise ValueError('model_gateway_profile_invalid')
         domains = value["scenarios"]
         if not isinstance(domains, list) or len(set(domains)) != len(domains) or any(x not in SCENARIOS for x in domains):
             raise ValueError("model_gateway_profile_invalid")
@@ -60,7 +64,16 @@ def admit_profile(payload, profile, *, responses, scene):
         raise ValueError("model_gateway_model_scenario_denied")
     if payload.get("tools") and not profile["toolCalling"]:
         raise ValueError("model_gateway_capability_unavailable")
-    if (payload.get("response_format") or payload.get("text")) and not profile["structuredOutput"]:
+    content=payload.get('input',[]) if responses else payload.get('messages',[])
+    def has_image(value,depth=0):
+        if depth>12:return False
+        if isinstance(value,dict):return value.get('type') in {'image_url','input_image','image'} or any(has_image(item,depth+1) for item in value.values())
+        return isinstance(value,list) and any(has_image(item,depth+1) for item in value)
+    if has_image(content) and not profile.get('imageUnderstanding',False):raise ValueError('model_gateway_capability_unavailable')
+    if profile.get('parallelToolCalls') is not None and payload.get('parallel_tool_calls')!=profile['parallelToolCalls']:raise ValueError('model_gateway_configuration_changed')
+    verbosity=payload.get('text',{}).get('verbosity') if responses and isinstance(payload.get('text',{}),dict) else payload.get('verbosity')
+    if verbosity!=profile.get('verbosity'):raise ValueError('model_gateway_configuration_changed')
+    if (payload.get("response_format") or isinstance(payload.get("text"),dict) and payload["text"].get("format")) and not profile["structuredOutput"]:
         raise ValueError("model_gateway_capability_unavailable")
     ceiling = "max_output_tokens" if responses else "max_tokens"
     present = [key for key in ("max_tokens", "max_completion_tokens", "max_output_tokens") if key in payload]

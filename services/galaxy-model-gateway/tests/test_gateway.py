@@ -33,8 +33,16 @@ async def exchange(app, path, *, method="GET", headers=None, payload=None, query
 class GatewayTest(unittest.TestCase):
     def test_01_native_empty_proxy_starts_without_enterprise_and_rejects_before_prompt(self):
         self.assertIsNone(importlib.util.find_spec("litellm_enterprise"))
-        from importlib.metadata import version
-        self.assertEqual(version("litellm"), "1.108.0")
+        # The fixed upstream checkout is also a supported test runtime; a
+        # source import need not have an installed wheel's dist-info metadata.
+        import tomllib
+        from importlib.metadata import PackageNotFoundError, version
+        try:
+            runtime_version = version("litellm")
+        except PackageNotFoundError:
+            source = Path(importlib.util.find_spec("litellm").origin).resolve().parent.parent / "pyproject.toml"
+            runtime_version = tomllib.loads(source.read_text(encoding="utf-8"))["project"]["version"]
+        self.assertEqual(runtime_version, "1.108.0")
         with self.assertRaisesRegex(ValueError, "auth_not_configured"):
             Settings(service_key="")
         settings = Settings(service_key=KEY, models_file=str(BASE / "config/models.empty.yaml"))

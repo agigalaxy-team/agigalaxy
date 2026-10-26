@@ -59,6 +59,13 @@ class ResponseGuard:
             "reason": reason, "status": status, "stream": self.stream})
         await self.rejected()
         body = {"error": {"code": code}} if code else ERROR
+        if reason in {'upstream-http-error','native-provider-error'}:
+            from .metadata import provider_failure_for
+            origin=provider_failure_for(self.call_id)
+            confirmed=origin.get('httpStatus')==status or origin.get('category') in {'timeout','connection'}
+            body={'error':{**body['error'],'source':'provider' if confirmed else 'model-gateway',
+                **({'status':origin.get('httpStatus') or origin.get('reportedStatus') or status} if confirmed else {}),
+                **({'category':origin['category']} if confirmed and origin.get('category') else {})}}
         data = json.dumps(body, separators=(",", ":")).encode()
         if self.started:
             await self.downstream({"type": "http.response.body",
@@ -78,7 +85,7 @@ class ResponseGuard:
         if message["type"] == "http.response.start":
             status = message["status"]
             if status >= 400:
-                allowed = {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529}
+                allowed = {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, *range(500, 600)}
                 return await self.reject(status=status if status in allowed else 502,
                     code="model_gateway_request_failed", reason="upstream-http-error")
             headers = [(k, v) for k, v in message.get("headers", [])
@@ -93,19 +100,20 @@ class ResponseGuard:
         if message["type"] != "http.response.body":
             return
         if self.start is None:
-            return await self.reject()
+            return await self.reject(reason="missing-response-start")
         self.buffer.extend(message.get("body", b""))
         if len(self.buffer) + len(self.pending) > MAX_BUFFER:
-            return await self.reject()
+            return await self.reject(reason="response-too-large")
         if not self.stream:
             if not message.get("more_body"):
                 try:
                     value = json.loads(self.buffer)
                     valid = useful_response(value, self.responses)
                 except (ValueError, TypeError, RecursionError):
-                    valid = False
+                    return await self.reject(reason="invalid-json")
                 if not valid:
-                    return await self.reject()
+                    reason = "upstream-error-object" if isinstance(value, dict) and value.get("error") else "no-final-answer-or-tool"
+                    return await self.reject(reason=reason)
                 await self.begin()
                 await self.downstream({"type": "http.response.body", "body": bytes(self.buffer), "more_body": False})
                 self.buffer.clear()
@@ -129,20 +137,26 @@ class ResponseGuard:
         data = b"\n".join(line[5:].lstrip(b" ") for line in frame.splitlines() if line.startswith(b"data:"))
         if data == b"[DONE]":
             if not (self.useful and (self.terminal if self.responses else self.finish_reason)):
-                return await self.reject()
+                return await self.reject(reason="premature-stream-end")
             self.terminal = True
         elif data:
             try:
                 value = json.loads(data)
+                if isinstance(value, dict) and (value.get('error') or self.responses and value.get('type') in {'error','response.failed','response.incomplete'}):
+                    from .metadata import provider_failure_for
+                    origin=provider_failure_for(self.call_id)
+                    reported=origin.get('httpStatus') or origin.get('reportedStatus')
+                    if type(reported) is int and 400<=reported<=599:
+                        return await self.reject(status=reported,code='model_gateway_request_failed',reason='native-provider-error')
                 if not isinstance(value, dict) or value.get("error"):
-                    return await self.reject()
+                    return await self.reject(reason="invalid-stream-event")
                 if self.responses:
                     kind = value.get("type", "")
                     if kind in {"error", "response.failed", "response.incomplete"}:
-                        return await self.reject()
+                        return await self.reject(reason="upstream-stream-failed")
                     if kind == "response.completed":
                         if not useful_response(value.get("response"), True):
-                            return await self.reject()
+                            return await self.reject(reason="no-final-answer-or-tool")
                         self.terminal = self.useful = True
                     if kind in {"response.output_text.delta", "response.refusal.delta",
                             "response.function_call_arguments.delta"} and value.get("delta"):
@@ -153,7 +167,7 @@ class ResponseGuard:
                         self.useful = self.useful or useful_message(delta) or bool(delta.get("tool_calls"))
                         self.finish_reason = self.finish_reason or choice.get("finish_reason") is not None
             except (ValueError, TypeError, AttributeError, RecursionError):
-                return await self.reject()
+                return await self.reject(reason="invalid-stream-json")
         self.pending.extend(frame)
         if self.useful:
             await self.begin()
@@ -162,4 +176,4 @@ class ResponseGuard:
 
     async def complete(self):
         if not self.ended:
-            await self.reject()
+            await self.reject(reason="response-not-completed")

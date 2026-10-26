@@ -1,10 +1,18 @@
 import re
+from collections import OrderedDict
+from threading import Lock
 import httpx
+from urllib.parse import urlsplit
 from litellm.integrations.custom_logger import CustomLogger
 from .output import emit
 from .policy import ALIAS, CONFIG_VERSION, SCENARIOS
 
 _usage_store = None
+_failures=OrderedDict()
+_failure_lock=Lock()
+
+def provider_failure_for(call_id):
+    with _failure_lock:return dict(_failures.get(call_id,{}))
 
 
 def configure_usage(store):
@@ -14,6 +22,39 @@ def configure_usage(store):
 
 def nonnegative_int(value):
     return value if type(value) is int and value >= 0 else None
+
+
+def provider_evidence(exception, api_base):
+    """Inspect native causes, never serialize their URLs, bodies or headers.
+
+    LiteLLM wrappers can replace response.request with api.openai.com even
+    for a custom base. Only the matching original SDK cause attests origin.
+    """
+    try:
+        expected = urlsplit(api_base or '')
+        identity = lambda url: (url.scheme, url.hostname, url.port or (443 if url.scheme == 'https' else 80))
+        if not expected.hostname:
+            return {}
+        current, visited = exception, set()
+        for _ in range(8):
+            if current is None or id(current) in visited:
+                break
+            visited.add(id(current))
+            response = getattr(current, 'response', None)
+            try:
+                request = response.request if isinstance(response, httpx.Response) else getattr(current, 'request', None)
+            except RuntimeError:
+                request = getattr(current, 'request', None)
+            actual = urlsplit(str(request.url)) if isinstance(request, httpx.Request) else None
+            if actual and identity(actual) == identity(expected):
+                result = {'providerConfirmed': True}
+                if isinstance(response, httpx.Response) and 400 <= response.status_code <= 599 and getattr(current, 'status_code_is_synthesized', False) is not True:
+                    result['httpStatus'] = response.status_code
+                return result
+            current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+    except (ValueError, RuntimeError, AttributeError):
+        pass
+    return {}
 
 
 def safe_failure(exception):
@@ -85,12 +126,21 @@ def safe_record(kwargs, response, start_time, end_time, *, failed=False):
         "reasoningTokens": nonnegative_int(field(output_details, "reasoning_tokens"))}
     if failed:
         result["failure"] = safe_failure(kwargs.get("exception"))
+        result['failure'].update(provider_evidence(kwargs.get('exception'), params.get('api_base')))
     return result
 
 
 class MetadataLogger(CustomLogger):
     def record(self, row):
         if not row: return
+        # Only closed exception metadata attests origin; Galaxy admission
+        # errors never enter the provider SDK callback. No provider prose.
+        if row.get('state')=='failed' and isinstance(row.get('failure'),dict):
+            failure=row['failure']
+            if failure.get('providerConfirmed') is True:
+                with _failure_lock:
+                    _failures[row['callId']]={key:failure.get(key) for key in ['httpStatus','reportedStatus','category']}
+                    while len(_failures)>512:_failures.popitem(last=False)
         if _usage_store is not None:
             try: _usage_store.finish(row)
             except Exception: emit({"event": "model-usage-error", "code": "model_gateway_usage_write_failed"})

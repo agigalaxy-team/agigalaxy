@@ -51,6 +51,12 @@ admission, and closed error projection. It does not implement a replacement
 inference engine. The native `custom_auth` hook is used as a second admission
 check and does not represent a Galaxy business role.
 
+LiteLLM's native Proxy app, configuration and callbacks are process-wide. Run
+one gateway configuration per process. For local tests, invoke each native
+runtime test module (`test_gateway`, `test_model_profiles`, and
+`test_provider_failure_native`) in a separate Python process; a shared-process
+unittest discovery run cannot initialize multiple independent Proxy apps.
+
 ## Human model settings
 
 Only an operator-mounted file can supply native `model_list` entries. Entries

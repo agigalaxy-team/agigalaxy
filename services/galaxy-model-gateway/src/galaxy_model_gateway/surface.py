@@ -9,7 +9,7 @@ from .usage import unavailable_usage
 
 CALL_FIELDS = frozenset({"model", "messages", "stream", "stream_options", "tools", "tool_choice",
     "temperature", "top_p", "max_tokens", "max_completion_tokens", "response_format", "stop", "seed",
-    "frequency_penalty", "presence_penalty", "parallel_tool_calls", "reasoning_effort", "store"})
+    "frequency_penalty", "presence_penalty", "parallel_tool_calls", "reasoning_effort", "store", "verbosity"})
 RESPONSES_FIELDS = frozenset({"model", "input", "instructions", "stream", "tools", "tool_choice",
     "max_output_tokens", "reasoning", "text", "parallel_tool_calls", "store", "include", "truncation", "background"})
 
@@ -84,6 +84,9 @@ class PrivateSurface:
                     if any(key in payload for key in ("temperature", "top_p", "seed", "stop")):
                         raise ValueError()
                     admit_profile(payload, profile, responses=is_responses, scene=scene)
+                    # The operator timeout limits the actual upstream request,
+                    # not just the AgentOS-to-gateway HTTP connection.
+                    payload["timeout"] = profile["timeoutSeconds"]
                     if self.usage_store is None:
                         return await fail("model_gateway_usage_store_unavailable", 503)
                     try:
@@ -138,7 +141,7 @@ class PrivateSurface:
                 await self.app(scope, receive, guard.send)
                 await guard.complete()
             except Exception:
-                await guard.reject(code="model_gateway_request_failed")
+                await guard.reject(code="model_gateway_request_failed",reason="native-provider-error")
             return
         rejected, started, finished = False, False, False
         async def checked_send(message):

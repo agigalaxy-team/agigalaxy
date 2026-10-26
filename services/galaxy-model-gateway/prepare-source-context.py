@@ -1,6 +1,10 @@
 """Prepare a fresh Docker context from fixed public upstream source; no install/deploy."""
-import argparse,json,re,shutil,tarfile,urllib.request
+import argparse,json,os,re,shutil,tarfile,urllib.request
 from pathlib import Path,PurePosixPath
+
+def physical(path):
+    path=Path(path).absolute()
+    return Path('\\\\?\\'+str(path)) if os.name=='nt' and not str(path).startswith('\\\\?\\') else path
 
 def prepare(output,archive):
     here=Path(__file__).resolve().parent
@@ -17,21 +21,36 @@ def prepare(output,archive):
             while chunk:=response.read(1024*1024):
                 if target.tell()+len(chunk)>1024*1024*1024:raise ValueError('Upstream archive size limit exceeded')
                 target.write(chunk)
-    upstream=output/'upstream';upstream.mkdir();members=0
+    upstream=output/'upstream';upstream.mkdir();members=0;links=[];excluded_enterprise_links=0
     with tarfile.open(archive,'r:gz') as bundle:
         for item in bundle:
             parts=PurePosixPath(item.name).parts
-            if not parts or parts[0]!='litellm-'+source['commit'] or any(part in {'..','.'} for part in parts) or item.name.startswith('/') or item.issym() or item.islnk():raise ValueError('Unsafe or mismatched fixed source archive')
+            if not parts or parts[0]!='litellm-'+source['commit'] or any(part in {'..','.'} for part in parts) or item.name.startswith('/') or '\\' in item.name or ':' in item.name or item.islnk():raise ValueError('Unsafe or mismatched fixed source archive')
             if len(parts)==1:continue
             target=upstream.joinpath(*parts[1:]).resolve()
             if not target.is_relative_to(upstream):raise ValueError('Unsafe source path')
-            if item.isdir():target.mkdir(parents=True,exist_ok=True)
+            if item.issym():
+                # The MIT-only runtime deliberately does not install the
+                # optional enterprise alias. Keep its original archive intact.
+                if '/'.join(parts[1:])=='litellm/proxy/enterprise' and item.linkname=='../../enterprise':
+                    excluded_enterprise_links+=1
+                    continue
+                if PurePosixPath(item.linkname).is_absolute() or '\\' in item.linkname or ':' in item.linkname:raise ValueError('Unsafe source link')
+                origin=(target.parent/item.linkname).resolve()
+                if not origin.is_relative_to(upstream):raise ValueError('Unsafe source link')
+                links.append((origin,target))
+                continue
+            if item.isdir():physical(target).mkdir(parents=True,exist_ok=True)
             elif item.isfile():
                 members+=1
                 if members>200000:raise ValueError('Upstream member limit exceeded')
-                target.parent.mkdir(parents=True,exist_ok=True)
-                with bundle.extractfile(item) as incoming,target.open('xb') as outgoing:shutil.copyfileobj(incoming,outgoing)
+                physical(target.parent).mkdir(parents=True,exist_ok=True)
+                with bundle.extractfile(item) as incoming,physical(target).open('xb') as outgoing:shutil.copyfileobj(incoming,outgoing)
             else:raise ValueError('Unsupported source archive member')
+    for origin,target in links:
+        if not physical(origin).is_file() or physical(target).exists():raise ValueError('Source link requires one ordinary internal file')
+        physical(target.parent).mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(physical(origin),physical(target))
     for name in ['uv.lock','pyproject.toml','LICENSE','litellm-proxy-extras/LICENSE']:
         if not (upstream/name).is_file():raise ValueError('Missing required fixed upstream material: '+name)
     destination=output/'services/galaxy-model-gateway';destination.mkdir(parents=True)
@@ -42,7 +61,7 @@ def prepare(output,archive):
             target=destination/path.relative_to(here);target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
     target=destination/'config/models.empty.yaml';target.parent.mkdir();shutil.copyfile(here/'config/models.empty.yaml',target)
     (output/'SOURCE-CONTEXT.json').write_text(json.dumps({'repository':source['repository'],'commit':source['commit'],'upstreamFiles':members,'runtimeConfigurationIncluded':False,'built':False,'deployed':False},indent=2)+'\n',encoding='utf8')
-    return {'output':str(output),'upstreamFiles':members,'built':False,'deployed':False}
+    return {'output':str(output),'upstreamFiles':members,'materializedFileLinks':len(links),'excludedEnterpriseLinks':excluded_enterprise_links,'built':False,'deployed':False}
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
