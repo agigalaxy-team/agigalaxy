@@ -36,7 +36,10 @@ yarn-error.log*
 !**/.env.example
 .venv/
 /.openai/
-/.opencode/
+/.opencode/*
+!/.opencode/tui.json
+/packages/galaxy-official/deploy/operations-stack/configuration.*.json
+!/packages/galaxy-official/deploy/operations-stack/configuration.example.json
 
 # deployment and generated files
 .vercel

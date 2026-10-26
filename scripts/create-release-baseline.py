@@ -60,7 +60,7 @@ output.mkdir()
 records = {path.relative_to(root).as_posix(): hashlib.sha256(filesystem_path(path).read_bytes()).hexdigest() for path in sorted(files)}
 manifest = {'createdAt': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'kind': 'source-baseline', 'files': records,
             'componentCatalog':'repository-components.json','components':[item['id'] for item in components['components']],
-            'excluded': ['.env', 'local identity and private keys', 'host authentication/configuration', '.openai', '.opencode', 'dependency trees', 'outputs', 'Git history'],
+            'excluded': ['.env', 'local identity and private keys', 'private host configuration', '.openai', 'undeclared .opencode configuration', 'dependency trees', 'outputs', 'Git history'],
             'limits': 'Source checkpoint only; deployment configuration must be supplied through authorized secure channels.'}
 archive = output / 'source.zip'
 with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:

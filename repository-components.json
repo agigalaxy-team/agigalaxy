@@ -119,7 +119,8 @@
           "{node}",
           "--test",
           "packages/galaxy-official/test/operations-auth-root-lifecycle.test.mjs",
-          "packages/galaxy-official/test/task-fact-client-v2.test.mjs"
+          "packages/galaxy-official/test/task-fact-client-v2.test.mjs",
+          "packages/galaxy-official/deploy/operations-stack/operations-stack.test.mjs"
         ]
       ],
       "sourceEntries": [
@@ -210,7 +211,8 @@
       "configurationInputs": [
         "integrations/native-v2/prepare-service-config.mjs",
         "integrations/native-v2/host-capabilities.json",
-        "opencode.json"
+        "opencode.json",
+        ".opencode/tui.json"
       ],
       "artifact": "unsigned-native-candidate",
       "dataOwner": "Local ID controls local identity, history, work files and upload scope; account grants remain separate.",
@@ -675,7 +677,8 @@
     ".oxfmtrc.json",
     "RIGHTS.md",
     "WORK_STATUS.md",
-    "opencode.json"
+    "opencode.json",
+    ".opencode/tui.json"
   ],
   "sourceExtensions": [
     ".mjs",

@@ -187,7 +187,7 @@ def tools(config):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['prepare', 'tools', 'status'])
-    parser.add_argument('--config', default=str(SOURCE / 'configuration.pilot.json'))
+    parser.add_argument('--config', required=True, help='Absolute path to the protected target configuration')
     args = parser.parse_args()
     config_path = safe_path(args.config)
     config = json.loads(config_path.read_text())

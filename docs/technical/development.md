@@ -21,6 +21,8 @@ cd agigalaxy
 
 只安装本次需要的组件。根 `npm run setup` 顺序安装根、Official、A2A、`integrations/native-v2/compact-app`，不安装 Admin、不创建数据库或启动服务。Admin 单独运行 `npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin`；AgentOS 按其组件 README 安装锁定依赖。
 
+根 `opencode.json` 与 `.opencode/tui.json` 是共享开发接入配置，归 Native 组件维护；其他本机宿主配置不入库。
+
 ## 网页工作与真实 API
 
 ```sh

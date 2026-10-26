@@ -26,7 +26,7 @@ node packages/galaxy-official/deploy/operations-stack/manage.mjs up --config /et
 
 plan不读秘密值、不连接服务。prepare生成自身配置/目录/专用用户，install-units仅安装自身标记具名单位，同名无关unit停止；非空目录所有者不匹配不递归改权。up启动监控和日志，不启备份timer。将生成的caddy-monitoring.fragment合入所选管理站点catch-all前，保留 `/monitoring/`，不以handle_path剥前缀或覆盖整个Caddyfile。
 
-`stage-linux.py tools/prepare` 是带目标配置的专用准备器：按固定输入下载/拉镜像/构建备份镜像、保留原秘密，缺失时才生成监控和仓库材料，创建未启动units；它不是新主机的通用无参数安装器。仅在目标已准确核对时采用，不因文件存在而使用其中旧主机拓扑。原秘密留root0600，专用root0700目录中的精确UID可读副本用于只读bind，Alertmanager通过systemd LoadCredential读取receiver。
+`stage-linux.py tools/prepare --config <绝对目标配置路径>` 是专用准备器：按固定输入下载/拉镜像/构建备份镜像、保留原秘密，缺失时才生成监控和仓库材料，创建未启动units；它不是新主机的通用无参数安装器。仅在目标已准确核对时采用；具体主机配置留在源码外，不提供自动采用的目标默认值。原秘密留root0600，专用root0700目录中的精确UID可读副本用于只读bind，Alertmanager通过systemd LoadCredential读取receiver。
 
 ## 管理认证与告警
 
@@ -34,7 +34,7 @@ Grafana使用独立management realm与专用confidential client，Code+S256，�
 
 规则直接消费 [业务规则](examples/alerts/galaxy.rules.json)、[外部探测规则](examples/monitoring/external.rules.json) 及相应Blackbox配置。owner_role供路由选择，receiver连接另由目标配置确定。
 
-`prepare-alertmanager.py --recipient <明确管理收件人>` 仅在授权目标进程读取已有realm的SMTP并写私有receiver，不改变原SMTP/普通账户。发件身份与模板由galaxy-mail生成的monitoring/mail-identity.json确定，不沿用账户发件人；供应商须允许该身份。mask不是密码，TLS沿原STARTTLS/implicit设置且核证书。`--send-test` 仅向准确授权对象发一封标明测试的邮件，已有请求不自动重发。SMTP接受只表示submitted，不表示收件箱送达或完整调度链已验证。
+`prepare-alertmanager.py --config <绝对目标配置路径> --recipient <明确管理收件人>` 仅在授权目标进程读取已有realm的SMTP并写私有receiver，不改变原SMTP/普通账户。发件身份与模板由galaxy-mail生成的monitoring/mail-identity.json确定，不沿用账户发件人；供应商须允许该身份。mask不是密码，TLS沿原STARTTLS/implicit设置且核证书。`--send-test` 仅向准确授权对象发一封标明测试的邮件，已有请求不自动重发。SMTP接受只表示submitted，不表示收件箱送达或完整调度链已验证。
 
 ## 日志采集与安全投影
 

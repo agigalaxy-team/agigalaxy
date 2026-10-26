@@ -8,7 +8,7 @@ const json = value => JSON.stringify(value, null, 2) + '\n';
 const bind = (source, target, readOnly = true) => ({ type: 'bind', source, target, read_only: readOnly, bind: { create_host_path: false } });
 const command = values => values.map(value => '"' + value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%') + '"').join(' ');
 export const sourceDirectory = fileURLToPath(new URL('.', import.meta.url));
-const repositoryDocs = new URL('../../../../docs/', import.meta.url);
+const operationExamples = new URL('../../../../docs/operations/examples/', import.meta.url);
 
 export function grafanaIni(config) {
   const g = config.grafana;
@@ -282,7 +282,7 @@ WantedBy=multi-user.target
 }
 
 export async function renderOperationsFiles(config) {
-  const readJson = async path => JSON.parse(await readFile(new URL(path, repositoryDocs), 'utf8'));
+  const readJson = async path => JSON.parse(await readFile(new URL(path, operationExamples), 'utf8'));
   const [prometheus, blackbox, rules, externalRules, alertmanagerExample] = await Promise.all([
     readJson('monitoring/prometheus.example.json'), readJson('monitoring/blackbox.json'), readJson('alerts/galaxy.rules.json'), readJson('monitoring/external.rules.json'), readJson('alerts/alertmanager.example.json')
   ]);

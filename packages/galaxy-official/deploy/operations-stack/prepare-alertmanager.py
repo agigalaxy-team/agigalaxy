@@ -121,11 +121,12 @@ def send_test(recipient, smtp):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config', required=True, help='Absolute path to the protected target configuration')
     parser.add_argument('--recipient')
     parser.add_argument('--send-test', action='store_true')
     parser.add_argument('--metadata-only', action='store_true')
     args = parser.parse_args()
-    config = json.loads(Path(__file__).with_name('configuration.pilot.json').read_text())
+    config = json.loads(support.safe_path(args.config).read_text())
     if os.geteuid() != 0 or socket.gethostname() != config['targetHostname']:
         raise RuntimeError('operations_target_host_mismatch')
     smtp = read_smtp()
