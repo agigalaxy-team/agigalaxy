@@ -1,7 +1,11 @@
 # 银河源码工作说明
 
-围绕完整用户功能推进开发，需要的页面、交互、客户端、数据和服务一起处理。主会话及所有子会话、子智能体，每次开始新开发任务前必须实际全文读取[工作规则](../../../02-architecture/current/WORK_RULES.md)及[完整目标 A](../../../01-intake/CURRENT_RECONSTRUCTION_GOAL_2026-10-12.md)、[当前要求 B](../../../01-intake/CURRENT_USER_REQUIREMENTS_2026-10-09.md)、[体验规则 C](../../../02-architecture/current/EXPERIENCE_RULES.md)，首次参与及分派按 A 原要求执行，保留有用背景。
+围绕完整用户功能推进，需要的页面、交互、客户端、数据和服务一起处理。先读 [README](README.md)、[贡献说明](CONTRIBUTING.md)、[开发指南](docs/development.md)及本次组件说明，保留已有改动、真实资料、历史与权限；先连续形成实质开发成果，再由主会话合并最小必要验证；主／子会话不按文件、提交或交接重复运行。同输入已有有效结果直接复用，失败只回查受影响处，不新增阅读证明、指纹、门禁或巡检工具；真实业务的权限与签名机制保持。不能用构建通过代替实际功能。
 
-通用方法见[项目工作规则](../../../02-architecture/current/WORK_RULES.md)：只能做必要检查，尽量减少次数，整批改动后集中处理。命令参考见[开发检查](docs/development-checks.md)。保留已有改动、真实资料及权限，同一文件避免同时写入；子智能体不继续增派，浏览器仅用任务隔离的无头环境。
+在银河维护工作区内开发时，同时遵循上层项目 AGENTS.md；每项新任务实际全文读取 `../../../02-architecture/current/WORK_RULES.md`、`../../../01-intake/CURRENT_RECONSTRUCTION_GOAL_2026-10-12.md`、`../../../01-intake/CURRENT_USER_REQUIREMENTS_2026-10-09.md` 和 `../../../02-architecture/current/EXPERIENCE_RULES.md`，首次参与及分派按完整目标执行，截断补齐。连续任务的进展、交接或上下文恢复不单独算新任务，不为阅读证明重读未变资料；相关内容变化时补读。独立克隆以随仓库交付的规则和用户当前要求为依据，不假定存在维护者的私人目录。
 
-实现安排见[开发准备](../../../02-architecture/current/RECONSTRUCTION_PLAN.md)，当前事项与进展见[任务](../../../99-index/ACTIVE_DEVELOPMENT_GOAL.md)和[状态](../../../02-architecture/current/chapters/11-current-state.md)。
+文件归属统一见[开发指南](docs/development.md#仓库组织与文档归属)。先复用已有主题和组件入口，必要的新边界按真实消费者确定；配置示例不携带秘密，运行数据与一次性执行证据留源码外。正式部署及 AI Agent 排查见[部署指南](docs/deployment.md)与[AI Agent 部署](docs/agent-deployment.md)。
+
+同一文件避免同时写入；子智能体不继续增派，浏览器只用任务隔离的无头环境。不要切换共享工作树分支、整理他人索引、清除未知改动或借整理改变许可、远端、账号、真实数据及正式运行；所需外部动作按当前准确授权执行。
+
+交接直接给可用结果、准确源码和取得方式、已有检查及未查部分、实际问题和下一步，供主会话统一组合，不要求每名成员各跑完整验证。

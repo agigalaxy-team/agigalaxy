@@ -58,6 +58,20 @@
 
 业务审计单列发起人、判断主体、执行账户及相关任务。Schema 130 的封闭 `actor_context` 由服务端原任务、原工具调用和稳定 AI 身份证明产生，不接受模型或 HTTP 自报；程序与 AI 的来源须有实际调用证据，历史缺项继续未知。该上下文与原操作输入、结果分开保存，不改变旧回执的精确对账合同。
 
+## 调度与独立健康监测
+
+Schema 129 建立持久计划、任务、原操作回执、提交后事件与工作台关联；后续迁移继续沿本页部署说明，不把 129 当作当前全部结构。升级只创建结构和停用默认配置，不启用岗位、旧授权或策略，也不改变人工模型配置。
+
+现有 PostgreSQL/pg-boss Worker 负责 `autonomy-tick` 心跳、到期事件合并、当期或一轮恢复任务，以及 `autonomy-task` 领取、全局并发限制和同岗位不重叠。受保护的 Native 原任务接口处理运行，结果未知只读取同 taskId/operationId。Native 程序分支回调 API 固定程序，不创建模型运行；业务完成数只取实际业务回执。
+
+`/v1/operations/autonomy/settings` 保存版本化工程参数，新任务冻结当时的 roundSeconds 等版本；当前停止、撤权和人工接管仍每次重核。总并发支持 1 或 2，与 Native 上限一致；每日岗位没有人工选定时刻时只能保存停用草稿。API/Worker 使用同一 endpoint、完整当前 schema 和各自最小角色 SQL；Worker 沿已有受保护 `GALAXY_AGENTOS_CONFIG_FILE` 只请求 Native 固定路径，私有桥继续核验服务身份和配额。
+
+Worker 的 `autonomy-tick` 与自身恢复循环不能发现自身死亡。独立消费者是 API loopback metrics exporter，从数据库读取心跳和真实持久任务，不依赖总控模型。既有 Prometheus `galaxy-api` scrape 示例为 `127.0.0.1:9464/metrics`、30 秒；实际加载 `docs/alerts/galaxy.rules.json` 后，`GalaxyAutonomyCollectionFailed`、`GalaxyAutonomyWorkerStale`、`GalaxyAutonomyTasksOverdue` 由既有 Alertmanager 路由接收，保留 `owner_role=operations`。标签不代表新接收器已配置；原运行说明记录当时沿 management 路由，实际端口与接收器从部署环境确认，不从源码示例推定已投递。无需另建值守 timer。
+
+Exporter 提供 `galaxy_autonomy_collection_success`、`galaxy_autonomy_enabled_accounts`、`galaxy_autonomy_worker_health_available`、`galaxy_autonomy_worker_tick_age_seconds`、`galaxy_autonomy_worker_tick_limit_seconds`、`galaxy_autonomy_overdue_start_tasks`、`galaxy_autonomy_overdue_round_tasks`。无心跳时不补零 age，用 health_available=0 表示；所有岗位停用时不报值守心跳过期。API/Worker 自身掉线由原 TargetDown/TargetMissing 发现。
+
+必要检查采用既有 promtool fixture 核对触发和恢复；真实接收器投递按实际部署另证。程序模式已有 P14 条件读取、固定规则未命中的 no-action 回执，以及已接参数的文件扫描重试/内容恢复路径；其他动作缺明确参数或当前资格时进入人工处理，不据此宣称全部业务写已程序化。AI 动作仍取当前角色、计划、grant、策略、处理器和原对象资格的交集。
+
 ## AI agent 部署与排查
 
 1. 先读取实际生效的 API、Admin、Native 版本与数据库迁移；从已发布冻结源码增量构建，保留其他未发布改动。迁移129追加运行结构，130追加审计来源，131追加受限岗位提示词管理及审计关联，继续排除原暂缓迁移120。
@@ -66,4 +80,3 @@
 4. 验证会话、任务分页、权限投影、原操作恢复、接管、配置版本以及独立监测。界面用独立无头浏览器检查，禁止复用用户浏览器。
 5. 页面显示权限有效而执行未就绪时，先查处理器、模型绑定、源资格和计划条件；不要扩大角色或借用管理员会话。若调用已发出而回执未知，按同 owner、同 operationId 查询，不换 UUID 重发。
 6. 生产整站恢复仍由人工批准具体方案，程序统一执行和校验；AI 仅准备诊断和建议。文件清理的具体计划批准及原人工决定的改变同样保留人工要求。
-

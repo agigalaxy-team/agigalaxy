@@ -300,7 +300,7 @@
           },
           "annotations": {
             "summary": "Independent duty metadata collection is unavailable",
-            "runbook_ref": "docs/ai-autonomy-runtime.md"
+            "runbook_ref": "docs/ai-operations-autonomy.md"
           }
         },
         {
@@ -313,7 +313,7 @@
           },
           "annotations": {
             "summary": "Enabled duty scheduler has no current independent heartbeat",
-            "runbook_ref": "docs/ai-autonomy-runtime.md"
+            "runbook_ref": "docs/ai-operations-autonomy.md"
           }
         },
         {
@@ -326,7 +326,7 @@
           },
           "annotations": {
             "summary": "Persisted duty work exceeded its start or round allowance",
-            "runbook_ref": "docs/ai-autonomy-runtime.md"
+            "runbook_ref": "docs/ai-operations-autonomy.md"
           }
         }
       ]

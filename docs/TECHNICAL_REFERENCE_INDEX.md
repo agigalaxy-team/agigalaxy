@@ -37,8 +37,8 @@
 | A2A | [适配器 README](../packages/galaxy-a2a/README.md)、[源码导出](../packages/galaxy-a2a/package.json) |
 | 数据库和迁移 | [数据库实现](../packages/galaxy-official/src/database.mjs)、[迁移列表](../packages/galaxy-official/src/infrastructure/migrations.mjs) |
 
-## 版本与旧导航
+## 版本与历史定位
 
-旧技术入口有一部分只保留了指向维护工作区归档的跳转，正文不在此仓库中。不能把这些外置正文写成 GitHub 读者可以取得的资料，也不能把旧服务器路径与运行记录当作新环境配置。
+[历史技术主题表](reference/legacy-topics.md)集中承接没有技术正文的旧导航，保留原文件名、主题、外置定位和当前阅读处。实际被 API、运行手册或发行工具使用的入口继续就近维护；固定版本指南仍按随版内容阅读，不把历史观察提升成当前事实。
 
-目前可独立阅读的总览已经放在本仓库。历史导航中的外置引用应明确标注为未分发资料；原始路径可以保留在源码注释供维护者追溯。旧证据、演示和版本说明仍只证明各自范围，不替代当前产品状态或实际验收。
+主要正文按读者目的归位：产品与网络从[文档目录](README.md)进入，开发与发布看[组件](component-catalog.md)、[开发](development.md)和[部署](deployment.md)，配置跟随真实加载器，具体接口从本页及组件源码读取。私人配置、生产账本和完整用户资料不随源码分发。

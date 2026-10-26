@@ -22,7 +22,7 @@
 | 自行部署网站、API 和依赖 | [部署指南](deployment.md) |
 | 理解本机、同步、公开和资料许可 | [数据与权限](privacy-and-data.md) |
 | 核对阶段、版本和仍存在的问题 | [项目状态](project-status.md) |
-| 查具体接口和实现 | [技术参考索引](TECHNICAL_REFERENCE_INDEX.md) |
+| 查具体接口和实现 | [技术参考索引](TECHNICAL_REFERENCE_INDEX.md)、[历史主题定位](reference/legacy-topics.md) |
 | 提交问题或代码 | [贡献](../CONTRIBUTING.md)、[支持](../SUPPORT.md) |
 
 ## 主代码与公开资料
@@ -43,7 +43,7 @@
 
 ## 组件说明
 
-[官网](../apps/galaxy-site/README.md) · [网页](../packages/galaxy-web/README.md) · [Hub 服务](../packages/galaxy-official/README.md) · [Native 与宿主](../integrations/host-adapters/README.md) · [A2A](../packages/galaxy-a2a/README.md) · [认证](../apps/galaxy-auth/README.md) · [运营后台候选](../apps/galaxy-admin/README.md)
+[官网](../apps/galaxy-site/README.md) · [网页](../packages/galaxy-web/README.md) · [Hub 服务](../packages/galaxy-official/README.md) · [Native 与宿主](../integrations/host-adapters/README.md) · [A2A](../packages/galaxy-a2a/README.md) · [认证](../apps/galaxy-auth/README.md) · [运营后台](../apps/galaxy-admin/README.md)
 
 ## 版本与历史资料
 
