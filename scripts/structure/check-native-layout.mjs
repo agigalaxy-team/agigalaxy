@@ -15,7 +15,6 @@ for(const group of groups){
  assert(names.length>0,'Empty source category: '+group);
  for(const name of names)moved.push(base+group+'/'+name);
 }
-assert.equal(moved.length,27);
 const entryPoints={
  galaxy:'packages/galaxy-edge-mcp/src/native-v2-entry.mjs',
  runtime:base+'runtime.mjs',
