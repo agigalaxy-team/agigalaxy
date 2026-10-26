@@ -8,6 +8,8 @@ export type ModelSettingsModel={
  contextWindow:number|null;maxOutputTokens:number|null;timeoutSeconds:number|null;
  reasoning:{mode:'default'|'effort';effort:ModelSettingsEffort|null;supportedEfforts:ModelSettingsEffort[];supportSource:'manual'};
  toolCalling:boolean;structuredOutput:boolean;enabled:boolean;
+ imageUnderstanding?:boolean;parallelToolCalls?:boolean|null;verbosity?:'low'|'medium'|'high'|null;
+ fallbacks?:{modelId:string;dataPolicyApproved:boolean}[];
 };
 export type ModelSettingsBinding={modelId:string;dataPolicyApproved:boolean}|null;
 export type ModelSettingsConfiguration={models:ModelSettingsModel[];scenarios:Record<ModelSettingsDomain,ModelSettingsBinding>};

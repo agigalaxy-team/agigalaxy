@@ -20,13 +20,13 @@ import {authorizedCommandMatches} from '../../lib/authorized-preparation-model';
 import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from '../../lib/workbench-action-cards';
 import {useWorkbenchCommand} from '../../lib/use-workbench-command';
 import {useConversationStream} from '../../lib/use-conversation-stream';
-import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from '../../lib/agentos-client';
+import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from '../../lib/agentos-client';
 
 const domains=[{id:'overview',label:'总控'},{id:'governance',label:'治理'},{id:'messaging',label:'消息'},{id:'discovery',label:'数据与发现'},{id:'maintenance',label:'运维'}];
 const queries=[{label:'今天的变化',text:'总结今天的运营变化，并说明需要关注的事项。'},{label:'待办原因',text:'梳理当前待办的原因，以及需要人工处理的事项。'},{label:'处理进展',text:'查看最近处理进展和仍未解决的问题。'}];
 
 type WorkbenchConversation=AgentOsConversation&{toolCards?:unknown;contextChanged?:boolean};
-type WaitingReply={operationId:string;runId:string|null;text:string;csrfToken:string};
+type WaitingReply={retryOfOperationId?:string;operationId:string;runId:string|null;text:string;csrfToken:string};
 type StoppingReply={operationId:string;parentOperationId:string;csrfToken:string};
 type PanelMemory={focused:boolean;positions:Record<string,{top:number;follow:boolean}>;waiting:Partial<Record<AgentOsDomain,WaitingReply>>;stopping:Partial<Record<AgentOsDomain,StoppingReply>>};
 const retainedPanels=new Map<string,PanelMemory>();
@@ -95,8 +95,8 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
         setContextNotices(previous=>({...previous,[sentDomain]:true}));
       }else if(sentDomain&&typeof body.message==='string'&&value.state!=='not-started'){
         setContextNotices(previous=>{if(!previous[sentDomain])return previous;const next={...previous};delete next[sentDomain];return next;});
-        setWaiting(previous=>{const next={...previous};if(['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(value.state??''))delete next[sentDomain];else next[sentDomain]={operationId:String(body.operationId),runId:value.runId??null,text:String(body.message),csrfToken:verifiedSession?.csrfToken??''};memory.current.waiting=next;return next;});
-        if(draftsRef.current[sentDomain]===body.message){const next={...draftsRef.current,[sentDomain]:''};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
+        setWaiting(previous=>{const next={...previous};if(['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(value.state??''))delete next[sentDomain];else next[sentDomain]={operationId:String(body.operationId),runId:value.runId??null,text:String(body.message),...(typeof body.retryOfOperationId==='string'?{retryOfOperationId:body.retryOfOperationId}:{}),csrfToken:verifiedSession?.csrfToken??''};memory.current.waiting=next;return next;});
+        if(!body.retryOfOperationId&&draftsRef.current[sentDomain]===body.message){const next={...draftsRef.current,[sentDomain]:''};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
       }
       await conversation.read();
       if(returnToInput&&(document.activeElement===document.body||dismissedCard?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
@@ -147,13 +147,13 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   },[identityEnded,checkedSession,operatorId,onIdentityChange,command.cancel,dismissCommand.cancel,stopCommand.cancel,conversation.clear]);
   useEffect(()=>{if((!focused&&logSource!=='actions')||!conversation.verified||!currentConversation||!replying&&!cardsWaiting)return;const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void conversation.renew();},2000);return()=>clearTimeout(timer);},[focused,logSource,conversation.verified,currentConversation,replying,cardsWaiting,conversation.renew]);
   const taskReady=!taskId||!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
-  const sendMessage=async(message:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
+  const sendMessage=async(message:string,retryOfOperationId?:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
     scrollPositions.current[domain]={top:conversationElement.current?.scrollTop??0,follow:true};
     const path=agentOsConversationPath(domain)+'/runs';
-    await command.submit(path,{message,...(taskId?{taskId}:{})},'',operationId=>agentOsConversationOperationPath(domain,operationId));
+    await command.submit(path,{message,...(taskId?{taskId}:{}),...(retryOfOperationId?{retryOfOperationId}:{})},'',operationId=>agentOsConversationOperationPath(domain,operationId));
   };
   const send=()=>sendMessage(drafts[domain]??'');
-  const retryReply=(runId:string)=>{if(!conversation.verified||currentConversation?.contextChanged)return;const message=nativeConversationRetryMessage(currentConversation,runId);if(message!==null)void sendMessage(message);};
+  const retryReply=(runId:string)=>{if(!conversation.verified||currentConversation?.contextChanged)return;const message=nativeConversationRetryMessage(currentConversation,runId);if(message!==null){const original=currentConversation?.runs.find(run=>run.runId===runId);if(original?.operationId)void sendMessage(message,original.operationId);}};
   const confirmCard=(card:WorkbenchActionCard)=>{if(workLocked||!canUseDomain||!verifiedSession||!conversation.verified||!card.capability.canConfirm||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void command.submit(path+'/confirm',{cardId:card.cardId},'',()=>path,card.operationId);};
   const canDismissPending=(card:WorkbenchActionCard)=>command.pending?.domain===domain&&command.pending.path===workbenchCardPath(domain,card.cardId)+'/confirm'&&command.pending.body.cardId===card.cardId&&command.pending.body.operationId===card.operationId;
   const dismissCard=(card:WorkbenchActionCard)=>{if(!canUseDomain||!verifiedSession||!conversation.verified||dismissCommand.locked||command.locked&&!canDismissPending(card)||!['prepared','not-available'].includes(card.state)||!card.capability.canDismiss||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void dismissCommand.submit(path+'/dismiss',{cardId:card.cardId},'',()=>path,card.operationId);};
@@ -179,6 +179,11 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     const next={...draftsRef.current,[domain]:value};draftsRef.current=next;setDrafts(next);
     if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domain,next));
   };
+  const fillReplyDraft=(value:string)=>{
+    if(!canUseDomain||!verifiedSession)return;
+    updateDraft([draftsRef.current[domain]??"",value].filter(Boolean).join("\n\n"));
+    requestAnimationFrame(()=>input.current?.focus({preventScroll:true}));
+  };
   const changeDomain=(id:string)=>{
     if(!domains.some(item=>item.id===id))return;const element=conversationElement.current;if(element&&conversation.verified&&verifiedSession&&currentConversation)scrollPositions.current[domain]={top:element.scrollTop,follow:element.scrollHeight-element.clientHeight-element.scrollTop<24};domainRef.current=id;setDomain(id as AgentOsDomain);
     if(storageKey)setDraftStorageError(!saveDrafts(storageKey,id,draftsRef.current));
@@ -196,7 +201,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const latestFailure=conversation.verified&&!waitingReply&&latestRun?.status==='ERROR'?latestRun:null;
   const headerError=command.error||dismissCommand.error||stopCommand.error||conversation.error||session.error;
   return <section id="operations-ai" className={'wb-communication'+(focused?' wb-communication--focused':'')} aria-labelledby={panelId}>
-    <header className="wb-section-heading"><h2 id={panelId}><AdminIcon name="sparkles" size={19}/>运营AI · {current.label}</h2><div className="wb-communication-controls">{latestFailure&&<WorkbenchModelNotice run={latestFailure} canSend={canUseDomain&&conversation.verified&&!currentConversation?.contextChanged&&!!currentConversation?.capabilities.canSend} busy={workLocked||replying} onRetry={()=>retryReply(latestFailure.runId)}/>}<button type="button" className="wb-view-toggle" disabled={!interactive} aria-expanded={focused} aria-controls={panelId+'-conversation'} onClick={()=>focused?onFocusChange(false):open()}><AdminIcon name={focused?'workspace':'comment'} size={16}/><span>{focused?'返回仪表':interactive?'打开沟通':'准备沟通…'}</span></button></div></header>
+    <header className="wb-section-heading"><h2 id={panelId}><AdminIcon name="sparkles" size={19}/>运营AI · {current.label}</h2><div className="wb-communication-controls">{latestFailure&&<WorkbenchModelNotice run={latestFailure} canSend={canUseDomain&&conversation.verified&&!currentConversation?.contextChanged&&!!currentConversation?.capabilities.canSend} busy={workLocked||replying} onRetry={()=>retryReply(latestFailure.runId)}/>}{conversation.verified&&!waitingReply&&latestRun?.status==="COMPLETED"&&!!latestRun.modelFallbacks?.length&&<span className="wb-model-notice wb-model-notice--recovered" role="status">备用模型已接续</span>}<button type="button" className="wb-view-toggle" disabled={!interactive} aria-expanded={focused} aria-controls={panelId+'-conversation'} onClick={()=>focused?onFocusChange(false):open()}><AdminIcon name={focused?'workspace':'comment'} size={16}/><span>{focused?'返回仪表':interactive?'打开沟通':'准备沟通…'}</span></button></div></header>
     {headerError&&<div className="wb-header-feedback" role="alert">{headerError}</div>}
     {actionsTarget&&createPortal(<WorkbenchActionHistory domain={domain} label={current.label} cards={actionCards} verified={!!verifiedSession&&canUseDomain&&conversation.verified} loading={session.loading||conversation.loading} denied={!!verifiedSession&&!canUseDomain||signedOut} error={conversation.error||session.error} now={cardNow} renderCard={card=>showCards([card],'所选AI操作')} feedback={null}/>,actionsTarget)}
       <div className="wb-header-command-feedback" aria-live="polite">{command.pending?!permittedDomains.includes(command.pending.domain)?<p role="status">原操作结果尚未取得，当前无法继续读取。</p>:confirmingCard?pendingCardVisible?null:<p role="status">原操作的结果尚未确认，恢复读取后会继续查询。</p>:<p role="status">{sendingConversation?'正在发送…':'正在处理…'}</p>:command.message?<output>{command.message}</output>:null}</div>
@@ -208,14 +213,15 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       {domain==='overview'&&conversation.verified&&currentConversation&&<WorkbenchManagementCapabilities value={currentConversation.managementCapabilities??null}/>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
-      <div>{currentConversation?.runs.map(run=>{
-        const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation.capabilities.canStream===true;
+      <div>{nativeConversationDisplayRuns(currentConversation?.runs??[]).map(run=>{
+        const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
         const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
         const stateText=run.status==='CANCELLED'?'已停止生成':pending?(stopInProgress&&run.operationId===activeTurn?'正在停止生成…':live&&stream.finished?'正在读取完整回复…':live&&stream.phase==='working'?'正在核对资料…':'正在回复…'):nativeRunLabel(run.status);
-        return <article className="wb-run" key={run.runId}>{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={content}/></div>}{pending&&<p className="wb-reply-state" role="status">{stateText}</p>}</article>;
+        const previousAttempts=nativeConversationPreviousAttempts(currentConversation?.runs??[],run);
+        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={content} onDraft={fillReplyDraft}/></div>}{pending&&<p className="wb-reply-state" role="status">{stateText}</p>}</article>;
       })}</div>
 
-      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting"><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>{stream.text&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={stream.text}/></div>}<p className="wb-reply-state" role="status">{stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在核对资料…':stream.text?'正在回复…':'等待回复…'}</p></article>}
+      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{stream.text&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={stream.text}/></div>}<p className="wb-reply-state" role="status">{stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在核对资料…':stream.text?'正在回复…':'等待回复…'}</p></article>}
       {currentConversation?.blockedReason==='model-not-configured'&&<p>本领域暂未配置模型，输入会保留。</p>}
       {currentConversation?.blockedReason==='runtime-unavailable'&&<p>沟通服务暂时不可用，输入会保留。</p>}
 

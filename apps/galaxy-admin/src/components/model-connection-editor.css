@@ -1,0 +1,21 @@
+.model-connection-editor{--model-accent:#7c5667;--model-soft:#f8f4f6;display:grid;gap:0}
+.model-connection-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 0 24px;margin-bottom:24px;border-bottom:1px solid var(--admin-border,#e6eaf1)}
+.model-connection-heading>div{display:grid;gap:7px}.model-connection-heading h2{font-size:22px!important;letter-spacing:-.02em}.model-connection-heading>div>span:last-child{color:var(--admin-muted,#758099);font-size:12px}
+.model-connection-eyebrow{font-size:11px;letter-spacing:.1em;color:var(--model-accent)}
+.model-section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:17px}.model-section-heading h3{font-size:14px;font-weight:650;margin:0;color:var(--admin-text,#20283f)}
+.model-section-heading>span,.model-section-heading p{font-size:11px;color:var(--admin-muted,#758099);line-height:1.6}.model-section-heading p{margin:7px 0 0!important}
+.model-connection-editor .model-settings-section{padding-bottom:24px;margin-bottom:24px}.model-connection-editor .model-settings-section:last-child{margin-bottom:0;border-bottom:0}
+.model-capability-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.model-capability-option{display:flex!important;align-items:flex-start;gap:10px!important;padding:14px 12px;border:1px solid var(--admin-border,#e6eaf1);border-radius:8px;background:#fcfcfd;transition:background .15s,border-color .15s}
+.model-capability-option:has(input:checked){background:var(--model-soft);border-color:#cdbbc4}.model-capability-option>input{width:15px!important;min-height:15px!important;flex:none;accent-color:var(--model-accent);margin:2px 0 0}
+.model-capability-option>span{display:grid;gap:6px;min-width:0}.model-capability-option strong{font-size:12px;font-weight:600}.model-capability-option small,.model-advanced-fields small{font-size:11px;color:var(--admin-muted,#758099);line-height:1.55}
+.model-advanced-fields{margin-top:16px}.model-effort-options{display:grid;gap:10px;align-content:start}.model-effort-options>span{font-size:12px;color:var(--admin-muted,#758099)}.model-effort-options>div{display:flex;flex-wrap:wrap;gap:10px 14px}
+.model-credential-state{align-self:end;padding:9px 11px;border-radius:6px;background:#f3f4f6;color:#757681;font-size:11px;white-space:nowrap}.model-credential-state[data-state=configured]{color:#38745a;background:#eef6f1}
+.model-fallback-empty{padding:17px;border:1px dashed #ddd7dc;border-radius:8px;color:var(--admin-muted,#758099);font-size:12px;line-height:1.65}
+.model-fallback-list{list-style:none;display:grid;gap:11px;padding:0;margin:0 0 14px}.model-fallback-list>li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:start;gap:12px;padding:15px;border:1px solid var(--admin-border,#e6eaf1);border-radius:8px;background:#fcfbfc}
+.model-fallback-order{display:grid;place-items:center;margin-top:21px;width:24px;height:24px;border-radius:50%;background:#ede4e9;color:var(--model-accent);font-size:12px;font-weight:600}
+.model-fallback-choice{display:grid;gap:11px;min-width:0}.model-fallback-choice>label:first-child{display:grid;gap:7px;font-size:12px;color:var(--admin-muted,#758099)}.model-fallback-choice>.model-settings-checkbox{font-size:11px}
+.model-fallback-controls{display:flex;align-items:center;gap:4px;padding-top:20px}.model-fallback-controls>button{min-height:29px!important;padding:4px 7px!important;font-size:11px!important}
+.model-connection-editor input[type=checkbox]{accent-color:var(--model-accent)}
+.galaxy-model-settings input:focus-visible,.galaxy-model-settings select:focus-visible,.galaxy-model-settings button:focus-visible{outline-color:#a28294}
+@media(max-width:1400px){.model-capability-grid{grid-template-columns:minmax(0,1fr)}.model-capability-option{padding:12px}.model-capability-option>span{display:flex;gap:12px;align-items:baseline}.model-fallback-list>li{grid-template-columns:24px minmax(0,1fr)}.model-fallback-controls{grid-column:2;padding-top:0;justify-content:flex-end}}
+@media(prefers-reduced-motion:reduce){.model-capability-option{transition:none}}

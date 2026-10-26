@@ -2,6 +2,9 @@
 
 import {createElement,Fragment,useMemo,type ReactNode} from 'react';
 import {lexer,type Token,type Tokens} from 'marked';
+import {WorkbenchDiagram} from './WorkbenchDiagram';
+import {WorkbenchReplyForm} from './WorkbenchReplyForm';
+import './workbench-answer.css';
 
 const entities:Record<string,string>={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:'\u00a0'};
 function readableText(value:string){
@@ -28,26 +31,26 @@ function renderText(value:string):ReactNode{
   }
   return parts.length?<>{parts}{readableText(text.slice(offset))}</>:readableText(text);
 }
-function renderTokens(tokens:readonly Token[]):ReactNode{
+function renderTokens(tokens:readonly Token[],onDraft?:(text:string)=>void):ReactNode{
   return tokens.map((token,index)=>{
     let node:ReactNode;
     switch(token.type){
       case 'space':case 'def':return null;
-      case 'heading':{const item=token as Tokens.Heading;node=createElement('h'+Math.min(6,item.depth+2),null,renderTokens(item.tokens));break;}
-      case 'paragraph':node=<p>{renderTokens((token as Tokens.Paragraph).tokens)}</p>;break;
-      case 'text':{const item=token as Tokens.Text;node=item.tokens?renderTokens(item.tokens):renderText(item.text);break;}
+      case 'heading':{const item=token as Tokens.Heading;node=createElement('h'+Math.min(6,item.depth+2),null,renderTokens(item.tokens,onDraft));break;}
+      case 'paragraph':node=<p>{renderTokens((token as Tokens.Paragraph).tokens,onDraft)}</p>;break;
+      case 'text':{const item=token as Tokens.Text;node=item.tokens?renderTokens(item.tokens,onDraft):renderText(item.text);break;}
       case 'escape':node=readableText((token as Tokens.Escape).text);break;
-      case 'strong':node=<strong>{renderTokens((token as Tokens.Strong).tokens)}</strong>;break;
-      case 'em':node=<em>{renderTokens((token as Tokens.Em).tokens)}</em>;break;
-      case 'del':node=<del>{renderTokens((token as Tokens.Del).tokens)}</del>;break;
+      case 'strong':node=<strong>{renderTokens((token as Tokens.Strong).tokens,onDraft)}</strong>;break;
+      case 'em':node=<em>{renderTokens((token as Tokens.Em).tokens,onDraft)}</em>;break;
+      case 'del':node=<del>{renderTokens((token as Tokens.Del).tokens,onDraft)}</del>;break;
       case 'codespan':node=<code>{readableText((token as Tokens.Codespan).text)}</code>;break;
-      case 'code':{const item=token as Tokens.Code;node=<pre tabIndex={0}><code>{item.text}</code></pre>;break;}
+      case 'code':{const item=token as Tokens.Code;node=item.lang==='mermaid'?<WorkbenchDiagram source={item.text}/>:item.lang==='galaxy-form'?<WorkbenchReplyForm source={item.text} onDraft={onDraft}/>:<pre tabIndex={0}><code>{item.text}</code></pre>;break;}
       case 'br':node=<br/>;break;
       case 'hr':node=<hr/>;break;
-      case 'blockquote':node=<blockquote>{renderTokens((token as Tokens.Blockquote).tokens)}</blockquote>;break;
-      case 'list':{const item=token as Tokens.List,items=item.items.map((row,i)=><li key={i}>{row.task&&<input type="checkbox" checked={!!row.checked} disabled readOnly aria-label={row.checked?'已完成':'未完成'}/>} {renderTokens(row.tokens)}</li>);node=item.ordered?<ol start={typeof item.start==='number'?item.start:undefined}>{items}</ol>:<ul>{items}</ul>;break;}
-      case 'table':{const item=token as Tokens.Table;node=<div className="wb-answer-table" data-layout={item.header.length<=4?'fit':'scroll'} tabIndex={0} role="region" aria-label="回答中的表格"><table role="table"><thead role="rowgroup"><tr role="row">{item.header.map((cell,i)=><th scope="col" role="columnheader" key={i} style={{textAlign:cell.align??undefined}}>{renderTokens(cell.tokens)}</th>)}</tr></thead><tbody role="rowgroup">{item.rows.map((row,i)=><tr role="row" key={i}>{row.map((cell,j)=><td role="cell" key={j} style={{textAlign:cell.align??undefined}}><div className="wb-answer-cell-content">{renderTokens(cell.tokens)}</div></td>)}</tr>)}</tbody></table></div>;break;}
-      case 'link':{const item=token as Tokens.Link,href=safeHref(item.href);node=href?<a href={href} title={item.title??undefined} target={/^https?:/i.test(href)?'_blank':undefined} rel="noopener noreferrer">{renderTokens(item.tokens)}</a>:renderTokens(item.tokens);break;}
+      case 'blockquote':node=<blockquote>{renderTokens((token as Tokens.Blockquote).tokens,onDraft)}</blockquote>;break;
+      case 'list':{const item=token as Tokens.List,items=item.items.map((row,i)=><li key={i}>{row.task&&<input type="checkbox" checked={!!row.checked} disabled readOnly aria-label={row.checked?'已完成':'未完成'}/>} {renderTokens(row.tokens,onDraft)}</li>);node=item.ordered?<ol start={typeof item.start==='number'?item.start:undefined}>{items}</ol>:<ul>{items}</ul>;break;}
+      case 'table':{const item=token as Tokens.Table;node=<div className="wb-answer-table" data-layout={item.header.length<=4?'fit':'scroll'} tabIndex={0} role="region" aria-label="回答中的表格"><table role="table"><thead role="rowgroup"><tr role="row">{item.header.map((cell,i)=><th scope="col" role="columnheader" key={i} style={{textAlign:cell.align??undefined}}>{renderTokens(cell.tokens,onDraft)}</th>)}</tr></thead><tbody role="rowgroup">{item.rows.map((row,i)=><tr role="row" key={i}>{row.map((cell,j)=><td role="cell" key={j} style={{textAlign:cell.align??undefined}}><div className="wb-answer-cell-content">{renderTokens(cell.tokens,onDraft)}</div></td>)}</tr>)}</tbody></table></div>;break;}
+      case 'link':{const item=token as Tokens.Link,href=safeHref(item.href);node=href?<a href={href} title={item.title??undefined} target={/^https?:/i.test(href)?'_blank':undefined} rel="noopener noreferrer">{renderTokens(item.tokens,onDraft)}</a>:renderTokens(item.tokens,onDraft);break;}
       case 'image':{const item=token as Tokens.Image,href=safeHref(item.href),label=readableText(item.text)||'查看图片';node=href?<a href={href} target="_blank" rel="noopener noreferrer">{label}</a>:label;break;}
       case 'html':node=<span className="wb-answer-literal">{(token as Tokens.HTML).text}</span>;break;
       default:node=token.raw;
@@ -55,7 +58,7 @@ function renderTokens(tokens:readonly Token[]):ReactNode{
     return <Fragment key={index}>{node}</Fragment>;
   });
 }
-export function WorkbenchMarkdown({content}:{content:string}){
+export function WorkbenchMarkdown({content,onDraft}:{content:string;onDraft?:(text:string)=>void}){
   const tokens=useMemo(()=>{try{return lexer(content,{gfm:true,breaks:true});}catch{return null;}},[content]);
-  return <div className="wb-answer">{tokens?renderTokens(tokens):<p style={{whiteSpace:'pre-wrap'}}>{content}</p>}</div>;
+  return <div className="wb-answer">{tokens?renderTokens(tokens,onDraft):<p style={{whiteSpace:'pre-wrap'}}>{content}</p>}</div>;
 }

@@ -29,12 +29,12 @@ export const modelSettingsEmpty=():ModelSettingsConfiguration=>({models:[],scena
 export const modelSettingsClone=(configuration:ModelSettingsConfiguration):ModelSettingsConfiguration=>structuredClone(configuration);
 export const modelSettingsSame=(left:unknown,right:unknown):boolean=>JSON.stringify(left)===JSON.stringify(right);
 export function modelSettingsNewModel(id:string):ModelSettingsModel{
- return{id,displayName:'',modelId:null,apiFormat:'openai-chat',baseUrl:null,credentialRef:null,contextWindow:null,maxOutputTokens:null,timeoutSeconds:null,reasoning:{mode:'default',effort:null,supportedEfforts:[],supportSource:'manual'},toolCalling:false,structuredOutput:false,enabled:false};
+ return{id,displayName:'',modelId:null,apiFormat:'openai-chat',baseUrl:null,credentialRef:null,contextWindow:null,maxOutputTokens:null,timeoutSeconds:null,reasoning:{mode:'default',effort:null,supportedEfforts:[],supportSource:'manual'},toolCalling:false,structuredOutput:false,imageUnderstanding:false,parallelToolCalls:null,verbosity:null,fallbacks:[],enabled:false};
 }
 export function modelSettingsWithFormat(model:ModelSettingsModel,apiFormat:ModelSettingsFormat):ModelSettingsModel{
  const supportedEfforts=model.reasoning.supportedEfforts.filter(effort=>apiFormat!=='gemini'||!['xhigh','max'].includes(effort));
  const effort=model.reasoning.effort,valid=effort!==null&&supportedEfforts.includes(effort);
- return {...model,apiFormat,reasoning:{...model.reasoning,supportedEfforts,...(model.reasoning.mode==='effort'&&!valid?{mode:'default' as const,effort:null}:{})}};
+ return {...model,apiFormat,...(!['openai-chat','openai-responses'].includes(apiFormat)&&Object.hasOwn(model,'verbosity')?{verbosity:null}:{}),reasoning:{...model.reasoning,supportedEfforts,...(model.reasoning.mode==='effort'&&!valid?{mode:'default' as const,effort:null}:{})}};
 }
 export function modelSettingsValidBaseUrl(value:string){
  try{
@@ -74,6 +74,17 @@ export function modelSettingsValidation(configuration:ModelSettingsConfiguration
   if(efforts.some(effort=>!modelSettingsEfforts.includes(effort))||new Set(efforts).size!==efforts.length)errors.push(name+'：支持的思考档位无效。');
   if(reasoning.mode==='effort'&&(!reasoning.effort||!efforts.includes(reasoning.effort)))errors.push(name+'：选择该接口实际支持的思考档位。');
   if(model.apiFormat==='gemini'&&reasoning.mode==='effort'&&['xhigh','max'].includes(reasoning.effort??''))errors.push(name+'：Gemini 当前不支持所选思考档位。');
+  const backups=model.fallbacks??[];
+  if(backups.length>3||new Set(backups.map(item=>item.modelId)).size!==backups.length)errors.push(name+'：最多选择三个不同的备用模型。');
+  for(const backup of backups){
+   const target=configuration.models.find(item=>item.id===backup.modelId);
+   if(!target||target.id===model.id){errors.push(name+'：备用模型需为其他已有模型。');continue;}
+   if(applying&&model.enabled){
+    if(!target.enabled)errors.push(name+'：备用模型“'+target.displayName+'”尚未启用。');
+    if(!backup.dataPolicyApproved)errors.push(name+'：确认备用模型“'+target.displayName+'”可处理已获准资料。');
+    if(model.toolCalling&&!target.toolCalling||model.structuredOutput&&!target.structuredOutput||model.imageUnderstanding&&!target.imageUnderstanding)errors.push(name+'：备用模型“'+target.displayName+'”缺少所需的工具、结构化或图片能力。');
+   }
+  }
   if(applying&&model.enabled){if([model.modelId,model.baseUrl,model.contextWindow,model.maxOutputTokens,model.timeoutSeconds].some(value=>value===null))errors.push(name+'：启用前补齐模型名称、地址、上下文、输出上限和超时。');if(!model.credentialRef&&!pendingKeys.includes(model.id))errors.push(name+'：启用前配置 API Key。');}
  }
  for(const domain of modelSettingsDomains){const selected=configuration.scenarios[domain];if(!selected)continue;const model=configuration.models.find(item=>item.id===selected.modelId);
@@ -82,12 +93,17 @@ export function modelSettingsValidation(configuration:ModelSettingsConfiguration
  }
  return[...new Set(errors)];
 }
+function modelSettingsOptional(model:ModelSettingsModel){
+ const result:Partial<ModelSettingsModel>={};
+ for(const key of ['imageUnderstanding','parallelToolCalls','verbosity','fallbacks'] as const)if(Object.hasOwn(model,key))(result as Record<string,unknown>)[key]=structuredClone(model[key]);
+ return result;
+}
 export function modelSettingsSafeConfiguration(configuration:ModelSettingsConfiguration):ModelSettingsConfiguration{
- return{models:configuration.models.map(model=>({id:model.id,displayName:model.displayName.trim(),modelId:model.modelId?.trim()||null,apiFormat:model.apiFormat,baseUrl:model.baseUrl?.trim()||null,credentialRef:model.credentialRef,contextWindow:model.contextWindow,maxOutputTokens:model.maxOutputTokens,timeoutSeconds:model.timeoutSeconds,reasoning:{mode:model.reasoning.mode,effort:model.reasoning.mode==='effort'?model.reasoning.effort:null,supportedEfforts:[...model.reasoning.supportedEfforts],supportSource:'manual'},toolCalling:model.toolCalling,structuredOutput:model.structuredOutput,enabled:model.enabled})),scenarios:Object.fromEntries(modelSettingsDomains.map(domain=>[domain,configuration.scenarios[domain]?{modelId:configuration.scenarios[domain]!.modelId,dataPolicyApproved:configuration.scenarios[domain]!.dataPolicyApproved}:null])) as ModelSettingsConfiguration['scenarios']};
+ return{models:configuration.models.map(model=>({id:model.id,displayName:model.displayName.trim(),modelId:model.modelId?.trim()||null,apiFormat:model.apiFormat,baseUrl:model.baseUrl?.trim()||null,credentialRef:model.credentialRef,contextWindow:model.contextWindow,maxOutputTokens:model.maxOutputTokens,timeoutSeconds:model.timeoutSeconds,reasoning:{mode:model.reasoning.mode,effort:model.reasoning.mode==='effort'?model.reasoning.effort:null,supportedEfforts:[...model.reasoning.supportedEfforts],supportSource:'manual'},toolCalling:model.toolCalling,structuredOutput:model.structuredOutput,...modelSettingsOptional(model),enabled:model.enabled})),scenarios:Object.fromEntries(modelSettingsDomains.map(domain=>[domain,configuration.scenarios[domain]?{modelId:configuration.scenarios[domain]!.modelId,dataPolicyApproved:configuration.scenarios[domain]!.dataPolicyApproved}:null])) as ModelSettingsConfiguration['scenarios']};
 }
 export type ModelSettingsConflict={path:string;label:string;mine:unknown;current:unknown};
-const fields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','timeoutSeconds','reasoning','toolCalling','structuredOutput','enabled'] as const;
-const fieldNames:Record<string,string>={displayName:'显示名称',modelId:'API 模型名称',apiFormat:'接口格式',baseUrl:'接口地址',credentialRef:'凭据',contextWindow:'上下文窗口',maxOutputTokens:'最大输出',timeoutSeconds:'超时',reasoning:'思考设置',toolCalling:'工具调用',structuredOutput:'结构化输出',enabled:'启用状态'};
+const fields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','timeoutSeconds','reasoning','toolCalling','structuredOutput','imageUnderstanding','parallelToolCalls','verbosity','fallbacks','enabled'] as const;
+const fieldNames:Record<string,string>={displayName:'显示名称',modelId:'API 模型名称',apiFormat:'接口格式',baseUrl:'接口地址',credentialRef:'凭据',contextWindow:'上下文窗口',maxOutputTokens:'最大输出',timeoutSeconds:'超时',reasoning:'思考设置',toolCalling:'工具调用',structuredOutput:'结构化输出',imageUnderstanding:'图片识别',parallelToolCalls:'并行工具调用',verbosity:'回答详略',fallbacks:'备用模型',enabled:'启用状态'};
 export function modelSettingsMerge(base:ModelSettingsConfiguration,mine:ModelSettingsConfiguration,current:ModelSettingsConfiguration,choices:Record<string,'mine'|'current'>={},pendingCredentialIds:readonly string[]=[]){
  const conflicts:ModelSettingsConflict[]=[],pendingCredentials=new Set(pendingCredentialIds),retainedCredentials=new Set<string>();let unresolved=0;
  const knownReferences=[...base.models,...mine.models,...current.models].every(model=>model.credentialRef===null||typeof model.credentialRef==='string'&&/^model-key:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(model.credentialRef));
@@ -112,7 +128,7 @@ export function modelSettingsOperationLabel(operation:ModelSettingsOperation){if
 export function modelSettingsOperator(item:{operatorDisplayName?:string|null}){return typeof item.operatorDisplayName==='string'&&item.operatorDisplayName.trim()?item.operatorDisplayName.trim():'管理账户';}
 export function modelSettingsCount(value:unknown){return typeof value==='number'&&Number.isSafeInteger(value)&&value>=0?value.toLocaleString('zh-CN'):'未取得';}
 export function modelSettingsTime(value:unknown){if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return'未记录';return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value));}
-export const modelSettingsErrors:Record<string,string>={model_settings_revision_changed:'配置已有更新，你的修改已保留。',model_settings_draft_changed:'草稿已变化，请与当前版本合并后继续。',model_settings_operation_pending:'已有配置正在应用，完成后会自动更新。',model_settings_operation_conflict:'这次保存内容已有变化，请刷新后重试。',model_settings_native_drift:'两端配置与当前记录不一致，暂不能应用。',model_settings_native_readback_mismatch:'配置正在同步，完成后会自动更新。',model_settings_model_incomplete:'启用模型前请补齐连接与参数。',model_settings_credential_unavailable:'凭据尚未确认，请重新读取凭据状态。',model_settings_binding_unavailable:'场景所选模型尚不可用。',model_settings_data_policy_unapproved:'场景资料范围尚未确认。',model_settings_native_not_configured:'配置服务尚未接通，草稿仍可保存。',model_settings_native_unavailable:'配置服务暂时不可用，稍后可继续确认。',model_settings_permission_denied:'当前已无配置权限，操作已停止。',model_settings_authorization_unavailable:'配置授权服务暂时不可用，尚未应用。',invalid_model_settings_request:'请检查连接和参数后继续。'};
+export const modelSettingsErrors:Record<string,string>={model_settings_revision_changed:'配置已有更新，你的修改已保留。',model_settings_draft_changed:'草稿已变化，请与当前版本合并后继续。',model_settings_operation_pending:'已有配置正在应用，完成后会自动更新。',model_settings_operation_conflict:'这次保存内容已有变化，请刷新后重试。',model_settings_native_drift:'两端配置与当前记录不一致，暂不能应用。',model_settings_native_readback_mismatch:'配置正在同步，完成后会自动更新。',model_settings_model_incomplete:'启用模型前请补齐连接与参数。',model_settings_fallback_unavailable:'备用模型尚不可用，请检查记录和启用状态。',model_settings_fallback_data_policy_unapproved:'请确认备用模型的资料处理范围。',model_settings_fallback_capability_incompatible:'备用模型的能力不足以接续当前模型，请检查工具、结构化和图片能力。',model_settings_credential_unavailable:'凭据尚未确认，请重新读取凭据状态。',model_settings_binding_unavailable:'场景所选模型尚不可用。',model_settings_data_policy_unapproved:'场景资料范围尚未确认。',model_settings_native_not_configured:'配置服务尚未接通，草稿仍可保存。',model_settings_native_unavailable:'配置服务暂时不可用，稍后可继续确认。',model_settings_permission_denied:'当前已无配置权限，操作已停止。',model_settings_authorization_unavailable:'配置授权服务暂时不可用，尚未应用。',invalid_model_settings_request:'请检查连接和参数后继续。'};
 export function modelSettingsHistoryLines(item:ModelSettingsHistoryItem){
  const lines:string[]=[];for(const model of item.changes?.models??[]){const names=model.fields.map(field=>fieldNames[field.field]).filter(Boolean);if(names.length)lines.push((model.kind==='added'?'新增模型':model.kind==='removed'?'移除模型':'修改模型')+'：'+names.join('、'));}
  for(const scenario of item.changes?.scenarios??[]){const name=modelSettingsDomainNames[scenario.domain];if(name)lines.push(name+'：'+(scenario.after?'更新模型分配':'取消模型分配'));}

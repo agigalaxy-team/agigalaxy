@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "types": "tsc --noEmit",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --import tsx --test test/*.test.mjs",
     "payload": "payload",
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
@@ -24,6 +24,8 @@
     "@payloadcms/translations": "3.91.0",
     "@payloadcms/ui": "3.91.0",
     "graphql": "^16.8.1",
+    "marked": "14.0.0",
+    "mermaid": "12.2.0",
     "next": "16.4.2",
     "payload": "3.91.0",
     "react": "19.2.8",
@@ -32,13 +34,13 @@
     "recharts": "3.8.0",
     "sass": "1.105.2",
     "sharp": "0.35.5",
-    "marked": "14.0.0",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "tsx": "^4.23.13",
     "typescript": "5.9.3"
   }
 }

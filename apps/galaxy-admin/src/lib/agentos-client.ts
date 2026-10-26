@@ -6,7 +6,7 @@ export type AgentOsExecution={id:string;domain:AgentOsDomain;grantId:string;gran
 export type AgentOsGrantOption={id:string;name:string;version:number;domain:AgentOsDomain;mode:'assisted';resourceIds:string[];resourceScope:{kind:'selected';resourceIds:string[]}|{kind:'eligible'}|{kind:'unresolved'};actions:string[]};
 export type AgentOsOptions={items:AgentOsGrantOption[];checkedAt:number;readExpiresAt:number};
 export type AgentOsExecutions={items:AgentOsExecution[];checkedAt:number;readExpiresAt:number};
-export type AgentOsNativeRun={runId:string;operationId:string|null;status:string;content:string|null;userInput:string|null;createdAt:number|null;events:{event:string;eventIndex:number|null;createdAt:number|null}[];awaitingHuman:boolean;cancellation?:{operationId:string;state:'dispatching'|'accepted'|'unknown';recordedAt:string|null};errorCode?:string|null;failure?:{stage:'model-request';category:'rate-limit'|'timeout'|'connection'|'context-limit'|'service-unavailable'|'request-rejected'|'unknown';reportedStatus:number|null}|null;businessActivity?:{state:'not-started'|'check-records'|'unknown';basis:'same-owner-turn-tool-and-card-ledger'}};
+export type AgentOsNativeRun={regeneratedFrom?:string|null;retryOfOperationId?:string|null;modelFallbacks?:{from:string;to:string;status:number}[];runId:string;operationId:string|null;status:string;content:string|null;userInput:string|null;createdAt:number|null;events:{event:string;eventIndex:number|null;createdAt:number|null}[];awaitingHuman:boolean;cancellation?:{operationId:string;state:'dispatching'|'accepted'|'unknown';recordedAt:string|null};errorCode?:string|null;failure?:{stage:'model-request';category:'rate-limit'|'timeout'|'connection'|'context-limit'|'service-unavailable'|'request-rejected'|'unknown';reportedStatus:number|null}|null;businessActivity?:{state:'not-started'|'check-records'|'unknown';basis:'same-owner-turn-tool-and-card-ledger'}};
 export type AgentOsPreparedAction={tool:'content-visibility';targetKind:'post'|'reply';targetId:string;input:{kind:'hide'|'restore';until?:number;reason:string;expectedVersion:number;expectedRevision:number}};
 export type AgentOsDetail={execution:AgentOsExecution;preparedAction:AgentOsPreparedAction|null;native:{executionId:string;runs:AgentOsNativeRun[];traces:{traceId:string;status:string;durationMs:number;runId:string|null}[];traceCount:number;modelState:string}|null;runtimeState:string;modelState:string;checkedAt:number;readExpiresAt:number};
 export type AgentOsCommand={execution?:AgentOsExecution;executionId?:string;kind?:string|null;preparedAction?:AgentOsPreparedAction|null;operationId?:string;runId?:string|null;state?:string;native?:AgentOsNativeRun|null;replayed?:boolean;cancelledOperationId?:string};
@@ -47,7 +47,7 @@ export function nativeConversationFailure(run:AgentOsNativeRun){
   ?{title:'回复因权限变化而中断',detail:'请按当前权限重新核对这次处理。',retryable:false}
   :run.errorCode==='operations_authorization_unavailable'
    ?{title:'当前权限暂时无法核对',detail:'这次回复已中断，读取恢复后可继续查看原记录。',retryable:false}
-   :{title:'这次没有取得答复',detail:'模型服务未返回完整结果，具体原因尚未记录。',retryable:run.errorCode==='operations_agentos_model_request_failed'};
+   :{title:'这次没有取得答复',detail:run.errorCode==='operations_agentos_model_request_failed'?'模型服务未返回完整结果，具体原因尚未记录。':'这次回复暂未生成，具体原因尚未记录。',retryable:run.errorCode==='operations_agentos_model_request_failed'};
  const knownActivity=run.businessActivity?.basis==='same-owner-turn-tool-and-card-ledger'?run.businessActivity.state:'unknown';
  const processingNotice=knownActivity==='not-started'?'本轮没有发起业务处理。':knownActivity==='check-records'?'本轮已有处理记录，请先核对原结果，避免重复办理。':'本轮业务处理状态尚未确认，请以原记录为准。';
  const bound=typeof run.operationId==='string'&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(run.operationId)&&typeof run.runId==='string'&&!!run.runId;
@@ -63,3 +63,18 @@ export function nativeConversationRetryMessage(conversation:(AgentOsConversation
 export function nativeConversationFailureLabel(run:AgentOsNativeRun){const failure=nativeConversationFailure(run);return failure.title+'。'+failure.detail+failure.processingNotice;}
 import {operationsAiUseAllowed} from '../../../../packages/galaxy-official/src/shared/operations-ai-use.mjs';
 
+
+export function nativeConversationDisplayRuns(runs:readonly AgentOsNativeRun[]){
+ const replaced=new Set(runs.map(run=>run.regeneratedFrom).filter((id):id is string=>typeof id==="string"));
+ return runs.filter(run=>!replaced.has(run.runId));
+}
+
+export function nativeConversationPreviousAttempts(runs:readonly AgentOsNativeRun[],run:AgentOsNativeRun){
+ const previous:AgentOsNativeRun[]=[],seen=new Set([run.runId]);
+ let parent=run.regeneratedFrom;
+ while(parent&&!seen.has(parent)){
+  seen.add(parent);const attempt=runs.find(item=>item.runId===parent);if(!attempt)break;
+  previous.unshift(attempt);parent=attempt.regeneratedFrom;
+ }
+ return previous;
+}
