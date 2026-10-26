@@ -32,6 +32,8 @@
 
 [`repository-components.json`](../../repository-components.json) 是组件构建输入，构建器、CI、Hub capture 与源码归档共同读取。`apps/`、`packages/`、`services/`、`integrations/` 按实际运行和发行职责组织，跨目录共享源码不复制实现。
 
+组件dependsOn记录实际源码输入与变更传播，包含选用的跨目录客户端；它不表示需要启动同名服务。构建次序只按实际buildDependsOn处理。当前仍是共享源码的单仓工程，拆仓前再按真实接口收束依赖，不根据目录名推定已能独立安装或部署。
+
 Official 的 HTTP 适配位于 `src/adapters/http/`，闭合 schema 与纯合同位于 `src/shared/`，数据库、迁移和加载器位于 `src/infrastructure/`。领域下通常以 `authority`/`base`、`read-model`、`service` 区分授权事务、受权读取和命令，实际文件以源码为准。常用入口：
 
 | 修改目标 | 实现目录或入口 |

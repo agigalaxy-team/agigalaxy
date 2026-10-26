@@ -27,10 +27,11 @@ COPY services/galaxy-model-gateway/SOURCE.json /app/provenance/SOURCE.json
 COPY services/galaxy-model-gateway/src ./src
 COPY services/galaxy-model-gateway/config ./config
 COPY services/galaxy-model-gateway/tests ./tests
+COPY services/galaxy-model-gateway/run-tests.py ./run-tests.py
 ARG GALAXY_GATEWAY_CHECK=all
 RUN python -c "import importlib.util; assert importlib.util.find_spec('litellm_enterprise') is None" \
     && case "$GALAXY_GATEWAY_CHECK" in \
-       all) python -m unittest discover -s tests -p 'test_gateway.py' -v ;; \
+       all) python run-tests.py ;; \
        native) PYTHONPATH=/app/src:/app/tests python -m unittest test_gateway.GatewayTest.test_01_native_empty_proxy_starts_without_enterprise_and_rejects_before_prompt -v ;; \
        protocol) PYTHONPATH=/app/src:/app/tests python -m unittest test_gateway.GatewayTest.test_02_configured_admission_uses_native_protocol_and_metadata_only_without_model_call -v ;; \
        model-settings) PYTHONPATH=/app/src:/app/tests python -m unittest test_model_profiles -v ;; \

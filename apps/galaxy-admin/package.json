@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "types": "tsc --noEmit",
-    "test": "node --import tsx --test test/*.test.mjs",
+    "test": "node --import tsx --import ./test/register-assets.mjs --test test/*.test.mjs",
     "payload": "payload",
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",

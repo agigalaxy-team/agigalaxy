@@ -54,7 +54,7 @@ def prepare(output,archive):
     for name in ['uv.lock','pyproject.toml','LICENSE','litellm-proxy-extras/LICENSE']:
         if not (upstream/name).is_file():raise ValueError('Missing required fixed upstream material: '+name)
     destination=output/'services/galaxy-model-gateway';destination.mkdir(parents=True)
-    for name in ['Dockerfile','SOURCE.json','README.md']:shutil.copyfile(here/name,destination/name)
+    for name in ['Dockerfile','SOURCE.json','README.md','run-tests.py']:shutil.copyfile(here/name,destination/name)
     for area in ['src','tests']:
         for path in (here/area).rglob('*.py'):
             if any(part in {'__pycache__','.venv'} for part in path.parts) or path.is_symlink():continue

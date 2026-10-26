@@ -56,10 +56,69 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-      - if: matrix.component != 'agentos' && matrix.component != 'model-gateway' && matrix.component != 'discovery'
+      - if: matrix.component != 'model-gateway' && matrix.component != 'discovery'
         run: npm run setup
       - if: matrix.component == 'admin'
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin
+      - if: matrix.component == 'admin'
+        name: Prepare isolated Chromium for the existing Admin browser test
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - if: matrix.component == 'auth'
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - if: matrix.component == 'auth'
+        name: Compile and test the fixed Keycloak providers
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/keycloak-26.7.3.tar.gz" \
+            https://github.com/keycloak/keycloak/releases/download/26.7.3/keycloak-26.7.3.tar.gz
+          tar --extract --gzip --file "$RUNNER_TEMP/keycloak-26.7.3.tar.gz" --directory "$RUNNER_TEMP"
+          node scripts/ci/build-auth-providers.mjs --keycloak-dir "$RUNNER_TEMP/keycloak-26.7.3" \
+            --jdk-dir "$JAVA_HOME" --output "$RUNNER_TEMP/auth-providers"
+      - if: matrix.component == 'agentos'
+        name: Install locked AgentOS dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --no-deps -r services/galaxy-operations-agentos/requirements.lock
+          python -m pip check
+      - if: matrix.component == 'agentos'
+        name: Prepare isolated PostgreSQL test database
+        run: |
+          docker run --detach --rm --name galaxy-agentos-ci \
+            --publish 127.0.0.1:55432:5432 \
+            --env POSTGRES_PASSWORD=synthetic-ci-postgres-only postgres:17.6-bookworm
+          ready=false
+          for attempt in $(seq 1 60); do
+            if docker exec galaxy-agentos-ci pg_isready --username postgres; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          docker exec --interactive galaxy-agentos-ci psql --username postgres --set ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE galaxy_agentos_test_role LOGIN PASSWORD 'synthetic-ci-agentos-only'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+          CREATE DATABASE galaxy_agentos_test_db OWNER galaxy_agentos_test_role;
+          REVOKE ALL ON DATABASE galaxy_agentos_test_db FROM PUBLIC;
+          \connect galaxy_agentos_test_db
+          CREATE SCHEMA galaxy_agentos_test_schema AUTHORIZATION galaxy_agentos_test_role;
+          SQL
+          echo 'GALAXY_AGENTOS_TEST_DATABASE_URL=postgresql+psycopg://galaxy_agentos_test_role:synthetic-ci-agentos-only@127.0.0.1:55432/galaxy_agentos_test_db' >> "$GITHUB_ENV"
+          echo 'GALAXY_AGENTOS_TEST_DATABASE_NAME=galaxy_agentos_test_db' >> "$GITHUB_ENV"
+          echo 'GALAXY_AGENTOS_TEST_ROLE=galaxy_agentos_test_role' >> "$GITHUB_ENV"
+          echo 'GALAXY_AGENTOS_TEST_SCHEMA=galaxy_agentos_test_schema' >> "$GITHUB_ENV"
+      - if: matrix.component == 'model-gateway'
+        name: Build the fixed upstream Gateway runtime
+        env:
+          UV_LINK_MODE: copy
+          UV_PYTHON_DOWNLOADS: never
+          RUSTUP_TOOLCHAIN: 1.98.0
+        run: |
+          python -m pip install --disable-pip-version-check uv==0.13.5
+          rustup toolchain install 1.98.0 --profile minimal
+          python services/galaxy-model-gateway/prepare-source-context.py --output "$RUNNER_TEMP/gateway-context" --download
+          uv sync --project "$RUNNER_TEMP/gateway-context/upstream" --python "$(command -v python)" \
+            --frozen --extra proxy --no-dev --no-editable --no-install-package litellm-enterprise
+          "$RUNNER_TEMP/gateway-context/upstream/.venv/bin/python" -c "import importlib.util; assert importlib.util.find_spec('litellm_enterprise') is None"
+          echo "$RUNNER_TEMP/gateway-context/upstream/.venv/bin" >> "$GITHUB_PATH"
       - run: node scripts/components.mjs check --component ${{ matrix.component }} --output outputs/check-${{ matrix.component }}
       - if: matrix.component != 'admin'
         run: node scripts/components.mjs build --component ${{ matrix.component }} --output outputs/build-${{ matrix.component }}
@@ -80,3 +139,6 @@ jobs:
         run: node --test packages/galaxy-official/test/service-release-host.test.mjs
       - if: matrix.component == 'hub'
         run: python scripts/create-release-baseline.py
+      - if: always() && matrix.component == 'agentos'
+        name: Remove the isolated PostgreSQL container
+        run: docker rm --force galaxy-agentos-ci || true

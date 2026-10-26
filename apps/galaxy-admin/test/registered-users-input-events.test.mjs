@@ -6,9 +6,18 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import http from 'node:http';
 import {once} from 'node:events';
+import {compileFunction} from 'node:vm';
+import {chromium} from 'playwright';
 const require=createRequire(import.meta.url),ts=require('typescript');
 const {flushSync}=require('react-dom'),esbuild=require('esbuild');
-const {chromium}=require('C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+// Default to Playwright's managed browser. An explicit override must be an
+// absolute headless-shell file; never select a personal browser or profile.
+const browserExecutable=process.env.GALAXY_TEST_CHROMIUM_EXECUTABLE_PATH;
+if(browserExecutable!==undefined){
+ assert.ok(path.isAbsolute(browserExecutable),'GALAXY_TEST_CHROMIUM_EXECUTABLE_PATH must be absolute');
+ assert.match(path.basename(browserExecutable),/^(?:chrome-headless-shell|headless_shell)(?:\.exe)?$/i,'Only an isolated Chromium headless-shell executable may be overridden');
+ assert.ok(fs.statSync(browserExecutable).isFile(),'Headless-shell override must exist');
+}
 const app=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const sourcePath=process.env.GALAXY_REGISTERED_INPUT_SOURCE||path.join(app,'src/components/RegisteredUsers.tsx');
 const source=fs.readFileSync(sourcePath,'utf8'),tree=ts.createSourceFile(sourcePath,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
@@ -17,9 +26,9 @@ const js=source=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTar
 const dateSource=fs.readFileSync(path.join(app,'src/lib/registered-users-view-model.ts'),'utf8');
 const dateTree=ts.createSourceFile('registered-users-view-model.ts',dateSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
 const dateFunction=find(dateTree,node=>ts.isFunctionDeclaration(node)&&node.name?.text==='registeredDateFromInput')[0];
-const registeredDateFromInput=new Function(js(dateFunction.getText(dateTree).replace(/^export\s+/,''))+';return registeredDateFromInput;')();
+const registeredDateFromInput=compileFunction(js(dateFunction.getText(dateTree).replace(/^export\s+/,''))+';return registeredDateFromInput;')();
 async function fastImplicitSubmit(helper,handler){
- const evidence=path.resolve(process.env.GALAXY_REGISTERED_INPUT_ARTIFACT_DIR||path.join(app,'test/.registered-input-evidence'));
+ const evidence=path.resolve(process.env.GALAXY_REGISTERED_INPUT_ARTIFACT_DIR||path.join(app,'../../outputs/registered-input/tmp'));
  fs.mkdirSync(evidence,{recursive:true});const temporary=fs.mkdtempSync(path.join(evidence,'tmp-react-'));
  const input='fast-query',pendingSource=`import React,{useState,startTransition,Suspense} from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';
  const pending=new Promise(()=>{});function PendingRead({value}){if(value)throw pending;return React.createElement('span',null,'initial-read');}
@@ -31,7 +40,7 @@ async function fastImplicitSubmit(helper,handler){
  let browser,context,page;const report={scope:'One actual React handler/helper probe with a pending concurrent read; synthetic query only; no product API/OIDC or business/provider contact.',personalBrowserUsed:false,productionRequests:0,pageErrors:[],externalRequests:[],passed:false};
  try{
   server.listen(0,'127.0.0.1');await once(server,'listening');const origin='http://127.0.0.1:'+server.address().port;
-  browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});context=await browser.newContext();page=await context.newPage();
+  browser=await chromium.launch({headless:true,...(browserExecutable?{executablePath:browserExecutable}:{})});context=await browser.newContext();page=await context.newPage();
   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():(report.externalRequests.push('unexpected-external-origin'),route.abort()));page.on('pageerror',error=>report.pageErrors.push(error.name));
   await page.goto(origin);const query=page.getByRole('searchbox',{name:'Fast query',exact:true});await query.waitFor();
   await query.fill(input);await query.press('Enter');
@@ -54,9 +63,9 @@ test('registered filter handlers snapshot and commit fast input before implicit 
   const field=/filters\.(\w+)/.exec(valueAttribute.initializer.getText(tree))?.[1];
   assert.ok(Object.hasOwn(samples,field),'Known actual filter field');
   const queued=[],setFilters=updater=>queued.push(updater);
-  const updateFilters=helper?new Function('setFilters','flushSync',js(helper.getText(tree))+';return updateFilters;')(setFilters,flushSync):()=>{throw Error('Unexpected filter helper');};
+  const updateFilters=helper?compileFunction(js(helper.getText(tree))+';return updateFilters;',['setFilters','flushSync'])(setFilters,flushSync):()=>{throw Error('Unexpected filter helper');};
   const expression=attribute.initializer.expression.getText(tree);
-  const handler=new Function('setFilters','updateFilters','registeredDateFromInput',js('const handler='+expression+';')+';return handler;')(setFilters,updateFilters,registeredDateFromInput);
+  const handler=compileFunction(js('const handler='+expression+';')+';return handler;',['setFilters','updateFilters','registeredDateFromInput'])(setFilters,updateFilters,registeredDateFromInput);
   const target={value:samples[field]},initial={query:'',source:'all',business:'',subjectType:'',login:'',participation:'',emailVerified:'',registeredFrom:'',registeredTo:''};
   handler({target});
   assert.equal(queued.length,1);

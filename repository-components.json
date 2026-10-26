@@ -11,7 +11,10 @@
         "packages/galaxy-official/src/browser-client.mjs",
         "packages/galaxy-official/src/operations-permission-catalog.mjs"
       ],
-      "dependsOn": [],
+      "dependsOn": [
+        "hub",
+        "core"
+      ],
       "build": [],
       "checks": [
         [
@@ -171,7 +174,10 @@
       ],
       "dependsOn": [
         "core",
-        "contracts"
+        "contracts",
+        "hub",
+        "a2a",
+        "web"
       ],
       "build": [
         [
@@ -256,7 +262,8 @@
       "dependsOn": [
         "core",
         "contracts",
-        "native-client"
+        "native-client",
+        "hub"
       ],
       "build": [],
       "checks": [
@@ -291,7 +298,9 @@
       "dependsOn": [
         "contracts",
         "core",
-        "native-client"
+        "native-client",
+        "hub",
+        "site"
       ],
       "build": [
         [
@@ -403,7 +412,10 @@
       "interfaces": [
         "OIDC/Keycloak native forms; shared Web and Mail renderers"
       ],
-      "buildLimit": "The component command builds the shared Keycloak theme. Java providers under providers/ are separate artifacts: management-email-change/build.mjs requires an explicit Keycloak 26.7.3 distribution, JDK 21 and a new output directory; theme success does not prove a provider JAR."
+      "buildLimit": "The component command builds the shared Keycloak theme. Java providers under providers/ are separate artifacts: management-email-change/build.mjs requires an explicit Keycloak 26.7.3 distribution, JDK 21 and a new output directory; theme success does not prove a provider JAR.",
+      "files": [
+        "scripts/ci/build-auth-providers.mjs"
+      ]
     },
     {
       "id": "admin",
@@ -413,7 +425,9 @@
         "tools/qa/operations-read-renewal"
       ],
       "dependsOn": [
-        "contracts"
+        "contracts",
+        "web",
+        "mail"
       ],
       "cwd": "apps/galaxy-admin",
       "build": [
@@ -423,7 +437,22 @@
           "build"
         ]
       ],
-      "checks": [],
+      "checks": [
+        [
+          "{node}",
+          "--import",
+          "tsx",
+          "--import",
+          "./test/register-assets.mjs",
+          "--test",
+          "test/*.test.mjs"
+        ],
+        [
+          "{node}",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ]
+      ],
       "sourceEntries": [
         "apps/galaxy-admin/src/payload.config.ts"
       ],
@@ -462,14 +491,7 @@
       "checks": [
         [
           "{python}",
-          "-m",
-          "unittest",
-          "discover",
-          "-s",
-          "services/galaxy-operations-agentos/tests",
-          "-p",
-          "test_database_contract.py",
-          "-v"
+          "scripts/ci/run-agentos-tests.py"
         ]
       ],
       "sourceEntries": [
@@ -482,7 +504,8 @@
       "artifact": "python-source-compilation-or-separate-docker-image",
       "dataOwner": "Native run/session tables are separate from Node business facts and command receipts.",
       "files": [
-        "deploy/model-gateway/agentos.env.example"
+        "deploy/model-gateway/agentos.env.example",
+        "scripts/ci/run-agentos-tests.py"
       ]
     },
     {
@@ -505,7 +528,12 @@
         ]
       ],
       "buildLimit": "Python source compilation; pinned upstream download and Docker build are separate.",
-      "checks": [],
+      "checks": [
+        [
+          "{python}",
+          "services/galaxy-model-gateway/run-tests.py"
+        ]
+      ],
       "sourceEntries": [
         "services/galaxy-model-gateway/src/galaxy_model_gateway/app.py"
       ],

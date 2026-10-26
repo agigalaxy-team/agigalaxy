@@ -46,6 +46,8 @@ node apps/galaxy-auth/providers/email-code/build.mjs --keycloak-dir <固定26.7.
 
 无需Maven或新依赖；输出galaxy-email-code-26.7.3.jar、classes/provider.json，只读输入。with-tests仅编译测试。集中行为入口为候选classes/test-classes加Keycloak `lib/lib/main/*` 的Java classpath，运行org.agigalaxy.keycloak.emailcode包的EmailCodeChallengeStoreTest、EmailCodeTemplateProviderTest、EmailCodeRequiredActionTest、RegistrationContinuationTest；模板/required action测试另加 `lib/lib/boot/*`，Windows分隔符`;`。realm planner测试为 `node --test apps/galaxy-auth/providers/email-code/realm-plan.test.mjs`。
 
+同时验证两个Provider可用薄组合入口：`node scripts/ci/build-auth-providers.mjs --keycloak-dir <准确26.7.3分发目录> --jdk-dir <JDK21目录> --output <全新输出目录>`。它顺序调用原build.mjs、上述四个邮件码main及管理邮箱原native main，不下载工具或启动Keycloak/SMTP；主题构建仍单独将实际JAR经--provider-jar合入。
+
 | 实现 | 原生接法 |
 |---|---|
 | GalaxyVerifyEmailCode | 保VERIFY_EMAIL、order100；仅galaxy realm的required-action config中email-code-enabled精确字符串true启用，其他情况委托原VerifyEmail |

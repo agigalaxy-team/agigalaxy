@@ -99,4 +99,4 @@ CI [`product-checks.yml`](../../.github/workflows/product-checks.yml) 按真实 
 
 setup 版本拒绝先区分开发 24.13+ 与客户端 22.13+；官网首次失败检查 Python 和固定资源获取；静态页可看但业务不可用时查公开配置、API、Origin、Cookie/CSRF；管理登录查独立 realm、BFF 与当前角色。CI 在 lint 结束时，后续跳过项没有结果。
 
-现有材料记录管理邮件 provider 的本机 Java 工具链缺口，主题构建不能替代 Java 编译。真实 PostgreSQL、Prosody、模型、Native 制品、TLS、恢复各自需要明确环境；未运行项按实际范围报告，不把编译、进程启动或替身测试写成外部服务验收。
+认证主题与Java Provider分别构建，两个Provider可用既有CI组合入口在明确JDK21/Keycloak26.7.3环境验证。真实PostgreSQL、Prosody、模型、Native制品、TLS和恢复各自按所需环境运行；未运行项按实际范围报告，不把编译、进程启动或替身测试写成外部服务验收。
