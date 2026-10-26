@@ -9,12 +9,7 @@
       ],
       "files": [
         "packages/galaxy-official/src/browser-client.mjs",
-        "packages/galaxy-official/src/operations-permission-catalog.mjs",
-        "docs/api-error-catalog-v0.1.json",
-        "docs/data-inventory-v0.1.json",
-        "docs/development-api-reference-v1.json",
-        "docs/threat-model-v0.1.json",
-        "docs/version-contract.json"
+        "packages/galaxy-official/src/operations-permission-catalog.mjs"
       ],
       "dependsOn": [],
       "build": [],
@@ -345,9 +340,7 @@
       "interfaces": [
         "Public routes, shared Web shell and fixed historical public asset catalog"
       ],
-      "files": [
-        "tools/build_reader_bundle.py"
-      ]
+      "files": []
     },
     {
       "id": "auth",
@@ -562,7 +555,6 @@
     ".dockerignore",
     "scripts/test/components.test.mjs",
     ".oxlintrc.json",
-    ".editorconfig",
     "scripts/test/check.test.mjs"
   ],
   "sourceRoots": [
@@ -723,5 +715,14 @@
     "docs/alerts/galaxy.rules.json",
     "docs/alerts/galaxy.rules.test.json"
   ],
-  "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog."
+  "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog.",
+  "nonBuildInputs": [
+    ".editorconfig",
+    "docs/api-error-catalog-v0.1.json",
+    "docs/data-inventory-v0.1.json",
+    "docs/development-api-reference-v1.json",
+    "docs/threat-model-v0.1.json",
+    "docs/version-contract.json",
+    "tools/build_reader_bundle.py"
+  ]
 }

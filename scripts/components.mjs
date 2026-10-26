@@ -18,7 +18,7 @@ export function ownerOf(catalog,input){
   .find(item=>name===item.root||name.startsWith(item.root+'/'))?.id??null;
 }
 export function affectedComponents(catalog,files,imports=[]){
- const changed=files.map(normalize),globalInput=name=>catalog.globalInputs.some(input=>name===input||name.startsWith(input+'/')),all=changed.some(globalInput);
+ const changed=files.map(normalize),globalInput=name=>catalog.globalInputs.some(input=>name===input||name.startsWith(input+'/')),all=changed.some(globalInput),nonBuildInput=name=>(catalog.nonBuildInputs??[]).includes(name);
  const impactedFiles=new Set(changed);let imported=true;
  while(imported){imported=false;for(const edge of imports)if(edge.kind==='source'&&!impactedFiles.has(edge.source)&&[...impactedFiles].some(name=>edge.target===name||edge.target+'.ts'===name||edge.target+'.tsx'===name||edge.target+'.mjs'===name)){
   impactedFiles.add(edge.source);imported=true;
@@ -27,7 +27,7 @@ export function affectedComponents(catalog,files,imports=[]){
  const affected=new Set(direct);let moved=true;
  while(moved){moved=false;for(const c of catalog.components)if(!affected.has(c.id)&&c.dependsOn.some(id=>affected.has(id))){affected.add(c.id);moved=true;}}
  return{direct:[...direct],affected:catalog.components.filter(c=>affected.has(c.id)).map(c=>c.id),
-  impactedFiles:[...impactedFiles],unclassified:changed.filter(name=>!ownerOf(catalog,name)&&!globalInput(name))};
+  impactedFiles:[...impactedFiles],nonBuildInputs:changed.filter(nonBuildInput),unclassified:changed.filter(name=>!ownerOf(catalog,name)&&!globalInput(name)&&!nonBuildInput(name))};
 }
 const run=(args,cwd)=>{const r=spawnSync(args[0],args.slice(1),{cwd,stdio:'inherit',windowsHide:true});if(r.error)throw r.error;if(r.status!==0)throw Error('Component command failed: '+r.status);};
 function gitFiles(base){const result=spawnSync('git',['diff','--no-renames','--name-only','-z',`${base}...HEAD`],{cwd:repositoryRoot,encoding:'utf8',windowsHide:true});if(result.status!==0)throw Error('Cannot resolve explicit comparison base.');return result.stdout.split('\0').filter(Boolean);}
