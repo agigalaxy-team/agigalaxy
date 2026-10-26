@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -11,7 +11,7 @@ import {createOidcLoginProvider} from '../../galaxy-official/src/oidc-login.mjs'
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 
-const root=fileURLToPath(new URL('../../../',import.meta.url)),out=resolve(root,process.env.GALAXY_UI_REPORT_DIR??'../../../07-logs/development/ui-resume-20261002/fact-receipt-continuity');await mkdir(out,{recursive:true});
+const root=fileURLToPath(new URL('../../../',import.meta.url)),out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);await mkdir(out,{recursive:true});
 const now=Math.floor(Date.now()/1000),endpoint='https://official.example.org',issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/fixture'],{emailVerified:true});
 const provider=await createOidcLoginProvider({id:'fixture',name:'Synthetic fact OIDC',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/identity/callback/fixture',allowLoopbackHttp:true,now:()=>now});
 const f=await serviceFixture(browserScopes,null,{now,identityProviders:[provider],syntheticCommunityQuota:false}),checks=[],calls=[],pageErrors=[];
@@ -26,7 +26,7 @@ try{
  const css=(await Promise.all(cssNames.map(x=>readFile(resolve(cssDir,x),'utf8')))).join('\n')+await readFile(resolve(root,'packages/galaxy-web/src/workspace.css'),'utf8');
  frontend=createServer(async(req,res)=>{try{if(req.url==='/galaxy-web-config.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:1,endpoint,signingKeys:[...f.bindings.trustedKeys].map(([kid,pin])=>({kid,...pin}))}));}else if(req.url==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].text);}else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}else if(req.url==='/fixture-login'&&req.method==='POST'){let raw='';for await(const c of req)raw+=c;const input=JSON.parse(raw);assert.ok(['A','B','C'].includes(input.actor));assert.equal(new URL(input.authorizationUrl).origin,issuer.issuer);issuer.setAccount('synthetic-fact-receipt-'+input.actor);const callback=await issuer.authorize(input.authorizationUrl),response=await fetch(apiOrigin+callback.pathname+callback.search);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({state:(await response.json()).state}));}else{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body><div id="root"></div><script src="/bundle.js"></script></body></html>');}}catch{res.writeHead(500);res.end('fixture_error');}});
  await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  const button=(p,name)=>p.getByRole('button',{name,exact:true}),idle=p=>p.waitForFunction(()=>!document.querySelector('.operation-progress'));
  const nav=(p,path)=>p.evaluate(path=>{history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'));},path);
  async function actor(name){const context=await browser.newContext({viewport:{width:1440,height:1100},timezoneId:'UTC',reducedMotion:'reduce'});context.setDefaultTimeout(18000);await context.addInitScript(now=>{Date.now=()=>now*1000;},now);

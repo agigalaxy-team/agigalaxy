@@ -22,7 +22,7 @@ for (const name of ['SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT', 'PATH']) {
 for (const name of ['data', 'config', 'cache', 'state', 'home', 'tmp', 'project', 'managed']) await mkdir(join(scratch, name));
 Object.assign(env, { XDG_DATA_HOME: join(scratch, 'data'), XDG_CONFIG_HOME: join(scratch, 'config'),
   XDG_CACHE_HOME: join(scratch, 'cache'), XDG_STATE_HOME: join(scratch, 'state'),
-  OPENCODE_TEST_HOME: join(scratch, 'home'), USERPROFILE: join(scratch, 'home'),
+  OPENCODE_TEST_HOME: join(scratch, 'home'), HOME: join(scratch, 'home'), USERPROFILE: join(scratch, 'home'),
   APPDATA: join(scratch, 'data'), LOCALAPPDATA: join(scratch, 'data'), ProgramData: join(scratch, 'managed'),
   TEMP: join(scratch, 'tmp'), TMP: join(scratch, 'tmp'),
   OPENCODE_CONFIG_DIR: join(scratch, 'config', 'opencode'),

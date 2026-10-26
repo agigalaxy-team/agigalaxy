@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join,resolve,dirname,isAbsolute} from 'node:path';
+import {join,resolve,dirname,sep,isAbsolute} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 
@@ -17,8 +17,12 @@ const folders={project:join(scratch,'project'),config:join(scratch,'config'),dat
 await Promise.all(Object.values(folders).map(path=>mkdir(path,{recursive:true})));await mkdir(dirname(report),{recursive:true});
 // The normal setup reads the live HTTPS public configuration. This is the
 // scene's existing Native directory, never a replacement key or another owner.
+const hostConfigDirectory=join(folders.config,'opencode');
+assert.ok(hostConfigDirectory.startsWith(scratch+sep));
 const installation=await prepareNativeInstallation({website:role.origin,host:'opencode',packageDirectory:candidate,
- dataDirectory:role.dataDirectory,destination:join(scratch,'connection'),openCodePath:executable,confirm:()=>true});
+ dataDirectory:role.dataDirectory,destination:join(scratch,'connection'),openCodePath:executable,openCodeConfigDirectory:hostConfigDirectory,
+ confirm:review=>{assert.equal(review.hostConfigDirectory,hostConfigDirectory);return true;}});
+assert.equal(installation.hostConfigDirectory,hostConfigDirectory);
 assert.equal(installation.connected,false);assert.equal(installation.identityCreated,false);
 const config=join(folders.config,'opencode','opencode.json'),tui=join(scratch,'tui.json');await mkdir(dirname(config),{recursive:true});
 const generatedConfig=JSON.parse(await readFile(join(installation.hostDirectory,'opencode/opencode.json'),'utf8'));

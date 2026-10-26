@@ -1,7 +1,6 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, browserSourceUrl } from './browser-tool-runtime.mjs';
 import { createServer } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
@@ -10,7 +9,7 @@ import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 import { builderDeclaration } from '../../galaxy-official/test/builders-workflow.mjs';
 
 const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';
-const out = fileURLToPath(new URL('../../../../../../07-logs/development/ui-resume-20261002/builders-stopped/', import.meta.url)); await mkdir(out, { recursive: true });
+const out = browserToolOutput(import.meta.url, undefined); await mkdir(out, { recursive: true });
 const fixture = await serviceFixture(browserScopes, null, { now, syntheticCommunityQuota: false });
 let releaseOriginal, enteredOriginal;
 const barrier = new Promise(resolve => { releaseOriginal = resolve; }), entered = new Promise(resolve => { enteredOriginal = resolve; });
@@ -30,7 +29,7 @@ const frontend = createServer(async (request, response) => {
   } catch { response.writeHead(500); response.end('synthetic_fixture_failure'); }
 });
 await new Promise(resolve => frontend.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${frontend.address().port}`;
-const browser = await chromium.launch({ headless: true, executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+const browser = await chromium.launch({ headless: true });
 const contexts = [], events = [], calls = [], pageErrors = [];
 /** @type {Promise<{status():number}>|undefined} */
 let originalResponse;
@@ -79,12 +78,12 @@ try {
   releaseOriginal(); assert.equal((await originalResponse).status(), 200);
   const beforeQuery = calls.length; await stopped.getByRole('button', { name: '只查询这项原事件回执', exact: true }).click(); await stopped.getByText('服务已接收这项原事件；不代表能力认证或实际运行。', { exact: true }).waitFor();
   assert.deepEqual(calls.slice(beforeQuery).map(item => item.path), ['/v1/builders/events/receipt']); assert.equal(businessWrites(), 2);
-  const retained = await page.evaluate(async ({ endpoint, subjectId }) => {
-    const { openDeviceKeyStore } = await import('/app/@fs/C:/Users/USER1/Documents/ChatGPT/projects/active/银河项目/agi-galaxy-network/05-build/repos/galaxy-founding-beta/packages/galaxy-core/src/domain/device-key-store.mjs');
+  const retained = await page.evaluate(async ({ endpoint, subjectId, moduleUrl }) => {
+    const { openDeviceKeyStore } = await import(moduleUrl);
     const store = await openDeviceKeyStore(); try { const record = await store.get(`galaxy-web:${endpoint}:${subjectId}:builder-web-v2:${endpoint}:${subjectId}`);
       return { count: record.stoppedOperations.length, keys: Object.keys(record.stoppedOperations[0]).sort(), pending: !!record.pending, containsOriginalBody: JSON.stringify(record.stoppedOperations).includes('合成原建设者声明') };
     } finally { store.close(); }
-  }, { endpoint, subjectId: firstId });
+  }, { endpoint, subjectId: firstId, moduleUrl: browserSourceUrl('packages/galaxy-core/src/domain/device-key-store.mjs') });
   assert.deepEqual(retained, { count: 1, keys: ['builderId', 'endpoint', 'eventId', 'ownerId', 'payloadHash'], pending: false, containsOriginalBody: false });
   await page.setViewportSize({ width: 390, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await shot('stopped-original-after-new-declaration-narrow');
   events.push({ check: 'a real original HTTP dispatch commits after local stop and a new independent declaration; original stopped receipt remains queryable with one read request and no repeat business/Consent write', passed: true, actualIndexedDbMinimalLocator: retained });

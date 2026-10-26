@@ -4,13 +4,13 @@ import {resolve,join,sep,extname,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, requiredToolInput, loadToolMcpClient } from './browser-tool-runtime.mjs';
 
-const repo=fileURLToPath(new URL('../../../',import.meta.url)),project=resolve(repo,'../../..');
+const repo=fileURLToPath(new URL('../../../',import.meta.url));
 const dist=resolve(process.env.GALAXY_ACCOUNT_DIST??join(repo,'packages/galaxy-web/dist'));
-const out=resolve(process.env.GALAXY_ACCOUNT_REPORT??join(project,'07-logs/development/goal-20261008-current-plan/astra/community-scope-r1/account-after-r1'));
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_ACCOUNT_REPORT);
 const website='https://account-flow.example',endpoint='https://official.example.org',issuerAlias='https://isolated-oidc.example';
-const nativeCandidate=resolve(process.env.GALAXY_NATIVE_CANDIDATE_DIR??join(project,'05-build/outputs/goal-20261008/native-client-0.1.8-r2'));
+const nativeCandidate=requiredToolInput('GALAXY_NATIVE_CANDIDATE_DIR');
 const nativeScopes=['binding','consent','case-teaser','history','assistance','context'];
 const load=path=>import(pathToFileURL(join(repo,path)));
 const [{serviceFixture},{createApi},{browserScopes},{oidcProviderFixture},{createOidcLoginProvider},{IdentityLinkService}]=await Promise.all([
@@ -43,7 +43,7 @@ try{
   fixture=await serviceFixture(browserScopes,null,{now,identityProviders:providers,syntheticCommunityQuota:false});
   api=createApi({...fixture,browserOrigins:[website],rateLimit:10000});await new Promise(r=>api.listen(0,'127.0.0.1',r));
   const base='http://127.0.0.1:'+api.address().port;
-  browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+  browser=await chromium.launch({ headless:true });
   async function makePage(name,viewport={width:1440,height:1000}){
     const context=await browser.newContext({viewport,reducedMotion:'reduce'});contexts.push(context);context.setDefaultTimeout(15000);context.on('page',page=>page.on('pageerror',e=>report.pageErrors.push({actor:name,message:e.message})));
     await context.addInitScript(now=>{Date.now=()=>now*1000;},now);
@@ -157,7 +157,7 @@ try{
   failProviderActor='unknown-ack';await U.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await U.page.locator('.account-settings [role="alert"]').filter({hasText:'验证入口'}).waitFor();assert.equal(await U.page.getByText('当前服务没有可用的账号验证入口。身份仍可使用；依赖账号验证的公开操作暂不能完成。',{exact:true}).count(),0);await screenshot(U.page,'08-provider-failure-not-empty-catalog');failProviderActor=null;await button(U.page,'重新读取账号状态').click();await button(U.page,'使用 Isolated OIDC 验证').waitFor();report.checks.push({id:'provider-503-does-not-claim-empty-catalog-or-success',passed:true,syntheticTransportFault:true});
   report.stage='linked-but-unverified-account';const V=await makePage('email-unverified');await createOrdinary(V,target);await accountEntry(V.page,{fromOriginal:true});await preview(V.page,'Unverified email OIDC');await button(V.page,'确认关联这个账号').click();await V.page.getByText('账号关联已记录 · 关联状态与公开操作资格分别核对。',{exact:true}).waitFor();await V.page.getByText('当前账号尚未满足本服务的账号验证要求。已有账号关联不等于获得公开操作资格。',{exact:true}).waitFor();assert.equal((await V.page.evaluate(()=>window.__accountProbe.runtime.accounts.quotas())).accountVerified,false);await screenshot(V.page,'09-linked-does-not-mean-qualified');report.checks.push({id:'actual-oidc-email-verified-false-link-is-not-public-write-qualification',passed:true});
   report.stage='native-default-six-scopes-account-and-original-publication';
-  const [{createNativeRuntime},{createNativeToolServer},{Client,InMemoryTransport}]=await Promise.all([import(pathToFileURL(join(nativeCandidate,'runtime.js'))),import(pathToFileURL(join(nativeCandidate,'server.js'))),import(pathToFileURL(join(nativeCandidate,'node_modules/@modelcontextprotocol/client/dist/index.mjs')))]);
+  const [{createNativeRuntime},{createNativeToolServer},{Client,InMemoryTransport}]=await Promise.all([import(pathToFileURL(join(nativeCandidate,'runtime.js'))),import(pathToFileURL(join(nativeCandidate,'server.js'))),loadToolMcpClient()]);
   nativeDirectory=await mkdtemp(join(tmpdir(),'galaxy-account-native-'));native=await createNativeRuntime({dataDirectory:nativeDirectory,endpoint,website,trustedKeys:fixture.access.trustedKeys,now:()=>now,fetch:async(url,options)=>{const target=new URL(url);assert.equal(target.origin,endpoint);return fetch(base+target.pathname+target.search,options);},openBrowser:async url=>{opened.push(url);return{state:'captured-isolated-navigation',launched:false};}});
   await native.initialize({profile:'minimal'},{confirmed:true});await native.connect({confirmed:true});const nativeSubject=(await native.status()).identity;
   nativeServer=createNativeToolServer(native);nativeClient=new Client({name:'account-native-fixed-main',version:'1'},{capabilities:{}});const [left,right]=InMemoryTransport.createLinkedPair();await nativeServer.connect(left);await nativeClient.connect(right);

@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {createServer as createViteServer} from 'vite';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
@@ -12,7 +12,7 @@ import {sourceCapsule} from '../../galaxy-official/test/capsule-origin-continuit
 import {task as fixtureTask,ag,cg} from '../../galaxy-official/test/qualification-v2-workflow.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url)),baseline=process.argv.includes('--baseline'),mobile=process.argv.includes('--mobile'),now=Math.floor(Date.now()/1000);
-const out=process.env.GALAXY_UI_REPORT_DIR?resolve(root,process.env.GALAXY_UI_REPORT_DIR):resolve(root,'../../../07-logs/development/20261008-help-capsule-astra',baseline?'main-baseline':mobile?'main-mobile':'main-desktop');await mkdir(out,{recursive:true});
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR, [(baseline ? 'baseline' : 'current'), (mobile ? 'mobile' : 'desktop')].join('-'));await mkdir(out,{recursive:true});
 const sourcePaths=[...['main.tsx','help-origin-client.mjs','help-search-workspace.tsx','capsule-workspace.tsx','capsule-workspace-client.mjs','capsule-application.tsx','features/projects/management/workspace.tsx',"features/projects/management/people-selection.tsx",'features/projects/detail.tsx','task-contact-workspace.tsx'].map(name=>'packages/galaxy-web/src/'+name),'packages/galaxy-web/scripts/verify-help-capsule-origin-ui.mjs','packages/galaxy-official/src/shared/projects-schema-v2.mjs'];
 const sourceHashes=async()=>Object.fromEntries(await Promise.all(sourcePaths.map(async path=>[path,createHash('sha256').update(await readFile(resolve(root,path))).digest('hex')]))),sourceBefore=await sourceHashes();
 const f=await serviceFixture(browserScopes,null,{now}),capsule=await sourceCapsule(f),api=createApi({...f,browserOrigins:['https://galaxy-ui.example.org'],rateLimit:10000});
@@ -20,7 +20,7 @@ await new Promise(r=>api.listen(0,'127.0.0.1',r));
 const vite=await createViteServer({configFile:resolve(root,'packages/galaxy-web/vite.config.mjs'),server:{host:'127.0.0.1',port:0,strictPort:false}});
 vite.middlewares.use((req,res,next)=>{if(req.url!=='/galaxy-web-config.json')return next();res.setHeader('content-type','application/json');res.end(JSON.stringify({version:1,endpoint:f.bindings.endpoint,operator:'Synthetic isolated UI verification',signingKeys:[...f.bindings.trustedKeys].map(([kid,pin])=>({kid,...pin}))}));});
 await vite.listen();const origin=`http://127.0.0.1:${vite.httpServer.address().port}`;
-const browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'}),context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
+const browser=await chromium.launch({ headless:true }),context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
 context.setDefaultTimeout(20000);await context.addInitScript(now=>{Date.now=()=>now*1000;},now);
 const writes=[],events=[],errors=[];let holdTaskRead=null,releaseTaskRead=null;
 await context.route('**/galaxy-web-config.json',route=>route.fulfill({json:{version:1,endpoint:f.bindings.endpoint,operator:'Synthetic isolated UI verification',signingKeys:[...f.bindings.trustedKeys].map(([kid,pin])=>({kid,...pin}))}}));

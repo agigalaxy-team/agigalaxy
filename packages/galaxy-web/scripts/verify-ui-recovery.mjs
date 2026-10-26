@@ -1,10 +1,10 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
-const origin='http://127.0.0.1:5190',out=resolve('../../../07-logs/development/ui-resume-20261002'),events=[];
+const origin='http://127.0.0.1:5190',out=browserToolOutput(import.meta.url, undefined),events=[];
 await mkdir(out,{recursive:true});const fixture=await(await fetch(origin+'/__fixture')).json();
-const browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+const browser=await chromium.launch({ headless:true });
 const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});await context.addInitScript(now=>{Date.now=()=>now*1000;},fixture.now);
 await context.route('https://official.example.org/**',async route=>{const req=route.request(),url=new URL(req.url());const res=await context.request.fetch(fixture.api+url.pathname+url.search,{method:req.method(),headers:{...req.headers(),origin:'https://galaxy-ui.example.org'},data:req.postData()??undefined});await route.fulfill({response:res,headers:{...res.headers(),'access-control-allow-origin':origin}});});
 const page=await context.newPage();page.on('pageerror',e=>events.push({pageError:e.message}));

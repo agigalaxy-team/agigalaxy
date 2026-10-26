@@ -3,6 +3,7 @@ import { retainTaskContactAgent, taskContactWebsite } from './task-contact-agent
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { browserToolOutput } from '../scripts/browser-tool-runtime.mjs';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fixture.mjs';
 import { createOidcLoginProvider } from '../../galaxy-official/src/oidc-login.mjs';
@@ -16,7 +17,7 @@ test('same-subject reconnection cannot continue an old contact-send intent after
   const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';
   const issuer = await oidcProviderFixture([endpoint + '/v1/identity/callback/fixture'], { emailVerified: true });
   let fixture, api; const runtimes = [];
-  const output = resolve('../../../07-logs/development/ui-resume-20261002/task-contact-continuity');
+  const output = browserToolOutput(import.meta.url);
   try {
     const provider = await createOidcLoginProvider({ id: 'fixture', name: 'Synthetic contact lease OIDC', issuer: issuer.issuer, clientId: 'galaxy-fixture', redirectUri: endpoint + '/v1/identity/callback/fixture', allowLoopbackHttp: true, now: () => now });
     fixture = await serviceFixture(browserScopes, null, { now, identityProviders: [provider], syntheticCommunityQuota: false });

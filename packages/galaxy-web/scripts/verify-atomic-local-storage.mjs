@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -7,7 +7,7 @@ import {createServer} from 'node:http';
 import {randomUUID,createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
-const out=resolve(root,process.env.GALAXY_UI_REPORT_DIR??'../../../07-logs/development/goal-20261002-root/atomic-storage');
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);
 await mkdir(out,{recursive:true});
 const source=resolve(root,'packages/galaxy-core/src/domain/device-key-store.mjs'),sourceSha256=createHash('sha256').update(await readFile(source)).digest('hex');
 const bundle=await build({stdin:{contents:"export {openDeviceKeyStore} from './packages/galaxy-core/src/domain/device-key-store.mjs';",resolveDir:root},bundle:true,write:false,platform:'browser',format:'esm'});
@@ -15,7 +15,7 @@ const server=createServer((req,res)=>{if(req.url==='/store.js'){res.setHeader('c
 let browser,context;const checks=[],errors=[];
 try{
  await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+server.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  context=await browser.newContext();const tabs=await Promise.all([context.newPage(),context.newPage()]),dbName='galaxy-atomic-'+randomUUID();
  for(const page of tabs){page.on('pageerror',e=>errors.push(e.message));await page.goto(origin);await page.evaluate(async name=>{const {openDeviceKeyStore}=await import('/store.js');window.atomicStore=await openDeviceKeyStore({name});},dbName);}
  await tabs[0].evaluate(()=>atomicStore.put('count',0));

@@ -21,7 +21,8 @@ function environment(directory){
  const env={};for(const name of ['PATH','Path','SystemRoot','SYSTEMROOT','ComSpec','COMSPEC','PATHEXT','WINDIR'])if(process.env[name])env[name]=process.env[name];
  // These are child-process configuration selectors, never exports or changes to
  // the caller's HOME/CODEX_HOME or user settings. No provider/auth env is copied.
- return{...env,TEMP:directory,TMP:directory,USERPROFILE:join(directory,'profile'),APPDATA:join(directory,'appdata'),LOCALAPPDATA:join(directory,'localappdata'),
+ return{...env,TEMP:directory,TMP:directory,HOME:join(directory,'profile'),USERPROFILE:join(directory,'profile'),APPDATA:join(directory,'appdata'),LOCALAPPDATA:join(directory,'localappdata'),
+  XDG_CONFIG_HOME:join(directory,'config'),XDG_DATA_HOME:join(directory,'data-home'),XDG_STATE_HOME:join(directory,'state'),XDG_CACHE_HOME:join(directory,'cache'),
   CODEX_HOME:join(directory,'codex-profile'),CLAUDE_CONFIG_DIR:join(directory,'claude-profile'),
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1',CLAUDE_CODE_SKIP_PROMPT_HISTORY:'1',DISABLE_AUTOUPDATER:'1'};
 }
@@ -44,7 +45,7 @@ export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable
  const codexRun=codexEntry.endsWith('.exe')?{file:codexEntry,args:[]}:{file:process.execPath,args:[codexEntry]};
  const report={version:1,candidate,startedAt:new Date().toISOString(),syntheticConfiguration:true,userLoginRead:false,userModelCalls:0,globalConfigurationChanged:false,desktopUiVerified:false,hosts:[]};
  try{
-  const env=environment(directory);for(const path of[directory,env.USERPROFILE,env.APPDATA,env.LOCALAPPDATA,env.CODEX_HOME,env.CLAUDE_CONFIG_DIR])await mkdir(path,{recursive:true});
+  const env=environment(directory);for(const path of[directory,env.HOME,env.APPDATA,env.LOCALAPPDATA,env.XDG_CONFIG_HOME,env.XDG_DATA_HOME,env.XDG_STATE_HOME,env.XDG_CACHE_HOME,env.CODEX_HOME,env.CLAUDE_CONFIG_DIR])await mkdir(path,{recursive:true});
   const cwd=join(directory,'workspace');await mkdir(cwd);await cp(join(candidate,'skills/galaxy'),join(cwd,'.agents/skills/galaxy'),{recursive:true});
   const now=Math.floor(Date.now()/1000),pair=generateKeyPairSync('ed25519'),configPath=join(directory,'synthetic-public-config.json');
   await writeFile(configPath,json({version:2,endpoint:'https://not-connected.example.org',website:'https://www.example.org',dataDirectory:join(directory,'data'),

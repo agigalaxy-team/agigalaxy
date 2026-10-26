@@ -1,7 +1,6 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import { createServer } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { generateKeyPairSync, createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -10,7 +9,7 @@ import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 
 const now=Math.floor(Date.now()/1000),endpoint='https://official.example.org';
-const out=fileURLToPath(new URL('../../../../../../07-logs/development/ui-resume-20261002/trust-vc/',import.meta.url));await mkdir(out,{recursive:true});
+const out=browserToolOutput(import.meta.url, undefined);await mkdir(out,{recursive:true});
 const fixture=await serviceFixture(browserScopes,null,{now,syntheticCommunityQuota:false});
 const api=createApi({...fixture,browserOrigins:['https://galaxy-ui.example.org'],rateLimit:10000});await new Promise(r=>api.listen(0,'127.0.0.1',r));const apiOrigin=`http://127.0.0.1:${api.address().port}`;
 const calls=[],events=[],pageErrors=[],outsideRequests=[];let downloads=0,failure=null;
@@ -24,7 +23,7 @@ const frontend=createServer(async(request,response)=>{try{
  response.end(body);
 }catch{response.writeHead(500);response.end('synthetic_fixture_failure');}});
 await new Promise(r=>frontend.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${frontend.address().port}`;
-const browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+const browser=await chromium.launch({ headless:true });
 const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce',acceptDownloads:true});context.setDefaultTimeout(15000);
 await context.addInitScript(now=>{Date.now=()=>now*1000;window.__vcSigns=0;window.__gateVc=false;window.__vcGateEntered=false;window.__vcGateReturned=false;
  const nativeSign=crypto.subtle.sign.bind(crypto.subtle);

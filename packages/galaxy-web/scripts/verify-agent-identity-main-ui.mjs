@@ -3,22 +3,20 @@ import {mkdir,mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve,join,basename,sep,extname,relative} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {createRequire} from 'node:module';
 import {createHash,randomUUID} from 'node:crypto';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, requiredToolInput, loadToolMcpClient } from './browser-tool-runtime.mjs';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {sourceCapsule} from '../../galaxy-official/test/capsule-origin-continuity-v2-workflow.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url)),website='https://selected.example',mobile=process.argv.includes('--mobile');
-const nativeCandidate=process.env.GALAXY_NATIVE_CANDIDATE_DIR?resolve(root,process.env.GALAXY_NATIVE_CANDIDATE_DIR):null;
+const nativeCandidate=process.env.GALAXY_NATIVE_CANDIDATE_DIR?requiredToolInput('GALAXY_NATIVE_CANDIDATE_DIR'):null;
 const webIdentityDefaultScopes=Object.freeze(['binding','consent','case-teaser','history','assistance','context']);
 const {createNativeRuntime}=await import(nativeCandidate?pathToFileURL(join(nativeCandidate,'runtime.js')).href:'../../galaxy-edge-mcp/src/native-v2/runtime.mjs');
 const {createNativeToolServer}=await import(nativeCandidate?pathToFileURL(join(nativeCandidate,'server.js')).href:'../../galaxy-edge-mcp/src/native-v2/server.mjs');
-const edgeRequire=createRequire(new URL('../../galaxy-edge-mcp/package.json',import.meta.url));
-const {Client,InMemoryTransport}=nativeCandidate?await import(pathToFileURL(join(nativeCandidate,'node_modules/@modelcontextprotocol/client/dist/index.mjs')).href):{...edgeRequire('@modelcontextprotocol/sdk/client/index.js'),...edgeRequire('@modelcontextprotocol/sdk/inMemory.js')};
-const dist=resolve(root,process.env.GALAXY_WEB_CANDIDATE_DIR??'packages/galaxy-web/dist'),out=resolve(root,process.env.GALAXY_IDENTITY_MAIN_REPORT_DIR??'../../../07-logs/development/20261008-agent-identity-astra/'+(mobile?'main-mobile':'main-desktop'));
+const {Client,InMemoryTransport}=await loadToolMcpClient();
+const dist=resolve(root,process.env.GALAXY_WEB_CANDIDATE_DIR??'packages/galaxy-web/dist'),out=browserToolOutput(import.meta.url, process.env.GALAXY_IDENTITY_MAIN_REPORT_DIR, [(mobile ? 'mobile' : 'desktop')].join('-'));
 const sourcePaths=[...['main.tsx','runtime.mjs','agent-identity-handoff.mjs','agent-identity-evidence.mjs','agent-identity-workspace.tsx','identity-workspace.tsx','task-agent-identity-prompt.tsx','task-publish-workspace.tsx','task-application.tsx','task-collaboration.tsx','task-bounty-client.mjs','task-comment-client.mjs','task-comments-workspace.tsx','help-search-client.mjs','help-search-workspace.tsx','capsule-workspace-client.mjs','capsule-workspace.tsx','capsule-application.tsx','help-origin-client.mjs','features/notifications/workspace.tsx','privacy-client.mjs','privacy-workspace.tsx'].map(name=>'packages/galaxy-web/src/'+name),
  'packages/galaxy-edge-mcp/src/native-v2/identity/web-handoff.mjs','packages/galaxy-edge-mcp/src/native-v2/runtime.mjs','packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs',
  'packages/galaxy-edge-mcp/src/native-v2/server.mjs','integrations/native-v2/identity-web-connect-tools.mjs','packages/galaxy-web/scripts/verify-agent-identity-main-ui.mjs'];
@@ -65,7 +63,7 @@ try{
  server=createNativeToolServer(native);client=new Client({name:'synthetic-actual-main-identity-probe',version:'1'},{capabilities:{}});const[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
  async function call(name,input){const result=await client.callTool({name,arguments:input}),value=JSON.parse(result.content[0].text);assert.equal(result.isError??false,false,JSON.stringify(value));return value;}
  async function prepare(object={kind:'task',id:task.taskId},options={}){return call('galaxy_identity_web_connect',{requestId:randomUUID(),object,origin:{host:'synthetic-original-agent',workRef:'SYNTHETIC_PRIVATE_LOCAL_WORK'},scopes:[...webIdentityDefaultScopes],...options});}
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  async function makeContext({coop=false}={}){
   const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});contexts.push(context);context.setDefaultTimeout(18000);
   await context.addInitScript(now=>{Date.now=()=>now*1000;},f.now);

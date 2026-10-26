@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {createServer} from 'node:http';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -7,7 +7,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const out = resolve(root, process.env.GALAXY_UI_REPORT_DIR ?? '../../../07-logs/development/goal-20261008-current-plan/sol-1/cleanup-current');
+const out = browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);
 const baseline = process.env.GALAXY_CLEANUP_BASELINE === '1';
 const paths = ['packages/galaxy-web/src/task-contact-workspace.tsx', 'packages/galaxy-web/src/task-contact-client.mjs',
   'packages/galaxy-web/src/task-preparation-client.mjs', 'packages/galaxy-web/scripts/verify-task-contact-cleanup-ui.mjs'];
@@ -133,8 +133,7 @@ try {
     response.end(request.url === '/bundle.js' ? bundle.outputFiles[0].text : '<!doctype html><html lang="zh-CN"><body><div id="root"></div><script src="/bundle.js"></script></body></html>');});
   await new Promise(ok => server.listen(0, '127.0.0.1', ok));
   liveUrls.push('http://127.0.0.1:' + server.address().port);
-  browser = await chromium.launch({headless: true,
-    executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+  browser = await chromium.launch({ headless: true });
   console.log(JSON.stringify({stage: 'isolated-local-ui-running', url: liveUrls[0], processId: process.pid}));
 
   await check('pending-read-failure-releases-ui', async (page, errors) => {

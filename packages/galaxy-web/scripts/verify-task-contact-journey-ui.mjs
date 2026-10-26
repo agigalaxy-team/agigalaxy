@@ -1,8 +1,7 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import { createServer } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { oidcProviderFixture } from '../../galaxy-official/test/oidc-provider-fixture.mjs';
@@ -11,7 +10,7 @@ import { createApi } from '../../galaxy-official/src/http.mjs';
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 
 const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';
-const out = fileURLToPath(new URL('../../../../../../07-logs/development/ui-resume-20261002/task-contact-journey/', import.meta.url)); await mkdir(out, { recursive: true });
+const out = browserToolOutput(import.meta.url, undefined); await mkdir(out, { recursive: true });
 const events = [], errors = [], contexts = [], inviteWrites = [], roomWrites = [];
 const commonOnly = process.env.CONTACT_BRANCH === 'common';
 let currentPage, dropInvite = false, failSearch = false;
@@ -30,7 +29,7 @@ const frontend = createServer(async (request, response) => {
   } catch { response.writeHead(500, { 'content-type': 'application/json' }); response.end('{"error":"synthetic_fixture_failure"}'); }
 });
 await new Promise(resolve => frontend.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${frontend.address().port}`;
-const browser = await chromium.launch({ headless: true, executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+const browser = await chromium.launch({ headless: true });
 async function actor(name) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' }); contexts.push(context); context.setDefaultTimeout(15000);
   await context.addInitScript(now => { Date.now = () => now * 1000; }, now);

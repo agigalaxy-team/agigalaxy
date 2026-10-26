@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
+import {nativeData} from './native-result.mjs';
 import {mkdir,mkdtemp,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve,join,basename,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {compactVerify,importSPKI} from 'jose';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import {loadToolMcpClient} from '../../galaxy-web/scripts/browser-tool-runtime.mjs';
+const {Client,InMemoryTransport}=await loadToolMcpClient();
 import {chromium} from 'playwright';
 import {serviceFixture} from '../../galaxy-official/test/service-fixture.mjs';
 import {createApi} from '../../galaxy-official/src/http.mjs';
@@ -47,7 +48,7 @@ try{
  await runtime.api.call('/v2/tasks',{consentId:authorization.consentId,payloadJson:authorization.payloadJson});
  server=createNativeToolServer(runtime);client=new Client({name:'synthetic-native-popup-probe',version:'1'},{capabilities:{}});
  const[a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
- async function call(name,input){const result=await client.callTool({name,arguments:input}),value=JSON.parse(result.content[0].text);assert.equal(result.isError??false,false,JSON.stringify(value));return value;}
+ async function call(name,input){const result=await client.callTool({name,arguments:input}),value=nativeData(result);assert.equal(result.isError??false,false,JSON.stringify(value));return value;}
  async function prepare(){const request={requestId:randomUUID(),object:{kind:'task',id:task.taskId},origin:{host:'synthetic-original-native',workRef:'PRIVATE_LOCAL_WORK_REF'},scopes:[...webIdentityDefaultScopes]};
   const info=await call('galaxy_identity_web_connect',request);report.urls.push(info.url);return info;}
  const peer=String.raw`const params=new URLSearchParams(location.search);window.received=[];

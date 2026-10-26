@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -15,7 +15,7 @@ import {createSigningService} from '../../galaxy-official/src/signing-service.mj
 
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
-const out=resolve(root,'../../../07-logs/development/ui-resume-20261002/peering-inner-proof-expiry');await mkdir(out,{recursive:true});
+const out=browserToolOutput(import.meta.url, undefined);await mkdir(out,{recursive:true});
 const now=Math.floor(Date.now()/1000),apis=[],fixtures=[],checks=[],pageErrors=[],calls=[];
 let browser,context,page,frontend,lastSigned,remoteCalls=0,lastQuery;
 const wall=()=>Math.floor(Date.now()/1000);
@@ -53,7 +53,7 @@ try{
  `,resolveDir:root,loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',alias:{'@':root}});
  const cssPath=resolve(root,'packages/galaxy-web/dist/assets'),css=(await Promise.all((await readdir(cssPath)).filter(x=>x.endsWith('.css')).map(x=>readFile(resolve(cssPath,x),'utf8')))).join('\n')+await readFile(resolve(root,'packages/galaxy-web/src/workspace.css'),'utf8');
  frontend=createServer((req,res)=>{if(req.url==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].text);}else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}else{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body class="galaxy-site"><main class="workspace site-content" id="root"></main><script src="/bundle.js"></script></body></html>');}});await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});context.setDefaultTimeout(15000);
  await context.route(origin+'/read/**',async route=>{const request=route.request(),path=new URL(request.url()).pathname.slice(5);assert.ok(['/v2/hubs/peering/query','/v2/hubs/peering/connections'].includes(path),'browser journey only uses explicit reads');calls.push(path);const response=await context.request.post(a.testAddress+path,{headers:{Authorization:'Bearer '+a.credential,'Content-Type':'application/json'},data:request.postData()});if(path.endsWith('/query'))lastQuery=await response.json();await route.fulfill({response});});
  page=await context.newPage();page.on('pageerror',error=>pageErrors.push(error.message));await page.goto(origin);

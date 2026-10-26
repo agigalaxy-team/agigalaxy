@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { browserToolOutput } from '../scripts/browser-tool-runtime.mjs';
 import { resolve } from 'node:path';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
 import { createApi } from '../../galaxy-official/src/http.mjs';
@@ -97,7 +97,7 @@ test('actual signed HTTP owner projection refuses stale metadata, signing, Conse
     assert.equal(calls.filter(call=>call.action==='task.owner-read').length,priorOwnerConsents,'reload never grants the same read again');
     afterReload.close();
     await assert.rejects(runtime.api.call(`/v2/tasks/${task.taskId}`, null, { method: 'GET' }), error => error.code === 'consent_required');
-    const out = fileURLToPath(new URL('../../../../../../07-logs/development/ui-resume-20261002/task-owner-read/', import.meta.url)); await mkdir(out, { recursive: true });
+    const out = browserToolOutput(import.meta.url); await mkdir(out, { recursive: true });
     await writeFile(resolve(out, 'lease-http-report.json'), JSON.stringify({ actualWebRuntime: true, actualSignedHttp: true,
       syntheticLocalMapStore: true, noQuotaBypass: true, results, freshExplicitScopeAndReadPass: true,
       completeRuntimeReopenReusesOriginalBinding:true,originalReadDescriptorAndExpiryPreserved:true,

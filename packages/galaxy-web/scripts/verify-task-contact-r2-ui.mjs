@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -11,7 +11,7 @@ import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url));
-const out=resolve(root,'../../..',process.env.GALAXY_CONTACT_R2_REPORT_DIR??'07-logs/development/goal-20261002-ui/m11-r2-browser-initial');
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_CONTACT_R);
 await mkdir(out,{recursive:true});
 const now=Math.floor(Date.now()/1000),endpoint='https://official.example.org',taskId=randomUUID();
 const f=await serviceFixture(browserScopes,null,{now});
@@ -27,7 +27,7 @@ try{
  api=createApi({...f,browserOrigins:['https://galaxy-ui.example.org'],rateLimit:10000});await new Promise(ok=>api.listen(0,'127.0.0.1',ok));const apiOrigin='http://127.0.0.1:'+api.address().port;
  frontend=createServer((req,res)=>{if(req.url==='/galaxy-web-config.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:1,endpoint,signingKeys:[...f.bindings.trustedKeys].map(([kid,pin])=>({kid,...pin}))}));}else if(req.url==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].text);}else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}else{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body><div id="root"></div><script src="/bundle.js"></script></body></html>');}});
  await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});context.setDefaultTimeout(12000);await context.addInitScript(now=>{Date.now=()=>now*1000;},now);
  await context.route(endpoint+'/**',async route=>{const request=route.request(),u=new URL(request.url());let event;
   if(u.pathname===`/v2/tasks/${taskId}/events`)event=JSON.parse(JSON.parse(request.postData()).payloadJson).event;

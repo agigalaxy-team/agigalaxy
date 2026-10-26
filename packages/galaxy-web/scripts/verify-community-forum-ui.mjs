@@ -4,14 +4,13 @@ import { resolve, join, sep, extname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, requiredToolInput, loadToolMcpClient } from './browser-tool-runtime.mjs';
 
 const repo = resolve(process.env.GALAXY_FORUM_SOURCE_ROOT ?? fileURLToPath(new URL('../../../', import.meta.url)));
-const project = resolve(repo, '../../..');
 const dist = resolve(process.env.GALAXY_FORUM_DIST ?? join(repo, 'packages/galaxy-web/dist'));
-const out = resolve(process.env.GALAXY_FORUM_REPORT ?? join(project, '07-logs/development/goal-20261008-current-plan/astra/forum-r1/ui-r1'));
+const out = browserToolOutput(import.meta.url, process.env.GALAXY_FORUM_REPORT);
 const website = 'https://forum-flow.example', endpoint = 'https://official.example.org', issuerAlias = 'https://isolated-oidc.example';
-const nativeCandidate = resolve(process.env.GALAXY_NATIVE_CANDIDATE_DIR ?? join(project, '05-build/outputs/goal-20261008/native-client-0.1.8-r2'));
+const nativeCandidate = requiredToolInput('GALAXY_NATIVE_CANDIDATE_DIR');
 const nativeScopes = ['binding', 'consent', 'case-teaser', 'history', 'assistance', 'context'];
 const load = path => import(pathToFileURL(join(repo, path)));
 const [{ serviceFixture }, { createApi }, { browserScopes }, { oidcProviderFixture }, { createOidcLoginProvider }] = await Promise.all([
@@ -68,7 +67,7 @@ try {
   api = createApi({ ...fixture, browserOrigins: [website], rateLimit: 10000 });
   await new Promise(r => api.listen(0, '127.0.0.1', r));
   const base = 'http://127.0.0.1:' + api.address().port;
-  browser = await chromium.launch({ headless: true, executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+  browser = await chromium.launch({ headless: true });
 
   async function makePage(name, viewport = { width: 1440, height: 1000 }) {
     const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
@@ -522,7 +521,7 @@ try {
   stage('compiled-native-formal-task-body-free-distinct-locators');
   const [{ createNativeRuntime }, { createNativeToolServer }, { Client, InMemoryTransport }] = await Promise.all([
     import(pathToFileURL(join(nativeCandidate, 'runtime.js'))), import(pathToFileURL(join(nativeCandidate, 'server.js'))),
-    import(pathToFileURL(join(nativeCandidate, 'node_modules/@modelcontextprotocol/client/dist/index.mjs')))
+    loadToolMcpClient()
   ]);
   nativeDirectory = await mkdtemp(join(tmpdir(), 'galaxy-forum-native-'));
   native = await createNativeRuntime({ dataDirectory: nativeDirectory, endpoint, website, trustedKeys: fixture.access.trustedKeys, now: () => now,

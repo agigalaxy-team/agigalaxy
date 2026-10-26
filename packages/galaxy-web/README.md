@@ -28,3 +28,9 @@ npm run dev
 开发地址为 **http://127.0.0.1:5179/app/**。已有根依赖且锁文件未变时直接运行 dev；需要生成 Web 再用 `npm run build:web`，不必先装其他组件或跑全套检查。完整网站与 Web 一起预览使用根 build / start，见[开发指南](../../docs/technical/development.md)。前端预览不启动 API；业务功能需要所选公开配置、准确 Origin 和实际服务。
 
 本地浏览器观察使用独立无头上下文和明示合成材料，真实 API、OIDC、聊天、存储及模型的范围分别记录。不得从某次前端检查推定完整产品或全部依赖已经验收。当前已发行与候选范围见[项目状态](../../WORK_STATUS.md)。
+
+`scripts/` 的浏览器工具共用 `browser-tool-runtime.mjs`，使用根依赖中的 Playwright 和独立无头浏览器。首次按需执行 `node node_modules/playwright/cli.js install chromium`；默认结果写入仓库 `outputs/<脚本名>/tmp/`，与启动目录无关。原有报告目录环境变量仍可指定输出，通用临时产物管理见根开发规则。
+
+账户连续性、评论账户和论坛的完整工具需用 `GALAXY_NATIVE_CANDIDATE_DIR` 显式指定已准备 Native 的绝对目录，包含 `runtime.js`、`server.js` 及其运行依赖；按根开发指南准备候选，不读取历史日期目录。身份交接工具也可不指定候选而使用当前 Native 源码。工具侧 MCP 客户端取自 `integrations/native-v2/compact-app` 的已声明依赖，由根 `npm run setup` 安装，不要求发行包夹带测试依赖。
+
+`verify-first-registration-ui.mjs` 另需 `GALAXY_REGISTRATION_AS_MODULE` 指向导出 `createLocalRegistrationAS` 的已准备隔离认证夹具文件，`GALAXY_REGISTRATION_AS_ASSETS` 指向其资产目录，两者均为绝对路径。该完整 Keycloak/TLS/SMTP 夹具是显式外部输入，仓库没有自动生成它的通用命令；缺少时停止，不回读旧日志、不改用真实认证服务或合成响应冒充。运行时产物归本次工具输出目录。普通网页开发不需要这些输入。

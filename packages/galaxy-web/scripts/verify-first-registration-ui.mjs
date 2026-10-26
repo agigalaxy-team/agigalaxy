@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, requiredToolInput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {PGlite} from '../../galaxy-official/node_modules/@electric-sql/pglite/dist/index.js';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -13,10 +13,10 @@ import {createApi} from '../../galaxy-official/src/http.mjs';
 import {browserScopes} from '../../galaxy-official/src/browser-client.mjs';
 import {createOidcLoginProvider} from '../../galaxy-official/src/oidc-login.mjs';
 
-const root=fileURLToPath(new URL('../../../',import.meta.url)),project=resolve(root,'../../..');
-const out=resolve(project,process.env.GALAXY_REGISTRATION_REPORT_DIR??'07-logs/development/goal-20261002-ui/first-registration-browser-initial');
+const root=fileURLToPath(new URL('../../../',import.meta.url));
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_REGISTRATION_REPORT_DIR);
 await mkdir(out,{recursive:true});
-const helper=resolve(project,'07-logs/development/goal-20261002-flow/local-registration-as-tls-helper.mjs');
+const helper=requiredToolInput('GALAXY_REGISTRATION_AS_MODULE', 'file');
 const {createLocalRegistrationAS}=await import(pathToFileURL(helper));
 const endpoint='https://official.example.org',redirectUri=endpoint+'/v1/identity/callback/galaxy-account',sha=value=>createHash('sha256').update(value).digest('hex');
 const sourceHashes={[helper]:sha(await readFile(helper))},checks=[],calls=[],pageErrors=[],blockedOrigins=new Set(),requestFailures=[],asNavigations=[];
@@ -24,7 +24,7 @@ const report={actualMain:true,actualWebCryptoIndexedDB:true,actualSignedHttpPGli
 let as,db,api,frontend,browser,context,page,authPage,failure,services,callbackResult,callbackRedirectURL,notifyCallbackRedirect,notifyCallbackFailure,notifyCallbackArrived;
 const callbackRedirectReady=new Promise(ok=>notifyCallbackRedirect=ok),callbackFailed=new Promise(ok=>notifyCallbackFailure=ok),callbackArrived=new Promise(ok=>notifyCallbackArrived=ok);
 try{
- report.stage='start-fresh-real-AS';as=await createLocalRegistrationAS({assetRoot:resolve(project,'05-build/runtime/account-registration-20261002'),runtimeRoot:resolve(project,'05-build/runtime/account-registration-20261002/ui-local-as'),redirectUri,registrationAllowed:true,clientId:'galaxy-official'});
+ report.stage='start-fresh-real-AS';as=await createLocalRegistrationAS({assetRoot:requiredToolInput('GALAXY_REGISTRATION_AS_ASSETS'),runtimeRoot:resolve(out, 'identity-runtime'),redirectUri,registrationAllowed:true,clientId:'galaxy-official'});
  assert.equal(await as.ordinaryUserCount(),0);assert.equal(as.emailCount(),0);
  report.TLS={HTTPS:true,exactSPKITrustOnly:true,certificateSha256:as.certificateSha256};
  const provider=await createOidcLoginProvider({id:'galaxy-account',name:'银河账号',issuer:as.issuer,clientId:as.clientId,redirectUri,fetch:as.trustedFetch});
@@ -38,7 +38,7 @@ try{
  const html=await readFile(resolve(root,'packages/galaxy-web/dist/index.html'),'utf8'),cssNames=[...html.matchAll(/href="\/app\/assets\/([A-Za-z0-9_.-]+\.css)"/g)].map(x=>x[1]);assert.ok(cssNames.length);const css=(await Promise.all(cssNames.map(name=>readFile(resolve(root,'packages/galaxy-web/dist/assets',name),'utf8')))).join('\n');
  frontend=createServer((req,res)=>{if(req.url==='/galaxy-web-config.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:1,endpoint,signingKeys:[...services.bindings.trustedKeys].map(([kid,pin])=>({kid,...pin}))}));}else if(req.url==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].text);}else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}else{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body><div id="root"></div><script src="/bundle.js"></script></body></html>');}});
  await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe',args:['--ignore-certificate-errors-spki-list='+as.certificateSPKISha256]});
+ browser=await chromium.launch({ headless:true, args:['--ignore-certificate-errors-spki-list='+as.certificateSPKISha256] });
  context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});context.setDefaultTimeout(18000);
  await context.route('**/*',async route=>{const request=route.request(),u=new URL(request.url());if(u.origin===origin||u.origin===as.origin)return route.continue();if(u.origin!==endpoint){blockedOrigins.add(u.origin);return route.abort();}
   const row={method:request.method(),path:u.pathname};calls.push(row);if(u.pathname==='/v2/tasks'&&request.method()==='POST'){const envelope=JSON.parse(request.postData()),payload=JSON.parse(envelope.payloadJson);row.operationId=payload.operationId;row.taskId=payload.taskId;row.payloadHash=sha(envelope.payloadJson);}

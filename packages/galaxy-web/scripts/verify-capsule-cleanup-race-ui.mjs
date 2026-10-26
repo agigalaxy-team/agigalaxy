@@ -6,10 +6,10 @@ import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 import {carryHelpOrigin,helpOriginLocator} from '../src/help-origin-client.mjs';
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 
 const root=fileURLToPath(new URL('../../../',import.meta.url)),baseline=process.argv.includes('--baseline');
-const out=process.env.GALAXY_UI_REPORT_DIR?resolve(root,process.env.GALAXY_UI_REPORT_DIR):resolve(root,'../../../07-logs/development/20261008-help-capsule-astra',baseline?'race-baseline':'race-after');
+const out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR, [(baseline ? 'baseline' : 'current')].join('-'));
 await mkdir(out,{recursive:true});
 const sourcePaths=[...['capsule-workspace.tsx','capsule-workspace-client.mjs','help-origin-client.mjs'].map(name=>'packages/galaxy-web/src/'+name),'packages/galaxy-web/scripts/verify-capsule-cleanup-race-ui.mjs'],sourceHashes=async()=>Object.fromEntries(await Promise.all(sourcePaths.map(async path=>[path,createHash('sha256').update(await readFile(resolve(root,path))).digest('hex')]))),sourceBefore=await sourceHashes();
 const taskId='11111111-1111-4111-8111-111111111111',capsuleId='22222222-2222-4222-8222-222222222222',versionId='33333333-3333-4333-8333-333333333333',original=`/app/tasks/${taskId}?section=collaboration#facts`,target=`/app/capsules/${capsuleId}/versions/${versionId}?q=selected#read`;
@@ -26,7 +26,7 @@ state.holdPending=()=>pendingHold=true;state.rejectPending=()=>pendingReject=tru
 await build({stdin:{contents:entry,resolveDir:root,sourcefile:'capsule-cleanup-race.tsx',loader:'tsx'},bundle:true,format:'esm',target:'es2022',outfile:resolve(out,'harness.js'),alias:{'@':root},logLevel:'silent'});
 const server=createServer(async(req,res)=>{res.setHeader('content-type',req.url==='/harness.js'?'text/javascript':'text/html; charset=utf-8');res.end(req.url==='/harness.js'?await readFile(resolve(out,'harness.js')):'<!doctype html><html><body><div id="root"></div><script type="module" src="/harness.js"></script></body></html>');});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'}),page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],events=[];
+const browser=await chromium.launch({ headless:true }),page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],events=[];
 page.on('pageerror',e=>errors.push(e.message));
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByRole('button',{name:'查找',exact:true}).waitFor();

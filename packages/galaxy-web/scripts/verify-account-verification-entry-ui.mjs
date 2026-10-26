@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 
 const scriptRoot=fileURLToPath(new URL('../../../',import.meta.url));
-const root=resolve(process.env.GALAXY_UI_SOURCE_ROOT??scriptRoot),out=resolve(scriptRoot,process.env.GALAXY_UI_REPORT_DIR??'../../../07-logs/development/goal-20261002-ui/account-verification-entry/browser');await mkdir(out,{recursive:true});
+const root=resolve(process.env.GALAXY_UI_SOURCE_ROOT??scriptRoot),out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);await mkdir(out,{recursive:true});
 const load=path=>import(pathToFileURL(resolve(root,path)).href),sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const [{serviceFixture},{oidcProviderFixture},{createOidcLoginProvider},{createApi},{browserScopes}]=await Promise.all([load('packages/galaxy-official/test/service-fixture.mjs'),load('packages/galaxy-official/test/oidc-provider-fixture.mjs'),load('packages/galaxy-official/src/oidc-login.mjs'),load('packages/galaxy-official/src/http.mjs'),load('packages/galaxy-official/src/browser-client.mjs')]);
 const now=Math.floor(Date.now()/1000),endpoint='https://official.example.org',issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/fixture'],{emailVerified:true});
@@ -26,7 +26,7 @@ try{
  report.browserImportHashes=Object.fromEntries(await Promise.all(Object.keys(bundle.metafile.inputs).filter(file=>!file.includes('node_modules')&&!file.startsWith('<')).map(async file=>[file,sha(await readFile(resolve(file)))])));
  const html=await readFile(resolve(root,'packages/galaxy-web/dist/index.html'),'utf8'),cssNames=[...html.matchAll(/href="\/app\/assets\/([A-Za-z0-9_.-]+\.css)"/g)].map(x=>x[1]);assert.ok(cssNames.length);const css=(await Promise.all(cssNames.map(x=>readFile(resolve(root,'packages/galaxy-web/dist/assets',x),'utf8')))).join('\n')+await readFile(resolve(root,'packages/galaxy-web/src/workspace.css'),'utf8');
  frontend=createServer((req,res)=>{if(req.url==='/bundle.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].text);}else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}else{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body><div id="root"></div><script src="/bundle.js"></script></body></html>');}});await new Promise(ok=>frontend.listen(0,'127.0.0.1',ok));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  const button=(name,p=page)=>p.getByRole('button',{name,exact:true}),nav=path=>page.evaluate(path=>{history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'));},path),idle=()=>page.waitForFunction(()=>!document.querySelector('.operation-progress'));
  const createCalls=()=>calls.filter(c=>c.path==='/v2/chat/rooms/create'),publishCalls=()=>calls.filter(c=>c.path==='/v2/tasks'&&c.method==='POST'),beginCalls=()=>calls.filter(c=>c.path==='/v1/identity/begin');
  const counts=async fixture=>(await fixture.db.query('SELECT (SELECT count(*)::int FROM subjects) subjects,(SELECT count(*)::int FROM chat_rooms) rooms,(SELECT count(*)::int FROM task_requests) tasks,(SELECT count(*)::int FROM task_events) events')).rows[0];

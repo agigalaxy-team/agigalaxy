@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { browserToolOutput } from '../../galaxy-web/scripts/browser-tool-runtime.mjs';
 import { serviceFixture } from './service-fixture.mjs';
 import { oidcProviderFixture } from './oidc-provider-fixture.mjs';
 import { createOidcLoginProvider } from '../src/oidc-login.mjs';
@@ -9,6 +11,13 @@ import { createApi } from '../src/http.mjs';
 import { browserScopes } from '../src/browser-client.mjs';
 import { createExistingWebRuntime, confirmFixtureAccountLink } from './existing-web-identity-fixture.mjs';
 import { createTaskCommentClient } from '../../galaxy-web/src/task-comment-client.mjs';
+
+const output = browserToolOutput(import.meta.url);
+async function writeObservation(filename, observation) {
+  await mkdir(output, { recursive: true });
+  await writeFile(resolve(output, filename), JSON.stringify(observation, null, 2) + '\n');
+}
+
 
 // Actual WebRuntime, Galaxy signed Consent, verified synthetic OIDC account and
 // HTTP/PGlite. Map storage controls the completion boundary; this is not IDB or
@@ -89,7 +98,7 @@ test('original confirmed comment must not sign or publish after getLocal complet
       generationChanged: before.generation !== after?.generation,
       newConsentPosts: f.counts.consents - baseline.consents, commentPosts: f.counts.comments - baseline.comments,
       acceptedCommentEvents: rows, returnedState: result?.state ?? null, rejected: !!error };
-    await writeFile(new URL('../../../../../../07-logs/development/collaboration-runtime-review/task-comment-consumer-lease-fixed.json', import.meta.url), JSON.stringify(observation, null, 2) + '\n');
+    await writeObservation('task-comment-consumer-lease-fixed.json', observation);
     assert.equal(switched, true); assert.equal(before.subjectId, after.subjectId);
     assert.notEqual(before.bindingId, after.bindingId); assert.notEqual(before.generation, after.generation);
     assert.equal(observation.newConsentPosts, 0, 'a replacement binding cannot receive the original comment confirmation');
@@ -119,7 +128,7 @@ test('pending private comment must be withheld when local read completion reconn
       newConsentPosts: f.counts.consents - baseline.consents, newCommentPosts: f.counts.comments - baseline.comments,
       originalPrivateBodyReturned: bodyReturned, withheld: !!error,
       originalLocatorRetained: [...f.values.values()].some(value => value?.active?.operationId === f.payload.id) };
-    await writeFile(new URL('../../../../../../07-logs/development/collaboration-runtime-review/task-comment-pending-lease-fixed.json', import.meta.url), JSON.stringify(observation, null, 2) + '\n');
+    await writeObservation('task-comment-pending-lease-fixed.json', observation);
     assert.equal(switched, true); assert.equal(before.subjectId, after.subjectId); assert.notEqual(before.bindingId, after.bindingId);
     assert.equal(bodyReturned, false, 'a stale completion must not return the original private comment body');
     assert.equal(observation.newCommentPosts, 0); assert.equal(observation.originalLocatorRetained, true);

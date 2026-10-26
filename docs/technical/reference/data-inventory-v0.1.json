@@ -2950,9 +2950,12 @@
     "schema": 41,
     "table_count": 44,
     "reviewed_at": "2026-09-11T07:13:50.231303+08:00",
-    "workspace_reference": "../../../../07-logs/documentation/documentation-refresh-20261024/dated-history/deep-review/05-build/repos/galaxy-founding-beta/docs/technical/reference/data-inventory-v0.1.json",
     "distributed_with_repository": false,
-    "scope": "Maintenance workspace history only; current source declarations and guides in this repository are self-contained."
+    "scope": "Maintenance workspace history only; current source declarations and guides in this repository are self-contained.",
+    "archive_reference": {
+      "base": "maintenance_records in the external project metadata",
+      "path": "evidence/07-logs/documentation/documentation-refresh-20261024/dated-history/deep-review/05-build/repos/galaxy-founding-beta/docs/data-inventory-v0.1.json"
+    }
   },
   "current_guides": [
     "docs/operations/observability.md",

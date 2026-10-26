@@ -1,15 +1,15 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {notificationTarget} from '../src/features/notifications/target.mjs';
-const origin='http://127.0.0.1:5190',out=resolve('../../../07-logs/development/ui-resume-20261002/notification-follow-through'),events=[],calls=[];
+const origin='http://127.0.0.1:5190',out=browserToolOutput(import.meta.url, undefined),events=[],calls=[];
 const watchId='00000000-0000-4000-8000-000000000081',reportId='00000000-0000-4000-8000-000000000082',eventId='00000000-0000-4000-8000-000000000083';
 assert.equal(notificationTarget({object:{type:'task',id:'../../settings'}}),null);
 assert.equal(notificationTarget({object:{type:'capsule',id:watchId,versionId:'javascript:alert(1)'}}),null);
 assert.equal(notificationTarget({object:{type:'case',id:reportId}}),null);
 await mkdir(out,{recursive:true});const fixture=await(await fetch(origin+'/__fixture')).json();
-const browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+const browser=await chromium.launch({ headless:true });
 const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});await context.addInitScript(now=>{Date.now=()=>now*1000;},fixture.now);
 await context.route('https://official.example.org/**',async route=>{const req=route.request(),url=new URL(req.url());calls.push(url.pathname);if(url.pathname==='/v2/notifications/query'){const item=(type,id,title)=>({id:(type==='information-watch'?'information-change':type==='case'?'incident':type)+':'+eventId,category:'materials',object:{type,id,eventId},title,eventKind:'synthetic-notification',at:new Date(fixture.now*1000).toISOString(),read:false,quiet:true,presented:false,interruptiveEligible:false});await route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:JSON.stringify({items:[item('information-watch',watchId,'合成关注变化'),item('target-governance',reportId,'合成处理状态'),item('case',eventId,'合成旧案例通知')],nextAfter:null,lastCheckedAt:new Date(fixture.now*1000).toISOString(),externalDelivery:'disabled',deliveryConfirmed:false})});return;}const res=await context.request.fetch(fixture.api+url.pathname+url.search,{method:req.method(),headers:{...req.headers(),origin:'https://galaxy-ui.example.org'},data:req.postData()??undefined});await route.fulfill({response:res,headers:{...res.headers(),'access-control-allow-origin':origin}});});
 context.setDefaultTimeout(15000);const page=await context.newPage();page.on('pageerror',e=>events.push({pageError:e.message}));

@@ -1,4 +1,4 @@
-import {chromium} from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {mkdir,mkdtemp,readFile,readdir,writeFile,rm} from 'node:fs/promises';
 import {resolve,join,sep} from 'node:path';
@@ -15,7 +15,7 @@ import {verifyIdentityControlChain} from '../../galaxy-official/src/verification
 // Actual WebCrypto/IndexedDB browser and separate Native FS devices against
 // an isolated signed HTTP/PGlite authority. These are synthetic devices only.
 const root=fileURLToPath(new URL('../../../',import.meta.url));
-const out=resolve(root,'../../../07-logs/development/ui-resume-20261002/device-management');
+const out=browserToolOutput(import.meta.url, undefined);
 await mkdir(out,{recursive:true});
 const directory=await mkdtemp(join(tmpdir(),'galaxy-device-management-ui-'));
 const f=await serviceFixture(browserScopes,null,{now:Math.floor(Date.now()/1000),syntheticCommunityQuota:false});
@@ -49,7 +49,7 @@ try{
   else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}
   else {res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body class="galaxy-site"><main id="panel" class="workspace" style="max-width:900px;margin:24px auto;padding:20px"></main><script src="/bundle.js"></script></body></html>');}
  });await new Promise(r=>frontend.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+frontend.address().port;
- browser=await chromium.launch({headless:true,executablePath:'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe'});
+ browser=await chromium.launch({ headless:true });
  const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});contexts.push(context);context.setDefaultTimeout(15000);
  await context.addInitScript(now=>{window.__fixtureNow=now;Date.now=()=>window.__fixtureNow*1000;},f.now);
  await context.route(endpoint+'/**',async route=>{

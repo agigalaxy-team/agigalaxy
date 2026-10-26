@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import {loadToolMcpClient} from '../../galaxy-web/scripts/browser-tool-runtime.mjs';
+const {Client,InMemoryTransport}=await loadToolMcpClient();
 import { createRemoteToolServer } from '../../galaxy-edge-mcp/src/remote-server.mjs';
 
 test('real MCP client discovers explicit tools and publication requires host approval of original preview', async () => {

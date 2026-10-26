@@ -1,4 +1,4 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput } from './browser-tool-runtime.mjs';
 import { build } from '../../../node_modules/esbuild/lib/main.js';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -14,7 +14,7 @@ import { digest } from '../../galaxy-official/src/shared/digest.mjs';
 // CapsuleWorkspace/Authoring DOM. The read-only browser transport injects each
 // fixture subject's credential in routing; this is not browser identity enrollment.
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const out = resolve(root, '../../../07-logs/development/ui-resume-20261002/capsule-attribution-responses');
+const out = browserToolOutput(import.meta.url, undefined);
 await mkdir(out, { recursive: true });
 const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';
 const scopes = ['binding', 'consent', 'case-teaser', 'assistance', 'capsules', 'history'];
@@ -73,7 +73,7 @@ try {
   const css = (await Promise.all((await readdir(cssRoot)).filter(n => n.endsWith('.css')).map(n => readFile(resolve(cssRoot, n), 'utf8')))).join('\n') + await readFile(resolve(root, 'packages/galaxy-web/src/workspace.css'), 'utf8');
   frontend = createServer((req, res) => { if (req.url === '/bundle.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(bundle.outputFiles[0].text); } else if (req.url === '/style.css') { res.setHeader('Content-Type', 'text/css'); res.end(css); } else { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end('<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><body class="galaxy-site"><main class="workspace" style="max-width:920px;margin:24px auto;padding:20px" id="panel"></main><script src="/bundle.js"></script></body></html>'); } });
   await new Promise(r => frontend.listen(0, '127.0.0.1', r)); const origin = `http://127.0.0.1:${frontend.address().port}`;
-  browser = await chromium.launch({ headless: true, executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+  browser = await chromium.launch({ headless: true });
   const config = who => ({ endpoint, subjectId: who?.actor.subjectId ?? null, bindingId: who?.actor.bindingId ?? null, capsuleId: version.capsuleId, versionId: version.id });
   async function open(who) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' }); contexts.push(context); context.setDefaultTimeout(15000);

@@ -1,7 +1,6 @@
-import { chromium } from 'file:///C:/Users/USER1/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+import { chromium, browserToolOutput, browserSourceUrl } from './browser-tool-runtime.mjs';
 import { createServer } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
@@ -12,7 +11,7 @@ import { createRetirementController } from '../../galaxy-official/src/retirement
 import { browserScopes } from '../../galaxy-official/src/browser-client.mjs';
 
 const now = Math.floor(Date.now() / 1000), endpoint = 'https://official.example.org';
-const out = fileURLToPath(new URL('../../../../../../07-logs/development/ui-resume-20261002/task-owner-control/', import.meta.url));
+const out = browserToolOutput(import.meta.url, undefined);
 await mkdir(out, { recursive: true });
 const issuer=await oidcProviderFixture([endpoint+'/v1/identity/callback/fixture'],{emailVerified:true});
 const provider=await createOidcLoginProvider({id:'fixture',name:'Synthetic owner control OIDC',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri:endpoint+'/v1/identity/callback/fixture',allowLoopbackHttp:true,now:()=>now});
@@ -36,7 +35,7 @@ const frontend = createServer(async (request, response) => {
   } catch { response.writeHead(500); response.end('synthetic_fixture_failure'); }
 });
 await new Promise(resolve => frontend.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${frontend.address().port}`;
-const browser = await chromium.launch({ headless: true, executablePath: 'C:/Users/USER1/AppData/Local/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe' });
+const browser = await chromium.launch({ headless: true });
 const contexts = [], events = [], calls = [], pageErrors = [];
 let page, dropConsent = false, dropControl=false, failReceipt=false, failLegacySend=false, holdPrepare=false, releasePrepare, signalHeld;let heldPrepare;
 async function open() {
@@ -85,7 +84,7 @@ try {
   const participationId=proposal.participationId;
   const confirmation={kind:'confirm',eventId:crypto.randomUUID(),expectedParticipationVersion:1,scopeVersion:1};
   await fixture.assistance.submitParticipationEvent(other.actor,participationId,await other.authorize(confirmation,'assistance.publish',{objectId:confirmation.eventId,viewers:[subjectId]}));
-  const seeded=await page.evaluate(async({taskId,peer,now})=>{const {createWebRuntime,loadWebConfiguration}=await import('/app/src/runtime.mjs'),{getFactClient}=await import('/app/src/features/work-records/client.mjs'),{createContextClientV2}=await import('/app/@fs/C:/Users/USER1/Documents/ChatGPT/projects/active/银河项目/agi-galaxy-network/05-build/repos/galaxy-founding-beta/packages/galaxy-official/src/context-v2-client.mjs');const r=await createWebRuntime(await loadWebConfiguration());try{await r.connect({confirmed:true});let task=await r.api.call('/v2/tasks/'+taskId,null,{method:'GET'});const participant=task.participations.find(p=>p.subjectId===peer);const contexts=createContextClientV2({api:r.api,getLocal:r.getLocal,putLocal:r.putLocal});const prepared=await contexts.prepareGrant({schemaVersion:2,id:crypto.randomUUID(),taskId,participationId:participant.participationId,participantId:peer,scopeVersion:participant.scopeVersion,scopeEventId:participant.scopeEventId,expiresAt:now+1800,materials:[{id:crypto.randomUUID(),label:'原协作资料',mediaType:'text/plain',content:'SYNTHETIC_RETAINED_CONTEXT_NOT_NEW_CONTROL_AUTHORITY'}]});await contexts.execute(prepared,{confirmed:true});const facts=getFactClient(r,task.requesterId);await facts.submitFact(task,null,null,{kind:'intervention',types:['scope-clarification'],affectsAttemptIds:[],description:'合成已实际确认材料范围',sourceRefs:[],observedEffect:'已分开所选材料和整体解决判断'},{confirmed:true,viewers:[peer],caseSummary:'独立合成测试中的原工作事实',synthetic:true});task=await r.api.call('/v2/tasks/'+taskId,null,{method:'GET'});return {caseId:task.caseId};}finally{r.close();}},{taskId,peer:other.actor.subjectId,now});
+  const seeded=await page.evaluate(async({taskId,peer,now,moduleUrl})=>{const {createWebRuntime,loadWebConfiguration}=await import('/app/src/runtime.mjs'),{getFactClient}=await import('/app/src/features/work-records/client.mjs'),{createContextClientV2}=await import(moduleUrl);const r=await createWebRuntime(await loadWebConfiguration());try{await r.connect({confirmed:true});let task=await r.api.call('/v2/tasks/'+taskId,null,{method:'GET'});const participant=task.participations.find(p=>p.subjectId===peer);const contexts=createContextClientV2({api:r.api,getLocal:r.getLocal,putLocal:r.putLocal});const prepared=await contexts.prepareGrant({schemaVersion:2,id:crypto.randomUUID(),taskId,participationId:participant.participationId,participantId:peer,scopeVersion:participant.scopeVersion,scopeEventId:participant.scopeEventId,expiresAt:now+1800,materials:[{id:crypto.randomUUID(),label:'原协作资料',mediaType:'text/plain',content:'SYNTHETIC_RETAINED_CONTEXT_NOT_NEW_CONTROL_AUTHORITY'}]});await contexts.execute(prepared,{confirmed:true});const facts=getFactClient(r,task.requesterId);await facts.submitFact(task,null,null,{kind:'intervention',types:['scope-clarification'],affectsAttemptIds:[],description:'合成已实际确认材料范围',sourceRefs:[],observedEffect:'已分开所选材料和整体解决判断'},{confirmed:true,viewers:[peer],caseSummary:'独立合成测试中的原工作事实',synthetic:true});task=await r.api.call('/v2/tasks/'+taskId,null,{method:'GET'});return {caseId:task.caseId};}finally{r.close();}},{taskId,peer:other.actor.subjectId,now,moduleUrl:browserSourceUrl('packages/galaxy-official/src/context-v2-client.mjs')});
   const retained=async()=>({participations:(await fixture.db.query('SELECT * FROM task_participations WHERE task_id=$1',[taskId])).rows,case:(await fixture.db.query('SELECT * FROM cases WHERE id=$1',[seeded.caseId])).rows,caseEvents:(await fixture.db.query('SELECT * FROM case_events WHERE case_id=$1 ORDER BY version',[seeded.caseId])).rows,context:(await fixture.db.query('SELECT * FROM context_grants_v2 WHERE task_id=$1',[taskId])).rows});
   const retainedBefore=await retained();assert.equal(retainedBefore.participations.length,1);assert.equal(retainedBefore.context.length,1);assert.equal(retainedBefore.case.length,1);assert.equal(retainedBefore.caseEvents.length,2);
   const originalRows=(await fixture.db.query('SELECT * FROM task_events WHERE task_id=$1 ORDER BY version',[taskId])).rows;
