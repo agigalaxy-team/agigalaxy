@@ -367,7 +367,8 @@
       "dataOwner": "Keycloak retains authentication state; normal and management identity domains remain distinct.",
       "interfaces": [
         "OIDC/Keycloak native forms; shared Web and Mail renderers"
-      ]
+      ],
+      "buildLimit": "The component command builds the shared Keycloak theme. Java providers under providers/ are separate artifacts: management-email-change/build.mjs requires an explicit Keycloak 26.7.3 distribution, JDK 21 and a new output directory; theme success does not prove a provider JAR."
     },
     {
       "id": "admin",

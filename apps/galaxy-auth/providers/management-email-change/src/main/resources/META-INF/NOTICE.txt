@@ -1,0 +1,5 @@
+Galaxy management email-change realm extension
+Targets Keycloak 26.7.3 APIs (Keycloak contributors, Apache License 2.0).
+Uses the installed native UpdateEmailActionToken, handler, user profile and email template providers.
+Does not bundle or replace Keycloak implementation classes or modify the upstream distribution.
+The Keycloak license is included as LICENSE-KEYCLOAK.txt.
