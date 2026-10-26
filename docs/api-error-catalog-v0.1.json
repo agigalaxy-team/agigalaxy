@@ -69,6 +69,54 @@
       "line": 95
     },
     {
+      "code": "invalid_account_follow_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 7
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 15
+    },
+    {
+      "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 17
+    },
+    {
+      "code": "account_follow_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 36
+    },
+    {
+      "code": "account_follow_self",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 46
+    },
+    {
+      "code": "account_follow_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 49
+    },
+    {
+      "code": "account_follow_target_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 50
+    },
+    {
+      "code": "account_follow_cursor_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/account-follows-v1.mjs",
+      "line": 71
+    },
+    {
       "code": "invalid_account_query",
       "status": 400,
       "source": "packages/galaxy-official/src/account-public-query.mjs",
@@ -84,19 +132,19 @@
       "code": "external_credentials_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/account-public-query.mjs",
-      "line": 50
+      "line": 51
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/account-public-query.mjs",
-      "line": 55
+      "line": 56
     },
     {
       "code": "forum_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/account-public-query.mjs",
-      "line": 56
+      "line": 57
     },
     {
       "code": "account_selection_required",
@@ -177,6 +225,102 @@
       "line": 17
     },
     {
+      "code": "chat_report_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 22
+    },
+    {
+      "code": "chat_report_account_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 30
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 31
+    },
+    {
+      "code": "invalid_chat_report_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 40
+    },
+    {
+      "code": "invalid_chat_report_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/account-chat-governance-http.mjs",
+      "line": 43
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-feedback-data-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "invalid_account_feedback_data_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/account-feedback-data-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-feedback-data-http.mjs",
+      "line": 20
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/account-feedback-data-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "account_follow_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/account-follows-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/account-follows-http.mjs",
+      "line": 9
+    },
+    {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/account-work-http.mjs",
@@ -216,13 +360,43 @@
       "code": "browser_origin_not_enabled",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/browser-policy.mjs",
-      "line": 26
+      "line": 27
     },
     {
       "code": "browser_preflight_denied",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/browser-policy.mjs",
-      "line": 43
+      "line": 56
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/business-admin-http.mjs",
+      "line": 6
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/business-admin-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/business-admin-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/business-admin-http.mjs",
+      "line": 26
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/business-admin-http.mjs",
+      "line": 32
     },
     {
       "code": "invalid_account_target",
@@ -327,6 +501,36 @@
       "line": 20
     },
     {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/feedback-attachment-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "attachment_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/feedback-attachment-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/feedback-attachment-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/feedback-attachment-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "attachment_length_required",
+      "status": 411,
+      "source": "packages/galaxy-official/src/adapters/http/feedback-attachment-http.mjs",
+      "line": 18
+    },
+    {
       "code": "invalid_account_target",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/forum-attachment-http.mjs",
@@ -369,34 +573,1144 @@
       "line": 14
     },
     {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
-      "line": 25
-    },
-    {
       "code": "invalid_account_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
       "line": 26
     },
     {
-      "code": "invalid_archive_cursor",
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 30
+    },
+    {
+      "code": "invalid_account_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
       "line": 31
     },
     {
-      "code": "not_found",
-      "status": 404,
+      "code": "invalid_archive_cursor",
+      "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
-      "line": 40
+      "line": 36
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 45
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/official-account-http.mjs",
+      "line": 49
+    },
+    {
+      "code": "invalid_operations_agentos_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 36
+    },
+    {
+      "code": "operations_agentos_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 37
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 46
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 53
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 62
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 63
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 71
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 72
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 81
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-agentos-http.mjs",
+      "line": 82
+    },
+    {
+      "code": "invalid_operations_autonomy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 5
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "operations_autonomy_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "operations_autonomy_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 29
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-autonomy-http.mjs",
+      "line": 34
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 21
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 32
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 33
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 35
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 40
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-business-http.mjs",
+      "line": 48
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-chat-message-http.mjs",
+      "line": 7
+    },
+    {
+      "code": "chat_report_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-chat-message-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_chat_report_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-chat-message-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "invalid_feedback_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "feedback_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 31
+    },
+    {
+      "code": "feedback_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 32
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 34
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
+      "line": 39
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-feedback-http.mjs",
       "line": 44
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-access-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_file_access_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-access-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "invalid_operations_file_access",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-access-http.mjs",
+      "line": 22
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-cleanup-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-cleanup-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-cleanup-http.mjs",
+      "line": 21
+    },
+    {
+      "code": "operations_file_cleanup_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-file-cleanup-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 21
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 29
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 30
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 41
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 42
+    },
+    {
+      "code": "invalid_operations_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-forum-content-http.mjs",
+      "line": 48
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "operations_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "business_admin_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 33
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 37
+    },
+    {
+      "code": "site_publication_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 42
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 44
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 48
+    },
+    {
+      "code": "site_publication_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 54
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 55
+    },
+    {
+      "code": "operations_jobs_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 60
+    },
+    {
+      "code": "operations_jobs_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 66
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 67
+    },
+    {
+      "code": "operations_jobs_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 73
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 74
+    },
+    {
+      "code": "operations_search_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 87
+    },
+    {
+      "code": "operations_search_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 93
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 94
+    },
+    {
+      "code": "operations_search_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 100
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-http.mjs",
+      "line": 101
+    },
+    {
+      "code": "maintenance_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "unsupported_media_type",
+      "status": 415,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "request_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "maintenance_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 25
+    },
+    {
+      "code": "invalid_maintenance_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 28
+    },
+    {
+      "code": "maintenance_prosody_live_component_readiness_unconfirmed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 29
+    },
+    {
+      "code": "maintenance_prosody_live_component_readiness_unconfirmed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 34
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 54
+    },
+    {
+      "code": "invalid_maintenance_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 56
+    },
+    {
+      "code": "invalid_maintenance_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 57
+    },
+    {
+      "code": "maintenance_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-maintenance-http.mjs",
+      "line": 58
+    },
+    {
+      "code": "invalid_operations_messaging_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "invalid_operations_messaging_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "operations_messaging_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 21
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 30
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 32
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-messaging-http.mjs",
+      "line": 39
+    },
+    {
+      "code": "model_settings_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 6
+    },
+    {
+      "code": "unsupported_media_type",
+      "status": 415,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "request_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "model_settings_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "invalid_model_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 26
+    },
+    {
+      "code": "invalid_model_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 27
+    },
+    {
+      "code": "model_settings_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-model-settings-http.mjs",
+      "line": 28
+    },
+    {
+      "code": "invalid_operations_permissions_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-permissions-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "invalid_operations_permissions_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-permissions-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-permissions-http.mjs",
+      "line": 22
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-permissions-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 7
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "operations_notices_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "operations_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 28
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 30
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 31
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 43
+    },
+    {
+      "code": "operations_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 44
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 47
+    },
+    {
+      "code": "operations_rules_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 47
+    },
+    {
+      "code": "operations_rules_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 49
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 50
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 52
+    },
+    {
+      "code": "operations_notices_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 54
+    },
+    {
+      "code": "operations_notices_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 57
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 59
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 60
+    },
+    {
+      "code": "operations_retention_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 62
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 62
+    },
+    {
+      "code": "operations_retention_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 64
+    },
+    {
+      "code": "operations_retention_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 67
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 67
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-product-http.mjs",
+      "line": 68
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-recommendation-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "invalid_recommendation_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-recommendation-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_recommendation_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-recommendation-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "discovery_recommendation_operations_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-recommendation-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "invalid_registered_users_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-registered-users-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_registered_users_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-registered-users-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-registered-users-http.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-registered-users-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "invalid_registered_users_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-registered-users-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 5
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "operations_rules_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "operations_rule_explicit_publication_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 21
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 22
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-rules-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-search-quality-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_search_quality_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-search-quality-http.mjs",
+      "line": 10
+    },
+    {
+      "code": "invalid_search_quality_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-search-quality-http.mjs",
+      "line": 11
+    },
+    {
+      "code": "discovery_search_quality_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-search-quality-http.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_smtp_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-smtp-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_smtp_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-smtp-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-smtp-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-smtp-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 5
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "p13_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "p13_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 16
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 22
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-strategies-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 8
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 9
+    },
+    {
+      "code": "maintenance_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 13
+    },
+    {
+      "code": "unsupported_media_type",
+      "status": 415,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 15
+    },
+    {
+      "code": "request_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 17
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_json",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 19
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 23
+    },
+    {
+      "code": "system_settings_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 24
+    },
+    {
+      "code": "system_settings_consumer_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 26
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 44
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 45
+    },
+    {
+      "code": "system_settings_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/adapters/http/operations-system-settings-http.mjs",
+      "line": 47
     },
     {
       "code": "invalid_forwarded_address",
@@ -432,19 +1746,19 @@
       "code": "invalid_request",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 57
+      "line": 139
     },
     {
       "code": "capacity_limited",
       "status": 503,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 68
+      "line": 150
     },
     {
       "code": "rate_limited",
       "status": 429,
       "source": "packages/galaxy-official/src/adapters/http/policy.mjs",
-      "line": 73
+      "line": 155
     },
     {
       "code": "access_denied",
@@ -492,73 +1806,73 @@
       "code": "invalid_search_v2_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 85
+      "line": 142
     },
     {
       "code": "invalid_recruitment_receipt_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 143
+      "line": 200
     },
     {
       "code": "invalid_task_owner_control",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 263
+      "line": 320
     },
     {
       "code": "invalid_task_owner_read",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 273
+      "line": 330
     },
     {
       "code": "invalid_search_query",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 333
+      "line": 390
     },
     {
       "code": "invalid_host",
       "status": 403,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 484
+      "line": 541
     },
     {
       "code": "method_not_allowed",
       "status": 405,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 485
+      "line": 542
     },
     {
       "code": "access_denied",
       "status": 401,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 514
+      "line": 571
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 520
+      "line": 577
     },
     {
       "code": "invalid_case_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 533
+      "line": 590
     },
     {
       "code": "invalid_case_route",
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 534
+      "line": 591
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/adapters/http/routes.mjs",
-      "line": 554
+      "line": 611
     },
     {
       "code": "unsupported_media_type",
@@ -583,6 +1897,12 @@
       "status": 400,
       "source": "packages/galaxy-official/src/adapters/http/task-material-http.mjs",
       "line": 12
+    },
+    {
+      "code": "invalid_host",
+      "status": 403,
+      "source": "packages/galaxy-official/src/adapters/mcp/personal/handler.mjs",
+      "line": 141
     },
     {
       "code": "invalid_assistance_payload",
@@ -1139,506 +2459,686 @@
     {
       "code": "builder_unavailable",
       "status": 404,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 30
+      "source": "packages/galaxy-official/src/builders/authority.mjs",
+      "line": 17
     },
     {
       "code": "builder_unavailable",
       "status": 404,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 38
+      "source": "packages/galaxy-official/src/builders/authority.mjs",
+      "line": 25
     },
     {
       "code": "builder_unavailable",
       "status": 404,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 40
+      "source": "packages/galaxy-official/src/builders/authority.mjs",
+      "line": 27
     },
     {
       "code": "builder_proof_owner_mismatch",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 47
+      "source": "packages/galaxy-official/src/builders/authority.mjs",
+      "line": 34
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 11
+    },
+    {
+      "code": "node_control_export_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 14
+    },
+    {
+      "code": "node_control_export_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 40
+    },
+    {
+      "code": "conformance_report_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 45
+    },
+    {
+      "code": "conformance_report_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/builders/portable-evidence.mjs",
+      "line": 50
+    },
+    {
+      "code": "builder_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 19
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 27
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 36
+    },
+    {
+      "code": "builder_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 39
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 46
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 103
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/read-model.mjs",
+      "line": 105
     },
     {
       "code": "invalid_builder_payload",
       "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 56
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 17
     },
     {
       "code": "builder_visibility_required",
       "status": 403,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 66
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 27
     },
     {
       "code": "builder_event_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 68
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 29
     },
     {
       "code": "builder_revision_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 70
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 31
     },
     {
       "code": "builder_type_immutable",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 72
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 33
     },
     {
       "code": "builder_declaration_changed",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 82
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 43
     },
     {
       "code": "builder_node_holder_required",
       "status": 403,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 85
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 46
     },
     {
       "code": "builder_visibility_mismatch",
       "status": 403,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 89
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 50
     },
     {
       "code": "builder_report_mismatch",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 92
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 53
     },
     {
       "code": "builder_node_control_mismatch",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 95
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 56
     },
     {
       "code": "builder_node_control_unavailable",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 99
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 60
     },
     {
       "code": "builder_work_node_authorization_required",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 104
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 65
     },
     {
       "code": "builder_probe_target_required",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 110
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 71
     },
     {
       "code": "builder_probe_maintenance_blocked",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 112
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 73
     },
     {
       "code": "builder_probe_cooldown",
       "status": 429,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 113
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 74
     },
     {
       "code": "builder_work_revoke_unavailable",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 118
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 79
     },
     {
       "code": "builder_transition_denied",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 85
+    },
+    {
+      "code": "invalid_builder_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/builders/service.mjs",
+      "line": 99
+    },
+    {
+      "code": "invalid_account_data",
+      "status": 400,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 16
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 20
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 21
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 22
+    },
+    {
+      "code": "account_settings_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 25
+    },
+    {
+      "code": "account_type_unchanged",
+      "status": 409,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 26
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 38
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 39
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 43
+    },
+    {
+      "code": "account_restriction_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 44
+    },
+    {
+      "code": "invalid_restriction_expiry",
+      "status": 400,
+      "source": "packages/galaxy-official/src/business-admin-domain.mjs",
+      "line": 45
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 17
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 45
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 49
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 52
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 53
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 57
+    },
+    {
+      "code": "operations_permission_unknown",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 63
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 72
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 79
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 89
+    },
+    {
+      "code": "identity_directory_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
       "line": 124
     },
     {
-      "code": "builder_unavailable",
+      "code": "identity_directory_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 130
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 230
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 270
+    },
+    {
+      "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 148
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 276
     },
     {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 156
+      "code": "business_admin_operation_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 278
     },
     {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 158
+      "code": "business_admin_operation_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 286
     },
     {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 167
-    },
-    {
-      "code": "builder_unavailable",
-      "status": 404,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 170
-    },
-    {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 177
-    },
-    {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 250
-    },
-    {
-      "code": "node_control_export_unavailable",
+      "code": "business_admin_operation_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 253
-    },
-    {
-      "code": "node_control_export_unavailable",
-      "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 257
-    },
-    {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 279
-    },
-    {
-      "code": "conformance_report_unavailable",
-      "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 284
-    },
-    {
-      "code": "conformance_report_unavailable",
-      "status": 409,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 289
-    },
-    {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 304
-    },
-    {
-      "code": "invalid_builder_query",
-      "status": 400,
-      "source": "packages/galaxy-official/src/builders.mjs",
-      "line": 306
-    },
-    {
-      "code": "invalid_capsule_v2_payload",
-      "status": 400,
-      "source": "packages/galaxy-official/src/capsule-sources-v2.mjs",
-      "line": 12
-    },
-    {
-      "code": "capsule_use_already_recorded",
-      "status": 409,
-      "source": "packages/galaxy-official/src/capsules-v2.mjs",
-      "line": 289
+      "source": "packages/galaxy-official/src/business-admin.mjs",
+      "line": 301
     },
     {
       "code": "invalid_capsule_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 8
+      "line": 9
     },
     {
       "code": "capsule_source_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 24
+      "line": 25
     },
     {
       "code": "capsule_case_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 28
+      "line": 29
     },
     {
       "code": "case_event_limit",
       "status": 413,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 30
+      "line": 31
     },
     {
       "code": "capsule_proof_mismatch",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 37
-    },
-    {
-      "code": "unsupported_semantics",
-      "status": 409,
-      "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 43
+      "line": 38
     },
     {
       "code": "capsule_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 52
+      "line": 44
+    },
+    {
+      "code": "unsupported_semantics",
+      "status": 409,
+      "source": "packages/galaxy-official/src/capsules.mjs",
+      "line": 46
+    },
+    {
+      "code": "capsule_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/capsules.mjs",
+      "line": 55
     },
     {
       "code": "capsule_owner_required",
       "status": 403,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 57
+      "line": 60
     },
     {
       "code": "capsule_visibility_required",
       "status": 403,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 59
+      "line": 62
     },
     {
       "code": "capsule_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 60
+      "line": 63
     },
     {
       "code": "unsupported_semantics",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 61
+      "line": 64
     },
     {
       "code": "capsule_revision_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 62
+      "line": 65
     },
     {
       "code": "capsule_version_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 66
+      "line": 69
     },
     {
       "code": "capsule_resolution_required",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 68
+      "line": 71
     },
     {
       "code": "capsule_contributor_unknown",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 70
+      "line": 73
     },
     {
       "code": "capsule_notice_visibility_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 74
+      "line": 77
     },
     {
       "code": "capsule_transition_denied",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 75
+      "line": 78
     },
     {
       "code": "capsule_replacement_mismatch",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 76
+      "line": 79
     },
     {
       "code": "capsule_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 87
+      "line": 90
     },
     {
       "code": "capsule_visibility_required",
       "status": 403,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 90
+      "line": 93
     },
     {
       "code": "capsule_use_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 92
+      "line": 95
     },
     {
       "code": "capsule_attribution_mismatch",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 93
+      "line": 96
     },
     {
       "code": "capsule_not_applicable",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 96
+      "line": 99
     },
     {
       "code": "capsule_new_case_required",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 97
+      "line": 100
     },
     {
       "code": "capsule_result_mismatch",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 100
+      "line": 103
     },
     {
       "code": "capsule_application_required",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 103
+      "line": 106
     },
     {
       "code": "capsule_use_already_recorded",
       "status": 409,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 107
+      "line": 110
     },
     {
       "code": "invalid_capsule_query",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 122
+      "line": 125
     },
     {
       "code": "invalid_capsule_query",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 123
+      "line": 126
     },
     {
       "code": "invalid_capsule_query",
       "status": 400,
       "source": "packages/galaxy-official/src/capsules.mjs",
-      "line": 187
+      "line": 190
+    },
+    {
+      "code": "invalid_capsule_v2_payload",
+      "status": 400,
+      "source": "packages/galaxy-official/src/capsules/v2/sources.mjs",
+      "line": 12
+    },
+    {
+      "code": "capsule_use_already_recorded",
+      "status": 409,
+      "source": "packages/galaxy-official/src/capsules/v2/uses.mjs",
+      "line": 82
     },
     {
       "code": "invalid_case_v2_payload",
       "status": 400,
-      "source": "packages/galaxy-official/src/cases.mjs",
+      "source": "packages/galaxy-official/src/cases/helpers.mjs",
+      "line": 8
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/cases/read-model.mjs",
+      "line": 14
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/cases/read-model.mjs",
       "line": 18
+    },
+    {
+      "code": "unsupported_semantics",
+      "status": 409,
+      "source": "packages/galaxy-official/src/cases/read-model.mjs",
+      "line": 21
+    },
+    {
+      "code": "case_event_limit",
+      "status": 413,
+      "source": "packages/galaxy-official/src/cases/read-model.mjs",
+      "line": 22
     },
     {
       "code": "invalid_case_payload",
       "status": 400,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 30
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 22
     },
     {
       "code": "requester_required",
       "status": 403,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 36
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 28
     },
     {
       "code": "case_conflict_or_not_found",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 40
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 32
     },
     {
       "code": "event_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 49
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 41
     },
     {
       "code": "unsupported_semantics",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 52
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 44
     },
     {
       "code": "case_withdrawn",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 53
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 45
     },
     {
       "code": "version_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 56
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 48
     },
     {
       "code": "case_event_limit",
       "status": 413,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 57
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 49
     },
     {
       "code": "attempt_order_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 62
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 54
     },
     {
       "code": "invalid_case_reference",
       "status": 400,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 67
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 59
     },
     {
       "code": "failure_reason_required",
       "status": 400,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 68
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 82
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 86
-    },
-    {
-      "code": "unsupported_semantics",
-      "status": 409,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 89
-    },
-    {
-      "code": "case_event_limit",
-      "status": 413,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 90
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 60
     },
     {
       "code": "invalid_case_task_link",
       "status": 400,
-      "source": "packages/galaxy-official/src/cases.mjs",
-      "line": 304
+      "source": "packages/galaxy-official/src/cases/service.mjs",
+      "line": 196
     },
     {
       "code": "access_denied",
@@ -1926,10 +3426,16 @@
       "code": "access_denied",
       "status": 401,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 49
+      "line": 48
     },
     {
       "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-accounts.mjs",
+      "line": 64
+    },
+    {
+      "code": "account_selection_required",
       "status": 409,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
       "line": 65
@@ -1941,44 +3447,32 @@
       "line": 66
     },
     {
-      "code": "account_selection_required",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 67
-    },
-    {
       "code": "account_target_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 69
+      "line": 68
     },
     {
       "code": "account_verification_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 70
+      "line": 69
     },
     {
       "code": "account_target_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 73
+      "line": 72
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/community-accounts.mjs",
-      "line": 96
+      "line": 95
     },
     {
       "code": "invalid_forum_audience",
       "status": 400,
-      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 39
-    },
-    {
-      "code": "forum_condition_unavailable",
-      "status": 409,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
       "line": 41
     },
@@ -1986,13 +3480,13 @@
       "code": "forum_condition_unavailable",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 42
+      "line": 43
     },
     {
       "code": "forum_condition_unavailable",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 43
+      "line": 44
     },
     {
       "code": "forum_condition_unavailable",
@@ -2001,58 +3495,64 @@
       "line": 45
     },
     {
+      "code": "forum_condition_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
+      "line": 47
+    },
+    {
       "code": "forum_section_participation_denied",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 61
+      "line": 65
     },
     {
       "code": "forum_source_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 66
+      "line": 70
     },
     {
       "code": "forum_participation_denied",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 83
+      "line": 94
     },
     {
       "code": "forum_section_participation_denied",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-access-v2.mjs",
-      "line": 84
+      "line": 95
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 30
+      "line": 31
     },
     {
       "code": "forum_quota_exceeded",
       "status": 429,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 32
+      "line": 33
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 37
+      "line": 38
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 43
+      "line": 44
     },
     {
       "code": "forum_storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-budget-v1.mjs",
-      "line": 46
+      "line": 47
     },
     {
       "code": "invalid_forum_request",
@@ -2106,112 +3606,76 @@
       "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 91
+      "line": 92
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 102
+      "line": 110
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 105
+      "line": 113
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 117
+      "line": 127
     },
     {
       "code": "forum_report_target_mismatch",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 134
+      "line": 144
     },
     {
       "code": "forum_content_limit",
       "status": 413,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 135
+      "line": 145
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 140
+      "line": 150
     },
     {
       "code": "account_verification_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 145
+      "line": 155
     },
     {
       "code": "forum_independent_handler_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 146
+      "line": 156
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 147
+      "line": 157
     },
     {
       "code": "forum_report_version_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 147
+      "line": 157
     },
     {
       "code": "forum_independent_handler_required",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 151
+      "line": 161
     },
     {
       "code": "forum_report_transition",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 152
-    },
-    {
-      "code": "forum_hide_expiry",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 153
-    },
-    {
-      "code": "forum_appeal_unavailable",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 155
-    },
-    {
-      "code": "forum_report_transition",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 157
-    },
-    {
-      "code": "forum_report_transition",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 158
-    },
-    {
-      "code": "forum_report_event_limit",
-      "status": 413,
-      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 160
-    },
-    {
-      "code": "forum_report_account_changed",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
       "line": 162
@@ -2220,13 +3684,49 @@
       "code": "forum_hide_expiry",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 163
+    },
+    {
+      "code": "forum_appeal_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 165
+    },
+    {
+      "code": "forum_report_transition",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
       "line": 167
+    },
+    {
+      "code": "forum_report_transition",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 168
+    },
+    {
+      "code": "forum_report_event_limit",
+      "status": 413,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 170
+    },
+    {
+      "code": "forum_report_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 172
+    },
+    {
+      "code": "forum_hide_expiry",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
+      "line": 177
     },
     {
       "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-governance-v1.mjs",
-      "line": 184
+      "line": 194
     },
     {
       "code": "forum_operation_conflict",
@@ -2406,35 +3906,17 @@
       "code": "invalid_forum_request",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 18
+      "line": 20
     },
     {
       "code": "invalid_forum_request",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 35
+      "line": 49
     },
     {
       "code": "forum_signature_evidence_required",
       "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 36
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 44
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 48
-    },
-    {
-      "code": "not_found",
-      "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 50
     },
@@ -2442,173 +3924,185 @@
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 59
+      "line": 58
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 65
+      "line": 62
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 64
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 73
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 82
+    },
+    {
+      "code": "forum_account_target_mismatch",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 84
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 89
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 67
+      "line": 91
     },
     {
       "code": "account_selection_required",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 70
+      "line": 94
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 72
+      "line": 96
     },
     {
       "code": "forum_content_limit",
       "status": 413,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 85
+      "line": 109
     },
     {
       "code": "invalid_forum_payload",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 96
+      "line": 120
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 103
+      "line": 127
     },
     {
       "code": "forum_post_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 109
+      "line": 133
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 112
+      "line": 136
     },
     {
       "code": "forum_post_withdrawn",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 113
+      "line": 137
     },
     {
       "code": "forum_head_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 114
-    },
-    {
-      "code": "attachment_service_unavailable",
-      "status": 503,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 127
-    },
-    {
-      "code": "forum_operation_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 130
-    },
-    {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 138
     },
     {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 139
-    },
-    {
-      "code": "forum_reply_source_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 143
-    },
-    {
       "code": "attachment_service_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 151
+      "line": 152
     },
     {
       "code": "forum_operation_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 154
+      "line": 155
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 163
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 164
+    },
+    {
+      "code": "forum_reply_source_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 168
+    },
+    {
+      "code": "attachment_service_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 177
+    },
+    {
+      "code": "forum_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 180
     },
     {
       "code": "invalid_forum_action",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 158
+      "line": 184
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 163
+      "line": 189
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 164
+      "line": 190
     },
     {
       "code": "forum_reply_transition",
       "status": 409,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 165
+      "line": 191
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 168
+      "line": 194
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 169
+      "line": 195
     },
     {
       "code": "forum_head_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 170
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 171
-    },
-    {
-      "code": "forum_version_transition",
-      "status": 409,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 171
-    },
-    {
-      "code": "not_found",
-      "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 196
     },
@@ -2616,91 +4110,109 @@
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 212
+      "line": 197
+    },
+    {
+      "code": "forum_version_transition",
+      "status": 409,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 197
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 225
+      "line": 229
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 231
+      "line": 246
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 236
+      "line": 260
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 237
+      "line": 266
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 238
+      "line": 271
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 239
+      "line": 272
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 241
+      "line": 273
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 274
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 276
     },
     {
       "code": "invalid_forum_request",
       "status": 400,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 281
+      "line": 317
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 297
+      "line": 333
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 305
+      "line": 341
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 310
+      "line": 346
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 311
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
-      "line": 312
+      "line": 347
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/community-forum-v1.mjs",
       "line": 348
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/community-forum-v1.mjs",
+      "line": 384
     },
     {
       "code": "invalid_configuration_request",
@@ -2827,6 +4339,96 @@
       "status": 404,
       "source": "packages/galaxy-official/src/contacts-v2.mjs",
       "line": 31
+    },
+    {
+      "code": "site_publication_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 55
+    },
+    {
+      "code": "site_publication_not_cancellable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 57
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 70
+    },
+    {
+      "code": "invalid_site_publication",
+      "status": 400,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 74
+    },
+    {
+      "code": "site_publication_operation_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 80
+    },
+    {
+      "code": "site_publication_queue_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 87
+    },
+    {
+      "code": "invalid_site_publication",
+      "status": 400,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 93
+    },
+    {
+      "code": "site_publication_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 95
+    },
+    {
+      "code": "invalid_operations_query",
+      "status": 400,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 100
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 116
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 124
+    },
+    {
+      "code": "site_publication_failed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 153
+    },
+    {
+      "code": "site_publication_base_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 200
+    },
+    {
+      "code": "site_publication_base_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 219
+    },
+    {
+      "code": "site_publication_failed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/content-publications.mjs",
+      "line": 219
     },
     {
       "code": "invalid_context_v2_payload",
@@ -3235,6 +4837,318 @@
       "status": 400,
       "source": "packages/galaxy-official/src/deletion.mjs",
       "line": 82
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/analytics.mjs",
+      "line": 18
+    },
+    {
+      "code": "discovery_analysis_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/analytics.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_discovery_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/analytics.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_discovery_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 10
+    },
+    {
+      "code": "discovery_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 26
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 29
+    },
+    {
+      "code": "discovery_identity_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 38
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 39
+    },
+    {
+      "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 42
+    },
+    {
+      "code": "discovery_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 46
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/discovery-runtime/http.mjs",
+      "line": 55
+    },
+    {
+      "code": "discovery_engine_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 16
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 21
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 26
+    },
+    {
+      "code": "discovery_index_task_failed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 26
+    },
+    {
+      "code": "discovery_index_task_pending",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 26
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 29
+    },
+    {
+      "code": "invalid_search_quality_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 30
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 30
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 31
+    },
+    {
+      "code": "invalid_search_quality_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 32
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 32
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 32
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 46
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 49
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 72
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 82
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 97
+    },
+    {
+      "code": "discovery_analysis_not_supported",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 110
+    },
+    {
+      "code": "discovery_analysis_not_supported",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 115
+    },
+    {
+      "code": "discovery_analysis_scope_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 120
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 122
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/native-clients.mjs",
+      "line": 124
+    },
+    {
+      "code": "invalid_discovery_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/public-content-source.mjs",
+      "line": 57
+    },
+    {
+      "code": "invalid_discovery_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/purpose.mjs",
+      "line": 10
+    },
+    {
+      "code": "discovery_purpose_denied",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/purpose.mjs",
+      "line": 15
+    },
+    {
+      "code": "discovery_purpose_denied",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/purpose.mjs",
+      "line": 16
+    },
+    {
+      "code": "invalid_discovery_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/discovery-runtime/purpose.mjs",
+      "line": 27
+    },
+    {
+      "code": "discovery_identity_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/discovery-runtime/purpose.mjs",
+      "line": 30
+    },
+    {
+      "code": "discovery_identity_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 11
+    },
+    {
+      "code": "discovery_source_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 12
+    },
+    {
+      "code": "discovery_recommendation_attribution_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 13
+    },
+    {
+      "code": "discovery_search_attribution_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 14
+    },
+    {
+      "code": "discovery_search_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 18
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 19
+    },
+    {
+      "code": "discovery_selected_scope_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 31
+    },
+    {
+      "code": "discovery_recommendations_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 32
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 42
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/discovery-runtime/runtime.mjs",
+      "line": 44
+    },
+    {
+      "code": "discovery_identity_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/discovery-runtime/store.mjs",
+      "line": 11
+    },
+    {
+      "code": "discovery_event_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/discovery-runtime/store.mjs",
+      "line": 13
+    },
+    {
+      "code": "discovery_event_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/discovery-runtime/store.mjs",
+      "line": 15
     },
     {
       "code": "invalid_discovery_v2_query",
@@ -4071,6 +5985,12 @@
       "line": 194
     },
     {
+      "code": "information_watch_authorization_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/information-watch-worker.mjs",
+      "line": 10
+    },
+    {
       "code": "attachment_scanner_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/infrastructure/attachment-clamav.mjs",
@@ -4215,34 +6135,58 @@
       "line": 14
     },
     {
+      "code": "smtp_credential_binding_mismatch",
+      "status": 409,
+      "source": "packages/galaxy-official/src/infrastructure/operations-smtp-credentials.mjs",
+      "line": 23
+    },
+    {
       "code": "chat_transport_invalid_reply",
       "status": 502,
       "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
-      "line": 23
+      "line": 43
     },
     {
       "code": "chat_delivery_unknown",
       "status": 504,
       "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
-      "line": 26
+      "line": 46
     },
     {
       "code": "chat_transport_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
-      "line": 29
+      "line": 53
     },
     {
       "code": "chat_delivery_unknown",
       "status": 504,
       "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
-      "line": 30
+      "line": 55
     },
     {
       "code": "chat_delivery_unknown",
       "status": 504,
       "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
-      "line": 33
+      "line": 58
+    },
+    {
+      "code": "chat_transport_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
+      "line": 61
+    },
+    {
+      "code": "chat_delivery_unknown",
+      "status": 504,
+      "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
+      "line": 62
+    },
+    {
+      "code": "chat_delivery_unknown",
+      "status": 504,
+      "source": "packages/galaxy-official/src/infrastructure/prosody-chat.mjs",
+      "line": 65
     },
     {
       "code": "qualification_registry_unavailable",
@@ -4254,19 +6198,19 @@
       "code": "storage_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 115
+      "line": 112
     },
     {
       "code": "job_queue_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 116
+      "line": 113
     },
     {
       "code": "export_ticket_quota_exceeded",
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
-      "line": 117
+      "line": 114
     },
     {
       "code": "participation_conflict",
@@ -4285,6 +6229,18 @@
       "status": 409,
       "source": "packages/galaxy-official/src/infrastructure/task-repository.mjs",
       "line": 29
+    },
+    {
+      "code": "operations_directory_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/keycloak-admin-directory.mjs",
+      "line": 3
+    },
+    {
+      "code": "invalid_operations_email",
+      "status": 400,
+      "source": "packages/galaxy-official/src/keycloak-admin-directory.mjs",
+      "line": 69
     },
     {
       "code": "invalid_moderation_payload",
@@ -4608,13 +6564,13 @@
       "code": "invalid_account_data",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 11
+      "line": 12
     },
     {
       "code": "official_account_login_required",
       "status": 401,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 21
+      "line": 22
     },
     {
       "code": "account_settings_changed",
@@ -4623,14 +6579,8 @@
       "line": 36
     },
     {
-      "code": "account_settings_changed",
-      "status": 409,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 48
-    },
-    {
-      "code": "account_type_unchanged",
-      "status": 409,
+      "code": "not_found",
+      "status": 404,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
       "line": 49
     },
@@ -4638,70 +6588,70 @@
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 57
-    },
-    {
-      "code": "invalid_archive_cursor",
-      "status": 400,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 64
-    },
-    {
-      "code": "invalid_archive_selection",
-      "status": 400,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 75
-    },
-    {
-      "code": "archive_deleted",
-      "status": 409,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 78
-    },
-    {
-      "code": "archive_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 84
+      "line": 52
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 87
+      "line": 59
     },
     {
-      "code": "archive_chunk_too_large",
-      "status": 413,
+      "code": "invalid_archive_cursor",
+      "status": 400,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 89
+      "line": 66
     },
     {
-      "code": "archive_chunk_conflict",
+      "code": "invalid_archive_selection",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 77
+    },
+    {
+      "code": "archive_deleted",
       "status": 409,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 92
-    },
-    {
-      "code": "archive_already_complete",
-      "status": 409,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 93
-    },
-    {
-      "code": "archive_too_large",
-      "status": 413,
-      "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 94
+      "line": 80
     },
     {
       "code": "archive_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 100
+      "line": 86
     },
     {
-      "code": "archive_incomplete",
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 89
+    },
+    {
+      "code": "archive_chunk_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 91
+    },
+    {
+      "code": "archive_chunk_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 94
+    },
+    {
+      "code": "archive_already_complete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 95
+    },
+    {
+      "code": "archive_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 96
+    },
+    {
+      "code": "archive_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
       "line": 102
@@ -4710,89 +6660,119 @@
       "code": "archive_incomplete",
       "status": 409,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 106
+      "line": 104
+    },
+    {
+      "code": "archive_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account-data.mjs",
+      "line": 108
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/official-account-data.mjs",
-      "line": 108
+      "line": 110
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-registration.mjs",
+      "line": 13
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-registration.mjs",
+      "line": 19
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-registration.mjs",
+      "line": 27
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-uid.mjs",
+      "line": 15
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-uid.mjs",
+      "line": 21
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/official-account-uid.mjs",
+      "line": 35
     },
     {
       "code": "official_account_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 10
+      "line": 13
     },
     {
       "code": "invalid_account_return",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 54
+      "line": 58
     },
     {
       "code": "invalid_account_return",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 56
+      "line": 60
     },
     {
       "code": "invalid_account_return",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 57
+      "line": 61
     },
     {
       "code": "invalid_account_return",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 59
+      "line": 63
     },
     {
       "code": "invalid_account_login",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 71
+      "line": 76
     },
     {
       "code": "invalid_account_login",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 73
+      "line": 78
     },
     {
       "code": "invalid_account_query",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 133
+      "line": 140
     },
     {
       "code": "invalid_account_query",
       "status": 400,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 135
+      "line": 142
     },
     {
       "code": "access_denied",
       "status": 401,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 147
+      "line": 155
     },
     {
       "code": "official_account_login_required",
       "status": 401,
-      "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 149
-    },
-    {
-      "code": "account_csrf_invalid",
-      "status": 403,
-      "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 153
-    },
-    {
-      "code": "official_account_changed",
-      "status": 409,
       "source": "packages/galaxy-official/src/official-account.mjs",
       "line": 157
     },
@@ -4800,13 +6780,811 @@
       "code": "account_csrf_invalid",
       "status": 403,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 159
+      "line": 161
+    },
+    {
+      "code": "official_account_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 165
     },
     {
       "code": "account_csrf_invalid",
       "status": 403,
       "source": "packages/galaxy-official/src/official-account.mjs",
-      "line": 164
+      "line": 167
+    },
+    {
+      "code": "invalid_account",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 176
+    },
+    {
+      "code": "invalid_account",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 180
+    },
+    {
+      "code": "invalid_account",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 184
+    },
+    {
+      "code": "invalid_account",
+      "status": 400,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 188
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 192
+    },
+    {
+      "code": "account_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/official-account.mjs",
+      "line": 194
+    },
+    {
+      "code": "operations_agentos_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-conversation-stream.mjs",
+      "line": 3
+    },
+    {
+      "code": "invalid_operations_agentos_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-agentos-public-reference.mjs",
+      "line": 13
+    },
+    {
+      "code": "operations_agentos_source_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-agentos-public-reference.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-query-view.mjs",
+      "line": 59
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-query-view.mjs",
+      "line": 99
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-query-view.mjs",
+      "line": 101
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-query-view.mjs",
+      "line": 113
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-agentos-query-view.mjs",
+      "line": 135
+    },
+    {
+      "code": "operations_access_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-auth.mjs",
+      "line": 10
+    },
+    {
+      "code": "operations_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-auth.mjs",
+      "line": 11
+    },
+    {
+      "code": "operations_csrf_invalid",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-auth.mjs",
+      "line": 59
+    },
+    {
+      "code": "operations_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations-auth.mjs",
+      "line": 184
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-auth.mjs",
+      "line": 188
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 43
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 45
+    },
+    {
+      "code": "identity_directory_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 49
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 51
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 61
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 64
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-config.mjs",
+      "line": 68
+    },
+    {
+      "code": "operations_queue_unknown",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 10
+    },
+    {
+      "code": "operations_job_payload_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 59
+    },
+    {
+      "code": "operations_job_key_required",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 60
+    },
+    {
+      "code": "operations_messaging_schedule_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 66
+    },
+    {
+      "code": "operations_messaging_schedule_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 68
+    },
+    {
+      "code": "operations_messaging_schedule_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 71
+    },
+    {
+      "code": "operations_messaging_schedule_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 76
+    },
+    {
+      "code": "operations_job_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 116
+    },
+    {
+      "code": "operations_job_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 118
+    },
+    {
+      "code": "operations_page_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 133
+    },
+    {
+      "code": "operations_autonomy_task_control_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 139
+    },
+    {
+      "code": "operations_job_not_cancellable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 154
+    },
+    {
+      "code": "operations_job_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 156
+    },
+    {
+      "code": "operations_autonomy_task_control_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 163
+    },
+    {
+      "code": "operations_job_not_failed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 168
+    },
+    {
+      "code": "operations_job_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-jobs.mjs",
+      "line": 171
+    },
+    {
+      "code": "maintenance_native_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 8
+    },
+    {
+      "code": "maintenance_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 30
+    },
+    {
+      "code": "maintenance_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 31
+    },
+    {
+      "code": "maintenance_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 33
+    },
+    {
+      "code": "maintenance_service_denied",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 36
+    },
+    {
+      "code": "invalid_maintenance_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 38
+    },
+    {
+      "code": "maintenance_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-maintenance-native.mjs",
+      "line": 40
+    },
+    {
+      "code": "operations_access_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-management-sessions.mjs",
+      "line": 5
+    },
+    {
+      "code": "operations_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-management-sessions.mjs",
+      "line": 50
+    },
+    {
+      "code": "model_settings_native_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-model-settings-native.mjs",
+      "line": 8
+    },
+    {
+      "code": "model_settings_native_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-model-settings-native.mjs",
+      "line": 38
+    },
+    {
+      "code": "invalid_model_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-model-settings-native.mjs",
+      "line": 54
+    },
+    {
+      "code": "model_settings_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-model-settings-native.mjs",
+      "line": 56
+    },
+    {
+      "code": "invalid_model_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-model-settings-native.mjs",
+      "line": 57
+    },
+    {
+      "code": "operations_notice_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_notice_not_cancellable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 15
+    },
+    {
+      "code": "operations_notice_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 28
+    },
+    {
+      "code": "operations_notice_expiry_invalid",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 51
+    },
+    {
+      "code": "operations_notice_version_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 66
+    },
+    {
+      "code": "operations_notice_not_draft",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 67
+    },
+    {
+      "code": "operations_notice_version_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 77
+    },
+    {
+      "code": "operations_notice_not_draft",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 78
+    },
+    {
+      "code": "operations_notice_audience_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 86
+    },
+    {
+      "code": "operations_notice_queue_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 88
+    },
+    {
+      "code": "operations_notice_version_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 96
+    },
+    {
+      "code": "operations_notice_already_withdrawn",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 97
+    },
+    {
+      "code": "operations_notice_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 122
+    },
+    {
+      "code": "operations_notice_queue_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-notices.mjs",
+      "line": 145
+    },
+    {
+      "code": "operations_command_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-product-commands.mjs",
+      "line": 13
+    },
+    {
+      "code": "operations_policy_not_initialized",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-product-rules.mjs",
+      "line": 32
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-product-rules.mjs",
+      "line": 42
+    },
+    {
+      "code": "operations_policy_not_initialized",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-product-rules.mjs",
+      "line": 52
+    },
+    {
+      "code": "operations_policy_version_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-product-rules.mjs",
+      "line": 53
+    },
+    {
+      "code": "operations_policy_not_initialized",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-product-rules.mjs",
+      "line": 72
+    },
+    {
+      "code": "operations_retention_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 44
+    },
+    {
+      "code": "operations_retention_not_cancellable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 45
+    },
+    {
+      "code": "operations_retention_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 72
+    },
+    {
+      "code": "operations_retention_queue_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 82
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 92
+    },
+    {
+      "code": "operations_retention_authority_changed",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-retention.mjs",
+      "line": 108
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 29
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 31
+    },
+    {
+      "code": "operations_command_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 59
+    },
+    {
+      "code": "smtp_configuration_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 61
+    },
+    {
+      "code": "smtp_credential_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 64
+    },
+    {
+      "code": "smtp_configuration_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 66
+    },
+    {
+      "code": "identity_directory_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 81
+    },
+    {
+      "code": "smtp_configuration_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 111
+    },
+    {
+      "code": "operations_messaging_recipient_ineligible",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 112
+    },
+    {
+      "code": "operations_command_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 130
+    },
+    {
+      "code": "smtp_configuration_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 131
+    },
+    {
+      "code": "smtp_configuration_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations-smtp.mjs",
+      "line": 137
+    },
+    {
+      "code": "invalid_operations_ai_work_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/accounts/ai-work-schema.mjs",
+      "line": 16
+    },
+    {
+      "code": "management_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/management-directory.mjs",
+      "line": 24
+    },
+    {
+      "code": "management_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/management-directory.mjs",
+      "line": 25
+    },
+    {
+      "code": "management_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/management-directory.mjs",
+      "line": 28
+    },
+    {
+      "code": "management_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/management-directory.mjs",
+      "line": 31
+    },
+    {
+      "code": "management_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/management-directory.mjs",
+      "line": 33
+    },
+    {
+      "code": "invalid_management_accounts_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/accounts/management-schema.mjs",
+      "line": 41
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/accounts/profile-summary.mjs",
+      "line": 21
+    },
+    {
+      "code": "registered_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-directory.mjs",
+      "line": 38
+    },
+    {
+      "code": "registered_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-directory.mjs",
+      "line": 42
+    },
+    {
+      "code": "registered_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-directory.mjs",
+      "line": 50
+    },
+    {
+      "code": "registered_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-directory.mjs",
+      "line": 56
+    },
+    {
+      "code": "registered_directory_source_changed",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-directory.mjs",
+      "line": 60
+    },
+    {
+      "code": "invalid_registered_users_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/accounts/registered-schema.mjs",
+      "line": 23
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/accounts/usage-summary.mjs",
+      "line": 14
+    },
+    {
+      "code": "invalid_business_admin_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/accounts/usage-summary.mjs",
+      "line": 102
+    },
+    {
+      "code": "operations_query_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/agentos/query/safe-values.mjs",
+      "line": 5
+    },
+    {
+      "code": "operations_agentos_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/autonomy/native-client.mjs",
+      "line": 7
+    },
+    {
+      "code": "operations_autonomy_result_unknown",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/autonomy/native-client.mjs",
+      "line": 10
+    },
+    {
+      "code": "operations_autonomy_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/autonomy/native-client.mjs",
+      "line": 11
+    },
+    {
+      "code": "operations_autonomy_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/autonomy/native-client.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_operations_command_receipt",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/chat-command-receipts.mjs",
+      "line": 11
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/feedback/read-model.mjs",
+      "line": 30
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations/feedback/read-model.mjs",
+      "line": 70
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/feedback/read-model.mjs",
+      "line": 76
+    },
+    {
+      "code": "feedback_operation_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/feedback/read-model.mjs",
+      "line": 78
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations/feedback/read-model.mjs",
+      "line": 87
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 15
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 16
+    },
+    {
+      "code": "feedback_operation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 28
+    },
+    {
+      "code": "feedback_rate_limited",
+      "status": 429,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 35
+    },
+    {
+      "code": "feedback_daily_limit",
+      "status": 429,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 36
+    },
+    {
+      "code": "official_account_login_required",
+      "status": 401,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 52
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 53
+    },
+    {
+      "code": "feedback_revision_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 69
+    },
+    {
+      "code": "feedback_no_change",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/feedback/service.mjs",
+      "line": 71
+    },
+    {
+      "code": "attachment_content_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/files/access-gate.mjs",
+      "line": 16
+    },
+    {
+      "code": "invalid_operations_command_receipt",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/governance-command-receipts.mjs",
+      "line": 61
     },
     {
       "code": "service_enrollment_stopped",
@@ -4821,10 +7599,238 @@
       "line": 44
     },
     {
-      "code": "invalid_host",
+      "code": "invalid_operations_command_receipt",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/product-command-receipts.mjs",
+      "line": 13
+    },
+    {
+      "code": "operations_policy_not_initialized",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/rules/base.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_policy_not_initialized",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/rules/base.mjs",
+      "line": 29
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/rules/base.mjs",
+      "line": 36
+    },
+    {
+      "code": "business_admin_denied",
       "status": 403,
-      "source": "packages/galaxy-official/src/personal-mcp.mjs",
-      "line": 141
+      "source": "packages/galaxy-official/src/operations/rules/base.mjs",
+      "line": 37
+    },
+    {
+      "code": "operations_rule_exception_account_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/base.mjs",
+      "line": 41
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/rules/read-model.mjs",
+      "line": 25
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/rules/read-model.mjs",
+      "line": 33
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/rules/runtime.mjs",
+      "line": 12
+    },
+    {
+      "code": "operations_rule_version_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/rules/runtime.mjs",
+      "line": 14
+    },
+    {
+      "code": "operations_rules_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/rules/runtime.mjs",
+      "line": 24
+    },
+    {
+      "code": "invalid_operations_rule_target",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/rules/runtime.mjs",
+      "line": 29
+    },
+    {
+      "code": "operations_command_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 21
+    },
+    {
+      "code": "operations_rule_revision_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 22
+    },
+    {
+      "code": "operations_rule_version_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 25
+    },
+    {
+      "code": "operations_rule_draft_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 26
+    },
+    {
+      "code": "operations_rule_version_not_published",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 27
+    },
+    {
+      "code": "operations_rule_source_changed",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 33
+    },
+    {
+      "code": "operations_rule_version_unavailable",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 54
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/rules/service.mjs",
+      "line": 57
+    },
+    {
+      "code": "p13_native_binding_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations/strategies/authority.mjs",
+      "line": 15
+    },
+    {
+      "code": "p13_execution_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/operations/strategies/effects.mjs",
+      "line": 16
+    },
+    {
+      "code": "operations_agentos_prepared_command_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/strategies/effects.mjs",
+      "line": 17
+    },
+    {
+      "code": "operations_agentos_scope_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/operations/strategies/gateway.mjs",
+      "line": 12
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/strategies/gateway.mjs",
+      "line": 13
+    },
+    {
+      "code": "p13_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/strategies/gateway.mjs",
+      "line": 13
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/strategies/gateway.mjs",
+      "line": 14
+    },
+    {
+      "code": "p13_native_workflow_not_connected",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/strategies/native-client.mjs",
+      "line": 17
+    },
+    {
+      "code": "p13_native_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/strategies/native-client.mjs",
+      "line": 29
+    },
+    {
+      "code": "p13_native_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/strategies/native-client.mjs",
+      "line": 46
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/system-settings/native-client.mjs",
+      "line": 14
+    },
+    {
+      "code": "system_settings_native_not_configured",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/system-settings/native-client.mjs",
+      "line": 16
+    },
+    {
+      "code": "system_settings_native_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/system-settings/native-client.mjs",
+      "line": 19
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/system-settings/schema.mjs",
+      "line": 42
+    },
+    {
+      "code": "system_settings_configuration_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/system-settings/schema.mjs",
+      "line": 48
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/operations/system-settings/schema.mjs",
+      "line": 108
+    },
+    {
+      "code": "system_settings_private_configuration_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/system-settings/smtp-credentials.mjs",
+      "line": 10
+    },
+    {
+      "code": "system_settings_private_configuration_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/operations/system-settings/smtp-credentials.mjs",
+      "line": 18
+    },
+    {
+      "code": "system_settings_credential_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/operations/system-settings/smtp-credentials.mjs",
+      "line": 23
     },
     {
       "code": "invalid_profile_statement",
@@ -4968,37 +7974,37 @@
       "code": "invalid_public_write",
       "status": 400,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 63
+      "line": 64
     },
     {
       "code": "public_write_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 73
+      "line": 74
     },
     {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 77
+      "line": 78
     },
     {
       "code": "invitation_cooldown",
       "status": 429,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 83
+      "line": 84
     },
     {
       "code": "community_quota_exceeded",
       "status": 429,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 87
+      "line": 88
     },
     {
       "code": "invalid_public_write",
       "status": 400,
       "source": "packages/galaxy-official/src/public-writes.mjs",
-      "line": 96
+      "line": 97
     },
     {
       "code": "invalid_qualification_calculation",
@@ -5133,70 +8139,112 @@
       "line": 72
     },
     {
+      "code": "invalid_search_recovery",
+      "status": 400,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 90
+    },
+    {
+      "code": "invalid_search_recovery",
+      "status": 400,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 104
+    },
+    {
+      "code": "invalid_search_recovery",
+      "status": 400,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 117
+    },
+    {
+      "code": "invalid_search_recovery",
+      "status": 400,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 134
+    },
+    {
+      "code": "search_job_not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 138
+    },
+    {
+      "code": "search_recovery_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 139
+    },
+    {
+      "code": "search_index_disabled",
+      "status": 409,
+      "source": "packages/galaxy-official/src/search-index.mjs",
+      "line": 140
+    },
+    {
       "code": "index_source_not_public",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 61
+      "line": 155
     },
     {
       "code": "index_case_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 69
+      "line": 163
     },
     {
       "code": "index_case_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 71
+      "line": 165
     },
     {
       "code": "index_proof_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 82
+      "line": 176
     },
     {
       "code": "index_proof_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 84
+      "line": 178
     },
     {
       "code": "index_proof_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 94
+      "line": 188
     },
     {
       "code": "index_builder_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 103
+      "line": 197
     },
     {
       "code": "index_builder_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 106
+      "line": 200
     },
     {
       "code": "index_builder_delisted",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 110
+      "line": 204
     },
     {
       "code": "index_capsule_unavailable",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 126
+      "line": 220
     },
     {
       "code": "index_source_expired",
       "status": 404,
       "source": "packages/galaxy-official/src/search-index.mjs",
-      "line": 128
+      "line": 222
     },
     {
       "code": "invalid_search_v2_query",
@@ -5217,6 +8265,18 @@
       "line": 8
     },
     {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/server.mjs",
+      "line": 211
+    },
+    {
+      "code": "operations_authorization_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/server.mjs",
+      "line": 214
+    },
+    {
       "code": "community_restricted",
       "status": 403,
       "source": "packages/galaxy-official/src/services.mjs",
@@ -5227,6 +8287,12 @@
       "status": 400,
       "source": "packages/galaxy-official/src/shared/account-archive-cursor.mjs",
       "line": 18
+    },
+    {
+      "code": "invalid_account_feedback_data_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/account-feedback-data-schema.mjs",
+      "line": 8
     },
     {
       "code": "account_work_input_invalid",
@@ -5244,13 +8310,13 @@
       "code": "invalid_forum_subject",
       "status": 400,
       "source": "packages/galaxy-official/src/shared/community-forum-ids-v1.mjs",
-      "line": 38
+      "line": 42
     },
     {
       "code": "forum_locator_mismatch",
       "status": 409,
       "source": "packages/galaxy-official/src/shared/community-forum-ids-v1.mjs",
-      "line": 54
+      "line": 58
     },
     {
       "code": "invalid_forum_action",
@@ -5289,6 +8355,126 @@
       "line": 34
     },
     {
+      "code": "invalid_feedback_attachment_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/feedback-attachments-v1-schema.mjs",
+      "line": 18
+    },
+    {
+      "code": "operations_agentos_ai_use_denied",
+      "status": 403,
+      "source": "packages/galaxy-official/src/shared/operations-ai-use.mjs",
+      "line": 7
+    },
+    {
+      "code": "invalid_feedback_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-feedback-schema.mjs",
+      "line": 27
+    },
+    {
+      "code": "invalid_operations_messaging_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-messaging-schema.mjs",
+      "line": 41
+    },
+    {
+      "code": "invalid_model_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-model-settings-schema.mjs",
+      "line": 52
+    },
+    {
+      "code": "model_settings_model_incomplete",
+      "status": 409,
+      "source": "packages/galaxy-official/src/shared/operations-model-settings-schema.mjs",
+      "line": 57
+    },
+    {
+      "code": "model_settings_binding_unavailable",
+      "status": 409,
+      "source": "packages/galaxy-official/src/shared/operations-model-settings-schema.mjs",
+      "line": 60
+    },
+    {
+      "code": "model_settings_data_policy_unapproved",
+      "status": 409,
+      "source": "packages/galaxy-official/src/shared/operations-model-settings-schema.mjs",
+      "line": 61
+    },
+    {
+      "code": "invalid_operations_product_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-product-schema.mjs",
+      "line": 17
+    },
+    {
+      "code": "invalid_recommendation_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-recommendation-schema.mjs",
+      "line": 22
+    },
+    {
+      "code": "invalid_search_quality_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-search-quality-schema.mjs",
+      "line": 19
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/shared/operations-search-quality-schema.mjs",
+      "line": 23
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/shared/operations-search-quality-schema.mjs",
+      "line": 24
+    },
+    {
+      "code": "discovery_engine_response_invalid",
+      "status": 503,
+      "source": "packages/galaxy-official/src/shared/operations-search-quality-schema.mjs",
+      "line": 25
+    },
+    {
+      "code": "invalid_smtp_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-smtp-schema.mjs",
+      "line": 25
+    },
+    {
+      "code": "invalid_system_settings_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/operations-system-general-schema.mjs",
+      "line": 17
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/p13-strategies-schema.mjs",
+      "line": 66
+    },
+    {
+      "code": "invalid_p13_strategy_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/p13-strategies-schema.mjs",
+      "line": 67
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/p14-rules-schema.mjs",
+      "line": 66
+    },
+    {
+      "code": "invalid_operations_rule_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/shared/p14-rules-schema.mjs",
+      "line": 67
+    },
+    {
       "code": "signing_unavailable",
       "status": 503,
       "source": "packages/galaxy-official/src/signing-service.mjs",
@@ -5304,7 +8490,7 @@
       "code": "target_operation_restricted",
       "status": 409,
       "source": "packages/galaxy-official/src/target-governance-restrictions-v2.mjs",
-      "line": 20
+      "line": 22
     },
     {
       "code": "invalid_comment_payload",
@@ -5559,52 +8745,58 @@
       "line": 24
     },
     {
+      "code": "task_termination_intent_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
+      "line": 29
+    },
+    {
       "code": "task_transition_denied",
       "status": 409,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 34
+      "line": 36
     },
     {
       "code": "invalid_task_owner_control",
       "status": 400,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 47
+      "line": 50
     },
     {
       "code": "task_owner_control_scope_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 48
+      "line": 51
     },
     {
       "code": "not_found",
       "status": 404,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 55
+      "line": 58
     },
     {
       "code": "task_owner_control_source_unavailable",
       "status": 403,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 59
+      "line": 62
     },
     {
       "code": "task_owner_control_scope_mismatch",
       "status": 403,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 63
+      "line": 66
     },
     {
       "code": "task_owner_control_integrity_error",
       "status": 500,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 66
+      "line": 69
     },
     {
       "code": "task_event_conflict",
       "status": 409,
       "source": "packages/galaxy-official/src/task-owner-control-v2.mjs",
-      "line": 79
+      "line": 82
     },
     {
       "code": "invalid_task_owner_read",
@@ -5685,244 +8877,244 @@
       "line": 137
     },
     {
-      "code": "invalid_task_payload",
-      "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 19
-    },
-    {
       "code": "task_content_unavailable",
       "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 30
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 15
     },
     {
       "code": "task_event_conflict",
       "status": 409,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 22
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
       "line": 37
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 52
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 39
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 54
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 56
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 41
     },
     {
       "code": "task_case_unavailable",
       "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 59
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 44
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 66
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 51
     },
     {
       "code": "task_private_recipient_consent_required",
       "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 74
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 59
     },
     {
       "code": "participation_not_authorized",
       "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 81
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 66
     },
     {
       "code": "participation_not_authorized",
       "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 85
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 70
     },
     {
       "code": "public_write_verification_unavailable",
       "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 90
-    },
-    {
-      "code": "invalid_task_material_request",
-      "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 97
-    },
-    {
-      "code": "request_too_large",
-      "status": 413,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 98
+      "source": "packages/galaxy-official/src/tasks/v2/authority.mjs",
+      "line": 75
     },
     {
       "code": "invalid_task_payload",
       "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 99
-    },
-    {
-      "code": "task_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 109
-    },
-    {
-      "code": "task_visibility_mismatch",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 112
-    },
-    {
-      "code": "task_fact_validation_required",
-      "status": 409,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 115
-    },
-    {
-      "code": "task_parent_not_authorized",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 120
-    },
-    {
-      "code": "qualification_unavailable",
-      "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 123
-    },
-    {
-      "code": "task_target_mismatch",
-      "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 138
-    },
-    {
-      "code": "task_paused",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 143
-    },
-    {
-      "code": "invitation_recipient_unavailable",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 152
-    },
-    {
-      "code": "task_paused",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 168
-    },
-    {
-      "code": "participation_conflict",
-      "status": 409,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 169
-    },
-    {
-      "code": "participation_already_exists",
-      "status": 409,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 175
-    },
-    {
-      "code": "qualification_unavailable",
-      "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 185
-    },
-    {
-      "code": "qualification_v2_unavailable",
-      "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 188
-    },
-    {
-      "code": "qualification_required",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 192
-    },
-    {
-      "code": "qualification_required",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 198
-    },
-    {
-      "code": "not_found",
-      "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 205
-    },
-    {
-      "code": "task_paused",
-      "status": 403,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 208
-    },
-    {
-      "code": "task_fact_validation_unavailable",
-      "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 216
+      "source": "packages/galaxy-official/src/tasks/v2/helpers.mjs",
+      "line": 10
     },
     {
       "code": "invalid_task_receipt",
       "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 233
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 12
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 236
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 15
     },
     {
       "code": "task_material_reader_unavailable",
       "status": 503,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 252
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 32
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 286
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 66
     },
     {
       "code": "not_found",
       "status": 404,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 293
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 73
     },
     {
       "code": "invalid_task_query",
       "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 326
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 106
     },
     {
       "code": "invalid_task_query",
       "status": 400,
-      "source": "packages/galaxy-official/src/tasks-v2.mjs",
-      "line": 330
+      "source": "packages/galaxy-official/src/tasks/v2/read-model.mjs",
+      "line": 110
+    },
+    {
+      "code": "invalid_task_material_request",
+      "status": 400,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 17
+    },
+    {
+      "code": "request_too_large",
+      "status": 413,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 18
+    },
+    {
+      "code": "invalid_task_payload",
+      "status": 400,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 19
+    },
+    {
+      "code": "task_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 29
+    },
+    {
+      "code": "task_visibility_mismatch",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 32
+    },
+    {
+      "code": "task_fact_validation_required",
+      "status": 409,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 35
+    },
+    {
+      "code": "task_parent_not_authorized",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 40
+    },
+    {
+      "code": "qualification_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 43
+    },
+    {
+      "code": "task_target_mismatch",
+      "status": 400,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 58
+    },
+    {
+      "code": "task_paused",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 63
+    },
+    {
+      "code": "invitation_recipient_unavailable",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 72
+    },
+    {
+      "code": "task_paused",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 88
+    },
+    {
+      "code": "participation_conflict",
+      "status": 409,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 89
+    },
+    {
+      "code": "participation_already_exists",
+      "status": 409,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 95
+    },
+    {
+      "code": "qualification_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 105
+    },
+    {
+      "code": "qualification_v2_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 108
+    },
+    {
+      "code": "qualification_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 112
+    },
+    {
+      "code": "qualification_required",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 118
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 125
+    },
+    {
+      "code": "task_paused",
+      "status": 403,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 128
+    },
+    {
+      "code": "task_fact_validation_unavailable",
+      "status": 503,
+      "source": "packages/galaxy-official/src/tasks/v2/service.mjs",
+      "line": 136
     },
     {
       "code": "invalid_trust_input",
