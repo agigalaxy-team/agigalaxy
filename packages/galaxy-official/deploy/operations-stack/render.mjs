@@ -236,7 +236,7 @@ IOSchedulingClass=best-effort
 IOSchedulingPriority=7
 `,
     'systemd/galaxy-operations-backup.timer': `[Unit]
-Description=Galaxy daily backup
+Description=Galaxy scheduled backup
 [Timer]
 OnCalendar=${config.backup.calendar}
 RandomizedDelaySec=10m

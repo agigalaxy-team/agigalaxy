@@ -161,11 +161,11 @@
     "passwordFile": "/etc/galaxy/operations-secrets/restic.password",
     "credentialEnvironmentFile": null,
     "resticHost": "galaxy-production",
-    "minimumFreeBytes": 21474836480,
+    "minimumFreeBytes": 34359738368,
     "maxCaptureBytes": 107374182400,
     "maxPauseSeconds": 180,
     "statusGroupId": 978,
-    "calendar": "*-*-* 03:15:00 UTC",
+    "calendar": "Sun *-*-* 03:15:00 UTC",
     "keycloakRealms": [
       "galaxy",
       "galaxy-operations"

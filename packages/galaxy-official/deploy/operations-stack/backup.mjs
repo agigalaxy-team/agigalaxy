@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, readFile, realpath, statfs, chmod, chown } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, chmod, chown } from 'node:fs/promises';
 import { posix } from 'node:path';
 import { beginBackupStatus, finishBackupStatus } from '../../src/operations/backup-status.mjs';
 import { requireConfiguration, beneath } from './configuration.mjs';
 import { runCommand, ensureDirectory, atomicWrite, newTarget, removeOwnedTarget, withJobLock, resticEnvironment, inspectPostgres, postgresSqlArguments, quiesce } from './host.mjs';
 import { pgBackRestConfiguration } from './render.mjs';
+import { assertBackupSpace } from './backup-space.mjs';
 
 const json = value => JSON.stringify(value, null, 2) + '\n';
 const labelPattern = /^[0-9]{8}-[0-9]{6}F(?:_[0-9]{8}-[0-9]{6}[DI])?$/;
@@ -59,8 +60,7 @@ async function repositorySize(config, paths, run) {
     total += bytes;
   }
   if (total > config.backup.maxCaptureBytes) throw new Error('operations_capture_size_limit');
-  const free = await statfs(config.directories.captures);
-  if (Number(free.bavail) * Number(free.bsize) < total + config.backup.minimumFreeBytes) throw new Error('operations_capture_space_unavailable');
+  await assertBackupSpace(config, total);
   return total;
 }
 async function sourcesForCapture(config) {
@@ -99,6 +99,8 @@ export async function createProductBackup(config, { type = 'auto', run = runComm
   requireConfiguration(config, 'backup');
   if (!['auto', 'full', 'diff', 'incr'].includes(type)) throw new Error('operations_backup_type_invalid');
   return withJobLock(config, () => publishStatus(config, 'create', async () => {
+    await ensureDirectory(config.directories.captures);
+    await assertBackupSpace(config, 0);
     const id = randomUUID(), stage = config.directories.captures + '/' + id;
     await newTarget(config.directories.captures, stage);
     await atomicWrite(stage + '/.galaxy-capture', json({ id, purpose: 'backup' }));
