@@ -1,7 +1,7 @@
 import {createWebEventAuthorization} from './authorization.mjs';
 import {ServiceError} from '../shared/service-error.mjs';
 import {transaction} from '../infrastructure/database.mjs';
-import {webEventAuthorizationDependencies} from './topics.mjs';
+import {webEventAuthorizationDependencies,operationsAuthorityEventSources} from './topics.mjs';
 
 const hubs=new WeakMap();
 const integer=value=>typeof value==='string'&&/^(0|[1-9]\d{0,18})$/.test(value);
@@ -88,7 +88,7 @@ export function createWebEventService(options){
   for(const event of rows){
    // Qualification dependencies do not have one encompassing source version.
    // Expiry/session is additionally checked by heartbeat authorization below.
-   if(event.module==='authorization'||connection.surface==='admin'&&['permissions','management-accounts','ai-work-accounts'].includes(event.module)){
+   if(event.module==='authorization'||connection.surface==='admin'&&operationsAuthorityEventSources.has(event.source_table)){
     const ref=event.source_ref;
     const account=connection.actor?.accountId,subject=connection.actor?.subjectId;
     const dependencies=webEventAuthorizationDependencies[event.source_table];

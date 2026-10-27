@@ -80,3 +80,12 @@ export const operationsEventPermissions = Object.freeze({
 });
 export const webModules = Object.freeze([...new Set([...Object.values(webEventSources),...Object.values(webEventSourceAliases).flat()].filter(name=>name!=='authorization'&&!Object.hasOwn(operationsEventPermissions,name)))]);
 export const operationsModules = Object.freeze(Object.keys(operationsEventPermissions));
+
+// Directory observations and command receipts do not change effective authority.
+// Their own module still updates; only these authority records invalidate all
+// dependent management projections.
+export const operationsAuthorityEventSources=new Set([
+ 'operations_business_roles_v1','operations_role_assignments_v1','operations_permission_authority_v1',
+ 'operations_automation_grants_v1','operations_management_accounts_v1','operations_management_login_fences_v1',
+ 'operations_ai_work_accounts_v1','operations_ai_work_assignments_v1',
+]);

@@ -24,9 +24,11 @@ export async function dispatchWebEvents({webEvents,request,response,requestId,ur
     if(response.writableLength>65536){close();return;}
     response.write(`id: ${event.cursor}\ndata: ${JSON.stringify(event)}\n\n`);current=event.cursor;
    }
-  }catch{
-   // Clear only this connection's module projections; no source locator leaks.
-   if(!closed)response.write(`data: ${JSON.stringify({type:'reset',cursor:current??'0',modules:connection.modules})}\n\n`);
+  }catch(error){
+   // Confirmed loss of authority clears its projections immediately. A transport
+   // or database failure only reconnects from the cursor; each read keeps its
+   // own original expiry and is never renewed by an event heartbeat.
+   if(!closed&&[401,403,409,410].includes(error?.status))response.write(`data: ${JSON.stringify({type:'reset',cursor:current??'0',modules:connection.modules})}\n\n`);
    close();
   }finally{busy=false;if(pending){pending=false;void pump();}}
  };
