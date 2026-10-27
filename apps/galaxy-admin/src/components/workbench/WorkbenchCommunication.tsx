@@ -10,7 +10,6 @@ import {AdminIcon} from '../AdminIcons';
 import {AdminTabs} from '../AdminTabs';
 import {useOperationsRead} from '../../lib/use-operations-read';
 import {ReadStatus} from '../OperationControls';
-import {WorkbenchMarkdown} from './WorkbenchMarkdown';
 import {WorkbenchModelNotice} from './WorkbenchModelNotice';
 import {WorkbenchManagementCapabilities} from './WorkbenchManagementCapabilities';
 import {WorkbenchActionHistory} from './WorkbenchActionHistory';
@@ -19,7 +18,7 @@ import {WorkbenchActionCards} from './WorkbenchActionCards';
 import {authorizedCommandMatches} from "../../lib/workbench/authorized-preparation-model";
 import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchCommand} from "../../lib/workbench/use-workbench-command";
-import {useProgressiveText} from '../../lib/workbench/use-progressive-text';
+import {WorkbenchReplyProgress,WorkbenchAnswer} from './WorkbenchReply';
 import {useConversationScroll} from '../../lib/workbench/use-conversation-scroll';
 import {useConversationStream} from "../../lib/workbench/use-conversation-stream";
 import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from "../../lib/workbench/agentos-client";
@@ -45,7 +44,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const task=useOperationsRead<AutonomyTaskRead>({path:operatorId&&taskId?'/v1/operations/autonomy/tasks/'+taskId:null,clearOnOffline:true,failureMessage:'接续任务暂时无法读取。'}),linkedTask=task.verified?task.value?.task:null,appliedTask=useRef('');
   const [domain,setDomain]=useState<AgentOsDomain>('overview'),[drafts,setDrafts]=useState<Record<string,string>>({}),[draftStorageError,setDraftStorageError]=useState(false);
   const draftsRef=useRef<Record<string,string>>({}),domainRef=useRef('overview');
-  const memory=useRef(panelMemory(operatorId)),composing=useRef(false);
+  const memory=useRef(panelMemory(operatorId)),composing=useRef(false),animatedTurns=useRef(new Set<string>()),revealDomain=useRef<AgentOsDomain>('overview');
   const [waiting,setWaiting]=useState(memory.current.waiting),[stopping,setStopping]=useState(memory.current.stopping??{}),[contextNotices,setContextNotices]=useState<Partial<Record<AgentOsDomain,boolean>>>({});
   const input=useRef<HTMLTextAreaElement>(null),panelId=useId(),inputId=useId();
   const conversationElement=useRef<HTMLDivElement>(null),conversationContent=useRef<HTMLDivElement>(null),scrollPositions=useRef(memory.current.positions);
@@ -96,6 +95,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
         setWaiting(previous=>{const next={...previous};delete next[sentDomain];memory.current.waiting=next;return next;});
         setContextNotices(previous=>({...previous,[sentDomain]:true}));
       }else if(sentDomain&&typeof body.message==='string'&&value.state!=='not-started'){
+        animatedTurns.current.add(String(body.operationId));
         setContextNotices(previous=>{if(!previous[sentDomain])return previous;const next={...previous};delete next[sentDomain];return next;});
         setWaiting(previous=>{const next={...previous};if(['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(value.state??''))delete next[sentDomain];else next[sentDomain]={operationId:String(body.operationId),runId:value.runId??null,text:String(body.message),...(typeof body.retryOfOperationId==='string'?{retryOfOperationId:body.retryOfOperationId}:{}),csrfToken:verifiedSession?.csrfToken??''};memory.current.waiting=next;return next;});
         if(!body.retryOfOperationId&&draftsRef.current[sentDomain]===body.message){const next={...draftsRef.current,[sentDomain]:''};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
@@ -135,7 +135,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     setStopping(previous=>{const next={...previous};let changed=false;for(const [key,value]of Object.entries(previous))if(value&&(value.csrfToken!==verifiedSession.csrfToken||currentConversation?.domain===key&&(currentConversation.contextChanged||currentConversation.runs.some(run=>run.operationId===value.parentOperationId&&['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(run.status))))){delete next[key as AgentOsDomain];changed=true;}if(!changed)return previous;memory.current.stopping=next;return next;});
   },[verifiedSession?.csrfToken,currentConversation]);
   const scrolling=useConversationScroll({viewport:conversationElement,content:conversationContent,scope:domain,enabled:focused&&!!currentConversation,positions:scrollPositions});
-  const displayedStream=useProgressiveText(stream.text,JSON.stringify([operatorId,domain,activeTurn]),focused&&!stream.finished);
+  useLayoutEffect(()=>{if(revealDomain.current!==domain){animatedTurns.current.clear();revealDomain.current=domain;}if(activeTurn)animatedTurns.current.add(activeTurn);},[domain,activeTurn]);
   useLayoutEffect(()=>{
     if(!identityEnded||!checkedSession)return;
     command.cancel();dismissCommand.cancel();stopCommand.cancel();conversation.clear();
@@ -199,7 +199,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const latestRun=currentConversation?.runs.at(-1);
   const latestFailure=conversation.verified&&!waitingReply&&latestRun?.status==='ERROR'?latestRun:null;
   const pendingOutgoing=canUseDomain&&conversation.verified&&command.pending?.domain===domain&&command.pending.path===agentOsConversationPath(domain)+'/runs'&&!command.pending.body.retryOfOperationId&&typeof command.pending.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===command.pending?.body.operationId)?command.pending:null;
-  const progress=(label:string,live:boolean)=><div className="wb-reply-progress"><p className="wb-reply-state" role="status"><span className="wb-reply-dots" aria-hidden="true"><i/><i/><i/></span>{label}</p>{live&&!!stream.steps.length&&<details className="wb-processing-steps"><summary>处理进度{stream.revisions>0?' · 回复已调整 '+stream.revisions+' 次':''}</summary><ol>{stream.steps.map((step,index)=><li key={index}>{step==='working'?'查询并核对资料':'整理回复'}</li>)}</ol></details>}</div>;
+  const progress=(label:string,active=true)=><WorkbenchReplyProgress active={active} label={label} revised={stream.revisions>0}/>;
   const headerError=command.error||dismissCommand.error||stopCommand.error||conversation.error||session.error;
   return <section id="operations-ai" className={'wb-communication'+(focused?' wb-communication--focused':'')} aria-labelledby={panelId}>
     <header className="wb-section-heading"><h2 id={panelId}><AdminIcon name="sparkles" size={19}/>运营AI · {current.label}</h2><div className="wb-communication-controls">{latestFailure&&<WorkbenchModelNotice run={latestFailure} canSend={canUseDomain&&conversation.verified&&!currentConversation?.contextChanged&&!!currentConversation?.capabilities.canSend} busy={workLocked||replying} onRetry={()=>retryReply(latestFailure.runId)}/>}{conversation.verified&&!waitingReply&&latestRun?.status==="COMPLETED"&&!!latestRun.modelFallbacks?.length&&<span className="wb-model-notice wb-model-notice--recovered" role="status">备用模型已接续</span>}<button type="button" className="wb-view-toggle" disabled={!interactive} aria-expanded={focused} aria-controls={panelId+'-conversation'} onClick={()=>focused?onFocusChange(false):open()}><AdminIcon name={focused?'workspace':'comment'} size={16}/><span>{focused?'返回仪表':interactive?'打开沟通':'准备沟通…'}</span></button></div></header>
@@ -218,14 +218,14 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
       <div>{nativeConversationDisplayRuns(currentConversation?.runs??[]).map(run=>{
         const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
-        const content=['ERROR','CANCELLED'].includes(run.status)?null:live?displayedStream:run.content;
-        const stateText=run.status==='CANCELLED'?'已停止生成':pending?(stopInProgress&&run.operationId===activeTurn?'正在停止生成…':live&&stream.finished?'正在读取完整回复…':live&&stream.phase==='working'?'正在核对资料…':'正在回复…'):nativeRunLabel(run.status);
+        const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
+        const stateText=run.status==='CANCELLED'?'已停止生成':pending?(stopInProgress&&run.operationId===activeTurn?'正在停止生成…':live&&stream.finished?'正在读取完整回复…':live&&stream.phase==='working'?'正在查询与核对资料':live&&stream.phase==='waiting'&&stream.steps.length?'正在接续回复':live&&!stream.text?'正在整理回复':'正在回复'):nativeRunLabel(run.status);
         const previousAttempts=nativeConversationPreviousAttempts(currentConversation?.runs??[],run);
-        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<div className={"wb-run-output"+(live?" wb-run-output--streaming":"")} aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={content} onDraft={fillReplyDraft}/></div>}{pending&&progress(stateText,live)}</article>;
+        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<WorkbenchAnswer content={content} binding={run.runId} animate={pending||!!run.operationId&&animatedTurns.current.has(run.operationId)} streaming={live} onDraft={fillReplyDraft}/>}<WorkbenchReplyProgress active={pending} label={stateText} revised={pending&&live&&stream.revisions>0}/></article>;
       })}</div>
 
-      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{displayedStream&&<div className="wb-run-output wb-run-output--streaming" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={displayedStream}/></div>}{progress(stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在核对资料…':stream.text?'正在回复…':'等待回复…',true)}</article>}
-      {pendingOutgoing&&<article className="wb-run wb-run--waiting"><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{String(pendingOutgoing.body.message)}</p><p className="wb-reply-state" role="status">正在确认发送…</p></article>}
+      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{stream.text&&<WorkbenchAnswer content={stream.text} binding={waitingReply.operationId} animate streaming/>}{progress(stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在查询与核对资料':stream.phase==='waiting'&&stream.steps.length?'正在接续回复':stream.text?'正在回复':'正在整理回复',true)}</article>}
+      {pendingOutgoing&&<article className="wb-run wb-run--waiting"><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{String(pendingOutgoing.body.message)}</p>{progress('正在确认发送')}</article>}
       {currentConversation?.blockedReason==='model-not-configured'&&<p>本领域暂未配置模型，输入会保留。</p>}
       {currentConversation?.blockedReason==='runtime-unavailable'&&<p>沟通服务暂时不可用，输入会保留。</p>}
 

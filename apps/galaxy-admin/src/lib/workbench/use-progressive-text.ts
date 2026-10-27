@@ -8,7 +8,12 @@ export function useProgressiveText(text:string,binding:string,active:boolean){
   let frame=0,last=0;const media=window.matchMedia('(prefers-reduced-motion: reduce)');
   const apply=(value:string)=>{current.current={binding,text:value};setView(current.current);};
   if(!active||media.matches||!text){apply(text);return;}
-  if(current.current.binding!==binding||!text.startsWith(current.current.text))apply('');
+  if(current.current.binding!==binding)apply('');
+  else if(!text.startsWith(current.current.text)){
+   let common=0;while(common<text.length&&common<current.current.text.length&&text[common]===current.current.text[common])common++;
+   if(common&&text.charCodeAt(common-1)>=0xD800&&text.charCodeAt(common-1)<=0xDBFF)common--;
+   apply(text.slice(0,common));
+  }
   const tick=(now:number)=>{
    if(now-last>=32){
     last=now;const previous=current.current.text.length,remaining=text.length-previous;

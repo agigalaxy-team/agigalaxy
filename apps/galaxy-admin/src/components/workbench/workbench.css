@@ -314,17 +314,9 @@
 .galaxy-workbench .wb-conversation{overflow-anchor:none;overscroll-behavior:contain;width:100%}
 .galaxy-workbench .wb-conversation-content{flex:none;min-width:0;width:100%;padding-bottom:6px}
 .galaxy-workbench .wb-jump-latest{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 11px;border:1px solid var(--wb-border);border-radius:18px;background:var(--admin-surface,#fff);color:var(--wb-accent);box-shadow:0 3px 12px #20283f0d;font-size:12px;z-index:2;animation:wb-soft-enter 160ms ease-out}
-.galaxy-workbench .wb-reply-progress{padding:2px 0 8px;min-height:29px}
 .galaxy-workbench .wb-reply-state{display:flex;align-items:center;gap:8px;margin:5px 0;line-height:1.7}
-.galaxy-workbench .wb-reply-dots{display:inline-flex;align-items:center;gap:3px;height:16px}
-.galaxy-workbench .wb-reply-dots i{width:3px;height:3px;border-radius:50%;background:var(--wb-accent);animation:wb-dot-breathe 1.3s ease-in-out infinite}
-.galaxy-workbench .wb-reply-dots i:nth-child(2){animation-delay:140ms}.galaxy-workbench .wb-reply-dots i:nth-child(3){animation-delay:280ms}
-.galaxy-workbench .wb-processing-steps{font-size:11px;color:var(--wb-muted);margin:3px 0 7px}
-.galaxy-workbench .wb-processing-steps summary{cursor:pointer;line-height:1.8}.galaxy-workbench .wb-processing-steps ol{margin:6px 0;padding-left:21px;line-height:1.9}
-.galaxy-workbench .wb-run-output--streaming .wb-answer-author::after{content:'';display:inline-block;width:4px;height:4px;margin-left:7px;border-radius:50%;background:var(--wb-accent);vertical-align:middle;animation:wb-dot-breathe 1.3s ease-in-out infinite}
 .galaxy-workbench .wb-compose{border-radius:9px;transition:box-shadow 180ms ease}
 .galaxy-workbench .wb-compose:focus-within{box-shadow:0 0 0 3px color-mix(in srgb,var(--wb-accent) 7%,transparent)}
 .galaxy-workbench .wb-send{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px}
-@keyframes wb-dot-breathe{0%,75%,100%{opacity:.3}35%{opacity:1}}
 @keyframes wb-soft-enter{from{opacity:.6;translate:0 3px}to{opacity:1;translate:0 0}}
-@media(prefers-reduced-motion:reduce){.galaxy-workbench :is(.wb-reply-dots i,.wb-run-output--streaming .wb-answer-author::after,.wb-jump-latest){animation:none}.galaxy-workbench .wb-compose{transition:none}}
+@media(prefers-reduced-motion:reduce){.galaxy-workbench .wb-jump-latest{animation:none}.galaxy-workbench .wb-compose{transition:none}}
