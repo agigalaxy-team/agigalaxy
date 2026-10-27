@@ -1,7 +1,7 @@
 import { lstat, readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { ServiceError } from '../../shared/service-error.mjs';
-import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath} from '../../shared/account-resource-routes.mjs';
+import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,accountFeedbackOperationId} from '../../shared/account-resource-routes.mjs';
 import {accountFollowMethod} from '../../shared/account-follows-schema.mjs';
 
 export function validateBrowserOrigins(origins = []) {
@@ -39,6 +39,7 @@ export function applyBrowserPolicy(request, response, origins) {
     ||accountFeedbackData
     ||accountDataMethod==='POST'&&!!accountFollowMethod(pathname)
     || pathname==='/v1/account/feedback'
+    || accountDataMethod==='GET'&&accountFeedbackOperationId(pathname)!==null
     || /^\/v1\/account\/feedback\/attachments\/(?:config|prepare|read|revoke)$/.test(pathname)
     || /^\/v1\/account\/notifications\/notices(?:\/[0-9a-f-]{36}\/read)?$/.test(pathname)
     || request.url.startsWith('/v2/community/')||isAccountChatJsonPath(pathname)||isAccountBinaryPath(pathname);

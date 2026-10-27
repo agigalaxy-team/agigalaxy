@@ -7,6 +7,8 @@ const chatAttachmentBinary=new RegExp('^/v2/chat/attachments/'+id+'/(?:upload|co
 const forumAttachmentBinary=new RegExp('^/v2/community/attachments/'+id+'/(?:upload|content)$');
 const feedbackAttachmentUpload=new RegExp('^/v1/account/feedback/attachments/'+id+'/upload$');
 const feedbackExportContent=new RegExp('^/v1/account/data/feedback/exports/'+id+'/attachments/'+id+'/content$');
+const feedbackSubmissionOperation=/^\/v1\/account\/feedback\/operations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+export const accountFeedbackOperationId=path=>feedbackSubmissionOperation.exec(path)?.[1].toLowerCase()??null;
 export const isAccountChatJsonPath=path=>chatGlobal.test(path)||chatRoom.test(path)||chatMessage.test(path)||chatAttachmentJson.test(path);
 export const isAccountBinaryPath=path=>chatAttachmentBinary.test(path)||forumAttachmentBinary.test(path)||feedbackAttachmentUpload.test(path)||feedbackExportContent.test(path);
 export const isAccountUploadPath=path=>isAccountBinaryPath(path)&&path.endsWith('/upload');

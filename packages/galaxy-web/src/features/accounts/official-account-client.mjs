@@ -1,4 +1,4 @@
-import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath} from "../../../../galaxy-official/src/shared/account-resource-routes.mjs";
+import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath,accountFeedbackOperationId} from "../../../../galaxy-official/src/shared/account-resource-routes.mjs";
 import {accountAvatarKey} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
 import {accountFollowMethod} from "../../../../galaxy-official/src/shared/account-follows-schema.mjs";
 const guid=value=>typeof value==='string'&&/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(value);
@@ -69,7 +69,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    const parsed=new URL(path,endpoint),route=parsed.pathname;
    const noticeList=route==='/v1/account/notifications/notices',noticeRead=/^\/v1\/account\/notifications\/notices\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/read$/i.test(route);
    const feedbackDataWrite=/^\/v1\/account\/data\/feedback\/(?:export|delete)$/.test(route)&&method==='POST',
-    feedbackSubmissionOperation=path===route&&/^\/v1\/account\/feedback\/operations\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(route)&&method==='GET',
+    feedbackSubmissionOperation=path===route&&accountFeedbackOperationId(route)!==null&&method==='GET',
     feedbackDataOperation=/^\/v1\/account\/data\/feedback\/operations\/[0-9a-f-]{36}$/.test(route)&&method==='GET',
     feedbackDataExport=/^\/v1\/account\/data\/feedback\/exports\/[0-9a-f-]{36}$/.test(route)&&method==='GET';
    const allowed=method==='POST'&&path===route&&!!accountFollowMethod(route)||feedbackDataWrite||feedbackSubmissionOperation||feedbackDataOperation||feedbackDataExport||/^\/v1\/account\/chat-reports\/(?:config|source|query|report|event|receipt|get)$/.test(route)||isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
