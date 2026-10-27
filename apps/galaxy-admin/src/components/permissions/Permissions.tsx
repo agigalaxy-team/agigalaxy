@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useRef,useState,useTransition} from 'react';
 import type {FormEvent,ReactNode} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
@@ -75,6 +75,7 @@ type PermissionsProps={operatorId:string;location:PermissionsLocation;csrfToken:
 export function Permissions(props:PermissionsProps){return <section className="galaxy-permissions" aria-label="角色与执行授权" data-operator={props.operatorId}><SettingsDraftBoundary scope="/admin/operations/permissions" resetKey={props.csrfToken}><PermissionsContent {...props}/></SettingsDraftBoundary></section>;}
 function PermissionsContent({operatorId,location:requestedLocation,csrfToken,authorization}:PermissionsProps){
  const [pinnedLocation,setPinnedLocation]=useState<PermissionsLocation|null>(null),location=pinnedLocation??requestedLocation;
+ const [navigating,startNavigation]=useTransition();
  const router=useRouter(),canRead=authorization?.permissions.includes('permissions.read')===true;
  const catalogRead=useOperationsRead<PermissionCatalog>({path:canRead?'/v1/operations/permissions/catalog':null,failureMessage:'权限目录暂时无法取得。',clearOnOffline:true});
  const rolesRead=useOperationsRead<BusinessRoles>({path:canRead?'/v1/operations/permissions/roles':null,failureMessage:'业务角色暂时无法取得。',clearOnOffline:true});
@@ -131,7 +132,7 @@ function PermissionsContent({operatorId,location:requestedLocation,csrfToken,aut
  const conflict=useCallback(()=>{void refreshAll();router.refresh();},[refreshAll,router]);
  const currentCommand=useOperationCommand<PermissionSave>({csrfToken,canWrite:!!catalog&&!resumed,onCommitted:committed,onConflict:conflict,errorMessages:errors,recover});
  const resumedRead=useOperationsRead<PermissionOperationRead>({path:resumed&&canRead&&catalog?permissionReceiptPath(resumed):null,failureMessage:'保存结果暂时无法读取。',clearOnOffline:true});
- const command={...currentCommand,locked:currentCommand.locked||!!resumed,pending:currentCommand.pending??resumed,error:resumed?resumedRead.error||recoveryNotice:currentCommand.error,message:resumeMessage||currentCommand.message,submit:(path:string,body:Record<string,unknown>,label:string)=>{setResumeMessage('');return currentCommand.submit(path,body,label);}};
+ const command={...currentCommand,locked:currentCommand.locked||!!resumed||navigating,pending:currentCommand.pending??resumed,error:resumed?resumedRead.error||recoveryNotice:currentCommand.error,message:resumeMessage||currentCommand.message,submit:(path:string,body:Record<string,unknown>,label:string)=>{setResumeMessage('');return currentCommand.submit(path,body,label);}};
  const dirty=Object.entries(roleDrafts).some(([key,draft])=>roleDraftChanged(draft,roleItems.find(row=>row.id===key)))||Object.entries(automationDrafts).some(([key,draft])=>automationDraftChanged(draft,autoItems.find(row=>row.id===key)));
  useSettingsDraftState(dirty,command.locked);
  const memory=useSettingsDraftMemory({scope:'permissions',ready:!!catalog&&!!roles&&!!people&&(location.tab!=='automatic'||!!automation),denied:!canRead||/登录|权限/.test(catalogRead.error),blocked:command.locked,snapshot:()=>({roleDrafts,automationDrafts,editing,searches,assignmentChoice,matrixFilters,templateChoice,automationRoleChoice,automationCopyNote,mergeChoices,selections:selections.current,returnSelection:returnSelection.current,listPositions:listPositions.current,matrixPositions:matrixPositions.current,historyPositions:historyPositions.current}),restore:value=>{setRoleDrafts(value.roleDrafts);setAutomationDrafts(value.automationDrafts);setEditing(value.editing);setSearches(value.searches);setAssignmentChoice(value.assignmentChoice);setMatrixFilters(value.matrixFilters);setTemplateChoice(value.templateChoice);setAutomationRoleChoice(value.automationRoleChoice);setAutomationCopyNote(value.automationCopyNote);setMergeChoices(value.mergeChoices);selections.current={...value.selections};returnSelection.current={...value.returnSelection};listPositions.current=value.listPositions;matrixPositions.current=value.matrixPositions;historyPositions.current=value.historyPositions;},discard:()=>{setRoleDrafts({});setAutomationDrafts({});setEditing({});setSearches({});setAssignmentChoice({});setMatrixFilters({});setTemplateChoice({});setAutomationRoleChoice({});setAutomationCopyNote({});setMergeChoices({});selections.current={};returnSelection.current={};listPositions.current={};matrixPositions.current={};historyPositions.current={};}});
@@ -161,7 +162,7 @@ function PermissionsContent({operatorId,location:requestedLocation,csrfToken,aut
  useLayoutEffect(()=>{if(directory&&listRef.current)listRef.current.scrollTop=listPositions.current[location.tab]??0;},[location.tab,directory?.checkedAt]);
  useLayoutEffect(()=>{if(catalog&&(role||person||grant||newRole||newAutomation)&&matrixRef.current)matrixRef.current.scrollTop=matrixPositions.current[location.tab+':'+id]??0;},[location.tab,id,catalog?.checkedAt,role?.version,person?.effective?.version,grant?.version,newRole,newAutomation]);
  useLayoutEffect(()=>{if(history&&historyRef.current)historyRef.current.scrollTop=historyPositions.current[historyQuery]??0;},[history?.checkedAt,historyQuery]);
- function navigate(patch:Partial<PermissionsLocation>){if(!command.locked)router.push(permissionsHref(location,patch),{scroll:false});}
+ function navigate(patch:Partial<PermissionsLocation>){if(!command.locked)startNavigation(()=>router.push(permissionsHref(location,patch),{scroll:false}));}
  function select(next:string){if(command.locked)return;selections.current[location.tab]=next;navigate({id:next,after:'',trail:[]});}
  function openRoleAssignments(targetOperatorId=''){if(command.locked||!role)return;if(targetOperatorId)setAssignmentChoice(previous=>({...previous,[targetOperatorId]:''}));setSearches(previous=>({...previous,personnel:''}));navigate({tab:'personnel',id:targetOperatorId,roleId:targetOperatorId?'':role.id,after:'',trail:[]});}
  function chooseAssignmentRole(roleId:string){if(command.locked||!person)return;assignmentPrefill.current=person.operatorId+':'+roleId;setAssignmentChoice(previous=>({...previous,[person.operatorId]:roleId}));router.replace(permissionsHref(location,{id:person.operatorId,roleId}),{scroll:false});}

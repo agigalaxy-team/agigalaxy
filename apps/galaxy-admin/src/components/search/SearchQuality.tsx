@@ -54,7 +54,12 @@ function SearchQualitySettings({location,csrfToken}:{location:SearchQualityLocat
  const navigate=useCallback((patch:Partial<SearchQualityLocation>,replace=false)=>{const href=searchQualityHref(locationRef.current,patch);if(replace)router.replace(href,{scroll:false});else router.push(href,{scroll:false});setValidation('');},[router]);
  useEffect(()=>setQuery(location.query),[location.query]);
  const refresh=useCallback(async()=>{await Promise.all([overview.read(),history.read()]);},[overview.read,history.read]);
- const committed=useCallback(async(value:SearchQualityOperationResult)=>{const [fresh]=await Promise.all([overview.read(),history.read()]);if(value.phase==='applied'&&value.kind==='draft'&&searchQualityOverview(fresh)?.configuration.draft?.id===value.versionId)setDraft(null);},[overview.read,history.read]);
+ const committed=useCallback(async(value:SearchQualityOperationResult)=>{
+  // The receipt confirms this save. A competing event may cancel the refresh;
+  // that must not turn a completed save back into an unsaved local draft.
+  if(value.phase==='applied'&&value.kind==='draft')setDraft(null);
+  await Promise.all([overview.read(),history.read()]);
+ },[overview.read,history.read]);
  const localCommand=useSearchQualityCommand({csrfToken,data,denied:!!overview.error&&/登录|权限/.test(overview.error),onComplete:committed,onConflict:()=>{void refresh();}});
  const recovery=useSettingsReceiptRecovery({scope:'search',refresh:refresh,live:localCommand.receipt,ready:!!data&&overview.verified,denied:!!overview.error&&/登录|权限/.test(overview.error),onRecorded:refresh,onDenied:()=>{overview.clear();history.clear();setDraft(null);setReasons({});}});
  const command=localCommand;

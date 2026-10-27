@@ -31,6 +31,18 @@ test('owner feedback HTTP binds closed intents and export bytes to the current o
  const request=(path,{method='GET',input,headers={}}={})=>fetch(base+path,{method,headers:{origin,'x-local-session':'present','content-type':'application/json','x-galaxy-account-csrf':'local-only',...headers},...(input===undefined?{}:{body:JSON.stringify(input)}),signal:AbortSignal.timeout(10000)});
  for(const name of ['export','delete'])assert.equal((await request(root+name,{method:'POST',input:{operationId}})).status,201);
  assert(auth.slice(0,2).every(call=>call.write===true));
+ const preflightHeaders={'access-control-request-method':'GET','access-control-request-headers':'content-type,x-galaxy-account-id,x-galaxy-account-csrf'};
+ const domainCalls=calls.length,authorizations=auth.length;
+ for(const path of [root+'exports/'+operationId+'?after=2&limit=5','/v1/account/archives?limit=20','/v1/account/external-credentials?after=2','/v1/account/notifications/notices?limit=20&unreadOnly=true']){
+  const preflight=await request(path,{method:'OPTIONS',headers:preflightHeaders});
+  assert.equal(preflight.status,204,path);assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
+  assert.equal(preflight.headers.get('access-control-allow-credentials'),'true');
+  assert.match(preflight.headers.get('access-control-allow-headers'),/X-Galaxy-Account-CSRF/);
+ }
+ assert.equal(calls.length,domainCalls);assert.equal(auth.length,authorizations);
+ for(const suffix of ['?after=2&after=3','?limit=51','?limit=','?accountId='+actor.accountId])
+  assert.equal((await request(root+'exports/'+operationId+suffix,{method:'OPTIONS',headers:preflightHeaders})).status,400,suffix);
+ assert.equal((await request(root+'exports/'+operationId+'?limit=5',{method:'OPTIONS',headers:{...preflightHeaders,'access-control-request-method':'POST'}})).status,400);
  assert.equal((await request(root+'operations/'+operationId)).status,200);
  assert.equal((await request(root+'exports/'+operationId+'?after=2&limit=5')).status,200);
  assert.deepEqual(calls.at(-1),{name:'exportPage',args:[operationId,{after:'2',limit:5}]});

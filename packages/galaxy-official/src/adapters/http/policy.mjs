@@ -31,6 +31,7 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   if (request.headers.origin && !browserOrigins.includes(request.headers.origin)) throw new ServiceError('browser_origin_not_enabled', 403);
   let url;
   try { url = new URL(request.url, endpoint); } catch { throw new ServiceError('invalid_request'); }
+  const readIntent=request.method==='GET'||request.method==='OPTIONS'&&request.headers['access-control-request-method']==='GET';
   const consentList = request.method === 'GET' && url.pathname === '/v1/consents';
   const oidcCallback = request.method === 'GET' && (/^\/v1\/identity\/callback\/[a-z0-9][a-z0-9._-]{0,63}$/.test(url.pathname) || url.pathname === '/v1/account/callback' || url.pathname === '/v1/operations/callback');
   const auditDirectory=url.pathname==='/v1/operations/audit',accountAudit=/^\/v1\/operations\/users\/[0-9a-f-]{36}\/audit$/.test(url.pathname);
@@ -108,12 +109,12 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   const contentQuery=(contentDirectory||contentHistory)&&url.search.length<=8192
     &&[...url.searchParams.keys()].every(key=>(contentDirectory?['query','targetId','kind','topic','visibility','pinned','featured','days','after','limit']:['historyAfter']).includes(key)&&url.searchParams.getAll(key).length===1);
   const identityReturn=request.method==='GET'&&/^\/v1\/identity\/return\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=8192;
-  const accountQuery = request.method === 'GET' && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
-  const accountFeedbackExportQuery=request.method==='GET'&&/^\/v1\/account\/data\/feedback\/exports\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=160
+  const accountQuery = readIntent && ['/v1/account/login','/v1/account/session','/v1/account/archives','/v1/account/external-credentials'].includes(url.pathname) && url.search.length <= 8192;
+  const accountFeedbackExportQuery=readIntent&&/^\/v1\/account\/data\/feedback\/exports\/[0-9a-f-]{36}$/i.test(url.pathname)&&url.search.length<=160
     &&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1)
     &&(!url.searchParams.has('after')||/^(0|[1-9][0-9]{0,18})$/.test(url.searchParams.get('after')))
     &&(!url.searchParams.has('limit')||/^(?:[1-9]|[1-4][0-9]|50)$/.test(url.searchParams.get('limit')));
-  const accountNoticeQuery=request.method==='GET'&&url.pathname==='/v1/account/notifications/notices'&&url.search.length<=512&&[...url.searchParams.keys()].every(key=>['after','limit','unreadOnly'].includes(key)&&url.searchParams.getAll(key).length===1);
+  const accountNoticeQuery=readIntent&&url.pathname==='/v1/account/notifications/notices'&&url.search.length<=512&&[...url.searchParams.keys()].every(key=>['after','limit','unreadOnly'].includes(key)&&url.searchParams.getAll(key).length===1);
   const publicAccountQuery=request.method==='GET'&&/^\/v1\/account\/public\/(?:[0-9a-f-]{36}\/(?:ids|credentials)|by-id\/GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26})$/.test(url.pathname)
     &&url.search.length<=160&&[...url.searchParams.keys()].every(key=>['after','limit'].includes(key)&&url.searchParams.getAll(key).length===1);
   const publicAccountPostsQuery=request.method==='GET'&&/^\/v1\/account\/public\/[0-9a-f-]{36}\/posts$/.test(url.pathname)
@@ -132,7 +133,6 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   const summaryQuery = request.method === 'GET' && url.pathname === '/v1/operations/summary'
     && url.search.length <= 80 && keys.length === 1 && keys[0] === 'publicActivity'
     && url.searchParams.get('publicActivity') === 'deferred';
-  const readIntent=request.method==='GET'||request.method==='OPTIONS'&&request.headers['access-control-request-method']==='GET';
   const webEventsQuery=readIntent&&['/v1/web-events','/v1/operations/web-events'].includes(url.pathname)&&url.search.length<=4096
     &&keys.every(key=>['cursor','topics','stream'].includes(key)&&url.searchParams.getAll(key).length===1)
     &&(!url.searchParams.has('cursor')||/^(0|[1-9][0-9]{0,18})$/.test(url.searchParams.get('cursor')))
