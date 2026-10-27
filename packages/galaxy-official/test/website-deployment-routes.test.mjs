@@ -38,8 +38,8 @@ test('website deployment fragment pins current/previous IDs, first-upgrade RSC a
   assert.throws(()=>websiteRoutes({...config,port}));
   assert.throws(()=>websiteRoutes({...config,previous:{port,deploymentId:'release-old_1'}}));
  }
- for(const deploymentId of ['',null,'*','../old','old\r\nX-Host: other','x'.repeat(129)])assert.throws(()=>websiteRoutes({...config,deploymentId}));
- for(const deploymentId of ['',undefined,'*','../old',config.deploymentId])assert.throws(()=>websiteRoutes({...config,previous:{port:3101,deploymentId}}));
+ for(const deploymentId of ['',null,'*','release.1','../old','old\r\nX-Host: other','x'.repeat(129)])assert.throws(()=>websiteRoutes({...config,deploymentId}));
+ for(const deploymentId of ['',undefined,'*','release.1','../old',config.deploymentId])assert.throws(()=>websiteRoutes({...config,previous:{port:3101,deploymentId}}));
  assert.throws(()=>websiteRoutes({...config,previous:{port:3100,deploymentId:'release-old_1'}}));
  assert.throws(()=>websiteRoutes({...config,origin:'https://*.example'}));
  assert.throws(()=>websiteRoutes({...config,previous:{port:3101,deploymentId:'release-old_1',upstream:'other.example'}}));

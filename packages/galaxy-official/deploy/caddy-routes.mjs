@@ -59,7 +59,7 @@ export function officialRoutes({ endpoint, apiPort }) {
 // ports. A request header can select a retained deployment, never an upstream.
 export function websiteRoutes({origin,port,deploymentId,previous}){
  const url=new URL(origin),validPort=value=>Number.isInteger(value)&&value>=1024&&value<=65535;
- const validId=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
+ const validId=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
  if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||url.port
   ||!/^[a-z0-9.-]+$/.test(url.hostname)||!validPort(port)
   ||deploymentId!==undefined&&!validId(deploymentId))throw Error('Invalid website proxy configuration');

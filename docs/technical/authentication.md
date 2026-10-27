@@ -103,6 +103,6 @@ Node原command ledger仍是owner/target/intent权威；SingleUseObjectProvider g
 
 短期凭据在服务器续期，浏览器只持稳定 HttpOnly Cookie；原账户 ID、CSRF、角色和草稿作用域不因正常续期改变。真实输入活动才延长闲置期，事件心跳、页面聚焦和后台定时器不算活动。并发续期由原表 CAS 合并，注销和撤销阻止迟到结果恢复会话。
 
-网络/认证服务暂不可用与真正失效分别处理。交换结果未知不再次使用可能已经旋转的 refresh token，保留未确认状态并允许退出；明确 invalid_grant 才按撤销处理。未知业务写入继续查原 operation，不因认证恢复重发。
+网络/认证服务暂不可用与真正失效分别处理。 Admin 对 Payload 的会话适配必须保留 unknown：暂时故障不能变为 `200 user:null`，已挂载的身份与草稿不因此清空。只有确认 signed-out 才自动进入 SSO；服务端当前页面无法核验时保留原 URL 和重试入口，不以非 200 RSC 诱发框架整页导航。交换结果未知不再次使用可能已经旋转的 refresh token，保留未确认状态并允许退出；明确 invalid_grant 才按撤销处理。未知业务写入继续查原 operation，不因认证恢复重发。
 
 启用前须先应用技术迁移并核实际 Keycloak 客户端及 SSO idle/max 与 refresh-token 配置。未配置或上游未提供刷新凭据时不伪称长期登录；原会话必要时只做一次重新登录。源码中的默认值不表示已修改真实认证系统。
