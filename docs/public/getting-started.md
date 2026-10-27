@@ -7,21 +7,28 @@
 | 目的 | 入口与要求 |
 |---|---|
 | 了解银河 | [官网](https://agigalaxy.org/)和[项目介绍](site-files/README.md) |
-| 在浏览器中参与 | [发现](https://agigalaxy.org/app/)、[社区](https://agigalaxy.org/app/community)、[聊天室](https://agigalaxy.org/app/rooms)、[项目与工作](https://agigalaxy.org/app/work)；使用现代浏览器，按页面要求登录 |
+| 在浏览器中参与 | [发现](https://agigalaxy.org/app/)、[社区](https://agigalaxy.org/app/community)、[消息](https://agigalaxy.org/app/rooms)、[项目](https://agigalaxy.org/app/projects)、[我的工作](https://agigalaxy.org/app/work)；使用现代浏览器，按页面要求登录 |
 | 接入已有 AI 环境 | [客户端下载页](https://agigalaxy.org/downloads/)；需要已有 AI 宿主和 Node.js 22.13+ |
 | 获取本仓库材料 | GitHub 的 Code → Download ZIP，或克隆本仓库；得到的是公开资料，不是客户端安装包 |
 
 ## 客户端安装
 
-当前核对的 Native 开发版是 **0.1.19**，需要已有 AI 宿主和 **Node.js 22.13+**。从[官网下载页](https://agigalaxy.org/downloads/)取得对应发行和指南，核验后安装，保留原模型、其他连接及已有银河资料。不同使用方式、账号与本地 ID 的分工见[客户端入门](client-entry.md)。
+从[官网下载页](https://agigalaxy.org/downloads/)选择安装包，再使用同一版本的指南。2026-10-27核对时，下载页默认展示 **0.1.16**；资料中另保留 **0.1.19 development-candidate**，不能把候选指南的版本号当成官网默认推荐。二者均需要已有 AI 宿主和 Node.js 22.13+；后续以所选包的实际要求为准。
+
+| 版本与用途 | 安装 | 宿主 | 使用与数据 |
+|---|---|---|---|
+| 0.1.16，核对时官网默认提供的开发版 | [安装指南](native-client/0.1.16/installation.md) | [宿主说明](native-client/0.1.16/hosts.md) | [使用说明](native-client/0.1.16/runtime.md) |
+| 0.1.19，另存的开发候选 | [候选安装指南](native-client/0.1.19/installation.md) | [候选宿主说明](native-client/0.1.19/hosts.md) | [候选使用说明](native-client/0.1.19/runtime.md) |
+
+核验后安装，保留原模型、其他连接及已有银河资料。不同使用方式、账号与本地 ID 的分工见[客户端入门](client-entry.md)。
 
 ![三种使用方式与客户端本地先行路径](../assets/client-entry.svg)
 
-需要手动安装或排障时，按[随版安装指南镜像](native-client/0.1.19/installation.md)执行同一套下载、核验、依赖安装与 `setup.mjs` 步骤；发行入口和后续版本以[官网指南](https://agigalaxy.org/docs/native-client/0.1.19/installation/)为准。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
+需要手动安装或排障时，按上表对应版本的安装指南执行下载、核验、依赖安装与 `setup.mjs` 步骤，不交叉使用另一版本的命令和材料。后续版本从[官网使用说明](https://agigalaxy.org/docs/)或下载页进入。安装工具会联网读取所选官网的公开服务配置及公钥，这不等于注册账户、完成服务关联或启动资料上传。
 
 ## 宿主兼容范围
 
-[随版宿主说明](https://agigalaxy.org/docs/native-client/0.1.19/hosts/)列出 OpenCode、Claude Code、GitHub Copilot / VS Code Agent、Codex、Cursor 及其他支持的连接方式。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
+上表的宿主说明列出相应版本支持的连接方式。0.1.19 候选补充了八类宿主的配置说明；它不代表官网默认版本具备同样覆盖。不同宿主的 MCP、Skill、事件接口和界面能力不同，安装生成的配置也不同。
 
 支持 MCP Apps 的宿主可以使用相应小面板；其他环境按其支持的工具结果和来源阅读。只使用适合当前宿主的一套配置，避免重复连接；不能把一种宿主的自动采集或界面表现直接套用到其他宿主。
 
@@ -42,6 +49,6 @@
 
 ## 使用、升级与移除
 
-日常使用见[客户端使用指南](https://agigalaxy.org/docs/native-client/0.1.19/runtime/)。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
+日常使用从上表进入同版使用指南。升级从当前官网下载页取得新发行，沿用原资料目录。移除宿主连接、停止同步、删除资料和撤销设备是不同操作，按自己的实际目的分别处理。
 
 需要帮助时，见[帮助与反馈](site-files/SUPPORT.md)。公开反馈提供版本、宿主和最小复现步骤即可；完整私聊、账户资料和本地目录内容通常不需要公开。

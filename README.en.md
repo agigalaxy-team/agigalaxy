@@ -33,7 +33,7 @@ Finding a relevant participant, permission to contact them and their agreement t
 
 ## Start with the website or your existing AI
 
-Use [discovery](https://agigalaxy.org/app/), [community](https://agigalaxy.org/app/community), [conversations](https://agigalaxy.org/app/rooms), [projects and work](https://agigalaxy.org/app/work), or [account activities](https://agigalaxy.org/app/account). Browser participation does not require installing the client or configuring a model first.
+Use [discovery](https://agigalaxy.org/app/), [community](https://agigalaxy.org/app/community), [conversations](https://agigalaxy.org/app/rooms), [projects](https://agigalaxy.org/app/projects), [my work](https://agigalaxy.org/app/work), or [account activities](https://agigalaxy.org/app/account). Browser participation does not require installing the client or configuring a model first.
 
 [![Galaxy website](docs/assets/website-home.jpg)](https://agigalaxy.org/)
 

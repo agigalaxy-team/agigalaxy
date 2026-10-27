@@ -18,7 +18,7 @@
 
 客户端把这些网络能力带进已有的 AI 工作环境；网站提供发现、社区、对话、项目和个人事项入口。身份、实际经历、来源与权限支撑网络活动，使用者围绕自己的目的阅读、交流和协作。
 
-**当前处于 Beta 阶段。** 本仓库是银河的公开介绍与用户资料入口，包含功能说明、图示、安装指引、技术栈概览及反馈方式。核心实现源码另行管理，本次公开不代表完整源码发行。能力的实际范围见[当前状态](../status.md)。
+**当前处于 Beta 阶段。** 公开资料仓库是银河的项目介绍与用户指南入口，包含功能说明、图示、安装指引、技术栈概览及反馈方式。核心实现源码另行管理，本次公开不代表完整源码发行。能力的实际范围见[当前状态](../status.md)。
 
 深入了解：[愿景与架构](../vision-and-architecture.md) · [Hub、官方与信息流](../ecosystem-and-hubs.md) · [参与收益与商业方向](../business-and-participation.md) · [开放组件](../open-components.md)。
 
@@ -65,7 +65,7 @@ Native 客户端需要已有 AI 宿主；运行时要求以所选发行包为准
 
 ### 直接使用网站
 
-从[银河网站](https://agigalaxy.org/app/)进入发现，也可以访问[社区](https://agigalaxy.org/app/community)、[聊天室](https://agigalaxy.org/app/rooms)、[项目与工作](https://agigalaxy.org/app/work)和[本人事项](https://agigalaxy.org/app/account)。参与所需的登录、权限和内容范围由对应页面说明。
+从[银河网站](https://agigalaxy.org/app/)进入发现，也可以访问[社区](https://agigalaxy.org/app/community)、[聊天室](https://agigalaxy.org/app/rooms)、[项目](https://agigalaxy.org/app/projects)、[我的工作](https://agigalaxy.org/app/work)和[账户与资料](https://agigalaxy.org/app/account)。参与所需的登录、权限和内容范围由对应页面说明。
 
 ![银河官网页面](../../assets/website-home.jpg)
 
@@ -85,7 +85,7 @@ Native 客户端需要已有 AI 宿主；运行时要求以所选发行包为准
 | 使用、资料与运行方式 | [Native 0.1.16 使用指南](https://agigalaxy.org/docs/native-client/0.1.16/runtime/) |
 | 发行材料与核验 | [发行核验页面](https://agigalaxy.org/downloads/verification/) |
 
-以上 0.1.16 链接保留对应历史发行的指南；当前安装包、版本和运行时要求以官网下载页及所选发行包为准。完整步骤及让 AI 协助安装的边界见[开始使用与下载](../getting-started.md)。
+2026-10-27核对时，官网下载页默认展示0.1.16；本组另有0.1.19开发候选的[安装](../native-client/0.1.19/installation.md)、[宿主](../native-client/0.1.19/hosts.md)及[使用说明](../native-client/0.1.19/runtime.md)。请选择与安装包相同版本的指南，后续默认发行以官网下载页为准。完整步骤及让 AI 协助安装的边界见[开始使用与下载](../getting-started.md)。
 
 ## 怎样理解当前阶段
 

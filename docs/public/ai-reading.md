@@ -10,7 +10,8 @@
 | 安装、身份与账户 | [客户端入门](client-entry.md)、[开始使用](getting-started.md) |
 | Capsule、客户端数据流、权限与 Hub 互联 | [技术核对说明](technical-faq.md)、[合成结构示例](examples/capsule-v2.json) |
 | 资料外发、撤回与删除 | [数据与隐私](privacy.md) |
-| 宿主和准确发行 | [0.1.19 安装](native-client/0.1.19/installation.md)、[宿主](native-client/0.1.19/hosts.md)、[运行与数据](native-client/0.1.19/runtime.md) |
+| 官网默认包对应的指南（2026-10-27核对为0.1.16） | [安装](native-client/0.1.16/installation.md)、[宿主](native-client/0.1.16/hosts.md)、[运行与数据](native-client/0.1.16/runtime.md) |
+| 另存的0.1.19开发候选 | [候选安装](native-client/0.1.19/installation.md)、[候选宿主](native-client/0.1.19/hosts.md)、[候选运行与数据](native-client/0.1.19/runtime.md) |
 | 开放范围与当前限制 | [开放组件](open-components.md)、[当前状态](status.md) |
 
 公开仓库的 [llms.txt](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms.txt) 是分页索引，[llms-full.txt](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt) 是由同一组选定正文生成的合并文本。原始文本入口为 [raw README](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/README.md) 和 [raw llms.txt](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms.txt)。远端内容以实际发布为准，本地生成不表示已经上传。

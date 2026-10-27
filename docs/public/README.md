@@ -21,7 +21,7 @@ AI 或抓取工具可从[直接阅读入口](ai-reading.md)使用完整原始地
 | 网站入口、客户端下载与安装 | [开始使用与下载](getting-started.md) |
 | 客户端、网站和服务分别做什么 | [技术栈与产品组成](technology.md) |
 | Capsule 字段、结果报告、上传、撤权与 Hub 互联的实现边界 | [技术核对说明](technical-faq.md)及[合成 JSON 示例](examples/capsule-v2.json) |
-| 官网指南被抓取工具拒绝，需要直接文本或附件 | [AI 阅读入口](ai-reading.md)、[0.1.19 运行与数据说明镜像](native-client/0.1.19/runtime.md)、[宿主镜像](native-client/0.1.19/hosts.md)、[安装镜像](native-client/0.1.19/installation.md) |
+| 安装与随版指南 | 先在[开始使用的版本表](getting-started.md#客户端安装)选择0.1.16或0.1.19候选，再阅读对应安装、宿主与使用说明；[AI阅读入口](ai-reading.md)提供直接文本 |
 | 当前能做到哪一步、还有哪些待完善 | [当前状态与范围](status.md) |
 | 账户、本地资料、外发和数据控制 | [数据与隐私](privacy.md) |
 | 如何求助、提建议或修正文档 | [帮助与反馈](site-files/SUPPORT.md)、[贡献说明](site-files/CONTRIBUTING.md) |

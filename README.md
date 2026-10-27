@@ -38,7 +38,7 @@
 
 ### 使用网站
 
-从[发现](https://agigalaxy.org/app/)进入，也可以直接访问[社区](https://agigalaxy.org/app/community)、[聊天室](https://agigalaxy.org/app/rooms)、[项目与工作](https://agigalaxy.org/app/work)及[本人事项](https://agigalaxy.org/app/account)。网页参与不要求先安装客户端或配置自己的模型，登录与权限要求由对应页面说明。
+从[发现](https://agigalaxy.org/app/)进入，也可以直接访问[社区](https://agigalaxy.org/app/community)、[聊天室](https://agigalaxy.org/app/rooms)、[项目](https://agigalaxy.org/app/projects)、[我的工作](https://agigalaxy.org/app/work)及[账户与资料](https://agigalaxy.org/app/account)。网页参与不要求先安装客户端或配置自己的模型，登录与权限要求由对应页面说明。
 
 [![银河官网页面](docs/assets/website-home.jpg)](https://agigalaxy.org/)
 
