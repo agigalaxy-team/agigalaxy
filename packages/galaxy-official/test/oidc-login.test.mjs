@@ -100,3 +100,13 @@ test('signed OIDC profiles never turn an email login identifier into a default d
   }
   assert.deepEqual(issuer.failures, []);
 });
+
+test('explicit management sign-in requests credentials without changing the default website SSO flow',async t=>{
+ const redirectUri='https://admin.example/v1/operations/callback',issuer=await oidcProviderFixture([redirectUri]);t.after(issuer.close);
+ const options={id:'management',name:'Management',issuer:issuer.issuer,clientId:'galaxy-fixture',redirectUri,allowLoopbackHttp:true};
+ const website=await createOidcLoginProvider(options),management=await createOidcLoginProvider({...options,requireFreshLogin:true});
+ assert.equal(new URL((await website.begin()).authorizationUrl).searchParams.get('prompt'),null);
+ const attempt=await management.begin();assert.equal(new URL(attempt.authorizationUrl).searchParams.get('prompt'),'login');
+ assert.equal(new URL(attempt.authorizationUrl).searchParams.get('code_challenge_method'),'S256');
+ const identity=await management.complete(attempt,await issuer.authorize(attempt.authorizationUrl));assert.equal(identity.externalSubject,'synthetic-oidc-subject');
+});

@@ -40,10 +40,10 @@ function endpoint(value, allowLoopbackHttp) {
 // The returned identity is not an API credential or a Galaxy authorization.
 export async function createOidcLoginProvider({ id, name, issuer, clientId, redirectUri, clientSecret,
   allowedOrigins = [], includeAccountProfile = false, includeOperatorRoles = false, transactionStore = null,
-  sessionRenewal = false, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
+  sessionRenewal = false, requireFreshLogin = false, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
   if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(id ?? '') || !text(name, 100) || !text(clientId, 200)
     || clientSecret !== undefined && !text(clientSecret, 4096) || !Array.isArray(allowedOrigins) || allowedOrigins.length > 8
-    || typeof includeAccountProfile!=='boolean'||typeof includeOperatorRoles!=='boolean')
+    || typeof includeAccountProfile!=='boolean'||typeof includeOperatorRoles!=='boolean'||typeof requireFreshLogin!=='boolean')
     throw new Error('Invalid OIDC provider configuration.');
   const authority = endpoint(issuer, allowLoopbackHttp), callback = endpoint(redirectUri, allowLoopbackHttp);
   const origins = new Set([authority.origin, ...allowedOrigins.map(value => {
@@ -96,7 +96,7 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
   async function begin() {
     const verifier = oidc.randomPKCECodeVerifier(), state = oidc.randomState(), nonce = oidc.randomNonce();
     const authorization = oidc.buildAuthorizationUrl(configuration, { redirect_uri: callback.href, scope: 'openid email',
-      response_type: 'code', code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256', state, nonce });
+      response_type: 'code', ...(requireFreshLogin?{prompt:'login'}:{}), code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256', state, nonce });
     const preview = Object.freeze({ ...description, loginId: randomUUID(), authorizationUrl: authorization.href, expiresAt: now() + 300 });
     if(store)await store.put({providerKey,loginId:preview.loginId,expiresAt:preview.expiresAt,verifier,state,nonce});
     else pending.set(preview, { verifier, state, nonce });

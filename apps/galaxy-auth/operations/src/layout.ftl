@@ -1,0 +1,9 @@
+<div class="op-background" aria-hidden="true"><div class="op-ambient op-ambient--one"></div><div class="op-ambient op-ambient--two"></div><div class="op-grid"></div></div>
+<div class="op-shell">
+ <header class="op-topbar"><div class="op-brand"><span class="op-brand-mark"><img src="${url.resourcesPath}/img/galaxy-mark.svg?v=@@resource-version@@" alt=""></span><span>AGI Galaxy<small>${msg("galaxyOperationsLabel")}</small></span></div><span class="op-top-label">OPERATIONS CONSOLE</span></header>
+ <main id="main-content" class="op-stage">
+  <div class="op-visual" aria-hidden="true"><span class="op-eyebrow">AGI GALAXY / OPERATIONS</span><p class="op-display">${msg("galaxyOperationsHero")}<span>${msg("galaxyOperationsHeroAccent")}</span></p><div class="op-orbit-scene"><div class="op-orbit op-orbit--one"></div><div class="op-orbit op-orbit--two"></div><div class="op-orbit op-orbit--three"></div><div class="op-orbit-halo"></div><div class="op-core"><img src="${url.resourcesPath}/img/galaxy-mark.svg?v=@@resource-version@@" alt=""></div><span class="op-star op-star--one"></span><span class="op-star op-star--two"></span><span class="op-star op-star--three"></span></div><div class="op-scope"><span>${msg("galaxyOperationsScopeAccounts")}</span><i></i><span>${msg("galaxyOperationsScopeCommunity")}</span><i></i><span>${msg("galaxyOperationsScopeRuntime")}</span></div></div>
+  <section class="auth-form-area op-form-panel" aria-labelledby="kc-page-title"><div class="op-form-accent" aria-hidden="true"></div><div class="op-form-tools"><span class="op-account-kind">${msg("galaxyOperationsPrivate")}</span>@@languages@@</div>@@form@@<p class="op-account-note">${msg("galaxyOperationsAccountNote")}</p><p class="op-caps-lock" id="operations-caps-lock" role="status" hidden>${msg("galaxyOperationsCapsLock")}</p></section>
+ </main>
+ <footer class="op-footer"><span>AGI Galaxy · ${msg("galaxyOperationsLabel")}</span><span>DESIGNED FOR OPERATIONS</span></footer>
+</div>

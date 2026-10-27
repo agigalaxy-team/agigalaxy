@@ -9,3 +9,5 @@ node apps/galaxy-auth/operations/build-theme.mjs --auth-root <auth候选>
 ```
 
 可用--out-root/--admin-origin选新候选及实际HTTPS管理地址，只新建themes/galaxy-operations/login。父galaxy主题需一同提供。
+
+管理登录独立于官网外壳，直接显示原生账号密码表单。布局和资源位于 src/ 与 theme/；保留Keycloak原生表单及父主题的提交状态增强，不在浏览器另建认证逻辑。显式管理登录要求重新输入凭据，门户会话续期不受影响。

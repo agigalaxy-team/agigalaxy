@@ -56,6 +56,7 @@ export function Navigation(){
   const rail=useActiveNavigation(active,'both');
   const name=user?.displayName?.trim()||'管理账户';
   const role=user?.role==='administrator'?'运营管理员':user?.role==='reader'?'运营成员':'管理账户';
+  if(!user||pathname==='/admin/login')return null;
   return <>
     <AdminNavigationMotion/>
     <a className="galaxy-admin-skip" href="#galaxy-admin-main" onClick={event=>{const target=document.getElementById('galaxy-admin-main')??document.querySelector<HTMLElement>('.template-default__wrap');if(target){event.preventDefault();target.tabIndex=-1;target.focus();}}}>跳到主要内容</a>

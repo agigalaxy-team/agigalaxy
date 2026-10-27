@@ -136,7 +136,7 @@ export async function loadOperationsConfiguration(path,{db,endpoint,permissions=
   const sessionRenewal=await loadPortalSessionPolicy(renewalConfiguration);
   const namespace='operations:'+createHash('sha256').update(JSON.stringify({endpoint,origin:config.adminOrigin,issuer:config.issuer,clientId:config.clientId})).digest('hex');
   const provider=await factory({id:'operations-admin',name:'银河运营管理',issuer:config.issuer,clientId:config.clientId,
-    redirectUri:config.adminOrigin+'/v1/operations/callback',includeAccountProfile:true,includeOperatorRoles:true,
+    redirectUri:config.adminOrigin+'/v1/operations/callback',includeAccountProfile:true,includeOperatorRoles:true,requireFreshLogin:true,
     transactionStore:createOidcTransactionStore({db,namespace}),sessionRenewal:!!sessionRenewal});
   const roleDirectory=createKeycloakAdminDirectory({issuer:config.issuer,adminOrigin:directoryOrigin,clientId:credential.clientId,clientSecret:credential.clientSecret});
   const identityDirectory=createKeycloakAdminDirectory({issuer:accountDirectory.issuer,adminOrigin:directoryOrigin,clientId:businessCredential.clientId,clientSecret:businessCredential.clientSecret});

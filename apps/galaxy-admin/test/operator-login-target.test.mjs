@@ -27,5 +27,7 @@ test('management login uses a document redirect and lets React render the naviga
  const normalized=proxy(new NextRequest(request.url,{headers:{'sec-fetch-dest':'empty','sec-fetch-mode':'cors'}}));
  assert.equal(normalized.headers.get('x-middleware-next'),'1');
  const signedOut=proxy(new NextRequest('https://admin.example/admin/login?signedOut=1'));
- assert.equal(signedOut.headers.get('x-middleware-next'),'1');
+ assert.equal(signedOut.status,307);
+ assert.equal(new URL(signedOut.headers.get('location')).pathname,'/v1/operations/login');
+ for(const reason of ['denied','stale'])assert.equal(proxy(new NextRequest('https://admin.example/admin/login?reason='+reason)).headers.get('x-middleware-next'),'1');
 });

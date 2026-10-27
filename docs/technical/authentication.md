@@ -22,7 +22,7 @@ galaxy realm邮箱优先注册、verifyEmail=true，firstName/lastName由 `realm
 
 galaxy-operations-web为public code+S256，回调仅所选admin origin的/v1/operations/callback；Grafana独立confidential code，回调/monitoring/login/generic_oauth。目录client仅service account，其role mappings和client scope mappings都只给本realm的view-users/query-users，不给manage-users/realm-admin/impersonation；可写管理邮箱client另见下节。分配用当前返回client/user/role UUID及原生role representation：`/clients/{id}/scope-mappings/realm`、`/users/{serviceUser}/role-mappings/clients/{realmManagement}`、`/clients/{directory}/scope-mappings/clients/{realmManagement}`。普通业务目录由createBusinessDirectoryPlan单独生成，不属于管理realm plan。管理域不注册、不关联普通IdP/同邮箱账户，规划器关闭自助reset；后台原生管理员reset独立。
 
-管理子主题命令 `node apps/galaxy-auth/operations/build-theme.mjs --auth-root <auth候选>`，可选--out-root/--admin-origin，只新建themes/galaxy-operations/login，父galaxy主题须随包。复用同一React外壳与FTL，仅管理文案/返回位置不同。
+管理子主题命令 `node apps/galaxy-auth/operations/build-theme.mjs --auth-root <auth候选>`，可选--out-root/--admin-origin，只新建themes/galaxy-operations/login，父galaxy主题须随包。管理子主题使用独立的品牌布局、样式和渐进交互，不加载官网导航或搜索；复用原生Keycloak表单、密码可见性与提交状态，不代理密码。显式管理登录请求凭据，退出后直接进入账号密码页；已有门户会话的正常续期不受影响。
 
 普通realm资料 `realm-profile.mjs --input <原完整UPConfig.json> --output <新profile.json>` 只移firstName/lastName的required；management的planOperationsUserProfile亦只调整同域姓名必填。对当前完整GET /admin/realms/<realm>/users/profile结果规划，再以完整PUT回写，不是Merge Patch；保原profile可回退。26.7.3 permissions.user同时管注册和本人资料，required:{}意味着始终必填，required.scopes/selector.scopes是OIDC scopes而非页面。不能用假scope、管理员专用权限或CSS隐藏替代后台必填修正。
 
