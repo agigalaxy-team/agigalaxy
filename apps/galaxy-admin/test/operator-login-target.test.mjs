@@ -17,6 +17,9 @@ test('management login uses a document redirect and lets React render the naviga
  const react=proxy(new NextRequest(request.url,{headers:{rsc:'1'}}));
  assert.equal(react.headers.get('x-middleware-next'),'1');
  assert.equal(react.headers.has('location'),false);
+ // Next normalizes its RSC headers before invoking the production proxy.
+ const normalized=proxy(new NextRequest(request.url,{headers:{'sec-fetch-dest':'empty','sec-fetch-mode':'cors'}}));
+ assert.equal(normalized.headers.get('x-middleware-next'),'1');
  const signedOut=proxy(new NextRequest('https://admin.example/admin/login?signedOut=1'));
  assert.equal(signedOut.headers.get('x-middleware-next'),'1');
 });
