@@ -26,10 +26,10 @@ function History({domain,label,cards,verified,loading,error,denied,now,renderCar
  const ordered=[...cards].reverse().sort((a,b)=>Number(pending(b,now))-Number(pending(a,now)));
  const visible=filter==='pending'?ordered.filter(card=>pending(card,now)):ordered;
  const selected=visible.find(card=>card.cardId===selectedId)??visible[0];
- useEffect(()=>{history.current[domain]={...history.current[domain],filter,selectedId:selected?.cardId??null};},[history,domain,filter,selected?.cardId]);
- const index=useRef<HTMLDivElement>(null),detail=useRef<HTMLDivElement>(null),selection=useRef(selected?.cardId);
- useLayoutEffect(()=>{const saved=history.current[domain];if(index.current)index.current.scrollTop=saved?.listTop??0;if(detail.current)detail.current.scrollTop=saved?.selectedId===selected?.cardId?saved?.detailTop??0:0;},[domain,history]);
- useLayoutEffect(()=>{if(selection.current===selected?.cardId)return;selection.current=selected?.cardId;if(detail.current)detail.current.scrollTop=0;const saved=history.current[domain];if(saved)history.current[domain]={...saved,detailTop:0};},[selected?.cardId,domain,history]);
+ useEffect(()=>{if(verified)history.current[domain]={...history.current[domain],filter,selectedId:selected?.cardId??null};},[history,domain,filter,selected?.cardId,verified]);
+ const index=useRef<HTMLDivElement>(null),detail=useRef<HTMLDivElement>(null),selection=useRef(selectedId??selected?.cardId),restored=useRef(false);
+ useLayoutEffect(()=>{if(restored.current||!verified||!index.current)return;const saved=history.current[domain];index.current.scrollTop=saved?.listTop??0;if(detail.current)detail.current.scrollTop=saved?.selectedId===selected?.cardId?saved?.detailTop??0:0;restored.current=true;},[domain,history,verified,selected?.cardId]);
+ useLayoutEffect(()=>{if(!verified||selection.current===selected?.cardId)return;selection.current=selected?.cardId;if(detail.current)detail.current.scrollTop=0;const saved=history.current[domain];if(saved)history.current[domain]={...saved,detailTop:0};},[selected?.cardId,domain,history,verified]);
  const remember=(key:'listTop'|'detailTop',top:number)=>{history.current[domain]={...history.current[domain],filter,selectedId:selected?.cardId??null,[key]:top};};
  useEffect(()=>{
   if(!verified)return;
