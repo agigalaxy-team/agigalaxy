@@ -1,3 +1,4 @@
+import {SelectionRail} from '../../shared/navigation/SelectionRail';
 import { labels, categories, states, date, publicWrite, sectionWrite, Body, Links, ForumLink, PostTime, PreviewBody, PermissionDetail, type ForumFocusTarget } from "./presentation";
 import {AccountProfileAvatar} from "../accounts/account-profile-avatar";
 import { ReadingSurface } from "../../shared/reading/reading-details";
@@ -541,7 +542,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   return <section className={'forum-workspace'+(postFeed?' forum-discovery':'')} aria-busy={busy}>
     {privatePage&&!connected&&accountEntry}
     <OfficialAccountLoginNotice search={routeSearch}/>
-    {isFeed&&<><div className="forum-heading"><div><h1 id={fieldId+'-heading'} className="small" style={{overflowWrap:'anywhere'}}>{feedTitle}</h1><p>{feedDescription}</p></div></div><nav className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论',undefined,postFeed,'tabs')}{link('/app/community?section=sections','成员版块',undefined,section==='sections','tabs')}{link('/app/community?section=notifications','回复提醒',undefined,section==='notifications','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</nav></>}
+    {isFeed&&<><div className="forum-heading"><div><h1 id={fieldId+'-heading'} className="small" style={{overflowWrap:'anywhere'}}>{feedTitle}</h1><p>{feedDescription}</p></div></div><SelectionRail active={section+topic} className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论',undefined,postFeed,'tabs')}{link('/app/community?section=sections','成员版块',undefined,section==='sections','tabs')}{link('/app/community?section=notifications','回复提醒',undefined,section==='notifications','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</SelectionRail></>}
     {!isFeed&&link(returnPath,<>返回{returnLabel}</>,'back-link')}
     {!isFeed&&(memberSectionId?!sectionDetail:compose||reportId||replyId||!isAvailable(detail))&&<div className="forum-heading"><h1 className="small">{memberSectionId?'版块详情':compose?editorTitle:reportId?'处理记录详情':replyId?'回复详情':manage?'帖子管理':'帖子详情'}</h1></div>}
     {error && <div ref={actionError} tabIndex={-1} className="message error" role="alert">{error}<Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重试</Button></div>}

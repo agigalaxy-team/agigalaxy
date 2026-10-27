@@ -1,3 +1,4 @@
+import {SelectionRail} from '../../shared/navigation/SelectionRail';
 import {useQuery} from "@tanstack/react-query";
 import {galaxyQueryKey} from "../../shared/runtime/query-client";
 import {forumBodyExcerpt} from './community-forum-browse.mjs';
@@ -90,7 +91,7 @@ export function CommunityExternalWorkspace({runtime,subjectId,navigate,routeSear
  const readings=filterExternalReadings(topic,query,format);
  return <section className="forum-workspace forum-discovery forum-external-workspace">
   <div className="forum-heading"><div><h1 className="small" style={{overflowWrap:'anywhere'}}>{title}</h1><p>{description}</p></div></div>
-  <nav className="forum-tabs" aria-label="社区内容"><ReadingLink target={communityBrowsePath({topic,query})} navigate={navigate}>银河讨论</ReadingLink><ReadingLink target={target()} navigate={navigate} aria-current="page" className="active">外部精选</ReadingLink></nav>
+  <SelectionRail active="external" className="forum-tabs" aria-label="社区内容"><ReadingLink target={communityBrowsePath({topic,query})} navigate={navigate}>银河讨论</ReadingLink><ReadingLink target={target()} navigate={navigate} aria-current="page" className="active">外部精选</ReadingLink></SelectionRail>
   <div className="forum-discovery-layout"><section className="forum-results" aria-label="外部精选内容">
    <div className="forum-feed-toolbar"><span className="forum-order-label">编辑选读</span><nav className="forum-formats" aria-label="精选内容形式">{([['all','全部'],['work','作品'],['method','方法'],['article','文章']] as const).map(([id,label])=><ReadingLink key={id} target={target({format:id})} navigate={navigate} aria-current={format===id?'page':undefined}>{label}</ReadingLink>)}</nav></div>
    <search><form className="forum-search" onSubmit={event=>{event.preventDefault();navigate(target({query:search}));}}><label><span className="forum-search-label">搜索外部精选</span><input type="search" aria-label="搜索外部精选" maxLength={160} value={search} onChange={event=>setSearch(event.target.value)} placeholder={selection?'在'+selection.label+'中搜索':'搜索外部精选的标题与摘要'}/></label><button type="submit"><Search size={16} aria-hidden/><span>搜索</span></button></form></search>

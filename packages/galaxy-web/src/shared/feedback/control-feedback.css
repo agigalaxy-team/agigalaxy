@@ -1,12 +1,17 @@
 /* Presentation only. No layout-changing transitions or business-state timers. */
 :root{--galaxy-motion-fast:140ms;--galaxy-motion-soft:220ms;--galaxy-motion-ease:cubic-bezier(.2,.75,.2,1)}
-:where(.galaxy-site,.galaxy-operations,.galaxy-admin-topbar,.galaxy-admin-sidebar) :where(button,[role=button],input,textarea,select){transition:background-color var(--galaxy-motion-fast) ease,border-color var(--galaxy-motion-fast) ease,color var(--galaxy-motion-fast) ease,box-shadow var(--galaxy-motion-soft) var(--galaxy-motion-ease),opacity var(--galaxy-motion-fast) ease,translate 100ms ease}
-:where(.galaxy-site,.galaxy-operations) :where(button:not(.galaxy-admin-tab):not([role=tab]):not(:disabled):not([aria-disabled=true])):hover{box-shadow:0 2px 7px rgb(35 30 50 / 7%)}
-:where(.galaxy-site,.galaxy-operations,.galaxy-admin-topbar) :where(button:not(.galaxy-admin-tab):not([role=tab]):not(:disabled)):active{translate:0 1px;box-shadow:0 0 0 transparent}
-:where(.galaxy-site,.galaxy-operations) :where(input:not([type=checkbox]):not([type=radio]),textarea,select):hover:not(:disabled):not(:focus){border-color:color-mix(in srgb,var(--admin-muted,var(--g-muted,#667080)) 38%,transparent)}
-:where(.galaxy-site,.galaxy-operations) :where(input:not([type=checkbox]):not([type=radio]),textarea,select):focus-visible{border-color:var(--admin-accent,var(--g-accent,#a64c74));box-shadow:0 0 0 3px color-mix(in srgb,var(--admin-accent,var(--g-accent,#a64c74)) 10%,transparent);outline:2px solid transparent;outline-offset:2px}
-:where(.galaxy-site,.galaxy-operations) :where(input,textarea,select)[aria-invalid=true]{border-color:#ba4363;box-shadow:0 0 0 3px rgb(186 67 99 / 9%)}
-:where(.galaxy-site,.galaxy-operations) :where(button,[role=button]):focus-visible{outline:2px solid var(--admin-accent,var(--g-accent,#a64c74));outline-offset:3px}
-:where(.galaxy-site,.galaxy-operations) :where(button[aria-busy=true]){cursor:progress}
-:where(.galaxy-site,.galaxy-operations) :where(button:disabled,input:disabled,textarea:disabled,select:disabled){cursor:not-allowed}
-@media(prefers-reduced-motion:reduce){:where(.galaxy-site,.galaxy-operations,.galaxy-admin-topbar,.galaxy-admin-sidebar) :where(button,[role=button],input,textarea,select){transition:none;translate:none}}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations,.galaxy-admin-topbar,.galaxy-admin-sidebar) :where(button,[role=button],a,input,textarea,select){transition:background-color var(--galaxy-motion-fast) ease,border-color var(--galaxy-motion-fast) ease,color var(--galaxy-motion-fast) ease,box-shadow var(--galaxy-motion-soft) var(--galaxy-motion-ease),opacity var(--galaxy-motion-fast) ease,translate 100ms ease}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :where(button:not(.galaxy-admin-tab):not([role=tab]):not(:disabled):not([aria-disabled=true])):hover{box-shadow:0 2px 7px rgb(35 30 50 / 7%)}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations,.galaxy-admin-topbar) :where(button:not(.galaxy-admin-tab):not([role=tab]):not(:disabled)):active{translate:0 1px;box-shadow:0 0 0 transparent}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :where(input:not([type=checkbox]):not([type=radio]),textarea,select):hover:not(:disabled):not(:focus){border-color:color-mix(in srgb,var(--admin-muted,var(--g-muted,#667080)) 38%,transparent)}
+:is(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select):focus-visible{border-color:color-mix(in srgb,var(--admin-accent,var(--g-accent,#a64c74)) 65%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--admin-accent,var(--g-accent,#a64c74)) 10%,transparent);outline:2px solid transparent;outline-offset:2px}
+:is(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :is(input,textarea,select)[aria-invalid=true]{border-color:#ba4363;box-shadow:0 0 0 3px rgb(186 67 99 / 9%)}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :where(button,[role=button]):focus-visible{outline:2px solid var(--admin-accent,var(--g-accent,#a64c74));outline-offset:3px}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :where(button[aria-busy=true]){cursor:progress}
+:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :where(button:disabled,input:disabled,textarea:disabled,select:disabled){cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){:where(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations,.galaxy-admin-topbar,.galaxy-admin-sidebar) :where(button,[role=button],a,input,textarea,select){transition:none;translate:none}}
+
+/* Borderless search inputs belong to the surrounding field; keep a single focus boundary. */
+:is(.galaxy-admin-search,.selected-conversation-search,.site-search):focus-within{border-color:color-mix(in srgb,var(--admin-accent,var(--g-accent,#a64c74)) 55%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--admin-accent,var(--g-accent,#a64c74)) 8%,transparent);transition:border-color 140ms ease,box-shadow 220ms ease}
+:is(.galaxy-admin-search,.selected-conversation-search,.site-search) input:focus-visible{outline:none;box-shadow:none}
+@media(forced-colors:active){:is(.galaxy-site,.galaxy-home,.home-shell,.galaxy-operations) :is(input,textarea,select):focus-visible{outline:2px solid Highlight;outline-offset:2px;box-shadow:none}}

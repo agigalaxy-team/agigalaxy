@@ -1,3 +1,4 @@
+import {SelectionRail} from '../../shared/navigation/SelectionRail';
 import React from 'react';
 import {carryHelpOrigin} from "../help-search/help-origin-client.mjs";
 
@@ -8,5 +9,5 @@ export function discoveryTarget(path:Destination,query:string,from=location.path
  return carryHelpOrigin(path+(params.size?'?'+params.toString():''),from);
 }
 export function DiscoveryTabs({path,query,navigate}:{path:Destination;query:string;navigate:(path:string)=>void}){
- return <nav className="discovery-tabs" aria-label="查找范围">{([['/app/find','全部内容'],['/app/search','方法与工具'],['/app/match','同行与项目']] as const).map(([target,label])=><a key={target} href={discoveryTarget(target,query)} aria-current={path===target?'page':undefined} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();if(path!==target)navigate(discoveryTarget(target,query));}}}>{label}</a>)}</nav>;
+ return <SelectionRail active={path} className="discovery-tabs" aria-label="查找范围">{([['/app/find','全部内容'],['/app/search','方法与工具'],['/app/match','同行与项目']] as const).map(([target,label])=><a key={target} href={discoveryTarget(target,query)} aria-current={path===target?'page':undefined} onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();if(path!==target)navigate(discoveryTarget(target,query));}}}>{label}</a>)}</SelectionRail>;
 }

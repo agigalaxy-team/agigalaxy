@@ -34,6 +34,8 @@ npm run dev
 
 前台和 Admin 分别构建。根依赖与 Admin 均锁定相同 Next/React/Query 版本，共享源码在各自运行入口仅解析一份 React。Admin 安装与 `npm run build --prefix apps/galaxy-admin` 保持独立。
 
+网页交互按职责复用：`packages/galaxy-web/src/shared/navigation/` 管选中指示与导航呈现；`shared/feedback/` 管控件、加载、失败和内容动效；`shared/reading/` 管阅读辅助。前台领域目录保留具体表单、私聊定位与业务提交；Admin 组件只做其框架及页面适配，共用实现从上述目录导入。动效不控制请求、权限或业务完成状态，不通过重挂内容播放动画。
+
 ## 公开内容与运行产物
 
 原公开内容由 Python 编译为安全内容树、首页数据及精确资源清单，Next.js 服务器呈现。现行网页不再生成或引导加载一套 HTML；下载与历史文档仍保留原文件。首页作者模板是唯一正文来源，生成 JSON 不手工维护。CMS 发布和网页代码构建分离。

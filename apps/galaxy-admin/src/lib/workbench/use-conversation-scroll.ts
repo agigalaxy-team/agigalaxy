@@ -1,4 +1,5 @@
 'use client';
+import {observeBottomFollow} from '../../../../../packages/galaxy-web/src/shared/reading/bottom-follow';
 import {useCallback,useLayoutEffect,useRef,useState,type RefObject} from 'react';
 
 type Position={top:number;follow:boolean};
@@ -23,9 +24,9 @@ export function useConversationScroll({viewport,content,scope,enabled,positions}
    positions.current[scope]={top:node.scrollTop,follow:follow.current};
   };
   const key=(event:KeyboardEvent)=>{if(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))intent();};
-  const resize=new ResizeObserver(()=>{if(follow.current)bottom();});resize.observe(node);if(content.current)resize.observe(content.current);
+  const stopResize=observeBottomFollow(node,content.current,()=>follow.current,bottom);
   node.addEventListener('wheel',intent,{passive:true});node.addEventListener('touchmove',intent,{passive:true});node.addEventListener('pointerdown',pointer);window.addEventListener('pointerup',release);node.addEventListener('keydown',key);node.addEventListener('scroll',scroll,{passive:true});schedule();
-  return()=>{cancelAnimationFrame(frame.current);resize.disconnect();node.removeEventListener('wheel',intent);node.removeEventListener('touchmove',intent);node.removeEventListener('pointerdown',pointer);window.removeEventListener('pointerup',release);node.removeEventListener('keydown',key);node.removeEventListener('scroll',scroll);};
+  return()=>{cancelAnimationFrame(frame.current);stopResize();node.removeEventListener('wheel',intent);node.removeEventListener('touchmove',intent);node.removeEventListener('pointerdown',pointer);window.removeEventListener('pointerup',release);node.removeEventListener('keydown',key);node.removeEventListener('scroll',scroll);};
  },[scope,enabled,viewport,content,positions,bottom,schedule]);
  useLayoutEffect(()=>{if(enabled&&follow.current)bottom();});
  return {following,jumpToLatest};

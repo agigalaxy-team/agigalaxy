@@ -2,7 +2,8 @@
 
 import type {KeyboardEvent,ReactNode} from 'react';
 import Link from 'next/link';
-import {useTabIndicator} from './use-tab-indicator';
+import {useSelectionIndicator} from '../../../../packages/galaxy-web/src/shared/navigation/use-selection-indicator';
+import '../../../../packages/galaxy-web/src/shared/navigation/selection-rail.css';
 import {useActiveNavigation} from './use-active-navigation';
 import {AdminNavigationPending} from './AdminNavigationMotion';
 import './operations.css';
@@ -12,7 +13,7 @@ export type AdminTabsProps={items:readonly AdminTabItem[];active:string;onChange
 
 export function AdminTabs({items,active,onChange,ariaLabel='页面选项',className}:AdminTabsProps){
   const rail=useActiveNavigation(active);
-  useTabIndicator(rail,active);
+  useSelectionIndicator(rail,active);
   const inPage=!!onChange&&items.every(item=>!item.href);
   function handleKeys(event:KeyboardEvent<HTMLButtonElement>){
     const keys=['ArrowLeft','ArrowRight','Home','End'];
@@ -29,8 +30,8 @@ export function AdminTabs({items,active,onChange,ariaLabel='页面选项',classN
   }
   const first=items.find(item=>!item.disabled)?.id;
   const selected=items.some(item=>item.id===active&&!item.disabled)?active:first;
-  return <nav ref={rail} className={['galaxy-admin-tabs',className].filter(Boolean).join(' ')} aria-label={ariaLabel} role={inPage?'tablist':undefined}>
-    <span className="galaxy-admin-tab-indicator" aria-hidden="true"/>
+  return <nav data-selection-rail ref={rail} className={['galaxy-admin-tabs',className].filter(Boolean).join(' ')} aria-label={ariaLabel} role={inPage?'tablist':undefined}>
+    <span data-selection-marker aria-hidden="true"/>
     {items.map(item=>item.disabled?<span key={item.id} className="galaxy-admin-tab" aria-disabled="true">{item.label}</span>:item.href?<Link key={item.id} className="galaxy-admin-tab" href={item.href} prefetch={false} aria-current={active===item.id?'page':undefined}>{item.label}<AdminNavigationPending/></Link>:<button key={item.id} className="galaxy-admin-tab" type="button" data-tab-id={item.id} role={inPage?'tab':undefined} aria-selected={inPage?active===item.id:undefined} aria-controls={item.panelId} tabIndex={inPage&&selected!==item.id?-1:0} onKeyDown={handleKeys} onClick={()=>onChange?.(item.id)}>{item.label}</button>)}
   </nav>;
 }

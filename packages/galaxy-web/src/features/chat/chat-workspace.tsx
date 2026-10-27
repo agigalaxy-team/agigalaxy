@@ -1,3 +1,4 @@
+import {observeBottomFollow} from '../../shared/reading/bottom-follow';
 import {independentTaskLabel} from "../tasks/materials/task-material-client.mjs";
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -314,13 +315,17 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
     void update();const unsubscribe=(runtime as ChatRuntime&{subscribe?:(fn:(reset?:boolean)=>void)=>()=>void}).subscribe?.(reset=>{if(reset)clearControlled();void update();});
     return()=>{stopped=true;unsubscribe?.();epoch.current++;};
   },[runtime,connected,roomId,filter,after,locatedMessage,readRefresh,replyLocator?.messageId,editDraft?.messageId,draft.other?.reply?.messageId,draft.other?.edit?.messageId,draft.ready]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const box = historyBox.current; if (!box||loading||!messages.length) return;
     if(restorePosition.current){const position=restorePosition.current,item=position.anchor?document.getElementById('chat-message-'+position.anchor.messageId):null;box.scrollTop=item&&position.anchor?box.scrollTop+item.getBoundingClientRect().top-box.getBoundingClientRect().top-position.anchor.offset:position.top;restorePosition.current=null;locateOnce.current=false;firstRead.current=false;scrollEnd.current=box.scrollHeight-box.scrollTop-box.clientHeight<90;}
     else if (prepend.current) { box.scrollTop = prepend.current.top + box.scrollHeight - prepend.current.height; prepend.current = null; }
     else if (locatedMessage&&locateOnce.current) {const target=document.getElementById('chat-message-' + locatedMessage);if(target){box.scrollTop+=target.getBoundingClientRect().top-box.getBoundingClientRect().top-box.clientHeight/2+Math.min(target.clientHeight,box.clientHeight)/2;locateOnce.current=false;firstRead.current=false;scrollEnd.current=false;}}
     else if (!filter && (firstRead.current || scrollEnd.current)) { box.scrollTop = box.scrollHeight; firstRead.current = false; }
   }, [messages, locatedMessage, filter,loading]);
+  useEffect(()=>{
+    const box=historyBox.current;if(!box||!roomId||filter||locatedMessage||loading)return;
+    return observeBottomFollow(box,null,()=>scrollEnd.current&&!prepend.current&&!restorePosition.current&&!firstRead.current,()=>{box.scrollTop=box.scrollHeight;});
+  },[roomId,filter,locatedMessage,loading]);
   useEffect(() => {
     if (!room || panel || action || document.hidden || !historyBox.current) return;
     let timer: ReturnType<typeof setTimeout> | undefined;

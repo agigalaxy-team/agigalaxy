@@ -3,6 +3,7 @@
 import {useEffect,useLayoutEffect,useRef} from 'react';
 import {usePathname,useSearchParams} from 'next/navigation';
 import {useLinkStatus} from 'next/link';
+import {animateContent} from '../../../../packages/galaxy-web/src/shared/feedback/content-motion';
 
 const reduceMotion='(prefers-reduced-motion: reduce)';
 // Payload can remount Navigation during a soft page transition. Retain only
@@ -20,17 +21,12 @@ function visibleContent(root:HTMLElement):HTMLElement[]{
  }
  return result;
 }
-function motionOptions():KeyframeAnimationOptions{
- const style=getComputedStyle(document.documentElement),token=style.getPropertyValue('--admin-motion-content-duration').trim(),value=Number.parseFloat(token);
- return {duration:Number.isFinite(value)?value*(token.endsWith('ms')?1:1000):180,easing:style.getPropertyValue('--admin-motion-content-easing').trim()||'cubic-bezier(.2,.8,.2,1)'};
-}
-
 /** Observe committed App Router state. Never wrap, remount, hide or gate business content. */
 export function AdminNavigationMotion(){
  const pathname=usePathname(),search=useSearchParams();
  const key=[pathname,search.get('tab')??'',search.get('view')??''].join('|');
- const animations=useRef<Animation[]>([]);
- const cancel=()=>{for(const animation of animations.current)animation.cancel();animations.current=[];};
+ const animations=useRef<(()=>void)[]>([]);
+ const cancel=()=>{for(const animation of animations.current)animation();animations.current=[];};
  useEffect(()=>{
   const media=window.matchMedia(reduceMotion),change=()=>{if(media.matches)cancel();};
   media.addEventListener('change',change);return()=>{media.removeEventListener('change',change);cancel();};
@@ -40,13 +36,7 @@ export function AdminNavigationMotion(){
   if(old===undefined||old===key||window.matchMedia(reduceMotion).matches)return;
   const root=document.getElementById('galaxy-admin-main')??document.querySelector<HTMLElement>('.template-default__wrap');
   if(!root)return;
-  const options=motionOptions();
-  for(const element of visibleContent(root)){
-   if(typeof element.animate!=='function')continue;
-   // Composited transform adds to any existing presentation; no inline state survives.
-   const opacity=Number.parseFloat(getComputedStyle(element).opacity)||1;
-   animations.current.push(element.animate([{opacity:opacity*.9},{opacity}],options),element.animate([{transform:'translateY(5px)'},{transform:'translateY(0px)'}],{...options,composite:'add'}));
-  }
+  for(const element of visibleContent(root)){const stop=animateContent(element);if(stop)animations.current.push(stop);}
   return cancel;
  },[key]);
  return null;

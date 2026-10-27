@@ -1,3 +1,4 @@
+import {SelectionRail} from '../navigation/SelectionRail';
 import React,{createContext,useContext,useEffect,useState} from 'react';
 import { Bell, MessageCircle, UserRound } from 'lucide-react';
 import type {createWebRuntime} from "../../runtime.mjs";
@@ -71,10 +72,10 @@ export function MemberLink({subjectId,name,ownId,navigate,avatar=false}: {subjec
 }
 
 export function MessageNavigation({ active, navigate }: { active: 'rooms' | 'notifications'; navigate: (path: string) => void }) {
-  return <nav className="message-navigation" aria-label="消息分类">
+  return <SelectionRail active={active} className="message-navigation" aria-label="消息分类">
     <a href="/app/community?section=notifications" onClick={event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate('/app/community?section=notifications');}}}><MessageCircle size={17}/>社区回复</a>
     {([['rooms', '对话', MessageCircle], ['notifications', '通知', Bell]] as const).map(([id, label, Icon]) => <a key={id} href={'/app/' + id} aria-current={active === id ? 'page' : undefined} onClick={event => { if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return; event.preventDefault(); navigate('/app/' + id); }}><Icon size={17} />{label}</a>)}
-  </nav>;
+  </SelectionRail>;
 }
 
 export function readableTime(value?: string | number) {
