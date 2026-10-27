@@ -16,7 +16,7 @@ const atomic=async(path,bytes)=>{const temporary=path+'.release-'+crypto.randomU
 export async function createServiceReleaseHost({configuration,operationId,from,to,run=command,fetch=globalThis.fetch}){
  const {files,units,migrationUnit,stateDirectory,readyUrl}=configuration;
  if(!/^[0-9a-f-]{36}$/i.test(operationId)||!isAbsolute(stateDirectory)||!Array.isArray(files)||files.length<1||files.length>20||!Array.isArray(units)||units.length!==3
-  ||new Set(units).size!==3||[...units,migrationUnit].some(unit=>!/^[a-zA-Z0-9._-]+\.service$/.test(unit)))throw Error('Explicit service family configuration required.');
+  ||new Set(units).size!==3||[...units,migrationUnit].some(unit=>!/^[a-zA-Z0-9._@-]+\.service$/.test(unit)))throw Error('Explicit service family configuration required.');
  const url=new URL(readyUrl);if(!['http:','https:'].includes(url.protocol)||!['127.0.0.1','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash||url.pathname!=='/readyz')throw Error('Loopback readiness URL required.');
  for(const file of files)if(!isAbsolute(file.destination)||!isAbsolute(file.targetSource)||file.destination===file.targetSource)throw Error('Explicit protected source/destination files required.');
  if(new Set(files.map(file=>resolve(file.destination))).size!==files.length)throw Error('Duplicate protected file target.');

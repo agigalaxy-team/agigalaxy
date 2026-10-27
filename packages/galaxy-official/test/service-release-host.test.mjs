@@ -15,7 +15,7 @@ test('host adapter snapshots and restores exact environment/unit bytes and verif
   await writeFile(env,oldEnv);await writeFile(unit,oldUnit);await writeFile(nextEnv,'GALAXY_RELEASE_DIRECTORY=/synthetic/new\n');await writeFile(nextUnit,'[Service]\nExecStart=/synthetic/new\n');
   const operationId=randomUUID(),from={releaseId:'fixture-old'},to={releaseId:'fixture-new'};
   const adapter=await createServiceReleaseHost({configuration:{files:[{destination:env,targetSource:nextEnv},{destination:unit,targetSource:nextUnit}],
-   units:['fixture-api.service','fixture-worker.service','fixture-publisher.service'],migrationUnit:'fixture-migration.service',stateDirectory:join(directory,'protected'),readyUrl:'http://127.0.0.1:1/readyz'},operationId,from,to,
+   units:['fixture-api@pilot.service','fixture-worker@pilot.service','fixture-publisher.service'],migrationUnit:'fixture-migration@pilot.service',stateDirectory:join(directory,'protected'),readyUrl:'http://127.0.0.1:1/readyz'},operationId,from,to,
    run:async args=>{commands.push(args);return args[0]==='show'?'inactive':'';},
    fetch:async()=>new Response(JSON.stringify({status:'ready'}),{headers:{'x-galaxy-release':(await readFile(env,'utf8')).includes('/old')?from.releaseId:to.releaseId}})});
   const reference=await adapter.host.snapshot();await adapter.host.stopAll();await adapter.host.applyTarget();await adapter.host.startTarget();await adapter.host.verifyTarget();
@@ -26,5 +26,6 @@ test('host adapter snapshots and restores exact environment/unit bytes and verif
   await adapter.journal.write({operationId,state:'result-unknown',snapshotReference:reference});
   assert.deepEqual(await adapter.journal.read(operationId),{operationId,state:'result-unknown',snapshotReference:reference});
   assert.equal(commands.filter(args=>args[0]==='stop').length,2);
+  assert.deepEqual(commands.find(args=>args[0]==='start'),['start','fixture-api@pilot.service','fixture-worker@pilot.service','fixture-publisher.service']);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
