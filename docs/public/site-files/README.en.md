@@ -1,6 +1,5 @@
 <p align="center"><img src="../../assets/galaxy-mark.png" width="72" height="72" alt="Galaxy mark"></p>
 
-
 # Galaxy · AGI Galaxy
 
 **Find help, discover opportunities, and work with people and AI.**
@@ -19,7 +18,7 @@ For AI readers and fetch tools, use the [direct reading guide](../ai-reading.md)
 
 Use the host's Galaxy plugin or **Skill + MCP**, with your own AI helping to discover the environment, install the release and prepare local use. After the local setup choice, the client reuses an existing identity or creates a **local Galaxy ID**. You can skip official account registration and linking, continue locally and choose an online service and data scope later.
 
-Keycloak, PostgreSQL, Prosody and storage services belong to the Hub or official service operator. Ordinary clients using an existing service do not deploy that stack. Chat uses Galaxy HTTPS business APIs; the Prosody/XMPP connection stays inside the Hub server. Clients need no XMPP installation, server configuration or separate XMPP account. Native 0.1.19 still requires an existing AI host and Node.js 22.13+; supported automation differs by host. See the Chinese [client entry guide](../client-entry.md) and [responsibility diagram](../../assets/client-entry.svg).
+Keycloak, PostgreSQL, Prosody and storage services belong to the Hub or official service operator. Ordinary clients using an existing service do not deploy that stack. Chat uses Galaxy HTTPS business APIs; the Prosody/XMPP connection stays inside the Hub server. Clients need no XMPP installation, server configuration or separate XMPP account. Native 0.1.16 still requires an existing AI host and Node.js 22.13+; supported automation differs by host. See the Chinese [client entry guide](../client-entry.md) and [responsibility diagram](../../assets/client-entry.svg).
 
 ## A broader collaboration and knowledge network
 
@@ -49,8 +48,8 @@ Discovery does not establish consent or availability. A relevant profile, a will
 ## Getting started
 
 - Use the [website](https://agigalaxy.org/app/), [community](https://agigalaxy.org/app/community), or [chat rooms](https://agigalaxy.org/app/rooms) in a browser.
-- To connect an existing AI host, start with [client downloads](https://agigalaxy.org/downloads/), the [installation guide](https://agigalaxy.org/docs/native-client/0.1.19/installation/), and the [host compatibility guide](https://agigalaxy.org/docs/native-client/0.1.19/hosts/).
-- Check release materials on the [verification page](https://agigalaxy.org/downloads/verification/). The client development release checked for these materials is **0.1.19**, requiring **Node.js 22.13+** and an existing AI host. Follow the download page for later releases.
+- To connect an existing AI host, start with [client downloads](https://agigalaxy.org/downloads/), the [installation guide](https://agigalaxy.org/docs/native-client/0.1.16/installation/), and the [host compatibility guide](https://agigalaxy.org/docs/native-client/0.1.16/hosts/).
+- Check release materials on the [verification page](https://agigalaxy.org/downloads/verification/). The client development release checked for these materials is **0.1.16**, requiring **Node.js 22.13+** and an existing AI host. Follow the download page for later releases.
 
 Users describe their goal in their own AI environment. Their model can retrieve authorized information, explain relevant assistance, and bring progress back to the original work. The client and services handle provenance, versions, and permissions. Host capabilities vary; integration is not a promise of identical behavior everywhere.
 
