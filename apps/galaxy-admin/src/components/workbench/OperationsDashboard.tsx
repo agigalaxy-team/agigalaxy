@@ -17,7 +17,7 @@ import {WorkbenchInteractionProvider} from './WorkbenchInteraction';
 export type {OperationsSummary} from "../../lib/analytics/admin-analytics-types";
 
 export function OperationsDashboard({initial,initialError}:{initial:OperationsSummary|null;initialError:string}){
-  const page=useOperationsRead<OperationsSummary>({path:'/v1/operations/summary?publicActivity=deferred',initial,initialError,failureMessage:'工作台数据暂时无法取得。',clearOnOffline:true});
+  const page=useOperationsRead<OperationsSummary>({path:'/v1/operations/summary?publicActivity=deferred',initial,initialError,failureMessage:'工作台数据暂时无法取得。',clearOnOffline:true,retryUnavailable:true});
   const [communicationFocused,setCommunicationFocused]=useState(false);
   const [refreshKey,setRefreshKey]=useState(0);
   // A missing business snapshot is not a change of management identity.

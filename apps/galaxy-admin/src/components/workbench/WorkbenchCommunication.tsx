@@ -50,7 +50,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const input=useRef<HTMLTextAreaElement>(null),panelId=useId(),inputId=useId();
   const conversationElement=useRef<HTMLDivElement>(null),conversationContent=useRef<HTMLDivElement>(null),scrollPositions=useRef(memory.current.positions);
   const storageKey=operatorId?'galaxy:operations:workbench:drafts:v1:'+operatorId:null;
-  const session=useOperationsRead<AgentOsSession>({path:operatorId?'/v1/operations/session':null,failureMessage:'当前管理登录暂时无法核对。',clearOnOffline:true});
+  const session=useOperationsRead<AgentOsSession>({path:operatorId?'/v1/operations/session':null,failureMessage:'当前管理登录暂时无法核对。',clearOnOffline:true,retryUnavailable:true});
   const checkedSession=session.verified?session.value:null;
   const identityEnded=!!checkedSession&&(checkedSession.state==='signed-out'||checkedSession.operator.id!==operatorId);
   const verifiedSession=!signedOut&&checkedSession?.state==='signed-in'&&checkedSession.operator.id===operatorId?checkedSession:null;
