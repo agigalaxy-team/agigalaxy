@@ -1,0 +1,57 @@
+/* Processing records: one owner for all three tabs and the master/detail layout. */
+.galaxy-workbench .wb-operation-log{container-type:inline-size;container-name:workbench-records;font-family:var(--font-body,Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif);--wb-record-muted:#65718b}
+.galaxy-workbench .wb-operation-log>.wb-section-heading{min-height:24px;flex:none}
+.galaxy-workbench .wb-operation-log>.wb-section-heading h2{font-size:15px;font-weight:650;letter-spacing:.005em}
+.galaxy-workbench .wb-log-tabs{margin:9px 0 0;flex:none;gap:18px}
+.galaxy-workbench .wb-log-tabs .galaxy-admin-tab{font-size:13px;font-weight:550;min-height:38px;padding-block:8px}
+.galaxy-workbench :is(.wb-actions-pane,.wb-record-panel){display:flex;flex-direction:column;flex:1;min-height:0;margin-top:10px}
+.galaxy-workbench :is(.wb-actions-pane,.wb-record-panel)[hidden]{display:none}
+.galaxy-workbench .wb-actions-mount{display:flex;flex-direction:column;min-height:0;flex:1}
+.galaxy-workbench .wb-action-history{display:flex;flex-direction:column;min-height:0;flex:1;gap:10px}
+.galaxy-workbench :is(.wb-actions-toolbar,.wb-record-caption){display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;min-height:32px;font-size:12px;color:var(--wb-record-muted)}
+.galaxy-workbench .wb-actions-domain{display:inline-flex;align-items:center;gap:6px;font-size:12px;min-width:0}
+.galaxy-workbench .wb-actions-toolbar>div{display:inline-flex;gap:3px;padding:3px;background:#f4f6fa;border-radius:8px;flex:none}
+.galaxy-workbench .wb-actions-toolbar button{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 8px;border:0;border-radius:6px;background:transparent;font-size:12px;color:var(--wb-record-muted)}
+.galaxy-workbench .wb-actions-toolbar button[aria-pressed=true]{background:#fff;color:var(--admin-text,#253047);box-shadow:0 1px 3px #24334b12}
+.galaxy-workbench .wb-actions-toolbar button span{font-size:11px;font-variant-numeric:tabular-nums}
+.galaxy-workbench .wb-action-workspace{display:flex;flex-direction:column;gap:12px;flex:1;min-width:0;min-height:0}
+.galaxy-workbench :is(.wb-action-index,.wb-action-detail,.wb-operation-log-scroll){min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bdc6d6 #eef1f6;scrollbar-gutter:stable}
+.galaxy-workbench .wb-action-index{display:flex;flex-direction:column;flex:1;min-height:60px;overflow-x:hidden;border:1px solid var(--wb-border);border-radius:9px;background:#fcfdff}
+.galaxy-workbench .wb-action-index-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:start;gap:8px;width:100%;min-width:0;flex:none;text-align:left;border:0;border-bottom:1px solid #edf0f5;background:transparent;padding:11px;color:inherit;box-shadow:inset 2px 0 transparent;transition:background-color 160ms ease,box-shadow 160ms ease}
+.galaxy-workbench .wb-action-index-row:last-child{border-bottom:0}
+.galaxy-workbench .wb-action-index-row:hover{background:#f5f7fb}
+.galaxy-workbench .wb-action-index-row.is-selected{background:var(--wb-soft);box-shadow:inset 2px 0 var(--wb-accent)}
+.galaxy-workbench .wb-action-index-icon{display:grid;place-items:center;width:28px;height:28px;flex:none;border:1px solid var(--wb-border);border-radius:8px;color:#6c7c98;background:#fff}
+.galaxy-workbench .is-selected .wb-action-index-icon{color:var(--wb-accent);border-color:#edcfdb}
+.galaxy-workbench .wb-action-index-title{display:flex;flex-direction:column;gap:4px;min-width:0}
+.galaxy-workbench .wb-action-index-title strong{font-size:13px;font-weight:600;line-height:1.55;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.galaxy-workbench .wb-action-index-title>span{font-size:12px;line-height:1.55;color:var(--wb-record-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.galaxy-workbench .wb-action-index-state{color:var(--wb-record-muted);font-size:11px;line-height:1.6;white-space:nowrap;padding:2px 5px;border-radius:5px;background:#fff;border:1px solid var(--wb-border);font-weight:450}
+.galaxy-workbench .wb-action-index-state.is-pending{color:#a23f64;border-color:#f0d5df;background:#fff9fb}
+.galaxy-workbench .wb-action-detail{flex:0 1 auto;max-height:44%;min-height:80px;border-top:1px solid var(--wb-border);padding-top:12px}
+.galaxy-workbench .wb-action-detail .wb-action-cards{margin:0}
+.galaxy-workbench .wb-action-detail .wb-action-card{background:transparent;border:0;border-radius:0;padding:0 2px;font-size:13px;line-height:1.7}
+.galaxy-workbench .wb-action-detail .wb-action-card h3{font-size:14px;font-weight:600;line-height:1.6}
+.galaxy-workbench .wb-action-detail .wb-action-card header{gap:7px}
+.galaxy-workbench .wb-action-detail .wb-action-impact{padding-left:18px;color:var(--wb-record-muted);font-size:12px;line-height:1.75}
+.galaxy-workbench .wb-action-detail .wb-action-basis{font-size:12px;border-color:var(--wb-border)}
+.galaxy-workbench .wb-action-detail .wb-action-buttons{flex-wrap:wrap}
+.galaxy-workbench .wb-record-caption{padding:0 2px 7px}
+.galaxy-workbench .wb-record-caption>span:last-child{font-size:11px;font-variant-numeric:tabular-nums}
+.galaxy-workbench .wb-operation-log-scroll{flex:1}
+.galaxy-workbench .wb-record-list{list-style:none;padding:0;margin:0}
+.galaxy-workbench .wb-record-list li{border-bottom:1px solid #edf0f5}
+.galaxy-workbench .wb-record-list li:last-child{border-bottom:0}
+.galaxy-workbench .wb-record-link{display:flex;align-items:flex-start;gap:9px;padding:12px 5px;border-radius:7px;transition:background-color 160ms ease}
+.galaxy-workbench .wb-record-link:hover{background:#f5f7fb;color:inherit}
+.galaxy-workbench .wb-record-icon{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:8px;background:#f4f6fa;color:#6e7f9d}
+.galaxy-workbench .wb-record-content{flex:1;min-width:0}
+.galaxy-workbench .wb-record-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:9px}
+.galaxy-workbench .wb-record-heading strong{font-size:13px;font-weight:600;line-height:1.6;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.galaxy-workbench .wb-record-state{flex:none;font-size:11px;color:var(--wb-record-muted);white-space:nowrap;line-height:1.6;padding:2px 5px;border:1px solid var(--wb-border);border-radius:5px;background:#fafbfd}
+.galaxy-workbench .wb-record-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;font-size:12px;line-height:1.6;color:var(--wb-record-muted);margin-top:5px}
+.galaxy-workbench .wb-record-meta time{font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.galaxy-workbench .wb-actions-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;min-height:65px;padding:16px;color:var(--wb-record-muted);font-size:13px;line-height:1.6;text-align:center}
+.galaxy-workbench .wb-actions-empty>svg{color:#a0adc2}
+@container workbench-records (min-width:520px){.galaxy-workbench .wb-action-workspace{display:grid;grid-template-columns:minmax(230px,.95fr) minmax(0,1.05fr);grid-template-rows:minmax(0,1fr);gap:16px}.galaxy-workbench .wb-action-detail{max-height:none;min-height:0;border-top:0;border-left:1px solid var(--wb-border);padding-top:0;padding-left:15px}}
+@media(prefers-reduced-motion:reduce){.galaxy-workbench :is(.wb-action-index-row,.wb-record-link){transition:none}}
