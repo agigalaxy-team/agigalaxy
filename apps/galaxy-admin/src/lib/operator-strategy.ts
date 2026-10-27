@@ -4,7 +4,7 @@ import {operatorBusinessAuthorization,operatorSync,type OperatorUser,type Operat
 
 // The mapping is a CMS identity projection. Authority comes from the live BFF
 // session on every request, never from a stored role or a Payload password.
-async function projection(payload:Payload,operator:{id:string;displayName:string;role:'administrator'|'reader';businessAuthorization?:OperatorBusinessAuthorization}){
+export async function projectOperatorPrincipal(payload:Payload,operator:{id:string;displayName:string;role:'administrator'|'reader';businessAuthorization?:OperatorBusinessAuthorization}){
   const principal:OperatorUser={id:operator.id,collection:'operators',externalId:operator.id,displayName:operator.displayName,role:operator.role,verifiedOperator:true,businessAuthorization:operatorBusinessAuthorization(operator)};
   const find=()=>payload.find({collection:'operators',where:{externalId:{equals:operator.id}},limit:1,depth:0,overrideAccess:false,user:principal});
   let document=(await find()).docs[0];
@@ -24,6 +24,6 @@ export const operatorStrategy:AuthStrategy={
     if(session.state!=='signed-in')return {user:null};
     // Payload's me endpoint reloads stored fields, then preserves _strategy.
     // Keep the real authentication provenance across that public projection.
-    return {user:{...await projection(payload,session.operator),_strategy:operatorStrategyName}};
+    return {user:{...await projectOperatorPrincipal(payload,session.operator),_strategy:operatorStrategyName}};
   },
 };

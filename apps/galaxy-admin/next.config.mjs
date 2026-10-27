@@ -10,6 +10,7 @@ const sharedContractZodEntry='./node_modules/zod/index.js';
 
 export default withPayload({
   output:'standalone',
+  deploymentId:process.env.GALAXY_WEB_DEPLOYMENT_ID,
   outputFileTracingRoot:repositoryRoot,
   turbopack:{root:repositoryRoot,rules:payloadUiClient.turbopackRules,resolveAlias:{zod:sharedContractZodEntry}},
   webpack(config){

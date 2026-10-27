@@ -55,8 +55,28 @@ export function officialRoutes({ endpoint, apiPort }) {
   ];
 }
 
-// The dynamic website owns only this exact host and loopback service.
-export function websiteRoutes({origin,port}){
- const url=new URL(origin);if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||url.port||!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid website proxy configuration');
- return [{match:[{host:[url.hostname]}],handle:[{handler:'reverse_proxy',upstreams:[{dial:'127.0.0.1:'+port}]}],terminal:true}];
+// The website/Admin caller owns only this exact host and configured loopback
+// ports. A request header can select a retained deployment, never an upstream.
+export function websiteRoutes({origin,port,deploymentId,previous}){
+ const url=new URL(origin),validPort=value=>Number.isInteger(value)&&value>=1024&&value<=65535;
+ const validId=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
+ if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||url.port
+  ||!/^[a-z0-9.-]+$/.test(url.hostname)||!validPort(port)
+  ||deploymentId!==undefined&&!validId(deploymentId))throw Error('Invalid website proxy configuration');
+ const route=(match,targetPort)=>({match,handle:[{handler:'reverse_proxy',upstreams:[{dial:'127.0.0.1:'+targetPort}]}],terminal:true});
+ const current=route([{host:[url.hostname]}],port);
+ if(previous===undefined)return[current];
+ if(!validId(deploymentId)||!previous||typeof previous!=='object'||Array.isArray(previous)
+  ||Object.keys(previous).some(key=>!['port','deploymentId'].includes(key))
+  ||!validPort(previous.port)||previous.port===port
+  ||previous.deploymentId!==null&&!validId(previous.deploymentId)||previous.deploymentId===deploymentId)
+  throw Error('Invalid retained website deployment');
+ // Caddy's native header matcher represents an absent header with null. The
+ // first no-ID upgrade retains RSC or a nonempty Server Action protocol header;
+ // new documents and ordinary API requests still use current.
+ const retained=previous.deploymentId===null?[
+  {host:[url.hostname],header:{Rsc:['1'],'X-Deployment-Id':null}},
+  {host:[url.hostname],header:{'X-Deployment-Id':null},header_regexp:{'Next-Action':{pattern:'.+'}}},
+ ]:[{host:[url.hostname],header:{'X-Deployment-Id':[previous.deploymentId]}}];
+ return[route(retained,previous.port),current];
 }

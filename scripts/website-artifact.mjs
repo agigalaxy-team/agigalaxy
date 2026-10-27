@@ -17,6 +17,8 @@ export async function packWebsiteRuntime({root,artifact,content,previousRuntime}
  const app=path.join(artifact,'apps/galaxy-site'),target=path.join(app,'.next/static');
  mkdirSync(path.dirname(target),{recursive:true});await cp(path.join(built,'static'),target,{recursive:true});
  const current=files(target);
+ const required=path.join(built,'required-server-files.json');
+ const deploymentId=existsSync(required)?JSON.parse(readFileSync(required,'utf8')).config?.deploymentId??null:null;
  if(previousRuntime){
   const source=path.join(previousRuntime,'apps/galaxy-site/.next/static');
   const previous=JSON.parse(readFileSync(path.join(previousRuntime,'public-build-assets.json'),'utf8'));
@@ -30,6 +32,6 @@ export async function packWebsiteRuntime({root,artifact,content,previousRuntime}
  }
  if(existsSync(path.join(root,'apps/galaxy-site/public')))await cp(path.join(root,'apps/galaxy-site/public'),path.join(app,'public'),{recursive:true});
  await cp(content,path.join(artifact,'content'),{recursive:true});
- writeFileSync(path.join(artifact,'public-build-assets.json'),JSON.stringify({version:1,files:current})+'\n');
+ writeFileSync(path.join(artifact,'public-build-assets.json'),JSON.stringify({version:1,deploymentId,files:current})+'\n');
  writeFileSync(path.join(artifact,'start.mjs'),`import {fileURLToPath} from 'node:url';\nprocess.env.GALAXY_SITE_BASELINE_ROOT??=fileURLToPath(new URL('./content/',import.meta.url));\nprocess.env.GALAXY_SITE_PUBLIC_ROOT??=process.env.GALAXY_SITE_BASELINE_ROOT;\nawait import('./apps/galaxy-site/server.js');\n`);
 }

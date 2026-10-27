@@ -7,5 +7,5 @@ export function RetainedPageSlot<T>({route,value,children,isProtected,leave,rest
  const latest=useRef({leave,onCommit,accepted});latest.current={leave,onCommit,accepted};
  useLayoutEffect(()=>{if(!held){if(latest.current.accepted!==null)setAccepted(null);latest.current.onCommit?.();return;}let active=true;latest.current.leave(()=>{if(active)setAccepted(route);});return()=>{active=false;};},[held,route]);
  if(held)return <>{wrap(previous.current.children,previous.current.value,value)}<aside className="message"><p><output>正在保存原页输入。保存完成后继续打开目标页面。</output></p><button onClick={()=>latest.current.leave(()=>setAccepted(route))}>保存并继续</button><button onClick={()=>restore(previous.current.route)}>返回原页继续编辑</button></aside></>;
- previous.current={route,children,value};return <>{children}</>;
+ previous.current={route,children,value};return <>{wrap(children,value,value)}</>;
 }

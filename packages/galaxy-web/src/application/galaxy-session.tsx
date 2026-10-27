@@ -362,18 +362,33 @@ const NavigationContext=createContext<GalaxyNavigation|null>(null);
 type Session=ReturnType<typeof useSessionState>;
 const SessionContext=createContext<Session|null>(null);
 export function useGalaxySession(){const value=useContext(SessionContext);if(!value)throw Error("GalaxySessionProvider is required");return value;}
-function RuntimeSession({children}:{children:React.ReactNode}){const session=useSessionState();return <AccountSessionScope endpoint={session.endpoint}><SessionContext.Provider value={session}><RetainedRouteSlot>{children}</RetainedRouteSlot></SessionContext.Provider></AccountSessionScope>;}
-function BrowserSession({children}:{children:React.ReactNode}){const [queryClient]=useState(createGalaxyQueryClient);return <QueryClientProvider client={queryClient}><RuntimeSession>{children}</RuntimeSession></QueryClientProvider>;}
-export function GalaxySessionProvider({children,navigation}:{children:React.ReactNode;navigation:GalaxyNavigation}){const [ready,setReady]=useState(false);useEffect(()=>setReady(true),[]);return ready?<NavigationContext.Provider value={navigation}><BrowserSession>{children}</BrowserSession></NavigationContext.Provider>:<>{children}</>;}
+/** Mount browser authority without replacing the already-rendered page subtree. */
+const RuntimeSession=React.memo(function RuntimeSession({publish}:{publish:(session:Session)=>void}){
+ const session=useSessionState();
+ useLayoutEffect(()=>publish(session),[publish,session]);
+ return null;
+});
+function BrowserSession({children,ready}:{children:React.ReactNode;ready:boolean}){
+ const [queryClient]=useState(createGalaxyQueryClient),[session,setSession]=useState<Session|null>(null);
+ return <QueryClientProvider client={queryClient}><AccountSessionScope endpoint={session?.endpoint}><SessionContext.Provider value={session}>
+  {ready&&<RuntimeSession publish={setSession}/>}
+  <RetainedRouteSlot>{children}</RetainedRouteSlot>
+ </SessionContext.Provider></AccountSessionScope></QueryClientProvider>;
+}
+export function GalaxySessionProvider({children,navigation}:{children:React.ReactNode;navigation:GalaxyNavigation}){
+ const [ready,setReady]=useState(false);useEffect(()=>setReady(true),[]);
+ return <NavigationContext.Provider value={navigation}><BrowserSession ready={ready}>{children}</BrowserSession></NavigationContext.Provider>;
+}
 
 export function useOptionalGalaxySession(){return useContext(SessionContext);}
 
 function RetainedRouteSlot({children}:{children:React.ReactNode}){
- const session=useGalaxySession(),navigation=useContext(NavigationContext)!;
- return <RetainedPageSlot route={session.path+session.routeSearch} value={session}
-  isProtected={origin=>!!session.selectHistoryLeave(origin)}
-  leave={complete=>{if(!session.draftHistory.current?.leave(complete,true))complete();}}
+ const session=useOptionalGalaxySession(),navigation=useContext(NavigationContext)!;
+ const search=new URLSearchParams(navigation.search).toString(),route=navigation.pathname+(search?'?'+search:'');
+ return <RetainedPageSlot route={route} value={session}
+  isProtected={origin=>!!session?.selectHistoryLeave(origin)}
+  leave={complete=>{if(!session?.draftHistory.current?.leave(complete,true))complete();}}
   restore={origin=>navigation.replace(origin,{scroll:false})}
-  onCommit={()=>{session.acceptHistoryLocation();session.draftHistory.current?.changed();}}
-  wrap={(children,previous,current)=><SessionContext.Provider value={{...previous,runtime:current.runtime,status:current.status,historySavePending:current.historySavePending,error:current.error}}>{children}</SessionContext.Provider>}>{children}</RetainedPageSlot>;
+  onCommit={()=>{session?.acceptHistoryLocation();session?.draftHistory.current?.changed();}}
+  wrap={(children,previous,current)=><SessionContext.Provider value={previous&&current?{...previous,runtime:current.runtime,status:current.status,historySavePending:current.historySavePending,error:current.error}:current}>{children}</SessionContext.Provider>}>{children}</RetainedPageSlot>;
 }

@@ -14,13 +14,21 @@ async function observedRead(fetcher,url,options,headers,stage){
 
 const eventCursorState=cache(()=>{/** @type {{value:string|null}} */const state={value:null};return state;});
 export const operationsEventCursor=()=>eventCursorState().value;
+// React cache owns this map only for the current RSC request. API calls get no
+// cross-request user cache; failed reads are never replaced with an old principal.
+const sessionRequestReads=cache(()=>new Map());
 const failure=(code,status=503)=>Object.assign(Error(code),{code,status});
 /** @typedef {{version:string,permissions:string[]}} BusinessAuthorization */
 /** @typedef {{state:'signed-out'}|{state:'signed-in',operator:{id:string,displayName:string,role:'administrator'|'reader',businessAuthorization?:BusinessAuthorization},csrfToken:string,expiresAt:number}} OperatorSession */
 /** @returns {Promise<OperatorSession>} */
 export async function readOperatorSession(headers,{fetcher=fetch,environment=adminEnvironment()}={}){
   const cookie=operatorCookies(headers,environment.fixtureCookies);if(!cookie)return {state:'signed-out'};
-  const response=await observedRead(fetcher,environment.bffOrigin+'/v1/operations/session',{headers:{Cookie:cookie,Origin:environment.publicOrigin,'X-Forwarded-For':operatorForwardedAddress(headers,environment.fixtureCookies)},redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(10000)},headers,'session');
+  const forwarded=operatorForwardedAddress(headers,environment.fixtureCookies),reads=sessionRequestReads();
+  let entries=reads.get(fetcher);if(!entries){entries=new Map();reads.set(fetcher,entries);}
+  const key=JSON.stringify([cookie,forwarded,environment.publicOrigin,environment.bffOrigin]);
+  if(entries.has(key))return entries.get(key);
+  const pending=(async()=>{
+  const response=await observedRead(fetcher,environment.bffOrigin+'/v1/operations/session',{headers:{Cookie:cookie,Origin:environment.publicOrigin,'X-Forwarded-For':forwarded},redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(10000)},headers,'session');
   if(!response.ok)throw failure('operator_session_unavailable');
   const value=await response.json();if(value.state==='signed-out')return {state:'signed-out'};
   if(value.state!=='signed-in'||typeof value.operator?.id!=='string'||!['administrator','reader'].includes(value.operator.role)||typeof value.csrfToken!=='string'||!Number.isFinite(value.expiresAt)||value.expiresAt<=Date.now()/1000)throw failure('operator_session_invalid',401);
@@ -29,6 +37,7 @@ export async function readOperatorSession(headers,{fetcher=fetch,environment=adm
     ||authority.permissions.some(code=>typeof code!=='string'||!/^[a-z][a-z0-9.-]{0,99}$/.test(code))||new Set(authority.permissions).size!==authority.permissions.length))throw failure('operator_session_invalid',401);
   return {state:'signed-in',operator:{id:value.operator.id,displayName:typeof value.operator.displayName==='string'?value.operator.displayName:'运营成员',role:value.operator.role,
     ...(authority?{businessAuthorization:{version:authority.version,permissions:[...authority.permissions]}}:{})},csrfToken:value.csrfToken,expiresAt:value.expiresAt};
+  })();entries.set(key,pending);return pending;
 }
 export async function operationsRead(headers,path,{fetcher=fetch,environment=adminEnvironment()}={}){
   if(!operationsReadPath(path))throw failure('invalid_operations_path',400);
