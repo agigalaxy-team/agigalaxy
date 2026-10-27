@@ -1,18 +1,18 @@
 .galaxy-workbench .wb-reply-progress{display:flex;align-items:center;gap:8px;min-height:28px;margin:3px 0 8px;padding:1px 0;color:var(--wb-muted);font-size:12px;line-height:1.7;animation:wb-reply-enter 220ms ease-out both}
 .galaxy-workbench .wb-reply-progress[data-active=false]{animation:wb-reply-leave 220ms ease-in both;pointer-events:none}
-.galaxy-workbench .wb-reply-orbit{flex:none;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.55;animation:wb-reply-breathe 2.6s ease-in-out infinite}
+.galaxy-workbench .wb-reply-orbit{flex:none;width:5px;height:5px;border-radius:50%;background:var(--admin-text,#20283f);opacity:.65;animation:wb-reply-breathe 2.8s ease-in-out infinite}
 .galaxy-workbench .wb-reply-words{display:inline-grid;align-items:center}
 .galaxy-workbench .wb-reply-words>span{grid-area:1/1;white-space:nowrap}
 .galaxy-workbench .wb-reply-current{animation:wb-reply-word-in 240ms ease-out both}
 .galaxy-workbench .wb-reply-previous{animation:wb-reply-word-out 220ms ease-in both;pointer-events:none}
 .galaxy-workbench .wb-reply-detail{font-size:11px;opacity:.7}
-@supports(background-clip:text){.galaxy-workbench .wb-reply-shimmer{background:linear-gradient(105deg,var(--wb-muted) 22%,color-mix(in srgb,var(--wb-text,#263247) 86%,var(--wb-muted)) 46%,var(--wb-muted) 70%);background-size:240% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;animation:wb-reply-shimmer 3.2s ease-in-out infinite}}
+@supports(background-clip:text){.galaxy-workbench .wb-reply-shimmer{background:linear-gradient(105deg,color-mix(in srgb,var(--wb-muted) 65%,var(--wb-surface,#fff)) 25%,var(--admin-text,#20283f) 45%,var(--admin-text,#20283f) 54%,color-mix(in srgb,var(--wb-muted) 65%,var(--wb-surface,#fff)) 75%);background-size:240% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;animation:wb-reply-shimmer 2.8s ease-in-out infinite}}
 .galaxy-workbench .wb-answer-token{animation:wb-reply-token-in 180ms ease-out both}
 @keyframes wb-reply-enter{from{opacity:0;translate:0 2px}to{opacity:1;translate:0 0}}
 @keyframes wb-reply-leave{from{opacity:1}to{opacity:0}}
 @keyframes wb-reply-word-in{from{opacity:0;translate:0 2px}to{opacity:1;translate:0 0}}
 @keyframes wb-reply-word-out{from{opacity:1;translate:0 0}to{opacity:0;translate:0 -2px}}
-@keyframes wb-reply-breathe{0%,100%{opacity:.35}50%{opacity:.8}}
+@keyframes wb-reply-breathe{0%,100%{opacity:.25}50%{opacity:1}}
 @keyframes wb-reply-shimmer{from{background-position:180% 50%}to{background-position:-60% 50%}}
 @keyframes wb-reply-token-in{from{opacity:.3}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.galaxy-workbench :is(.wb-reply-progress,.wb-reply-orbit,.wb-reply-current,.wb-reply-previous,.wb-reply-shimmer,.wb-answer-token){animation:none!important;translate:none}.galaxy-workbench .wb-reply-previous{display:none}.galaxy-workbench .wb-reply-shimmer{background:none;color:var(--wb-muted)}}
