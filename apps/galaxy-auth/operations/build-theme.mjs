@@ -1,4 +1,4 @@
-import {readFile,writeFile,mkdir,readdir,copyFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,readdir,copyFile,rename} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -26,9 +26,11 @@ export async function buildOperationsTheme({authRoot,outputRoot=authRoot,adminOr
  // Keep Keycloak session checks and password controls, without the public search runtime.
  const head=parent.slice(0,bodyAt).replace(/<script type="module" src="[^"\n]*search-entry\.js[^"\n]*"><\/script>\s*/g,'');
  await copyTree(source,target);
+ await rename(path.join(target,'resources/css/operations-login.css'),path.join(target,'resources/css/operations-login.'+resourceVersion+'.css'));
+ await rename(path.join(target,'resources/js/operations-login.js'),path.join(target,'resources/js/operations-login.'+resourceVersion+'.js'));
  await writeFile(path.join(target,'template.ftl'),head+'<body class="galaxy-operations-auth ${bodyClass}" data-page-id="login-${pageId}">'+body+'</body></html></#macro>\n','utf8');
  let properties=await readFile(path.join(target,'theme.properties'),'utf8');
- properties=properties.replace(/^galaxyWebsite=.*$/m,'galaxyWebsite='+adminOrigin)+'\nstyles=css/operations-login.css?v='+resourceVersion+'\nstylesCommon=\nscripts=js/galaxy-auth.js?v='+manifest.resourceVersion+' js/operations-login.js?v='+resourceVersion+'\n';
+ properties=properties.replace(/^galaxyWebsite=.*$/m,'galaxyWebsite='+adminOrigin)+'\nstyles=css/operations-login.'+resourceVersion+'.css\nstylesCommon=\nscripts=js/galaxy-auth.js?v='+manifest.resourceVersion+' js/operations-login.'+resourceVersion+'.js'+'\n';
  await writeFile(path.join(target,'theme.properties'),properties,'utf8');
  return {theme:'galaxy-operations',parent:'galaxy',output:target,resourceVersion};
 }
