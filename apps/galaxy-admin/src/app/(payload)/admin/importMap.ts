@@ -2,9 +2,13 @@ import { Navigation as Navigation_487a9ee8120562a75cb42f5eda70fc23 } from '../..
 import { SignOut as SignOut_b79efc39b783a3c0be53b13b063ae961 } from '../../../components/SignOut'
 import { BrandIcon as BrandIcon_42af45a2e169122dea8a98337d41efda } from '../../../components/Brand'
 import { Brand as Brand_42af45a2e169122dea8a98337d41efda } from '../../../components/Brand'
+import { SettingsDraftSession as SettingsDraftSession_93c3d17d41de337b32fc2d726751f980 } from '../../../components/SettingsDraftSession'
 import { Welcome as Welcome_8bc0a79ba68fecd0d220fb0029807b29 } from '../../../components/Welcome'
 import { Login as Login_33b002a6560b56feb6bc3b05b8034163 } from '../../../components/Login'
 import { OperationsView as OperationsView_eaa6430e8236ba37f0eb9a6899af39a8 } from '../../../components/OperationsView'
+import { ManagementAccountsView as ManagementAccountsView_8f1dc8eafe49be1183175e864fb8f046 } from '../../../components/ManagementAccountsView'
+import { AiWorkAccountsView as AiWorkAccountsView_ca1563acc67a6dee614c3a38b89ad492 } from '../../../components/AiWorkAccountsView'
+import { SystemSettingsView as SystemSettingsView_86f6a0e5d20bc93315e22ebca892eafa } from '../../../components/SystemSettingsView'
 import { PublicationView as PublicationView_1a3e0a3736bf6f1fdb16586f039a656a } from '../../../components/PublicationView'
 import { ChatReportsView as ChatReportsView_272b7f6c20698737163bd1ea4c95ceb7 } from '../../../components/ChatReportsView'
 import { OperationsJobsView as OperationsJobsView_5a6a7280aa7b19acac47b468a36c53ab } from '../../../components/OperationsJobsView'
@@ -16,6 +20,8 @@ import { FilesView as FilesView_cf32428f57e847176e49f4e22f080cb4 } from '../../.
 import { NoticesView as NoticesView_26f81ac07088ba16e2715ec3cd74e4b8 } from '../../../components/NoticesView'
 import { MessagingView as MessagingView_64a4a4ea0ec6cc5e2c5748b3453fc0f6 } from '../../../components/MessagingView'
 import { SmtpView as SmtpView_8ae4ae83f611015b869a4015181e4199 } from '../../../components/SmtpView'
+import { StrategiesView as StrategiesView_35569934e0bbfc8d6aa7c9f989cfa80a } from '../../../components/StrategiesView'
+import { AutoOperationsView as AutoOperationsView_06dc8dd6c10be790f8860a0b91f9be0b } from '../../../components/AutoOperationsView'
 import { AiRunsView as AiRunsView_bdd5dceb5e8480d3ee5b1ec85a0cb370 } from '../../../components/AiRunsView'
 import { ModelSettingsView as ModelSettingsView_25c1e4de9203e4871f4cdb5163dd29f8 } from '../../../components/ModelSettingsView'
 import { AnalyticsView as AnalyticsView_bf97cfe8cf7e4182aa63ced32aae9f52 } from '../../../components/AnalyticsView'
@@ -34,9 +40,13 @@ export const importMap = {
   "/components/SignOut#SignOut": SignOut_b79efc39b783a3c0be53b13b063ae961,
   "/components/Brand#BrandIcon": BrandIcon_42af45a2e169122dea8a98337d41efda,
   "/components/Brand#Brand": Brand_42af45a2e169122dea8a98337d41efda,
+  "/components/SettingsDraftSession#SettingsDraftSession": SettingsDraftSession_93c3d17d41de337b32fc2d726751f980,
   "/components/Welcome#Welcome": Welcome_8bc0a79ba68fecd0d220fb0029807b29,
   "/components/Login#Login": Login_33b002a6560b56feb6bc3b05b8034163,
   "/components/OperationsView#OperationsView": OperationsView_eaa6430e8236ba37f0eb9a6899af39a8,
+  "/components/ManagementAccountsView#ManagementAccountsView": ManagementAccountsView_8f1dc8eafe49be1183175e864fb8f046,
+  "/components/AiWorkAccountsView#AiWorkAccountsView": AiWorkAccountsView_ca1563acc67a6dee614c3a38b89ad492,
+  "/components/SystemSettingsView#SystemSettingsView": SystemSettingsView_86f6a0e5d20bc93315e22ebca892eafa,
   "/components/PublicationView#PublicationView": PublicationView_1a3e0a3736bf6f1fdb16586f039a656a,
   "/components/ChatReportsView#ChatReportsView": ChatReportsView_272b7f6c20698737163bd1ea4c95ceb7,
   "/components/OperationsJobsView#OperationsJobsView": OperationsJobsView_5a6a7280aa7b19acac47b468a36c53ab,
@@ -48,6 +58,8 @@ export const importMap = {
   "/components/NoticesView#NoticesView": NoticesView_26f81ac07088ba16e2715ec3cd74e4b8,
   "/components/MessagingView#MessagingView": MessagingView_64a4a4ea0ec6cc5e2c5748b3453fc0f6,
   "/components/SmtpView#SmtpView": SmtpView_8ae4ae83f611015b869a4015181e4199,
+  "/components/StrategiesView#StrategiesView": StrategiesView_35569934e0bbfc8d6aa7c9f989cfa80a,
+  "/components/AutoOperationsView#AutoOperationsView": AutoOperationsView_06dc8dd6c10be790f8860a0b91f9be0b,
   "/components/AiRunsView#AiRunsView": AiRunsView_bdd5dceb5e8480d3ee5b1ec85a0cb370,
   "/components/ModelSettingsView#ModelSettingsView": ModelSettingsView_25c1e4de9203e4871f4cdb5163dd29f8,
   "/components/AnalyticsView#AnalyticsView": AnalyticsView_bf97cfe8cf7e4182aa63ced32aae9f52,

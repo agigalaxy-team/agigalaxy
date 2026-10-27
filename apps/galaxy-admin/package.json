@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "payload generate:importmap",
     "build": "next build",
     "start": "next start",
     "types": "tsc --noEmit",
