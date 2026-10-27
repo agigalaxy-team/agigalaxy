@@ -4,7 +4,7 @@
 .galaxy-workbench .wb-reply-current{animation:wb-reply-word-in 200ms ease-out both}
 .galaxy-workbench .wb-reply-previous{animation:wb-reply-word-out 180ms ease-in both;pointer-events:none}
 .galaxy-workbench .wb-reply-shimmer{display:inline-block;color:var(--admin-text,#20283f)}
-@supports(background-clip:text){.galaxy-workbench .wb-reply-shimmer{background-image:linear-gradient(90deg,var(--admin-text,#20283f) calc(50% - 7px),color-mix(in srgb,var(--wb-surface,#fff) 85%,var(--admin-text,#20283f)) 50%,var(--admin-text,#20283f) calc(50% + 7px));background-size:var(--wb-sweep-size) 100%;background-repeat:repeat-x;background-clip:text;-webkit-background-clip:text;color:transparent;animation:wb-reply-shimmer var(--wb-sweep-duration) linear infinite}}
+@supports(background-clip:text){.galaxy-workbench .wb-reply-shimmer{background-image:linear-gradient(90deg,var(--admin-text,#20283f) calc(50% - 10px),color-mix(in srgb,var(--wb-surface,#fff) 42%,var(--admin-text,#20283f)) calc(50% - 4px),color-mix(in srgb,var(--wb-surface,#fff) 72%,var(--admin-text,#20283f)) 50%,color-mix(in srgb,var(--wb-surface,#fff) 42%,var(--admin-text,#20283f)) calc(50% + 4px),var(--admin-text,#20283f) calc(50% + 10px));background-size:var(--wb-sweep-size) 100%;background-repeat:repeat-x;background-clip:text;-webkit-background-clip:text;color:transparent;animation:wb-reply-shimmer var(--wb-sweep-duration) linear infinite}}
 .galaxy-workbench .wb-answer-token{animation:wb-reply-token-in 180ms ease-out both}
 .galaxy-workbench .wb-message-divider{height:0;border:0;border-top:1px solid var(--wb-border);margin:14px 0}
 .galaxy-workbench .wb-answer-actions{display:flex;align-items:center;margin-top:8px;min-height:28px}
