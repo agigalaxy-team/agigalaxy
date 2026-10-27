@@ -1,4 +1,5 @@
 import {createChatClient} from './chat-client.mjs';
+import {isCancelledError} from '@tanstack/react-query';
 import {readWithTransientRecovery} from "../../../../../integrations/shared/read-task.mjs";
 
 const readPost = path => ['/v2/chat/rooms/directory','/v2/chat/invitations/query','/v2/chat/accounts/query','/v2/chat/attachments/config','/v2/chat/attachments/query'].includes(path)
@@ -32,6 +33,18 @@ export function createOfficialChatRuntime({base,endpoint,client,getSession,getNe
   const getLocal=(key,selected)=>{owner(selected);return guard(()=>base.getLocal(key,subjectId));};
   const putLocal=(key,value,selected)=>{owner(selected);return guard(()=>base.putLocal(key,value,subjectId));};
   const updateLocal=(key,update,selected)=>{owner(selected);return guard(()=>base.updateLocal(key,current=>{assertCurrent();return update(current);},subjectId));};
+  const queryRead=async(path,input,options,action)=>{
+    const key=queryKey(path,input??null);
+    for(let attempt=0;;attempt++){
+      try{return await query.query({queryKey:key,queryFn:()=>readWithTransientRecovery(action,{signal:options.signal,check:()=>{assertCurrent();networkSession();}})});}
+      catch(error){
+        // An event reset cancels imperative readers as well as observers. Rejoin
+        // that same authorized read; never replay writes or a removed scope.
+        if(!isCancelledError(error)||attempt>=2||options.signal?.aborted||!query.getQueryCache().find({queryKey:key,exact:true}))throw error;
+        assertCurrent();networkSession();
+      }
+    }
+  };
   const api={endpoint,snapshot,call:(path,input,options={})=>{
     assertCurrent();
     const action=()=>networkGuard(session=>client.call(path,input,{...options,session}));
@@ -41,7 +54,7 @@ export function createOfficialChatRuntime({base,endpoint,client,getSession,getNe
       if(deadlines.some(value=>value*1000<=Date.now()))query.removeQueries({queryKey:key,exact:true});
     }
     return (options.method??'POST')==='POST'&&(readPost(path)||(/\/(?:receipt|operation-receipt)$/.test(path)||path==='/v2/chat/attachments/read'))
-      ?(query&&queryKey&&readPost(path)?query.query({queryKey:queryKey(path,input??null),queryFn:()=>readWithTransientRecovery(action,{signal:options.signal,check:()=>{assertCurrent();networkSession();}})}):readWithTransientRecovery(action,{signal:options.signal,check:()=>{assertCurrent();networkSession();}}))
+      ?(query&&queryKey&&readPost(path)?queryRead(path,input,options,action):readWithTransientRecovery(action,{signal:options.signal,check:()=>{assertCurrent();networkSession();}}))
       :action().then(result=>{if(query&&queryKey&&(options.method??'POST')!=='GET')void query.invalidateQueries({queryKey:queryKey()});return result;});
   },
     attachmentTransfer:(path,{bytes,signal}={})=>networkGuard(async session=>{
