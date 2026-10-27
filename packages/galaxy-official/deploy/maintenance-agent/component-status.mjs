@@ -156,9 +156,15 @@ async function monitoringHealth(config,rows,{fetchImpl,now}){
 export async function readMaintenanceComponentStatus(config,{footprint,run,fetchImpl=fetch,now=()=>new Date()}={}){
  const rows=new Map(maintenanceComponents.map(({id})=>[id,empty(id)])),at=now().toISOString();
  footprintProcesses(rows,footprint,at);
- // The website is published static content, not a dedicated process. Its
- // existing external observation is handled independently below.
- processFact(rows.get('website'),'not-applicable','static-site',available(),at);
+ const websiteUnit=config.monitoring?.websiteUnit;
+ if(websiteUnit){
+  try{
+   if(!/^[a-zA-Z0-9_.@-]+\.service$/.test(websiteUnit))throw Error('Invalid website unit');
+   const observed=await run(config.tools.systemctl,['show',websiteUnit,'--property=ActiveState','--value'],{accepted:[0],timeout:5000,maxOutput:1024});
+   const active=observed.stdout.trim();if(!['active','inactive','failed','activating','deactivating'].includes(active))throw Error('Unknown website state');
+   processFact(rows.get('website'),active==='active'?'running':'stopped','systemd-process',available(),at);
+  }catch{sourceFailure(rows.get('website'),'systemd-process','maintenance_component_process_unavailable');}
+ }else processFact(rows.get('website'),'unknown','not-connected',notConfigured('maintenance_component_not_bound'),null);
  await Promise.all([additionalProcesses(config,rows,{footprint,run,now}),monitoringHealth(config,rows,{fetchImpl,now})]);
  return maintenanceComponents.map(({id})=>rows.get(id));
 }

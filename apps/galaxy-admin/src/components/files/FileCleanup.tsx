@@ -27,7 +27,7 @@ export function FileCleanup({location,csrfToken,navigate,onLock,onChanged}:{loca
  useEffect(()=>{onLock(command.locked);return()=>onLock(false);},[command.locked,onLock]);
  useEffect(()=>{setAfter('');setTrail([]);},[location.kind]);
  useEffect(()=>{if(location.plan)setTab('plans');},[location.plan]);
- useEffect(()=>{if(!plan||!['queued','running'].includes(plan.state))return;const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){void detail.read();void plans.read();}},3000);return()=>clearTimeout(timer);},[plan,detail.read,plans.read]);
+
  function select(item:CleanupCandidate){if(command.locked||!item.eligible||!permissions?.canCreate)return;setSelection(previous=>{const next={...previous},key=cleanupKey(item);if(next[key])delete next[key];else if(Object.keys(next).length<50)next[key]=item;return next;});}
  function closeDetail(){if(command.locked)return;detailFocus.prepareReturn();navigate({plan:''});}
  const materialValid=candidates.verified&&!!candidates.value;

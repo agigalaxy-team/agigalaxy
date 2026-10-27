@@ -30,19 +30,19 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run dev
 ```
 
-Web 开发入口为 `http://127.0.0.1:5179/app/`。锁未变且依赖已安装时直接 dev。仅 Web 用 `npm run build:web`，仅官网用 `npm run build:site`；完整预览使用 `npm run build` 后 `npm start`，打开 `http://127.0.0.1:5179/`。构建输出为 `packages/galaxy-web/dist`、`apps/galaxy-site/dist`，不附带全套业务检查。
+前台使用 Next.js，开发入口 `http://127.0.0.1:5179/`。首次先运行 `npm run build:site` 准备公开内容与固定历史资源，再 `npm run dev`；已准备的资源可用 `--offline`。`npm run build` 或 `build:web` 生成数据并构建动态网页，`npm start` 启动实际 Node 网页服务。`build:browser-client` 只生成仍供独立浏览器诊断使用的 Vite 薄宿主，不是网站生产入口。
 
-[`scripts/build-product.mjs`](../../scripts/build-product.mjs) 统一构建，[`serve-product.mjs`](../../scripts/serve-product.mjs) 本机预览，端口可用 `GALAXY_PREVIEW_PORT` 指定。首次官网构建获取固定公开历史资料与下载文件；`--offline` 需要已有缓存，或在对应组件入口用 `--preserved-public-source` 指定准确旧公开发行目录。缺少历史二进制时不能用空文件冒充。
+前台和 Admin 分别构建。根依赖与 Admin 均锁定相同 Next/React/Query 版本，共享源码在各自运行入口仅解析一份 React。Admin 安装与 `npm run build --prefix apps/galaxy-admin` 保持独立。
 
-前端预览不启动 Hub。连接业务时给预览进程设置 `GALAXY_WEB_CONFIG_FILE`，值为公开 JSON 的绝对路径。字段以 `serve-product.mjs` 的 `publicConfiguration()` 为准：`version:1`、无凭据 `endpoint`、当前公钥 `signingKeys`（kid/有效期/撤销状态），可选 `operator`。API 的 browser policy 同时允许准确 Origin；静态可读不代表 Cookie、CSRF 或签名操作已可用。公开配置不含服务私钥或数据库连接。
+## 公开内容与运行产物
 
-## 官网内容树与制品配对
+原公开内容由 Python 编译为安全内容树、首页数据及精确资源清单，Next.js 服务器呈现。现行网页不再生成或引导加载一套 HTML；下载与历史文档仍保留原文件。首页作者模板是唯一正文来源，生成 JSON 不手工维护。CMS 发布和网页代码构建分离。
 
-Site的public_reading.py把现行非首页内容转成/assets/public-pages/安全树，public-reading-contract.json约束标签/属性/大小/交互，拒脚本、事件属性、inline style、iframe和未知行为；Web通过createElement呈现，不注入HTML。product_pages/guide_pages/chrome与workspace-navigation/selected-shell复用入口。首页独立，非首页public-bootstrap预读树并启动同App，失败保原URL静态HTML；原始版本指南/下载不被树重写。
+`node scripts/build-product.mjs --offline --web-output outputs/site-runtime` 生成独立运行包：Node standalone、当前静态资产及公开内容数据。`node outputs/site-runtime/start.mjs` 可运行；`--previous-runtime <上次运行包>` 仅携带上一构建自身的公共静态资产，不拷贝旧代码、业务数据或累积更早构建。输出目录须独立且为空。
 
-统一build先Web再传entry/CSS/摘要给Site，独立Site必须显式--web-dist才增强。可用 `npm run build -- --web-output <Web目录> --output <Site目录>` 配对输出，发行构建显式--site-release/--api-release，release-data取真实观测。public-archive固定公开旧文件地址/摘要，首次网络后.cache可offline；被替换的旧docs/downloads入口字节留/archives/public/，历史下载不改地址。
+`GALAXY_SITE_BASELINE_ROOT` 指软件公开内容，`GALAXY_SITE_PUBLIC_ROOT` 可指定同一公开资源目录；`GALAXY_SITE_CONTENT_ROOT` 选 CMS 发布指针。未配置内容指针时为明确 baseline；已配置但损坏则失败，不能静默显示旧内容。公开资源只来自编译清单或当前选中的 CMS 媒体。
 
-静态响应须允许同源脚本、字体/图像、搜索form-action及安全树/workspace-entry读取；非首页按当前公开配置精确connect-src至API，缺项会停在静态回退。default-src none而form-action none会阻搜索，HTTP200/构建不检测目标浏览器CSP。组件构建参数仍以实际build-product/官网生成器为准。
+`GALAXY_WEB_CONFIG_FILE` 为服务器读取的公开连接配置文件，`/galaxy-web-config.json` 只返回 endpoint、当前公钥等原允许字段，不输出凭据或文件路径。该 API 的浏览器策略仍须允许准确网站 Origin。
 
 ## 组件构建与真实边界
 
@@ -62,8 +62,8 @@ python scripts/create-release-baseline.py
 
 | 组件/动作 | 能证明什么及仍需输入 |
 |---|---|
-| Web | 实际 Vite 打包 |
-| Site | 先构建 Web，再运行网站生成器；公开发行目录、资产和下载按生成器合同提供 |
+| Web | 共享浏览器组件与独立诊断宿主构建，不承担生产网站路由 |
+| Site | 公开数据编译、Next.js 构建与独立 Node 运行包；无需先生成 Vite 网站 |
 | Hub capture | API/worker/migration/publisher 四入口、完整迁移和显式资源的服务源码包；不安装或部署 |
 | Auth | Keycloak 主题；Java 邮件验证码 provider 需自己的 Java21/Keycloak26.7.3 构建，再经 `--provider-jar` 合入 |
 | Admin | 独立 Next/Payload 锁和构建；根产品 build 不覆盖它 |

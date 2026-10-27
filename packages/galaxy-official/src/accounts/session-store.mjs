@@ -5,7 +5,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const keyPattern = /^[a-f0-9]{64}$/;
 const read = row => row ? {accountId:row.account_id,issuer:row.issuer,externalSubject:row.external_subject,
   account:{id:row.account_id,email:row.email,emailVerified:row.email_verified},
-  csrfToken:row.csrf_token,expiresAt:Number(row.expires_at)} : null;
+  tokenHash:row.token_hash,renewalRow:row,csrfToken:row.csrf_token,expiresAt:Number(row.expires_at)} : null;
 
 export class OfficialAccountSessionStore {
   constructor({db,scope,now=()=>Math.floor(Date.now()/1000)}) {
@@ -19,7 +19,7 @@ export class OfficialAccountSessionStore {
     return transaction(this.db,async db=>{
       await db.query('SELECT pg_advisory_xact_lock(734912339,hashtext($1))',[this.scope]);
       await db.query('DELETE FROM official_account_logins_v1 WHERE scope_hash=$1 AND expires_at<=$2',[this.scope,at]);
-      await db.query('DELETE FROM official_account_sessions_v1 WHERE scope_hash=$1 AND (expires_at<=$2 OR revoked_at IS NOT NULL)',[this.scope,at]);
+      await db.query("DELETE FROM official_account_sessions_v1 WHERE scope_hash=$1 AND (expires_at<=$2 OR revoked_at IS NOT NULL OR idle_expires_at<=$2 OR refresh_state='revoked')",[this.scope,at]);
       const pending=(await db.query("SELECT count(*)::int AS n FROM official_account_logins_v1 WHERE scope_hash=$1 AND status IN ('pending','exchanging')",[this.scope])).rows[0].n;
       const active=(await db.query('SELECT count(*)::int AS n FROM official_account_sessions_v1 WHERE scope_hash=$1',[this.scope])).rows[0].n;
       if(pending>=2048||active>=10000)throw Error('Account login capacity reached.');
@@ -71,6 +71,7 @@ export class OfficialAccountSessionStore {
       await db.query(`INSERT INTO official_account_sessions_v1(scope_hash,token_hash,login_hash,account_id,issuer,external_subject,email,email_verified,csrf_token,created_at,expires_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [this.scope,tokenHash,loginHash,value.accountId,value.issuer,value.externalSubject,value.account.email,value.account.emailVerified,value.csrfToken,at,value.expiresAt]);
+      if(value.installRenewal)await value.installRenewal(db);
       await db.query("UPDATE official_account_logins_v1 SET status='completed' WHERE scope_hash=$1 AND login_hash=$2",[this.scope,loginHash]);
       return value;
     });
@@ -95,7 +96,7 @@ export class OfficialAccountSessionStore {
   async sessionSummary({issuer,externalSubject}) {
     const row=(await this.db.query(`SELECT count(*)::int AS n FROM official_account_sessions_v1
       WHERE scope_hash=$1 AND issuer=$2 AND external_subject=$3
-        AND revoked_at IS NULL AND expires_at>$4`,[this.scope,issuer,externalSubject,this.now()])).rows[0];
+        AND revoked_at IS NULL AND expires_at>$4 AND (idle_expires_at IS NULL OR idle_expires_at>$4) AND refresh_state<>'revoked'`,[this.scope,issuer,externalSubject,this.now()])).rows[0];
     return {activeCount:row.n,scope:'website-portal'};
   }
   async revokePrincipal({issuer,externalSubject}) {

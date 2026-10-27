@@ -11,14 +11,17 @@ function returnPath(value,website){
  try{const url=new URL(value,website);url.searchParams.delete('accountLogin');return url.origin===website&&(url.pathname==='/app'||url.pathname.startsWith('/app/'))?url.pathname+url.search+url.hash:'/app/account';}catch{return '/app/account';}
 }
 
-export function createOfficialAccountClient({endpoint,website=globalThis.location?.origin,fetch:fetcher=globalThis.fetch,now=()=>Math.floor(Date.now()/1000)}){
+export function createOfficialAccountClient({endpoint,website=globalThis.location?.origin,fetch:fetcher=globalThis.fetch,activity=()=>0,now=()=>Math.floor(Date.now()/1000)}){
  const origin=new URL(endpoint);
  if(origin.protocol!=='https:'||origin.origin!==endpoint||origin.username||origin.password)fail('official_account_configuration_invalid');
  const websiteOrigin=new URL(website).origin;
+ let currentSession=null,activitySent=0;
   async function request(path,{anonymous=false,signal,...options}={}){
-   const timeout=AbortSignal.timeout(10000);
+   const timeout=AbortSignal.timeout(10000),version=activity(),active=!anonymous&&currentSession&&version>activitySent&&Date.now()-version<60000;
+   const activityHeaders=active?{'X-Galaxy-User-Activity':'1','X-Galaxy-Account-CSRF':currentSession.csrfToken}:{};
    const response=await fetcher(endpoint+path,{...options,credentials:anonymous?'omit':'include',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:signal?AbortSignal.any([signal,timeout]):timeout,
-   headers:{Accept:'application/json',...options.headers}});
+   headers:{Accept:'application/json',...activityHeaders,...options.headers}});
+  if(active&&response.ok)activitySent=version;
   if(Number(response.headers.get('content-length'))>2097152)fail('official_account_response_invalid');
   const text=await response.text();if(new TextEncoder().encode(text).length>2097152)fail('official_account_response_invalid');
   let result;try{result=JSON.parse(text);}catch{fail('official_account_response_invalid');}
@@ -44,7 +47,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    expiresAt:value.expiresAt,csrfToken:value.csrfToken,galaxyAuthorization:false};
  }
  return Object.freeze({
-   async session({after,signal}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');return readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):''),{signal}));},
+   async session({after,signal}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');const value=readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):''),{signal}));currentSession=value.state==='signed-in'?value:null;return value;},
    async publicAccount(id,{signal}={}){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true,signal});},
    async publicAccountByUid(uid,{signal}={}){if(!accountUid(uid))fail('official_account_request_invalid');return request('/v1/account/public/by-uid/'+encodeURIComponent(uid.toUpperCase()),{method:'GET',anonymous:true,signal});},
     /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
@@ -97,7 +100,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
   async logout(session){
    if(session?.state!=='signed-in'||typeof session.csrfToken!=='string'||!session.csrfToken||session.expiresAt<=now())fail('official_account_session_expired');
    const result=readSession(await request('/v1/account/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Galaxy-Account-CSRF':session.csrfToken},body:'{}'}));
-   if(result.state!=='signed-out')fail('official_account_response_invalid');return result;
+   if(result.state!=='signed-out')fail('official_account_response_invalid');currentSession=null;return result;
   }
  });
 }

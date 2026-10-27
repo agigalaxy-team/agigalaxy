@@ -56,7 +56,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const runtime=useOperationsRead<AgentOsStatus>({path:permittedDomains.length?'/v1/operations/agentos/status':null,failureMessage:'运行服务状态暂时无法取得。',clearOnOffline:true});
   const conversation=useOperationsRead<WorkbenchConversation>({path:canUseDomain&&(focused||logSource==='actions')?agentOsConversationPath(domain):null,failureMessage:'当前对话暂时无法取得。',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000});
   const currentConversation=canUseDomain&&conversation.value?.domain===domain?conversation.value:null;
-  const actionCards=workbenchActionCards(currentConversation?.toolCards,domain),cardsWaiting=actionCards.some(card=>['processing','unknown'].includes(card.state));
+  const actionCards=workbenchActionCards(currentConversation?.toolCards,domain);
   const [,tickCardClock]=useState(0),cardNow=Math.floor(Date.now()/1000);
   useEffect(()=>{
     if(!conversation.verified||!actionCards.length)return;
@@ -145,7 +145,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     if(operatorId)retainedPanels.delete(operatorId);
     onIdentityChange(checkedSession.state==='signed-in'?checkedSession.operator.id:null);
   },[identityEnded,checkedSession,operatorId,onIdentityChange,command.cancel,dismissCommand.cancel,stopCommand.cancel,conversation.clear]);
-  useEffect(()=>{if((!focused&&logSource!=='actions')||!conversation.verified||!currentConversation||!replying&&!cardsWaiting)return;const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void conversation.renew();},2000);return()=>clearTimeout(timer);},[focused,logSource,conversation.verified,currentConversation,replying,cardsWaiting,conversation.renew]);
+
   const taskReady=!taskId||!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
   const sendMessage=async(message:string,retryOfOperationId?:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
     scrollPositions.current[domain]={top:conversationElement.current?.scrollTop??0,follow:true};

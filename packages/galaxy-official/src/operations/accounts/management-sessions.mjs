@@ -45,8 +45,9 @@ export function createOperationsManagementSessions({db,endpoint,issuer,roleDirec
       const principal=identity(value);
       return withConnection(connection,async connection=>{
         const row=(await connection.query(`SELECT count(*)::integer AS count FROM operations_operator_sessions_v1
-          WHERE endpoint=$1 AND operator_id=$2 AND issuer=$3 AND external_subject=$4 AND expires_at>$5`,
-        [endpoint,principal.operatorId,principal.issuer,principal.externalSubject,new Date(now()*1000).toISOString()])).rows[0];
+          WHERE endpoint=$1 AND operator_id=$2 AND issuer=$3 AND external_subject=$4 AND expires_at>$5
+          AND (idle_expires_at IS NULL OR idle_expires_at>$6) AND (max_expires_at IS NULL OR max_expires_at>$6) AND refresh_state<>'revoked'`,
+        [endpoint,principal.operatorId,principal.issuer,principal.externalSubject,new Date(now()*1000).toISOString(),now()])).rows[0];
         if(!Number.isSafeInteger(row?.count)||row.count<0)throw new ServiceError('operations_unavailable',503);
         return {state:'available',activeCount:row.count,scope:'management-portal'};
       });

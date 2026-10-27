@@ -12,7 +12,7 @@ node apps/galaxy-auth/build.mjs --out <全新或空的绝对目录> [--provider-
 
 产物为themes/galaxy/login、选定galaxy-mail-editorial/email、site、manifest；可选JAR复制为providers/galaxy-email-code.jar并记SHA256。build不修改realm。验证码数据由JAR提供，品牌邮件HTML/plaintext头尾唯一源是galaxy-mail/layout，旧email-designs/common仅re-export。账户发件人/Reply-To按共享身份配置，静态预览示例码不进入正式模板。
 
-公开客户端 `client-contract.json` 定义galaxy-account-entry：登录/注册进API `/v1/account/login?mode=login|register`，回调 `/v1/account/callback`，默认官网 `/app/account`。目标origin取选定服务，API管理state/nonce/S256/code exchange/签名与HttpOnly会话；浏览器不存令牌、不设浏览器complete页。public client禁implicit/password/service account/API权限，回调精确登记，不用旧auth/complete或通配。returnTo仅官网/app/范围；mode=register只把同issuer授权路径换registrations，保原参数。账户进程内会话当前一小时，进程重启需重登；官网退出不等Keycloak SSO退出。
+公开客户端 `client-contract.json` 定义galaxy-account-entry：登录/注册进API `/v1/account/login?mode=login|register`，回调 `/v1/account/callback`，默认官网 `/app/account`。目标origin取选定服务，API管理state/nonce/S256/code exchange/签名与HttpOnly会话；浏览器不存令牌、不设浏览器complete页。public client禁implicit/password/service account/API权限，回调精确登记，不用旧auth/complete或通配。returnTo仅官网/app/范围；mode=register只把同issuer授权路径换registrations，保原参数。门户使用数据库持久会话；未启用刷新凭据时沿用原一小时期限。官网退出不等于 Keycloak SSO 退出。
 
 galaxy realm邮箱优先注册、verifyEmail=true，firstName/lastName由 `realm-profile.mjs` 在完整profile上变可选，保校验/权限/已有值，注册模板仅过滤这两个字段。UID/公开资料合同归产品与账户服务，不在认证模板造第二套身份。
 
@@ -96,3 +96,13 @@ Node原command ledger仍是owner/target/intent权威；SingleUseObjectProvider g
 邮件码真实隔离路径用新H2、example.invalid合成账户、loopback回调/内存SMTP，集中覆盖注册→码→原密码→OIDC、密码登录、reset及错误/过期/重发/并发/取消/重填/SMTP失败；不持久化码/密码/Cookie/OAuth参数。管理邮箱实际送达/点击需获准测试身份与邮箱，检查fresh native user而非提交回执。检查层次见[开发](development.md#故障定位与未验证范围)。
 
 固定上游依据：26.7.3的[VerifyEmail](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/authentication/requiredactions/VerifyEmail.java)、[SingleUseObjectProvider](https://github.com/keycloak/keycloak/blob/26.7.3/server-spi/src/main/java/org/keycloak/models/SingleUseObjectProvider.java)、[UpdateEmail](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/authentication/requiredactions/UpdateEmail.java)、[UpdateEmailActionTokenHandler](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/authentication/actiontoken/updateemail/UpdateEmailActionTokenHandler.java)。Provider不捆绑替换上游类，许可原文归组件。
+
+## 门户会话与连续使用
+
+网站与管理门户各自在原配置中可选 `sessionRenewal:{keyFile,idleSeconds,maximumSeconds,refreshBeforeSeconds}`。工程默认闲置 7 天、最长 30 天、提前 60 秒续期。keyFile 为源码外受保护的文件，内容为独立生成的 32 字节 base64url 密钥；前后台以用途、配置及原 token hash 绑定加密上下文。
+
+短期凭据在服务器续期，浏览器只持稳定 HttpOnly Cookie；原账户 ID、CSRF、角色和草稿作用域不因正常续期改变。真实输入活动才延长闲置期，事件心跳、页面聚焦和后台定时器不算活动。并发续期由原表 CAS 合并，注销和撤销阻止迟到结果恢复会话。
+
+网络/认证服务暂不可用与真正失效分别处理。交换结果未知不再次使用可能已经旋转的 refresh token，保留未确认状态并允许退出；明确 invalid_grant 才按撤销处理。未知业务写入继续查原 operation，不因认证恢复重发。
+
+启用前须先应用技术迁移并核实际 Keycloak 客户端及 SSO idle/max 与 refresh-token 配置。未配置或上游未提供刷新凭据时不伪称长期登录；原会话必要时只做一次重新登录。源码中的默认值不表示已修改真实认证系统。

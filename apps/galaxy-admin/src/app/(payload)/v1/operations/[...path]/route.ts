@@ -24,12 +24,14 @@ async function proxy(request:Request){
   const environment=adminEnvironment();
   const policy=operationsProxyRequestPolicy({url:request.url,method:request.method,headers:request.headers,publicOrigin:environment.publicOrigin});
   if(!policy.allowed)return finish(Response.json({error:'operations_request_denied'},{status:policy.status,headers:noStore}),'policy');
-  const observing=request.method==='GET'&&isAgentOsConversationEventsPath(new URL(request.url).pathname);
+  const webEvents=request.method==='GET'&&new URL(request.url).pathname==='/v1/operations/web-events';
+  const observing=request.method==='GET'&&(isAgentOsConversationEventsPath(new URL(request.url).pathname)||new URL(request.url).pathname==='/v1/operations/web-events');
   const forwarded=new Headers({Accept:observing?'text/event-stream':'application/json'}),cookie=operatorCookies(request.headers,environment.fixtureCookies);
   try{forwarded.set('X-Forwarded-For',operatorForwardedAddress(request.headers,environment.fixtureCookies));}
   catch(error){return finish(Response.json({error:'operations_forwarded_address_unavailable'},{status:503,headers:noStore}),'forwarded-address',error);}
   if(cookie)forwarded.set('Cookie',cookie);
   if(policy.forwardOrigin)forwarded.set('Origin',policy.forwardOrigin);
+  if(request.headers.get('X-Galaxy-User-Activity')==='1')forwarded.set('X-Galaxy-User-Activity','1');
   const csrf=request.headers.get('X-Galaxy-Operator-CSRF');if(csrf)forwarded.set('X-Galaxy-Operator-CSRF',csrf);
   let body:ArrayBuffer|undefined;
   if(request.method==='POST'){
@@ -40,10 +42,10 @@ async function proxy(request:Request){
     if(body.byteLength)forwarded.set('Content-Type','application/json');
   }
   try{
-    const response=await fetch(environment.bffOrigin+policy.path,{method:request.method,headers:forwarded,body,redirect:'manual',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(observing?35000:20000)])});
+    const response=await fetch(environment.bffOrigin+policy.path,{method:request.method,headers:forwarded,body,redirect:'manual',cache:'no-store',signal:webEvents?request.signal:AbortSignal.any([request.signal,AbortSignal.timeout(observing?35000:20000)])});
     const responseHeaders=new Headers(noStore);
     if(observing){responseHeaders.set('Cache-Control','no-store, no-transform');responseHeaders.set('X-Accel-Buffering','no');}
-    for(const name of ['content-type','content-disposition','location','retry-after','x-request-id']){const value=response.headers.get(name);if(value)responseHeaders.set(name,value);}
+    for(const name of ['content-type','content-disposition','location','retry-after','x-request-id','x-galaxy-event-cursor']){const value=response.headers.get(name);if(value)responseHeaders.set(name,value);}
     for(const cookie of response.headers.getSetCookie())responseHeaders.append('Set-Cookie',cookie);
     return finish(new Response(response.body,{status:response.status,headers:responseHeaders}),'upstream');
   }catch(error){return finish(Response.json({error:'operations_unavailable'},{status:503,headers:noStore}),'upstream-transport',error);}

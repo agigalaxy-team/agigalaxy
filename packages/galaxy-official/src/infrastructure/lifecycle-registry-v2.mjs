@@ -94,6 +94,8 @@ export const subjectDeletionServiceTables = Object.freeze({
     'operations_management_accounts_v1','operations_management_commands_v1','operations_management_directory_v1',
     'operations_management_entries_v1','operations_management_generations_v1','operations_management_login_fences_v1',
   ],
+  // Bounded change references only; retain delivery continuity for all viewers.
+  webDelivery: ['web_event_outbox_v1','web_event_sequence_v1','web_event_log_v1'],
   operatorConfigurationAndAudit: [
     'business_admin_audit_v1','site_publications_v1','operations_content_visibility_v1',
     'operations_product_commands_v1','operations_product_rules_v1','operations_policy_processes_v1',

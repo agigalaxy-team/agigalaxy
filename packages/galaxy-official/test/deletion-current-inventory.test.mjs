@@ -1,3 +1,4 @@
+import {migrations} from '../src/infrastructure/migrations.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -60,10 +61,10 @@ async function assertSources(db,f,s){
  assert.equal((await db.query('SELECT 1 FROM discovery_delivery_outbox_v1 WHERE event_id=$1',[s.eventId])).rows.length,1);
 }
 
-test('schema131 deletion maps origin uploads while retaining independent account/operator facts, audit and delegated file locators',async t=>{
+test('current schema deletion maps origin uploads while retaining independent account/operator facts, audit and delegated file locators',async t=>{
  const f=await serviceFixture(scopes);t.after(()=>f.db.close());
  const other=await serviceFixture(scopes,f.db,{migrateDatabase:false}),s=await currentSources(f,other),at=stamp(f);
- assert.equal((await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version,131);
+ assert.equal((await f.db.query('SELECT max(version) version FROM schema_migrations')).rows[0].version,migrations.at(-1).version);
  await transaction(f.db,db=>lockDeletionTables(db));
  // A newly added, unmapped table still fails closed; there is no wildcard skip.
  await f.db.query('CREATE TABLE synthetic_unmapped_subject_data(id uuid PRIMARY KEY,body text)');
@@ -91,7 +92,7 @@ test('schema131 deletion maps origin uploads while retaining independent account
  await assertSources(f.db,f,s);
 });
 
-test('schema131 old snapshots replay executed deletion into quarantine without reviving origin data or deleting independent owners',async t=>{
+test('current schema old snapshots replay executed deletion into quarantine without reviving origin data or deleting independent owners',async t=>{
  const f=await serviceFixture(scopes);t.after(()=>f.db.close());
  const other=await serviceFixture(scopes,f.db,{migrateDatabase:false}),s=await currentSources(f,other);
  const item={id:randomUUID(),kind:'case',localRef:randomUUID(),title:'Old source',summary:'Owned text',source:{kind:'local',reference:randomUUID()},participants:[{subjectId:f.actor.subjectId,role:'requester'}]};

@@ -378,30 +378,33 @@
         [
           "{node}",
           "scripts/build-product.mjs",
-          "--site-only",
-          "--web-dist",
-          "{webOutput}",
-          "--output",
+          "--web-output",
           "{output}"
         ]
       ],
       "checks": [],
       "sourceEntries": [
-        "apps/galaxy-site/build.py"
+        "apps/galaxy-site/src/app/layout.tsx",
+        "apps/galaxy-site/next.config.mjs"
       ],
       "configurationInputs": [
         "apps/galaxy-site/release-data.json",
         "apps/galaxy-site/public-archive.json",
-        "next.config.ts",
-        "vite.config.ts"
+        "apps/galaxy-site/public-reading-contract.json",
+        "apps/galaxy-site/package.json"
       ],
-      "artifact": "static-site-with-web-assets",
+      "artifact": "next-server-with-public-content",
       "dataOwner": "Public documents and assets; original download bytes and CMS publication identity remain distinct.",
       "interfaces": [
         "Public routes, shared Web shell and fixed historical public asset catalog"
       ],
       "files": [
-        "scripts/test/browser-demo.test.mjs"
+        "scripts/test/browser-demo.test.mjs",
+        "scripts/build-product.mjs",
+        "scripts/serve-product.mjs",
+        "scripts/web-runtime.mjs",
+        "scripts/website-artifact.mjs",
+        "scripts/test/website-artifact.test.mjs"
       ]
     },
     {

@@ -1,0 +1,19 @@
+[Unit]
+Description=Galaxy dynamic website
+After=network.target
+
+[Service]
+Type=simple
+User=galaxy-website
+Group=galaxy-website
+WorkingDirectory=/srv/galaxy/website/current
+EnvironmentFile=/etc/galaxy/website.env
+ExecStart=/usr/bin/node /srv/galaxy/website/current/start.mjs
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

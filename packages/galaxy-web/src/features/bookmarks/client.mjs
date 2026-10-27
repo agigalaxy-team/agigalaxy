@@ -107,6 +107,14 @@ export function createAccountReadingBookmarksClient({client,getSession,endpoint,
       if(page.accountId!==ownerId)throw failure('reading_bookmark_receipt_mismatch','收藏账户暂时无法确认。');return page;
     },
     pending(){return serial(async lease=>Object.values((await load(lease)).operations));},
+    /** Read original outcomes without replaying a possibly accepted command.
+     * @param {ReadingBookmarkReference|null} [reference] */
+    recoverPending(reference=null){return serial(async lease=>{
+      const selected=reference?readingBookmarkKey(reference):null,journal=await load(lease);
+      for(const[key,record]of Object.entries(journal.operations))if(!selected||key===selected){
+        const known=await receipt(lease,record);if(known.state==='acknowledged')await settle(lease,key,record,known);
+      }
+    });},
     /** @param {ReadingBookmarkReference|null} [reference] */
     resumePending(reference=null){return serial(async lease=>{
       const selected=reference?readingBookmarkKey(reference):null,journal=await load(lease);

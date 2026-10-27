@@ -80,11 +80,21 @@ API/Worker 的 `GALAXY_SERVICE_CONNECTIONS_METADATA_FILE`、`GALAXY_SYSTEM_SETTI
 
 ## CMS快照与发布
 
-`GET /api/site/export`需当前管理登录，仅导version1、已发布settings(siteTitle/description/footerLinks)、pages(id/path/title/description/blocks/updatedAt)、media(id/url/filename/alt/width/height/mimeType/filesize/credit)，不含草稿/人员/业务私有资料。blockType为hero/prose/linkList/image/notice/releaseLinks，分别含heading/text/links、heading/body、heading/links、mediaId/caption、tone/title/text、heading/channel=stable/label；链接label/href/可选description。媒体为位图、描述/credit分别保存，仅被发布页面引用后开放，快照保真实filename，下载/签名仍取原发行流程。
+管理员选择正式快照，银河原发布队列准备并激活不可变 `cms-snapshot.json`、选中媒体及私有 `cms-publication.json` 指针。不执行 Python HTML 应用器，也不复制软件基线。首次无指针可正常发布；显式 baseline marker 使用 null ID，不能伪造已发布 UUID。
 
-草稿保存不触发publisher，正式发布导完整snapshot提交队列，状态来自queued/building/published/failed，不推百分比。System General只替settings、保pages/media与发布基底；其版本采用按[系统设置](#系统设置与消费者采用)，命令接续按[原操作](#管理身份与原操作)。
+Next.js 读取当前发布数据；发布根损坏不能回落到软件旧内容。首页保留原互动区域，发布调整作者文案及额外内容；下载/版本页面保留程序化发行资料。媒体 URL 保持 `/media/cms/<id>/<filename>`。
 
-案内附件由POST取流，每次绑当前管理session/Origin/CSRF及authorize回调，存储读取前后、成功审计前复查；客户端失联/lease到期/身份变更取消在途并在落盘前再核。旧上游目录15秒缓存是外部撤权延迟边界。它不提供全站私聊历史或任意下载URL。
+`GET /site-publication.json` 只公开 version/publicationId，系统设置据此核对实际采用；私有 marker/snapshot 不公开。`GET /cms-routes.json` 返回当前公开 CMS 路径。公开页面收到真实完成事件后只核对最小 publication metadata，ID 改变才刷新当前 React 服务端正文，不重载整页或重建根会话。
+
+## 网页变化与快照接续
+
+`GET /v1/web-events` 服务网站账户/匿名或原 Native Bearer，`GET /v1/operations/web-events` 使用独立管理会话。`topics` 为固定模块，`cursor` 为十进制接续位置；默认 SSE，`stream=false` 返回有限事件与当前位置。source 当前权限由原业务服务核验，订阅对象编号不是授权。
+
+帧为 change/reset/snapshot；change 只在核权后提供最小对象标识、可得版本和原操作号。共享客户端目前按模块失效，不能声称所有对象均精准到单条查询。snapshot 只推进位置，不触发周期 GET；reset 清相应投影并恢复。补发最多 256 条，日志最多 4096 条且不超过 7 天，超界要求模块快照。
+
+业务 GET 在源读取前捕获 `X-Galaxy-Event-Cursor`，后台 SSR 通过这一位置接续，保留字符串 `0`。没有可靠位置的兼容来源先重核，不能直接跳到最新并丢掉窗口变化。事件按 cursor 去重并合并在途读取；没有完整投影证据时不跳过本人的真实变化读取。
+
+`GET /v1/operations/permissions/catalog` 返回 sourceVersion；`GET /v1/operations/permissions/catalog/lease?version=<64hex>` 重新核当前权限和能力，unchanged 时只返回新读取元数据。该能力限固定目录，不把其它来源的保留期或事件头当作完整资格证明。
 
 ## 外部签名凭据的技术 profile
 

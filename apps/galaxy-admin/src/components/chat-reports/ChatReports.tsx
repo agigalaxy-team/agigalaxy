@@ -1,4 +1,6 @@
 'use client';
+import {useQueryClient} from '@tanstack/react-query';
+import {useAdminQueryScope,galaxyQueryKey} from '../AdminQueryProvider';
 import {AutonomyObjectContext} from "../autonomy/AutonomyObjectContext";
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
@@ -63,7 +65,9 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
  const [pendingFilters,setPendingFilters]=useState<ChatReportFilters|null>(null),filters=pendingFilters??location;
  const router=useRouter(),directoryPath=chatReportReadPath(filters);
  const directory=useOperationsRead<ReportPage>({path:directoryPath,failureMessage:'案件列表暂时无法取得。',clearOnOffline:true});
+ const queryClient=useQueryClient(),scope=useAdminQueryScope();
  const reportId=filters.report,path=reportId?'/v1/operations/chat-reports/'+reportId:null;
+ const queryKey=useMemo(()=>galaxyQueryKey(scope,'chat-reports',path),[scope,path]);
  const [reading,setReading]=useState<{path:string|null;value:ReportDetail|null;loading:boolean;error:string}>({path:null,value:null,loading:false,error:''});
  const detail=reading.path===path&&reading.value&&reading.value.readExpiresAt*1000>Date.now()?reading.value:null;
  const loading=reading.path===path?reading.loading:!!path,error=reading.path===path?reading.error:'';
@@ -77,9 +81,10 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
  const [download,setDownload]=useState(''),[downloadError,setDownloadError]=useState('');
  const latest=useRef<DownloadContext>({resource:detail,path,reportId,csrfToken});latest.current={resource:detail,path,reportId,csrfToken};
  const cancelDownload=useCallback((clear=true)=>{downloadGeneration.current++;activeDownload.current?.abort();activeDownload.current=null;downloadFlight.current=null;if(clear&&alive.current)setDownload('');},[]);
- const clearDetail=useCallback((message='')=>{readGeneration.current++;activeRead.current?.abort();activeRead.current=null;cancelDownload();latest.current={...latest.current,resource:null};setReading({path,value:null,loading:false,error:message});},[path,cancelDownload]);
+ const clearDetail=useCallback((message='')=>{queryClient.removeQueries({queryKey,exact:true});readGeneration.current++;activeRead.current?.abort();activeRead.current=null;cancelDownload();latest.current={...latest.current,resource:null};setReading({path,value:null,loading:false,error:message});},[path,cancelDownload,queryClient,queryKey]);
  const read=useCallback(async()=>{
   if(!path||!alive.current)return;
+  queryClient.getQueryCache().build(queryClient,{queryKey});
   activeRead.current?.abort();const controller=new AbortController(),generation=++readGeneration.current;activeRead.current=controller;
   setReading(previous=>({path,value:previous.path===path?previous.value:null,loading:true,error:''}));
   try{
@@ -96,6 +101,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
    if(!alive.current||controller.signal.aborted||generation!==readGeneration.current||latest.current.path!==path)return;
    if(value.reportId!==reportId||!Number.isFinite(value.readExpiresAt))throw Error('invalid_case_response');
    if(downloadFlight.current&&!downloadReadable(downloadFlight.current,{...latest.current,resource:value}))cancelDownload();
+   queryClient.setQueryData(queryKey,value);
    latest.current={...latest.current,resource:value};
    setReading({path,value,loading:false,error:''});
   }catch(failure){
@@ -103,7 +109,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
    cancelDownload();latest.current={...latest.current,resource:null};
    setReading({path,value:null,loading:false,error:operationsFailure(failure,'这份案件暂时无法取得。')});
   }finally{if(activeRead.current===controller)activeRead.current=null;}
- },[path,reportId,cancelDownload]);
+ },[path,reportId,cancelDownload,queryClient,queryKey]);
  useLayoutEffect(()=>{
   alive.current=true;cancelDownload();setDownloadError('');readGeneration.current++;activeRead.current?.abort();
   return()=>{alive.current=false;readGeneration.current++;activeRead.current?.abort();cancelDownload(false);};
@@ -112,19 +118,18 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
  useEffect(()=>{
   if(!path)return;
   const offline=()=>clearDetail('网络已断开，恢复后继续读取。');
-  const visible=()=>{if(document.visibilityState==='visible'&&navigator.onLine)void read();else if(document.visibilityState!=='visible')clearDetail();};
-  if(!navigator.onLine)offline();else if(document.visibilityState==='visible')void read();
+  const visible=()=>{if(document.visibilityState==='visible'&&navigator.onLine&&!(latest.current.resource&&latest.current.resource.readExpiresAt*1000>Date.now()))void read();else if(document.visibilityState!=='visible')clearDetail();};
+  if(!navigator.onLine)offline();else if(document.visibilityState==='visible'){const cached=queryClient.getQueryData<ReportDetail>(queryKey);if(cached?.reportId===reportId&&cached.readExpiresAt*1000>Date.now()){latest.current={...latest.current,resource:cached};setReading({path,value:cached,loading:false,error:''});}else void read();}
   window.addEventListener('offline',offline);window.addEventListener('online',visible);window.addEventListener('focus',visible);document.addEventListener('visibilitychange',visible);
   return()=>{window.removeEventListener('offline',offline);window.removeEventListener('online',visible);window.removeEventListener('focus',visible);document.removeEventListener('visibilitychange',visible);};
  },[path,read,clearDetail,csrfToken]);
+ useEffect(()=>queryClient.getQueryCache().subscribe(event=>{if(event.type==='updated'&&event.action.type==='invalidate'&&event.query.queryHash===queryClient.getQueryCache().find({queryKey,exact:true})?.queryHash)void read();}),[queryClient,queryKey,read]);
+ useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes('chat-reports')){clearDetail();if(modules.length)void read();}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[clearDetail,read]);
  useEffect(()=>{
   if(!detail)return;const timer=setTimeout(()=>{clearDetail();if(navigator.onLine&&document.visibilityState==='visible')void read();},Math.max(0,detail.readExpiresAt*1000-Date.now()));
   return()=>clearTimeout(timer);
  },[detail,read,clearDetail]);
- useEffect(()=>{
-  if(!directory.value)return;const timer=setTimeout(()=>{directory.clear();if(navigator.onLine&&document.visibilityState==='visible')void directory.read();},Math.max(0,directory.value.readExpiresAt*1000-Date.now()));
-  return()=>clearTimeout(timer);
- },[directory.value,directory.clear,directory.read]);
+
  const committed=useCallback(async(value:ReportDetail|ChatRecovered)=>{
   setDrafts(previous=>{const next={...previous};delete next[value.reportId];return next;});
   if(latest.current.reportId===value.reportId)await read();
@@ -240,7 +245,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
    <aside className="galaxy-private-sidebar" aria-label="案件列表、证据与处理" ref={side} onScroll={event=>{if(detail)positions.current.set('side:'+reportId,event.currentTarget.scrollTop);}}>
     <section className="galaxy-private-directory">
      <header><h2>案件列表</h2><span>{directory.value?'本页 '+items.length+' 份':'数量未知'}</span></header>
-     <form className="galaxy-private-filters" key={filters.state+':'+filters.room} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);navigate({state:String(data.get('state')??'') as ChatReportFilters['state'],after:'',trail:''});}}><fieldset disabled={locked}><label><span>处理状态</span><select name="state" defaultValue={filters.state}><option value="">全部状态</option>{Object.entries(reportStates).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label><button type="submit">筛选</button></fieldset></form>
+     <form className="galaxy-private-filters" key={filters.state+':'+filters.room} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);navigate({state:(typeof data.get('state')==='string'?data.get('state'):'') as ChatReportFilters['state'],after:'',trail:''});}}><fieldset disabled={locked}><label><span>处理状态</span><select name="state" defaultValue={filters.state}><option value="">全部状态</option>{Object.entries(reportStates).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label><button type="submit">筛选</button></fieldset></form>
      {filters.room&&<p className="galaxy-private-scope">当前对话 <code>{filters.room}</code><button type="button" disabled={locked} onClick={()=>navigate({room:'',after:'',trail:''})}>查看全部对话</button></p>}
      <div className="galaxy-private-read-status"><ReadStatus loading={directory.loading} error={directory.error} retry={directory.read}/></div>
      <div className="galaxy-private-case-list" ref={list} onScroll={event=>{if(directory.value)positions.current.set('list:'+directoryPath,event.currentTarget.scrollTop);}}>

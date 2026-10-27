@@ -1,11 +1,15 @@
+import {AccountSessionScope,useAccountSessionModel} from '../accounts/account-session-scope';
+import {useQueryClient} from '@tanstack/react-query';
+import {galaxyQueryKey} from '../../shared/runtime/query-client';
+import {useQueryReads} from "../../application/query-reads";
 import React,{createContext,useContext,useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState} from "react";
 import {Bookmark,BookmarkCheck} from "lucide-react";
 import type {z} from "zod/v4";
 import {createAccountReadingBookmarksClient} from "./client.mjs";
 import {createPublicCommunityFeedback} from "../discovery/public-feedback.mjs";
 import {readingBookmarkReferenceSchema,readingBookmarkStateSchema,readingBookmarkKey} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
-import {useOfficialAccountSession} from "../accounts/official-account-panel";
-import {rememberBookmarkLogin,readBookmarkLogin,claimBookmarkLogin,finishBookmarkLogin} from "./account-bookmark-pending.mjs";
+import type {useOfficialAccountSession} from "../accounts/official-account-panel";
+import {rememberBookmarkLogin} from "./account-bookmark-pending.mjs";
 import './workspace.css';
 
 // One shared account context and the original save control; this module does not import the full bookmarks page.
@@ -42,7 +46,7 @@ export function scopeOf(props:ContextProps,account:AccountModel|null){
 export function useBookmarkClient(props:ContextProps,account:AccountModel|null):BookmarkClient|null{
   const accountClient=account?.client,accountId=account?.session?.account.id,token=account?.session?.csrfToken;
   const leaseKey=JSON.stringify([accountId,token]);
-  const lease=useMemo(()=>({key:leaseKey,client:accountClient,session:null as AccountModel['session']}),[accountClient,leaseKey]);
+  const lease=useMemo(()=>({key:leaseKey,client:accountClient,session:account?.session??null as AccountModel['session']}),[accountClient,leaseKey,account?.session]);
   useLayoutEffect(()=>{lease.session=account?.session??null;return()=>{lease.session=null;};},[lease,account?.session]);
   return useMemo(()=>{
     if(!accountClient||!accountId)return null;
@@ -61,45 +65,38 @@ export function SaveForLaterButton(props:SaveProps){
 }
 
 function IndependentSaveButton(props:SaveProps){
-  const account=useOfficialAccountSession(props.runtime?.api.endpoint);
+ return <AccountSessionScope endpoint={props.runtime?.api.endpoint}><ScopedSaveButton {...props}/></AccountSessionScope>;
+}
+function ScopedSaveButton(props:SaveProps){
+  const account=useAccountSessionModel();
   return <SaveForLaterSession key={scopeOf(props,account)+':'+readingBookmarkKey(props.reference)} {...props} model={account}/>;
 }
 
 function SaveForLaterSession(props:SaveProps&{model:AccountModel|null}){
   const {reference,onChanged,initialState,model}=props,client=useBookmarkClient(props,model);
+  const query=useQueryClient(),queryScope={endpoint:client?.endpoint??props.runtime?.api.endpoint??'',identity:model?.session?.account.id??'anonymous',surface:'web' as const};
+  const reads=useQueryReads(queryScope,'bookmarks',readingBookmarkKey(reference));
   const [state,setState]=useState<BookmarkState|null>(initialState??null),[busy,setBusy]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState('');
   const displayed=initialState&&initialState.revision>(state?.revision??-1)?initialState:state;
-  const alive=useRef(true),working=useRef(false),intentTried=useRef(false);
-  async function refresh(){
+  const alive=useRef(true),working=useRef(false);
+  async function refresh(force=false){
     if(!client||working.current||navigator.onLine===false)return;
     working.current=true;
     try{
-      await client.resumePending(reference);
-      if(!intentTried.current){
-        const intent=readBookmarkLogin();
-        if(intent&&readingBookmarkKey(intent.reference)===readingBookmarkKey(reference)){
-          intentTried.current=true;
-          if(claimBookmarkLogin(intent,client.ownerId)){
-            const previous=await client.status(reference);
-            if(previous.saved===intent.saved)finishBookmarkLogin(intent,reference);
-            else {const result=await client.setSaved(reference,intent.saved);if(result.state==='acknowledged')finishBookmarkLogin(intent,reference);}
-          }
-        }
-      }
-      const[value,records]=await Promise.all([client.status(reference),client.pending()]);client.current();
-      if(alive.current){setState(value);setPending(records.some(row=>readingBookmarkKey(row.command.reference)===readingBookmarkKey(reference)));setError('');onChanged?.(value);}
+      const result=await reads.run({lane:'status',key:readingBookmarkKey(reference)},async()=>{await client.recoverPending(reference);const snapshot=await Promise.all([client.status(reference),client.pending()]);client.current();return snapshot;},{force,onSuccess:([value,records])=>{if(alive.current){setState(value);setPending(records.some(row=>readingBookmarkKey(row.command.reference)===readingBookmarkKey(reference)));setError('');onChanged?.(value);}},onError:caught=>{if(alive.current){setState(null);setError(errorText(caught));}}});
+      if(result.status==='error')throw result.error;
     }catch(caught){if(alive.current)setError(errorText(caught));}
     finally{working.current=false;if(alive.current)setBusy(false);}
   }
   const hasInitialState=!!initialState;
-  const reread=useEffectEvent(()=>{if(!document.hidden)return refresh();});
+  const reread=useEffectEvent(()=>refresh());
   useEffect(()=>{
     alive.current=true;
     if(hasInitialState)return()=>{alive.current=false;};
     void reread();
-    const observe=()=>void reread(),timer=window.setInterval(observe,15000);
-    window.addEventListener('focus',observe);window.addEventListener('online',observe);
-    return()=>{alive.current=false;window.clearInterval(timer);window.removeEventListener('focus',observe);window.removeEventListener('online',observe);};
+    const observe=()=>void reread();
+    window.addEventListener('online',observe);
+    return()=>{alive.current=false;window.removeEventListener('online',observe);};
   },[client,hasInitialState]);
   function login(){
     if(model?.phase!=='signed-out'||!model.client){void model?.refresh();return;}
@@ -110,9 +107,7 @@ function SaveForLaterSession(props:SaveProps&{model:AccountModel|null}){
     working.current=true;setBusy(true);setError('');const desired=!(displayed?.saved??false);
     try{
       if(retry){
-        const record=(await client.pending()).find(row=>readingBookmarkKey(row.command.reference)===readingBookmarkKey(reference));
-        const result=await client.retry(reference);
-        if(record&&result?.state==='absent')await client.setSaved(reference,record.command.saved);
+        await client.recoverPending(reference);
       }else{
         const result=await client.setSaved(reference,desired);client.current();
         if(alive.current&&result.state==='acknowledged'){setState(result.bookmark);onChanged?.(result.bookmark);}
@@ -122,13 +117,13 @@ function SaveForLaterSession(props:SaveProps&{model:AccountModel|null}){
         try{const target=rememberBookmarkLogin(reference,{saved:desired,accountId:client.ownerId});location.assign(model.client.loginUrl('login',target));}catch{void model.refresh();}
       }
     }}
-    finally{working.current=false;if(alive.current){setBusy(false);void refresh();}}
+    finally{working.current=false;if(alive.current){setBusy(false);void query.invalidateQueries({queryKey:galaxyQueryKey(queryScope,'bookmarks')});void refresh(true);}}
   }
   return <span className="reading-bookmark-control">
     <button type="button" className="reading-bookmark-button" aria-pressed={displayed?.saved??false} disabled={busy||pending||!client&&model?.phase==='loading'} onClick={()=>void change()}>
       {displayed?.saved?<BookmarkCheck size={16}/>:<Bookmark size={16}/>}{busy?'正在保存…':displayed?.saved?'取消收藏':'收藏'}
     </button>
-    {pending&&<span className="reading-bookmark-message">收藏正在保存。<button type="button" disabled={busy} onClick={()=>void change(true)}>重试</button></span>}
-    {error&&<output className="reading-bookmark-message" >{error}<button type="button" disabled={busy} onClick={()=>void change(true)}>重试</button></output>}
+    {pending&&<span className="reading-bookmark-message">收藏正在保存。<button type="button" disabled={busy} onClick={()=>void change(true)}>重新核对</button></span>}
+    {error&&<output className="reading-bookmark-message" >{error}<button type="button" disabled={busy} onClick={()=>void change(true)}>重新核对</button></output>}
   </span>;
 }

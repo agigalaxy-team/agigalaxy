@@ -8,13 +8,18 @@ import { informationField, informationError as errorText, informationLocalTime a
 import type { InformationQuery, InformationSelection, InformationScope, InformationItem, InformationPage, InformationWatch, InformationEvents, InformationOperation, InformationPrepared, InformationCommand, InformationDetail, InformationEditing, InformationClient, HonorRule, ComposerKind, ComposerValues, ComposerDraft, QueryComposer, WatchComposer } from "./state";
 import { actionNames, scopeTitle, itemLink, exactSelection, download } from "./presentation";
 import type { InformationWorkspaceProps } from "./state";
+import {nativeQueryScope} from '../../application/query-scope';
+import {useServiceReadClient} from '../../shared/runtime/use-service-query';
+const informationReads=['query','watches','events','rules'] as const;
 // Completed queries are re-read under the current permission lease.
 const recentSearches = new WeakMap<object, Map<string, InformationQuery>>();
 export function useInformationSession({runtime,subjectId,connected,navigate,onNeedIdentity,watchId}:InformationWorkspaceProps) {
-  const client = useMemo<InformationClient|null>(
+  const originalClient = useMemo<InformationClient|null>(
     () => (runtime ? createInformationClientV2({ runtime, subjectId }) : null),
     [runtime, subjectId],
   );
+  const eventRefresh=useRef<(reset:boolean)=>void>(()=>{}),eventDirty=useRef(false);
+  const client=useServiceReadClient(originalClient,nativeQueryScope(runtime,subjectId),'information',informationReads,reset=>eventRefresh.current(reset));
   const searchOwner = JSON.stringify([
     runtime?.api?.endpoint,
     subjectId ?? null,
@@ -427,6 +432,7 @@ export function useInformationSession({runtime,subjectId,connected,navigate,onNe
         if (valid()) {
           working.current = false;
           setBusy(false);
+          if(eventDirty.current){eventDirty.current=false;queueMicrotask(()=>eventRefresh.current(false));}
         }
       }
     }
@@ -452,13 +458,15 @@ export function useInformationSession({runtime,subjectId,connected,navigate,onNe
   useLayoutEffect(()=>{detailRef.current=detail;eventsRef.current=events;});
   const refreshLatest = useEffectEvent(refresh);
   useEffect(() => {
-    if (!client || !connected) return;
+    if (!client) return;
     const epoch = generation.current,
       valid = () => generation.current === epoch;
-    let checking = false,
+    let checking = false,again=false,
       lastCheck = 0;
-    const update = async () => {
-      if (document.hidden || working.current || checking || !valid()) return;
+    const update = async (refreshList=false) => {
+      if (document.hidden || !valid()) return;
+      if(working.current){if(refreshList)eventDirty.current=true;return;}
+      if(checking){if(refreshList)again=true;return;}
       checking = true;
       try {
         const original = eventsRef.current;
@@ -487,8 +495,8 @@ export function useInformationSession({runtime,subjectId,connected,navigate,onNe
               setDetail({ ...opened, page: null, unavailable: true });
           }
         }
-        await refreshLatest(valid);
-        if (Date.now() - lastCheck >= 60000) {
+        if(refreshList){if(connected)await refreshLatest(valid);const request=runtime?recentSearches.get(runtime)?.get(searchOwner):null;if(request){const value=await client.query(request);if(valid())setPage(value);}}
+        if (connected && Date.now() - lastCheck >= 60000) {
           const outcome = await client.checkDue();
           lastCheck = Date.now();
           if (
@@ -501,17 +509,19 @@ export function useInformationSession({runtime,subjectId,connected,navigate,onNe
         if (valid()) setError(errorText(e));
       } finally {
         checking = false;
+        if(again&&valid()){again=false;void update(true);}
       }
     };
-    const timer = setInterval(() => void update(), 20000),
-      visible = () => void update();
+    eventRefresh.current=reset=>{if(reset){setPage(null);setEvents(null);setWatches([]);setDetail(null);}void update(true);};
+    const timer = setInterval(() => {if(connected)void update();}, 20000),
+      visible = () => {if(connected)void update();};
     document.addEventListener('visibilitychange', visible);
     void update();
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [client, connected]);
+  }, [client, connected, runtime, searchOwner]);
   function inputSources() {
     return informationSelections(types.map((type) => {
       const request:{query:string;limit:number;timeWindow?:{kind:string};context?:{environment:string}} = { query: query.trim(), limit: 8 };

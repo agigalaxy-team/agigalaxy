@@ -1,3 +1,5 @@
+import {nativeQueryScope} from "../../../application/query-scope";
+import {useQueryReads,sourceReadDeadline} from "../../../application/query-reads";
 import { states, actions, Audience, CommentStream, CommentReports } from "./presentation";
 import {ReadingDetails,ReadingSummary} from "../../../shared/reading/reading-details";
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -51,6 +53,7 @@ function TaskCommentsSession({
   lease,
 }: CommentProps&{lease:ChoiceViewLease|null}) {
   const taskId=task.taskId;
+  const dataReads=useQueryReads(nativeQueryScope(runtime,subjectId),'tasks','comments:'+taskId+':'+String(connected));
   const [taskView,setTaskView]=useState(task);
   const privateTask=taskView.request?.visibility==='Private';
   const client = useMemo<CommentClient|null>(
@@ -244,6 +247,11 @@ function TaskCommentsSession({
     return known[key]??(/[\u3400-\u9fff]/.test(message)?message:'暂时未能完成，已输入的内容仍保留。');
   }
   async function read(options:{query?:string;pages?:number}={}){
+    const result=await dataReads.run({lane:'comments',key:JSON.stringify([options.query??readingRef.current.submittedQuery,options.pages??readingRef.current.pages])},async()=>await readSnapshot(options)??null,{validUntil:sourceReadDeadline,onSuccess:value=>{if(current()&&value){setComments(value.items);setNext(value.next);setLoading(false);}},onError:()=>{if(current()){setComments([]);setNext(null);setReplyFresh(null);setSourceChange(old=>old&&old.kind!=='task'?{...old,source:null,canContinue:false}:null);}}});
+    if(result.status==='error')throw result.error;
+    return result.status==='success'?result.value:undefined;
+  }
+  async function readSnapshot(options:{query?:string;pages?:number}={}){
     const sequence=++readSequence.current,selectedQuery=options.query??readingRef.current.submittedQuery,pages=options.pages??readingRef.current.pages,items:CommentView[]=[];let after:string|undefined,more:string|null=null;
     try{
       for(let page=0;page<Math.max(1,pages);page++){
@@ -288,6 +296,7 @@ function TaskCommentsSession({
   }
   async function run(fn:()=>Promise<unknown>){
     if(busyRef.current||!current())return;busyRef.current=true;setBusy(true);setError('');setNotice('');committedRef.current=false;
+    dataReads.invalidate();
     try{await fn();}catch(cause){
       if(!current())return;setPreview(null);const required=needsAccountVerification(cause);setVerificationRequired(required);
       setError(committedRef.current?'内容已发送，列表稍后会自动更新。':required?'发送前需要关联银河账户。你的文字会保留。':friendlyError(cause));
@@ -307,8 +316,9 @@ function TaskCommentsSession({
     const active=activeRef,sequence=readSequence;active.current=true;
     if(!readingDraft.ready)return()=>{active.current=false;sequence.current++;};
     if(!initialized.current){initialized.current=true;void initialize();}
-    const timer=window.setInterval(()=>{setNow(Date.now());void checkLatest();},15000),quotaTimer=window.setInterval(()=>{if(!document.hidden&&!busyRef.current&&current())void extras();},60000),visible=()=>{if(!document.hidden){setNow(Date.now());void checkLatest();}};document.addEventListener('visibilitychange',visible);
-    return()=>{active.current=false;sequence.current++;window.clearInterval(timer);window.clearInterval(quotaTimer);document.removeEventListener('visibilitychange',visible);};
+    const timer=window.setInterval(()=>setNow(Date.now()),15000);
+    const visible=()=>{if(!document.hidden){setNow(Date.now());void checkLatest();}};document.addEventListener('visibilitychange',visible);
+    return()=>{active.current=false;sequence.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
   },[current,extras,readingDraft.ready]);
   const previewOpen=preview!==null,sourceChangeOpen=sourceChange!==null,editorOpen=editor!==null;
   useEffect(()=>{if(previewOpen)dialog.current?.showModal();else dialog.current?.close();},[previewOpen]);

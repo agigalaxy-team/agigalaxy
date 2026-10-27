@@ -1,3 +1,5 @@
+import {useQuery} from "@tanstack/react-query";
+import {galaxyQueryKey} from "../../shared/runtime/query-client";
 import {forumBodyExcerpt} from "../community-forum/community-forum-browse.mjs";
 import React,{useEffect,useState} from 'react';
 import {Search} from 'lucide-react';
@@ -38,24 +40,15 @@ function SearchGroup<K extends Kind>({runtime,navigate,kind,query}:{runtime:Runt
  return <ExistingSearchGroup {...{runtime,navigate,kind,query}}/>;
 }
 function ExistingSearchGroup<K extends Kind>({runtime,navigate,kind,query}:{runtime:Runtime;navigate:Props['navigate'];kind:K;query:string}){
- const [page,setPage]=useState<BrowsePage<Content[K]>|null>(null),[busy,setBusy]=useState(true),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);
  const [clock,setClock]=useState(()=>Date.now()/1000);
- useEffect(()=>{let active=true,working=false;
-  const read=async()=>{if(working)return;working=true;
-   try{const value:BrowsePage<Content[K]>=await runtime.api.call(directories[kind].endpoint,{query,limit:3,...(kind==='tasks'?{view:'open'}:{}),...(kind==='community'?{order:'published'}:{})},{authenticated:false});if(active){setPage(value);setError(false);setClock(Date.now()/1000);}}
-   catch{if(active){setPage(null);setError(true);}}
-   finally{working=false;if(active)setBusy(false);}
-  };
-  void read();const resume=()=>{if(!document.hidden)void read();},timer=window.setInterval(resume,30000);
-  window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
-  return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
- },[runtime,kind,query,attempt]);
+ const read=useQuery<BrowsePage<Content[K]>>({queryKey:galaxyQueryKey({endpoint:runtime.api.endpoint,identity:'anonymous',surface:'web'},kind==='community'?'forum':kind,'search',query),queryFn:({signal})=>runtime.api.call(directories[kind].endpoint,{query,limit:3,...(kind==='tasks'?{view:'open'}:{}),...(kind==='community'?{order:'published'}:{})},{authenticated:false,signal})});
+ const page=read.data??null,busy=read.isFetching,error=read.isError;
  const expiry=kind==='community'?Math.min(...(page?.items??[]).flatMap(value=>{const item=value as ForumPostView;return typeof item.publishedUntil==='number'&&item.publishedUntil>clock?[item.publishedUntil]:[];})):Infinity;
  useEffect(()=>{if(!Number.isFinite(expiry))return;const timer=window.setTimeout(()=>setClock(Date.now()/1000),Math.min(2147483647,Math.max(0,expiry*1000-Date.now()+1)));return()=>window.clearTimeout(timer);},[expiry]);
  const items=kind==='community'?(page?.items??[]).filter(value=>availableForumContent(value as ForumPostView,clock)):page?.items??[];
  const target=directoryPath(kind,query);
  return <section className="content-search-group" id={'search-'+kind} aria-labelledby={'search-heading-'+kind} aria-busy={busy}><header><h2 id={'search-heading-'+kind}>{directories[kind].label}</h2><a href={target} onClick={event=>follow(event,target,navigate)}>查看全部</a></header>
-  {busy&&!page?<output>正在查找…</output>:error?<output className="content-search-empty">暂时无法读取这部分内容。<button type="button" onClick={()=>{setBusy(true);setAttempt(value=>value+1);}}>重试</button></output>:!items.length?<p className="content-search-empty">{page?.nextAfter?'当前读取范围没有可展示的结果，可进入目录继续查找。':'没有找到相符的公开内容。'}</p>:<div className="content-search-results">{items.map(value=>kind==='community'?<ForumSearchRow key={(value as ForumPostView).locator.postId} item={value as ForumPostView} navigate={navigate} clock={clock}/>:kind==='tasks'?<ContentCard key={(value as TaskBrowseItem).taskId} kind="tasks" item={value as TaskBrowseItem} runtime={runtime} navigate={navigate}/>:kind==='capsules'?<ContentCard key={(value as CapsuleBrowseItem).capsuleId} kind="capsules" item={value as CapsuleBrowseItem} navigate={navigate}/>:<ContentCard key={(value as ProjectBrowseItem).projectId} kind="projects" item={value as ProjectBrowseItem} navigate={navigate}/>)}</div>}
+  {busy&&!page?<output>正在查找…</output>:error?<output className="content-search-empty">暂时无法读取这部分内容。<button type="button" onClick={()=>{void read.refetch();}}>重试</button></output>:!items.length?<p className="content-search-empty">{page?.nextAfter?'当前读取范围没有可展示的结果，可进入目录继续查找。':'没有找到相符的公开内容。'}</p>:<div className="content-search-results">{items.map(value=>kind==='community'?<ForumSearchRow key={(value as ForumPostView).locator.postId} item={value as ForumPostView} navigate={navigate} clock={clock}/>:kind==='tasks'?<ContentCard key={(value as TaskBrowseItem).taskId} kind="tasks" item={value as TaskBrowseItem} runtime={runtime} navigate={navigate}/>:kind==='capsules'?<ContentCard key={(value as CapsuleBrowseItem).capsuleId} kind="capsules" item={value as CapsuleBrowseItem} navigate={navigate}/>:<ContentCard key={(value as ProjectBrowseItem).projectId} kind="projects" item={value as ProjectBrowseItem} navigate={navigate}/>)}</div>}
  </section>;
 }
 

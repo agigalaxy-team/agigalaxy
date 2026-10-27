@@ -1,3 +1,5 @@
+import {useQuery} from "@tanstack/react-query";
+import {galaxyQueryKey} from "../../shared/runtime/query-client";
 import React,{useEffect,useState} from "react";
 import {PublicRecommendations} from "../public-reading/native-content";
 import {BookOpen,Layers,MessagesSquare,Search,UsersRound} from "lucide-react";
@@ -12,18 +14,19 @@ function BrowseSection({runtime,navigate,kind}:Props&{kind:Kind}){
  const [attempt,setAttempt]=useState(0);
  return <BrowseSectionRead key={JSON.stringify([runtime?.api.endpoint,kind,attempt])} runtime={runtime} navigate={navigate} kind={kind} retry={()=>setAttempt(value=>value+1)}/>;
 }
-async function readHighlights(runtime:NonNullable<Props['runtime']>,kind:Kind):Promise<BrowsePage<ContentEntry>>{
+async function readHighlights(runtime:NonNullable<Props['runtime']>,kind:Kind,signal?:AbortSignal):Promise<BrowsePage<ContentEntry>>{
  const endpoint=directories[kind].endpoint,options={query:'',limit:3};
- if(kind==='tasks'){const page:BrowsePage<TaskBrowseItem>=await runtime.api.call(endpoint,{...options,view:'open'},{authenticated:false});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};}
- if(kind==='capsules'){const page:BrowsePage<CapsuleBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};}
- const page:BrowsePage<ProjectBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};
+ if(kind==='tasks'){const page:BrowsePage<TaskBrowseItem>=await runtime.api.call(endpoint,{...options,view:'open'},{authenticated:false,signal});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};}
+ if(kind==='capsules'){const page:BrowsePage<CapsuleBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false,signal});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};}
+ const page:BrowsePage<ProjectBrowseItem>=await runtime.api.call(endpoint,options,{authenticated:false,signal});return{items:page.items.map(item=>({kind,item})),nextAfter:page.nextAfter};
 }
-function BrowseSectionRead({runtime,navigate,kind,retry}:Props&{kind:Kind;retry:()=>void}){
- const d=directories[kind],[items,setItems]=useState<ContentEntry[]>([]),[state,setState]=useState('loading'),[hasMore,setHasMore]=useState(false);
- useEffect(()=>{let current=true;if(runtime)void readHighlights(runtime,kind).then(value=>{if(current){setItems(value.items);setHasMore(!!value.nextAfter);setState('ready');}}).catch(()=>{if(current)setState('error');});return()=>{current=false;};},[runtime,kind]);
+function BrowseSectionRead({runtime,navigate,kind}:Props&{kind:Kind;retry:()=>void}){
+ const d=directories[kind];
+ const read=useQuery({queryKey:galaxyQueryKey({endpoint:runtime?.api.endpoint??'',identity:'anonymous',surface:'web'},kind,'highlights'),enabled:!!runtime,queryFn:({signal})=>readHighlights(runtime!,kind,signal)});
+ const items=read.data?.items??[],hasMore=!!read.data?.nextAfter,state=read.isError?'error':read.isPending?'loading':'ready';
  const emptyText=kind==='tasks'?'当前还没有公开的求助。':kind==='capsules'?'当前还没有公开的方法。':'当前还没有可浏览的公开项目。';
  return <section className={'browse-section browse-section-'+kind} aria-labelledby={'browse-'+kind}><header><div><h2 id={'browse-'+kind}>{d.title}</h2><p>{d.subtitle}</p></div><a href={d.path} onClick={event=>{event.preventDefault();navigate(d.path);}}>查看全部 </a></header>
-  {state==='loading'?<div className="browse-loading"><output>正在读取公开内容…</output></div>:state==='error'?<div className="browse-empty"><p>暂时无法读取这部分内容。</p><button onClick={retry}>重新读取</button></div>:items.length?<div className={'browse-highlights browse-highlights-'+kind}>{items.map(entry=><BrowseHighlight key={contentKey(entry)} {...entry} navigate={navigate} runtime={runtime}/>)}</div>:<div className="browse-empty"><p>{hasMore?'这一范围暂未发现可浏览内容。':emptyText}</p>{kind==='tasks'?<a href="/app/publish" onClick={event=>{event.preventDefault();navigate('/app/publish');}}>发起自己的求助 </a>:<a href={kind==='projects'?'/app/match':'/app/search'} onClick={event=>{event.preventDefault();navigate(kind==='projects'?'/app/match':'/app/search');}}>{kind==='projects'?'按方向寻找同行':'查找其他经验'} </a>}</div>}
+  {state==='loading'?<div className="browse-loading"><output>正在读取公开内容…</output></div>:state==='error'?<div className="browse-empty"><p>暂时无法读取这部分内容。</p><button onClick={()=>void read.refetch()}>重新读取</button></div>:items.length?<div className={'browse-highlights browse-highlights-'+kind}>{items.map(entry=><BrowseHighlight key={contentKey(entry)} {...entry} navigate={navigate} runtime={runtime}/>)}</div>:<div className="browse-empty"><p>{hasMore?'这一范围暂未发现可浏览内容。':emptyText}</p>{kind==='tasks'?<a href="/app/publish" onClick={event=>{event.preventDefault();navigate('/app/publish');}}>发起自己的求助 </a>:<a href={kind==='projects'?'/app/match':'/app/search'} onClick={event=>{event.preventDefault();navigate(kind==='projects'?'/app/match':'/app/search');}}>{kind==='projects'?'按方向寻找同行':'查找其他经验'} </a>}</div>}
  </section>;
 }
 export function PublicBrowseWorkspace({runtime,navigate}:Props){

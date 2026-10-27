@@ -47,3 +47,36 @@ test('an unverified network session stops new and late chat requests while retai
  await assert.rejects(pending,{code:'official_account_unavailable'});
  verified=f.current();f.client.call=async()=>({rooms:[]});assert.deepEqual(await runtime.api.call('/v2/chat/rooms/query',{}),{rooms:[]});
 });
+
+
+test('shared Query deduplicates private-chat reads, reuses valid pages on return and rechecks receipts independently',async()=>{
+ const {QueryClient}=await import('@tanstack/react-query');
+ const f=fixture(),query=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+ const key=(...parts)=>['galaxy',f.endpoint,'web',f.current().account.id,'chat',...parts];
+ const make=()=>createOfficialChatRuntime({base:{getLocal:async()=>null,putLocal:async()=>{},updateLocal:async()=>null},endpoint:f.endpoint,client:f.client,getSession:f.current,query,queryKey:key});
+ const room=randomUUID(),path='/v2/chat/rooms/'+room+'/history';let reads=0;
+ f.client.call=async route=>{reads++;return route.endsWith('/history')?{messages:[],readExpiresAt:Math.floor(Date.now()/1000)+60}:{state:'unknown'};};
+ const first=make();await Promise.all([first.api.call(path,{limit:50}),first.api.call(path,{limit:50})]);assert.equal(reads,1);
+ const returned=make();await returned.api.call(path,{limit:50});assert.equal(reads,1,'returning to a valid query does not refetch');
+ await query.invalidateQueries({queryKey:key()});await returned.api.call(path,{limit:50});assert.equal(reads,2);
+ await returned.api.call('/v2/chat/rooms/'+room+'/operation-receipt',{operationId:'original'});
+ await returned.api.call('/v2/chat/rooms/'+room+'/operation-receipt',{operationId:'original'});assert.equal(reads,4,'unknown receipts are checked, never replayed as writes');
+ query.setQueryData(key(path,{limit:50}),{messages:[],readExpiresAt:Math.floor(Date.now()/1000)-1});
+ await returned.api.call(path,{limit:50});assert.equal(reads,5,'expired permission windows never reuse cached data');
+ query.clear();
+});
+
+
+test('account unknown send recovery only checks the original receipt, including an explicit recheck',async()=>{
+ const f=fixture(),runtime=f.create(),roomId=randomUUID();let sends=0,receipts=0;
+ f.client.call=async(path,input)=>{
+  if(path.endsWith('/send')){sends++;throw Error('response-lost');}
+  if(path.endsWith('/receipt')){receipts++;return {roomId,...input,state:'absent',checkedAt:new Date().toISOString(),currentAccessGranted:false,contentReturned:false,othersReadStatus:'not-asserted',acceptedByRoom:false};}
+  throw Error('unexpected operation');
+ };
+ await assert.rejects(runtime.chat.send(roomId,'approved original',{confirmed:true}),/response-lost/);
+ const original=await runtime.chat.pending(roomId);
+ assert.equal((await runtime.chat.resumePending(roomId)).state,'absent');
+ assert.equal((await runtime.chat.resumePending(roomId,{explicitRetry:true})).state,'absent');
+ assert.equal(sends,1);assert.equal(receipts,2);assert.deepEqual((await runtime.chat.pending(roomId)).input,original.input);
+});

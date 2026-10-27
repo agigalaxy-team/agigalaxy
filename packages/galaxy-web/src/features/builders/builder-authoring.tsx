@@ -8,6 +8,8 @@ import {builderFormNames,BuilderDeclarationFields,BuilderSupportFields,BuilderPa
 import {builderField,builderInputSchema,builderLocatorSchema,builderContactsSchema,isBuilderFormKind,initialBuilderInput,builderBaseChanged,builderContentPatch,builderCurrentSourcePatch,builderContentFromImport,prepareBuilderPreview} from './builder-authoring-state';
 import type {BuilderRuntime,BuilderClient,BuilderRead,BuilderEntry,BuilderPreview,BuilderReceipt,BuilderInput,BuilderLocator} from './builder-authoring-state';
 import './builder-authoring.css';
+import {nativeQueryScope} from '../../application/query-scope';
+import {useServiceQuery} from '../../shared/runtime/use-service-query';
 
 type Props={runtime:BuilderRuntime;client:BuilderClient;subjectId:string;selected:BuilderRead|null;management:BuilderEntry|null;kind:string;pending:unknown;onKind:(kind:string)=>void;onClose:()=>void;onSaved:(builderId:string)=>Promise<void>;onPending:()=>Promise<void>};
 export function builderAuthoringKey(endpoint:string,builderId?:string){return `${endpoint}:builder-authoring-input:${builderId??'new'}`;}
@@ -25,6 +27,8 @@ export function builderFormError(error:unknown){
   return typeof message==='string'&&/[\u3400-\u9fff]/.test(message)?message:'暂时未能完成，输入仍保留。';
 }
 export function BuilderAuthoring({runtime,client,subjectId,selected,management,kind:requestedKind,pending,onKind,onClose,onSaved,onPending}:Props){
+  const contactRefresh=useRef<()=>void>(()=>{});
+  const contactReads=useServiceQuery(nativeQueryScope(runtime,subjectId),'contacts',()=>contactRefresh.current());
   const entry=selected?.entry??management,extensions=selected?.extensions,builderId=entry?.builderId;
   const [initial]=useState(()=>initialBuilderInput(selected,management,subjectId,requestedKind));
   const draft=useGovernanceDraft<BuilderInput,BuilderLocator>(runtime,subjectId,true,builderAuthoringKey(runtime.api.endpoint,builderId),initial);
@@ -40,9 +44,10 @@ export function BuilderAuthoring({runtime,client,subjectId,selected,management,k
   useEffect(()=>{if(preview){previewStart.current?.scrollIntoView({block:'start'});previewStart.current?.focus({preventScroll:true});}},[preview]);
   useEffect(()=>{if(draft.ready)onKind(kind);},[draft.ready,kind,onKind]);
   const loadContacts=useCallback((after?:string)=>{
-    const read=async()=>{check();const page=builderContactsSchema.parse(await runtime.api.call('/v2/contacts/query',{direction:'both',limit:50,...(after?{after}:{})}));check();return page;};
+    const read=async()=>{check();const input={direction:'both',limit:50,...(after?{after}:{})};const page=builderContactsSchema.parse(await contactReads.read(['builder-viewers',input],()=>runtime.api.call('/v2/contacts/query',input)));check();return page;};
     return read().then(page=>{const ids=page.items.map(item=>item.initiatorId===subjectId?item.recipientId:item.initiatorId);setContactError('');setContacts(old=>[...new Set(after?[...old,...ids]:ids)]);setContactAfter(page.nextAfter??null);}).catch(()=>{if(active.current)setContactError('联系人暂时无法读取，已有选择仍保留。');});
-  },[check,runtime,subjectId]);
+  },[check,runtime,subjectId,contactReads]);
+  contactRefresh.current=()=>{setContacts([]);void loadContacts();};
   useEffect(()=>{void loadContacts();},[loadContacts]);
   const settleDraft=useEffectEvent(async()=>{
     const receipt:{current:BuilderReceipt|null}={current:null};

@@ -20,10 +20,10 @@ export class SystemGeneralPublications{
  }
  async marker(){
   try{
-   const response=await this.fetchImpl(this.websiteOrigin+'/cms-publication.json',{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(5000)});
+   const response=await this.fetchImpl(this.websiteOrigin+'/site-publication.json',{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(5000)});
    if(!response.ok)fail('system_settings_source_changed',503);const raw=await response.text();if(Buffer.byteLength(raw)>4096)throw Error();
-   const value=JSON.parse(raw);if(value?.version!==1||!systemSettingsUuidSchema.safeParse(value.publicationId).success)throw Error();
-   return value.publicationId.toLowerCase();
+   const value=JSON.parse(raw);if(value?.version!==1||value.publicationId!==null&&!systemSettingsUuidSchema.safeParse(value.publicationId).success)throw Error();
+   return value.publicationId===null?null:value.publicationId.toLowerCase();
   }catch{fail('system_settings_source_changed',503);}
  }
  async source(operator){

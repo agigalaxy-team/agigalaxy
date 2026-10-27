@@ -1,3 +1,4 @@
+import {loadPortalSessionPolicy} from '../identity/authentication/portal-session.mjs';
 import {lstat, readFile} from 'node:fs/promises';
 import {isAbsolute} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -73,7 +74,7 @@ export function createStoredManagementMaintainerAuthorization({db,endpoint,issue
 
 export async function loadOperationsWorkerAuthorization(path,{db,endpoint}={}){
   if(!path)return null;
-  const config=await privateJson(path),{directoryOrigin,accountDirectory:_accountDirectory,rootOperatorFile,managementAccounts,...core}=config;
+  const config=await privateJson(path),{directoryOrigin,accountDirectory:_accountDirectory,rootOperatorFile,managementAccounts,sessionRenewal:_sessionRenewal,...core}=config;
   if(config.version!==1||Object.keys(core).sort().join(',')!=='adminOrigin,clientId,directoryCredentialFile,issuer,roles,version'
     ||!validManagementAccountsReference(managementAccounts))throw Error('Invalid operations worker configuration.');
   origin(config.adminOrigin);
@@ -105,7 +106,7 @@ export async function loadOperationsAccountDirectory(path){
 export async function loadOperationsConfiguration(path,{db,endpoint,permissions=null,factory=createOidcLoginProvider}={}) {
   if (!path) return null;
   const config=await privateJson(path);
-  const {directoryOrigin,accountDirectory,rootOperatorFile,managementAccounts,...core}=config;
+  const {directoryOrigin,accountDirectory,rootOperatorFile,managementAccounts,sessionRenewal:renewalConfiguration,...core}=config;
   if (config.version!==1 || Object.keys(core).sort().join(',')!=='adminOrigin,clientId,directoryCredentialFile,issuer,roles,version'
     || !/^[a-z0-9][a-z0-9._-]{0,199}$/.test(config.clientId??'')||!validManagementAccountsReference(managementAccounts)) throw Error('Invalid operations configuration.');
   origin(config.adminOrigin);
@@ -132,10 +133,11 @@ export async function loadOperationsConfiguration(path,{db,endpoint,permissions=
       ||!managementWriter.clientSecret||managementWriter.clientSecret.length>4096||[credential.clientId,businessCredential.clientId].includes(managementWriter.clientId))
       throw Error('Invalid protected management writer.');
   }
+  const sessionRenewal=await loadPortalSessionPolicy(renewalConfiguration);
   const namespace='operations:'+createHash('sha256').update(JSON.stringify({endpoint,origin:config.adminOrigin,issuer:config.issuer,clientId:config.clientId})).digest('hex');
   const provider=await factory({id:'operations-admin',name:'银河运营管理',issuer:config.issuer,clientId:config.clientId,
     redirectUri:config.adminOrigin+'/v1/operations/callback',includeAccountProfile:true,includeOperatorRoles:true,
-    transactionStore:createOidcTransactionStore({db,namespace})});
+    transactionStore:createOidcTransactionStore({db,namespace}),sessionRenewal:!!sessionRenewal});
   const roleDirectory=createKeycloakAdminDirectory({issuer:config.issuer,adminOrigin:directoryOrigin,clientId:credential.clientId,clientSecret:credential.clientSecret});
   const identityDirectory=createKeycloakAdminDirectory({issuer:accountDirectory.issuer,adminOrigin:directoryOrigin,clientId:businessCredential.clientId,clientSecret:businessCredential.clientSecret});
   const rootPrincipal=await loadOperationsRootPrincipal(rootOperatorFile,{endpoint,issuer:config.issuer});
@@ -144,7 +146,7 @@ export async function loadOperationsConfiguration(path,{db,endpoint,permissions=
     privateOrigin:directoryOrigin??new URL(config.issuer).origin,writer:managementWriter}):null;
   const managementDirectory=createKeycloakManagementAccounts({issuer:config.issuer,adminOrigin:directoryOrigin,
     reader:credential,writer:managementWriter,roleNames:config.roles,emailChanges:managementEmailChanges});
-  const portal=createOperationsPortal({provider,db,endpoint,adminOrigin:config.adminOrigin,roleDirectory,roles:config.roles,permissions,rootPrincipal,managementSessions});
+  const portal=createOperationsPortal({provider,db,endpoint,adminOrigin:config.adminOrigin,roleDirectory,roles:config.roles,permissions,rootPrincipal,managementSessions,sessionRenewal});
   return Object.freeze({portal,identityDirectory,rootPrincipal,managementSessions,managementDirectory,roleDirectory,
     authorizeStoredOperator:createStoredOperatorAuthorization({db,endpoint,issuer:config.issuer,roles:config.roles,roleDirectory,rootPrincipal,managementSessions}),
     authorizeManagementMaintainer:createStoredManagementMaintainerAuthorization({db,endpoint,issuer:config.issuer,rootPrincipal,managementDirectory,managementSessions}),

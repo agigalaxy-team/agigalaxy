@@ -4,7 +4,8 @@ import {DefaultTemplate} from '@payloadcms/next/templates';
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
 import {isOperator,operatorBusinessAuthorization} from '../lib/access';
-import {readOperatorSession} from '../lib/operations.mjs';
+import {readOperatorSession,operationsEventCursor} from '../lib/operations.mjs';
+import {AdminEventCursorSeed} from './AdminQueryProvider';
 import {AdminSectionTabs} from './AdminSectionTabs';
 import {OperationsPageAccessProvider} from './OperationsPageAccess';
 import {operatorLoginPage} from '../lib/operator-login-target.mjs';
@@ -21,7 +22,7 @@ export function OperationsContent({children,variant='page'}:{children:ReactNode;
 }
 export function OperationsPage({page,children,variant='page'}:{page:AdminViewServerProps;children:ReactNode;variant?:'page'|'workbench'|'accounts'}){
   const {initPageResult,params,user}=page,req=initPageResult.req;
-  return <DefaultTemplate i18n={req.i18n} locale={initPageResult.locale} params={params} payload={req.payload} permissions={initPageResult.permissions} searchParams={page.searchParams??{}} user={user} visibleEntities={initPageResult.visibleEntities}><OperationsPageAccessProvider permissions={operatorBusinessAuthorization(req.user)?.permissions??[]}><OperationsContent variant={variant}>{children}</OperationsContent></OperationsPageAccessProvider></DefaultTemplate>;
+  return <DefaultTemplate i18n={req.i18n} locale={initPageResult.locale} params={params} payload={req.payload} permissions={initPageResult.permissions} searchParams={page.searchParams??{}} user={user} visibleEntities={initPageResult.visibleEntities}><OperationsPageAccessProvider permissions={operatorBusinessAuthorization(req.user)?.permissions??[]}><OperationsContent variant={variant}><AdminEventCursorSeed cursor={operationsEventCursor()}/>{children}</OperationsContent></OperationsPageAccessProvider></DefaultTemplate>;
 }
 export function operationsSearch(search:AdminViewServerProps['searchParams'],key:string){
   const value=search?.[key];return typeof value==='string'?value:'';

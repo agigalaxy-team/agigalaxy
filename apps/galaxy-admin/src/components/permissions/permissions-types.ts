@@ -1,7 +1,7 @@
 export type PermissionAction={code:string;label:string;group:string;groupLabel:string;sensitive:boolean;humanOnly:boolean;description?:string};
 export type PermissionCapabilities={canManageRoles:boolean;canManageAssignments:boolean;canManageAutomation:boolean};
 export type PermissionRead={checkedAt:number;readExpiresAt:number;metadataOnly:true;permissions:PermissionCapabilities};
-export type PermissionCatalog=PermissionRead&{items:PermissionAction[]};
+export type PermissionCatalog=PermissionRead&{items:PermissionAction[];sourceVersion?:string};
 export type BusinessAuthorization={version:string;permissions:string[]};
 export type BusinessRole={id:string;name:string;description:string;enabled:boolean;version:number;permissions:string[];createdAt:string;updatedAt:string;subjectScope?:'shared'|'ai-only';usage?:{humanAssignments:number;aiAssignments:number;aiAccounts:{id:string;domain:AutomationAiDomain;name:string;enabled:boolean}[]};impact?:{affectsPeople:boolean;affectsAi:boolean;assignmentCount:number}};
 export type BusinessAssignment={id:string;operatorId:string;roleId:string;enabled:boolean;version:number;createdAt:string;updatedAt:string};

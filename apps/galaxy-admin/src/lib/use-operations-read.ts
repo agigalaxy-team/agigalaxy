@@ -1,5 +1,7 @@
 'use client';
-import {useCallback,useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useCallback,useMemo,useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
+import {useAdminQueryScope,useAdminEventCursorSeed,galaxyQueryKey} from '../components/AdminQueryProvider';
 import {operationsFailure,operationsMayRetryRead,operationsRequest,OperationsRequestError} from './operations-client';
 import {useClientReady} from './use-client-ready';
 import {operationsReadsSuspended,operationsReadServerSnapshot,subscribeOperationsReadLifecycle} from './operations-read-lifecycle';
@@ -25,11 +27,20 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   // Hydration must render the exact server snapshot, even when downloading JS
   // outlives its lease. Only the mounted client can validate or renew that lease.
   const ready=useClientReady();
+  const queryClient=useQueryClient(),scope=useAdminQueryScope();
+  const module=path?.startsWith('/api/system-settings/')?'system-settings':path?.split('/')[3]??'none';
+  const queryKey=useMemo(()=>galaxyQueryKey(scope,module,path),[scope,module,path]);
+  const cached=queryClient.getQueryData<T>(queryKey);
+  const cursorValue=initial&&typeof initial==='object'&&'webEventCursor' in initial?initial.webEventCursor:undefined;
+  useAdminEventCursorSeed(typeof cursorValue==='string'?cursorValue:undefined);
+  if(cached!==undefined&&initial===null)initial=cached;
   const logoutPending=useSyncExternalStore(subscribeOperationsReadLifecycle,operationsReadsSuspended,operationsReadServerSnapshot),resumeFresh=useRef(false);
-  const [state,setState]=useState<ReadState<T>>(()=>({path,value:initial,loading:!!path&&!initial&&!initialError,refreshing:false,error:initialError,checkedAt:sourceCheckedAt(initial),attemptedAt:null}));
+  const [state,setState]=useState<ReadState<T>>(()=>({path,value:initial,loading:!!path&&!initial&&!initialError,refreshing:false,error:initialError,checkedAt:sourceCheckedAt(initial)??(!clearOnOffline&&cached!==undefined?queryClient.getQueryState(queryKey)?.dataUpdatedAt??null:null),attemptedAt:null}));
+  const latestState=useRef(state);latestState.current=state;
+  const pendingInvalidation=useRef(false);
   const retryable=useRef(false),active=useRef<AbortController|null>(null),inFlight=useRef<{path:string;controller:AbortController;promise:Promise<T|undefined>}|null>(null),generation=useRef(0),alive=useRef(false);
   const performRead=useCallback((background=false):Promise<T|undefined>=>{
-    if(!path||!alive.current||operationsReadsSuspended())return Promise.resolve(undefined);
+    if(!path||!scope.endpoint||!scope.identity||!alive.current||operationsReadsSuspended())return Promise.resolve(undefined);
     if(background&&inFlight.current?.path===path&&!inFlight.current.controller.signal.aborted)return inFlight.current.promise;
     active.current?.abort();const controller=new AbortController(),version=++generation.current;active.current=controller;retryable.current=false;
     setState(previous=>{
@@ -40,7 +51,16 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
       try{
         let value:T;
         for(let retry=0;;retry++){
-          try{value=await operationsRequest<T>(path,{signal:controller.signal});break;}
+          try{value=await queryClient.query<T>({queryKey,queryFn:async({signal})=>{
+            const previous=latestState.current.path===path?latestState.current.value:null;
+            if(background&&path==='/v1/operations/permissions/catalog'&&previous&&typeof previous==='object'&&'sourceVersion' in previous&&typeof previous.sourceVersion==='string'&&/^[0-9a-f]{64}$/.test(previous.sourceVersion)){
+              const lease=await operationsRequest<{unchanged:boolean;sourceVersion:string;checkedAt:number;readExpiresAt:number;metadataOnly:true;permissions:unknown;webEventCursor?:string}>(path+'/lease?version='+previous.sourceVersion,{signal});
+              if(lease.unchanged){if(lease.sourceVersion!==previous.sourceVersion||!Number.isFinite(lease.checkedAt)||!Number.isFinite(lease.readExpiresAt)||lease.readExpiresAt*1000<=Date.now()||lease.metadataOnly!==true||!lease.permissions)throw new OperationsRequestError(503,'operations_read_lease_invalid');
+                return {...previous,sourceVersion:lease.sourceVersion,checkedAt:lease.checkedAt,readExpiresAt:lease.readExpiresAt,metadataOnly:true,permissions:lease.permissions,...(lease.webEventCursor?{webEventCursor:lease.webEventCursor}:{})} as T;
+              }
+            }
+            return operationsRequest<T>(path,{signal});
+          },staleTime:0,retry:false});break;}
           catch(error){
             // Ordinary leased reads get a small transport-only recovery budget.
             // The explicit long-running recovery surface keeps its existing policy.
@@ -63,16 +83,20 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
         });return undefined;
       }finally{
         if(active.current===controller)active.current=null;
-        if(inFlight.current?.controller===controller)inFlight.current=null;
+        const ownsFlight=inFlight.current?.controller===controller;if(ownsFlight)inFlight.current=null;
+        if(ownsFlight&&pendingInvalidation.current&&alive.current&&!operationsReadsSuspended()){pendingInvalidation.current=false;queueMicrotask(()=>void performRead(true));}
       }
     })();
     inFlight.current={path,controller,promise};return promise;
-  },[path,failureMessage,clearOnOffline,retryUnavailable]);
+  },[path,failureMessage,clearOnOffline,retryUnavailable,queryClient,queryKey,scope]);
   const read=useCallback(()=>performRead(),[performRead]);
   const renew=useCallback(()=>performRead(true),[performRead]);
-  const clear=useCallback(()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path]);
+  const clear=useCallback(()=>{queryClient.removeQueries({queryKey,exact:true});generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path,queryClient,queryKey]);
   useLayoutEffect(()=>{
-    alive.current=true;
+    if(path&&initial!==null&&queryClient.getQueryData(queryKey)===undefined)queryClient.setQueryData(queryKey,initial,{updatedAt:sourceCheckedAt(initial)??Date.now()});
+  },[path,initial,queryClient,queryKey]);
+  useLayoutEffect(()=>{
+    alive.current=true;pendingInvalidation.current=false;
     return()=>{alive.current=false;generation.current++;active.current?.abort();active.current=null;inFlight.current=null;};
   },[path]);
   useLayoutEffect(()=>{
@@ -88,12 +112,12 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   useEffect(()=>{
     if(!path||logoutPending)return;
     const offline=()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState(previous=>({path,value:!clearOnOffline&&previous.path===path?previous.value:null,loading:false,refreshing:false,error:'网络已断开，恢复后可继续读取。',checkedAt:null,attemptedAt:null}));};
-    const visible=()=>{if(document.visibilityState==='visible'&&navigator.onLine)void performRead(true);};
+
     const initialFresh=initial!==null&&(!clearOnOffline||expiresAt(initial,sourceCheckedAt(initial))>Date.now());
     const freshAfterFailure=resumeFresh.current;resumeFresh.current=false;
-    if(!navigator.onLine)offline();else if((freshAfterFailure||!initialFresh||sourceCheckedAt(initial)===null)&&document.visibilityState==='visible')void performRead(true);
-    window.addEventListener('offline',offline);window.addEventListener('online',visible);window.addEventListener('focus',visible);document.addEventListener('visibilitychange',visible);
-    return()=>{window.removeEventListener('offline',offline);window.removeEventListener('online',visible);window.removeEventListener('focus',visible);document.removeEventListener('visibilitychange',visible);};
+    if(!navigator.onLine)offline();else if((freshAfterFailure||!initialFresh)&&document.visibilityState==='visible')void performRead(true);
+    window.addEventListener('offline',offline);
+    return()=>{window.removeEventListener('offline',offline);};
   },[path,initial,read,performRead,clearOnOffline,clear,logoutPending]);
   useEffect(()=>{
     if(!ready||logoutPending||!clearOnOffline||state.value===null||state.checkedAt===null)return;
@@ -124,6 +148,10 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void performRead(true);},4000);
     return()=>clearTimeout(timer);
   },[retryUnavailable,path,state.path,state.value,state.loading,state.refreshing,state.error,state.attemptedAt,performRead,logoutPending]);
+  useEffect(()=>queryClient.getQueryCache().subscribe(event=>{
+    if(event.type==='updated'&&event.action.type==='invalidate'&&event.query.queryHash===queryClient.getQueryCache().find({queryKey,exact:true})?.queryHash){if(inFlight.current){pendingInvalidation.current=true;generation.current++;}else void performRead(true);}
+  }),[queryClient,queryKey,performRead]);
+  useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes(module)){clear();if(modules.length&&navigator.onLine&&document.visibilityState==='visible')void performRead(true);}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[module,clear,performRead]);
   const current=state.path===path?state:{path,value:null,loading:!!path,refreshing:false,error:'',checkedAt:null,attemptedAt:null};
   const valid=!ready||!clearOnOffline||expiresAt(current.value,current.checkedAt)>Date.now();
   return{...current,value:!logoutPending&&valid?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,clear,ready,verified:!logoutPending&&ready&&valid&&current.checkedAt!==null};

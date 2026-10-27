@@ -42,6 +42,7 @@
     "apps/galaxy-admin",
     "services",
     "tools/qa",
-    "outputs"
+    "outputs",
+    "apps/galaxy-site"
   ]
 }

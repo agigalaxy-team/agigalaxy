@@ -401,3 +401,7 @@ GRANT SELECT,INSERT ON operations_autonomy_decisions_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON operations_autonomy_workbench_runs_v1 TO galaxy_api;
 GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_workbench_pending_v1(text,uuid),public.galaxy_autonomy_workbench_receipts_v1(text,uuid) TO galaxy_api;
 GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_lock_persisted_authority_v1(text,uuid) TO galaxy_api;
+
+-- Web change delivery: only the fixed promotion function writes the technical log.
+GRANT SELECT ON web_event_sequence_v1,web_event_log_v1 TO galaxy_api;
+GRANT EXECUTE ON FUNCTION public.galaxy_web_events_promote_v1(integer) TO galaxy_api;

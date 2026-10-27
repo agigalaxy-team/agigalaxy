@@ -6,7 +6,7 @@
 
 | 运行目标 | 需要的组件与额外准备 |
 |---|---|
-| 官网/Web | 根 Node 工具链，官网生成另需 Python；业务页接准确 API 和公开公钥配置 |
+| 官网/Web | 根 Node 工具链，Python 仅编译公开数据；前台 Node standalone、后台独立 Next，业务页接准确 API 和公开公钥配置 |
 | Hub | PostgreSQL、API/Worker、HTTPS反代；显式迁移、最小数据库角色、Ed25519签名和信任材料 |
 | 网站账户 | OIDC/Keycloak、准确 issuer/client/redirect URI、Cookie/CSRF 与邮件 |
 | 聊天/附件 | Prosody、对象存储、ClamAV；私有读取、配额和扫描策略 |
@@ -89,3 +89,13 @@ Admin独立锁/工具链，环境字段以 `apps/galaxy-admin/.env.example` 为�
 Runner只获得完成可信CI所需的独立低权限系统账号；无sudo、不加入docker/业务组，独立私有安装/home，凭据文件受限。systemd采用 NoNewPrivileges、ProtectSystem=strict、ProtectHome、PrivateTmp、UMask0077，仅开放自身写目录。标签只是调度条件，不是安全隔离；可修改可信workflow者具有该账号的执行能力，普通PR不得调度生产Runner。不能因构建需求给NOPASSWD:ALL或生产权限。
 
 注册token仅短期进程注入，不保存长期PAT或输出token。自检使用手动workflow、准确可信ref、最小/空permissions、无checkout/部署，检查非root、架构、临时目录可写及业务/TLS/服务配置不可写。现有仓库查询：`gh api repos/agigalaxy-team/agigalaxy/actions/runners`；仅在明确需要自检时运行 `gh workflow run runner-healthcheck.yml --repo agigalaxy-team/agigalaxy --ref main`，以 `gh run view <run-id> --repo agigalaxy-team/agigalaxy` 读取结果。新增目标须独立注册，不复用其他项目运行目录或生产权限；停用仅处理准确Runner unit及仓库注册。
+
+## 动态网页交付与 AI 代理部署
+
+前台部署运行包的 `start.mjs`，不再将公开数据目录当成现行网站根。运行配置与 unit 示例位于 Official deploy 的 `galaxy-website.*.example`；网站反代使用独立 loopback 端口，保留现有 HTTPS/域名边界。旧静态站脚本/CSP配置须按 Next.js 实际资源与连接方式适配，不能把动态页面当作 HTML 文件服务。
+
+部署代理先读取目标实际配置：Node 路径、前台端口、公开配置文件、软件内容根、CMS 指针、身份/业务数据库版本和原服务账户。秘密由保护文件/进程注入，不从示例推断可用凭据，不借部署扩大数据库或用户权限。
+
+本轮技术迁移 132/133 涉及原会话字段和网页事件表/触发器；不能只更新网页就宣称续期与变化推送可用。应用迁移、API role、API 服务及网站配置后，集中检查实际登录续期、一个真实提交到页面的事件、内容发布及原 operation 恢复。未获部署授权时只交付材料，不连接或改变生产。
+
+代码运行包支持只携带上一构建自身的 JS/CSS，避免打开中的页面因资源被移除报错；不长期积累历史产物，不把旧业务源码混入新运行包。使用不可变运行目录切换，不在运行中的 `.next` 目录原地构建。运行故障/结果未知保留原回执，不通过自动刷新或重发写入掩盖。

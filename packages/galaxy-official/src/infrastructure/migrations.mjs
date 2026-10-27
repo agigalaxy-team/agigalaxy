@@ -1,3 +1,5 @@
+import {portalSessionsV1MigrationSql} from './portal-sessions-v1-schema.mjs';
+import {webEventsV1MigrationSql} from './web-events-v1-schema.mjs';
 import {accountRegistrationProfilesV1MigrationSql} from './account-registration-profiles-v1-schema.mjs';
 import {businessAuditAttributionMigrationSql} from './business-audit-attribution-v1-schema.mjs';
 import {operationsAiPromptManagementMigrationSql} from './operations-ai-prompt-management-v1-schema.mjs';
@@ -740,6 +742,9 @@ END $autonomy_audit$;
 
 migrations.push({version:130,sql:businessAuditAttributionMigrationSql});
 migrations.push({version:131,sql:operationsAiPromptManagementMigrationSql});
+
+migrations.push({version:132,sql:portalSessionsV1MigrationSql});
+migrations.push({version:133,sql:webEventsV1MigrationSql});
 
 export function assertSupportedSchema(versions) {
   const actual = versions.map(row => row.version ?? row);

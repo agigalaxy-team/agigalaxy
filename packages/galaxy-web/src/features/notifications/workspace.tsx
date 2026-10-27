@@ -1,8 +1,10 @@
+import {useQueryReads} from "../../application/query-reads";
+import {nativeQueryScope} from "../../application/query-scope";
 import {useCurrentTaskMaterialTree} from "../tasks/materials/task-material-view";
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {mergeNotificationItems,notificationRows,markNotificationRowRead} from './merge.mjs';
-import {createNotificationLoader} from './loader.mjs';
+import {notificationRows,markNotificationRowRead} from './merge.mjs';
+
 import {leaseNotificationItems,currentNotificationItems} from './read-lease.mjs';
 import {PageLoading} from '../../site-shell';
 import {notificationTarget} from './target.mjs';
@@ -28,7 +30,7 @@ export function NotificationWorkspace(props:Props){
 function NotificationSession({runtime,subjectId,connected,navigate}:Props){
  const connection=runtime?.api.snapshot(),permitted=!!(connected&&connection?.subjectId===subjectId&&(connection.scopes.includes('notifications')||connection.scopes.includes('*')));
  const client=useMemo(()=>runtime&&permitted?runtime.notifications:null,[runtime,permitted]);
- const loader=useMemo(()=>client?createNotificationLoader(client):null,[client]);
+ const reads=useQueryReads(nativeQueryScope(runtime,subjectId),'notifications','inbox');
  const deliveryClientId=useMemo(()=>{
    const key=`galaxy.notification.delivery-client-id:${runtime?.api.endpoint??'offline'}:${subjectId??'unknown'}`;
   try {
@@ -46,25 +48,38 @@ function NotificationSession({runtime,subjectId,connected,navigate}:Props){
  const [settingsOpen,setSettingsOpen]=useState(false),loadedPages=useRef(1);
  const [unread,setUnread]=useState(true),[busy,setBusy]=useState(false),[loading,setLoading]=useState(permitted),[error,setError]=useState(''),[notice,setNotice]=useState(''),[checked,setChecked]=useState<string|null>(null);
  const active=useRef({epoch:0,open:true}),working=useRef(false),presentedIds=useRef(new Set<string>()),titleBase=useRef(document.title.replace(/^\(\d+\)\s*/,''));
- const load=useCallback(async(after?:string)=>{if(!loader||!permitted||!navigator.onLine)return;const lease=active.current.epoch,startedAt=Date.now();
-  return loader.load({unreadOnly:unread,...(after?{after}:{})},{pages:after?1:loadedPages.current,apply:(page:Page,prefs:Options)=>{if(lease!==active.current.epoch)return;if(after)loadedPages.current++;
-   const current=leaseNotificationItems(page.items,startedAt);setItems(old=>after?mergeNotificationItems(currentNotificationItems(old),current):current);
-   setPrompt(old=>{if(!old)return null;const fresh=current.find(item=>item.id===old.item.id&&!item.read&&!item.quiet);return fresh?{...old,item:fresh}:after?old:null;});
+ const load=useCallback(async(after?:string)=>{
+  if(!client||!permitted||!navigator.onLine)return;const lease=active.current.epoch,pages=after?loadedPages.current+1:loadedPages.current;
+  const result=await reads.run({lane:'list',key:JSON.stringify([unread,pages])},async()=>{
+   const startedAt=Date.now(),[first,prefs]=await Promise.all([client.query({unreadOnly:unread}),client.options()]);
+   let page=first;const seen=new Set<string>();
+   for(let index=1;index<pages&&page.nextAfter&&!seen.has(page.nextAfter);index++){
+    seen.add(page.nextAfter);const next=await client.query({unreadOnly:unread,after:page.nextAfter});
+    const rows=new Map(page.items.map((item:Item)=>[item.id,item]));for(const item of next.items)rows.set(item.id,item);page={...next,items:[...rows.values()]};
+   }
+   return{page:page as Page,prefs:prefs as Options,startedAt};
+  },{validUntil:value=>value.startedAt+60000,onSuccess:({page,prefs,startedAt})=>{
+   if(lease!==active.current.epoch)return;loadedPages.current=pages;
+   const current=leaseNotificationItems(page.items,startedAt);setItems(current);
+   setPrompt(old=>{if(!old)return null;const fresh=current.find(item=>item.id===old.item.id&&!item.read&&!item.quiet);return fresh?{...old,item:fresh}:null;});
    setNext(page.nextAfter);setChecked(page.lastCheckedAt);setLoading(false);setError('');setOptions(prefs);
-  },failed:()=>{if(lease===active.current.epoch){setItems([]);setNext(null);setLoading(false);}}});},[loader,permitted,unread]);
+  },onError:()=>{if(lease===active.current.epoch){setItems([]);setPrompt(null);setNext(null);setLoading(false);}}});
+  if(result.status==='error')throw result.error;
+ },[reads,client,permitted,unread]);
  async function run(fn:()=>Promise<unknown>){if(working.current)return;working.current=true;setBusy(true);setError('');setNotice('');const lease=active.current.epoch;let committed=false;
+  reads.invalidate('list');
   try{await fn();committed=true;if(lease===active.current.epoch)await load();}catch(reason){if(lease===active.current.epoch)setError(committed?'通知操作已完成，列表稍后会自动更新。':readableError(reason,'当前未取得通知，请稍后重试。'));}finally{if(active.current.open){working.current=false;setBusy(false);}}}
  useEffect(()=>{const session=active.current;session.epoch++;session.open=true;return()=>{session.open=false;session.epoch++;};},[]);
- function changeFilter(value:boolean){if(value===unread)return;loader?.invalidate();active.current.epoch++;loadedPages.current=1;setUnread(value);setLoading(permitted);setItems([]);setNext(null);setPrompt(null);setError('');setChecked(null);}
+ function changeFilter(value:boolean){if(value===unread)return;reads.cancel('list');active.current.epoch++;loadedPages.current=1;setUnread(value);setLoading(permitted);setItems([]);setNext(null);setPrompt(null);setError('');setChecked(null);}
  useEffect(()=>{let alive=true;const update=()=>{if(alive&&permitted&&navigator.onLine&&!busy&&!working.current&&!document.hidden)void load().catch((reason:unknown)=>{if(alive){setLoading(false);setError(readableError(reason,'暂时未取得通知。'));}});};const onVisibility=()=>{if(!document.hidden)update();};
-  const onOffline=()=>{loader?.invalidate();active.current.epoch++;setItems([]);setPrompt(null);setNext(null);setLoading(false);setError('网络暂时中断。恢复连接后会重新读取当前可见的通知。');};
-  if(navigator.onLine)update();else onOffline();const timer=setInterval(update,15000);document.addEventListener('visibilitychange',onVisibility);window.addEventListener('offline',onOffline);window.addEventListener('online',update);
-  return()=>{alive=false;loader?.invalidate();clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);window.removeEventListener('offline',onOffline);window.removeEventListener('online',update);};},[loader,permitted,load,busy]);
+  const onOffline=()=>{reads.cancel('list');active.current.epoch++;setItems([]);setPrompt(null);setNext(null);setLoading(false);setError('网络暂时中断。恢复连接后会重新读取当前可见的通知。');};
+  if(navigator.onLine)update();else onOffline();document.addEventListener('visibilitychange',onVisibility);window.addEventListener('offline',onOffline);window.addEventListener('online',update);
+  return()=>{alive=false;reads.cancel('list');document.removeEventListener('visibilitychange',onVisibility);window.removeEventListener('offline',onOffline);window.removeEventListener('online',update);};},[reads,permitted,load,busy]);
  useEffect(()=>{if(!readItems.length)return;const deadline=Math.min(...readItems.map(item=>item.readUntil));const timer=setTimeout(()=>{
   const now=Date.now(),fresh=currentNotificationItems(readItems,now),expiredRead=readItems.some(item=>item.readUntil<=now&&(!item.sourceExpiresAt||Date.parse(item.sourceExpiresAt)>now));
   setItems(old=>currentNotificationItems(old,now));setPrompt(old=>old&&fresh.some(item=>item.id===old.item.id)?old:null);
-  if(expiredRead)setError('暂时无法核对这些通知，连接恢复后会重新读取。');
- },Math.max(0,deadline-Date.now()));return()=>clearTimeout(timer);},[readItems]);
+  if(expiredRead){setError('暂时无法核对这些通知，连接恢复后会重新读取。');if(navigator.onLine&&!document.hidden)void load().catch(()=>{});}
+ },Math.max(0,deadline-Date.now()));return()=>clearTimeout(timer);},[readItems,load]);
  useEffect(()=>{if(!savedPrompt)return;const timer=setTimeout(()=>setPrompt(old=>old?.item.readUntil===savedPrompt.item.readUntil?null:old),Math.max(0,savedPrompt.item.readUntil-Date.now()));return()=>clearTimeout(timer);},[savedPrompt]);
  useEffect(()=>{const base=titleBase.current;const count=items.filter(item=>!item.read&&!item.quiet).length;document.title=count?`(${count}) ${base}`:base;return()=>{document.title=base;};},[items]);
  useEffect(()=>{

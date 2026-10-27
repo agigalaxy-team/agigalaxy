@@ -40,7 +40,7 @@ function endpoint(value, allowLoopbackHttp) {
 // The returned identity is not an API credential or a Galaxy authorization.
 export async function createOidcLoginProvider({ id, name, issuer, clientId, redirectUri, clientSecret,
   allowedOrigins = [], includeAccountProfile = false, includeOperatorRoles = false, transactionStore = null,
-  now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
+  sessionRenewal = false, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false, fetch: transport = globalThis.fetch }) {
   if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(id ?? '') || !text(name, 100) || !text(clientId, 200)
     || clientSecret !== undefined && !text(clientSecret, 4096) || !Array.isArray(allowedOrigins) || allowedOrigins.length > 8
     || typeof includeAccountProfile!=='boolean'||typeof includeOperatorRoles!=='boolean')
@@ -132,14 +132,31 @@ export async function createOidcLoginProvider({ id, name, issuer, clientId, redi
           displayName: accountDisplayName(claims,includeOperatorRoles),
         })} : {}),
         ...(includeOperatorRoles ? {operatorRoles:signedOperatorRoles(claims,clientId)} : {}),
+        ...(sessionRenewal && tokens.refresh_token ? {portalTokens:Object.freeze({refreshToken:tokens.refresh_token,expiresAt:now()+Math.max(1,Number(tokens.expires_in)||60)})}:{}),
         verifiedAt: now(), issuedAt: claims.iat, expiresAt: Math.min(claims.exp, preview.expiresAt),
         authentication: 'oidc-authorization-code-pkce-s256-id-token-signature', galaxyAuthorization: false });
     } catch { throw new Error('OIDC login verification failed.'); }
   }
+    async function refresh({refreshToken,issuer:expectedIssuer,externalSubject}) {
+      if(!sessionRenewal||expectedIssuer!==description.issuer||!text(refreshToken,16384)||!text(externalSubject,255))throw Error('Invalid portal refresh.');
+      try{
+        const tokens=await oidc.refreshTokenGrant(configuration,refreshToken);
+        const claims=tokens.claims();
+        if(claims&&(claims.iss!==description.issuer||claims.sub!==externalSubject||!Number.isSafeInteger(claims.exp)||claims.exp<=now()))
+          throw Object.assign(Error('Portal identity changed.'),{code:'portal_refresh_rejected'});
+        if(!Number.isFinite(Number(tokens.expires_in))||Number(tokens.expires_in)<=0)throw Error('Invalid refresh expiry.');
+        return {refreshToken:tokens.refresh_token??refreshToken,expiresAt:now()+Math.floor(Number(tokens.expires_in))};
+      }catch(error){
+        // Only an explicit OAuth invalid_grant closes the session. Timeouts,
+        // transport errors and malformed responses have an unknown outcome.
+        if(error?.error==='invalid_grant'||error?.code==='portal_refresh_rejected')throw Object.assign(Error('Portal refresh rejected.'),{code:'portal_refresh_rejected'});
+        throw Error('Portal refresh outcome is unconfirmed.');
+      }
+    }
     function cancel(preview) {
       return store?store.cancel({providerKey,loginId:preview.loginId}):pending.delete(preview);
     }
-    return Object.freeze({describe:()=>description,begin,complete,cancel,withTransactionStore:next=>operations(next)});
+    return Object.freeze({describe:()=>description,begin,complete,cancel,refresh,withTransactionStore:next=>operations(next)});
   }
   return operations(transactionStore);
 }

@@ -1,0 +1,9 @@
+{
+  "name": "@agi-galaxy/site",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../scripts/web-runtime.mjs dev",
+    "build": "next build",
+    "start": "node ../../scripts/web-runtime.mjs start"
+  }
+}

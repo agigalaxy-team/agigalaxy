@@ -1,3 +1,4 @@
+import {cache} from 'react';
 import {adminEnvironment,operatorCookies,operatorForwardedAddress} from './environment.mjs';
 import {adminLog,requestCorrelation} from './runtime-log.mjs';
 import {operationsReadPath} from './proxy-policy.mjs';
@@ -11,6 +12,8 @@ async function observedRead(fetcher,url,options,headers,stage){
   }catch(error){adminLog('operations.read',{stage,path:url,method:'GET',statusCode:503,durationMs:performance.now()-started,edgeRequestId,error});throw error;}
 }
 
+const eventCursorState=cache(()=>{/** @type {{value:string|null}} */const state={value:null};return state;});
+export const operationsEventCursor=()=>eventCursorState().value;
 const failure=(code,status=503)=>Object.assign(Error(code),{code,status});
 /** @typedef {{version:string,permissions:string[]}} BusinessAuthorization */
 /** @typedef {{state:'signed-out'}|{state:'signed-in',operator:{id:string,displayName:string,role:'administrator'|'reader',businessAuthorization?:BusinessAuthorization},csrfToken:string,expiresAt:number}} OperatorSession */
@@ -32,5 +35,7 @@ export async function operationsRead(headers,path,{fetcher=fetch,environment=adm
   const session=await readOperatorSession(headers,{fetcher,environment});if(session.state!=='signed-in')throw failure('operator_login_required',401);
   const response=await observedRead(fetcher,environment.bffOrigin+path,{headers:{Cookie:operatorCookies(headers,environment.fixtureCookies),Origin:environment.publicOrigin,'X-Forwarded-For':operatorForwardedAddress(headers,environment.fixtureCookies)},cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)},headers,'business-read');
   if(!response.ok){const error=await response.json().catch(()=>null);throw failure(typeof error?.error==='string'?error.error:'operations_unavailable',response.status);}
-  return response.json();
+  const value=await response.json(),cursor=response.headers.get('X-Galaxy-Event-Cursor');
+  if(cursor&&/^[0-9]{1,20}$/.test(cursor)){const state=eventCursorState();if(state.value===null||BigInt(cursor)<BigInt(state.value))state.value=cursor;if(value&&typeof value==='object'&&!Array.isArray(value))return {...value,webEventCursor:cursor};}
+  return value;
 }

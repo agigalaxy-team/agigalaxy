@@ -12,7 +12,6 @@ import urllib.request
 import chrome
 from product_pages import render_product_pages
 from guide_pages import render_versioned_guides
-from public_reading import web_entry_assets
 
 ROOT = Path(__file__).resolve().parent
 
@@ -70,6 +69,7 @@ def copy_external_images(output):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
+    parser.add_argument('--runtime-data', action='store_true', help='Compile public data/assets for the dynamic website; do not generate current HTML or browser bootstrap')
     parser.add_argument('--preview', action='store_true')
     parser.add_argument('--site-release', default=os.environ.get('GALAXY_SITE_RELEASE'))
     parser.add_argument('--api-release', default=os.environ.get('GALAXY_API_RELEASE'))
@@ -77,7 +77,6 @@ def main():
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--preserved-public-source', type=Path, help='Copy the selected existing public release files without fetching or recalculating archive digests')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
-    parser.add_argument('--web-dist', type=Path, help='Exact completed Web build used for progressive non-home startup')
     parser.add_argument('--node', default='node', help='Node.js executable used by the shared website UI renderer')
     args = parser.parse_args()
     output = resolved_file_path(args.output)
@@ -186,10 +185,10 @@ def main():
 
     chrome.OUT = output
     chrome.PREVIEW = preview
-    chrome.WEB_ASSETS = web_entry_assets(resolved_file_path(args.web_dist)) if args.web_dist else None
     chrome.PUBLIC_PAGES.clear()
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
-    for name in ('site.css', 'cms-content.css', 'navigation.js', 'interaction-copy.mjs', 'home-experience.css', 'home-experience.js', 'public-bootstrap.js'):
+    assets = ('site.css', 'cms-content.css', 'interaction-copy.mjs', 'home-experience.css')
+    for name in assets:
         chrome.write('assets/' + name, (ROOT / name).read_text(encoding='utf-8'))
     for name in chrome.shared_shell()['styles']:
         chrome.write('assets/' + name,
@@ -197,11 +196,9 @@ def main():
     chrome.write('assets/public-reading.css',
                  (ROOT.parent.parent / 'packages' / 'galaxy-web' / 'src' / 'features' / 'public-reading' / 'workspace.css').read_text(encoding='utf-8')
                  .replace("'../../../../../apps/galaxy-site/cms-content.css'", "'/assets/cms-content.css'"))
-    if chrome.WEB_ASSETS:
-        chrome.write('assets/workspace-entry.json', json.dumps(chrome.WEB_ASSETS, indent=2) + '\n')
     copy_example_images(output)
     copy_external_images(output)
-    site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview}
+    site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview, 'RUNTIME_DATA': True}
     guide_pages = render_versioned_guides(site, metadata)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
     chrome.write('assets/public-pages/index.json', json.dumps({'version': 1, 'routes': chrome.PUBLIC_PAGES}, indent=2) + '\n')
@@ -212,6 +209,9 @@ def main():
     chrome.write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
                  ''.join('<url><loc>https://agigalaxy.org' + page + '</loc></url>' for page in pages) + '</urlset>\n')
+    types = {'.json':'application/json', '.css':'text/css', '.svg':'image/svg+xml', '.png':'image/png', '.gif':'image/gif', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.md':'text/plain', '.txt':'text/plain', '.xml':'application/xml', '.js':'text/javascript', '.mjs':'text/javascript', '.html':'text/html', '.zip':'application/zip', '.tgz':'application/gzip'}
+    files = [{'path': source.relative_to(output).as_posix(), 'contentType': types.get(source.suffix, 'application/octet-stream')} for source in sorted(output.rglob('*')) if source.is_file() and source.name != 'public-assets.json']
+    chrome.write('public-assets.json', json.dumps({'version':1,'files':files}, ensure_ascii=False, separators=(',', ':')) + '\n')
     print(json.dumps({'output': str(output), 'preview': preview,
                       'siteRelease': metadata['version'], 'apiRelease': metadata['backendRelease'],
                       'clientVersion': metadata['nativeClientDownload']['package']['version'],

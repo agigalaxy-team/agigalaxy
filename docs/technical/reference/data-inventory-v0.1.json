@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "status": "schema131-source-inventory-with-isolated-deletion-and-recovery-authority-checks-not-production-audit",
-  "reviewed_at": "2026-10-26T10:52:36.724456+00:00",
-  "schema": 131,
-  "migrationVersions": 130,
+  "status": "schema133-source-inventory-not-production-migration",
+  "reviewed_at": "2026-10-27",
+  "schema": 133,
+  "migrationVersions": 132,
   "migration120Applied": false,
-  "table_count": 292,
+  "table_count": 295,
   "tables": [
     {
       "table": "access_credentials",
@@ -2777,6 +2777,30 @@
       "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
+    },
+    {
+      "table": "web_event_outbox_v1",
+      "introducedByMigration": 133,
+      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "coverage": "registered-source-table-not-live-database-readback",
+      "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
+      "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
+    },
+    {
+      "table": "web_event_sequence_v1",
+      "introducedByMigration": 133,
+      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "coverage": "registered-source-table-not-live-database-readback",
+      "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
+      "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
+    },
+    {
+      "table": "web_event_log_v1",
+      "introducedByMigration": 133,
+      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "coverage": "registered-source-table-not-live-database-readback",
+      "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
+      "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
     }
   ],
   "coverage": {

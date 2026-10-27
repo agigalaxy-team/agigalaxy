@@ -39,6 +39,7 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
   if (origin.protocol !== 'https:' || origin.origin !== endpoint || origin.username || origin.password
     || !(trustedKeys instanceof Map) || !trustedKeys.size || typeof sign !== 'function') throw new Error('Invalid browser authority configuration.');
   let session = null, generation = 0, closed = false, connectionController, establishedBinding = null;
+  const eventControllers = new Set();
   async function send(url, { bodyJson, method = 'POST', signal, credential, accountId } = {}) {
     const target = new URL(url);
     if (closed || target.origin !== endpoint || target.username || target.password || target.hash
@@ -97,6 +98,48 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
       credential: authenticated ? current.credential : undefined, accountId: authenticated ? accountId : undefined });
     if (lease !== generation || authenticated && (session !== current || !snapshot())) throw new Error('Authorization changed during request.');
     return result;
+  }
+  // The event transport is bound to this configured authority. It never exposes
+  // the Native credential or accepts a caller-selected credential destination.
+  async function eventFetch(url, init = {}) {
+    const target = new URL(String(url), endpoint), headers = new Headers(init.headers);
+    if (closed || target.origin !== endpoint || target.pathname !== '/v1/web-events'
+      || target.username || target.password || target.hash || init.body !== undefined && init.body !== null
+      || init.method !== undefined && init.method !== 'GET') throw new Error('Invalid browser event target.');
+    for (const key of target.searchParams.keys()) {
+      if (!['cursor','topics','stream'].includes(key) || target.searchParams.getAll(key).length !== 1)
+        throw new Error('Invalid browser event query.');
+    }
+    if (target.search.length > 2048 || target.searchParams.has('cursor') && !/^(0|[1-9]\d{0,18})$/.test(target.searchParams.get('cursor'))
+      || target.searchParams.has('stream') && target.searchParams.get('stream') !== 'true') throw new Error('Invalid browser event query.');
+    const current = session, lease = generation;
+    if (!snapshot() || !current.scopes.includes('binding')) throw Object.assign(new Error('connection_required'), {code:'connection_required'});
+    const accountId = headers.get('x-galaxy-account-id');
+    if (accountId !== null && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(accountId)) throw new Error('Invalid account target.');
+    const controller = new AbortController(); eventControllers.add(controller);
+    const expiry = AbortSignal.timeout(Math.max(1, Math.min(2147483647, (current.expiresAt - now()) * 1000)));
+    const signal = AbortSignal.any([controller.signal, expiry, ...(init.signal ? [init.signal] : [])]);
+    const check = () => {
+      if (closed || generation !== lease || session !== current || !snapshot()) throw new Error('Authorization changed during event stream.');
+      signal.throwIfAborted();
+    };
+    try {
+      const response = await fetcher(target.href, {method:'GET', signal, redirect:'error', credentials:'omit', cache:'no-store', referrerPolicy:'no-referrer',
+        headers:{Accept:'text/event-stream',Authorization:`Bearer ${current.credential}`,...(accountId ? {'X-Galaxy-Account-ID':accountId} : {})}});
+      check();
+      if (!response.ok || !response.body) { eventControllers.delete(controller); return response; }
+      const reader = response.body.getReader();
+      const body = new ReadableStream({
+        async pull(stream) {
+          try { check(); const chunk = await reader.read(); check();
+            if (chunk.done) { eventControllers.delete(controller); reader.releaseLock(); stream.close(); }
+            else stream.enqueue(chunk.value);
+          } catch (error) { eventControllers.delete(controller); await reader.cancel().catch(()=>{}); stream.error(error); }
+        },
+        async cancel(reason) { eventControllers.delete(controller); controller.abort(); await reader.cancel(reason).catch(()=>{}); },
+      });
+      return new Response(body, {status:response.status,statusText:response.statusText,headers:response.headers});
+    } catch (error) { eventControllers.delete(controller); controller.abort(); throw error; }
   }
   /** @param {any} input @param {{confirmed?:boolean,binding?:{bindingId:string,receipt:string}|null}} [options] */
   async function connect(input, { confirmed = false, binding: originalBinding = null } = {}) {
@@ -238,7 +281,7 @@ export function createBrowserClient({ endpoint, trustedKeys, sign, now = () => M
   async function authorizePayload(payload, options = {}) {
     return submitAuthorization(await prepareAuthorization(payload, options), { confirmed: options.confirmed === true });
   }
-  function disconnect() { generation++; connectionController?.abort(); connectionController = null; session = null; }
-  return Object.freeze({ endpoint, send, call, attachmentTransfer, connect, snapshot, bindingRecord:()=>establishedBinding?JSON.parse(JSON.stringify(establishedBinding)):null, authorizePayload, prepareAuthorization, submitAuthorization, reconcileAuthorization, disconnect,
+  function disconnect() { generation++; for (const controller of eventControllers) controller.abort(); eventControllers.clear(); connectionController?.abort(); connectionController = null; session = null; }
+  return Object.freeze({ endpoint, send, call, eventFetch, attachmentTransfer, connect, snapshot, bindingRecord:()=>establishedBinding?JSON.parse(JSON.stringify(establishedBinding)):null, authorizePayload, prepareAuthorization, submitAuthorization, reconcileAuthorization, disconnect,
     close() { disconnect(); closed = true; } });
 }

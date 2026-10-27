@@ -1,3 +1,4 @@
+import {userActivityVersion} from '../../shared/runtime/activity';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {Cloud,Fingerprint,UserRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -29,7 +30,7 @@ export function useOfficialAccountSession(endpoint?:string):Model{
  const read=useCallback(async(after?:string,quiet=false)=>{
   const current=lifecycle.current;if(!current.active||!current.client)return;
   if(current.busy){if(quiet||!current.quiet)return;tasks.cancel('session');current.request++;current.busy=false;}
-  if(!isOnline()){tasks.cancel('session');current.request++;current.busy=false;current.session=null;setBusy(false);setSession(null);setPhase('offline');return;}
+  if(!isOnline()){tasks.cancel('session');current.request++;current.busy=false;setBusy(false);setPhase('offline');return;}
   const generation=current.generation,ticket=++current.request,original=current.session;current.busy=true;current.quiet=quiet;if(!quiet){setBusy(true);setError('');}
   const valid=()=>current.active&&current.generation===generation&&current.request===ticket;
   const selectedClient=current.client;
@@ -44,7 +45,7 @@ export function useOfficialAccountSession(endpoint?:string):Model{
    const checked=sameOfficialSession(original,next)?original!:next;
    current.session=checked;setSession(checked);setPhase('signed-in');setError('');
   },onError:()=>{
-   if(valid()){current.session=null;setSession(null);setPhase(isOnline()?'unavailable':'offline');setError('暂时无法核对官方账户，请重新读取。');}
+   if(valid()){setPhase(isOnline()?'unavailable':'offline');setError('暂时无法核对官方账户，请重新读取。');}
   },onSettled:()=>{if(current.active&&current.generation===generation){current.busy=false;setBusy(false);}}});
  },[tasks]);
  const refresh=useCallback(()=>read(),[read]);
@@ -52,15 +53,16 @@ export function useOfficialAccountSession(endpoint?:string):Model{
    const current=lifecycle.current,generation=++current.generation;current.active=true;current.requestedEndpoint=endpoint;current.request++;current.busy=false;current.session=null;current.client=null;current.endpoint=null;
   queueMicrotask(()=>{if(!current.active||generation!==current.generation)return;setClient(null);setSession(null);setBusy(false);setError('');setPhase(isOnline()?'loading':'offline');});
   void (async()=>{await Promise.resolve();try{const deployedEndpoint=endpoint??(await loadWebConfiguration()).endpoint;if(!current.active||generation!==current.generation)return;
-   const next=createOfficialAccountClient({endpoint:deployedEndpoint});current.client=next;current.endpoint=deployedEndpoint;setClient(next);await read();
+   const next=createOfficialAccountClient({endpoint:deployedEndpoint,activity:userActivityVersion});current.client=next;current.endpoint=deployedEndpoint;setClient(next);await read();
   }catch{if(current.active&&generation===current.generation){setPhase(isOnline()?'unavailable':'offline');setError('账户服务配置暂不可用。');}}})();
-  const refreshVisible=()=>{if(document.visibilityState==='visible')void read(undefined,true);};
-  const offline=()=>{tasks.cancel('session');current.request++;current.busy=false;current.session=null;setBusy(false);setSession(null);setPhase('offline');setError('');};
+  let checkedActivity=0;
+  const refreshVisible=()=>{const version=userActivityVersion();if(document.visibilityState==='visible'&&version>checkedActivity){checkedActivity=version;void read(undefined,true);}};
+  const offline=()=>{tasks.cancel('session');current.request++;current.busy=false;setBusy(false);setPhase('offline');setError('');};
   const accountReturn=(event:MessageEvent)=>{if(current.endpoint&&event.origin===current.endpoint&&event.data&&typeof event.data==='object'&&!Array.isArray(event.data)&&event.data.type==='galaxy:identity-account-return')void read();};
-  window.addEventListener('focus',refreshVisible);window.addEventListener('online',refreshVisible);window.addEventListener('offline',offline);document.addEventListener('visibilitychange',refreshVisible);
+  window.addEventListener('online',refreshVisible);window.addEventListener('offline',offline);
   window.addEventListener('message',accountReturn);
   const timer=window.setInterval(refreshVisible,30000);
-  return()=>{tasks.cancel();current.active=false;current.generation++;current.request++;current.session=null;current.endpoint=null;window.clearInterval(timer);window.removeEventListener('focus',refreshVisible);window.removeEventListener('online',refreshVisible);window.removeEventListener('offline',offline);window.removeEventListener('message',accountReturn);document.removeEventListener('visibilitychange',refreshVisible);};
+  return()=>{tasks.cancel();current.active=false;current.generation++;current.request++;current.session=null;current.endpoint=null;window.clearInterval(timer);window.removeEventListener('online',refreshVisible);window.removeEventListener('offline',offline);window.removeEventListener('message',accountReturn);};
  },[endpoint,read,tasks]);
  useEffect(()=>{if(!session)return;const delay=session.expiresAt*1000-Date.now();const timer=window.setTimeout(()=>{const current=lifecycle.current;if(current.session!==session)return;tasks.cancel('session');current.session=null;current.request++;current.busy=false;setBusy(false);setSession(null);setPhase('signed-out');void read();},Math.max(0,delay));return()=>window.clearTimeout(timer);},[session,read,tasks]);
   const logout=useCallback(async()=>{const current=lifecycle.current,selected=current.session;if(!current.active||!current.client||!selected||current.busy&&!current.quiet)return;

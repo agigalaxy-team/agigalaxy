@@ -14,8 +14,8 @@
 
 | 组件 | 实现和数据归属 |
 |---|---|
-| 官网 | `apps/galaxy-site/` 的 Python 生成器消费 Web 构建及公开资料；静态阅读与 CMS 发布元数据分别保持 |
-| 业务网页 | `packages/galaxy-web/src/main.tsx`；React/TypeScript/Vite。`runtime.mjs` 组合当前身份、设备、连接世代和受控客户端，`features/` 按业务域组织 |
+| 官网 | `apps/galaxy-site/src/app/` 的 Next.js 动态网页；公开正文服务器呈现，Python 只编译原有公开内容与历史资源，不生成现行 HTML |
+| 业务网页 | `packages/galaxy-web/src/application/` 共享 React 业务实现，Next.js 页面持路由；Vite 薄入口仅保留独立诊断用途。`runtime.mjs` 组合当前身份、设备、连接世代和受控客户端，`features/` 按业务域组织 |
 | 本机客户端 | Core 保存本机身份、领域与工作记录，Node 组合 CLI，edge-mcp 提供 MCP/Native 表面；模型由宿主提供，采集能力取决于宿主实际接口 |
 | Hub | `packages/galaxy-official/src/server.mjs`、`worker.mjs`、`migrate.mjs` 与 publisher 属于同一发行服务族，共用业务 PostgreSQL；迁移、运行和所有权角色分开 |
 | 身份 | `apps/galaxy-auth/` 的 Keycloak 主题、Java provider 与受限 realm 工具；普通账户与管理身份域分别配置 |
@@ -59,7 +59,7 @@ Admin 的 Payload 服务入口继续在 `src/components/Welcome.tsx`、`Feedback
 
 Web的业务实现、类型及同域样式集中在`src/features/`，跨域人物、身份、阅读与操作生命周期在`src/shared/`；根入口保留应用、运行时和全站外壳的真实组合职责。复杂页面由唯一会话控制器持有草稿、权限租约和原操作，子面板只消费受控数据。Admin同样将业务族的页面实现与命令hooks归同域目录，公共读取、账户选择及提交反馈继续共享。
 
-AgentOS的`app.py`装配应用，`surface.py`维护唯一ASGI请求权限边界，运行投影与工具合同分别独立；Node的`operations/agentos/actions/`按准备、执行和原回执核对分工。OpenCode的`galaxy.tui.ts`装配宿主会话，领域菜单消费同一实时会话上下文；不复制代际控制或恢复流程。Site生成与CMS发布共享`cms_slots.py`中的模板合同，页面生成不加载CMS发布应用器。
+AgentOS的`app.py`装配应用，`surface.py`维护唯一ASGI请求权限边界，运行投影与工具合同分别独立；Node的`operations/agentos/actions/`按准备、执行和原回执核对分工。OpenCode的`galaxy.tui.ts`装配宿主会话，领域菜单消费同一实时会话上下文；不复制代际控制或恢复流程。Site 数据编译保留原作者内容；CMS 发布器只激活安全 snapshot 与选中媒体，Next.js 按实际发布指针呈现，不执行 HTML 应用器。
 
 稳定公共入口可转出实际实现，内部消费者直接引用所属目录。Hub 私有 AgentOS schema不因目录位置而成为公开协议。路径细分和搬移过程属于变更记录。
 
@@ -72,3 +72,13 @@ HTTP、MCP、MCP Apps、A2A 复用对应业务含义，宿主面板与协议可�
 `galaxy-direct-proof/1` 是双方 HTTPS 签名查询：显式约定双方 endpoint、公钥、协议哈希、来源种类、请求者、用途、限流、分页、有效期及退出状态；只交换获准 `ci-proof-v2` 或选择的非叙述贡献字段。逐来源版本/哈希与许可重新核查，不夹带原任务上下文，不留存响应正文，不经官方中继。它不提供全站复制或 XMPP 聊天联邦；Bridge 映射与对端报告保留出处，不能自动升级为独立证据。
 
 局部构建见[开发](development.md)，运行配置见[部署](../operations/deployment.md)，精确路由和授权定位见[接口](interfaces.md)。
+
+## 网页运行机制
+
+前台与管理后台分别运行，使用同一 Query/事件方法，不共享身份缓存。Next.js 管路由、常驻布局与服务端公开首屏；业务组件保留，主网页不再经旧 App 启动桥接。浏览器设备、私钥与 IndexedDB 仅在浏览器初始化。
+
+服务器数据由 QueryClient 持有，按 endpoint、主体/连接世代、前后台表面、模块与对象隔离；输入草稿、筛选和阅读位置独立保存。常规切页、聚焦与重连不整批读取。真实业务变更通过提交后事件使相应模块查询失效；事件不广播源正文，断线补发不足只重核相关模块。
+
+读取资格与内容变化分开：权限目录已提供真正的轻量版本/资格续证；其它来源保留其必要授权重核。不得把一般条件 GET、保留期限或本机状态时钟称为完整资格续证。jobs、独立搜索存储及外部扫描/运维源未被虚报为完整事件覆盖。
+
+门户续期复用原会话表，配置、边界和切换要求见[认证](authentication.md#门户会话与连续使用)。新技术迁移和源码交付不代表生产已启用。

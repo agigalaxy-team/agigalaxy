@@ -1,5 +1,5 @@
 /* Shared public pages. The homepage has its own content composition. */
-@import url('/assets/cms-content.css');
+@import './cms-content.css';
 :root {
   color-scheme:light;
   --ink:#202735;

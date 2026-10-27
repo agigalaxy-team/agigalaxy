@@ -1,4 +1,6 @@
-import { purposeNames, SavedOperationContent, ProjectTextField, ProjectIntroductionFields, RecruitmentWorkFields, RecruitmentConditionFields } from './presentation';
+import {useQueryReads,sourceReadDeadline,type QueryReadCallbacks} from "../../../application/query-reads";
+import {nativeQueryScope} from "../../../application/query-scope";
+import {purposeNames,SavedOperationContent,ProjectTextField,ProjectIntroductionFields,RecruitmentWorkFields,RecruitmentConditionFields} from './presentation';
 import {ReadingDetails,ReadingSummary} from "../../../shared/reading/reading-details";
 import {useCurrentTaskMaterialTree,TaskCurrentTitle} from "../../tasks/materials/task-material-view";
 import React,{useEffect,useEffectEvent,useId,useMemo,useRef,useState} from "react";
@@ -14,7 +16,7 @@ import {ProjectContactPreferences} from "../preferences";
 import "./people-selection.css";
 import "./workspace.css";
 import {checkedProjectCompose,discoveryPurpose,object,projectErrorFlag,projectErrorNumber,projectErrorText,projectFormFor,recruitmentFormFor,savedDiscoveryForm,isProjectForm,isRecruitmentForm,recruitmentExpiry} from "../contracts";
-import type {ProjectRuntime,ProjectContactClient,ProjectViewClient,ProjectView,RecruitmentView,ContactView,ProjectPage,RecruitmentPage,ContactsPage,VisibleOpportunity,Opportunity,OpportunityDetail,DiscoveryQuery,DiscoveryForm,ProjectForm,RecruitmentForm,PendingProjectOperation,OriginalProjectOperation,PreferencesView,ProjectPreferencesView,TaskChoice,Quota,Confirmation,ContactEvent,ProjectChoice,ComposeLane,ComposeValue,ComposeMarker,ProjectSelection,SendResult} from "../contracts";
+import type {ProjectRuntime,ProjectContactClient,ProjectViewClient,ProjectView,RecruitmentView,ContactView,ContactsPage,VisibleOpportunity,Opportunity,OpportunityDetail,DiscoveryQuery,DiscoveryForm,ProjectForm,RecruitmentForm,PendingProjectOperation,OriginalProjectOperation,PreferencesView,ProjectPreferencesView,TaskChoice,Quota,Confirmation,ContactEvent,ProjectChoice,ComposeLane,ComposeValue,ComposeMarker,ProjectSelection,SendResult} from "../contracts";
 import {ProjectPeopleSelection,projectRoleNames,projectRoleDetails,projectSelectionReceipt} from './people-selection';
 
 
@@ -153,40 +155,39 @@ function ProjectContactView({
   const [recruitProjectCheck,setRecruitProjectCheck]=useState<{id:string;state:'idle'|'reading'|'ready'|'failed';message?:string}>({id:'',state:'idle'}),[recruitProjectRead,setRecruitProjectRead]=useState(0),[publicationQuota,setPublicationQuota]=useState<Quota|null>(null);
   useEffect(()=>{composeMounted.current=true;return()=>{composeMounted.current=false;};},[]);
   const viewScope=projectViewScope(runtime,connected);
+  const queryScope=nativeQueryScope(runtime,subjectId??undefined);
+  const projectReads=useQueryReads(queryScope,'projects','management'),contactReads=useQueryReads(queryScope,'contacts','management'),taskReads=useQueryReads(queryScope,'tasks','management');
   const checkCompose=()=>{if(!composeLease)throw Error('请连接当前身份后继续这份草稿。');composeLease.assertCurrent();};
   function composeLocation(kind:'project'|'recruitment',editing:boolean,id?:string){const url=new URL(location.href);url.searchParams.set('section',kind==='project'?'projects':'recruitment');url.searchParams.delete('contactId');url.searchParams.delete('manage');url.searchParams.delete(kind==='project'?'recruitmentId':'projectId');if(editing)url.searchParams.set('compose',kind);else url.searchParams.delete('compose');const field=kind==='project'?'projectId':'recruitmentId';if(id)url.searchParams.set(field,id);else url.searchParams.delete(field);window.history.replaceState(window.history.state,'',url.pathname+url.search);window.dispatchEvent(new Event('galaxy:route-view-changed'));}
   function managementLocation(mode:'roles'|'transfer'|'read',id=project?.projectId){const url=new URL(location.href);url.searchParams.set('section','projects');url.searchParams.delete('compose');url.searchParams.delete('contactId');url.searchParams.delete('recruitmentId');if(id)url.searchParams.set('projectId',id);if(mode==='read')url.searchParams.delete('manage');else url.searchParams.set('manage',mode);setProjectMode(mode);window.history.replaceState(window.history.state,'',url.pathname+url.search);window.dispatchEvent(new Event('galaxy:route-view-changed'));}
-  async function read(path: string, input?: unknown) {
+  async function rawRead<T>(path:string,input?:unknown,signal?:AbortSignal):Promise<T>{
     if(projectViewScope(runtime,connected)!==viewScope)throw new Error('身份或连接已改变，请重新读取。');
-    const result=await runtime.api.call(path, input, {
-      authenticated: connected,
-      ...(input === undefined ? { method: 'GET' } : {}),
-    });
-    if(projectViewScope(runtime,connected)!==viewScope)throw new Error('身份或连接已改变，请重新读取。');
-    return result;
-  };
-  function loadProjects(after?: string) {
-    return read('/v2/projects/query', {limit:20,...(after?{after}:{})}).then((page:ProjectPage)=>{
-      if(!composeMounted.current)return;
-      setProjects(old=>after?[...old,...page.items]:page.items);setProjectNext(page.nextAfter);setProjectsLoaded(true);
-    });
+    const value:T=await runtime.api.call(path,input,{authenticated:connected,signal,...(input===undefined?{method:'GET'}:{})});
+    if(projectViewScope(runtime,connected)!==viewScope)throw new Error('身份或连接已改变，请重新读取。');return value;
   }
-  function loadRecruitments(after?: string) {
-    return read('/v2/recruitment/query',{view:'managed',limit:20,...(after?{after}:{})}).then((page:RecruitmentPage)=>{
-      if(!composeMounted.current)return;
-      setRecruits(old=>after?[...old,...page.items]:page.items);setRecruitNext(page.nextAfter);setRecruitsLoaded(true);
-    });
+  async function read<T>(path:string,input?:unknown,options:QueryReadCallbacks<NoInfer<T>>={}):Promise<T>{
+    const isRead=input===undefined||path.endsWith('/query')||path.endsWith('/read');
+    if(!isRead){projectReads.invalidate();contactReads.invalidate();return rawRead<T>(path,input);}
+    const reads=path.startsWith('/v2/contacts')?contactReads:path.startsWith('/v2/tasks')?taskReads:projectReads;
+    const result=await reads.run<T>({lane:path,key:JSON.stringify(input??null)},({signal})=>rawRead<T>(path,input,signal),{...options,force:options.force??working.current,...(input===undefined&&!options.validUntil?{validUntil:sourceReadDeadline}:{})});
+    if(result.status==='error')throw result.error;if(result.status==='superseded')throw Error('当前读取已被替换。');return result.value;
   }
-  async function loadContacts(after?: string) {
-    const request=++contactsRequest.current;
+  const projectPages=useRef(1),recruitmentPages=useRef(1),contactPages=useRef({key:contactContext,count:1});
+  async function readPages<T>(path:string,input:Record<string,unknown>,depth:number,signal:AbortSignal){let after:string|undefined;const items:T[]=[];const seen=new Set<string>();
+    for(let index=0;index<depth;index++){const page=await rawRead<{items:T[];nextAfter?:string|null}>(path,{...input,...(after?{after}:{})},signal);items.push(...page.items);after=page.nextAfter??undefined;if(!after)break;if(seen.has(after))throw Error('当前分页范围已变化，请重新读取。');seen.add(after);}return{items,nextAfter:after??null};
+  }
+  async function loadProjects(after?:string){const depth=after?projectPages.current+1:projectPages.current;
+    const result=await projectReads.run({lane:'project-list',key:String(depth)},({signal})=>readPages<ProjectView>('/v2/projects/query',{limit:20},depth,signal),{force:working.current,onSuccess:page=>{if(!composeMounted.current)return;projectPages.current=depth;setProjects(page.items);setProjectNext(page.nextAfter);setProjectsLoaded(true);},onError:()=>{setProjects([]);setProjectNext(null);setProjectsLoaded(false);}});if(result.status==='error')throw result.error;
+  }
+  async function loadRecruitments(after?:string){const depth=after?recruitmentPages.current+1:recruitmentPages.current;
+    const result=await projectReads.run({lane:'recruitment-list',key:String(depth)},({signal})=>readPages<RecruitmentView>('/v2/recruitment/query',{view:'managed',limit:20},depth,signal),{force:working.current,onSuccess:page=>{if(!composeMounted.current)return;recruitmentPages.current=depth;setRecruits(page.items);setRecruitNext(page.nextAfter);setRecruitsLoaded(true);},onError:()=>{setRecruits([]);setRecruitNext(null);setRecruitsLoaded(false);}});if(result.status==='error')throw result.error;
+  }
+  async function loadContacts(after?:string){
+    const request=++contactsRequest.current;if(contactPages.current.key!==contactContext)contactPages.current={key:contactContext,count:1};const depth=after?contactPages.current.count+1:contactPages.current.count;
     try{
-      if(initialContactId!==undefined&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(initialContactId))throw new Error('原联系链接中的编号无效，请从原联系或房间重新打开。');
-      const page:ContactsPage = initialContactId!==undefined
-        ?{items:[await read('/v2/contacts/'+initialContactId)],nextAfter:null}
-        :await read('/v2/contacts/query', {direction,limit:20,...(after?{after}:{})});
-      if(request!==contactsRequest.current)return;
-      setContacts((old) => (after ? [...old, ...page.items] : page.items));
-      setContactNext(page.nextAfter);setContactsState('ready');setContactsKey(contactContext);setError('');
+      if(initialContactId!==undefined&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(initialContactId))throw Error('原联系链接中的编号无效，请从原联系或房间重新打开。');
+      const result=await contactReads.run({lane:'contacts-list',key:JSON.stringify([direction,initialContactId,depth])},async({signal})=>initialContactId!==undefined?{items:[await rawRead<ContactView>('/v2/contacts/'+initialContactId,undefined,signal)],nextAfter:null}:await readPages<ContactView>('/v2/contacts/query',{direction,limit:20},depth,signal),{force:working.current,onSuccess:page=>{if(!composeMounted.current)return;contactPages.current={key:contactContext,count:depth};setContacts(page.items);setContactNext(page.nextAfter);setContactsState('ready');setContactsKey(contactContext);setError('');},onError:()=>{if(composeMounted.current){setContacts([]);setContactNext(null);setContactsState('failed');setContactsKey(contactContext);}}});
+      if(result.status==='error')throw result.error;
     }catch(error){if(request===contactsRequest.current){setContacts([]);setContactNext(null);setContactsState('failed');setContactsKey(contactContext);}throw error;}
   }
   function editProject(value:ProjectView|null){if(!value)setNewProjectId(crypto.randomUUID());setProject(value);setProjectForm(projectFormFor(value,blankProject));setViewers('');setVisibility(value?.visibility??'Private');setProjectPreferences(null);}
@@ -242,8 +243,8 @@ function ProjectContactView({
     }).then(async(prepared)=>{if(!prepared)return;const {lane,result}=prepared;checkCompose();if(!composeMounted.current||!currentView()||!lane.open||compose.current[kind]!==lane)return;
     setComposeReady(old=>({...old,[kind]:false}));setComposeStatus(old=>({...old,[kind]:'正在读取本机草稿…'}));
     if(kind==='project'){setProject(null);setProjectMode('edit');}else{setRecruit(null);setRecruitMode('edit');}
-    if(result.completedId){const received=await read('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+result.completedId);if(!composeMounted.current||!currentView()||!lane.open||compose.current[kind]!==lane)return;if(kind==='project'){editProject(received);setProjectMode('read');}else{editRecruitment(received);setRecruitMode('read');}lane.open=false;composeLocation(kind,false,result.completedId);setComposeStatus(old=>({...old,[kind]:''}));setMessage('上次提交已完成。');return;}
-    let current:ProjectView|RecruitmentView|null=null;const currentId=id??result.acknowledgedId;if(currentId){current=await read('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+currentId);checkCompose();if(kind==='project'&&(!current||'recruitmentId' in current||!current.permissions.edit))throw Error('当前不能编辑这个项目，原草稿仍保留。');if(kind==='recruitment'&&current){const represented:ProjectView=await read('/v2/projects/'+current.projectId);if(!represented.permissions?.represent||current.state==='closed')throw Error('当前不能继续编辑这项招募，原草稿仍保留。');}}
+    if(result.completedId){const received=await read<ProjectView|RecruitmentView>('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+result.completedId);if(!composeMounted.current||!currentView()||!lane.open||compose.current[kind]!==lane)return;if(kind==='project'){editProject(received as ProjectView);setProjectMode('read');}else{editRecruitment(received as RecruitmentView);setRecruitMode('read');}lane.open=false;composeLocation(kind,false,result.completedId);setComposeStatus(old=>({...old,[kind]:''}));setMessage('上次提交已完成。');return;}
+    let current:ProjectView|RecruitmentView|null=null;const currentId=id??result.acknowledgedId;if(currentId){current=await read<ProjectView|RecruitmentView>('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+currentId);checkCompose();if(kind==='project'&&(!current||'recruitmentId' in current||!current.permissions.edit))throw Error('当前不能编辑这个项目，原草稿仍保留。');if(kind==='recruitment'&&current){const represented:ProjectView=await read<ProjectView>('/v2/projects/'+current.projectId);if(!represented.permissions?.represent||current.state==='closed')throw Error('当前不能继续编辑这项招募，原草稿仍保留。');}}
     await loadProjects();if(kind==='recruitment')await loadRecruitments();checkCompose();if(!composeMounted.current||!currentView()||!lane.open||compose.current[kind]!==lane)return;
     const saved=result.saved,changes={...saved?.value.changes};
     lane.head=saved?.revision??null;lane.objectId=saved?.objectId??lane.objectId;lane.started=!!saved;lane.baseRevision=current?.revision??0;
@@ -263,7 +264,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     });
   }
   async function markCompose(kind:'project'|'recruitment',operationId:string):Promise<ComposeMarker|null>{const lane=compose.current[kind];if(!lane?.ready)return null;await lane.queue;checkCompose();const saved=checkedCompose(await runtime.getLocal(lane.key,subjectId),kind,lane.targetId);checkCompose();if(saved?.attempt){const previous=await client!.reviewPending(saved.attempt.operationId);checkCompose();if(previous?.state==='acknowledged'){await settleOpenComposers();throw Error('上次提交已完成，请基于当前内容重新预览后继续。');}if(previous)throw Error('请先从提交状态继续原操作，当前修改仍保存在草稿中。');}const revision=lane.head,value=composeValue(kind,lane);if(revision)await runtime.updateLocal(lane.key,(raw:unknown)=>{checkCompose();const current=checkedCompose(raw,kind,lane.targetId);if(current?.revision!==revision)throw Error('另一页已修改这份草稿，请重新打开后核对。');return{...current,attempt:{operationId,revision}};},subjectId);checkCompose();return{lane,revision,value};}
-  async function settleOpenComposers(){for(const kind of ['project','recruitment'] as const){const lane=compose.current[kind];if(!lane?.head)continue;const result=await readCompose(kind,lane);if((result.completedId||result.acknowledgedId)&&lane.open&&compose.current[kind]===lane){const current=await read('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+(result.completedId??result.acknowledgedId));checkCompose();if(!composeMounted.current||!lane.open||compose.current[kind]!==lane)continue;if(result.completedId){if(kind==='project'){editProject(current);setProjectMode('read');}else{editRecruitment(current);setRecruitMode('read');}lane.open=false;composeLocation(kind,false,result.completedId);}else{if(kind==='project')setProject(current);else setRecruit(current);rebaseCompose(kind,lane,current);}}}}
+  async function settleOpenComposers(){for(const kind of ['project','recruitment'] as const){const lane=compose.current[kind];if(!lane?.head)continue;const result=await readCompose(kind,lane);if((result.completedId||result.acknowledgedId)&&lane.open&&compose.current[kind]===lane){const current=await read<ProjectView|RecruitmentView>('/v2/'+(kind==='project'?'projects':'recruitment')+'/'+(result.completedId??result.acknowledgedId));checkCompose();if(!composeMounted.current||!lane.open||compose.current[kind]!==lane)continue;if(result.completedId){if(kind==='project'){editProject(current as ProjectView);setProjectMode('read');}else{editRecruitment(current as RecruitmentView);setRecruitMode('read');}lane.open=false;composeLocation(kind,false,result.completedId);}else{if(kind==='project')setProject(current as ProjectView);else setRecruit(current as RecruitmentView);rebaseCompose(kind,lane,current);}}}}
   function leaveComposer(kind:'project'|'recruitment',id?:string){if(compose.current[kind])compose.current[kind].open=false;composeLocation(kind,false,id);setConfirmation(null);}
   const names=useMemberNames(runtime,subjectId??undefined,connected,[...audienceIds,...tags(viewers),...contacts.flatMap(item=>[item.initiatorId,item.recipientId]),...opportunities.map(item=>item.subjectId),...(project?.management?.roles??[]).map(item=>item.subjectId),...(project?.management?.transfers??[]).flatMap(item=>[item.fromSubjectId,item.toSubjectId]),...(pendingReview?[projectErrorText(pendingReview.payload,'recipientId'),projectErrorText(pendingReview.payload,'subjectId'),projectErrorText(pendingReview.payload,'toSubjectId'),...(pendingReview.viewers??[])].filter(Boolean):[])]);
   const name=(id:string)=>names[id]??memberName(id);
@@ -271,7 +272,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
   useEffect(()=>{if(contactReply)contactDialog.current?.showModal();else contactDialog.current?.close();},[contactReply]);
   useEffect(()=>{if(detailOpen&&detail)detailDialog.current?.showModal();else detailDialog.current?.close();},[detailOpen,detail]);
   useEffect(()=>{if(pendingReview)pendingDialog.current?.showModal();else pendingDialog.current?.close();},[pendingReview]);
-  async function refreshVisible(){if(tab==='projects'){await loadProjects();if(project&&['read','roles','transfer'].includes(projectMode))editProject(await read('/v2/projects/'+project.projectId));}else if(tab==='recruitment'){await loadRecruitments();if(recruit&&recruitMode==='read')setRecruit(await read('/v2/recruitment/'+recruit.recruitmentId));}else if(tab==='contacts')await loadContacts();}
+  async function refreshVisible(){if(tab==='projects'){await loadProjects();if(project&&['read','roles','transfer'].includes(projectMode))editProject(await read<ProjectView>('/v2/projects/'+project.projectId));}else if(tab==='recruitment'){await loadRecruitments();if(recruit&&recruitMode==='read')setRecruit(await read<RecruitmentView>('/v2/recruitment/'+recruit.recruitmentId));}else if(tab==='contacts')await loadContacts();}
   const recoverPending=useEffectEvent(async(current:()=>boolean)=>{
     if(!client)return;let completed=false;const reasons:Record<string,string>={};
     const value=await client.pending();
@@ -288,7 +289,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
   async function run(fn: () => Promise<unknown>) {
     if (working.current) return;
     working.current=true;
-    projectReadEpoch.current++;
+    projectReadEpoch.current++;projectReads.invalidate();contactReads.invalidate();taskReads.invalidate();
     setBusy(true);
     setError('');
     setMessage('');
@@ -317,10 +318,10 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     }
   }
   useEffect(()=>{if(projectViewScope(runtime,connected)===viewScope)projectQueryMemory(runtime,connected,'contact-list',{query,note,roomTitle});},[runtime,viewScope,connected,query,note,roomTitle]);
-  async function loadAudience(after?:string){checkCompose();try{const page:ContactsPage=await read('/v2/contacts/query',{direction:'both',limit:50,...(after?{after}:{})});checkCompose();if(!composeMounted.current)return;const ids:string[]=page.items.map(item=>item.initiatorId===subjectId?item.recipientId:item.initiatorId).filter((id:unknown)=>typeof id==='string');setAudienceIds(old=>[...new Set<string>(after?[...old,...ids]:ids)]);setAudienceAfter(page.nextAfter??null);setAudienceLoaded(true);setAudienceError('');}catch(error){if(composeMounted.current){setAudienceLoaded(true);setAudienceError('联系人暂未读取成功，可以重新读取。');}throw error;}}
+  async function loadAudience(after?:string){checkCompose();try{const page:ContactsPage=await read<ContactsPage>('/v2/contacts/query',{direction:'both',limit:50,...(after?{after}:{})});checkCompose();if(!composeMounted.current)return;const ids:string[]=page.items.map(item=>item.initiatorId===subjectId?item.recipientId:item.initiatorId).filter((id:unknown)=>typeof id==='string');setAudienceIds(old=>[...new Set<string>(after?[...old,...ids]:ids)]);setAudienceAfter(page.nextAfter??null);setAudienceLoaded(true);setAudienceError('');}catch(error){if(composeMounted.current){setAudienceLoaded(true);setAudienceError('联系人暂未读取成功，可以重新读取。');}throw error;}}
   const refreshAudience=useEffectEvent(()=>{void loadAudience().catch(()=>{});});
   useEffect(()=>{if(projectMode==='edit'&&projectStep===1&&visibility==='Private'&&composeReady.project&&!audienceLoaded)refreshAudience();},[projectMode,projectStep,visibility,composeReady.project,audienceLoaded]);
-  const readRecruitProject=useEffectEvent((id:string,currentView:()=>boolean)=>read('/v2/projects/'+id).then(async(current:ProjectView)=>{
+  const readRecruitProject=useEffectEvent((id:string,currentView:()=>boolean)=>read<ProjectView>('/v2/projects/'+id).then(async(current:ProjectView)=>{
     checkCompose();if(currentView())setProjects(old=>[...old.filter(item=>item.projectId!==id),current]);
     if(!recruitProjectEligible(current))throw Error('这项招募需要公开且进行中的项目，以及你当前的对外代表权限。请先调整原项目，或选择其他可发布的项目。');
     const publicView:ProjectView=await runtime.api.call('/v2/projects/'+id,undefined,{method:'GET',authenticated:false});checkCompose();
@@ -336,8 +337,8 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
   const requestedCompose=new URLSearchParams(location.search).get('compose'),initialRecruitmentId=new URLSearchParams(location.search).get('recruitmentId'),requestedManagement=new URLSearchParams(location.search).get('manage');
   const readRequested=useEffectEvent((currentView:()=>boolean)=>{
     if(writable&&(requestedCompose==='project'||requestedCompose==='recruitment')){const id=requestedCompose==='project'?initialProjectId:initialRecruitmentId??undefined,lane=compose.current[requestedCompose];if(!lane?.open||lane.targetId!==(id??'new'))return openComposer(requestedCompose,id,currentView);}
-    else if(initialTab==='recruitment'&&initialRecruitmentId&&/^[0-9a-f-]{36}$/.test(initialRecruitmentId))return read('/v2/recruitment/'+initialRecruitmentId).then((value:RecruitmentView)=>{if(currentView()){editRecruitment(value);setRecruitMode('read');}});
-    else if(initialProjectId&&/^[0-9a-f-]{36}$/.test(initialProjectId))return read('/v2/projects/'+initialProjectId).then((value:ProjectView)=>{if(currentView()){editProject(value);setProjects([value]);setProjectMode(value.permissions.manage&&(requestedManagement==='roles'||requestedManagement==='transfer')?requestedManagement:'read');if(requestedManagement&&!value.permissions.manage)setError('当前身份已不能管理这个项目，原来未提交的选择仍保留在本机。');}}).catch(error=>{if(currentView())editProject(null);throw error;});
+    else if(initialTab==='recruitment'&&initialRecruitmentId&&/^[0-9a-f-]{36}$/.test(initialRecruitmentId))return read<RecruitmentView>('/v2/recruitment/'+initialRecruitmentId).then((value:RecruitmentView)=>{if(currentView()){editRecruitment(value);setRecruitMode('read');}});
+    else if(initialProjectId&&/^[0-9a-f-]{36}$/.test(initialProjectId))return read<ProjectView>('/v2/projects/'+initialProjectId).then((value:ProjectView)=>{if(currentView()){editProject(value);setProjects([value]);setProjectMode(value.permissions.manage&&(requestedManagement==='roles'||requestedManagement==='transfer')?requestedManagement:'read');if(requestedManagement&&!value.permissions.manage)setError('当前身份已不能管理这个项目，原来未提交的选择仍保留在本机。');}}).catch(error=>{if(currentView())editProject(null);throw error;});
     return Promise.resolve();
   });
   useEffect(()=>{let active=true;void readRequested(()=>active).catch((error:unknown)=>{if(active)setError(projectErrorText(error).trim()?projectErrorText(error):initialTab==='recruitment'?'招募详情暂未读取成功，请重新打开。':'项目详情暂未读取成功，请重新打开或刷新。');});return()=>{active=false;};},[viewScope,initialTab,initialProjectId,initialRecruitmentId,requestedCompose,requestedManagement,writable]);
@@ -348,8 +349,8 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
 
     const refresh=()=>{if(!active||reading||working.current||document.visibilityState!=='visible')return;reading=true;
       void refreshContacts().catch(e=>{if(active)setError(projectErrorText(e).trim()?projectErrorText(e):'联系列表暂未读取成功，请重试。');}).finally(()=>{reading=false;});};
-    refresh();const timer=window.setInterval(refresh,20000);document.addEventListener('visibilitychange',refresh);
-    return()=>{active=false;requestRef.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
+    refresh();
+    return()=>{active=false;requestRef.current++;};
   },[runtime,viewScope,tab,direction,writable,initialContactId]);
   async function projectWrite(event:ProjectChoice,extraViewers:string[]=[],selection:ProjectSelection|null=null) {
     const targetId=event.projectId??project?.projectId??newProjectId,expectedRevision=event.expectedRevision??project?.revision??0;
@@ -358,7 +359,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     if(managing){
       const previous=(await client!.pending()).find(item=>item.type==='project'&&item.objectId===targetId);checkCompose();
       if(previous){await reviewManagementOperation(previous.operationId);return false;}
-      const current:ProjectView=await read('/v2/projects/'+targetId);checkCompose();
+      const current:ProjectView=await read<ProjectView>('/v2/projects/'+targetId);checkCompose();
       if(current.projectId!==targetId)throw Error('当前项目暂时无法准确核对，请重新读取。');
       if(project?.projectId===targetId)setProject(current);
       if(event.kind==='accept-transfer'){
@@ -391,7 +392,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     const finish=!marker||(compose.current.project===marker.lane&&marker.lane.open&&!settled?.saved&&JSON.stringify(composeValue('project',marker.lane))===JSON.stringify(marker.value));
     try{await loadProjects();}catch(error:unknown){if(selection&&error instanceof Error)Object.assign(error,{operationAcknowledged:true});throw error;}
     try {
-      const current:ProjectView=await read('/v2/projects/' + receipt.projectId);
+      const current:ProjectView=await read<ProjectView>('/v2/projects/' + receipt.projectId);
       if(finish)editProject(current);else if(marker&&compose.current.project===marker.lane&&marker.lane.open){setProject(current);rebaseCompose('project',marker.lane,current);}
     } catch {
       if(finish)editProject(null);
@@ -458,7 +459,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     await loadRecruitments();
     // An owner may close a source that is no longer publicly readable. The write receipt is still valid.
     try {
-      const current:RecruitmentView=await read('/v2/recruitment/' + id);if(finish)editRecruitment(current);else if(marker&&compose.current.recruitment===marker.lane&&marker.lane.open){setRecruit(current);rebaseCompose('recruitment',marker.lane,current);}
+      const current:RecruitmentView=await read<RecruitmentView>('/v2/recruitment/' + id);if(finish)editRecruitment(current);else if(marker&&compose.current.recruitment===marker.lane&&marker.lane.open){setRecruit(current);rebaseCompose('recruitment',marker.lane,current);}
     } catch {
       if(finish)setRecruit(null);
     }
@@ -478,11 +479,11 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
           purposes: [query.purpose],
         };
     if(!request)throw Error('请先读取当前查找范围。');
-    const page:import("../contracts").DiscoveryPage = await read('/v2/discovery/query', {
+    const page:import("../contracts").DiscoveryPage = await read<import('../contracts').DiscoveryPage>('/v2/discovery/query', {
       ...request,
       limit: 20,
       ...(after ? { after } : {}),
-    });
+    },{validUntil:sourceReadDeadline,onSuccess:(value:import('../contracts').DiscoveryPage)=>{if(composeMounted.current){setOpportunities(old=>after?[...new Map([...old,...value.items].map(item=>[item.id,item])).values()]:value.items);setQueryNext(value.nextAfter);}}});
     setSubmitted(request);
     setOpportunities((old) => (after ? [...old, ...page.items] : page.items));
     setQueryNext(page.nextAfter);
@@ -495,31 +496,31 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
     }
   }
   function chooseTab(next:string){setTab(next);for(const lane of Object.values(compose.current))if(lane)lane.open=false;setProjectMode('list');setRecruitMode('list');const url=new URL(location.href);url.searchParams.set('section',next);url.searchParams.delete('compose');url.searchParams.delete('manage');url.searchParams.delete('projectId');url.searchParams.delete('recruitmentId');if(next!=='contacts')url.searchParams.delete('contactId');window.history.replaceState(window.history.state,'',url.pathname+url.search);window.dispatchEvent(new Event('galaxy:route-view-changed'));}
-  function loadPreferences(){return read('/v1/discovery/preferences/read',{}).then(async(global:PreferencesView)=>{if(!composeMounted.current)return;setDiscoveryPreferences(global);if(project?.document){const selected:ProjectPreferencesView=await read('/v2/projects/'+project.projectId+'/preferences/read',{});if(composeMounted.current)setProjectPreferences(selected);}});}
-  async function savePreferences(patch:Partial<PreferencesView['preferences']>){if(!discoveryPreferences)throw Error('请先读取当前交流意愿。');setDiscoveryPreferences(await read('/v1/discovery/preferences/save',{expectedRevision:discoveryPreferences.revision,preferences:{...discoveryPreferences.preferences,...patch}}));setMessage('交流意愿已更新。');}
-  async function loadTasks(after?:string){const page=await read('/v2/tasks/query',{view:'requested',limit:20,...(after?{after}:{})});setTasks(old=>after?[...old,...page.items]:page.items);setTaskNext(page.nextAfter??page.next??null);}
+  function loadPreferences(){return read<PreferencesView>('/v1/discovery/preferences/read',{},{onSuccess:(value:PreferencesView)=>{if(composeMounted.current)setDiscoveryPreferences(value);}}).then(async(global:PreferencesView)=>{if(!composeMounted.current)return;setDiscoveryPreferences(global);if(project?.document){const selected:ProjectPreferencesView=await read<ProjectPreferencesView>('/v2/projects/'+project.projectId+'/preferences/read',{},{onSuccess:(value:ProjectPreferencesView)=>{if(composeMounted.current)setProjectPreferences(value);}});if(composeMounted.current)setProjectPreferences(selected);}});}
+  async function savePreferences(patch:Partial<PreferencesView['preferences']>){if(!discoveryPreferences)throw Error('请先读取当前交流意愿。');setDiscoveryPreferences(await read<PreferencesView>('/v1/discovery/preferences/save',{expectedRevision:discoveryPreferences.revision,preferences:{...discoveryPreferences.preferences,...patch}}));setMessage('交流意愿已更新。');}
+  async function loadTasks(after?:string){const page=await read<{items:TaskChoice[];nextAfter?:string|null;next?:string|null}>('/v2/tasks/query',{view:'requested',limit:20,...(after?{after}:{})});setTasks(old=>after?[...old,...page.items]:page.items);setTaskNext(page.nextAfter??page.next??null);}
   const loadTab=useEffectEvent(()=>{if(working.current)return;const loaded=tab==='projects'?loadProjects():tab==='recruitment'?loadProjects().then(()=>loadRecruitments()):tab==='willingness'?loadPreferences():Promise.resolve();void loaded.catch((error:unknown)=>{if(composeMounted.current)setError(projectErrorText(error)||'当前内容暂未读到，请稍后再试。');});});
   useEffect(()=>{if(writable)loadTab();},[tab,writable]);
   function confirmAction(title:string,body:React.ReactNode,execute:()=>Promise<unknown>){setConfirmation({title,body,execute});}
 
-  const readManagedProject=useEffectEvent(async(id:string,epoch:number,current:()=>boolean)=>{try{const value:ProjectView=await read('/v2/projects/'+id);if(!current()||working.current||epoch!==projectReadEpoch.current)return;if(value.projectId!==id)throw Error('项目的读取结果不匹配，请重新打开。');setProject(value);if(['roles','transfer'].includes(projectMode)&&!value.permissions.manage){managementLocation('read',id);setMessage('项目管理关系已变化，未提交的选择仍保留在本机。');}}catch(reason){if(current()&&!working.current&&epoch===projectReadEpoch.current){if([403,404].includes(projectErrorNumber(reason)??0)){setProject(null);setProjectMode('list');setConfirmation(null);void loadProjects().catch(()=>{});setError('原项目当前不可读取，未提交的编辑稿和选人草稿仍保留在本机。');}else setError('项目当前状态暂未重新读取，请稍后再试。');}}});
+  const readManagedProject=useEffectEvent(async(id:string,epoch:number,current:()=>boolean)=>{try{const apply=(value:ProjectView)=>{if(!current()||working.current)return;setProject(value);if(['roles','transfer'].includes(projectMode)&&!value.permissions.manage){managementLocation('read',id);setMessage('项目管理关系已变化，未提交的选择仍保留在本机。');}};const value:ProjectView=await read<ProjectView>('/v2/projects/'+id,undefined,{validUntil:()=>Infinity,onSuccess:apply,onError:()=>{if(current()){setProject(null);setConfirmation(null);}}});if(!current()||working.current||epoch!==projectReadEpoch.current)return;if(value.projectId!==id)throw Error('项目的读取结果不匹配，请重新打开。');setProject(value);if(['roles','transfer'].includes(projectMode)&&!value.permissions.manage){managementLocation('read',id);setMessage('项目管理关系已变化，未提交的选择仍保留在本机。');}}catch(reason){if(current()&&!working.current&&epoch===projectReadEpoch.current){if([403,404].includes(projectErrorNumber(reason)??0)){setProject(null);setProjectMode('list');setConfirmation(null);void loadProjects().catch(()=>{});setError('原项目当前不可读取，未提交的编辑稿和选人草稿仍保留在本机。');}else setError('项目当前状态暂未重新读取，请稍后再试。');}}});
   useEffect(()=>{
     if(tab!=='projects'||!writable||!project?.projectId||!['read','roles','transfer'].includes(projectMode))return;
     let active=true,reading=false;const id=project.projectId,epochRef=projectReadEpoch;
     const refresh=()=>{if(!active||reading||working.current||document.hidden)return;reading=true;const epoch=projectReadEpoch.current;
       void readManagedProject(id,epoch,()=>active).finally(()=>{reading=false;});
     };
-    const timer=window.setInterval(refresh,20000);document.addEventListener('visibilitychange',refresh);
-    return()=>{active=false;epochRef.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
+    refresh();
+    return()=>{active=false;epochRef.current++;};
   },[runtime,viewScope,tab,writable,project?.projectId,projectMode]);
   function hideSource(item:VisibleOpportunity){setOpportunities(old=>old.map(row=>row.id===item.id?{...opportunityLocator(row),sourceUnavailable:true as const}:row));setDetail(old=>old?.opportunity.id===item.id?null:old);setSelected(old=>old.filter(id=>id!==item.id));setSourceDenied(true);}
   async function inspect(item:Opportunity,after?:string|null) {
     if(!submitted)throw Error('请先读取当前查找范围。');
-    try{setDetail(await read('/v2/discovery/detail', {
+    try{setDetail(await read<OpportunityDetail>('/v2/discovery/detail', {
         ...submitted,
         opportunityRef: item.opportunityRef,
         ...(after ? { experienceAfter: after } : {}),
-      }));}catch(error){if(opportunityUnavailable(error))hideSource(item);throw error;}
+      },{validUntil:sourceReadDeadline,onSuccess:(value:OpportunityDetail)=>{if(composeMounted.current)setDetail(value);},onError:()=>{if(composeMounted.current)setDetail(null);}}));}catch(error){if(opportunityUnavailable(error))hideSource(item);throw error;}
   }
   async function sendSelected() {
     if(!submitted)throw Error('请先读取当前查找范围。');
@@ -631,7 +632,7 @@ showCompose(kind,lane);setComposeReady(old=>({...old,[kind]:true}));setComposeSt
             {recruitProjectId&&recruitProjectCheck.state==='reading'&&<p className="record-meta"><output>正在读取项目的公开介绍与当前代表权限…</output></p>}{recruitProjectId&&recruitProjectCheck.state==='failed'&&<p className="message error" role="alert">{recruitProjectCheck.message}<button type="button" className="text-link" disabled={busy} onClick={()=>setRecruitProjectRead(value=>value+1)}>重新读取项目</button></p>}{publicationLimited&&<p className="message"><output>今天可公开发布的求助和招募次数已用完。内容仍保存在本机，可在 {readableTime(publicationQuota.resetAt??undefined)} 后继续发布。</output></p>}<div className="button-row">{recruitStep>0&&<Button type="button" variant="outline" onClick={()=>changeCompose('recruitment',{step:0},false)}>上一步</Button>}<Button type="submit" disabled={busy||!writable||!composeReady.recruitment||!recruitmentSourceReady||(recruitStep===1&&(recruitComposePending||publicationLimited))||!recruitProjectId||recruit?.state==='closed'||!recruitForm.title.trim()||!recruitForm.role.trim()||!recruitForm.summary.trim()||!tags(recruitForm.functions).length}>{recruitStep===0?'继续':'预览招募'}</Button>{recruit&&recruitStep===1&&<Button type="button" variant="outline" disabled={busy||!composeReady.recruitment||!recruitmentSourceReady||recruitComposePending||publicationLimited||recruit.state==='closed'} onClick={()=>confirmAction('续期招募',<><h3>{recruitForm.title}</h3><p className="reading-prose">{recruitForm.summary}</p><p>角色：{recruitForm.role} · 方向：{recruitForm.functions}</p><p>{recruitForm.conditions}</p><p>按当前内容公开续期 {recruitForm.days} 天。</p></>,async()=>{if(await recruitWrite('renew'))setRecruitMode('read');})}>预览续期</Button>}</div>
           </form>
         </>}</section>}
-        {recruitMode==='link'&&recruit&&<form className="workspace-form project-editor" onSubmit={event=>{event.preventDefault();confirmAction('关联已有求助',<p>将 <TaskCurrentTitle runtime={runtime} task={tasks.find(item=>item.taskId===taskId)} fallback="所选求助"/> 关联到 {recruit.document?.title}。求助的工作范围与状态保持原记录。</p>,async()=>{const task=await read('/v2/tasks/'+taskId);await recruitWrite('link-task',{taskId,expectedTaskVersion:task.version});setRecruitMode('read');});}}><h2>选择你发起的求助</h2><label>已有求助<select required value={taskId} onChange={event=>setTaskId(event.target.value)}><option value="">选择求助</option>{tasks.map(item=><option key={item.taskId} value={item.taskId}>{item.request?.title??item.title??'已有求助'}</option>)}</select></label>{taskNext&&<Button type="button" variant="outline" disabled={busy} onClick={()=>run(()=>loadTasks(taskNext))}>更多求助</Button>}{!tasks.length&&<p>还没有可关联的求助。</p>}<div className="button-row"><Button type="submit" disabled={busy||!taskId}>预览关联</Button><Button type="button" variant="outline" onClick={()=>setRecruitMode('read')}>返回</Button></div></form>}
+        {recruitMode==='link'&&recruit&&<form className="workspace-form project-editor" onSubmit={event=>{event.preventDefault();confirmAction('关联已有求助',<p>将 <TaskCurrentTitle runtime={runtime} task={tasks.find(item=>item.taskId===taskId)} fallback="所选求助"/> 关联到 {recruit.document?.title}。求助的工作范围与状态保持原记录。</p>,async()=>{const task=await read<{version:number}>('/v2/tasks/'+taskId);await recruitWrite('link-task',{taskId,expectedTaskVersion:task.version});setRecruitMode('read');});}}><h2>选择你发起的求助</h2><label>已有求助<select required value={taskId} onChange={event=>setTaskId(event.target.value)}><option value="">选择求助</option>{tasks.map(item=><option key={item.taskId} value={item.taskId}>{item.request?.title??item.title??'已有求助'}</option>)}</select></label>{taskNext&&<Button type="button" variant="outline" disabled={busy} onClick={()=>run(()=>loadTasks(taskNext))}>更多求助</Button>}{!tasks.length&&<p>还没有可关联的求助。</p>}<div className="button-row"><Button type="submit" disabled={busy||!taskId}>预览关联</Button><Button type="button" variant="outline" onClick={()=>setRecruitMode('read')}>返回</Button></div></form>}
       </>}
     </>}
     {tab==='contacts'&&<section>

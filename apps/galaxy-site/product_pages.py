@@ -110,7 +110,8 @@ def render_product_pages(site):
 
     page("/404/", "页面未找到", "返回银河，继续浏览或查找内容。",
         '<section class="missing-page"><span aria-hidden="true">404</span><h1>这里没有找到内容。</h1><p>地址可能已经改变，可以继续浏览或搜索。</p><a class="button" href="/app/">回到发现 ' + '</a><a class="text-link" href="/app/community">看看社区</a></section>')
-    site["write"]("404.html", (out / "404/index.html").read_text(encoding="utf-8"))
+    if not site.get("RUNTIME_DATA"):
+        site["write"]("404.html", (out / "404/index.html").read_text(encoding="utf-8"))
 
     community = metadata.get('webGuides', {}).get('community')
     guides = raw_guides

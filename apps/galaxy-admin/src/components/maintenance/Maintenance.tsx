@@ -16,7 +16,7 @@ import {useOperationsRead} from "../../lib/use-operations-read";
 import {operationsRequest,OperationsRequestError} from "../../lib/operations-client";
 import type {MaintenanceRecoveredResult} from "../../lib/maintenance-view-model";
 import {maintenanceApprovalBody,maintenanceRecoveryReceipt,maintenanceRecoveryNative,maintenanceAvailabilityText,maintenanceBytes,maintenanceCalendar,maintenanceCommandErrors,maintenanceComponentSource,maintenanceConditionLabels,maintenanceCount,maintenanceCurrentAuthorityDeclared,maintenanceExecutionBody,maintenanceHealthText,maintenanceHref,maintenanceIntegrity,maintenanceLease,maintenanceLocation,maintenanceLossText,maintenanceNext,maintenancePath,maintenancePlanLabels,maintenancePrevious,maintenanceProcessText,maintenanceReason,maintenanceRestoreBasis,maintenanceTime} from "../../lib/maintenance-view-model";
-import type {MaintenanceAvailability,MaintenanceBackupDetail,MaintenanceBackupPage,MaintenanceComponent,MaintenanceLocation,MaintenanceLog,MaintenanceLogPage,MaintenanceModule,MaintenanceNativeOperation,MaintenanceOperationDetail,MaintenanceOverview,MaintenancePlanDetail,MaintenancePlanPage,MaintenancePoint,MaintenancePolicy} from './maintenance-types';
+import type {MaintenanceAvailability,MaintenanceBackupDetail,MaintenanceBackupPage,MaintenanceComponent,MaintenanceLocation,MaintenanceLog,MaintenanceLogPage,MaintenanceModule,MaintenanceNativeOperation,MaintenanceOperationDetail,MaintenanceOverview,MaintenancePlanDetail,MaintenancePlanPage,MaintenancePolicy} from './maintenance-types';
 import './maintenance.css';
 
 type RestoreDraft={scope:'whole-site'|'selected-modules';moduleIds:string[]};
@@ -148,12 +148,9 @@ function MaintenanceSettings({location:requestedLocation,csrfToken,canRead,canRe
  },[overviewRead.value,backupsRead.value,pointRead.value,plansRead.value,planRead.value,logsRead.value,operationRead.value]);
  useEffect(()=>{
   if(!operationId||!operationRead.value||operationRead.loading||operationRead.refreshing||operation&&!['pending','running','unknown'].includes(operation.state))return;
-  const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){void operationRead.read();void backupsRead.read();void overviewRead.read();}},4000);return()=>clearTimeout(timer);
+  const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){void operationRead.read();}},4000);return()=>clearTimeout(timer);
  },[operationId,operation,operationRead.value,operationRead.loading,operationRead.refreshing,operationRead.read,backupsRead.read,overviewRead.read]);
- useEffect(()=>{
-  if(!detail||!['preparing','restoring','validating','ready-to-open','opening'].includes(detail.plan.state)||planRead.loading)return;
-  const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){void planRead.read();void overviewRead.read();}},4000);return()=>clearTimeout(timer);
- },[detail,planRead.loading,planRead.read,overviewRead.read]);
+
  useLayoutEffect(()=>{
   const regions=[{ref:runtimeColumn,key:location.tab+':runtime',readable:!!overview},{ref:backupColumn,key:location.tab+':backup:'+location.point,readable:!!backups},{ref:restoreColumn,key:location.tab+':restore:'+location.plan,readable:!!plans},{ref:logsColumn,key:'logs:'+location.component+':'+location.level+':'+location.period+':'+location.before,readable:!!logs}];
   for(const region of regions)if(region.readable&&region.ref.current)region.ref.current.scrollTop=positions.current[region.key]??0;
@@ -182,7 +179,7 @@ function MaintenanceSettings({location:requestedLocation,csrfToken,canRead,canRe
  const componentNames=new Map<string,string>(overview?.components.map(item=>[item.id,item.label] as const)??[]);
  useSettingsDraftState(Object.values(drafts).some(value=>value.scope!=='whole-site'||value.moduleIds.length>0),command.locked);
  return <section className="galaxy-maintenance" aria-label="系统维护与备份恢复">
-  <SettingsReceiptNotice recovery={recovery}/><header className="maintenance-page-header"><div><h1>系统维护与备份恢复</h1><p>{location.tab==='logs'?'运行日志与故障线索':location.tab==='control'?'当前维护状态与设置':location.tab==='overview'?'组件、队列与空间':'运行、备份与本次恢复方案'}</p></div><div><span className="maintenance-updated">{latestCheckedAt?'更新于 '+maintenanceTime(new Date(latestCheckedAt*1000).toISOString())+' · 上海时间':''}</span><button type="button" disabled={command.locked||busyRead} onClick={()=>void refresh()}><AdminIcon name="refresh" size={14}/>刷新</button></div></header>{true&&<AutonomyObjectContext targetType="maintenance" targetId="website" csrfToken={csrfToken}/>}
+  <SettingsReceiptNotice recovery={recovery}/><header className="maintenance-page-header"><div><h1>系统维护与备份恢复</h1><p>{location.tab==='logs'?'运行日志与故障线索':location.tab==='control'?'当前维护状态与设置':location.tab==='overview'?'组件、队列与空间':'运行、备份与本次恢复方案'}</p></div><div><span className="maintenance-updated">{latestCheckedAt?'更新于 '+maintenanceTime(new Date(latestCheckedAt*1000).toISOString())+' · 上海时间':''}</span><button type="button" disabled={command.locked||busyRead} onClick={()=>void refresh()}><AdminIcon name="refresh" size={14}/>刷新</button></div></header><AutonomyObjectContext targetType="maintenance" targetId="website" csrfToken={csrfToken}/>
   <div className="maintenance-command"><CommandFeedback command={{...command,message:operation&&['succeeded','failed'].includes(operation.state)&&['备份任务已受理，结果将在完成后更新。','校验任务已受理，结果将在完成后更新。','已请求程序按本次批准方案执行。'].includes(command.message)?'':command.message}}/></div>
   {canRead&&inBackups&&<div className="maintenance-status-strip"><span>维护模式 <b>{overview?modeLabels[overview.maintenanceMode.state]:'未取得'}</b></span><span>最近备份 <b>{backups?.policy.lastCreate?({running:'执行中',succeeded:'捕获已完成',failed:'捕获失败',unknown:'结果未取得'})[backups.policy.lastCreate.outcome]:'未取得'}</b></span><span>恢复方案 <b>{currentPlan?maintenancePlanLabels[currentPlan.state]:location.plan?'正在读取':'未选择'}</b></span></div>}
   {location.tab==='backups'?<div className="maintenance-workspace">

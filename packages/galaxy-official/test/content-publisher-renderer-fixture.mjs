@@ -1,5 +1,4 @@
-// A controlled child process for filesystem-publisher boundaries. The real
-// Python block renderer has its own test_cms_content.py behavior tests.
+// Legacy renderer sentinel used to prove that dynamic publication never executes a renderer process.
 import {readFile, readdir, writeFile} from 'node:fs/promises';
 import {isAbsolute, join, relative, sep} from 'node:path';
 

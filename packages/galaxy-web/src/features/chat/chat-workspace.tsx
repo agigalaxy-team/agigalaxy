@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from 'lucide-react';
 import {AccountConversationNotes} from "../conversation-notes/account/workspace.tsx";
 import {OfficialAccountStatus} from "../accounts/official-account-panel";
-import {AccountSessionScope,useAccountSessionModel} from "../accounts/account-session-scope";
+import {AccountSessionScope,useAccountSessionModel,useAccountQueryScope} from "../accounts/account-session-scope";
 import {createOfficialChatRuntime} from "./official-chat-runtime.mjs";
 import {ChatMemberLink,chatMemberName as memberName,useChatMembers} from "./chat-member-ui";
 import {SaveForLaterButton,ReadingBookmarksAccountProvider} from "../bookmarks/controls";
@@ -73,18 +73,19 @@ function ConversationSidebar({runtime,subjectId,lease,roomId,navigate}:{runtime:
    const now=Date.now(),available=values.filter(item=>readDeadline(item.readExpiresAt)*1000>now);
    if(cursor)pages.current++;
    setRows(previous=>cursor?[...new Map([...previous.filter(item=>item.readExpiresAt*1000>now),...available].map(item=>[item.roomId,item])).values()]:available);setNext(after);setError('');setClock(now);
-  }catch{if(canRead()&&token===version.current){setRows([]);setNext(null);setError('对话列表暂时未读到。');}}
+  }catch{if(canRead()&&token===version.current){setError('对话列表暂时未读到。');}}
   finally{if(inFlight.current===token)inFlight.current=null;if(canRead()&&token===version.current)setBusy(false);}
  },[runtime,canRead,submittedQuery]);
  useEffect(()=>{
   const life=live,sequence=version,flight=inFlight;life.current=true;pages.current=1;setRows([]);setNext(null);
   const refresh=()=>{if(!document.hidden)void read();};
-  const lost=()=>{sequence.current++;flight.current=null;setRows([]);setNext(null);setBusy(false);setError('连接恢复后重新读取对话。');};
+  const lost=()=>{sequence.current++;flight.current=null;setBusy(false);setError('连接恢复后重新读取对话。');};
   readAgain.current=refresh;
-  const initial=window.setTimeout(refresh,0),timer=window.setInterval(refresh,30000);
-  window.addEventListener('online',refresh);window.addEventListener('offline',lost);document.addEventListener('visibilitychange',refresh);
-  return()=>{life.current=false;sequence.current++;flight.current=null;window.clearTimeout(initial);window.clearInterval(timer);window.removeEventListener('online',refresh);window.removeEventListener('offline',lost);document.removeEventListener('visibilitychange',refresh);};
- },[read]);
+  const initial=window.setTimeout(refresh,0);
+  const unsubscribe=(runtime as ChatRuntime&{subscribe?:(fn:(reset?:boolean)=>void)=>()=>void}).subscribe?.(reset=>{if(reset){setRows([]);setNext(null);}refresh();});
+  window.addEventListener('online',refresh);window.addEventListener('offline',lost);
+  return()=>{life.current=false;sequence.current++;flight.current=null;window.clearTimeout(initial);unsubscribe?.();window.removeEventListener('online',refresh);window.removeEventListener('offline',lost);};
+ },[read,runtime]);
  useEffect(()=>{if(!rows.length)return;const deadlines=rows.map(item=>item.readExpiresAt*1000).filter(value=>value>clock),messageExpiry=nextChatMessageExpiry(rows.map(item=>item.latestMessage).filter((item):item is ChatMessage=>!!item),clock);if(messageExpiry!==null)deadlines.push(messageExpiry);if(!deadlines.length)return;const timer=window.setTimeout(()=>{const now=Date.now();setClock(now);setRows(previous=>previous.filter(item=>item.readExpiresAt*1000>now));readAgain.current();},Math.min(2147483647,Math.max(0,Math.min(...deadlines)-Date.now()+1)));return()=>window.clearTimeout(timer);},[rows,clock]);
  const shown=rows;
  return <MemberAvatarProvider profiles={profiles}><aside className="selected-conversation-directory" aria-label="对话列表"><header><h2>消息</h2><button type="button" onClick={()=>navigate('/app/rooms?compose=conversation')}>发起对话</button></header><MessageNavigation active="rooms" navigate={navigate}/><label className="selected-conversation-search"><Search size={17}/><input type="search" value={query} maxLength={120} onChange={event=>{setQuery(event.target.value);if(!event.target.value)setSubmittedQuery('');}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();setSubmittedQuery(query.trim());}}} placeholder="对话名称或成员，回车查找" aria-label="查找对话或成员"/></label>{error&&<p role="alert">{error}<button type="button" onClick={()=>void read()}>重试</button></p>}<div className="conversation-list">{shown.map(item=><a key={item.roomId} href={'/app/rooms/'+item.roomId} aria-current={item.roomId===roomId?'page':undefined} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate('/app/rooms/'+item.roomId);}}}><MemberAvatar subjectId={item.members.find(member=>member.subjectId!==subjectId)?.subjectId??item.roomId} name={names[item.members.find(member=>member.subjectId!==subjectId)?.subjectId??'']??undefined}/><div><div className="conversation-row-heading"><h3>{title(item)}</h3><time>{readableTime(item.lastActivityAt)}</time></div><p className="conversation-last-message">{item.latestMessage?messagePreview(item.latestMessage,clock):'暂无可读消息预览'}</p></div>{!!item.unreadHumanCount&&<span className="conversation-unread">{item.unreadHumanCount>99?'99+':item.unreadHumanCount}</span>}</a>)}</div>{busy&&!rows.length&&<output>正在读取对话…</output>}{!busy&&!error&&!shown.length&&<p className="selected-directory-empty">{submittedQuery?'没有找到这段对话或成员。':'还没有其他对话。'}</p>}{next&&<button type="button" className="text-link" disabled={busy} onClick={()=>void read(next)}>更多对话</button>}</aside></MemberAvatarProvider>;
@@ -95,13 +96,14 @@ export function ChatWorkspace(props: Props) {
   return <AccountSessionScope endpoint={props.runtime?.api.endpoint}><AccountChatWorkspace {...props}/></AccountSessionScope>;
 }
 function AccountChatWorkspace(props: Props) {
+  const sharedQuery=useAccountQueryScope();
   const official=useAccountSessionModel(),retained=useRef(official.session);
   if(official.session)retained.current=official.session;else if(official.phase==='signed-out')retained.current=null;
   const session=retained.current,authority=useRef({retained:session,verified:official.phase==='signed-in'?official.session:null}),accountEpoch=useRef({key:'',value:0});authority.current={retained:session,verified:official.phase==='signed-in'?official.session:null};
   const accountKey=JSON.stringify([session?.account.id,session?.csrfToken]);if(accountEpoch.current.key!==accountKey)accountEpoch.current={key:accountKey,value:accountEpoch.current.value+1};
   const currentOfficial=useRef(official);currentOfficial.current=official;
   const chatOwner=useMemo(()=>({id:session?.account.id,csrfToken:session?.csrfToken}),[session?.account.id,session?.csrfToken]);
-  const accountRuntime=useMemo(()=>props.runtime&&official.client&&chatOwner.id?createOfficialChatRuntime({base:props.runtime,endpoint:props.runtime.api.endpoint,client:official.client,getSession:()=>authority.current.retained,getNetworkSession:()=>authority.current.verified,getGeneration:()=>accountEpoch.current.value,onSessionError:()=>void currentOfficial.current.refresh()}) as unknown as ChatRuntime:null,[props.runtime,official.client,chatOwner]);
+  const accountRuntime=useMemo(()=>props.runtime&&official.client&&chatOwner.id?createOfficialChatRuntime({base:props.runtime,endpoint:props.runtime.api.endpoint,client:official.client,getSession:()=>authority.current.retained,getNetworkSession:()=>authority.current.verified,getGeneration:()=>accountEpoch.current.value,onSessionError:()=>void currentOfficial.current.refresh(),query:sharedQuery.query,queryKey:(...parts:unknown[])=>sharedQuery.scope?['galaxy',sharedQuery.scope.endpoint.replace(/\/$/,''),sharedQuery.scope.surface,sharedQuery.scope.identity,'chat',...parts]:['unavailable']}) as unknown as ChatRuntime:null,[props.runtime,official.client,chatOwner,sharedQuery.query,sharedQuery.scope]);
   const selected=accountRuntime,owner=session?.account.id?'account:'+session.account.id:undefined;
   const scope=useChoiceViewLease(selected,owner),ready=official.phase==='signed-in'||!!session&&['offline','unavailable'].includes(official.phase);
   if(!ready||!selected||!owner||!scope.lease)return <section className="messages-page selected-message-guest"><h2 className="message-module-title">消息</h2><MessageNavigation active="rooms" navigate={props.navigate}/><h1 className="small message-page-title">开始一段对话</h1><OfficialAccountStatus model={official} navigate={props.navigate} returnTo={'/app/rooms'+(props.roomId?'/'+props.roomId:'')+(props.search??'')} compact/></section>;
@@ -164,11 +166,12 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   function setError(reason: unknown) {
     if(navigator.onLine===false){setErrorMessage('已离线。输入仍保留，连接恢复后会继续。');return;}
     const code = chatErrorCode(reason)??'';
+    if(['chat_access_denied','official_account_session_expired','official_account_changed'].includes(code))clearControlled();
     setErrorMessage(typeof reason === 'string' ? reason : ({ chat_transport_unavailable: '暂时无法发送，消息已保留，连接恢复后会继续。', chat_access_denied: '你目前无法查看这段对话或进行这项操作。', connection_required: '连接已到期，请重新连接后继续。', account_verification_required: '请重新登录账户后继续这段对话。', chat_revision_conflict: '设置刚刚发生变化，请按最新内容重试。', chat_membership_changed:'成员已变化，请按当前成员重新提出请求。', chat_decision_expired:'这次请求已过期。', chat_invitation_expired:'这份邀请已过期。', chat_decision_unavailable:'这次请求已处理或当前不能继续。', chat_two_party_removal_forbidden: '两人对话不能移除另一方，可以退出对话。' } as Record<string, string>)[code] ?? (/[\u3400-\u9fff]/.test(code)?code:'暂时无法完成，请稍后重试。'));
     setVerificationRequired(needsAccountVerification(reason));
   }
   function clearControlled(){setHiddenMessageId(null);setMessageReading([]);setReferences({});setRooms([]);setInvitations([]);setDecisions([]);setLinkedTasks([]);setRoom(null);setReadExpiresAt(null);}
-  useEffect(()=>{if(!connected){clearControlled();setLoading(false);setErrorMessage(navigator.onLine===false?'已离线，输入仍保留。':'账户暂时无法核对，输入仍保留。');}},[connected]);
+  useEffect(()=>{if(!connected){setLoading(false);setErrorMessage(navigator.onLine===false?'已离线，输入仍保留。':'账户暂时无法核对，输入仍保留。');}},[connected]);
   async function reload(appendAfter?: string) {
     if (!connected||!current()) return;
     const lease = active.current, ticket=++readEpoch.current;
@@ -185,7 +188,7 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
       setRooms(old => appendAfter ? [...new Map([...old, ...rows].map(item => [item.roomId, item])).values()] : rows);
       setRoomNext(roomCursor); setInvitations(invites.invitations); setPending(saved);setReadExpiresAt(rows.length?Math.min(...rows.map(item=>readDeadline(item.readExpiresAt))):null);
     } else {
-      const [currentRoom, choices, saved]: [ChatRoom,{decisions:ChatDecision[]},ChatPending|null] = await Promise.all([runtime.api.call(roomPath + '/read', {}), runtime.api.call(roomPath + '/decisions', {}), runtime.chat.pending(roomId)]).catch(reason => { if (current(lease) && ticket === readEpoch.current) { setHiddenMessageId(null);setRoom(null); setMessageReading([]); setLinkedTasks([]); } throw reason; });
+      const [currentRoom, choices, saved]: [ChatRoom,{decisions:ChatDecision[]},ChatPending|null] = await Promise.all([runtime.api.call(roomPath + '/read', {}), runtime.api.call(roomPath + '/decisions', {}), runtime.chat.pending(roomId)]).catch(reason => { if (current(lease) && ticket === readEpoch.current && ['chat_access_denied','official_account_session_expired','official_account_changed'].includes(chatErrorCode(reason)??'')) { clearControlled(); } throw reason; });
       if (!current(lease) || ticket!==readEpoch.current) return;
       setRoom(currentRoom); setDecisions(choices.decisions); setPending(saved);
       const links = await Promise.all<ChatLinkedTask>((currentRoom.taskRefs ?? []).map(async (id: string) => { try { const task = await runtime.api.call(`/v2/tasks/${id}`, null, { method: 'GET', authenticated: true }); return { id, title: independentTaskLabel(task), caseId:task.caseId, available: true }; } catch { return { id, available: false }; } }));
@@ -297,10 +300,10 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
     try{
       if(!recovering.current){recovering.current=true;try{await resumePending(stillCurrent);}catch{/* The original retry remains available. */}finally{recovering.current=false;}}
       if(current()&&stillCurrent())await reload();
-    }catch(reason){if(current()&&stillCurrent()){clearControlled();setError(reason);setLoading(false);}}
+    }catch(reason){if(current()&&stillCurrent()){setError(reason);setLoading(false);}}
   });
   useEffect(()=>{
-    const lost=()=>{readEpoch.current++;setOffline(true);clearControlled();setLoading(false);setErrorMessage('已离线。输入保留在本机，连接恢复后会重新读取对话。');};
+    const lost=()=>{readEpoch.current++;setOffline(true);setLoading(false);setErrorMessage('已离线。输入保留在本机，连接恢复后会重新读取对话。');};
     const restored=()=>{setOffline(false);setLoading(true);setReadRefresh(value=>value+1);};
     window.addEventListener('offline',lost);window.addEventListener('online',restored);if(navigator.onLine===false)lost();return()=>{window.removeEventListener('offline',lost);window.removeEventListener('online',restored);};
   },[]);
@@ -308,8 +311,8 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   useEffect(()=>{
     let stopped=false,reading=false;const epoch=readEpoch;
     const update=async()=>{if(stopped||reading)return;reading=true;try{await poll(()=>!stopped);}finally{reading=false;}};
-    void update();const timer=setInterval(update,7000);document.addEventListener('visibilitychange',update);
-    return()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',update);epoch.current++;};
+    void update();const unsubscribe=(runtime as ChatRuntime&{subscribe?:(fn:(reset?:boolean)=>void)=>()=>void}).subscribe?.(reset=>{if(reset)clearControlled();void update();});
+    return()=>{stopped=true;unsubscribe?.();epoch.current++;};
   },[runtime,connected,roomId,filter,after,locatedMessage,readRefresh,replyLocator?.messageId,editDraft?.messageId,draft.other?.reply?.messageId,draft.other?.edit?.messageId,draft.ready]);
   useEffect(() => {
     const box = historyBox.current; if (!box||loading||!messages.length) return;

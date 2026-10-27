@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {operationsPermissionCatalog} from "../../operations-permission-catalog.mjs";
@@ -14,7 +15,9 @@ export class OperationsPermissionsReadModel extends OperationsPermissionsAuthori
  metadata(actor){const p=actor.businessAuthorization.permissions;return {checkedAt:this.now(),readExpiresAt:this.now()+30,metadataOnly:true,
   permissions:{canManageRoles:p.includes('permissions.roles.write'),canManageAssignments:p.includes('permissions.assignments.write'),canManageAutomation:p.includes('permissions.automation.write')}};}
  async read(operator,fn){return transaction(this.db,async db=>{const actor=await this.requireAction(operator,'permissions.read',{db});return {...await fn(db,actor),...this.metadata(actor)};});}
- catalog(operator){return this.read(operator,async()=>({items:operationsPermissionCatalog}));}
+ catalogVersion(actor){return createHash('sha256').update(JSON.stringify({items:operationsPermissionCatalog,permissions:this.metadata(actor).permissions})).digest('hex');}
+ catalog(operator){return this.read(operator,async(_db,actor)=>({items:operationsPermissionCatalog,sourceVersion:this.catalogVersion(actor)}));}
+ catalogLease(operator,version){return this.read(operator,async(_db,actor)=>{const sourceVersion=this.catalogVersion(actor);return {unchanged:version===sourceVersion,sourceVersion};});}
  roles(operator){return this.read(operator,async db=>{const rows=(await db.query('SELECT * FROM operations_business_roles_v1 WHERE endpoint=$1 ORDER BY created_at,id',[this.endpoint])).rows,items=[];for(const row of rows)items.push({...roleView(row),...await roleUsageWithin(db,this.endpoint,row.id)});return{items,nextAfter:null};});}
  role(operator,id){return this.read(operator,async db=>{const row=(await db.query('SELECT * FROM operations_business_roles_v1 WHERE endpoint=$1 AND id=$2',[this.endpoint,id])).rows[0];if(!row)fail('operations_role_not_found',404);return {role:{...roleView(row),...await roleUsageWithin(db,this.endpoint,row.id)}};});}
  personnel(operator){return this.read(operator,async db=>{

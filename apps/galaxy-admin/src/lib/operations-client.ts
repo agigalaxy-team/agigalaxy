@@ -19,7 +19,8 @@ export async function operationsRequest<T>(path:string,{signal,csrfToken,body}:{
     const value=await response.json().catch(()=>null),code=typeof value?.error==='string'?value.error:typeof value?.error?.code==='string'?value.error.code:'operations_unavailable';
     throw new OperationsRequestError(response.status,code);
   }
-  return response.json() as Promise<T>;
+  const value=await response.json(),cursor=response.headers.get('X-Galaxy-Event-Cursor');
+  return !body&&cursor&&/^[0-9]{1,20}$/.test(cursor)&&value&&typeof value==='object'&&!Array.isArray(value)?{...value,webEventCursor:cursor} as T:value as T;
 }
 export function operationsFailure(error:unknown,fallback:string){
   if(!(error instanceof OperationsRequestError))return fallback;

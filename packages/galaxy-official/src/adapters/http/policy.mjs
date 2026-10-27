@@ -132,9 +132,16 @@ export function requestUrl(request, endpoint, browserOrigins = []) {
   const summaryQuery = request.method === 'GET' && url.pathname === '/v1/operations/summary'
     && url.search.length <= 80 && keys.length === 1 && keys[0] === 'publicActivity'
     && url.searchParams.get('publicActivity') === 'deferred';
+  const readIntent=request.method==='GET'||request.method==='OPTIONS'&&request.headers['access-control-request-method']==='GET';
+  const webEventsQuery=readIntent&&['/v1/web-events','/v1/operations/web-events'].includes(url.pathname)&&url.search.length<=4096
+    &&keys.every(key=>['cursor','topics','stream'].includes(key)&&url.searchParams.getAll(key).length===1)
+    &&(!url.searchParams.has('cursor')||/^(0|[1-9][0-9]{0,18})$/.test(url.searchParams.get('cursor')))
+    &&(!url.searchParams.has('stream')||['true','false'].includes(url.searchParams.get('stream')))
+    &&(!url.searchParams.has('topics')||url.searchParams.get('topics').length<=1024&&url.searchParams.get('topics').split(',').length<=32&&url.searchParams.get('topics').split(',').every(value=>/^[a-z][a-z-]{0,50}$/.test(value)));
+  const permissionsCatalogLeaseQuery=readIntent&&url.pathname==='/v1/operations/permissions/catalog/lease'&&keys.length===1&&keys[0]==='version'&&url.search.length<=80&&/^[a-f0-9]{64}$/.test(url.searchParams.get('version'));
   const allowedQuery = consentList ? keys.every(key => key === 'after') && url.searchParams.getAll('after').length === 1
     : oidcCallback && url.search.length <= 8192 && keys.every(key => ['code','state','iss','error','error_description','error_uri','session_state'].includes(key))
-      && new Set(keys).size === keys.length || recruitmentReceipt || forumQuota || summaryQuery || accountQuery || accountNoticeQuery || accountFeedbackExportQuery || publicAccountQuery || publicAccountPostsQuery || identityReturn || operationsQuery || auditQuery || chatReportsQuery || permissionsHistoryQuery || messagingQuery || autonomyQuery || nativeQuery || conversationEventsQuery || filesQuery || fileCleanupQuery || accountAnalyticsQuery || registeredQuery || managementQuery || feedbackQuery || contentQuery;
+      && new Set(keys).size === keys.length || webEventsQuery || permissionsCatalogLeaseQuery || recruitmentReceipt || forumQuota || summaryQuery || accountQuery || accountNoticeQuery || accountFeedbackExportQuery || publicAccountQuery || publicAccountPostsQuery || identityReturn || operationsQuery || auditQuery || chatReportsQuery || permissionsHistoryQuery || messagingQuery || autonomyQuery || nativeQuery || conversationEventsQuery || filesQuery || fileCleanupQuery || accountAnalyticsQuery || registeredQuery || managementQuery || feedbackQuery || contentQuery;
   if (url.origin !== endpoint || url.username || url.password || url.hash || (url.search && !allowedQuery))
     throw new ServiceError('invalid_request');
   return url;

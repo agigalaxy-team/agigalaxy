@@ -23,7 +23,7 @@ const files = [fileURLToPath(import.meta.url)];
 async function sourceTree(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) await sourceTree(path); else if (entry.isFile()) files.push(path); } }
 await sourceTree(join(repo, 'packages/galaxy-official/src'));
 await sourceTree(join(repo, 'packages/galaxy-core/src'));
-for (const name of ['community-forum-client.mjs', 'community-forum-workspace.tsx', 'community-forum-origin.mjs', 'runtime.mjs', 'main.tsx', 'site-shell.tsx', 'task-publish-workspace.tsx', 'workspace.css'])
+for (const name of ['features/community-forum/community-forum-client.mjs', 'features/community-forum/community-forum-workspace.tsx', 'features/community-forum/community-forum-origin.mjs', 'runtime.mjs', 'main.tsx','standalone-galaxy.tsx','application/galaxy-session.tsx','application/galaxy-pages.tsx','application/galaxy-shell.tsx', 'site-shell.tsx', 'features/tasks/publish/task-publish-workspace.tsx', 'workspace.css'])
   files.push(join(repo, 'packages/galaxy-web/src', name));
 for (const name of ['package.json', 'package-lock.json', 'packages/galaxy-official/test/service-fixture.mjs', 'packages/galaxy-official/test/oidc-provider-fixture.mjs']) files.push(join(repo, name));
 for (const name of (await readdir(nativeCandidate)).filter(name => /\.(?:[cm]?js|json)$/.test(name))) files.push(join(nativeCandidate, name));

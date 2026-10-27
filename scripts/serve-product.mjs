@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import {publicConfiguration} from '../packages/galaxy-web/server/public-configuration.mjs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,24 +8,6 @@ const website = path.join(root, 'apps/galaxy-site/dist');
 const web = path.join(root, 'packages/galaxy-web/dist');
 const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.md': 'text/plain', '.txt': 'text/plain', '.xml': 'application/xml', '.tgz': 'application/gzip' };
 
-async function publicConfiguration() {
-  if (!process.env.GALAXY_WEB_CONFIG_FILE) throw new Error('Missing GALAXY_WEB_CONFIG_FILE');
-  const raw = await readFile(process.env.GALAXY_WEB_CONFIG_FILE, 'utf8');
-  if (raw.length > 16000) throw new Error('Public configuration is too large');
-  const config = JSON.parse(raw);
-  const endpoint = new URL(config.endpoint);
-  if (config.version !== 1 || endpoint.username || endpoint.password
-      || !['http:', 'https:'].includes(endpoint.protocol)
-      || !Array.isArray(config.signingKeys) || !config.signingKeys.length) throw new Error('Invalid public configuration');
-  const signingKeys = config.signingKeys.map((pin) => {
-    if (typeof pin.kid !== 'string' || typeof pin.publicKeyPem !== 'string'
-        || !pin.publicKeyPem.startsWith('-----BEGIN PUBLIC KEY-----')
-        || pin.publicKeyPem.includes('PRIVATE KEY') || !Number.isFinite(pin.notBefore)
-        || !Number.isFinite(pin.notAfter) || typeof pin.revoked !== 'boolean') throw new Error('Invalid public signing key');
-    return { kid: pin.kid, publicKeyPem: pin.publicKeyPem, notBefore: pin.notBefore, notAfter: pin.notAfter, revoked: pin.revoked };
-  });
-  return { version: 1, endpoint: endpoint.href.replace(/\/$/, ''), operator: typeof config.operator === 'string' ? config.operator : '银河技术团队', signingKeys };
-}
 
 export function productMiddleware({ development = false } = {}) {
   return async (request, response, next = () => { response.writeHead(404); response.end(); }) => {
@@ -66,12 +48,4 @@ export function productMiddleware({ development = false } = {}) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const port = Number(process.env.GALAXY_PREVIEW_PORT ?? 5179);
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid GALAXY_PREVIEW_PORT');
-  const server = createServer(productMiddleware());
-  server.listen(port, '127.0.0.1', () => {
-    process.stdout.write(`Galaxy product preview: http://127.0.0.1:${port}/\n`);
-    if (!process.env.GALAXY_WEB_CONFIG_FILE) process.stdout.write('Public pages are available. Set GALAXY_WEB_CONFIG_FILE for API-backed product flows.\n');
-  });
-}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){process.argv[2]='start';await import('./web-runtime.mjs');}

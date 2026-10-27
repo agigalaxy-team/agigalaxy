@@ -124,6 +124,9 @@ export function createApi({ readiness = async () => true, failureAudit = null, l
         }
         return send(200,status);
       }
+      if(request.method==='GET'&&services.webEvents&&!['/v1/web-events','/v1/operations/web-events'].includes(url.pathname)){
+        response.setHeader('X-Galaxy-Event-Cursor',await services.webEvents.position());
+      }
       stage='http-dispatch';
       await withRuntimeDiagnosticContext({requestId,stage},()=>dispatch({ request, response, requestId, url, send,recordFailure:failed,consumeSearchPage:(actor,after)=>{
         if(after===undefined)return;

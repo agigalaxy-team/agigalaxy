@@ -12,6 +12,7 @@ export function officialRoutes({ endpoint, apiPort }) {
     // browser preflight and later additive v2 operations reachable through the
     // same host; unknown routes remain an API 404, not another upstream.
     { method: ['GET','POST','OPTIONS'], path: ['/v2/*'] },
+    { method: ['GET'], path: ['/v1/web-events','/v1/operations/web-events'] },
     { method: ['GET'], path: ['/v1/discovery/config','/v1/discovery/search','/v1/discovery/recommendations','/v1/announcements'] },
     { method: ['POST'], path: ['/v1/discovery/events'] },
     { method: ['PUT'], path_regexp:{name:'galaxy_attachment_upload',pattern:`^/v2/(chat|community)/attachments/${id}/upload$`} },
@@ -52,4 +53,10 @@ export function officialRoutes({ endpoint, apiPort }) {
     { match: matchers, handle: [{ handler: 'reverse_proxy', upstreams: [{ dial: `127.0.0.1:${apiPort}` }] }], terminal: true },
     { match: [{ host: [url.hostname] }], handle: [{ handler: 'static_response', status_code: 404 }], terminal: true },
   ];
+}
+
+// The dynamic website owns only this exact host and loopback service.
+export function websiteRoutes({origin,port}){
+ const url=new URL(origin);if(url.origin!==origin||url.protocol!=='https:'||url.username||url.password||url.port||!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid website proxy configuration');
+ return [{match:[{host:[url.hostname]}],handle:[{handler:'reverse_proxy',upstreams:[{dial:'127.0.0.1:'+port}]}],terminal:true}];
 }

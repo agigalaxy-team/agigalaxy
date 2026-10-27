@@ -48,7 +48,7 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
  const usage=useOperationsRead<ModelSettingsUsage>({path:modelSettingsPath('usage',location),failureMessage:'基础用量暂时无法取得。',clearOnOffline:true});
  const history=useOperationsRead<ModelSettingsHistory>({path:modelSettingsPath('history',location),failureMessage:'配置记录暂时无法取得。',clearOnOffline:true});
  const [clock,setClock]=useState(()=>Date.now()),[configuration,setConfiguration]=useState<ModelSettingsConfiguration>(modelSettingsEmpty),[baseConfiguration,setBaseConfiguration]=useState<ModelSettingsConfiguration>(modelSettingsEmpty),[baseRevision,setBaseRevision]=useState<number|null>(null),[keys,setKeys]=useState<Record<string,string>>({}),[errors,setErrors]=useState<string[]>([]),[mergeDecision,setMergeDecision]=useState<{revision:number;choices:Record<string,'mine'|'current'>}|null>(null),[selected,setSelected]=useState(location.id);
- const editor=useRef<HTMLDivElement|null>(null),sidebar=useRef<HTMLElement|null>(null),positions=useRef<Record<string,number>>({}),pendingPolls=useRef({id:'',count:0});
+ const editor=useRef<HTMLDivElement|null>(null),sidebar=useRef<HTMLElement|null>(null),positions=useRef<Record<string,number>>({});
  const current=readable(overview.value),historyValue=readable(history.value),usageValue=modelUsage(readable(usage.value)),source=current?modelSettingsSource(current):null;
  const dirty=!modelSettingsSame(configuration,baseConfiguration)||Object.values(keys).some(Boolean);
  const changed=!!current&&baseRevision!==null&&current.revision!==baseRevision;
@@ -81,10 +81,7 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
   useEffect(()=>{const clear=()=>setKeys({});window.addEventListener('offline',clear);return()=>window.removeEventListener('offline',clear);},[]);
  useEffect(()=>{if(!current)setKeys(previous=>Object.keys(previous).length?{}:previous);},[!!current]);
  useEffect(()=>{if(overview.error&&/登录|权限/.test(overview.error)){setKeys({});usage.clear();history.clear();}},[overview.error,usage.clear,history.clear]);
- useEffect(()=>{
-  const operation=current?.pending;if(!operation||command.locked)return;if(pendingPolls.current.id!==operation.operationId)pendingPolls.current={id:operation.operationId,count:0};
-  const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){pendingPolls.current.count++;void overview.read();}},Math.min(10000,2000+pendingPolls.current.count*1000));return()=>clearTimeout(timer);
- },[current?.pending,current?.checkedAt,command.locked,overview.read]);
+
  useLayoutEffect(()=>{if(current&&editor.current)editor.current.scrollTop=positions.current[location.tab+':'+selected]??0;},[location.tab,selected,!!current]);
  void clock;
  const selectedModel=configuration.models.find(model=>model.id===selected)??configuration.models[0]??null;

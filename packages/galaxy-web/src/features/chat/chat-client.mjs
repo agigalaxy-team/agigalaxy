@@ -6,7 +6,7 @@ const stoppedIndexWrites = new Map();
 
 // Only user-confirmed, stable operations are journalled. Reopening a page never
 // resends a draft, approves an invitation, or turns ordinary chat into a Task.
-export function createChatClient({ api, getLocal, putLocal, updateLocal, subjectId, captureLease }) {
+export function createChatClient({ api, getLocal, putLocal, updateLocal, subjectId, captureLease, readOnlyRecovery=false }) {
   const connection = () => { const current = api.snapshot() ?? {}; return { subjectId: current.subjectId ?? null,
     endpoint: api.endpoint ?? current.endpoint ?? null, bindingId: current.bindingId ?? null, generation: current.generation ?? null }; };
   const fixedOwner = subjectId !== undefined;
@@ -140,8 +140,9 @@ export function createChatClient({ api, getLocal, putLocal, updateLocal, subject
       }
       const receipt = await exactReceipt(record,lease);
       if (!['pending','absent'].includes(receipt.state)) { await replaceOriginal(roomId, record, null,lease); return receipt; }
-      if (record.localRetryStopped) return {...receipt, localRetryStopped: true, serverOperationCancelled: false};
+      if (record.localRetryStopped||readOnlyRecovery) return {...receipt, localRetryStopped: record.localRetryStopped===true, serverOperationCancelled: false};
     }
+    if(readOnlyRecovery&&!record.businessRejection)return {state:'unconfirmed',roomId:record.roomId,operationId:record.input.operationId??record.input.clientMessageId};
     if(record.businessRejection&&!explicitRetry){const error=new Error('服务未接受这次聊天操作，已停止自动发送。原内容仍保留。');
       error.code='chat_operation_business_rejected';error.reason=record.businessRejection.code;error.status=record.businessRejection.status;throw error;}
     // A durable journal is written only by the original approved action.

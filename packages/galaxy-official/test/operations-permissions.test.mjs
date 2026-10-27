@@ -176,3 +176,17 @@ test('batch-only content grants preview and execute independently of single acti
  await f.permissions.saveRole(f.admin,{operationId:randomUUID(),id:batchRole.id,expectedVersion:1,name:batchRole.name,description:batchRole.description,enabled:false,permissions:batchRole.permissions},{authorize:async()=>f.admin});await assert.rejects(service.batch(f.reader,command),{code:'operations_permission_denied'});
  const after=(await f.db.query('SELECT id,payload_text,payload_hash FROM forum_events_v1 ORDER BY id')).rows;assert.deepEqual(after,original);
 });
+
+
+test('catalog lightweight lease checks current grants and changes version without reloading catalog items',async t=>{
+ const f=await fixture(t),role=await f.makeRole(['permissions.read']);await f.assign(role);
+ const catalog=await f.permissions.catalog(f.reader);assert.match(catalog.sourceVersion,/^[a-f0-9]{64}$/);
+ const unchanged=await f.permissions.catalogLease(f.reader,catalog.sourceVersion);
+ assert.equal(unchanged.unchanged,true);assert.equal(unchanged.sourceVersion,catalog.sourceVersion);assert.equal('items' in unchanged,false);
+ assert.equal(unchanged.permissions.canManageRoles,false);assert(unchanged.readExpiresAt>unchanged.checkedAt);
+ const manager=await f.makeRole(['permissions.roles.write']);await f.assign(manager);
+ const changed=await f.permissions.catalogLease(f.reader,catalog.sourceVersion);
+ assert.equal(changed.unchanged,false);assert.equal(changed.permissions.canManageRoles,true);assert.notEqual(changed.sourceVersion,catalog.sourceVersion);
+ f.roles.delete(f.reader.operatorId);
+ await assert.rejects(f.permissions.catalogLease(f.reader,changed.sourceVersion),{code:'business_admin_denied'});
+});

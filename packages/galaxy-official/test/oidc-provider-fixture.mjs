@@ -5,7 +5,7 @@ import Provider from 'oidc-provider';
 
 // A real, independent authorization server library, confined to a fresh local
 // HTTP fixture. Only its test interaction route chooses a synthetic account.
-export async function oidcProviderFixture(redirectUris, { extraClients = [], resources = [], introspectionClientId, emailVerified = false, profileClaims = null, roleClaims = null } = {}) {
+export async function oidcProviderFixture(redirectUris, { extraClients = [], resources = [], introspectionClientId, emailVerified = false, profileClaims = null, roleClaims = null, refreshTokens = false } = {}) {
   let provider, account = 'synthetic-oidc-subject';
   const failures = [], requests = [];
   const server = createServer((request, response) => {
@@ -35,7 +35,7 @@ export async function oidcProviderFixture(redirectUris, { extraClients = [], res
     const pair = await generateKeyPair('RS256', { modulusLength: 2048, extractable: true });
     const jwk = { ...await exportJWK(pair.privateKey), kid: 'synthetic-oidc', use: 'sig', alg: 'RS256' };
     provider = new Provider(issuer, { clients: [{ client_id: 'galaxy-fixture', redirect_uris: redirectUris,
-      response_types: ['code'], grant_types: ['authorization_code'], token_endpoint_auth_method: 'none' }, ...extraClients],
+      response_types: ['code'], grant_types: ['authorization_code',...(refreshTokens?['refresh_token']:[])], token_endpoint_auth_method: 'none' }, ...extraClients],
       jwks: { keys: [jwk] }, cookies: { keys: [randomBytes(32).toString('base64url')] },
       features: { devInteractions: { enabled: false },
         ...(introspectionClientId ? { introspection: { enabled: true, allowedPolicy: (_ctx,client) => client.clientId === introspectionClientId } } : {}),
@@ -46,6 +46,7 @@ export async function oidcProviderFixture(redirectUris, { extraClients = [], res
       }, pkce: { required: () => true },
       interactions: { url: (_context, interaction) => `/interaction/${interaction.uid}` },
       conformIdTokenClaims: false,
+      ...(refreshTokens?{issueRefreshToken:()=>true}:{}),
       claims: { openid: ['sub'], email: ['email', 'email_verified', ...(profileClaims ? ['name', 'preferred_username'] : []),...(roleClaims?['realm_access','resource_access']:[])] },
       findAccount: async (_context, subject) => ({ accountId: subject, claims: async () => ({ sub: subject,
         email: 'synthetic@example.invalid', email_verified: emailVerified,

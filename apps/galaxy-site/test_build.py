@@ -10,7 +10,7 @@ from build import copy_example_images, windows_filesystem_path
 from guide_pages import render_markdown
 import chrome
 from product_pages import render_homepage, render_product_pages
-from public_reading import reading_tree, web_entry_assets
+from public_reading import reading_tree
 
 
 class ArchivePathTests(unittest.TestCase):
@@ -67,19 +67,6 @@ class PublicReadingTreeTests(unittest.TestCase):
             with self.subTest(markup=markup), self.assertRaises(ValueError):
                 reading_tree(markup)
 
-    def test_bootstrap_names_the_exact_existing_build_files(self):
-        with TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            (directory / 'assets').mkdir()
-            (directory / 'assets/main-actual.js').write_text('export {}', encoding='utf-8')
-            (directory / 'assets/main-actual.css').write_text('body{}', encoding='utf-8')
-            (directory / 'index.html').write_text('<script type="module" src="/app/assets/main-actual.js"></script><link rel="stylesheet" href="/app/assets/main-actual.css">', encoding='utf-8')
-            assets = web_entry_assets(directory)
-            self.assertEqual(assets['entry'], '/app/assets/main-actual.js')
-            self.assertEqual(set(assets['sha256']), {'/app/assets/main-actual.js', '/app/assets/main-actual.css'})
-            (directory / 'assets/main-actual.js').unlink()
-            with self.assertRaises(ValueError):
-                web_entry_assets(directory)
 
 
 class HomepageParser(HTMLParser):
@@ -151,38 +138,22 @@ class HomepageTests(unittest.TestCase):
 
 
 class PublicNavigationTests(unittest.TestCase):
-    def test_all_current_pages_keep_entries_without_direction_icons_or_disclosures(self):
+    def test_public_compiler_emits_content_not_current_html(self):
         with TemporaryDirectory() as temporary:
             output = Path(temporary)
-            metadata = {
-                'backendRelease': '0.0.1', 'publicApiObservedAt': 'test fixture',
-                'nativeClientDownload': {
-                    'downloadBase': '/downloads/native-client/0.0.1/',
-                    'package': {'version': '0.0.1', 'filename': 'fixture.zip',
-                                'bytes': 128, 'sha256': 'a' * 64}
-                }
-            }
-            (output / 'release.json').write_text(json.dumps(metadata), encoding='utf-8')
-            with patch.object(chrome, 'OUT', output), patch.object(chrome, 'PREVIEW', True):
-                render_product_pages({'page': chrome.page, 'write': chrome.write,
-                                      'OUT': output, 'PREVIEW': True})
-            for page in output.rglob('*.html'):
-                html = page.read_text(encoding='utf-8')
-                elements = HomepageParser(html).elements
-                with self.subTest(page=page.relative_to(output)):
-                    self.assertFalse(any(tag in ('details', 'summary') for tag, _ in elements))
-                    self.assertFalse(any('aria-expanded' in attrs for _, attrs in elements))
-                    self.assertNotRegex(html, '[←→↔↑↓↗↘‹›»«]')
-                    links = {attrs.get('href') for tag, attrs in elements if tag == 'a'}
-                    self.assertTrue({'/app/', '/app/community', '/app/account', '/app/work',
-                                     '/app/rooms', '/app/publish', '/app/search'} <= links)
-            download = (output / 'downloads/index.html').read_text(encoding='utf-8')
-            verification = (output / 'downloads/verification/index.html').read_text(encoding='utf-8')
-            self.assertIn('href="/downloads/verification/"', download)
-            self.assertIn('SHA-256', verification)
-            self.assertIn('a' * 64, verification)
-            self.assertIn('/downloads/native-client/0.0.1/release.jws', verification)
-            self.assertIn('/docs/v0.3/installation.md', verification)
+            metadata = {'backendRelease':'0.0.1','publicApiObservedAt':'fixture','nativeClientDownload':{'downloadBase':'/downloads/native-client/0.0.1/','package':{'version':'0.0.1','filename':'fixture.zip','bytes':128,'sha256':'a'*64}}}
+            (output/'release.json').write_text(json.dumps(metadata),encoding='utf-8')
+            with patch.object(chrome,'OUT',output),patch.object(chrome,'PREVIEW',True):
+                render_product_pages({'page':chrome.page,'write':chrome.write,'OUT':output,'PREVIEW':True,'RUNTIME_DATA':True})
+            self.assertFalse(list(output.rglob('*.html')))
+            home=json.loads((output/'assets/home-content.json').read_text(encoding='utf-8'))
+            self.assertIn('同一身份',json.dumps(home,ensure_ascii=False))
+            download=json.loads((output/'assets/public-pages/downloads/index.json').read_text(encoding='utf-8'))
+            verification=json.loads((output/'assets/public-pages/downloads/verification/index.json').read_text(encoding='utf-8'))
+            self.assertIn('/downloads/verification/',json.dumps(download))
+            self.assertIn('SHA-256',json.dumps(verification))
+            self.assertIn('a'*64,json.dumps(verification))
+            self.assertIn('/downloads/native-client/0.0.1/release.jws',json.dumps(verification))
 
     def test_guide_prose_uses_words_while_technical_code_keeps_original_bytes(self):
         _, html, _ = render_markdown(

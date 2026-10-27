@@ -41,7 +41,7 @@ function fileCleanupQueryAllowed(pathname,search){
  const allowed=pathname.endsWith('/candidates')?['kind','after','limit']:pathname.endsWith('/plans')?['after','limit']:[],params=new URLSearchParams(search);
  return search.length<=4096&&[...params.keys()].every(key=>allowed.includes(key)&&params.getAll(key).length===1);
 }
-const permissionsReadPath=new RegExp('^/v1/operations/permissions/(?:catalog|roles(?:/'+uuid+')?|personnel|automation|history|operations/'+uuid+'|ai-delegation(?:/operations/'+uuid+')?)$','i');
+const permissionsReadPath=new RegExp('^/v1/operations/permissions/(?:catalog(?:/lease)?|roles(?:/'+uuid+')?|personnel|automation|history|operations/'+uuid+'|ai-delegation(?:/operations/'+uuid+')?)$','i');
 const permissionsWritePath=/^\/v1\/operations\/permissions\/(?:roles|assignments|automation|ai-delegation)$/;
 const messagingReadPath=new RegExp('^/v1/operations/messaging/(?:plans(?:/'+uuid+'(?:/history)?)?|runs(?:/'+uuid+'(?:/recipients)?)?|operations/'+uuid+')$','i');
 const messagingWritePath=new RegExp('^/v1/operations/messaging/(?:plans(?:/'+uuid+'/(?:save|activate|pause|resume|stop|withdraw))?|runs/'+uuid+'/retry)$','i');
@@ -146,6 +146,7 @@ export function operationsRequestBodyLimit(pathname){
 }
 function permissionsQueryAllowed(pathname,search){
   if(!pathname.startsWith('/v1/operations/permissions/'))return true;
+  if(pathname==='/v1/operations/permissions/catalog/lease'){const params=new URLSearchParams(search);return [...params.keys()].length===1&&params.getAll('version').length===1&&/^[0-9a-f]{64}$/.test(params.get('version')??'');}
   if(pathname!=='/v1/operations/permissions/history')return search.length===0;
   const params=new URLSearchParams(search);
   return search.length<=8192&&[...params.keys()].every(key=>['after','limit','resourceId','targetOperatorId'].includes(key)&&params.getAll(key).length===1);
@@ -239,13 +240,14 @@ export function operationsProxyRequestPolicy({url,method,headers,publicOrigin}){
 export function operationsProxyPolicy({url,method,headers,publicOrigin}){
   const requestUrl=new URL(url),path=requestUrl.pathname;
   if(requestUrl.origin!==publicOrigin)return {allowed:false,status:403};
+  if(path==='/v1/operations/web-events'){const params=requestUrl.searchParams;if(requestUrl.search.length>4096||[...params.keys()].some(key=>!['topics','cursor'].includes(key)||params.getAll(key).length!==1)||params.has('cursor')&&!/^[0-9]{1,20}$/.test(params.get('cursor'))||params.has('topics')&&!/^[a-z][a-z0-9-]*(?:,[a-z][a-z0-9-]*)*$/.test(params.get('topics')))return {allowed:false,status:404};}
   const navigation=method==='GET'&&['/v1/operations/login','/v1/operations/callback'].includes(path);
   const publicationPath=new RegExp('^/v1/operations/content/publications(?:/'+uuid+')?$','i');
   const reportRead=chatReportReadPath;
   const reportWrite=new RegExp('^/v1/operations/chat-reports/'+uuid+'/(?:event|attachments/'+uuid+'/content|messages/'+uuid+'/visibility)$','i');
   const taskRead=new RegExp('^/v1/operations/(?:jobs(?:/(?:'+queues+')/'+uuid+')?|search/failures(?:/'+uuid+')?)$','i');
   const taskWrite=new RegExp('^/v1/operations/(?:jobs/(?:'+queues+')/'+uuid+'/(?:cancel|retry)|search/failures/'+uuid+'/retry)$','i');
-  const read=method==='GET'&&((governanceOperationReadPath.test(path)||productChatOperationReadPath.test(path))||fileAccessReadPath.test(path)||fileCleanupReadPath.test(path)||strategiesReadPath.test(path)||ruleSettingsReadPath.test(path)||modelSettingsReadPath.test(path)||maintenanceReadPath.test(path)||searchQualityReadPath.test(path)||recommendationReadPath.test(path)||path===discoveryAnalyticsPath||agentOsReadPath.test(path)||messagingReadPath.test(path)||smtpReadPath.test(path)||permissionsReadPath.test(path)||path==='/v1/operations/session'||publicationPath.test(path)||userReadPath.test(path)||reportRead.test(path)||taskRead.test(path)||businessReads.some(pattern=>pattern.test(path)));
+  const read=method==='GET'&&(path==='/v1/operations/web-events'||(governanceOperationReadPath.test(path)||productChatOperationReadPath.test(path))||fileAccessReadPath.test(path)||fileCleanupReadPath.test(path)||strategiesReadPath.test(path)||ruleSettingsReadPath.test(path)||modelSettingsReadPath.test(path)||maintenanceReadPath.test(path)||searchQualityReadPath.test(path)||recommendationReadPath.test(path)||path===discoveryAnalyticsPath||agentOsReadPath.test(path)||messagingReadPath.test(path)||smtpReadPath.test(path)||permissionsReadPath.test(path)||path==='/v1/operations/session'||publicationPath.test(path)||userReadPath.test(path)||reportRead.test(path)||taskRead.test(path)||businessReads.some(pattern=>pattern.test(path)));
   const write=method==='POST'&&(fileAccessWritePath.test(path)||fileCleanupWritePath.test(path)||strategiesWritePath.test(path)||ruleSettingsWritePath.test(path)||modelSettingsWritePath.test(path)||maintenanceWritePath.test(path)||searchQualityWritePath.test(path)||recommendationWritePath.test(path)||agentOsWritePath.test(path)||messagingWritePath.test(path)||smtpWritePath.test(path)||permissionsWritePath.test(path)||path==='/v1/operations/logout'||path==='/v1/operations/content/publications'||reportWrite.test(path)||taskWrite.test(path)||businessWrites.some(pattern=>pattern.test(path))||new RegExp('^/v1/operations/users/'+uuid+'/(?:restriction(?:/release)?|type-change)$','i').test(path));
   const registeredRead=method==='GET'&&registeredUsersReadPath.test(path);
   const registeredWrite=method==='POST'&&registeredUsersWritePath.test(path);

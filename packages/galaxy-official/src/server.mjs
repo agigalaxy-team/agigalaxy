@@ -1,3 +1,4 @@
+import {createWebEventService} from './web-events/service.mjs';
 import {OperationsJobActions} from "./operations/jobs/job-actions.mjs";
 import { loadGovernanceForRuntime } from './operations/governance-review.mjs';
 import { loadIdentityProviders } from "./identity/config.mjs";
@@ -108,6 +109,7 @@ async function publicConfig(path) {
 }
 
 let db;
+let webEvents;
 let failureSpool;
 let metricsServer;
 let chatTransport;
@@ -329,7 +331,9 @@ try {
   const { createFailureAuditSpool } = await import(failureAuditModule);
   failureSpool = await createFailureAuditSpool({ path: join(process.env.GALAXY_TRUST_DIRECTORY, 'http-failure-audit.sqlite'),
     endpoint, write: httpFailureWriter(db, endpoint), logger: runtimeLog.write });
-  const server = createApi({ browserOrigins: [...new Set([...browserPolicy.origins,...(operations?[operations.adminOrigin]:[])])], ...services,
+  webEvents=createWebEventService({pool:db,endpoint,officialAccounts,communityAccounts:services.communityAccounts,access:services.access,authorizeOperator:operations?.portal?.authorizeOperator,businessAdmin,forum:services.forum,chat:services.chat,assistance:services.assistance,projects:services.projects,capsules:services.capsules,inbox:services.inbox,builders:services.builders,informationWatches:services.informationWatches,choices:services.choices,ciV2:services.ciV2});
+  await webEvents.start();
+  const server = createApi({webEvents, browserOrigins: [...new Set([...browserPolicy.origins,...(operations?[operations.adminOrigin]:[])])], ...services,
     operations,operationsSystemSettings,systemGeneralPublications,systemSettingsOperationsMail,systemSettingsNative,registeredUsers,managementAccounts,aiWorkAccounts,operationsPermissions,operationsMessaging,operationsSmtp,operationsAgentOs,agentOsGateway,operationsAutonomy,strategies,discoveryRuntime,discoveryHttp,operationsRecommendation,operationsSearchQuality,operationsMaintenance,maintenanceNative,operationsModelSettings,modelSettingsNative,businessAdmin,operationsJobs,operationsCommunity,operationsResources,operationsFiles,operationsFileCleanup,operationsFileAccess,operationsRules,p14Rules,operationsNotices,operationsRetention,operationsFeedback,feedbackAttachments,accountFeedbackData,accountFollows,contentPublications,accountChatGovernance,searchIndex:operationsSearchIndex,personalMcp, incident, metrics, requestQuotaPolicy, releaseId: release?.releaseId, keyring, docsMcp: handleDocsMcp, failureAudit: failureSpool.record,
     trustedProxyAddresses: process.env.GALAXY_TRUSTED_PROXY_ADDRESSES
       ? process.env.GALAXY_TRUSTED_PROXY_ADDRESSES.split(',').map(value => value.trim()) : [],
@@ -389,6 +393,7 @@ try {
       await closeStep('chat-drain',()=>chatMaintenance?.drain());
       await closeStep('credentials-close',()=>externalCredentialsMaintenance?.close());
       await closeStep('audit-close',()=>failureSpool.close());
+      await closeStep('web-events-stop',()=>webEvents?.stop());
       await closeStep('database-close',()=>db.end());
       runtimeLog.write({event:'runtime_stopped',stage:'shutdown',startedAt,exitCode:process.exitCode??0});
       await runtimeLog.close();
@@ -415,7 +420,8 @@ try {
   await closeStep('chat-drain',()=>chatMaintenance?.drain());
   await closeStep('credentials-close',()=>externalCredentialsMaintenance?.close());
   await closeStep('audit-close',()=>failureSpool?.close());
-  await closeStep('database-close',()=>db?.end());
+  await closeStep('web-events-stop',()=>webEvents?.stop());
+      await closeStep('database-close',()=>db?.end());
   runtimeLog.write({event:'runtime_stopped',stage:'shutdown',startedAt:runtimeStartedAt,exitCode:1});
   try{await runtimeLog.close();}catch{process.exitCode=1;}shutdown.finish();
 }

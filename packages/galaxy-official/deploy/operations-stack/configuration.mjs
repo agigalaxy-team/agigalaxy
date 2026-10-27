@@ -96,6 +96,7 @@ export function operationsConfiguration(input) {
       alertmanagerData: absolutePath(monitoring.alertmanagerData ?? '/var/lib/galaxy/operations/alertmanager', 'monitoring.alertmanagerData'),
       serviceUser: name(monitoring.serviceUser ?? 'galaxy-monitoring', 'monitoring.serviceUser'),
       receiverConfigurationFile: optionalPath(monitoring.receiverConfigurationFile, 'monitoring.receiverConfigurationFile'),
+      websiteUnit: monitoring.websiteUnit===undefined?undefined:name(monitoring.websiteUnit, 'monitoring.websiteUnit'),
       website: httpsUrl(monitoring.website ?? 'https://agigalaxy.org/', 'monitoring.website'),
       liveness: httpsUrl(monitoring.liveness ?? 'https://official.agigalaxy.org/healthz', 'monitoring.liveness'),
       readiness: httpsUrl(monitoring.readiness ?? 'https://official.agigalaxy.org/readyz', 'monitoring.readiness')

@@ -8,6 +8,9 @@ import {useMemberNames} from "../../shared/people/conversation-ui";
 import type {BuilderRuntime,BuilderFormKind,BuilderType,BuilderLocator} from './builder-authoring-state';
 import type {BuilderDirectoryClient,BuilderDirectoryRow,BuilderDirectoryRead,BuilderManagement,BuilderLocal,BuilderPending,BuilderAuthorization,BuilderStoppedResult,BuilderStopPreview} from './builder-workspace-state';
 import {builderDirectoryKind,builderDirectoryType,builderReadingUnavailable} from './builder-workspace-state';
+import {nativeQueryScope} from '../../application/query-scope';
+import {useServiceReadClient} from '../../shared/runtime/use-service-query';
+const builderReads=['query','read','owned','manage'] as const;
 type Props={runtime:BuilderRuntime|null;subjectId?:string;connected:boolean;navigate?:(path:string)=>void};
 const labels:Record<string,string>={registered:'已登记',unverified:'未核实',delisted:'已下架',unknown:'未核实','not-applicable':'不适用',reachable:'本次可达',unreachable:'本次未达',approved:'已批准','recent-owner-heartbeat':'作者近期报告在线','node-authorized-owner':'节点已批准当前声明','reported-pass':'该范围报告通过','reported-fail':'该范围报告失败','not-tested':'未测试',current:'当前可读','not-declared':'尚未声明',unavailable:'当前不可用','stale-declaration':'只适用旧声明','stale-support':'只适用旧支持范围',expired:'已到期',superseded:'已被后续报告替代','assessor-removed':'评估者已不在配置范围'};
 export function BuildersWorkspace(props:Props){
@@ -18,7 +21,9 @@ export function BuildersWorkspace(props:Props){
 function BuildersWorkspaceSession({runtime,subjectId,connected:identityConnected,navigate}:Omit<Props,'runtime'>&{runtime:BuilderRuntime}){
   const connection=runtime?.api.snapshot();
   const connected=!!(identityConnected&&subjectId&&(connection?.scopes?.includes('builders')||connection?.scopes?.includes('*')));
-  const client:BuilderDirectoryClient|null=useMemo(()=>runtime?createBuildersWebClient(runtime,{subjectId}):null,[runtime,subjectId]);
+  const originalClient:BuilderDirectoryClient|null=useMemo(()=>runtime?createBuildersWebClient(runtime,{subjectId}):null,[runtime,subjectId]);
+  const eventRefresh=useRef<(reset:boolean)=>void>(()=>{}),eventDirty=useRef(false);
+  const client=useServiceReadClient(originalClient,nativeQueryScope(runtime,subjectId),'builders',builderReads,reset=>eventRefresh.current(reset));
   const [editor,setEditor]=useState(()=>!!new URLSearchParams(location.search).get('compose')),[loaded,setLoaded]=useState(false);
   const [items,setItems]=useState<BuilderDirectoryRow[]>([]),[after,setAfter]=useState<string|null>(null),[owned,setOwned]=useState(false);
   const [query,setQuery]=useState(''),[type,setType]=useState<BuilderType|''>(''),[selected,setSelected]=useState<BuilderDirectoryRead|null>(null),[management,setManagement]=useState<BuilderManagement|null>(null);
@@ -31,7 +36,7 @@ function BuildersWorkspaceSession({runtime,subjectId,connected:identityConnected
   const names=useMemberNames(runtime,subjectId,connected,authorization?.viewers??[]);
   const applyLocal=(local:BuilderLocal)=>{setPending(local.pending);setStopped((local.stoppedOperations??[]).filter(item=>item.endpoint===runtime?.api.endpoint&&item.ownerId===subjectId));};
   const run=async(fn:(valid:()=>boolean)=>Promise<void>)=>{if(!client||running.current)return;const token=epoch.current,valid=()=>token===epoch.current;running.current=true;setBusy(true);setError('');setNotice('');
-    try{await fn(valid);}catch(e){if(valid())setError(builderFormError(e));}finally{running.current=false;if(valid())setBusy(false);}}
+    try{await fn(valid);}catch(e){if(valid())setError(builderFormError(e));}finally{running.current=false;if(valid())setBusy(false);if(valid()&&eventDirty.current){eventDirty.current=false;queueMicrotask(()=>eventRefresh.current(false));}}}
   const refreshLocal=async(valid:()=>boolean)=>{if(connected&&client){const local=await client.local();if(valid())applyLocal(local);}};
   const refreshFromEditor=async()=>{const token=epoch.current;await refreshLocal(()=>epoch.current===token);};
   const open=async(builderId:string,valid:()=>boolean,recover=false)=>{
@@ -54,6 +59,7 @@ function BuildersWorkspaceSession({runtime,subjectId,connected:identityConnected
         if(local.pending){const result=await client.resumePending();if(epoch.current!==token)return;applyLocal(await client.local());if(result.state==='acknowledged'){setNotice('原资料已保存。');if(!uiState.current.editor&&uiState.current.builderId===result.builderId)await open(result.builderId,()=>epoch.current===token);}else if(result.reason==='business-declined')setNotice('服务未接受上次资料，已停止自动发送。原输入仍保留。');}}
       catch(reason){if(epoch.current===token)setNotice(builderFormError(reason));}finally{recoveryReading.current=false;}});
   const initialize=useEffectEvent(async(token:number)=>{const initialId=new URLSearchParams(location.search).get('builderId');await list(false);if(initialId&&/^[0-9a-f-]{36}$/.test(initialId)&&epoch.current===token)await run(valid=>open(initialId,valid));await reloadLocal(token);});
+  eventRefresh.current=reset=>{const {builderId:id,editor:editing}=uiState.current;if(reset){setSelected(null);setManagement(null);setItems([]);}if(running.current){eventDirty.current=true;return;}if(document.hidden)return;void (async()=>{await list(owned);if(id&&!editing)await run(valid=>open(id,valid));})();};
   useEffect(()=>{epoch.current++;
     const token=epoch.current,reload=()=>reloadLocal(token);void initialize(token);
     const timer=window.setInterval(reload,12000);document.addEventListener('visibilitychange',reload);

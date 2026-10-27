@@ -3,13 +3,12 @@ from html import escape
 import json
 from pathlib import Path
 import subprocess
-from public_reading import public_page_data, reading_tree
-from cms_slots import content_slot, home_slots, TEMPLATE_PATH, TOKENS
+from public_reading import public_page_data
+from cms_slots import content_slot, home_slots
 
 ORIGIN = "https://agigalaxy.org"
 PREVIEW = True
 OUT = None
-WEB_ASSETS = None
 PUBLIC_PAGES = []
 NAVIGATION = json.loads(Path(__file__).with_name('workspace-navigation.json').read_text(encoding='utf-8'))
 _SHARED_SHELL = None
@@ -86,39 +85,6 @@ def public_sidebar(path, location):
             + ''.join(item(entry['href'], entry['label']) for entry in resources) + '</nav></aside>')
 
 
-def _document(path, title, description, body, header, rail, footer, is_home):
-    home_assets = (
-        '<link rel="stylesheet" href="/assets/home-experience.css">'
-        '<script src="/assets/home-experience.js" defer></script>' if is_home else ''
-    )
-    main_class = 'home-shell' if is_home else 'workspace-main site-content public-content'
-    body_class = '' if is_home else ' class="galaxy-site selected-shell selected-public-shell"'
-    shell_assets = '' if is_home else '<link rel="stylesheet" data-galaxy-static-style href="/assets/selected-shell.css"><link rel="stylesheet" data-galaxy-static-style href="/assets/public-reading.css">'
-    bootstrap = '<script type="module" src="/assets/public-bootstrap.js"></script>' if not is_home and WEB_ASSETS else ''
-    root_start, root_end = ('', '') if is_home else ('<div id="root">', '</div>')
-    static_style = '' if is_home else ' data-galaxy-static-style'
-    html = f'''<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escape(title)} · 银河</title><meta name="description" content="{escape(description)}">
-<meta name="theme-color" content="#ffffff"><link rel="canonical" href="{ORIGIN}{path}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet"{static_style} href="/assets/site.css">
-{home_assets}{shell_assets}<script type="module" src="/assets/navigation.js"></script>{bootstrap}</head>
-<body{body_class}>{root_start}<a class="skip" href="#main">跳到内容</a>
-{rail}{header}
-<div class="navigation-progress" role="status" aria-live="polite" hidden>{brand_mark('navigation-orbit')}<span>正在打开页面</span></div>
-<main class="{main_class}" id="main" tabindex="-1">{body}</main>
-{content_slot('footer', footer)}{root_end}</body></html>'''
-    if PREVIEW:
-        html = html.replace('<body>', '<body><div class="local-preview-label" role="note">本地重构预览 · 尚未发行</div>', 1)
-        html = html.replace('<meta name="viewport"', '<meta name="robots" content="noindex,nofollow"><meta name="viewport"', 1)
-    return html
-
-
-def _reading_content(sidebar, body):
-    return ('<div class="public-reading-page"><div class="public-page-layout">' + sidebar
-            + '<div class="public-page-content">' + content_slot('reading-body', body) + '</div></div></div>')
-
-
 def page(path, title, description, body):
     brand = (
         f'<a class="brand" href="/" aria-label="银河首页">{brand_mark()}'
@@ -159,19 +125,6 @@ def page(path, title, description, body):
         data = public_page_data(path, title + ' · 银河', description, location, sidebar, preview_note + body, footer)
         write('assets/public-pages' + path + 'index.json', json.dumps(data, ensure_ascii=False, separators=(',', ':')) + '\n')
         PUBLIC_PAGES.append(path)
-        body = _reading_content(sidebar, preview_note + body)
-        if path == '/how-it-works/':
-            # Capture the real shared chrome once during the ordinary site build.
-            # CMS publication fills these text slots without launching Node again.
-            generic_sidebar = public_sidebar('', '页面')
-            template_body = preview_note + content_slot('page-body', TOKENS['body']) + content_slot('page-extra')
-            template = {
-                'version': 1,
-                'html': _document(TOKENS['path'], TOKENS['title'], TOKENS['description'],
-                                  _reading_content(generic_sidebar, template_body),
-                                  shared['headers']['页面'], shared['rails']['public'], footer, False),
-                'sidebar': reading_tree(generic_sidebar),
-            }
-            write(TEMPLATE_PATH, json.dumps(template, ensure_ascii=False, separators=(',', ':')) + '\n')
-    html = _document(path, title, description, body, header, rail, footer, is_home)
-    write('index.html' if is_home else path.strip('/') + '/index.html', html)
+    if is_home:
+        from home_tree import trusted_tree
+        write('assets/home-content.json', json.dumps({'version': 1, 'title': title + ' · 银河', 'description': description, 'header': trusted_tree(header), 'body': trusted_tree(body), 'footer': trusted_tree(footer)}, ensure_ascii=False, separators=(',', ':')) + '\n')

@@ -1,5 +1,5 @@
 import { ReadingDetails, ReadingSummary } from "../../shared/reading/reading-details";
-import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,Check,Cloud,Smartphone,X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {createChoiceSyncClient} from './choice-sync-client.mjs';
@@ -8,6 +8,9 @@ import {ChoiceRetainedOperations,useChoiceViewLease,type ChoiceViewLease} from "
 import type {ChoiceContent,CloudChoiceContent,CloudChoice,CloudChoiceVersion,ChoicePreference,ChoiceLocalState,ChoiceSyncProps,ChoiceSyncPreview,ChoiceSyncViewClient} from './choice-sync-view-types';
 import {recordErrorField} from "../work-records/record-workspace-types";
 import './choice-sync-workspace.css';
+import {nativeQueryScope} from '../../application/query-scope';
+import {useServiceReadClient} from '../../shared/runtime/use-service-query';
+const choiceReads=['preferences','list','get'] as const;
 
 type Props=ChoiceSyncProps;
 const referenceNames:Record<string,string>={history:'经历',case:'工作',capsule:'方法',task:'求助',opportunity:'招募',proof:'验证材料',worker:'工作节点',hub:'服务'};
@@ -25,25 +28,40 @@ export function ChoiceSyncWorkspace(props:Props){
 }
 function ChoiceSyncView({runtime,subjectId,connected,localChoices,lease}:Props&{lease:ChoiceViewLease}){
  const ordinaryConnected=connected&&lease.bindingId!==null;
- const client=useMemo<ChoiceSyncViewClient|null>(()=>runtime&&subjectId?createChoiceSyncClient(runtime,{subjectId}):null,[runtime,subjectId]);
+ const queryScope=nativeQueryScope(runtime,subjectId);
+ const queryIdentity=queryScope.identity;
+ const originalClient=useMemo<ChoiceSyncViewClient|null>(()=>runtime&&subjectId&&queryIdentity!=='unavailable'?createChoiceSyncClient(runtime,{subjectId}):null,[runtime,subjectId,queryIdentity]);
+ const eventRefresh=useRef<(reset:boolean)=>void>(()=>{}),eventDirty=useRef(false);
+ const client=useServiceReadClient(originalClient,queryScope,'choice-sync',choiceReads,reset=>eventRefresh.current(reset));
  const [preferences,setPreferences]=useState<ChoicePreference|null>(null),[cloud,setCloud]=useState<CloudChoice[]>([]),[after,setAfter]=useState<string|null>(null),[localState,setLocalState]=useState<ChoiceLocalState|null>(null);
+ const currentCloud=useRef(cloud);currentCloud.current=cloud;
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[readError,setReadError]=useState('');
  const [preview,setPreview]=useState<ChoiceSyncPreview|null>(null),[deleteTarget,setDeleteTarget]=useState<CloudChoice|null>(null),[resolutions,setResolutions]=useState<Record<string,string[]>>({});
  const dialog=useRef<HTMLDialogElement>(null),deletion=useRef<HTMLDialogElement>(null),epoch=useRef(0),reading=useRef(false),running=useRef(false),cloudPages=useRef(1),refreshRef=useRef<()=>Promise<void>>(async()=>{});
  const valid=(token:number)=>{if(token!==epoch.current)return false;try{lease.assertCurrent();return true;}catch{return false;}};
- async function refresh(){if(!client||reading.current||running.current)return;const token=epoch.current;if(!valid(token))return;reading.current=true;
+ async function refresh(remote=true){if(!client||reading.current||running.current)return;const token=epoch.current;if(!valid(token))return;reading.current=true;
   try{const readLocal=async()=>{const state=await client.localState();for(const request of Object.values(state.pending??{})){try{await client.reconcileRetained(request.snapshotId,{versionId:request.versionId});}catch{/* The original remains pending; no resend or wider read. */}if(!valid(token))return null;}return client.localState();};
    const readCloud=async()=>{const first=await client.list();let items=first.items,nextAfter=first.nextAfter;for(let page=1;page<cloudPages.current&&nextAfter;page++){const next=await client.list({after:nextAfter});items=[...items,...next.items];nextAfter=next.nextAfter;}return{items,nextAfter};};
-   const [local,p,page]=await Promise.allSettled([readLocal(),ordinaryConnected?client.preferences():Promise.resolve(null),ordinaryConnected?readCloud():Promise.resolve(null)]);if(!valid(token))return;
+   const [local,p,page]=await Promise.allSettled([readLocal(),ordinaryConnected&&remote?client.preferences():Promise.resolve(null),ordinaryConnected&&remote?readCloud():Promise.resolve(null)]);if(!valid(token))return;
    if(local.status==='fulfilled')setLocalState(local.value);else setLocalState(null);
-   if(ordinaryConnected){if(p.status==='fulfilled')setPreferences(p.value);else setPreferences(null);
+   if(ordinaryConnected&&remote){if(p.status==='fulfilled')setPreferences(p.value);else setPreferences(null);
     if(page.status==='fulfilled'&&page.value){setCloud(page.value.items);setAfter(page.value.nextAfter);}else{setCloud([]);setAfter(null);}
     setReadError(p.status==='rejected'||page.status==='rejected'?'暂时无法读取当前云副本。':'');
-   }else{setPreferences(null);setCloud([]);setAfter(null);}
-  }finally{reading.current=false;if(valid(token))setLoading(false);}
+   }else if(!ordinaryConnected){setPreferences(null);setCloud([]);setAfter(null);}
+   else {
+    // Cloud expiry is not a lease for every original source qualification.
+    // Recheck only already displayed copies, never rescan the cloud directory.
+    const ids=currentCloud.current.map(item=>item.snapshotId);
+    const checked=await Promise.allSettled(ids.map(id=>client.get(id)));
+    if(valid(token))setCloud(old=>old.flatMap(item=>{const index=ids.indexOf(item.snapshotId);if(index<0)return[item];const value=checked[index];return value.status==='fulfilled'?[value.value as CloudChoice]:[];}));
+   }
+  }finally{reading.current=false;if(valid(token))setLoading(false);if(valid(token)&&eventDirty.current&&!running.current){eventDirty.current=false;queueMicrotask(()=>void refreshRef.current());}}
  }
  useLayoutEffect(()=>{refreshRef.current=refresh;});
- useEffect(()=>{const viewEpoch=epoch,token=++viewEpoch.current;void refreshRef.current();const observe=()=>{if(!document.hidden&&viewEpoch.current===token)void refreshRef.current();};const timer=window.setInterval(observe,20000);document.addEventListener('visibilitychange',observe);return()=>{viewEpoch.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',observe);client?.close();};},[client]);
+ const refreshSources=useEffectEvent(()=>refresh(false));
+ eventRefresh.current=reset=>{if(reset){setPreferences(null);setCloud([]);}if(reading.current||running.current){eventDirty.current=true;return;}if(!document.hidden)void refreshRef.current();};
+ useEffect(()=>{const viewEpoch=epoch,token=++viewEpoch.current;void refreshRef.current();const observe=()=>{if(!document.hidden&&viewEpoch.current===token)void refreshSources();};const timer=window.setInterval(observe,20000);document.addEventListener('visibilitychange',observe);return()=>{viewEpoch.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',observe);client?.close();};},[client]);
+ useEffect(()=>{const deadlines=cloud.flatMap(item=>[item.current,...item.conflicts].flatMap(version=>version?.expiresAt?[Date.parse(version.expiresAt)]:[])).filter(value=>Number.isFinite(value)&&value>Date.now());if(!deadlines.length)return;const timer=window.setTimeout(()=>{setCloud([]);void refreshRef.current();},Math.min(...deadlines)-Date.now());return()=>window.clearTimeout(timer);},[cloud]);
  useEffect(()=>{if(preview)dialog.current?.showModal();else dialog.current?.close();},[preview]);
  useEffect(()=>{if(deleteTarget)deletion.current?.showModal();else deletion.current?.close();},[deleteTarget]);
  async function run(fn:(c:NonNullable<typeof client>,active:()=>boolean)=>Promise<void>){if(!client||running.current)return;const token=epoch.current,active=()=>valid(token);if(!active())return;running.current=true;setBusy(true);setError('');setNotice('');

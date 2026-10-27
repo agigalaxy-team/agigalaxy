@@ -16,7 +16,8 @@ import "./discovery.css";
 import type {ProjectRuntime,DiscoveryPage,Opportunity,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail,DiscoveryQuery} from "./contracts";
 import {bodyFreeOpportunity,contactDraftRuntime} from "../help-search/help-contact-view-types";
 import type {DiscoveryInput} from "../help-search/help-contact-view-types";
-import {useReadTasks} from "../../shared/reading/use-read-task";
+import {useQueryReads,sourceReadDeadline} from "../../application/query-reads";
+import {nativeQueryScope} from "../../application/query-scope";
 import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import {purposes,tags,errorMessage,discoveryMemory} from "./query-memory";
 
@@ -24,7 +25,7 @@ type Props={runtime:ProjectRuntime|null;connected:boolean;navigate:(path:string)
 export function DiscoveryWorkspace(props:Props){return <DiscoveryView key={projectViewScope(props.runtime,props.connected)} {...props}/>;}
 function DiscoveryView({runtime,connected,navigate}:Props){
  const scope=projectViewScope(runtime,connected),subjectId=connected?runtime?.api.snapshot()?.subjectId:undefined;
- const reads=useReadTasks(scope);
+ const reads=useQueryReads(nativeQueryScope(runtime,subjectId),'projects',scope);
  const [entryQuery]=useState(()=>new URLSearchParams(location.search).get('q'));
  const memoryKey=entryQuery===null?'discovery':'discovery-query:'+entryQuery;
  const originReturn=helpOriginLocator(location.pathname+location.search+location.hash)?.returnTo;
@@ -60,6 +61,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
    for(let page=0;page<count;page++){value=await read<OpportunityDetail>('/v2/discovery/detail',{...selectedQuery,opportunityRef:item.opportunityRef,...(after?{experienceAfter:after}:{})},token);if(signal.aborted)throw new DOMException('Read replaced','AbortError');rows.push(...value.experience.items);after=value.experience.nextCursor??value.experience.nextAfter??null;if(!after)break;}
    if(!value)throw Error('没有读到项目介绍。');value.experience.items=[...new Map(rows.map(row=>[row.key,row])).values()];return value;
   },{
+   validUntil:sourceReadDeadline,
    onStart:()=>{if(!quiet){setBusy(true);setDetailError('');if(!same)setDetail(null);change({openedRef:bodyFreeOpportunity(item)});}},
    onSuccess:value=>{if(current(token)){opened.current=value.opportunity;setDetail(value);setDisplayQuery(selectedQuery);setDetailError('');}},
    onError:reason=>{if(current(token)){setDetail({opportunity:bodyFreeOpportunity(item),experience:{items:[]}});setDetailError(opportunityUnavailable(reason)?'这份介绍或交流意愿已经变化，请重新查找。':'暂时无法读取这份资料，联系草稿仍保留。');}},
@@ -74,6 +76,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
    let after=options.after??null;const rows:Opportunity[]=[];
    for(let page=0;page<count;page++){const value=await read<DiscoveryPage>('/v2/discovery/query',{...selectedQuery,limit:20,...(after?{after}:{})},token);if(signal.aborted)throw new DOMException('Read replaced','AbortError');rows.push(...value.items);after=value.nextAfter??null;if(!after)break;}return{rows,after};
   },{
+   validUntil:sourceReadDeadline,
    onStart:()=>{if(!options.quiet){setSearching(true);setError('');if(!options.after&&!options.restore){reads.cancel('detail');detailIntent.current++;foregroundDetail.current=false;opened.current=null;setDetail(null);setDetailError('');setBusy(false);change({submittedQuery:selectedQuery,openedRef:null});}}},
    onSuccess:({rows,after})=>{if(current(token)){setItems(old=>[...new Map((options.after?[...old,...rows]:rows).map(item=>[item.id,item])).values()]);if(options.after)pages.current++;setNext(after);setSearched(true);setError('');}},
    onError:reason=>{if(current(token)){setError(errorMessage(reason));setItems([]);setNext(null);}},
@@ -87,7 +90,7 @@ function DiscoveryView({runtime,connected,navigate}:Props){
   void search({restore:selectedQuery}).then(result=>{if(result?.status==='success'&&restore&&intent===detailIntent.current&&!opened.current)void inspect(restore);});
  });
  useEffect(()=>{restoreSources();},[draft.ready]);
-  useEffect(()=>{const refresh=()=>void reload(),timer=window.setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);window.addEventListener('focus',refresh);window.addEventListener('online',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);window.removeEventListener('online',refresh);};},[]);
+  useEffect(()=>{const refresh=()=>void reload();window.addEventListener('online',refresh);return()=>{window.removeEventListener('online',refresh);};},[]);
 
  const go=(path:string)=>{reads.cancel('detail');detailIntent.current++;foregroundDetail.current=false;navigate(path);};
  return <section className="discovery-page">

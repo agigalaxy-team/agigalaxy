@@ -1,4 +1,5 @@
 import {createHash, randomBytes, timingSafeEqual} from 'node:crypto';
+import {PortalSessions} from '../../identity/authentication/portal-session.mjs';
 import {transaction} from "../../infrastructure/database.mjs";
 import {ServiceError} from "../../shared/service-error.mjs";
 import {rootOperationsRole,managementAdmission,isOperationsRootPrincipal} from "../accounts/root-principal.mjs";
@@ -27,7 +28,7 @@ function cookieValue(request, name) {
 // caller cannot select its operator identity or role in a business request.
 export function createOperationsPortal({provider, db, endpoint, adminOrigin, roleDirectory,
   roles = {administrator:'galaxy-operations-administrator', reader:'galaxy-operations-reader'},
-  permissions = null, rootPrincipal = null, managementSessions = null,
+  sessionRenewal=null, permissions = null, rootPrincipal = null, managementSessions = null,
   now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false}) {
   const origin = exactOrigin(adminOrigin, allowLoopbackHttp);
   exactOrigin(endpoint, allowLoopbackHttp);
@@ -47,6 +48,7 @@ export function createOperationsPortal({provider, db, endpoint, adminOrigin, rol
   const loginCookie = secure ? '__Host-galaxy-operator-login' : 'galaxy-operator-login-fixture';
   const cookie = (name, value, age) => `${name}=${value}; Path=/; HttpOnly; ${secure ? 'Secure; ' : ''}SameSite=Lax; Max-Age=${age}`;
   const scope = [endpoint, configurationId];
+  const renewal=sessionRenewal?new PortalSessions({db,kind:'operator',scope,policy:sessionRenewal,provider,now}):null;
   const principalFrom = row => ({operatorId:row.operator_id,issuer:row.issuer,externalSubject:row.external_subject});
   const roleFrom = (names,principal) => rootOperationsRole(rootPrincipal,principal,names,roles);
   const operatorView = row => ({id:row.operator_id,displayName:row.display_name,role:row.role,
@@ -67,12 +69,19 @@ export function createOperationsPortal({provider, db, endpoint, adminOrigin, rol
     if (target.origin !== adminOrigin || !/^\/(?:admin(?:\/|$)|preview(?:\/|$))/.test(target.pathname)) throw denied();
     return target.href;
   }
-  async function rawSession(request) {
+  async function rawSession(request,{renew=true}={}) {
     noBearer(request);
     const value = cookieValue(request, sessionCookie); if (!value) return null;
     const row = (await db.query(`SELECT * FROM operations_operator_sessions_v1
       WHERE endpoint=$1 AND configuration_id=$2 AND token_hash=$3 AND expires_at>$4`, [...scope,digest(value),iso(now())])).rows[0];
-    return row ?? null;
+    if(!row||!renew)return row??null;
+    if(!renewal)return row.refresh_cipher?null:row;
+    const activityOrigin=request.headers.origin===adminOrigin||request.method==='GET'&&request.headers.origin===undefined
+      &&request.headers['sec-fetch-site']==='same-origin'&&request.headers.host===origin.host;
+    const activity=request.headers['x-galaxy-user-activity']==='1'&&activityOrigin
+      &&equal(request.headers['x-galaxy-operator-csrf'],row.csrf_token);
+    const live=await renewal.current(row,{activity});
+    return live===null?null:live?{...row,expires_at:iso(live.expiresAt)}:row;
   }
   async function current(request) {
     const row = await rawSession(request); if (!row) return null;
@@ -160,10 +169,11 @@ export function createOperationsPortal({provider, db, endpoint, adminOrigin, rol
           if (prior) await tx.query('DELETE FROM operations_operator_sessions_v1 WHERE endpoint=$1 AND configuration_id=$2 AND token_hash=$3', [...scope,digest(prior)]);
           await tx.query('DELETE FROM operations_operator_sessions_v1 WHERE endpoint=$1 AND configuration_id=$2 AND expires_at<=$3', [...scope,iso(now())]);
           await tx.query(`INSERT INTO operations_operator_sessions_v1(endpoint,configuration_id,token_hash,operator_id,issuer,external_subject,display_name,role,csrf_token,expires_at)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [...scope,digest(token),operatorId,principal.issuer,principal.externalSubject,displayName,role,csrf,iso(now()+3600)]);
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [...scope,digest(token),operatorId,principal.issuer,principal.externalSubject,displayName,role,csrf,iso(now()+(renewal&&principal.portalTokens?.refreshToken?renewal.policy.maximumSeconds:3600))]);
+          if(renewal)await renewal.create(tx,digest(token),principal);
           await tx.query("UPDATE operations_operator_logins_v1 SET status='completed' WHERE endpoint=$1 AND configuration_id=$2 AND token_hash=$3",[...scope,key]);
         });
-        cookies.push(cookie(sessionCookie,token,3600)); target=record.return_to;
+        cookies.push(cookie(sessionCookie,token,renewal&&principal.portalTokens?.refreshToken?renewal.policy.maximumSeconds:3600)); target=record.return_to;
       } catch { /* No token, callback URL, account profile or provider error is logged. */ }
       finally {if (record) await provider.cancel(record.preview);}
       // Do not clear an old login cookie after an asynchronous exchange: a
@@ -195,7 +205,7 @@ export function createOperationsPortal({provider, db, endpoint, adminOrigin, rol
     },
     async logout(request,response) {
       sameOrigin(request,true);
-      const row=await rawSession(request);
+      const row=await rawSession(request,{renew:false});
       if (!row || !equal(request.headers['x-galaxy-operator-csrf'],row.csrf_token)) throw denied();
       const pending=cookieValue(request,loginCookie);
       await transaction(db,async tx=>{

@@ -6,6 +6,7 @@ import {ServiceError} from "../shared/service-error.mjs";
 import {OfficialAccountData} from "./data.mjs";
 import {upsertOfficialAccountWithin} from "./uid.mjs";
 import {createOidcTransactionStore} from "../identity/authentication/oidc-transaction-store.mjs";
+import {PortalSessions,loadPortalSessionPolicy} from '../identity/authentication/portal-session.mjs';
 import {OfficialAccountSessionStore} from "./session-store.mjs";
 
 const opaque = () => randomBytes(32).toString('base64url');
@@ -34,7 +35,7 @@ function sameSecret(a, b) {
 // OIDC tokens never leave the server. Account actions use their own current
 // account session; a login never grants control of an associated Galaxy ID.
 export function createOfficialAccountPortal({provider, db, endpoint, websiteOrigin, associationProviders = [],
-  now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false}) {
+  sessionRenewal=null, now = () => Math.floor(Date.now() / 1000), allowLoopbackHttp = false}) {
   origin(endpoint, allowLoopbackHttp); origin(websiteOrigin, allowLoopbackHttp);
   const description = provider.describe();
   if (description.redirectUri !== endpoint + callbackPath) throw Error('Account callback mismatch.');
@@ -46,6 +47,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
   // keep their independent transactions and Galaxy signature requirements.
   if(typeof provider.withTransactionStore==='function')provider=provider.withTransactionStore(
     createOidcTransactionStore({db,namespace:'official-account:'+configurationHash,now}));
+  const renewal=sessionRenewal?new PortalSessions({db,kind:'account',scope:[configurationHash],policy:sessionRenewal,provider,now}):null;
   const data = new OfficialAccountData({db,endpoint,now});
   const secure = new URL(endpoint).protocol === 'https:';
   // __Host cookies are mandatory in production. Literal-loopback HTTP fixtures
@@ -63,9 +65,17 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
     if (target.origin !== websiteOrigin || !target.pathname.startsWith('/app/')) throw new ServiceError('invalid_account_return');
     return target.href;
   }
-  async function readSession(request) {
+  async function readSession(request,{renew=true}={}) {
     const value = cookieValue(request, sessionCookie);
-    return value ? sessions.session(hash(value)) : null;
+    const session=value?await sessions.session(hash(value)):null;
+    if(!session||!renew)return session;
+    if(!renewal)return session.renewalRow.refresh_cipher?null:session;
+    const activityOrigin=request.headers.origin===websiteOrigin||request.method==='GET'&&request.headers.origin===undefined
+      &&endpoint===websiteOrigin&&request.headers['sec-fetch-site']==='same-origin'&&request.headers.host===new URL(endpoint).host;
+    const verifiedActivity=request.headers['x-galaxy-user-activity']==='1'&&activityOrigin
+      &&sameSecret(request.headers['x-galaxy-account-csrf'],session.csrfToken);
+    const live=await renewal.current(session.renewalRow,{activity:verifiedActivity});
+    return live===null?null:live?{...session,expiresAt:live.expiresAt}:session;
   }
   const signedOut = () => ({state:'signed-out', galaxyAuthorization:false});
   return Object.freeze({
@@ -125,9 +135,10 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
           const profile=await data.ensureWithin(connection,accountRow.id,{subjectType:accountRow.created?'person':null});
           return {accountId:accountRow.id,issuer:account.issuer,externalSubject:account.externalSubject,
             account:{id:accountRow.id,uid:accountRow.uid,displayName:profile.display_name,avatarKey:profile.avatar_key??null,subjectType:profile.subject_type??null,email:account.accountProfile?.email??null,emailVerified:account.accountVerification?.verified===true},
-            csrfToken:opaque(),expiresAt:now()+3600};
+            csrfToken:opaque(),expiresAt:now()+(renewal&&account.portalTokens?.refreshToken?renewal.policy.maximumSeconds:3600),
+            ...(renewal&&account.portalTokens?.refreshToken?{installRenewal:connection=>renewal.create(connection,hash(token),account)}:{})};
         });
-        cookies.push(cookie(sessionCookie, token, 3600));
+        cookies.push(cookie(sessionCookie, token, renewal&&account.portalTokens?.refreshToken?renewal.policy.maximumSeconds:3600));
       } catch {
         await sessions.failLogin(key);
         const failure = new URL(target); failure.searchParams.set('accountLogin',url.searchParams.get('error')==='access_denied'?'cancelled':'failed'); target = failure.href;
@@ -190,7 +201,7 @@ export function createOfficialAccountPortal({provider, db, endpoint, websiteOrig
     },
     async logout(request, response) {
       if(request.headers.authorization!==undefined)throw new ServiceError('access_denied',401);
-      const session = await readSession(request);
+      const session = await readSession(request,{renew:false});
       if (request.headers.origin !== websiteOrigin || !session || !sameSecret(request.headers['x-galaxy-account-csrf'], session.csrfToken)) throw new ServiceError('account_csrf_invalid',403);
       const value = cookieValue(request, sessionCookie),login=cookieValue(request,loginCookie);
       await sessions.logout(hash(value),login?hash(login):null);
@@ -205,9 +216,11 @@ export async function loadOfficialAccountPortal(path, {endpoint, db, browserOrig
   const info = await lstat(path);
   if (!info.isFile() || info.isSymbolicLink() || info.size > 4096) throw Error('Invalid official account configuration.');
   const value = JSON.parse(await readFile(path,'utf8'));
-  if (value.version !== 1 || Object.keys(value).sort().join(',') !== 'clientId,issuer,version,websiteOrigin' || !/^[a-z0-9][a-z0-9._-]{0,199}$/.test(value.clientId ?? '') || !browserOrigins.includes(value.websiteOrigin)) throw Error('Invalid official account configuration.');
+  const {sessionRenewal:renewalConfiguration,...core}=value;
+  const sessionRenewal=await loadPortalSessionPolicy(renewalConfiguration);
+  if (value.version !== 1 || Object.keys(core).sort().join(',') !== 'clientId,issuer,version,websiteOrigin' || !/^[a-z0-9][a-z0-9._-]{0,199}$/.test(value.clientId ?? '') || !browserOrigins.includes(value.websiteOrigin)) throw Error('Invalid official account configuration.');
   origin(value.websiteOrigin); const issuer = new URL(value.issuer);
   if (issuer.protocol !== 'https:' || issuer.username || issuer.password || issuer.search || issuer.hash || issuer.href !== value.issuer) throw Error('Invalid official account issuer.');
-  const provider = await factory({id:'official-account-entry',name:'银河官方账户',issuer:value.issuer,clientId:value.clientId,redirectUri:endpoint + callbackPath,includeAccountProfile:true});
-  return createOfficialAccountPortal({provider,db,endpoint,websiteOrigin:value.websiteOrigin,associationProviders:identityProviders});
+  const provider = await factory({id:'official-account-entry',name:'银河官方账户',issuer:value.issuer,clientId:value.clientId,redirectUri:endpoint + callbackPath,includeAccountProfile:true,sessionRenewal:!!sessionRenewal});
+  return createOfficialAccountPortal({provider,db,endpoint,websiteOrigin:value.websiteOrigin,associationProviders:identityProviders,sessionRenewal});
 }

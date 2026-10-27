@@ -11,6 +11,8 @@ import type {CiEvidence,CiInput,CiLocal,CiLocator,CiPreview,CiResult,CiView} fro
 import {errorField,operationSessionKey} from "../tasks/operations/task-operation-state";
 import type {OperationRuntime} from "../tasks/operations/task-operation-state";
 import "../../shared/styles/peering-ci.css";
+import {nativeQueryScope} from '../../application/query-scope';
+import {useServiceQuery} from '../../shared/runtime/use-service-query';
 type Props={runtime:OperationRuntime;connected:boolean;subjectId?:string;caseId:string;results:CiResult[];evidence:CiEvidence[]};
 const names:Record<string,string>={pending:'等待读取运行记录',observed:'已取得运行观察',unavailable:'运行来源暂不可用',revoked:'已停止',stale:'观察已到期','source-unavailable':'来源当前不可读','read-unavailable':'暂时无法读取','proof-expired':'证明已到期',active:'当前可读',recorded:'已保存'};
 const initial:CiInput={selected:'',resultId:'',visibility:'Private'};
@@ -47,6 +49,8 @@ export function CiWorkspace(props:Props){
   return <CiSession key={connectionKey()} {...props} subjectId={props.subjectId}/>;
 }
 function CiSession({runtime,connected,subjectId,caseId,results,evidence}:Props&{subjectId:string}){
+  const eventRefresh=useRef<(reset:boolean)=>void>(()=>{});
+  const reads=useServiceQuery(nativeQueryScope(runtime,subjectId),'ci',reset=>eventRefresh.current(reset));
   const lease=useMemo(()=>{const value=runtime.receiptStatus.captureLease();if(value.subjectId!==subjectId)throw Error('当前 CI 身份已变化。');return value;},[runtime,subjectId]),client=useMemo(()=>getCiClient(runtime,subjectId),[runtime,subjectId]);
   const draft=useGovernanceDraft<CiInput,CiLocator>(runtime,subjectId,connected,'ci-input:v1:'+JSON.stringify([runtime.api.endpoint,subjectId,caseId]),initial),input=draft.value;
   const [local,setLocal]=useState<CiLocal|null>(null),[views,setViews]=useState<Record<string,CiView>>({}),[preview,setPreview]=useState<CiPreview|null>(null),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false);
@@ -57,7 +61,7 @@ function CiSession({runtime,connected,subjectId,caseId,results,evidence}:Props&{
   const ownResults=[...results.filter(item=>item.actorId===subjectId).reduce((map:Map<string,CiResult>,item)=>{const previous=map.get(item.id);if(!previous||item.version>previous.version)map.set(item.id,item);return map;},new Map<string,CiResult>()).values()];
   const sourceView=choices.find(item=>item.id+':'+item.version===input.selected),source=ciSourceFromEvidence(sourceView),result=ownResults.find(item=>item.id+':'+item.version===input.resultId);
   const requests=(local?.requests??[]).filter(item=>item.caseId===caseId),proofs=(local?.proofs??[]).filter(item=>requests.some(request=>request.id===item.requestId));
-  async function call(path:string,payload:object):Promise<unknown>{const token=session.current.generation;check();const value:unknown=await runtime.api.call(path,payload);check();if(token!==session.current.generation)throw Error('页面身份或工作已变化，请重新打开。');return value;}
+  async function call(path:string,payload:object):Promise<unknown>{const token=session.current.generation;check();const value:unknown=path.endsWith('/read')?await reads.read([caseId,path,payload],()=>runtime.api.call(path,payload)):await runtime.api.call(path,payload);check();if(token!==session.current.generation)throw Error('页面身份或工作已变化，请重新打开。');return value;}
   async function settleDraft(){if(!draft.ready)return;await draft.settle(async attempt=>{const value=readCiReceipt(await call('/v2/ci/receipts',{type:attempt.type,id:attempt.id}));if(value.state==='recorded'&&value.payloadHash!==attempt.payloadHash)throw Error('原操作的内容不匹配，请保留记录后核对。');return{state:value.state==='recorded'?'acknowledged':value.state};});}
   async function refresh(resume=false){
     if(session.current.reading){session.current.refreshAgain=true;return;}session.current.reading=true;const token=session.current.generation,serial=++session.current.readSerial;
@@ -73,6 +77,7 @@ function CiSession({runtime,connected,subjectId,caseId,results,evidence}:Props&{
     }finally{session.current.reading=false;if(session.current.refreshAgain&&token===session.current.generation&&session.current.active){session.current.refreshAgain=false;void refresh().catch(()=>{});}}
   }
   const readCurrent=useEffectEvent(()=>refresh(true));
+  eventRefresh.current=reset=>{if(reset)setViews({});if(!document.hidden&&!session.current.working)void refresh().catch(reason=>setError(ciError(reason)));};
   const settleCurrent=useEffectEvent(()=>settleDraft());
   useEffect(()=>{session.current.active=true;session.current.generation++;const token=session.current.generation;const read=()=>{if(document.hidden||session.current.working||session.current.reading)return;void readCurrent().catch(e=>{if(session.current.active&&token===session.current.generation)setError(ciError(e));});};read();const timer=window.setInterval(read,20000);document.addEventListener('visibilitychange',read);const state=session.current;return()=>{state.active=false;state.generation++;state.readSerial++;window.clearInterval(timer);document.removeEventListener('visibilitychange',read);};},[session,client,caseId]);
   useEffect(()=>{if(draft.ready&&draft.attempt)void settleCurrent().catch(()=>{});},[draft.ready,draft.attempt]);

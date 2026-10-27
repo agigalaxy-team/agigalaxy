@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {cp, lstat, mkdir, readFile, readdir, realpath, symlink, writeFile} from 'node:fs/promises';
+import {lstat, mkdir, readFile, readdir, realpath, symlink, unlink, writeFile} from 'node:fs/promises';
 import {dirname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createFilesystemContentPublisher, loadContentPublisherConfiguration} from "../src/publishing/content-publisher-files.mjs";
@@ -45,7 +45,7 @@ function imageSnapshot(media, title = 'Published help') {
   return publicSnapshot({title, pages: [publicPage({blocks: [{blockType: 'image', mediaId: media[0].id, caption: '配图'}]})], media});
 }
 
-test('prepare retains the active site, passes only referenced files privately, and activates the exact recorded candidate', {timeout: 60000}, async t => {
+test('prepare retains active content, stores only selected snapshot and media, and atomically activates the candidate', {timeout: 60000}, async t => {
   const fixture = await filesFixture(t); if (!fixture) return;
   const {config, previous, priorDirectory} = fixture;
   const configFile = join(fixture.directory, 'publisher.json');
@@ -65,15 +65,12 @@ test('prepare retains the active site, passes only referenced files privately, a
   assert.equal(await readFile(join(config.currentLink, 'index.html'), 'utf8'), 'Current valid website');
   assert.equal(artifact.publicationId, publicationId);
   assert.equal(artifact.siteVersion, 'fixture-software-release');
-  assert.deepEqual(await json(join(artifact.directory, 'renderer-invocation.json')), {
-    selectedFiles: ['selected.png'], inputInsideCandidate: false, mediaInsideCandidate: false,
-  });
-  assert.equal(await exists(join(artifact.directory, '.cms-selected-media')), false);
-  assert.equal(await exists(join(artifact.directory, '.cms-snapshot.json')), false);
-  assert.equal((await readdir(config.releaseDirectory)).some(name => name.startsWith('.cms-input-')), false,
-    'temporary snapshot and media are removed after rendering');
-  assert.equal(await readFile(join(artifact.directory, 'app/index.html'), 'utf8'), 'Existing business app');
-  assert.equal(await readFile(join(artifact.directory, 'downloads/release.jws'), 'utf8'), 'Existing signed release');
+  const snapshot=await json(join(artifact.directory,'cms-snapshot.json'));
+  assert.deepEqual(snapshot.media.map(item=>item.filename),['selected.png']);
+  assert.equal(snapshot.media[0].url,'/media/cms/selected-image/selected.png');
+  assert.deepEqual(await readFile(join(artifact.directory,'media/selected.png')),selected);
+  assert.equal(await exists(join(artifact.directory,'index.html')),false);
+  assert.equal(await exists(join(artifact.directory,'app')),false);
   assert.deepEqual(await publisher.current(), previous);
   try{await publisher.activate(artifact);}catch(error){
     if(process.platform==='win32'&&error.code==='EPERM'){t.skip('Windows cannot atomically replace a directory symbolic link; run activation on the Linux deployment host');return;}
@@ -89,12 +86,12 @@ test('prepare retains the active site, passes only referenced files privately, a
   assert.equal((await publisher.current()).publicationId, publicationId);
 });
 
-test('failed rendering and aborted preparation leave the previous pointer and no private staging data', {timeout: 60000}, async t => {
+test('invalid media and aborted preparation leave the previous pointer unchanged', {timeout: 60000}, async t => {
   const fixture = await filesFixture(t); if (!fixture) return;
   const {config, previous, priorDirectory} = fixture;
   const publisher = await createFilesystemContentPublisher(config);
   const bytes = Buffer.from('chosen image'); await writeFile(join(config.mediaDirectory, 'selected.png'), bytes);
-  const input = imageSnapshot([mediaItem({size: bytes.length})], '__fixture_renderer_failure__');
+  const input = imageSnapshot([mediaItem({size: bytes.length+1})]);
   await assert.rejects(publisher.prepare({publicationId: randomUUID(), snapshot: input}));
   assert.deepEqual(await publisher.current(), previous);
   assert.equal(await realpath(config.currentLink), await realpath(priorDirectory));
@@ -124,13 +121,14 @@ test('source paths, media origin and changed files cannot escape or broaden publ
   await assert.rejects(publisher.prepare({publicationId: randomUUID(), snapshot: imageSnapshot([linked])}), /regular file required/);
   assert.deepEqual(await publisher.current(), previous);
   assert.equal((await readdir(config.releaseDirectory)).some(name => name.startsWith('.cms-input-')), false);
-  const linkedBuild = join(fixture.directory, 'linked-build');
-  await cp(config.baseDirectory, linkedBuild, {recursive: true});
-  await symlink(relative(linkedBuild, outside), join(linkedBuild, 'unexpected-link'), 'file');
-  const invalidBuild = await createFilesystemContentPublisher({...config, baseDirectory: linkedBuild});
-  await assert.rejects(invalidBuild.prepare({publicationId: randomUUID(), snapshot: publicSnapshot()}), /must not contain symbolic links/);
-  assert.deepEqual(await publisher.current(), previous);
   const unsafeConfig = join(fixture.directory, 'unsafe-publisher.json');
-  await writeFile(unsafeConfig, JSON.stringify({...config, renderer: '../renderer.mjs'}), {mode: 0o600});
+  await writeFile(unsafeConfig, JSON.stringify({...config, mediaDirectory: '../media'}), {mode: 0o600});
   await assert.rejects(loadContentPublisherConfiguration(unsafeConfig), /Absolute publisher paths required/);
+});
+
+test('first publication can activate an absent pointer without fabricating a baseline publication',async t=>{
+ const fixture=await filesFixture(t);if(!fixture)return;const {config}=fixture;await unlink(config.currentLink);
+ const publisher=await createFilesystemContentPublisher(config);assert.equal(await publisher.current(),null);
+ const artifact=await publisher.prepare({publicationId:randomUUID(),snapshot:publicSnapshot()});await publisher.activate(artifact);
+ assert.equal((await publisher.current()).publicationId,artifact.publicationId);
 });

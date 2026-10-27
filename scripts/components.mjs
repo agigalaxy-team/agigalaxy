@@ -95,10 +95,10 @@ async function cli(){
  const id=value('--component');if(!id)throw Error('Select --component.');
  const outputRoot=resolve(value('--output')??join(repositoryRoot,'outputs','components',crypto.randomUUID()));
  if(outputRoot===repositoryRoot||repositoryRoot.startsWith(outputRoot+'/')||repositoryRoot.startsWith(outputRoot+'\\'))throw Error('Output must be separate from sources.');
- const selected=action==='build'&&id==='site'?['web','site']:[id];
+ const selected=[id];
  ordered(catalog,selected);
  await createOutputRoot(outputRoot);const records=[];
- // Only site requires a compiled Web artifact; libraries have no output step.
+ // Each application builds its declared runtime; shared libraries are consumed as source.
  for(const component of ordered(catalog,selected).filter(c=>selected.includes(c.id))){
   const destination=join(outputRoot,component.id),receipt=join(outputRoot,component.id+'-release.json');
   const tokens={'{node}':process.execPath,'{python}':process.env.GALAXY_BUILD_PYTHON??(process.platform==='win32'?'python':'python3'),'{output}':destination,'{receipt}':receipt,'{webOutput}':join(outputRoot,'web')};

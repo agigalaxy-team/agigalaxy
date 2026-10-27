@@ -1,8 +1,9 @@
 /* Local examples only: no model call, authentication, storage or network request. */
-(() => {
+export function attachHomeExperience(root) {
   "use strict";
-  const root = document.querySelector(".galaxy-home[data-home-example]");
-  if (!root) return;
+  if (!root) return () => {};
+  const disposers = [];
+  const listen = (target, type, callback) => { target.addEventListener(type, callback); disposers.push(() => target.removeEventListener(type, callback)); };
   const example = JSON.parse(root.dataset.homeExample);
   const all = selector => Array.from(root.querySelectorAll(selector));
   const one = selector => root.querySelector(selector);
@@ -72,7 +73,7 @@
     link.href = entry.href;
   }
 
-  root.addEventListener("click", event => {
+  listen(root, "click", event => {
     const button = event.target.closest("button");
     if (!button || !root.contains(button)) return;
     if (button.hasAttribute("data-gh-tab")) {
@@ -98,7 +99,7 @@
     }
   });
 
-  root.addEventListener("keydown", event => {
+  listen(root, "keydown", event => {
     const tab = event.target.closest("[data-gh-tab]");
     if (!tab) return;
     const group = tab.closest('[role="tablist"]');
@@ -123,18 +124,19 @@
     if (reference) associate(reference.dataset.ghAssociate, true);
   }
 
-  root.addEventListener("pointerover", event => {
+  listen(root, "pointerover", event => {
     if (event.pointerType !== "touch") preview(event.target);
   });
-  root.addEventListener("focusin", event => preview(event.target));
-  root.addEventListener("pointerout", event => {
+  listen(root, "focusin", event => preview(event.target));
+  listen(root, "pointerout", event => {
     const reference = event.target.closest("[data-gh-associate]");
     if (reference && !reference.contains(event.relatedTarget) && !reference.contains(document.activeElement)) {
       associate(reference.dataset.ghAssociate, false);
     }
   });
-  root.addEventListener("focusout", event => {
+  listen(root, "focusout", event => {
     const reference = event.target.closest("[data-gh-associate]");
     if (reference && !reference.contains(event.relatedTarget)) associate(reference.dataset.ghAssociate, false);
   });
-})();
+  return () => disposers.forEach(dispose => dispose());
+}
