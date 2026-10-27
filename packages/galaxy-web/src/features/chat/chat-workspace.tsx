@@ -1,4 +1,5 @@
 import {observeBottomFollow} from '../../shared/reading/bottom-follow';
+import {isCancelledError} from '@tanstack/react-query';
 import {independentTaskLabel} from "../tasks/materials/task-material-client.mjs";
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -296,12 +297,15 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
     }
   }
   useLayoutEffect(()=>{const generation=active,life=mounted;life.current=true;generation.current++;return()=>{life.current=false;generation.current++;};},[]);
-  const poll=useEffectEvent(async(stillCurrent:()=>boolean)=>{
+  const poll=useEffectEvent(async(stillCurrent:()=>boolean,hasQueuedRead:()=>boolean)=>{
     if(!current()||!stillCurrent()||!connected||working.current||document.hidden||navigator.onLine===false)return;
     try{
       if(!recovering.current){recovering.current=true;try{await resumePending(stillCurrent);}catch{/* The original retry remains available. */}finally{recovering.current=false;}}
       if(current()&&stillCurrent())await reload();
-    }catch(reason){if(current()&&stillCurrent()){setError(reason);setLoading(false);}}
+    }catch(reason){if(current()&&stillCurrent()){
+      if(isCancelledError(reason)&&hasQueuedRead())return;
+      setError(reason);setLoading(false);
+    }}
   });
   useEffect(()=>{
     const lost=()=>{readEpoch.current++;setOffline(true);setLoading(false);setErrorMessage('已离线。输入保留在本机，连接恢复后会重新读取对话。');};
@@ -310,8 +314,10 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   },[]);
   useEffect(()=>{if(readExpiresAt===null)return;const timer=window.setTimeout(()=>{clearControlled();if(navigator.onLine!==false)setReadRefresh(value=>value+1);},Math.min(2147483647,Math.max(0,readExpiresAt*1000-Date.now())));return()=>window.clearTimeout(timer);},[readExpiresAt]);
   useEffect(()=>{
-    let stopped=false,reading=false;const epoch=readEpoch;
-    const update=async()=>{if(stopped||reading)return;reading=true;try{await poll(()=>!stopped);}finally{reading=false;}};
+    let stopped=false,reading=false,queued=false;const epoch=readEpoch;
+    // A reset can cancel an in-flight snapshot. Coalesce that request instead of
+    // dropping its replacement and leaving the page in a permanent retry state.
+    const update=async()=>{if(stopped)return;if(reading){queued=true;return;}reading=true;try{do{queued=false;await poll(()=>!stopped,()=>queued);}while(!stopped&&queued);}finally{reading=false;}};
     void update();const unsubscribe=(runtime as ChatRuntime&{subscribe?:(fn:(reset?:boolean)=>void)=>()=>void}).subscribe?.(reset=>{if(reset)clearControlled();void update();});
     return()=>{stopped=true;unsubscribe?.();epoch.current++;};
   },[runtime,connected,roomId,filter,after,locatedMessage,readRefresh,replyLocator?.messageId,editDraft?.messageId,draft.other?.reply?.messageId,draft.other?.edit?.messageId,draft.ready]);
