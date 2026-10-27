@@ -167,14 +167,6 @@
 .galaxy-workbench .wb-answer hr{border:0;border-top:1px solid var(--wb-border);margin:16px 0}
 .galaxy-workbench .wb-answer-literal{white-space:pre-wrap}
 .galaxy-workbench .wb-reply-state{font-size:12px;color:var(--wb-muted)}
-.galaxy-workbench .wb-reply-failure{margin:10px 0 4px;padding:12px 14px;border:1px solid #e8c4b2;border-radius:8px;background:#fff8f3;color:#70402b;font-size:13px;line-height:1.6}
-.galaxy-workbench .wb-reply-failure-heading{display:flex;align-items:center;gap:7px;color:#853f20}
-.galaxy-workbench .wb-reply-failure-heading strong{font-size:14px;font-weight:620}
-.galaxy-workbench .wb-reply-failure p{margin:5px 0 0}
-.galaxy-workbench .wb-reply-failure .wb-reply-failure-notice{color:#765d50}
-.galaxy-workbench .wb-reply-retry{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:6px 11px;border:1px solid #d5ad95;border-radius:6px;background:#fff;color:#7c3c21;font-size:13px;line-height:1.5}
-.galaxy-workbench .wb-reply-retry:hover:enabled{background:#fff0e5;border-color:#b58061}
-.galaxy-workbench .wb-reply-retry:focus-visible{outline:2px solid #b58061;outline-offset:3px}
 .galaxy-workbench .wb-prepared-action{border:1px solid var(--wb-border);border-radius:7px;padding:10px 12px;margin:10px 0;background:#fff}
 .galaxy-workbench .wb-action-cards{display:flex;flex-direction:column;gap:12px;margin:12px 0}
 .galaxy-workbench .wb-previous-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--wb-border)}

@@ -1,6 +1,6 @@
 import type {ReactNode,SVGProps} from 'react';
 
-export type AdminIconName = 'workspace'|'users'|'user'|'governance'|'content'|'messages'|'analytics'|'strategy'|'permissions'|'settings'|'maintenance'|'search'|'close'|'refresh'|'plus'|'check'|'logout'|'clock'|'logs'|'activity'|'file'|'briefcase'|'sparkles'|'calendar'|'filter'|'info'|'warning'|'history'|'mail'|'identity'|'link'|'edit'|'bookmark'|'comment'|'send'|'down';
+export type AdminIconName = 'workspace'|'users'|'user'|'governance'|'content'|'messages'|'analytics'|'strategy'|'permissions'|'settings'|'maintenance'|'search'|'close'|'refresh'|'plus'|'check'|'logout'|'clock'|'logs'|'activity'|'file'|'briefcase'|'sparkles'|'calendar'|'filter'|'info'|'warning'|'history'|'mail'|'identity'|'link'|'edit'|'bookmark'|'comment'|'send'|'down'|'copy';
 
 type Props = Omit<SVGProps<SVGSVGElement>, 'name'> & {name:AdminIconName;size?:number};
 
@@ -19,6 +19,7 @@ export function AdminIcon({name,size=20,className,...props}:Props){
     case 'permissions':drawing=<><path d="m12 3 8 3v6c0 4.2-3.6 7.4-8 9-4.4-1.6-8-4.8-8-9V6l8-3Z"/><path d="m8.5 11.5 2.5 2.5 4.5-5"/></>;break;
     case 'maintenance':drawing=<><path d="M14.5 4a5.5 5.5 0 0 0-7 7L3 15.5a3.2 3.2 0 0 0 4.5 4.5l4.5-4.5a5.5 5.5 0 0 0 7-7l-3.5 3.5-4-4L15 4.5Z"/></>;break;
     case 'search':drawing=<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></>;break;
+    case 'copy':drawing=<><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></>;break;
     case 'send':drawing=<path d="M12 20V4m-6 6 6-6 6 6"/>;break;
     case 'down':drawing=<path d="M12 4v16m-6-6 6 6 6-6"/>;break;
     case 'close':drawing=<path d="m6 6 12 12M18 6 6 18"/>;break;
