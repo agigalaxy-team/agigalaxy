@@ -45,7 +45,7 @@ export function AdminNavigationMotion(){
    if(typeof element.animate!=='function')continue;
    // Composited transform adds to any existing presentation; no inline state survives.
    const opacity=Number.parseFloat(getComputedStyle(element).opacity)||1;
-   animations.current.push(element.animate([{opacity:opacity*.92},{opacity}],options),element.animate([{transform:'translateY(4px)'},{transform:'translateY(0px)'}],{...options,composite:'add'}));
+   animations.current.push(element.animate([{opacity:opacity*.9},{opacity}],options),element.animate([{transform:'translateY(5px)'},{transform:'translateY(0px)'}],{...options,composite:'add'}));
   }
   return cancel;
  },[key]);

@@ -1,4 +1,4 @@
-.galaxy-site.selected-shell .site-content[data-site-content-transition]{--g-page-transition-duration:180ms;--g-page-transition-easing:ease-out}
+.galaxy-site.selected-shell .site-content[data-site-content-transition]{--g-page-transition-duration:220ms;--g-page-transition-easing:cubic-bezier(.2,.75,.2,1)}
 /* The hooked main owns the route transition. Other embedded hosts retain the
    original section animation; the selected shell must not fade twice or to 0. */
 .galaxy-site.selected-shell .site-content[data-site-content-transition]>section{animation:none}

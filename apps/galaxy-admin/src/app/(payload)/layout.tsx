@@ -7,5 +7,6 @@ import {headers} from 'next/headers';
 import {requireAdminWrite} from '../../lib/request-origin.mjs';
 import type {ReactNode} from 'react';
 import './custom.css';
+import '../../../../../packages/galaxy-web/src/shared/feedback/control-feedback.css';
 const serverFunction:ServerFunctionClient=async function(args){'use server';requireAdminWrite(await headers());return handleServerFunctions({...args,config,importMap});};
 export default function Layout({children}:{children:ReactNode}){return <RootLayout config={config} importMap={importMap} serverFunction={serverFunction}>{children}</RootLayout>;}

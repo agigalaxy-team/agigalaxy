@@ -19,6 +19,8 @@ import {WorkbenchActionCards} from './WorkbenchActionCards';
 import {authorizedCommandMatches} from "../../lib/workbench/authorized-preparation-model";
 import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchCommand} from "../../lib/workbench/use-workbench-command";
+import {useProgressiveText} from '../../lib/workbench/use-progressive-text';
+import {useConversationScroll} from '../../lib/workbench/use-conversation-scroll';
 import {useConversationStream} from "../../lib/workbench/use-conversation-stream";
 import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeRunLabel,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from "../../lib/workbench/agentos-client";
 
@@ -46,7 +48,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const memory=useRef(panelMemory(operatorId)),composing=useRef(false);
   const [waiting,setWaiting]=useState(memory.current.waiting),[stopping,setStopping]=useState(memory.current.stopping??{}),[contextNotices,setContextNotices]=useState<Partial<Record<AgentOsDomain,boolean>>>({});
   const input=useRef<HTMLTextAreaElement>(null),panelId=useId(),inputId=useId();
-  const conversationElement=useRef<HTMLDivElement>(null),scrollPositions=useRef(memory.current.positions);
+  const conversationElement=useRef<HTMLDivElement>(null),conversationContent=useRef<HTMLDivElement>(null),scrollPositions=useRef(memory.current.positions);
   const storageKey=operatorId?'galaxy:operations:workbench:drafts:v1:'+operatorId:null;
   const session=useOperationsRead<AgentOsSession>({path:operatorId?'/v1/operations/session':null,failureMessage:'当前管理登录暂时无法核对。',clearOnOffline:true});
   const checkedSession=session.verified?session.value:null;
@@ -132,12 +134,8 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     if(!verifiedSession)return;
     setStopping(previous=>{const next={...previous};let changed=false;for(const [key,value]of Object.entries(previous))if(value&&(value.csrfToken!==verifiedSession.csrfToken||currentConversation?.domain===key&&(currentConversation.contextChanged||currentConversation.runs.some(run=>run.operationId===value.parentOperationId&&['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(run.status))))){delete next[key as AgentOsDomain];changed=true;}if(!changed)return previous;memory.current.stopping=next;return next;});
   },[verifiedSession?.csrfToken,currentConversation]);
-  useLayoutEffect(()=>{
-    const element=conversationElement.current;if(!element||!focused||!currentConversation)return;
-    const position=scrollPositions.current[domain];
-    if(position&&!position.follow){element.scrollTop=position.top;return;}
-    element.scrollTop=element.scrollHeight;
-  },[domain,focused,currentConversation,stream.text]);
+  const scrolling=useConversationScroll({viewport:conversationElement,content:conversationContent,scope:domain,enabled:focused&&!!currentConversation,positions:scrollPositions});
+  const displayedStream=useProgressiveText(stream.text,JSON.stringify([operatorId,domain,activeTurn]),focused&&!stream.finished);
   useLayoutEffect(()=>{
     if(!identityEnded||!checkedSession)return;
     command.cancel();dismissCommand.cancel();stopCommand.cancel();conversation.clear();
@@ -148,9 +146,10 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
 
   const taskReady=!taskId||!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
   const sendMessage=async(message:string,retryOfOperationId?:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
-    scrollPositions.current[domain]={top:conversationElement.current?.scrollTop??0,follow:true};
+    scrolling.jumpToLatest();
     const path=agentOsConversationPath(domain)+'/runs';
-    await command.submit(path,{message,...(taskId?{taskId}:{}),...(retryOfOperationId?{retryOfOperationId}:{})},'',operationId=>agentOsConversationOperationPath(domain,operationId));
+    const submission=command.submit(path,{message,...(taskId?{taskId}:{}),...(retryOfOperationId?{retryOfOperationId}:{})},'',operationId=>agentOsConversationOperationPath(domain,operationId));
+    input.current?.focus({preventScroll:true});await submission;
   };
   const send=()=>sendMessage(drafts[domain]??'');
   const retryReply=(runId:string)=>{if(!conversation.verified||currentConversation?.contextChanged)return;const message=nativeConversationRetryMessage(currentConversation,runId);if(message!==null){const original=currentConversation?.runs.find(run=>run.runId===runId);if(original?.operationId)void sendMessage(message,original.operationId);}};
@@ -185,7 +184,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     requestAnimationFrame(()=>input.current?.focus({preventScroll:true}));
   };
   const changeDomain=(id:string)=>{
-    if(!domains.some(item=>item.id===id))return;const element=conversationElement.current;if(element&&conversation.verified&&verifiedSession&&currentConversation)scrollPositions.current[domain]={top:element.scrollTop,follow:element.scrollHeight-element.clientHeight-element.scrollTop<24};domainRef.current=id;setDomain(id as AgentOsDomain);
+    if(!domains.some(item=>item.id===id))return;const element=conversationElement.current;if(element&&conversation.verified&&verifiedSession&&currentConversation)scrollPositions.current[domain]={top:element.scrollTop,follow:scrolling.following};domainRef.current=id;setDomain(id as AgentOsDomain);
     if(storageKey)setDraftStorageError(!saveDrafts(storageKey,id,draftsRef.current));
   };
   const open=()=>{onFocusChange(true);requestAnimationFrame(()=>{input.current?.focus({preventScroll:true});input.current?.scrollIntoView({block:'nearest'});});};
@@ -199,35 +198,43 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const showCards=(cards:WorkbenchActionCard[],label:string)=><WorkbenchActionCards cards={cards} label={label} now={cardNow} verified={canUseDomain&&conversation.verified} busy={workLocked} pendingCardId={typeof dismissCommand.pending?.body.cardId==='string'?dismissCommand.pending.body.cardId:typeof command.pending?.body.cardId==='string'?command.pending.body.cardId:null} pendingDismissCardId={cards.find(card=>card.capability.canDismiss&&canDismissPending(card))?.cardId??null} dismissBusy={dismissCommand.locked} onConfirm={confirmCard} onDismiss={dismissCard}/>;
   const latestRun=currentConversation?.runs.at(-1);
   const latestFailure=conversation.verified&&!waitingReply&&latestRun?.status==='ERROR'?latestRun:null;
+  const pendingOutgoing=canUseDomain&&conversation.verified&&command.pending?.domain===domain&&command.pending.path===agentOsConversationPath(domain)+'/runs'&&!command.pending.body.retryOfOperationId&&typeof command.pending.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===command.pending?.body.operationId)?command.pending:null;
+  const progress=(label:string,live:boolean)=><div className="wb-reply-progress"><p className="wb-reply-state" role="status"><span className="wb-reply-dots" aria-hidden="true"><i/><i/><i/></span>{label}</p>{live&&!!stream.steps.length&&<details className="wb-processing-steps"><summary>处理进度{stream.revisions>0?' · 回复已调整 '+stream.revisions+' 次':''}</summary><ol>{stream.steps.map((step,index)=><li key={index}>{step==='working'?'查询并核对资料':'整理回复'}</li>)}</ol></details>}</div>;
   const headerError=command.error||dismissCommand.error||stopCommand.error||conversation.error||session.error;
   return <section id="operations-ai" className={'wb-communication'+(focused?' wb-communication--focused':'')} aria-labelledby={panelId}>
     <header className="wb-section-heading"><h2 id={panelId}><AdminIcon name="sparkles" size={19}/>运营AI · {current.label}</h2><div className="wb-communication-controls">{latestFailure&&<WorkbenchModelNotice run={latestFailure} canSend={canUseDomain&&conversation.verified&&!currentConversation?.contextChanged&&!!currentConversation?.capabilities.canSend} busy={workLocked||replying} onRetry={()=>retryReply(latestFailure.runId)}/>}{conversation.verified&&!waitingReply&&latestRun?.status==="COMPLETED"&&!!latestRun.modelFallbacks?.length&&<span className="wb-model-notice wb-model-notice--recovered" role="status">备用模型已接续</span>}<button type="button" className="wb-view-toggle" disabled={!interactive} aria-expanded={focused} aria-controls={panelId+'-conversation'} onClick={()=>focused?onFocusChange(false):open()}><AdminIcon name={focused?'workspace':'comment'} size={16}/><span>{focused?'返回仪表':interactive?'打开沟通':'准备沟通…'}</span></button></div></header>
     {headerError&&<div className="wb-header-feedback" role="alert">{headerError}</div>}
     {actionsTarget&&createPortal(<WorkbenchActionHistory domain={domain} label={current.label} cards={actionCards} verified={!!verifiedSession&&canUseDomain&&conversation.verified} loading={session.loading||conversation.loading} denied={!!verifiedSession&&!canUseDomain||signedOut} error={conversation.error||session.error} now={cardNow} renderCard={card=>showCards([card],'所选AI操作')} feedback={null}/>,actionsTarget)}
-      <div className="wb-header-command-feedback" aria-live="polite">{command.pending?!permittedDomains.includes(command.pending.domain)?<p role="status">原操作结果尚未取得，当前无法继续读取。</p>:confirmingCard?pendingCardVisible?null:<p role="status">原操作的结果尚未确认，恢复读取后会继续查询。</p>:<p role="status">{sendingConversation?'正在发送…':'正在处理…'}</p>:command.message?<output>{command.message}</output>:null}</div>
+      <div className="wb-header-command-feedback" aria-live="polite">{command.pending?!permittedDomains.includes(command.pending.domain)?<p role="status">原操作结果尚未取得，当前无法继续读取。</p>:confirmingCard?pendingCardVisible?null:<p role="status">原操作的结果尚未确认，恢复读取后会继续查询。</p>:pendingOutgoing?null:<p role="status">{sendingConversation?'正在确认发送…':'正在处理…'}</p>:command.message?<output>{command.message}</output>:null}</div>
     <AdminTabs items={interactive?domains:domains.map(item=>({...item,disabled:true}))} active={domain} onChange={changeDomain} ariaLabel="运营AI领域" className="wb-ai-domains"/>
     <p className="wb-connection" role="status"><i className="wb-status-dot"/>{status}</p>
     {signedOut&&<a className="wb-text-link" href="/admin/login?redirect=%2Fadmin">重新登录</a>}
-    <div ref={conversationElement} id={panelId+'-conversation'} className="wb-conversation" hidden={!focused} onScroll={event=>{if(!conversation.verified||!verifiedSession||!currentConversation)return;const element=event.currentTarget;scrollPositions.current[domain]={top:element.scrollTop,follow:element.scrollHeight-element.clientHeight-element.scrollTop<24};}}>
+    <div className="wb-conversation-frame" hidden={!focused}>
+    <div ref={conversationElement} id={panelId+'-conversation'} className="wb-conversation" hidden={!focused}>
+      <div ref={conversationContent} className="wb-conversation-content">
       <ReadStatus loading={conversation.loading} error={''} retry={async()=>{await conversation.read();await session.read();await runtime.read();}}/>
       {domain==='overview'&&conversation.verified&&currentConversation&&<WorkbenchManagementCapabilities value={currentConversation.managementCapabilities??null}/>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
       <div>{nativeConversationDisplayRuns(currentConversation?.runs??[]).map(run=>{
         const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
-        const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
+        const content=['ERROR','CANCELLED'].includes(run.status)?null:live?displayedStream:run.content;
         const stateText=run.status==='CANCELLED'?'已停止生成':pending?(stopInProgress&&run.operationId===activeTurn?'正在停止生成…':live&&stream.finished?'正在读取完整回复…':live&&stream.phase==='working'?'正在核对资料…':'正在回复…'):nativeRunLabel(run.status);
         const previousAttempts=nativeConversationPreviousAttempts(currentConversation?.runs??[],run);
-        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={content} onDraft={fillReplyDraft}/></div>}{pending&&<p className="wb-reply-state" role="status">{stateText}</p>}</article>;
+        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{run.userInput}</p>}{content&&<div className={"wb-run-output"+(live?" wb-run-output--streaming":"")} aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={content} onDraft={fillReplyDraft}/></div>}{pending&&progress(stateText,live)}</article>;
       })}</div>
 
-      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{stream.text&&<div className="wb-run-output" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={stream.text}/></div>}<p className="wb-reply-state" role="status">{stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在核对资料…':stream.text?'正在回复…':'等待回复…'}</p></article>}
+      {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{displayedStream&&<div className="wb-run-output wb-run-output--streaming" aria-live="off"><strong className="wb-answer-author">运营助手</strong><WorkbenchMarkdown content={displayedStream}/></div>}{progress(stopInProgress?'正在停止生成…':stream.finished?'正在读取完整回复…':stream.phase==='working'?'正在核对资料…':stream.text?'正在回复…':'等待回复…',true)}</article>}
+      {pendingOutgoing&&<article className="wb-run wb-run--waiting"><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{String(pendingOutgoing.body.message)}</p><p className="wb-reply-state" role="status">正在确认发送…</p></article>}
       {currentConversation?.blockedReason==='model-not-configured'&&<p>本领域暂未配置模型，输入会保留。</p>}
       {currentConversation?.blockedReason==='runtime-unavailable'&&<p>沟通服务暂时不可用，输入会保留。</p>}
 
       {conversation.verified&&currentConversation?.runs.length===0&&currentConversation.capabilities.canSend&&!conversation.loading&&!conversation.error&&!session.error&&!waitingReply&&command.pending?.domain!==domain&&<div className="wb-empty wb-conversation-empty" role="status"><p><strong>开始对话</strong></p><p>询问这个领域的情况，或使用预设问题。</p></div>}
+      </div>
+    </div>
+    {focused&&!scrolling.following&&<button type="button" className="wb-jump-latest" onClick={scrolling.jumpToLatest}><AdminIcon name="down" size={14}/>回到最新</button>}
     </div>
     {taskId&&<div className="wb-task-context" role="status"><div><strong>{linkedTask?.title||'接续原任务'}</strong><span>{linkedTask?autonomyStates[linkedTask.state]??'状态待核对':task.error||'正在核对任务…'}</span>{linkedTask&&<Link href={autonomyTaskHref(linkedTask)} prefetch={false}>任务详情</Link>}</div><div>{linkedTask&&linkedTask.domain!==domain&&<button type="button" disabled={workLocked||replying} onClick={()=>changeDomain(linkedTask.domain)}>切换到对应岗位</button>}<button type="button" disabled={workLocked||replying} onClick={()=>{const next=new URLSearchParams(search);next.delete('taskId');router.replace('/admin'+(next.size?'?'+next:''),{scroll:false});}}>结束任务沟通</button></div></div>}
-    <div className="wb-compose"><label className="wb-visually-hidden" htmlFor={inputId}>{current.label}领域的运营问题</label><textarea ref={input} id={inputId} rows={focused?3:1} value={identityEnded?'':drafts[domain]??''} maxLength={12000} disabled={!interactive||!canUseDomain} placeholder={verifiedSession&&!canUseDomain?'当前未获准使用本领域 AI':interactive?'输入你的问题…':signedOut?'请重新登录后继续':'正在准备沟通…'} title="Enter 发送，Shift+Enter 换行" onFocus={()=>{if(!focused)open();}} onChange={event=>updateDraft(event.target.value)} onKeyDown={onComposerKeyDown} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}/><div className="wb-compose-actions">{replying&&!stream.finished&&currentConversation?.capabilities.canCancel&&(stream.stopAvailable||activeRun||stopInProgress)&&<button type="button" className="wb-stop-generation" disabled={!canStop} aria-busy={stopInProgress} onClick={stopGenerating} title="仅停止这次回复的后续生成，已完成的处理不会撤回。">{stopInProgress?'正在停止…':'停止生成'}</button>}<button type="button" className="wb-send" disabled={!sendReady} aria-busy={workLocked||replying} onClick={()=>void send()}>{!canUseDomain?'发送':sendingConversation?'发送中…':replying?(stream.finished?'读取回复中…':'等待回复'):'发送'}</button></div></div>{draftStorageError&&<p className="wb-draft-storage-error" role="status">草稿暂时只能保留在当前页面。</p>}
+    <div className="wb-compose"><label className="wb-visually-hidden" htmlFor={inputId}>{current.label}领域的运营问题</label><textarea ref={input} id={inputId} rows={focused?3:1} value={identityEnded?'':drafts[domain]??''} maxLength={12000} disabled={!interactive||!canUseDomain} placeholder={verifiedSession&&!canUseDomain?'当前未获准使用本领域 AI':interactive?'输入你的问题…':signedOut?'请重新登录后继续':'正在准备沟通…'} title="Enter 发送，Shift+Enter 换行" onFocus={()=>{if(!focused)open();}} onChange={event=>updateDraft(event.target.value)} onKeyDown={onComposerKeyDown} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}/><div className="wb-compose-actions">{replying&&!stream.finished&&currentConversation?.capabilities.canCancel&&(stream.stopAvailable||activeRun||stopInProgress)&&<button type="button" className="wb-stop-generation" disabled={!canStop} aria-busy={stopInProgress} onClick={stopGenerating} title="仅停止这次回复的后续生成，已完成的处理不会撤回。">{stopInProgress?'正在停止…':'停止生成'}</button>}<button type="button" className="wb-send" disabled={!sendReady} aria-busy={workLocked||replying} onClick={()=>void send()}><AdminIcon name="send" size={16}/>{!canUseDomain?'发送':sendingConversation?'发送中…':replying?(stream.finished?'读取回复中…':'等待回复'):'发送'}</button></div></div>{draftStorageError&&<p className="wb-draft-storage-error" role="status">草稿暂时只能保留在当前页面。</p>}
   </section>;
 }

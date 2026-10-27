@@ -5,8 +5,8 @@ import {type AgentOsDomain} from './agentos-client';
 import {conversationEventStream} from './conversation-stream';
 import {OperationsRequestError} from "../operations-client";
 
-type StreamView={binding:string;operationId:string|null;text:string;phase:'waiting'|'working'|'generating';stopAvailable:boolean;finished:boolean;readExpiresAt:number};
-const empty=(binding=''):StreamView=>({binding,operationId:null,text:'',phase:'waiting',stopAvailable:false,finished:false,readExpiresAt:0});
+type StreamView={binding:string;operationId:string|null;text:string;phase:'waiting'|'working'|'generating';stopAvailable:boolean;finished:boolean;readExpiresAt:number;revisions:number;steps:('working'|'generating')[]};
+const empty=(binding=''):StreamView=>({binding,operationId:null,text:'',phase:'waiting',stopAvailable:false,finished:false,readExpiresAt:0,revisions:0,steps:[]});
 const documentIsHidden=()=>document.visibilityState==='hidden';
 type Props={operatorId:string|null;csrfToken:string;domain:AgentOsDomain;operationId:string|null;enabled:boolean;readExpiresAt:number;onResync:()=>void|Promise<unknown>;onDenied:()=>void;onContextChanged:()=>void};
 
@@ -31,6 +31,7 @@ export function useConversationStream({operatorId,csrfToken,domain,operationId,e
   }
   if(data.current.binding!==binding)data.current={...empty(binding),operationId,cursor:-1};
   data.current.operationId=operationId;publish();
+  const step=(phase:'working'|'generating')=>{if(data.current.steps.at(-1)!==phase)data.current.steps=[...data.current.steps.slice(-5),phase];};
   const reread=()=>{void Promise.resolve(callbacks.current.onResync()).catch(()=>{});};
   const applyLease=()=>{
    clearTimeout(expiryTimer);clearTimeout(renewalTimer);
@@ -67,9 +68,9 @@ export function useConversationStream({operatorId,csrfToken,domain,operationId,e
      if('readExpiresAt'in event&&typeof event.readExpiresAt==='number')lease(Math.min(serverLease,event.readExpiresAt));
      if(data.current.readExpiresAt*1000<=Date.now()){active?.abort();clear();reread();return;}
      if(event.eventIndex!==null)data.current.cursor=event.eventIndex;
-     if(event.kind==='text'){data.current.text+=event.text;data.current.phase='generating';schedulePublish();}
-     else if(event.kind==='reset'){data.current.text='';data.current.phase='working';flush();}
-     else if(event.kind==='phase'){data.current.phase=event.phase;schedulePublish();}
+     if(event.kind==='text'){data.current.text+=event.text;data.current.phase='generating';step('generating');schedulePublish();}
+     else if(event.kind==='reset'){if(data.current.text)data.current.revisions++;data.current.text='';data.current.phase='working';step('working');flush();}
+     else if(event.kind==='phase'){data.current.phase=event.phase;if(event.phase!=='waiting')step(event.phase);schedulePublish();}
      else if(event.kind==='blocked'){ended=true;clear();callbacks.current.onDenied();return;}
      else if(event.kind==='context-changed'){ended=true;clear();callbacks.current.onContextChanged();reread();return;}
      else if(event.kind==='terminal'){
