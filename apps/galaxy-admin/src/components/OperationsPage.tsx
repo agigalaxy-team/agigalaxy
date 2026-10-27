@@ -7,12 +7,13 @@ import {isOperator,operatorBusinessAuthorization} from '../lib/access';
 import {readOperatorSession} from '../lib/operations.mjs';
 import {AdminSectionTabs} from './AdminSectionTabs';
 import {OperationsPageAccessProvider} from './OperationsPageAccess';
+import {operatorLoginPage} from '../lib/operator-login-target.mjs';
 
 export async function operationsPageContext(props:AdminViewServerProps,path:string){
   const req=props.initPageResult.req;
-  if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent(path));
+  if(!isOperator(req.user))redirect(operatorLoginPage(path,props.searchParams));
   const requestHeaders=await headers(),session=await readOperatorSession(requestHeaders);
-  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect('/admin/login?redirect='+encodeURIComponent(path));
+  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect(operatorLoginPage(path,props.searchParams));
   return {session,requestHeaders,searchParams:props.searchParams??{}};
 }
 export function OperationsContent({children,variant='page'}:{children:ReactNode;variant?:'page'|'workbench'|'accounts'}){
