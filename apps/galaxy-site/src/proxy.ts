@@ -10,6 +10,9 @@ export async function proxy(request:NextRequest){
   if(process.env.GALAXY_SITE_CONTENT_ROOT)try{await readSiteContent();}catch{return NextResponse.json({error:'site_content_unavailable'},{status:503,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}
   return NextResponse.next();
  }
- const target=request.nextUrl.clone();target.pathname='/__public-assets'+path;return NextResponse.rewrite(target);
+ // File dispatch is a relative framework rewrite in next.config. An absolute
+ // NextURL normalizes loopback to localhost and can become an external HTTPS
+ // request behind a TLS reverse proxy.
+ return NextResponse.next();
 }
 export const config={matcher:['/((?!_next/static|_next/image).*)']};
