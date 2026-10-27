@@ -1,3 +1,4 @@
+import {operatorLoginPage} from '../lib/operator-login-target.mjs';
 import type {AdminViewServerProps} from 'payload';
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
@@ -11,9 +12,9 @@ import type {OperationJobPage,OperationQueue} from './operations-task-types';
 
 export async function OperationsJobsView(props:AdminViewServerProps){
   const {initPageResult}=props,req=initPageResult.req,searchParams=props.searchParams??{};
-  if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent('/admin/operations/jobs'));
+  if(!isOperator(req.user))redirect(operatorLoginPage('/admin/operations/jobs',searchParams));
   const requestHeaders=await headers(),session=await readOperatorSession(requestHeaders);
-  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect('/admin/login');
+  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect(operatorLoginPage('/admin/operations/jobs',searchParams));
   if(!hasOperatorPermission(session.operator,'jobs.read'))return <OperationsPage page={props}><OperationsPermissionNotice permission="jobs.read"/></OperationsPage>;
   const requested=typeof searchParams.queue==='string'?searchParams.queue:'';
   const queue:OperationQueue=operationQueues.includes(requested as OperationQueue)?requested as OperationQueue:operationQueues[0];

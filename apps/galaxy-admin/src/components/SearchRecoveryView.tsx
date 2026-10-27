@@ -1,3 +1,4 @@
+import {operatorLoginPage} from '../lib/operator-login-target.mjs';
 import type {AdminViewServerProps} from 'payload';
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
@@ -11,9 +12,9 @@ import type {SearchFailurePage} from './operations-task-types';
 
 export async function SearchRecoveryView(props:AdminViewServerProps){
   const {initPageResult}=props,req=initPageResult.req,searchParams=props.searchParams??{};
-  if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent('/admin/operations/search-recovery'));
+  if(!isOperator(req.user))redirect(operatorLoginPage('/admin/operations/search-recovery',searchParams));
   const requestHeaders=await headers(),session=await readOperatorSession(requestHeaders);
-  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect('/admin/login');
+  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect(operatorLoginPage('/admin/operations/search-recovery',searchParams));
   if(!hasOperatorPermission(session.operator,'search.read'))return <OperationsPage page={props}><OperationsPermissionNotice permission="search.read"/></OperationsPage>;
   const after=typeof searchParams.after==='string'&&uuidPattern.test(searchParams.after)?searchParams.after:'';
   const path='/v1/operations/search/failures?'+new URLSearchParams({limit:'25',...(after?{after}:{})});

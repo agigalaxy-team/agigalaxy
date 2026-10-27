@@ -1,3 +1,4 @@
+import {operatorLoginPage} from '../lib/operator-login-target.mjs';
 import type {AdminViewServerProps} from 'payload';
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
@@ -13,9 +14,9 @@ import type {AuditPage,LinkedId,TypeHistoryItem,UserDetail,UserPage} from './bus
 
 export async function OperationsView(props:AdminViewServerProps){
   const {initPageResult}=props,searchParams=props.searchParams??{},req=initPageResult.req;
-  if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent('/admin/operations/users'));
+  if(!isOperator(req.user))redirect(operatorLoginPage('/admin/operations/users',searchParams));
   const requestHeaders=await headers(),session=await readOperatorSession(requestHeaders);
-  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect('/admin/login');
+  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect(operatorLoginPage('/admin/operations/users',searchParams));
   const text=(name:string)=>typeof searchParams[name]==='string'?String(searchParams[name]):'';
   const query=text('query').trim().slice(0,200),after=text('after'),requested=text('account');
   const subjectType=['person','organization','agent','unknown'].includes(text('subjectType'))?text('subjectType'):'';

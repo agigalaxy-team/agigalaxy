@@ -1,3 +1,4 @@
+import {operatorLoginPage} from '../lib/operator-login-target.mjs';
 import type {AdminViewServerProps} from 'payload';
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
@@ -10,9 +11,9 @@ import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 import type {PublicationPage,SnapshotSummary} from "./site-publication/publication-types";
 export async function PublicationView(props:AdminViewServerProps){
   const {initPageResult}=props,req=initPageResult.req,searchParams=props.searchParams??{};
-  if(!isOperator(req.user))redirect('/admin/login?redirect='+encodeURIComponent('/admin/site-publication'));
+  if(!isOperator(req.user))redirect(operatorLoginPage('/admin/site-publication',searchParams));
   const requestHeaders=await headers(),session=await readOperatorSession(requestHeaders);
-  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect('/admin/login');
+  if(session.state!=='signed-in'||session.operator.id!==req.user.externalId)redirect(operatorLoginPage('/admin/site-publication',searchParams));
   if(!hasOperatorPermission(session.operator,'cms.read'))return <OperationsPage page={props}><OperationsPermissionNotice permission="cms.read"/></OperationsPage>;
   let summary:SnapshotSummary|null=null,snapshotError='',listError='',publications:PublicationPage={items:[],nextAfter:null};
   await Promise.all([
