@@ -56,3 +56,26 @@ Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独�
 ## AI Agent 部署核对
 
 沿选定 Go manifest 的 pin、目标平台、原配置引用和数据库角色运行。构建完成只说明编译和资源打包完成；平台、专业组件、业务接续和激活结果以实际运行观察为准。发生未知结果继续核对原操作，不重发旧工作。银河自有代码统一采用 Apache-2.0；产物根目录的 `LICENSE` 和 `NOTICE` 从源码根目录逐字节复制并纳入文件 inventory。构建观察单列在 `BUILD_INFO.txt`，不会覆盖项目 `NOTICE`。第三方继续遵循各自原许可证；实际 Go 依赖许可文本位于 `third-party-licenses/`，缺失项在清单中明确记录。
+
+
+## 独立 Information Worker 的 Prosody 接线
+
+API 与独立 Information Worker 不能使用同一 XEP-0114 component 身份建立各自的连接。Go factory 已按各进程的 `GALAXY_CHAT_CONFIG_FILE` 读取独立配置，不需要更换二进制；Information Worker 使用 `information-chat.json.example` 的字段形状，将 `service` 和 `roomsDomain` 保持为实际既有值，仅选择独立 component domain 与 secret 引用。
+
+在原 Prosody 配置的外部 component 区域增加一份独立定义，例如：
+
+```lua
+Component "information.galaxy.internal"
+ local information_key = Lua.assert(Lua.io.open("/etc/prosody/information-component.key", "r"));
+ component_secret = information_key:read("*a"):gsub("%s+$", ""); information_key:close();
+```
+
+在**现有** MUC Component 配置块内增加以下值，不另建 MUC 或 archive，不替换主 `galaxy_gateway_host`：
+
+```lua
+ galaxy_reader_gateway_hosts = { "information.galaxy.internal" };
+```
+
+`mod_galaxy_rooms_v2.lua` 默认空集合，保留原主 gateway 行为。附加 reader 仅接受 `project` 与 `read`；`send`、`edit`、`erase`、`export-own` 等动作仍拒绝。`project` 是原 `ReadSelectedWithin` 的必要前置步骤：Go 先做原设备、当前房间成员、消息版本、有效期和治理权限检查，再同步数据库当前的 revision/members/state/title，随后读同一个 MAM archive。投影的成员 JID 仍由主 gateway 域构造，不能改成 reader 域；读取后 Go 原晚到权限检查也保留。原 read 中的到期内容处理不变。
+
+Prosody 与该 Info component 配置应使用同一份 **Info 专用** secret，但不要与 API 主 gateway 共用 secret，否则 reader 凭据仍可用于主 gateway 握手。Go 的 `secretFile` 指向该进程可读、权限仅属该进程的实际私密文件或 systemd credential 路径；Prosody 使用自己的对应受保护挂载路径。示例文件名不是新的凭据值，也不改变已有门户、device、账户、房间或数据库权限。部署时由原运维流程新增 component 配置并重载 Prosody，再启动独立 Info 进程；不启动第二个 API domain 连接来试探。

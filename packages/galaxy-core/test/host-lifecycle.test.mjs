@@ -1,3 +1,4 @@
+import {hostPersistenceFixture} from './fixtures/host-persistence.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
@@ -33,7 +34,7 @@ test('host disposal clears modal state and delayed callbacks; cached plugin can 
   let instances = 0, disconnects = 0;
   const plugin = createGalaxyPlugin(() => {
     instances++;
-    return createGalaxyAdapter({ cancel() {}, disconnect() { disconnects++; } }, { dataDirectory: directory });
+    return createGalaxyAdapter({ cancel() {}, disconnect() { disconnects++; } }, { dataDirectory: directory, recordWork: false, hostPersistence: hostPersistenceFixture(directory) });
   });
   const first = host();
   await plugin.tui(first.api); await first.open();
@@ -55,7 +56,7 @@ test('replacing a native dialog keeps new page keys and unloading preserves anot
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-dialog-lifecycle-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const current = host();
-  await createGalaxyAdapter(null, { dataDirectory: directory }).tui(current.api); await current.open();
+  await createGalaxyAdapter(null, { dataDirectory: directory, recordWork: false, hostPersistence: hostPersistenceFixture(directory) }).tui(current.api); await current.open();
   current.commands.get('galaxy.choose.4').run();
   current.commands.get('galaxy.choose.3').run();
   current.commands.get('galaxy.choose.1').run();
@@ -89,7 +90,7 @@ test('native dismissal without onCancel releases a pending connection and confir
   const preview = { endpoint: 'https://fixture.example.org', requestJson: '{}', confirmation: 'EXACT', maximumBindingSeconds: 1, maximumSessionSeconds: 1 };
   const adapter = createGalaxyAdapter({ status: async () => ({ endpoint: preview.endpoint, state: 'no-session' }),
     prepare: async () => { assert.equal(busy, false); busy = true; return preview; },
-    cancel() { busy = false; }, disconnect() {}, execute() { sends++; } }, { dataDirectory: directory });
+    cancel() { busy = false; }, disconnect() {}, execute() { sends++; } }, { dataDirectory: directory, recordWork: false, hostPersistence: hostPersistenceFixture(directory) });
   t.after(() => adapter.close()); await adapter.tui(current.api);
   async function openPrompt() {
     await current.open(); current.commands.get('galaxy.choose.4').run(); current.commands.get('galaxy.choose.6').run(); await delay(30);

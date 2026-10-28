@@ -679,6 +679,13 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	if audit != nil {
 		observer.Record = audit.Record
 	}
+	if release != nil {
+		next := handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Galaxy-Release", release.ReleaseID)
+			next.ServeHTTP(w, r)
+		})
+	}
 	server := &http.Server{Handler: observer.Middleware(handler), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32768}
 	metricListener, e := operationalmetrics.StartListener(metrics, metricConfig.Port)
 	if e != nil {

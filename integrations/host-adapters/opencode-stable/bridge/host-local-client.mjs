@@ -2,6 +2,7 @@ import {createChildRPC} from './child-rpc.mjs';
 
 // Private inherited-stdio persistence, never a model tool. No service choice
 // means the original local-only store, not an implicit official connection.
+/** @param {{configPath?:string, executable?:string, dataDirectory?:string, localOnly?:boolean, requestTimeoutMs?:number}} [options] */
 export function createHostLocalClient({configPath=process.env.GALAXY_NATIVE_CONFIG,executable=process.env.GALAXY_NATIVE_EXECUTABLE,dataDirectory,localOnly=!configPath,requestTimeoutMs=30000}={}){
  let rpc,closed=false,closing;
  const transport=()=>{
@@ -16,6 +17,7 @@ export function createHostLocalClient({configPath=process.env.GALAXY_NATIVE_CONF
   archive:Object.freeze({settings:call('archive.settings'),captureMessage:call('archive.captureMessage'),configure:call('archive.configure')}),
   store:Object.freeze({getLocalSnapshot:(_directory)=>snapshot(),getGalaxyIntegrationStatus:(_directory)=>status(),resetGalaxyIntegration:(_directory)=>reset()}),
   connection:Object.freeze({getGalaxyConnectionStatus:(_directory)=>connection()}),
+  /** @param {{endpoint:string,isCurrent?:()=>boolean}} options */
   deletionRecords({endpoint,isCurrent=()=>true}){
    const current=()=>{if(!isCurrent())throw Error('Deletion record canceled.');};
    const run=async(method,input)=>{current();const result=await call(method)({endpoint,...input});current();return result;};

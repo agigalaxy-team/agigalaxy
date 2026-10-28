@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "service": "xmpp://127.0.0.1:5347",
+  "domain": "information.galaxy.internal",
+  "roomsDomain": "rooms.galaxy.internal",
+  "secretFile": "/etc/galaxy/information-component.key"
+}

@@ -7,6 +7,8 @@ DO $$ BEGIN
 END $$;
 GRANT USAGE ON SCHEMA public,galaxy_jobs TO galaxy_content_publisher;
 GRANT SELECT ON schema_migrations,site_publications_v1 TO galaxy_content_publisher;
+-- Startup must honor restored-database quarantine without any write grant.
+GRANT SELECT ON recovery_state TO galaxy_content_publisher;
 GRANT UPDATE(state,attempts,result,error,created_at,updated_at,published_at) ON site_publications_v1 TO galaxy_content_publisher;
 GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA galaxy_jobs TO galaxy_content_publisher;
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA galaxy_jobs TO galaxy_content_publisher;

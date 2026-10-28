@@ -24,6 +24,10 @@ Component "gateway.galaxy.internal"
 Component "rooms.galaxy.internal" "muc"
  modules_enabled = { "galaxy_rooms_v2"; "muc_mam"; };
  galaxy_gateway_host = "gateway.galaxy.internal";
+ -- Optional independent source readers. Each must also have its own external
+ -- Component and distinct secret; never connect two processes as the gateway.
+ galaxy_reader_gateway_hosts = {};
+
  restrict_room_creation = true;
  component_admins_as_room_owners = false;
  muc_room_default_public = false;

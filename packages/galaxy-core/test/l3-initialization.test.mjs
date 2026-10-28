@@ -1,3 +1,4 @@
+import {hostPersistenceFixture} from './fixtures/host-persistence.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -54,7 +55,9 @@ test('recovery is displayed by command, CLI and native alert without opening ini
     assert.equal(result.recoveryRequired, true);
     assert.equal(result.identity, null);
   }
-  const { default: adapter } = await tsImport('../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts', import.meta.url);
+  const { createGalaxyAdapter } = await tsImport('../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts', import.meta.url);
+  const adapter = createGalaxyAdapter(null, {dataDirectory: directory, recordWork: false, hostPersistence: hostPersistenceFixture(directory)});
+  context.after(() => adapter.close());
   let page;
   let open;
   await adapter.tui({
@@ -79,7 +82,7 @@ test('native purpose entry opens without identity creation and prepares the devi
   context.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected network'); });
   const { createGalaxyAdapter } = await tsImport('../../../integrations/host-adapters/opencode-stable/galaxy.tui.ts', import.meta.url);
   let page = null, open;const commands=new Map();
-  const adapter=createGalaxyAdapter(null,{dataDirectory:dir}); context.after(()=>adapter.close());
+  const adapter=createGalaxyAdapter(null,{dataDirectory:dir,recordWork:false,hostPersistence:hostPersistenceFixture(dir)}); context.after(()=>adapter.close());
   await adapter.tui({keymap:{registerLayer:({commands:entries})=>{for(const entry of entries)commands.set(entry.name,entry);const command=entries.find(c=>c.name==='galaxy.open');if(command)open=command.run;return()=>{};}},
     ui:{dialog:{setSize(){},clear(){page=null;},replace(fn){page=fn();}},DialogSelect:props=>({type:'select',...props}),DialogAlert:props=>({type:'alert',...props}),DialogPrompt:props=>({type:'prompt',...props})}});
   async function transition(fn){const old=page;fn();for(let i=0;i<100&&page===old;i++)await delay(10);assert.notEqual(page,old);}

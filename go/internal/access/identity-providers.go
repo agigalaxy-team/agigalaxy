@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// LoadIdentityProviders exposes the already protected public issuer/client
+// LoadIdentityProviders exposes the public issuer/client
 // configuration for independent read workers. Secret references are validated
 // as names only; this function never resolves them or creates a login service.
 func LoadIdentityProviders(path string) ([]accounts.Provider, error) {
@@ -18,7 +18,7 @@ func LoadIdentityProviders(path string) ([]accounts.Provider, error) {
 		return out, nil
 	}
 	var config identityConfiguration
-	if e := protectedJSON(path, 32768, &config); e != nil {
+	if e := publicJSON(path, 32768, &config); e != nil {
 		return nil, e
 	}
 	bad := func() ([]accounts.Provider, error) { return nil, fault.New("server_configuration_invalid", 400) }

@@ -11,6 +11,10 @@ local muc = module:depends("muc");
 module:depends("muc_mam");
 local ns = "urn:galaxy:rooms:2";
 local gateway = assert(module:get_option_string("galaxy_gateway_host"));
+-- Independent source readers have their own XEP-0114 connection identity.
+-- They retain the original read-time projection, not send/edit/erase authority.
+local reader_gateways = module:get_option_set("galaxy_reader_gateway_hosts", {});
+
 local archive = module:open_store("muc_log", "archive");
 local tombstones = module:open_store("galaxy_erased");
 assert(archive.get and archive.set and archive.delete, "Archive get/set/delete required");
@@ -78,11 +82,17 @@ module:hook("iq-set/host/" .. ns .. ":command", function(event)
   origin.send(st.reply(stanza):tag("result", { xmlns = ns }):text(json.encode(value))); return true;
  end
  local function fail(code) return reply({ error = code }); end
- if jid.bare(stanza.attr.from) ~= gateway then return fail("chat_access_denied"); end
+ local sender = jid.bare(stanza.attr.from);
+ local reader = sender ~= gateway and reader_gateways:contains(sender);
+ if sender ~= gateway and not reader then return fail("chat_access_denied"); end
  local raw = stanza:get_child_text("command", ns);
  if not raw or #raw > 100000 then return fail("invalid_chat_request"); end
  local x = json.decode(raw);
  if type(x) ~= "table" or type(x.roomId) ~= "string" or #x.roomId ~= 36 or not x.roomId:match("^[0-9a-f%-]+$") then return fail("invalid_chat_request"); end
+ -- PostgreSQL/device/room checks stay in the owning Go source reader.
+ -- project is the existing current-snapshot prerequisite for read; keep its
+ -- primary-gateway member JIDs and original monotonic revision check below.
+ if reader and x.action ~= "project" and x.action ~= "read" then return fail("chat_access_denied"); end
  local room_jid = x.roomId .. "@" .. module.host;
  local room = muc.get_room_from_jid(room_jid);
  if x.action == "project" then

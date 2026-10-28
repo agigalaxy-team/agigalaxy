@@ -18,11 +18,28 @@ import (
 )
 
 func protectedJSON(file string, max int64, target any) error {
+	return configurationJSON(file, max, target, false)
+}
+
+// Public account/provider metadata contains secret references, not resolved
+// secrets. Its original Node loaders permit world-readable configuration.
+func publicJSON(file string, max int64, target any) error {
+	return configurationJSON(file, max, target, true)
+}
+
+func configurationJSON(file string, max int64, target any, public bool) error {
 	if !filepath.IsAbs(file) {
 		return fault.New("server_configuration_invalid", 400)
 	}
 	before, e := os.Lstat(file)
-	if e != nil || !before.Mode().IsRegular() || before.Size() > max || runtime.GOOS != "windows" && before.Mode().Perm()&0007 != 0 {
+	unsafeMode := os.FileMode(0007)
+	if public {
+		unsafeMode = 0022
+	}
+	validFile := func(info os.FileInfo) bool {
+		return info.Mode().IsRegular() && info.Size() <= max && (runtime.GOOS == "windows" || info.Mode().Perm()&unsafeMode == 0)
+	}
+	if e != nil || !validFile(before) {
 		return fault.New("server_configuration_unavailable", 503)
 	}
 	f, e := os.Open(file)
@@ -31,7 +48,7 @@ func protectedJSON(file string, max int64, target any) error {
 	}
 	defer f.Close()
 	opened, e := f.Stat()
-	if e != nil || !os.SameFile(before, opened) {
+	if e != nil || !validFile(opened) || !os.SameFile(before, opened) || before.Size() != opened.Size() || !before.ModTime().Equal(opened.ModTime()) || before.Mode() != opened.Mode() {
 		return fault.New("server_configuration_unavailable", 503)
 	}
 	b, e := io.ReadAll(io.LimitReader(f, max+1))
@@ -39,7 +56,11 @@ func protectedJSON(file string, max int64, target any) error {
 		return fault.New("server_configuration_invalid", 400)
 	}
 	after, e := f.Stat()
-	if e != nil || after.Size() != int64(len(b)) || !after.ModTime().Equal(opened.ModTime()) {
+	if e != nil || !validFile(after) || after.Size() != int64(len(b)) || !after.ModTime().Equal(opened.ModTime()) || after.Mode() != opened.Mode() {
+		return fault.New("server_configuration_unavailable", 503)
+	}
+	current, e := os.Lstat(file)
+	if e != nil || !validFile(current) || !os.SameFile(after, current) || current.Size() != after.Size() || !current.ModTime().Equal(after.ModTime()) || current.Mode() != after.Mode() {
 		return fault.New("server_configuration_unavailable", 503)
 	}
 	if protocol.Decode(b, target) != nil {
@@ -113,7 +134,7 @@ type identityConfiguration struct {
 	} `json:"providers"`
 }
 
-// Load reuses the original protected configuration files. It neither copies
+// Load reuses the original public metadata and protected secret references. It neither copies
 // credentials to a new configuration nor reads host model/provider secrets.
 // Login issuance and non-feedback domains remain on their existing runtime
 // until their own Go migration is complete; this loader is not a cutover.
@@ -122,13 +143,13 @@ func Load(ctx context.Context, pool *pgxpool.Pool, endpoint, accountFile, operat
 	var operations operationsConfiguration
 	var providers identityConfiguration
 	var root rootConfiguration
-	if e := protectedJSON(accountFile, 4096, &account); e != nil {
+	if e := publicJSON(accountFile, 4096, &account); e != nil {
 		return nil, e
 	}
 	if e := protectedJSON(operationsFile, 16384, &operations); e != nil {
 		return nil, e
 	}
-	if e := protectedJSON(identityFile, 32768, &providers); e != nil {
+	if e := publicJSON(identityFile, 32768, &providers); e != nil {
 		return nil, e
 	}
 	if e := protectedJSON(operations.RootFile, 16384, &root); e != nil {

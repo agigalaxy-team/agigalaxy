@@ -1,3 +1,4 @@
+import {hostPersistenceFixture} from './fixtures/host-persistence.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -27,7 +28,7 @@ test('injected connection uses actual native selection over the exact preview an
       assert.equal(value, preview); assert.equal(text, preview.confirmation); executes++;
       return new Promise(resolve => { complete = resolve; });
     } };
-  await createGalaxyAdapter(controller).tui({
+  await createGalaxyAdapter(controller, {dataDirectory: dir, recordWork: false, hostPersistence: hostPersistenceFixture(dir)}).tui({
     keymap: { registerLayer({ commands: layer }) {
       for (const item of layer) commands.set(item.name, item.run);
       return () => {};

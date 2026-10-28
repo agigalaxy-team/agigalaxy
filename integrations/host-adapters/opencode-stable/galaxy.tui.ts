@@ -156,7 +156,7 @@ export function createGalaxyAdapter(
         function closeGalaxy() {
           if (firstPreparationVisible) {
             firstPreparationVisible = false;
-            void deferOpenCodePreparation(dataDirectory).catch(() => {});
+            void persistence.deferPreparation().catch(() => {});
           }
           connectionGeneration++;
           nextPage();
