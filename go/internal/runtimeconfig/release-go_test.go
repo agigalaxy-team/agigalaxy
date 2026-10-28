@@ -29,13 +29,13 @@ func TestActualGoCandidateRuntimeBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if release.GoCandidate == nil || !release.FilesVerified || release.Kind != "galaxy-go-core-local-candidate" {
-		t.Fatal("actual Go candidate lost its own format or file verification")
+	if release.GoCandidate == nil || !release.FilesVerified || release.Kind != manifest.Kind || !validGoArtifactMode(&manifest) {
+		t.Fatal("actual Go artifact lost its own format or file verification")
 	}
 	if _, ok := runtimeReleaseEntry(release, "api", entry); ok {
 		t.Fatal("Information Worker was accepted as API")
 	}
 	if _, err = AssessSchemaTransition(nil, release, release); err == nil {
-		t.Fatal("development candidate must not become a Node production transition")
+		t.Fatal("Go artifact must not become a Node schema transition")
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimeconfig"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/subjectlifecycle"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/jackc/pgx/v5"
@@ -124,6 +125,9 @@ func commandJSON(raw []byte) ([]byte, error) {
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, lookup func(string) (string, bool), stdout io.Writer) error {
+	if _, err := runtimeconfig.RuntimeServiceRelease(getenv, "lifecycle", ""); err != nil {
+		return err
+	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "help") {
 		_, e := fmt.Fprintln(stdout, help)
 		return e

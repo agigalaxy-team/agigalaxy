@@ -1,12 +1,14 @@
 # 源码、许可与发行材料
 
-归档和目录整理不改变仓库公开性、账号权限或许可。根仓库未提供覆盖整仓的 LICENSE；Native 发行的 Apache-2.0 不外推到 Hub、Admin、全部服务、用户数据或运营资料。整仓开源/拆仓须明确对应范围。
+主源码 [agigalaxy](https://github.com/agigalaxy-team/agigalaxy) 已公开，源码、介绍与贡献说明直接在本仓库维护。银河自有代码统一采用 **Apache-2.0**，标准原文和归属说明集中在根 [LICENSE](../../LICENSE) 与 [NOTICE](../../NOTICE)。该选择覆盖银河自有的 Go、网页、宿主与专业服务接线代码；第三方与上游派生材料仍遵守原许可，用户资料和商标不因此授权。历史已签名发行保留原字节与准确随版许可。
 
 ## 自有与第三方范围
 
 | 范围 | 原文和准确来源 |
 |---|---|
-| 选定 Native 自有代码、Skill、辅助工具与说明 | `integrations/native-v2/legal/LICENSE`、`NOTICE` 限定 Apache-2.0 范围，商标及第三方另列 |
+| 当前银河自有代码 | 根 `LICENSE`、`NOTICE` 统一声明 Apache-2.0；银河自有 Go 核心、网页、宿主和服务接线适用，外部材料另依原声明 |
+| 历史 Native 自有代码、Skill、辅助工具与说明 | `integrations/native-v2/legal/LICENSE`、`NOTICE` 保留原发行 profile 和准确版本范围；不改已签名包 |
+| Go 核心与依赖 | `go/go.mod`、`go/go.sum` 固定实际模块版本；Go SDK、HTTP、PostgreSQL、River、SQLite、Prometheus 等第三方模块保留各自许可，不能据实现语言推定统一授权。源码位置、构建及运行见 `go/README.md` 与 `go/deploy/README.md`；银河自有 Go 代码适用根 Apache-2.0，第三方模块原许可与发行随附义务分别保留 |
 | Native 外置 npm 依赖 | 依准确 lock 和实际安装包提取 LICENSE/NOTICE/COPYING 与 package/lock 许可元数据，不把全部改写为 Apache |
 | MCP SDK | package 许可字段与实际混合许可原文分别保留；已发行版本的原文不能用浮动 main 替代 |
 | Keycloak | `apps/galaxy-auth/licenses/KEYCLOAK-APACHE-2.0.txt`；主题自有 NOTICE 一并进入主题包 |
@@ -23,7 +25,7 @@
 
 实际环境文件、凭据/私钥、依赖树、缓存、构建输出和运行工件不入源码。运维只保留 `configuration.example.json`，具体主机配置在源码外，通过工具的 `--config` 显式指定。成员哈希只证明包成员完整性及隔离解压校验，不证明权属、运行状态或发布授权。
 
-## Native 许可生成与准备
+## Native 许可生成与准备（按准确发行 profile）
 
 ```sh
 node scripts/build-native-v2.mjs <新的绝对候选目录>
@@ -34,7 +36,7 @@ node scripts/native-license-notices.mjs generate <绝对候选目录>
 node scripts/native-client-release.mjs <绝对候选目录> <新的绝对准备目录> <本机tar绝对路径>
 ```
 
-命令只构建无凭据候选和准备包，不签名、安装宿主配置或公开发布。生产签名按既有授权短期注入，生成 NOTICE 不需要读取发行私钥。
+上述许可工具按其支持的准确发行 profile 使用；Go 候选的编译与包布局另见 [Go 运行样例](../../go/deploy/README.md)，不能把旧 Node 发行许可检查自动当作 Go 二进制及其模块的完整许可核对。命令只构建无凭据候选和准备包，不签名、安装宿主配置或公开发布。生产签名按既有授权短期注入，生成 NOTICE 不需要读取发行私钥。
 
 `generateNativeLicenseNotices({candidate})` 无网络、按 lock 与实际安装组件新建 `third-party-licenses/` 和 `license-inventory.json`，拒绝覆盖；`verifyNativeLicenseNotices({candidate})` 只读重算。缺文本、版本不符、lock变化、篡改或缺可选平台 lock 成员都阻止准备，不伪造跨平台检查。bundler 外置 npm 依赖，源输入含 node_modules 时拒绝当前许可 profile；esbuild 原文只说明构建工具归属。
 

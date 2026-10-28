@@ -4,7 +4,7 @@
 
 这份说明帮助使用者理解账户、本地客户端、资料外发和公开反馈的区别。具体发行行为以所用版本的使用指南为准：[0.1.16](native-client/0.1.16/runtime.md)、[0.1.19 候选](native-client/0.1.19/runtime.md)。版本选择见[开始使用](getting-started.md)，网站处理范围以官网隐私说明及实际界面为准。
 
-公开的逐项实现说明见[客户端数据流、上传范围、脱敏与删除](technical-faq.md)；官网不可被工具读取时，可以使用上述同版指南镜像或[合并纯文本阅读包](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)。
+公开的逐项实现说明见[客户端数据流、上传范围、脱敏与删除](technical-faq.md)；官网不可被工具读取时，可以使用上述同版指南镜像或[主仓库直接阅读入口](ai-reading.md)。
 
 ## 账户、本地身份与设备
 

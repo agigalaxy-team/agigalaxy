@@ -1,11 +1,11 @@
 # 银河公开文档
 
 
-[项目首页](site-files/README.md) · [官网文档](https://agigalaxy.org/docs/) · [English overview](site-files/README.en.md)
+[项目首页](../../README.md) · [官网文档](https://agigalaxy.org/docs/) · [English overview](../../README.en.md)
 
 这组文档围绕网络的用途、开始使用和当前阶段展开。安装位置、宿主兼容性和发行核验以官网随版指南为准。
 
-AI 或抓取工具可从[直接阅读入口](ai-reading.md)使用完整原始地址，或者一次读取[合并纯文本](https://raw.githubusercontent.com/agigalaxy-team/agigalaxy-public/main/llms-full.txt)。
+AI 或抓取工具可从[直接阅读入口](ai-reading.md)选择主源码仓库中的原始 Markdown；不再依赖第二仓库的合并全文。
 
 | 想了解什么 | 阅读资料 |
 |---|---|
@@ -24,7 +24,7 @@ AI 或抓取工具可从[直接阅读入口](ai-reading.md)使用完整原始地
 | 安装与随版指南 | 先在[开始使用的版本表](getting-started.md#客户端安装)选择0.1.16或0.1.19候选，再阅读对应安装、宿主与使用说明；[AI阅读入口](ai-reading.md)提供直接文本 |
 | 当前能做到哪一步、还有哪些待完善 | [当前状态与范围](status.md) |
 | 账户、本地资料、外发和数据控制 | [数据与隐私](privacy.md) |
-| 如何求助、提建议或修正文档 | [帮助与反馈](site-files/SUPPORT.md)、[贡献说明](site-files/CONTRIBUTING.md) |
-| 本仓库公开了哪些材料 | [资料使用范围](site-files/RIGHTS.md) |
+| 如何求助、提建议或修正文档 | [帮助与反馈](site-files/SUPPORT.md)、[贡献说明](../../CONTRIBUTING.md) |
+| 本仓库公开了哪些材料 | [资料使用范围](../../RIGHTS.md) |
 
 资料按各页与发行标明的日期和范围核对。仓库文档、客户端发行和网站可以分别更新；具体使用以对应入口、版本及权限为准。

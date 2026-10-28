@@ -1,6 +1,6 @@
 # 冷启动、数据价值与贡献激励
 
-[项目首页](site-files/README.md) · [银河网络宣言](site-files/MANIFESTO.md) · [愿景与架构](vision-and-architecture.md) · [共同治理](community-governance.md)
+[项目首页](../../README.md) · [银河网络宣言](site-files/MANIFESTO.md) · [愿景与架构](vision-and-architecture.md) · [共同治理](community-governance.md)
 
 银河的冷启动设计同时处理三件事：使用者为什么愿意开始、真实知识怎样积累、贡献者为什么愿意留下。客户端、社区与激励机制各自承担一部分，任何一个组件都不能独自替代真实参与。
 

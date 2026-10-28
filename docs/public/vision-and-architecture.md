@@ -1,6 +1,6 @@
 # 项目愿景与架构
 
-[项目首页](site-files/README.md) · [网络功能](network.md) · [Hub 与官方的运作](ecosystem-and-hubs.md) · [参与价值与商业方向](business-and-participation.md)
+[项目首页](../../README.md) · [网络功能](network.md) · [Hub 与官方的运作](ecosystem-and-hubs.md) · [参与价值与商业方向](business-and-participation.md)
 
 银河希望让人以更少的重复交代和寻找成本，取得具体帮助、找到相关项目与同行、交流想法，并与人和 AI 一起把事情做下去。真实参与留下有来源的经历与方法，使下一次发现和协作更容易。
 

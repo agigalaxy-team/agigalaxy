@@ -1,6 +1,6 @@
 # Hub、银河官方与信息传递
 
-[项目首页](site-files/README.md) · [愿景与架构](vision-and-architecture.md) · [参与价值与商业方向](business-and-participation.md) · [技术核对说明](technical-faq.md)
+[项目首页](../../README.md) · [愿景与架构](vision-and-architecture.md) · [参与价值与商业方向](business-and-participation.md) · [技术核对说明](technical-faq.md)
 
 Hub 的原始定位是“自己的共同基础、自己的规则和自己的事实网络”。企业、专业社区、行业联盟或服务提供者可以围绕自己的成员与重复需求经营本地网络，再选择与更大网络互通。
 

@@ -23,16 +23,19 @@ type Lifecycle struct {
 	once    sync.Once
 }
 
-// Start preserves the original API/Worker bootstrap, initial adoption and
+// Start preserves API bootstrap and API/Worker initial adoption and
 // thirty-second refresh. API alone initializes the P14 editing heads.
 func Start(ctx context.Context, o StartOptions) (*Lifecycle, error) {
 	if !has([]string{"api", "worker"}, o.Component) || o.Rules == nil {
 		return nil, fail("operations_policy_consumers_invalid", 400)
 	}
-	if e := o.Rules.Bootstrap(ctx, o.Baselines); e != nil {
-		return nil, e
-	}
 	if o.Component == "api" {
+		// Only the API owns initial policy publication/editing heads. Runtime
+		// workers consume existing published rules under their SELECT grant;
+		// INSERT ON CONFLICT would still require forbidden INSERT authority.
+		if e := o.Rules.Bootstrap(ctx, o.Baselines); e != nil {
+			return nil, e
+		}
 		if e := o.Rules.Initialize(ctx); e != nil {
 			return nil, e
 		}
@@ -41,8 +44,14 @@ func Start(ctx context.Context, o StartOptions) (*Lifecycle, error) {
 	if e != nil {
 		return nil, e
 	}
-	if _, e = runtime.Refresh(ctx); e != nil {
+	adopted, e := runtime.Refresh(ctx)
+	if e != nil {
 		return nil, e
+	}
+	for _, value := range list(adopted["items"]) {
+		if obj(value)["errorCode"] != nil {
+			return nil, fail("operations_policy_apply_failed", 503)
+		}
 	}
 	work, cancel := context.WithCancel(ctx)
 	l := &Lifecycle{Service: o.Rules, Runtime: runtime, cancel: cancel, done: make(chan struct{})}

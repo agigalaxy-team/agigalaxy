@@ -10,12 +10,13 @@ import (
 	"strings"
 )
 
-// GoCoreArtifact retains the builder's development-candidate metadata separately
-// from Node service-release migrations. Inspecting it grants no deployment or
-// schema-transition authority.
+// GoCoreArtifact retains a Go build manifest separately from the original
+// Node service-release schema. A release artifact is still a build observation,
+// not evidence of activation, schema migration, or platform acceptance.
 type GoCoreArtifact struct {
 	Version              int    `json:"version"`
 	Kind                 string `json:"kind"`
+	Mode                 string `json:"mode,omitempty"`
 	Component            string `json:"component"`
 	ReleaseID            string `json:"releaseId"`
 	ConfigurationVersion string `json:"configurationVersion"`
@@ -44,8 +45,20 @@ var goCoreCommands = [...]string{"galaxy-api", "galaxy-worker", "galaxy-informat
 
 func explicitlyFalse(value *bool) bool { return value != nil && !*value }
 
-// InspectGoCoreArtifact validates the actual build-go-core.mjs output and all
-// inventoried bytes without running a candidate or interpreting it as a release.
+func validGoArtifactMode(artifact *GoCoreArtifact) bool {
+	switch artifact.Kind {
+	case "galaxy-go-core-local-candidate":
+		return artifact.Mode == "" || artifact.Mode == "candidate"
+	case "galaxy-go-core-release":
+		return artifact.Mode == "release"
+	default:
+		return false
+	}
+}
+
+// InspectGoCoreArtifact verifies the actual Go builder output and all bytes.
+// Candidate and release formats share the same pin, target and role bindings;
+// neither is accepted as an old Node schema-transition manifest.
 func InspectGoCoreArtifact(directory, pin string) (*ServiceRelease, error) {
 	if !filepath.IsAbs(directory) || !sha.MatchString(pin) {
 		return nil, releaseMismatch("Pinned release directory and digest required")
@@ -62,11 +75,11 @@ func InspectGoCoreArtifact(directory, pin string) (*ServiceRelease, error) {
 	if e = json.Unmarshal(raw, &artifact); e != nil {
 		return nil, e
 	}
-	if artifact.Version != 1 || artifact.Kind != "galaxy-go-core-local-candidate" || artifact.Component != "hub" || artifact.Backend != "go" || !ref.MatchString(artifact.ReleaseID) || !ref.MatchString(artifact.ConfigurationVersion) || artifact.Compiler == "" || !explicitlyFalse(artifact.Target.CGO) || !explicitlyFalse(artifact.PublicRelease) || !explicitlyFalse(artifact.Deployed) || !explicitlyFalse(artifact.DefaultInstallationChanged) || !explicitlyFalse(artifact.MigrationComplete) || !explicitlyFalse(artifact.ContainsConfiguredAuthority) {
-		return nil, releaseMismatch("Invalid Go core candidate manifest")
+	if artifact.Version != 1 || !validGoArtifactMode(&artifact) || artifact.Component != "hub" || artifact.Backend != "go" || !ref.MatchString(artifact.ReleaseID) || !ref.MatchString(artifact.ConfigurationVersion) || artifact.Compiler == "" || !explicitlyFalse(artifact.Target.CGO) || !explicitlyFalse(artifact.PublicRelease) || !explicitlyFalse(artifact.Deployed) || !explicitlyFalse(artifact.DefaultInstallationChanged) || !explicitlyFalse(artifact.MigrationComplete) || !explicitlyFalse(artifact.ContainsConfiguredAuthority) {
+		return nil, releaseMismatch("Invalid Go core artifact manifest")
 	}
 	if artifact.Target.GOOS != "windows" && artifact.Target.GOOS != "linux" && artifact.Target.GOOS != "darwin" || artifact.Target.GOARCH != "amd64" && artifact.Target.GOARCH != "arm64" {
-		return nil, releaseMismatch("Invalid Go core candidate target")
+		return nil, releaseMismatch("Invalid Go core artifact target")
 	}
 	ext := ""
 	if artifact.Target.GOOS == "windows" {
@@ -74,7 +87,7 @@ func InspectGoCoreArtifact(directory, pin string) (*ServiceRelease, error) {
 	}
 	for _, command := range goCoreCommands {
 		if artifact.Entries[command] != command+ext {
-			return nil, releaseMismatch("Invalid Go core candidate entries")
+			return nil, releaseMismatch("Invalid Go core artifact entries")
 		}
 	}
 	for _, name := range artifact.Entries {

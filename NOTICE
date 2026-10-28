@@ -1,0 +1,25 @@
+Galaxy / AGI Galaxy
+Copyright 2026 Galaxy contributors
+
+Galaxy-authored code in this source repository is provided under the Apache
+License, Version 2.0. See the root LICENSE. This includes Galaxy-authored Go,
+JavaScript/TypeScript, Python and other implementation code, subject to any
+separately identified third-party material and its original license terms.
+
+Third-party code, dependencies, vendored sources, patches derived from upstream
+projects, fonts, images and other externally sourced material retain their
+applicable licenses, copyright notices and attribution requirements. This NOTICE
+does not relicense them. Refer to component source records, lock files and the
+original LICENSE, NOTICE, COPYING and attribution files supplied with each item.
+
+No rights to Galaxy or third-party trademarks are granted beyond those stated
+in the Apache License. Product names identify integration targets and do not
+imply endorsement. User content, private histories, prompts, credentials and
+operational data are not licensed by this software grant. Documentation and
+assets follow their applicable identified rights; source visibility alone does
+not grant rights in material owned by others.
+
+Existing signed Native distributions retain their exact bytes and the LICENSE,
+NOTICE and third-party notices shipped with those versions. This source-tree
+notice does not rewrite those historical distributions. Software licensing does
+not promise hosted services, model inference or access to private information.

@@ -16,7 +16,7 @@ export async function hubCommand({role='api',artifact=process.env.GALAXY_RELEASE
    if(typeof artifact!=='string'||!artifact)throw Error('Select GALAXY_NATIVE_EXECUTABLE, or an existing combined Go core artifact through GALAXY_RELEASE_DIRECTORY.');
    const directory=resolve(artifact),manifest=JSON.parse(await readFile(join(directory,'go-core-artifact.json'),'utf8'));
    const native=manifest.entries?.native,expected='native/'+(manifest.target?.goos==='windows'?'galaxy.exe':'galaxy');
-   if(manifest.kind!=='galaxy-go-core-local-candidate'||manifest.backend!=='go'||native!==expected)throw Error('Selected Go core does not contain Native; choose the standalone Native executable.');
+   if(!['galaxy-go-core-local-candidate','galaxy-go-core-release'].includes(manifest.kind)||manifest.backend!=='go'||native!==expected)throw Error('Selected Go core does not contain Native; choose the standalone Native executable.');
    command=join(directory,native);
   }
   if(!isAbsolute(command)||!(await stat(command)).isFile())throw Error('Select an absolute existing Go Native executable.');
@@ -28,7 +28,7 @@ export async function hubCommand({role='api',artifact=process.env.GALAXY_RELEASE
  if(typeof artifact!=='string'||!artifact)throw Error('Select an existing Go core artifact with GALAXY_RELEASE_DIRECTORY (or --release-directory), GALAXY_RELEASE_SHA256, and GALAXY_CONFIGURATION_VERSION. Build it with scripts/build-go-core.mjs first.');
  if(!Array.isArray(args)||args.some(value=>typeof value!=='string'))throw Error('Hub arguments must be strings.');
  const directory=resolve(artifact),manifest=JSON.parse(await readFile(join(directory,'go-core-artifact.json'),'utf8'));
- if(manifest.kind!=='galaxy-go-core-local-candidate'||manifest.backend!=='go')throw Error('Expected a Go core artifact; a legacy Node service release is not a Go runtime.');
+ if(!['galaxy-go-core-local-candidate','galaxy-go-core-release'].includes(manifest.kind)||manifest.backend!=='go')throw Error('Expected a Go core artifact; a legacy Node service release is not a Go runtime.');
  const binary=manifest.entries?.[entry],expected=entry+(manifest.target?.goos==='windows'?'.exe':'');
  if(binary!==expected||basename(binary)!==binary)throw Error('Go artifact is missing the selected server entry.');
  const command=join(directory,binary);

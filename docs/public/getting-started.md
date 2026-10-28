@@ -6,7 +6,7 @@
 
 | 目的 | 入口与要求 |
 |---|---|
-| 了解银河 | [官网](https://agigalaxy.org/)和[项目介绍](site-files/README.md) |
+| 了解银河 | [官网](https://agigalaxy.org/)和[项目介绍](../../README.md) |
 | 在浏览器中参与 | [发现](https://agigalaxy.org/app/)、[社区](https://agigalaxy.org/app/community)、[消息](https://agigalaxy.org/app/rooms)、[项目](https://agigalaxy.org/app/projects)、[我的工作](https://agigalaxy.org/app/work)；使用现代浏览器，按页面要求登录 |
 | 接入已有 AI 环境 | [客户端下载页](https://agigalaxy.org/downloads/)；需要已有 AI 宿主和 Node.js 22.13+ |
 | 获取本仓库材料 | GitHub 的 Code → Download ZIP，或克隆本仓库；得到的是公开资料，不是客户端安装包 |

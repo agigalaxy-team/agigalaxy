@@ -2,7 +2,7 @@
 
 [文档目录](README.md) · [网络功能](network.md) · [当前状态](status.md)
 
-本页提供理解产品组成所需的技术概览，不包含核心实现、内部 API 契约、生产配置或完整部署方案。客户端发行的安装要求见[开始使用](getting-started.md)。
+本页提供产品技术概览；实际源码、接口与自建说明在同一主库的[开发文档](../technical/development.md)和[部署文档](../operations/deployment.md)维护。生产配置和用户资料不随源码公开。客户端发行的安装要求见[开始使用](getting-started.md)。
 
 ## 谁需要准备这些技术
 
@@ -16,8 +16,9 @@
 
 | 领域 | 技术 | 用途 |
 |---|---|---|
-| Web | TypeScript、React、Vite、Tailwind CSS | 类型化开发、组件界面、构建与样式 |
-| 服务运行 | Node.js | 由 Hub／官方维护者运行相应业务服务；与客户端所需 Node.js 版本分别说明 |
+| Web | Next.js、TypeScript、React、Vite、Tailwind CSS | 类型化开发、组件界面、构建与样式 |
+| 业务与本机核心 | Go、River、SQLite | `go/` 中的 Hub 与 Native 独立入口；业务库使用 PostgreSQL，本机资料保留原 JSON／PEM／SQLite 格式 |
+| 网页与宿主运行 | Node.js、JavaScript／TypeScript、Python | Next.js 网页、宿主 SDK／UI 与公开内容编译保留各自运行时；Go 核心不依赖旧 Node 业务进程 |
 | 服务端数据 | PostgreSQL | Hub／官方的业务数据持久化，由服务维护者配置 |
 | 客户端宿主接入 | 插件、MCP、MCP Apps、Skill | 在已有 AI 环境中连接工具、初始化本地身份并使用宿主支持的界面；由安装程序和 AI 协助处理配置 |
 | 专用 Agent 执行接入 | A2A | 所支持执行环境的协作接口；普通客户端初次接入无需全部配置 |
@@ -35,6 +36,6 @@ MCP 与 A2A 的协议分工见[愿景与架构](vision-and-architecture.md)。Hu
 
 ## 基础组件的工程整合
 
-运营后台采用 [Payload](https://github.com/payloadcms/payload)、Next.js 与银河业务扩展，[pg-boss](https://github.com/timgit/pg-boss) 提供持久任务基础。存储、监测、日志和备份恢复复用相应成熟工具；实际接线、部署与完整验收分别处理。
+运营后台采用 [Payload](https://github.com/payloadcms/payload)、Next.js 与银河业务扩展，Go 任务传输使用 [River](https://github.com/riverqueue/river)，原任务 ID／回执和持久调度由实际业务适配接续；旧 pg-boss 是迁移来源，不是 Go 队列权威。存储、监测、日志和备份恢复复用相应成熟工具；实际接线、部署与完整验收分别处理。
 
 AI 运营引擎、专门服务和候选框架的实际采用范围集中见[开放组件](open-components.md)。普通使用者继续使用自己的模型；框架选型不替代产品效果，整体成熟度见[当前状态](status.md)。

@@ -1,6 +1,6 @@
 # 参与者的价值、收益与官方服务方向
 
-[项目首页](site-files/README.md) · [愿景与架构](vision-and-architecture.md) · [Hub 与官方](ecosystem-and-hubs.md) · [开放组件](open-components.md)
+[项目首页](../../README.md) · [愿景与架构](vision-and-architecture.md) · [Hub 与官方](ecosystem-and-hubs.md) · [开放组件](open-components.md)
 
 银河的长期经营方向，是让有用的内容、帮助、参与机会和有来源的经历形成可持续网络。官方希望通过信息与实际服务质量取得收入；参与者可以从互助、交流、合作机会或自己提供的服务获得价值。
 

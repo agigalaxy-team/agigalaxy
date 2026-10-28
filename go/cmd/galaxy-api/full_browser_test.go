@@ -40,6 +40,13 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("normal API rejects root")
 	}
+	adminMode := os.Getenv("GALAXY_GO_BROWSER_ADMIN_MODE")
+	if adminMode == "" {
+		adminMode = "standalone"
+	}
+	if adminMode != "standalone" && adminMode != "development" {
+		t.Fatal("admin mode must be standalone or development")
+	}
 	browserScope := os.Getenv("GALAXY_GO_FULL_ENTRY_BROWSER_SCOPE")
 	if browserScope == "" {
 		browserScope = "full"
@@ -328,6 +335,7 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 	descriptor["tlsCert"], descriptor["tlsKey"], descriptor["proxyPort"] = certFile, keyFile, proxyPort
 	descriptor["currentDirectorySource"] = "controlled-loopback-protocol; not Keycloak"
 	descriptor["browserScope"] = browserScope
+	descriptor["adminMode"] = adminMode
 	writeJSON(descriptorFile, descriptor)
 	// Call the unchanged Admin session consumer directly with this real main
 	// endpoint. It needs React.cache but no Next request context when its Headers

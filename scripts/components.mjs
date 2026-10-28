@@ -85,7 +85,7 @@ async function cli(){
   if(Object.values(hub.entries).some(entry=>entry.startsWith('go/'))){
    const artifact=value('--artifact');if(!artifact)throw Error('Go Hub resources are embedded or inventoried in its built artifact; pass --artifact DIRECTORY.');
    const directory=resolve(artifact),manifest=JSON.parse(await readFile(join(directory,'go-core-artifact.json'),'utf8'));
-   if(manifest.kind!=='galaxy-go-core-local-candidate'||manifest.backend!=='go')throw Error('Expected a Go core artifact.');
+   if(!['galaxy-go-core-local-candidate','galaxy-go-core-release'].includes(manifest.kind)||manifest.backend!=='go')throw Error('Expected a Go core artifact.');
    console.log(JSON.stringify({backend:'go',entries:manifest.entries,embeddedResources:manifest.embeddedResources,files:manifest.files}));return;
   }
   const {releaseImportResources}=await import('../packages/galaxy-official/src/operations/service-release.mjs');

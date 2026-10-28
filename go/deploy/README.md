@@ -1,6 +1,6 @@
-# Go core 开发候选运行样例
+# Go core 发行与运行接线
 
-此目录是候选运行接线说明，不是完整 Go 发行版或生产切换授权。构建不启动服务、不迁移数据库、不采用旧队列、不修改正式安装。`go-core-artifact.json` 记录实际入口、目标平台及文件摘要；旧 Node `service-release` 部署器不能直接使用它。
+此目录提供 Go 产物的构建和直接运行接线。`go-core-artifact.json` 记录实际入口、目标平台及文件摘要；正式 Go release 与本地 candidate 使用不同 kind，旧 Node `service-release` 部署器不接受这两种 Go 格式。构建不启动服务、不迁移数据库、不采用旧队列、不修改正式安装。实际部署仍按选定产物和当前进程配置办理。
 
 在源码根目录构建新的绝对候选目录，例如：
 
@@ -8,13 +8,25 @@
 node scripts/build-go-core.mjs --output C:/absolute/new-go-candidate --go C:/absolute/go.exe --release go-core-local-1 --configuration-version local-1
 ```
 
+正式 Hub 发行在同一构建口显式选择 `release` 模式。Linux x86_64 服务器示例：
+
+```sh
+node scripts/build-go-core.mjs --output /absolute/new-go-release --release go-VERSION --configuration-version CONFIGURATION --mode release --goos linux --goarch amd64 --without-native
+```
+
+缺省模式仍是 `candidate`。正式模式输出 `kind: galaxy-go-core-release`、`mode: release`，不会把 `migrationComplete`、`deployed`、`defaultInstallationChanged` 改成 true；这些构建观察不代表已经切换或完成平台验收。`publicRelease:false` 表示该构建没有创建 GitHub Release，不表示源代码必须非公开。GitHub 源码公开与实际服务激活是独立操作。构建输出中的 `manifestSha256` 对应完整 `go-core-artifact.json` 字节，供原 `GALAXY_RELEASE_SHA256` 引用。
+
 `--go` 可省略，缺省通过 PATH 直接执行 `go`；也可指定命令名或编译器绝对路径。可用 `--goos linux --goarch amd64` 选择目标，或 `--without-native` 只构建服务程序。跨平台编译不表示目标平台运行已验收。默认 Native 使用既有 Go Native builder，保留独立 `native/` 包内宿主依赖；构建机须已有该 builder 的依赖。脚本固定 `-mod=readonly`，不修改模块锁。
 
 ## 运行与配置发现
 
-候选根目录包含 `galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle`（Windows 使用 `.exe`）。原 Go 邮件模板和内部 SQL/JSON 已嵌入对应二进制；`public-docs.json` 放在 API 二进制旁，或用绝对 `GALAXY_PUBLIC_DOCS_FILE` 指定。配置、凭据、签名钥和运行数据都不在包内。
+产物根目录包含 `galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle`（Windows 使用 `.exe`）。原 Go 邮件模板和内部 SQL/JSON 已嵌入对应二进制；`public-docs.json` 放在 API 二进制旁，或用绝对 `GALAXY_PUBLIC_DOCS_FILE` 指定。配置、凭据、签名钥和运行数据都不在包内。
 
-这里的 systemd 文件只是进程运行样例，路径、用户和受保护环境文件须由部署负责人明确配置。不要直接批量 enable/start。各环境文件独立，保留既有数据库角色：
+这里的 systemd 文件是通用运行样例。把 `ExecStart` 中的 `go-REPLACE_VERSION` 替换为已选的不可变发行目录；不要把 Go 程序放回旧 Node 发行命名空间。保留实际进程用户、group、supplementary groups、现有受保护环境文件和 `LoadCredential`。不经过 shell 展开 credentials 路径，不用 API 环境覆盖 Worker 或 Publisher 环境。
+
+每个进程沿原三项引用绑定发行：`GALAXY_RELEASE_DIRECTORY`、`GALAXY_RELEASE_SHA256`、`GALAXY_CONFIGURATION_VERSION`，示例值见 `release.env.example`。它们应合入既有角色环境文件，而不是增加一个自动加载的配置体系。Go 在启动时核对 pin、完整文件 inventory、目标平台、配置版本以及当前二进制是否属于该角色；同一 manifest 的 API 程序不能冒充 Worker。实际 systemd `ExecStart` 使用同目录下的 Go 程序，不调用 Node service-release host。
+
+各环境文件独立，保留既有数据库角色：
 
 | 进程 | 环境文件 | 数据库/身份边界 |
 |---|---|---|
@@ -27,6 +39,8 @@ Information 的环境变量名见 `information-worker.env.example`，只复用�
 
 普通 Worker 和 Information Worker 都使用 runtime log 的 `worker` component，必须用不同 `GALAXY_RUNTIME_LOG_INSTANCE`。样例分别固定为 `primary` 与 `information`，避免共写同一轮转文件。修改实例名时同时核对路径，不能给两个进程相同实例。SIGTERM 由各命令原停止流程接收，Information 停止会收尾队列、源政策刷新和 Chat transport。
 
+当前部署实例（2026-10-28 实机读取）为 Linux x86_64：API 是 `galaxy-api@pilot.service`，沿 `galaxy-api-pilot` 用户/group 和 `/etc/galaxy/pilot/api.env`、`api-workflow-release.env`；Worker 是 `galaxy-worker@pilot.service`，沿 `galaxy-worker-pilot` 与 `/etc/galaxy/pilot/worker.env`；Publisher 是 `galaxy-content-publisher-pilot.service`，沿 `galaxy-content-publisher-pilot` 用户、`galaxy-site-public` group 及 `galaxy-content-publisher-pilot`、`galaxy-site-publisher`、`galaxy-cms-media-readers` supplementary groups，环境文件为 `/etc/galaxy/operations-pilot/publisher/publisher.env`。三者已有 systemd credentials。选定 Go 目录使用 `/opt/galaxy/releases/go-<version>`，工作目录保留 `/opt/galaxy`；这只是当前实例，不是以后部署的固定命名规则。Information Worker 当前没有独立 unit，应分别配置已有 API 源读取账户和 Worker 传输账户，不能因此扩大旧数据库角色。Next 网站、后台 Next/Payload 及专业组件保持独立进程和入口。
+
 ## 显式维护入口
 
 `galaxy-migrate business-up` 承接原业务 schema 的初始化和升级，沿用原 SQL、`schema_migrations` 和事务锁；可显式附加 `--roles=api,worker,deletion-review,content-publisher` 中所需角色，省略时不设置角色。`--help` 同时列出 jobs/storage 技术迁移及角色供应动作。服务启动不执行这些命令，也不自动采用旧 Node 任务。迁移和队列切换另行安排，并停止旧领取者，再沿原业务 ID/回执接续；不能同时让 Node 与 Go 领取同一工作。
@@ -37,8 +51,8 @@ Information 的环境变量名见 `information-worker.env.example`，只复用�
 
 Native 入口为 `native/galaxy native`，使用明确的 `GALAXY_NATIVE_CONFIG`；宿主安装与平台限制见该子包 README。不要用新建身份、覆盖数据目录或重发操作处理升级/未知回执。
 
-Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独立 Native 候选和 core 内的 `native/` 使用相同布局。Windows 原 helper 位于二进制同级的 `notifications/windows-notify-icon.ps1`，不要单独搬走可执行文件；实际 PowerShell 命令仍来自显式可信配置。Linux 原 Python helper 嵌入 Go，目标机须有选定的 Python（缺省 `/usr/bin/python3`）。macOS 继续要求显式配置已签名 `GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications`，候选不自动构建、签名、安装或选择 App。复制资源不启用通知，也不证明目标平台通知已验收。包内 `native-v2.json` 的资源归属及 root `go-core-artifact.json` 文件摘要对应实际候选；两者均保留开发候选状态，`migrationComplete:false`。
+Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独立 Native 候选和 core 内的 `native/` 使用相同布局。Windows 原 helper 位于二进制同级的 `notifications/windows-notify-icon.ps1`，不要单独搬走可执行文件；实际 PowerShell 命令仍来自显式可信配置。Linux 原 Python helper 嵌入 Go，目标机须有选定的 Python（缺省 `/usr/bin/python3`）。macOS 继续要求显式配置已签名 `GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications`，候选不自动构建、签名、安装或选择 App。复制资源不启用通知，也不证明目标平台通知已验收。包内 `native-v2.json` 的资源归属及 root `go-core-artifact.json` 文件摘要对应实际候选；Native 子包仍如实保留其本机平台验收状态，root manifest 也不从构建推断 `migrationComplete:true`。
 
 ## AI Agent 部署核对
 
-先发现选定候选清单、目标平台、原配置引用和数据库角色，核对实际文件 SHA-256，再安排隔离启动与实际入口检查。构建成功只证明编译和资源打包完成，不证明配置有效、专业组件在线、平台功能、业务迁移或生产就绪。正式安装器、旧部署器迁出及 Hub 公开发行许可仍待后续统一处理；本包没有授予未公开服务代码的新许可。实际 Go 依赖许可文本位于 `third-party-licenses/`，缺失项在清单中明确记录。
+沿选定 Go manifest 的 pin、目标平台、原配置引用和数据库角色运行。构建完成只说明编译和资源打包完成；平台、专业组件、业务接续和激活结果以实际运行观察为准。发生未知结果继续核对原操作，不重发旧工作。银河自有代码统一采用 Apache-2.0；产物根目录的 `LICENSE` 和 `NOTICE` 从源码根目录逐字节复制并纳入文件 inventory。构建观察单列在 `BUILD_INFO.txt`，不会覆盖项目 `NOTICE`。第三方继续遵循各自原许可证；实际 Go 依赖许可文本位于 `third-party-licenses/`，缺失项在清单中明确记录。

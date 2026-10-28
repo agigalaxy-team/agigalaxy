@@ -15,9 +15,13 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/publication"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimeconfig"
 )
 
 func run(ctx context.Context) error {
+	if _, err := runtimeconfig.RuntimeServiceRelease(os.Getenv, "publisher", ""); err != nil {
+		return err
+	}
 	if os.Geteuid() == 0 {
 		return fault.New("non_root_runtime_required", 400)
 	}

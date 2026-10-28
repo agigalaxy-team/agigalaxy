@@ -1,4 +1,4 @@
-"""Focused offline tests for canonical public publishing boundaries."""
+"""Focused offline tests for canonical main-repository reading exports."""
 import json
 import posixpath
 from pathlib import Path
@@ -15,15 +15,15 @@ import sync_public_docs as public
 class PublicDocsToolsTests(unittest.TestCase):
     def test_explicit_sources_and_all_published_links(self):
         files, entries = public.plan()
-        self.assertEqual(len(files), len(entries) + 2)
+        self.assertEqual(len(files), len(entries))
         self.assertEqual({x['source'] for x in entries if x['source'].startswith('docs/assets/')}, public.ASSETS)
         for item in entries:
-            self.assertTrue(item['source'].startswith('docs/public/') or item['source'] in public.ASSETS)
+            self.assertTrue(item['source'].startswith('docs/public/') or item['source'] in public.ASSETS or item['source'] in public.CANONICAL)
             self.assertFalse(item['source'].startswith('docs/public/docs/'))
             self.assertNotIn('originals', Path(item['source']).parts)
         public.validate_links(files)
-        self.assertIn(b'development-candidate', files['docs/native-client/0.1.19/installation.md'])
-        self.assertIn('0.1.16'.encode(), files['docs/native-client/0.1.16/installation.md'])
+        self.assertIn(b'development-candidate', files['docs/public/native-client/0.1.19/installation.md'])
+        self.assertIn('0.1.16'.encode(), files['docs/public/native-client/0.1.16/installation.md'])
         self.assertNotIn(b'07-logs/', b'\n'.join(files.values()))
         references = set()
         for name, body in files.items():
@@ -76,10 +76,19 @@ class PublicDocsToolsTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     public.plan(root)
 
-    def test_missing_relative_link_fails_closed(self):
-        with self.assertRaisesRegex(ValueError, 'Unpublished'):
-            public.rewrite_links('[internal](../../originals/discussion.md)',
-                                 'docs/public/a.md', 'docs/a.md', {})
+    def test_nonexported_links_return_to_canonical_repository(self):
+        value = public.rewrite_links('[development](../technical/development.md)',
+                                     'docs/public/a.md', 'docs/public/a.md', {})
+        self.assertEqual(value, '[development](' + public.REPOSITORY + 'docs/technical/development.md)')
+
+    def test_reader_export_has_no_mirror_or_llms_layout(self):
+        import build_reader_bundle as reader
+        files, _ = public.plan()
+        manifest = json.loads((ROOT / public.MANIFEST).read_text(encoding='utf-8'))
+        result = reader.reader_outputs(files, manifest['readerDocuments'])
+        self.assertEqual(set(result), {'reader-index.md', 'reader-bundle.md'})
+        self.assertNotIn(b'agigalaxy-public', b''.join(result.values()))
+        self.assertIn(b'/agigalaxy/main/README.md', result['reader-index.md'])
 
     def test_atomic_failure_cleans_temporary_file(self):
         with tempfile.TemporaryDirectory() as tmp:

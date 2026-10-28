@@ -97,10 +97,10 @@ Install and build only the components needed for the task. The [development guid
 
 Local identities, online accounts, private work and public content have distinct scopes. Uploading, publishing and authorized reading are separate choices. Private-chat governance material is excluded from interest profiles and recommendations. Model responses, tool completion and business results are also separate. See [data and privacy](docs/public/privacy.md).
 
-There is no single root open-source license for the whole repository. Selected Native-owned release components use Apache-2.0; third-party dependencies retain their licenses. Client licensing does not extend to the whole source tree or user content. See [RIGHTS](RIGHTS.md) and [source and licensing](docs/technical/source-and-licensing.md).
+Galaxy-authored code is licensed under **Apache-2.0**; see the root [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party dependencies, upstream-derived material and external assets retain their original licenses. The software grant does not automatically license user content, private data or trademarks. Existing signed Native packages retain the notices shipped with their exact versions. See [RIGHTS](RIGHTS.md) and [source and licensing](docs/technical/source-and-licensing.md).
 
 - [Documentation](docs/README.md) and [public user guides](docs/public/README.md).
 - [Development guidance](AGENTS.md), [current work](WORK_STATUS.md) and [original materials](originals/README.md).
-- [Contributing](CONTRIBUTING.md), [support](docs/public/site-files/SUPPORT.md) and [public feedback](https://github.com/agigalaxy-team/agigalaxy-public/issues).
+- [Contributing](CONTRIBUTING.md), [support](docs/public/site-files/SUPPORT.md) and [public feedback](https://github.com/agigalaxy-team/agigalaxy/issues).
 
-Public materials are published from explicit sources under `docs/public/`. Repository homepages retain useful introductions, diagrams, capabilities and entry points; topic documents provide detail. Do not include credentials, private conversations or unpublished projects in public feedback.
+This public source repository is the sole maintained repository. Root introductions, rights and contribution guidance are canonical; user-facing topics live under `docs/public/`, without a second introduction repository. Repository homepages retain useful introductions, diagrams, capabilities and entry points; topic documents provide detail. Do not include credentials, private conversations or unpublished projects in public feedback.

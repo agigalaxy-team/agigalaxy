@@ -1,16 +1,17 @@
-# Candidate example only; do not install/start without approved configuration.
+# Substitute the immutable release path and existing process identity/env.
+# Retain the installed unit's actual LoadCredential and filesystem grants.
 [Unit]
-Description=Galaxy Go information-worker candidate
+Description=Galaxy Go information-worker
 After=network.target
 
 [Service]
 Type=simple
 User=galaxy
 Group=galaxy
-WorkingDirectory=/opt/galaxy/go-candidate
+WorkingDirectory=/opt/galaxy
 EnvironmentFile=/etc/galaxy/information-worker.env
 Environment=GALAXY_RUNTIME_LOG_INSTANCE=information
-ExecStart=/opt/galaxy/go-candidate/galaxy-information-worker
+ExecStart=/opt/galaxy/releases/go-REPLACE_VERSION/galaxy-information-worker
 KillSignal=SIGTERM
 TimeoutStopSec=60
 Restart=no

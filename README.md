@@ -9,7 +9,7 @@
   <a href="https://agigalaxy.org/app/">进入银河</a> ·
   <a href="https://agigalaxy.org/downloads/">客户端下载</a> ·
   <a href="docs/README.md">文档</a> ·
-  <a href="https://github.com/agigalaxy-team/agigalaxy-public">公开介绍</a> ·
+  <a href="https://github.com/agigalaxy-team/agigalaxy">源码与讨论</a> ·
   <a href="README.en.md">English</a>
 </p>
 
@@ -130,7 +130,7 @@ Hub 使用独立 Go 构建与运行入口：`npm run build:hub -- --output <绝�
 
 深层语义发现、持续机会推送、多 Hub 生态与完整社区激励等方向按各自实际交付推进；不要将介绍中的目标直接视为已上线能力。当前公开范围见[状态说明](docs/public/status.md)，工程未完项集中在 [WORK_STATUS](WORK_STATUS.md)。
 
-本仓库整体没有统一的根开源许可证。选定 Native 自有发行组件采用 Apache-2.0，第三方依赖保留各自许可；客户端的许可不自动扩大到整个仓库或用户内容。详见 [RIGHTS](RIGHTS.md) 和[源码与许可](docs/technical/source-and-licensing.md)。
+银河自有代码统一采用 **Apache-2.0**，见根 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。第三方依赖、上游派生材料与外部资产保留原许可；用户内容、私人资料与商标不因软件许可自动开放。历史已签名 Native 包保留各自准确版本的原许可材料。范围见 [RIGHTS](RIGHTS.md) 和[源码与许可](docs/technical/source-and-licensing.md)。
 
 ## 文档与参与
 
@@ -140,7 +140,7 @@ Hub 使用独立 Go 构建与运行入口：`npm run build:hub -- --output <绝�
 | 客户端、宿主与安装 | [客户端入门](docs/public/client-entry.md) · [本机开发](docs/technical/native-client.md) |
 | 开发、接口与 AI 运行 | [开发方法](AGENTS.md) · [开发指南](docs/technical/development.md) · [接口](docs/technical/interfaces.md) · [AI 运行](docs/technical/agent-runtime.md) |
 | 部署与维护 | [部署](docs/operations/deployment.md) · [观测](docs/operations/observability.md) · [恢复](docs/operations/recovery.md) |
-| 参与与反馈 | [贡献说明](CONTRIBUTING.md) · [帮助与反馈](docs/public/site-files/SUPPORT.md) · [公开 Issues](https://github.com/agigalaxy-team/agigalaxy-public/issues) |
+| 参与与反馈 | [贡献说明](CONTRIBUTING.md) · [帮助与反馈](docs/public/site-files/SUPPORT.md) · [公开 Issues](https://github.com/agigalaxy-team/agigalaxy/issues) |
 | 原始意图与当前工作 | [原始资料](originals/README.md) · [当前状态](WORK_STATUS.md) |
 
-主源码仓库维护现行文档，公开仓库从 `docs/public/` 的明确来源发布。项目首页保留介绍、功能、图示和使用入口；专题文档展开细节，源码仓库补充开发与部署。公开反馈请勿附带私人会话、凭据或未公开项目资料。
+本公开主源码仓库是唯一维护来源；根首页、权利与贡献说明不再复制到独立介绍仓库，`docs/public/` 维护面向使用者的专题。项目首页保留介绍、功能、图示和使用入口；专题文档展开细节，源码仓库补充开发与部署。公开反馈请勿附带私人会话、凭据或未公开项目资料。

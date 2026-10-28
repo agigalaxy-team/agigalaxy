@@ -2,4 +2,5 @@
 
 Start with AGENTS.md and docs/README.md. Current work is in WORK_STATUS.md.
 Read relevant topics for the task; originals are consulted only when provenance is needed.
-Public reading bundles are generated from docs/public by tools/build_reader_bundle.py.
+Public documentation and open-source information: docs/public/README.md and docs/technical/source-and-licensing.md.
+AI reading entry: docs/public/ai-reading.md. This source repository is the canonical public repository; no separate public mirror is maintained.

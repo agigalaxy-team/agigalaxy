@@ -21,4 +21,4 @@
 
 0.1.16 与 0.1.19 指南分别保留准确版本；技术核对说明中的 2026-10-21 观察及网站截图的采集日期也保留原范围。不能把旧许可核对、历史截图或旧检查简单改成新版本的验收。
 
-发现资料与实际行为不一致时，在[公开 Issues](https://github.com/agigalaxy-team/agigalaxy-public/issues)提供准确页面、版本、宿主、观察时间和可公开的最小复现。资料保护见[帮助与反馈](site-files/SUPPORT.md)。
+发现资料与实际行为不一致时，在[公开 Issues](https://github.com/agigalaxy-team/agigalaxy/issues)提供准确页面、版本、宿主、观察时间和可公开的最小复现。资料保护见[帮助与反馈](site-files/SUPPORT.md)。

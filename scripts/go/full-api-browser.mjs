@@ -19,9 +19,10 @@ assert.equal(cms.protocol,'postgres:');assert.equal(cms.hostname,'127.0.0.1');as
 for(const [origin,hostname] of [[website,'web.galaxy.localhost'],[admin,'admin.galaxy.localhost'],[endpoint,'api.galaxy.localhost']]){assert.equal(origin.protocol,'https:');assert.equal(origin.hostname,hostname);assert.equal(Number(origin.port||443),d.proxyPort);}
 assert.equal(new Set([website.host,admin.host,endpoint.host]).size,3);
 assert(d.browserScope===undefined||d.browserScope==='admin');const adminOnly=d.browserScope==='admin';
+const adminMode=d.adminMode??process.env.GALAXY_GO_BROWSER_ADMIN_MODE??'standalone';assert(['standalone','development'].includes(adminMode));const adminDevelopment=adminMode==='development';
 assert(d.expiresAt>Math.floor(Date.now()/1000));assert(d.feedbackId);if(!adminOnly){assert.equal(d.forum.published,false);assert.equal(d.chat.messageDeliverySeeded,false);}
 const directory=await mkdtemp(join(tmpdir(),'galaxy-full-api-browser-')),children=[],logs=[],ownedProcesses=[];
-let proxy,browser;const pages=[],errors=[],consoleErrors=[],chatFailures=[],pageFailures=new Map();
+let proxy,browser,hmrUpgrades=0;const pages=[],errors=[],consoleErrors=[],chatFailures=[],pageFailures=new Map(),upgradeSockets=new Set();
 const diagnosticText=value=>String(value).replace(/https?:\/\/[^\s"'<>]+/g,text=>{try{const url=new URL(text);return url.origin+url.pathname;}catch{return '[url]';}});
 function observePage(page){
  const failures=[];pageFailures.set(page,failures);
@@ -51,16 +52,18 @@ try{
  else await stat(join(root,'apps/galaxy-site/.next/standalone/apps/galaxy-site/server.js'));
  const site=await launch('website',siteRuntime?[join(siteRuntime,'start.mjs')]:[join(root,'scripts/web-runtime.mjs'),'start'],siteRuntime??root,{...common,PORT:String(sitePort),GALAXY_PREVIEW_PORT:String(sitePort),GALAXY_SITE_HOST:'127.0.0.1',...(d.siteBaselineRoot?{GALAXY_SITE_BASELINE_ROOT:resolve(d.siteBaselineRoot)}:{})},sitePort);
  const adminApp=join(root,'apps/galaxy-admin');
- const adminStandalone=join(adminApp,'.next/standalone/apps/galaxy-admin');await stat(join(adminStandalone,'server.js'));
+ const adminStandalone=join(adminApp,'.next/standalone/apps/galaxy-admin');if(!adminDevelopment)await stat(join(adminStandalone,'server.js'));
  const adminEnv={NODE_ENV:'production',GALAXY_ADMIN_PUBLIC_ORIGIN:admin.origin,GALAXY_ADMIN_BFF_ORIGIN:api.origin,GALAXY_CMS_DATABASE_URL:cms.href,GALAXY_CMS_SECRET:randomBytes(32).toString('hex'),GALAXY_CMS_DEV_PUSH:'false'};
  // Only the already asserted disposable literal-loopback CMS database is
  // migrated, through the original migration command and existing migrations.
  const migration=await launch('cms-migrate',[join(adminApp,'node_modules/payload/bin.js'),'migrate'],adminApp,adminEnv,null);
  const migrationCode=await new Promise((yes,no)=>{if(migration.exitCode!==null){yes(migration.exitCode);return;}migration.once('error',no);migration.once('exit',code=>yes(code));});
  assert.equal(migrationCode,0,'isolated CMS migration failed; inspect '+join(directory,'cms-migrate.log'));
- await mkdir(join(adminStandalone,'.next'),{recursive:true});await cp(join(adminApp,'.next/static'),join(adminStandalone,'.next/static'),{recursive:true});
- try{await stat(join(adminApp,'public'));await cp(join(adminApp,'public'),join(adminStandalone,'public'),{recursive:true});}catch(error){if(error.code!=='ENOENT')throw error;}
- const manager=await launch('admin',[join(adminStandalone,'server.js')],adminStandalone,{...adminEnv,HOSTNAME:'127.0.0.1',PORT:String(adminPort)},adminPort);
+ if(!adminDevelopment){
+  await mkdir(join(adminStandalone,'.next'),{recursive:true});await cp(join(adminApp,'.next/static'),join(adminStandalone,'.next/static'),{recursive:true});
+  try{await stat(join(adminApp,'public'));await cp(join(adminApp,'public'),join(adminStandalone,'public'),{recursive:true});}catch(error){if(error.code!=='ENOENT')throw error;}
+ }
+ const manager=await launch('admin',adminDevelopment?[join(adminApp,'node_modules/next/dist/bin/next'),'dev','--hostname','127.0.0.1','--port',String(adminPort)]:[join(adminStandalone,'server.js')],adminDevelopment?adminApp:adminStandalone,{...adminEnv,NODE_ENV:adminDevelopment?'development':'production',HOSTNAME:'127.0.0.1',PORT:String(adminPort)},adminPort);
  await Promise.all([ready(sitePort,'/',site),ready(adminPort,'/admin/login',manager)]);
  const upstream=new Map([[website.host,new URL('http://127.0.0.1:'+sitePort)],[admin.host,new URL('http://127.0.0.1:'+adminPort)],[endpoint.host,api]]);
  const proxyCertificate=await readFile(temporary(d.tlsCert));
@@ -73,6 +76,22 @@ try{
   // Pipe immediately, without buffering or SSE timeouts. Client disconnect
   // closes its upstream request instead of keeping an orphan event listener.
   forwarded.on('error',()=>{if(!response.headersSent)response.writeHead(502);response.end();});response.on('close',()=>forwarded.destroy());request.pipe(forwarded);
+ });
+ // Next 16 development's React debug stream is carried by the HMR socket,
+ // not only its visual refresh overlay. Standard Next dev serves this upgrade
+ // itself; the disposable HTTPS edge must preserve that same transport.
+ proxy.on('upgrade',(request,socket,head)=>{
+  const path=new URL(request.url,admin.origin).pathname;
+  if(!adminDevelopment||request.headers.host!==admin.host||request.headers.origin!==admin.origin||request.method!=='GET'||path!=='/_next/hmr'||request.headers.upgrade?.toLowerCase()!=='websocket'){socket.destroy();return;}
+  const forwarded=httpRequest({hostname:'127.0.0.1',port:adminPort,path:request.url,method:'GET',headers:{...request.headers,'x-forwarded-host':admin.host,'x-forwarded-proto':'https','x-forwarded-for':request.socket.remoteAddress}});
+  forwarded.once('upgrade',(response,upstreamSocket,upstreamHead)=>{
+   if(response.statusCode!==101){socket.destroy();upstreamSocket.destroy();return;}
+   hmrUpgrades++;upgradeSockets.add(socket);upgradeSockets.add(upstreamSocket);
+   const close=()=>{upgradeSockets.delete(socket);upgradeSockets.delete(upstreamSocket);socket.destroy();upstreamSocket.destroy();};socket.once('error',close);upstreamSocket.once('error',close);socket.once('close',close);upstreamSocket.once('close',close);
+   socket.write('HTTP/1.1 101 Switching Protocols\r\n'+response.rawHeaders.reduce((lines,value,index)=>lines+(index%2?value+'\r\n':value+': '),'')+'\r\n');
+   if(upstreamHead.length)socket.write(upstreamHead);if(head.length)upstreamSocket.write(head);socket.pipe(upstreamSocket).pipe(socket);
+  });
+  forwarded.once('response',response=>{response.resume();socket.destroy();});forwarded.once('error',()=>socket.destroy());socket.once('close',()=>forwarded.destroy());forwarded.end();
  });
  // Preserve handshake failures before any HTTP/Next request exists; never
  // log certificate/key bodies or session headers.
@@ -114,7 +133,8 @@ try{
  const editor=operations.locator('section.galaxy-feedback-editor'),status=editor.getByRole('combobox',{name:/^处理状态/});
  await status.selectOption('processing');await editor.getByRole('textbox').fill('完整 Go API 网页联检：保留原提交与处理记录。');await editor.getByRole('button',{name:'保存处理',exact:true}).click();await operations.getByText('处理已保存。',{exact:true}).waitFor({timeout:20000});
  await operations.goto(admin.origin+'/admin/operations/feedback?days=all',{waitUntil:'domcontentloaded'});await operations.goto(feedbackURL,{waitUntil:'domcontentloaded'});await status.waitFor();await operations.waitForFunction(()=>document.querySelector('.galaxy-feedback-editor-fields > label:nth-child(3) select')?.value==='processing',{},{timeout:20000});assert.equal(await status.inputValue(),'processing');
- assert.deepEqual(errors,[]);console.log(JSON.stringify({browserScope:adminOnly?'admin':'full',independentHeadless:true,fullGoAPI:true,actualNextPayload:true,publicRead:!adminOnly,forumPublishedAndRead:!adminOnly,chatTransportUnavailable:!adminOnly,chatDraftRestored:!adminOnly,feedbackSavedAndReturned:true}));
+ if(adminDevelopment)assert(hmrUpgrades>0,'actual Next development HMR upgrade required');
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({browserScope:adminOnly?'admin':'full',adminMode:adminDevelopment?'development':'standalone',developmentHMRConnected:adminDevelopment&&hmrUpgrades>0,independentHeadless:true,fullGoAPI:true,actualNextPayload:true,publicRead:!adminOnly,forumPublishedAndRead:!adminOnly,chatTransportUnavailable:!adminOnly,chatDraftRestored:!adminOnly,feedbackSavedAndReturned:true}));
 }catch(error){
  // Do not print the descriptor, cookies or CSRF material. Keep real runtime
  // diagnostics in the disposable fixture directory for the parent failure.
@@ -136,6 +156,7 @@ try{
  console.error('Full API browser cohort failed; Next logs: '+directory);throw error;
 }finally{
  await browser?.close();
+ for(const socket of upgradeSockets)socket.destroy();
  if(proxy){proxy.closeAllConnections();await new Promise(yes=>proxy.close(yes));}
  for(const child of children.reverse())if(child.exitCode===null&&child.signalCode===null){
   if(process.platform==='win32'){

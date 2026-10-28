@@ -6,6 +6,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimeconfig"
 )
 
 type ProcessConfiguration struct {
@@ -18,6 +19,9 @@ type ProcessConfiguration struct {
 func Load(getenv func(string) string) (ProcessConfiguration, error) {
 	if getenv == nil {
 		getenv = os.Getenv
+	}
+	if _, e := runtimeconfig.RuntimeServiceRelease(getenv, "information-worker", ""); e != nil {
+		return ProcessConfiguration{}, e
 	}
 	c := ProcessConfiguration{SourceDatabaseURL: getenv("GALAXY_INFORMATION_SOURCE_DATABASE_URL"), TransportDatabaseURL: getenv("GALAXY_INFORMATION_TRANSPORT_DATABASE_URL")}
 	c.Sources = SourceConfiguration{

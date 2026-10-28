@@ -29,7 +29,7 @@
 | 备份、恢复与生产恢复边界 | [恢复](operations/recovery.md) |
 | 维护代理、原生权限与组件恢复适配 | [恢复适配](operations/recovery-adapters.md) |
 | 对外介绍、用户指南与版本材料 | [公开正文](public/README.md) |
-| 生成公开仓库与可选阅读包 | [公开发布工具](public/PUBLISHING.md) |
+| 公开文档与可选阅读包 | [公开文档维护](public/PUBLISHING.md) |
 | 核对原始架构、用户原话与讨论 | [原始资料](../originals/README.md) |
 
 相同规则在所属正文解释一次，其他主题只补自己的条件与直接引用。机器消费的准确资源随相应技术目录保存，具体字段由相关代码和schema定义。

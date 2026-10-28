@@ -1,4 +1,4 @@
-"""Local-only publisher. Reads explicit public sources; never traverses docs or uploads."""
+"""Export an optional local reading snapshot from the public main repository; never uploads."""
 import argparse
 import json
 import os
@@ -13,7 +13,9 @@ MANIFEST = 'docs/public/publish-manifest.json'
 ASSETS = frozenset('docs/assets/' + name for name in (
     'client-entry.svg', 'community-value.svg', 'galaxy-mark.png',
     'hub-topology.svg', 'network-functions.svg', 'website-home.jpg'))
-GENERATED = frozenset(('llms.txt', 'llms-full.txt'))
+CANONICAL = frozenset(('README.md', 'README.en.md', 'RIGHTS.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE',
+                       'docs/technical/source-and-licensing.md'))
+REPOSITORY = 'https://github.com/agigalaxy-team/agigalaxy/blob/main/'
 LINK = re.compile(r'''(?P<start>\]\(|\b(?:src|href)=["'])(?P<url>[^\s)"']+)(?P<end>\)|["'])''')
 
 
@@ -53,7 +55,8 @@ def rewrite_links(text, source, target, reverse):
         resolved = posixpath.normpath(posixpath.join(posixpath.dirname(source), unquote(parsed.path)))
         destination = reverse.get(resolved)
         if destination is None:
-            raise ValueError(f'Unpublished local link in {source}: {url}')
+            relative(resolved)
+            return match['start'] + REPOSITORY + resolved + (('#' + parsed.fragment) if parsed.fragment else '') + match['end']
         path = posixpath.relpath(destination, posixpath.dirname(target) or '.')
         suffix = ('?' + parsed.query if parsed.query else '') + ('#' + parsed.fragment if parsed.fragment else '')
         return match['start'] + path + suffix + match['end']
@@ -74,19 +77,19 @@ def validate_links(files):
 
 def plan(root=ROOT):
     manifest = json.loads(contained(root, MANIFEST).read_text(encoding='utf-8'))
-    if manifest['schemaVersion'] != 1:
+    if manifest['schemaVersion'] != 2:
         raise ValueError('Unknown public manifest')
     entries = manifest['files']
-    reverse = {'docs/public/' + name: name for name in GENERATED}
+    reverse = {}
     targets = set()
     for item in entries:
         source, target = item['source'], item['target']
         relative(source); relative(target)
-        if not (source.startswith('docs/public/') or source in ASSETS):
+        if not (source.startswith('docs/public/') or source in ASSETS or source in CANONICAL):
             raise ValueError('Source outside public allowlist: ' + source)
         if any(part in ('originals', 'internal', 'product', 'reference') for part in PurePosixPath(source).parts):
             raise ValueError('Internal materials cannot be published: ' + source)
-        if target in targets or source in reverse or target in GENERATED:
+        if target in targets or source in reverse or source != target:
             raise ValueError('Duplicate or reserved public mapping')
         if source in ASSETS and target != source:
             raise ValueError('Asset destination changed')
@@ -99,12 +102,10 @@ def plan(root=ROOT):
         content = path.read_bytes()
         if path.suffix == '.md':
             text = content.decode('utf-8')
-            if re.search(r'(?:[A-Z]:[\\/]+Users[\\/]|/Users/|/home/|02-architecture/|07-logs/|originals/)', text):
+            if re.search(r'(?:[A-Z]:[\\/]+Users[\\/]|/Users/|/home/)', text):
                 raise ValueError('Private path in public content: ' + source)
             content = rewrite_links(text, source, target, reverse).encode('utf-8')
         files[target] = content
-    from build_reader_bundle import reader_outputs
-    files.update(reader_outputs(files, manifest['readerDocuments']))
     validate_links(files)
     return files, entries
 
@@ -115,7 +116,7 @@ def apply_plan(output, files, dry_run=False, check=False):
         raise ValueError('Output root cannot be linked')
     resolved = output.resolve()
     if resolved == ROOT or resolved in ROOT.parents or resolved.is_relative_to(ROOT):
-        raise ValueError('Output must be outside the source repository')
+        raise ValueError('Optional export must be outside the source repository')
     changed = []
     for name, data in sorted(files.items()):
         target = contained(output, name)
