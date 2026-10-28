@@ -9,9 +9,20 @@ import (
 // WorkbenchSummaryWithAuthority preserves the query's current human × fixed-AI
 // authority. It creates a read facade without copying mutexes or worker state.
 func (s *Service) WorkbenchSummaryWithAuthority(ctx context.Context, a Actor, authority permissions.Authority) (Object, error) {
-	accept, ok := authority.(interface{ AcceptsQuery(Actor) bool })
-	if !ok || !accept.AcceptsQuery(a) {
+	// HTTP workbench uses the same composition as the other business readers.
+	// Its human authority rechecks the real session in Overview's transactions;
+	// this facade must not turn a duty/executor half into a human reader.
+	if combined, ok := authority.(*permissions.BusinessAuthority); ok {
+		authority = combined.Human
+	}
+	if authority == nil || s.AcceptsDuty(a) {
 		return nil, fault.New("business_admin_denied", 403)
+	}
+	if a.AIProof != nil {
+		accept, ok := authority.(interface{ AcceptsQuery(Actor) bool })
+		if !ok || !accept.AcceptsQuery(a) {
+			return nil, fault.New("business_admin_denied", 403)
+		}
 	}
 	reader := &Service{Pool: s.Pool, Endpoint: s.Endpoint, Authority: authority, AIWork: s.AIWork, Now: s.Now, QualifyTargetWithin: s.QualifyTargetWithin, CurrentPublicSourceWithin: s.CurrentPublicSourceWithin, RuntimeStatus: s.RuntimeStatus, ReadTargetWithin: s.ReadTargetWithin, Native: s.Native, Permissions: s.Permissions, WorkbenchRunDetail: s.WorkbenchRunDetail}
 	s.defaultsMu.RLock()
