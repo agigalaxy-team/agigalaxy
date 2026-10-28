@@ -15,6 +15,7 @@
 | 规则、AI、人工、策略与自动运行 | [后台自动运行](product/admin-automation.md) |
 | 公告、站内信、系统邮件与官方身份 | [官方消息](product/messaging.md) |
 | 运行组件、数据所有者与真实依赖 | [技术架构](technical/architecture.md) |
+| 服务器与本机 Go 核心重构实施 | [Go 实施计划](technical/go-core-plan.md) |
 | 环境、工具链、局部构建与必要检查 | [开发](technical/development.md) |
 | HTTP、权限、原操作与配置采用 | [接口](technical/interfaces.md) |
 | Agno、Gateway、任务与工具运行约定 | [AI运行工程](technical/agent-runtime.md) |
