@@ -39,7 +39,7 @@ Information 的环境变量名见 `information-worker.env.example`，只复用�
 
 普通 Worker 和 Information Worker 都使用 runtime log 的 `worker` component，必须用不同 `GALAXY_RUNTIME_LOG_INSTANCE`。样例分别固定为 `primary` 与 `information`，避免共写同一轮转文件。修改实例名时同时核对路径，不能给两个进程相同实例。SIGTERM 由各命令原停止流程接收，Information 停止会收尾队列、源政策刷新和 Chat transport。
 
-当前部署实例（2026-10-28 实机读取）为 Linux x86_64：API 是 `galaxy-api@pilot.service`，沿 `galaxy-api-pilot` 用户/group 和 `/etc/galaxy/pilot/api.env`、`api-workflow-release.env`；Worker 是 `galaxy-worker@pilot.service`，沿 `galaxy-worker-pilot` 与 `/etc/galaxy/pilot/worker.env`；Publisher 是 `galaxy-content-publisher-pilot.service`，沿 `galaxy-content-publisher-pilot` 用户、`galaxy-site-public` group 及 `galaxy-content-publisher-pilot`、`galaxy-site-publisher`、`galaxy-cms-media-readers` supplementary groups，环境文件为 `/etc/galaxy/operations-pilot/publisher/publisher.env`。三者已有 systemd credentials。选定 Go 目录使用 `/opt/galaxy/releases/go-<version>`，工作目录保留 `/opt/galaxy`；这只是当前实例，不是以后部署的固定命名规则。Information Worker 当前没有独立 unit，应分别配置已有 API 源读取账户和 Worker 传输账户，不能因此扩大旧数据库角色。Next 网站、后台 Next/Payload 及专业组件保持独立进程和入口。
+当前部署实例（2026-10-28 实机读取）为 Linux x86_64：API 是 `galaxy-api@pilot.service`，沿 `galaxy-api-pilot` 用户/group 和 `/etc/galaxy/pilot/api.env`、`api-workflow-release.env`；Worker 是 `galaxy-worker@pilot.service`，沿 `galaxy-worker-pilot` 与 `/etc/galaxy/pilot/worker.env`；Publisher 是 `galaxy-content-publisher-pilot.service`，沿 `galaxy-content-publisher-pilot` 用户、`galaxy-site-public` group 及 `galaxy-content-publisher-pilot`、`galaxy-site-publisher`、`galaxy-cms-media-readers` supplementary groups，环境文件为 `/etc/galaxy/operations-pilot/publisher/publisher.env`。三者已有 systemd credentials。选定 Go 目录使用 `/opt/galaxy/releases/go-<version>`，工作目录保留 `/opt/galaxy`；这只是当前实例，不是以后部署的固定命名规则。Information Worker 已作为 `galaxy-information-worker-pilot.service` 独立运行，使用专属 Unix 用户及现有 API／Worker 数据库账户的受限基础角色，配置为 `/etc/galaxy/pilot/go-information.env`；不加载 API 签名私钥或门户 Cookie。Go 的最后生效覆盖文件为各角色的 `go-*.env`，旧发行环境不会盖过该配置。Next 网站、后台 Next/Payload 及专业组件保持独立进程和入口。
 
 ## 显式维护入口
 
@@ -56,7 +56,6 @@ Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独�
 ## AI Agent 部署核对
 
 沿选定 Go manifest 的 pin、目标平台、原配置引用和数据库角色运行。构建完成只说明编译和资源打包完成；平台、专业组件、业务接续和激活结果以实际运行观察为准。发生未知结果继续核对原操作，不重发旧工作。银河自有代码统一采用 Apache-2.0；产物根目录的 `LICENSE` 和 `NOTICE` 从源码根目录逐字节复制并纳入文件 inventory。构建观察单列在 `BUILD_INFO.txt`，不会覆盖项目 `NOTICE`。第三方继续遵循各自原许可证；实际 Go 依赖许可文本位于 `third-party-licenses/`，缺失项在清单中明确记录。
-
 
 ## 独立 Information Worker 的 Prosody 接线
 
