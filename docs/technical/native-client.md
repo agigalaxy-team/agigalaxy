@@ -1,30 +1,27 @@
 # Native 客户端与宿主工程
 
-共享 Native 是用户机器上的 v2 stdio 客户端，HTTP 调用所选服务；模型调用使用宿主配置。v2 是协议标识，发行版本从包 `package.json` 与 `native-v2.json.releaseId` 读取。旧 local-only MCP 和冻结旧包保持其原行为，源码更新不改变已签名包。公共授权/原操作规则见[接口](interfaces.md#管理身份与原操作)，本文只列Native持久状态和宿主机制。
+共享 Native 是用户机器上的 v2 stdio 客户端。当前 Go 开发候选使用目标平台的 `galaxy`（Windows 为 `galaxy.exe`）承接本机核心和所选服务的 HTTP 调用；OpenCode TUI、宿主插件 SDK 和 MCP Apps 界面保留平台代码，模型调用仍使用用户宿主配置。v2 是协议标识，发行版本读取包清单的 `releaseId`，不能据协议名推断版本或验收范围。旧已签名发行包保持其原字节和启动方式；本地候选没有自动替换正式安装。构建与运行边界见 [Go 核心](../../go/README.md)、[Go 候选运行样例](../../go/deploy/README.md)和[实施计划](go-core-plan.md)。公共授权/原操作规则见[接口](interfaces.md#管理身份与原操作)。
 
 ## 安装、配置与发行
 
-已发行包需要 Node.js22.13+，先用调用者固定的发行公钥验签，再进入解包的 `package`：
-
-```sh
-npm ci --ignore-scripts
-node setup.mjs <已选官网-origin>
-```
-
-setup 从所选官网 `galaxy-web-config.json` 读取真实 API 和 Ed25519 公钥；失败保留原资料，不猜另一服务。OpenCode 一次确认列出实际配置/资料位置、记录方式，保存独立运行包并合并银河 TUI/MCP/Skill，保留其他插件、项目和模型设置。已有身份/类型沿用；无身份时同次选择准备个人或明确组织身份。安装不注册账户、关联服务或开始上传。专业选项 `--host`、`--data-dir`、`--opencode-config-dir` 选真实宿主及绝对目录；只有自定义目录未被正常启动加载时用 `run-opencode.mjs`。
-
-直接 stdio 运行 `node galaxy.js`，`GALAXY_NATIVE_CONFIG` 指向公开配置绝对路径：`version:2`、精确 HTTPS `endpoint/website`、本机绝对 `dataDirectory`、`trustedKeys`（kid→publicKeyPem/notBefore/notAfter/revoked）。不放 token、私钥或恢复码。已知配置可用：
+服务版 Native 与无服务本机 Integration 是两个入口，不能互相替代：
 
 ```text
-node prepare-service-config.mjs <官网-origin> <API-origin> <本机资料绝对目录> <新配置绝对路径>
-node host-configs.mjs <公开配置绝对路径> <不存在的输出绝对目录>
+galaxy native --config <现有公开配置绝对路径>
+galaxy integration-mcp --data-dir <本机资料目录>
 ```
 
-前者不创建身份/目录/绑定、不跟重定向或覆盖原信任；后者只生成宿主配置和 Skill，不改用户配置。MCP command 取本机 Node，args 指独立包 `galaxy.js`，env 含配置路径。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
+`native` 读取服务配置，提供已接入的服务工具、连接与本人选择、宿主接续及本机能力。`integration-mcp` 不要求服务配置，只提供原本机 Integration 工具：初始化、Case Draft／Disclosure／Consent／Local Proof Draft、本机历史与原有本机资料管理等；不构造服务 Runtime、不连接服务或调用模型。它沿用 `--data-dir`、`GALAXY_DATA_DIR` 及默认用户 `.galaxy` 目录的选择次序。本机草稿不是云端 Evidence 或已验证履历；Consent 与 Proof 保留各自的原提交和状态。
+
+Go 候选中的 `setup`、`service-config`、`host-configs` 子命令分别承接原安装、公开配置准备与宿主配置生成。参数以 `galaxy --help` 和 [Go 核心说明](../../go/README.md)为准，不使用旧 Node 业务安装器来处理 Go 候选。`setup` 从所选官网 `galaxy-web-config.json` 读取真实 API 和 Ed25519 公钥；失败保留原资料，不猜另一服务。OpenCode 一次确认列出实际配置/资料位置、记录方式，保存独立运行包并合并银河 TUI/MCP/Skill，保留其他插件、项目和模型设置。已有身份/类型沿用；无身份时同次选择准备个人或明确组织身份。安装不注册账户、关联服务或开始上传。只有自定义目录未被正常启动加载时才使用包内原宿主启动薄适配。
+
+服务版公开配置仍为 `version:2`、精确 HTTPS `endpoint/website`、本机绝对 `dataDirectory`、`trustedKeys`（kid→publicKeyPem/notBefore/notAfter/revoked）；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不放 token、私钥或恢复码。配置准备不创建身份/绑定、不跟重定向或覆盖原信任；宿主生成只写选定输出，不自行修改用户配置。
+
+Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `native`，env 含公开配置路径。OpenCode 的 `opencode.js` 仅是宿主 UI／SDK 桥接，启动 Go MCP 子进程；录制和整理经独立 `galaxy host` 私有 JSONL 子进程保存原资料，该通道不是模型工具或网络服务。宿主事件取材及模型 SDK 调用留在宿主，不把观察方法开放给模型，也不偷偷改用服务器模型。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
 
 发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
 
-`scripts/build-native-v2.mjs`在新candidate内即时构建compact UI并捕获自有UI源摘要，不要求源码预存dist。OpenCode安装在搬移运行包时闭合复制当前已安装的依赖图，包括npm consumer提升至父node_modules的传递依赖，不在安装中联网补包。宿主验收launcher在准备前传入并核对独立profile；CLI发现、真实隔离TUI与物理桌面仍分开记录。
+`scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。宿主依赖在构建／搬移运行包时闭合，不在安装中联网补包。候选清单的目标平台与构建成功不表示真实宿主、系统提醒或对应操作系统已经验收，更不表示正式上线或用户已安装。宿主验收 launcher 在准备前传入并核对独立 profile；CLI 发现、真实隔离 TUI 与物理桌面仍分开记录。
 
 ## 宿主配置与能力
 
@@ -37,7 +34,7 @@ node host-configs.mjs <公开配置绝对路径> <不存在的输出绝对目录
 | Codex | 完整 galaxy-native-v2 插件，或 `config.fragment.toml`＋`.agents/skills/galaxy`，只启用一套 |
 | Cursor | `.cursor/mcp.json`、`.cursor/skills/galaxy`；Apps 显示、关闭重启须真宿主验证 |
 | WorkBuddy | connector-meta/mcp/icon/skills；元数据最低4.24.0，市场注册须独立确认 |
-| TRAE/TraeWork | 桌面本地 MCP 的 `mcp.local.json`、项目 `.trae/skills/galaxy`；command 不含空格，生成器用 `node`，须由宿主 PATH 解析到准确运行时 |
+| TRAE/TraeWork | 桌面本地 MCP 的 `mcp.local.json`、项目 `.trae/skills/galaxy`；Go 配置直接引用平台二进制，实际路径及该宿主对 command 空格的处理仍须宿主验收 |
 | Hermes | 合并 `config.fragment.yaml` 的 `mcp_servers.galaxy`、宿主 Skill 路径；不读取旧私人资料 |
 | DeepSeek Harness | 组合 `mcp-plugin.fragment.json`、项目 `.dsh/skills/galaxy`；复用原 registry/filesystem/consumer，浮窗和后台能力分别实现 |
 
@@ -45,7 +42,7 @@ OpenCode 的事件适配保存本地事实、有限片段和环境，自有模�
 
 Claude `watchHost` 只接受 `kind:claude-code` 与真实绝对 command/cwd，不接受附加参数、认证变量或已验证布尔值。`galaxy_watch_host_capabilities` 只查询版本/help，不建模型会话。缺有效配置证据时 `readerProfileDocumented` 可为真，`readerConfigurationConfirmed/effectiveManagedPolicyConfirmed/backgroundReaderSupported` 仍为假；activate 返回 foreground-fallback（如 `host_reader_configuration_unconfirmed`），不启动模型。原因是 managed settings 优先级及动态来源不能仅靠旗标/缺本机文件排除。前台 `galaxy_watch_check`/`ack` 更新 Agent 游标；reconcile 的 unknown 不等于原模型已停止。
 
-现有证据包括隔离 OpenCode 的实际 TUI 操作及 Codex/Claude CLI 工具发现；它们使用合成数据或有限发现范围，不能扩成八宿主、桌面 UI、真实模型与后台循环都已验收。
+既有证据包括隔离 OpenCode 的实际 TUI 操作及 Codex/Claude CLI 工具发现；它们使用合成数据或有限发现范围，且须保留其记录的版本／运行内核，不能自动归于当前 Go 候选，也不能扩成所有宿主、桌面 UI、真实模型与后台循环都已验收。
 
 ## 本机数据、同步与接续
 

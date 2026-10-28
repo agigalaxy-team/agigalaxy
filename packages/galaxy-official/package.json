@@ -8,10 +8,15 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "start": "node src/server.mjs",
-    "migrate": "node src/migrate.mjs",
+    "start": "node ../../scripts/hub-runtime.mjs api",
+    "migrate": "node ../../scripts/hub-runtime.mjs migrate",
     "test:postgres": "node scripts/test-postgres.mjs",
-    "test:caddy": "node --test test/proxy/caddy.test.mjs"
+    "test:caddy": "node --test test/proxy/caddy.test.mjs",
+    "worker": "node ../../scripts/hub-runtime.mjs worker",
+    "information-worker": "node ../../scripts/hub-runtime.mjs information-worker",
+    "publisher": "node ../../scripts/hub-runtime.mjs publisher",
+    "lifecycle": "node ../../scripts/hub-runtime.mjs lifecycle",
+    "build": "node ../../scripts/build-go-core.mjs --without-native"
   },
   "dependencies": {
     "@a2a-js/sdk": "1.1.0",

@@ -81,8 +81,15 @@ async function cli(){
  if(action==='list'){console.log(JSON.stringify(catalog,null,2));return;}
  if(action==='resources'){
   if(value('--component')!=='hub')throw Error('Runtime resource closure currently belongs to the Hub service family.');
+  const hub=catalog.components.find(c=>c.id==='hub');
+  if(Object.values(hub.entries).some(entry=>entry.startsWith('go/'))){
+   const artifact=value('--artifact');if(!artifact)throw Error('Go Hub resources are embedded or inventoried in its built artifact; pass --artifact DIRECTORY.');
+   const directory=resolve(artifact),manifest=JSON.parse(await readFile(join(directory,'go-core-artifact.json'),'utf8'));
+   if(manifest.kind!=='galaxy-go-core-local-candidate'||manifest.backend!=='go')throw Error('Expected a Go core artifact.');
+   console.log(JSON.stringify({backend:'go',entries:manifest.entries,embeddedResources:manifest.embeddedResources,files:manifest.files}));return;
+  }
   const {releaseImportResources}=await import('../packages/galaxy-official/src/operations/service-release.mjs');
-  console.log(JSON.stringify(await releaseImportResources(repositoryRoot,Object.values(catalog.components.find(c=>c.id==='hub').entries))));return;
+  console.log(JSON.stringify(await releaseImportResources(repositoryRoot,Object.values(hub.entries))));return;
  }
  if(action==='plan'){
   const selected=value('--files'),base=value('--base');if(!selected&&!base)throw Error('plan requires --files JSON or --base Git commit.');
@@ -101,7 +108,7 @@ async function cli(){
  // Each application builds its declared runtime; shared libraries are consumed as source.
  for(const component of ordered(catalog,selected).filter(c=>selected.includes(c.id))){
   const destination=join(outputRoot,component.id),receipt=join(outputRoot,component.id+'-release.json');
-  const tokens={'{node}':process.execPath,'{python}':process.env.GALAXY_BUILD_PYTHON??(process.platform==='win32'?'python':'python3'),'{output}':destination,'{receipt}':receipt,'{webOutput}':join(outputRoot,'web')};
+  const tokens={'{node}':process.execPath,'{python}':process.env.GALAXY_BUILD_PYTHON??(process.platform==='win32'?'python':'python3'),'{go}':process.env.GALAXY_BUILD_GO??'go','{output}':destination,'{receipt}':receipt,'{webOutput}':join(outputRoot,'web')};
   const commands=component[action==='build'?'build':'checks'];
   try{for(const command of commands){const argv=command.map(part=>tokens[part]??part);run(argv,resolve(repositoryRoot,component.cwd??'.'));}}
   catch(error){records.push({component:component.id,action,state:'failed',commands:commands.length});await writeFile(join(outputRoot,'result.json'),JSON.stringify({records,deployed:false},null,2)+'\n');throw error;}

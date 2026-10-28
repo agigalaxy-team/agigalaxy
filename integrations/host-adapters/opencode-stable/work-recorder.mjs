@@ -1,4 +1,4 @@
-import {createLocalWorkHistory} from '../../../packages/galaxy-core/src/work-history/index.mjs';
+import {createLegacyHistory} from './bridge/legacy-local.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
 import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
 
@@ -16,9 +16,9 @@ const content = text => ({excerpt: short(text), originalLength: typeof text === 
  * foreground session only, never enumerates other host sessions or creates a
  * background reader/model. State reconciliation also covers reconnect/restart.
  * @param {*} api
- * @param {{dataDirectory?: string, getIdentity?: (directory: string) => WorkRecorderIdentity | Promise<WorkRecorderIdentity>, history?: ReturnType<typeof createLocalWorkHistory>, archive?: ReturnType<typeof import('../../../packages/galaxy-core/src/conversation-archive/index.mjs').createLocalConversationArchive>, onSessionComplete?: (input: {host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
+ * @param {{dataDirectory?: string, getIdentity?: (directory: string) => WorkRecorderIdentity | Promise<WorkRecorderIdentity>, history?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/work-history/index.mjs').createLocalWorkHistory>, 'identity'|'beginCapture'|'observeEnvironment'|'observe'|'list'|'get'|'pending'|'setSummaryState'|'submitSummary'>, archive?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/conversation-archive/index.mjs').createLocalConversationArchive>, 'settings'|'captureMessage'|'configure'>, onSessionComplete?: (input: {galaxyId: string, host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
  */
-export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history = createLocalWorkHistory({dataDirectory, getIdentity}), archive, onSessionComplete, pollMs = 2000} = {}) {
+export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history = createLegacyHistory({dataDirectory, getIdentity}), archive, onSessionComplete, pollMs = 2000} = {}) {
   const diagnostics=nativeDiagnostics('host-client');
   diagnostics.emit({event:'host_recording',stage:'recording',outcome:'started',host:'opencode'});
   let accepting = true, closing, chain = Promise.resolve(), active = null, errorCode = null, selectedModel, actualModel;
@@ -144,7 +144,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
       while(accepting&&archiveSyncRequests.has(key)) {
         const request=archiveSyncRequests.get(key);archiveSyncRequests.delete(key);
         if((await history.identity())?.id!==request.galaxyId)continue;
-        try {archiveSyncState=await diagnostics.run('archive-sync',()=>onSessionComplete({host:request.host,sessionId:request.sessionId}),{event:'host_archive',host:'opencode',independent:true});}
+        try {archiveSyncState=await diagnostics.run('archive-sync',()=>onSessionComplete({galaxyId:request.galaxyId,host:request.host,sessionId:request.sessionId}),{event:'host_archive',host:'opencode',independent:true});}
         catch {archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};}
       }
     })().catch(error=>{diagnostics.emit({event:'host_archive',stage:'archive-sync',outcome:'failed',host:'opencode',error});archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};});

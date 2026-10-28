@@ -80,10 +80,10 @@
 
 | 范围 | 主要实现与位置 |
 |---|---|
-| 官网与业务网页 | `apps/galaxy-site/` 的 Python 生成器；`packages/galaxy-web/` 的 TypeScript、React、Vite 与 Tailwind CSS |
-| Hub 业务服务 | `packages/galaxy-official/`：Node.js、PostgreSQL、Zod 与 pg-boss；API、Worker、迁移与内容发布共用业务边界 |
-| 本机与宿主接入 | `packages/galaxy-core/`、`galaxy-node/`、`galaxy-edge-mcp/`；`integrations/` 提供 Native 与宿主集成 |
-| Agent 协作 | `packages/galaxy-a2a/` 的对端、任务、结果与宿主适配 |
+| 官网与业务网页 | `apps/galaxy-site/`：Next.js／React 动态网页与 Python 公开内容编译；`packages/galaxy-web/`：TypeScript、React、Tailwind CSS 共用交互，Vite 保留独立浏览器诊断入口 |
+| Hub 业务服务 | `go/cmd/galaxy-*` 与 `go/internal/`：Go、PostgreSQL、River；API、Worker、Information Worker、内容发布器和维护命令按原职责与权限分开运行 |
+| 本机与宿主接入 | `go/cmd/galaxy/`、`go/internal/native/` 承担本机身份、资料、MCP 与连接；`integrations/` 保留宿主 JavaScript／TypeScript、模型 SDK、Skill 和面板资源 |
+| Agent 协作 | Go 核心承接对端、任务、结果与 A2A 接线；宿主适配和专业运行组件保留各自职责 |
 | 运营后台 | `apps/galaxy-admin/`：Next.js、React、Payload；独立管理认证及 CMS 数据，经银河接口操作业务 |
 | AI 执行与模型入口 | `services/galaxy-operations-agentos/` 的 Python、Agno／AgentOS；`services/galaxy-model-gateway/` 复用 LiteLLM；业务权限与回执仍归银河服务 |
 | 搜索、推荐与分析 | `services/galaxy-discovery/` 及 Hub 适配，接入 Meilisearch、Gorse、OpenPanel；各引擎不替代业务可见资格检查 |
@@ -92,7 +92,8 @@
 
 ```text
 apps/          官网、后台、认证应用
-packages/      网页、Hub、本机核心、MCP、A2A、共享邮件
+go/            Hub 与 Native 核心、独立程序、运行样例
+packages/      共享网页、合同、资源及原实现互通参照
 services/      AI 执行、模型网关、发现引擎适配
 integrations/  Native 客户端与 AI 宿主集成
 scripts/       构建、发行与工程工具
@@ -105,16 +106,21 @@ originals/     原始资料与关键讨论
 
 ## 本地开发与自行部署
 
-完整源码开发使用 **Node.js 24.13+**、npm 与 Git；官网生成器需要 **Python 3.11+**，AI 服务使用各自锁定的 Python 3.12 工具链。已发行客户端的运行要求另以发行包为准。
+完整源码开发使用 **Go 1.27.3**、**Node.js 24.13+**、npm 与 Git；公开内容编译需要 **Python 3.11+**，AI 服务使用各自锁定的 Python 3.12 工具链。Go 核心运行不依赖 Node 业务进程；Next.js 网页、宿主插件与专业组件仍使用各自运行时。已发行客户端的运行要求另以发行包为准。
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
 npm ci --ignore-scripts --no-audit --no-fund
+npm run build:site
 npm run dev
 ```
 
-业务网页开发入口为 **http://127.0.0.1:5179/app/**。已有依赖且锁文件未变时直接启动；仅构建网页用 `npm run build:web`，完整官网与网页预览用 `npm run build` 后 `npm start`。前端预览不自动启动 Hub、数据库、认证或聊天服务。
+网站开发入口为 **http://127.0.0.1:5179/**，业务页面位于 `/app/`。首次准备公开内容后可直接开发；`npm run build:web` 构建动态网页，`npm run build` 准备公开内容并构建网站，`npm start` 启动构建后的 Next.js 网站服务。这些命令不启动 Hub、数据库、认证或聊天服务。
+
+Hub 使用独立 Go 构建与运行入口：`npm run build:hub -- --output <绝对新目录> --release <标签> --configuration-version <配置版本>` 生成服务器开发候选；选定 `GALAXY_RELEASE_DIRECTORY` 及相应运行配置后，`npm run hub -- api` 启动实际 Go API，其余角色分别启动。配置、发行校验及独立权限见 [Go 运行样例](go/deploy/README.md)。
+
+本机入口也分两类：`npm run mcp`（同 `npm run integration:mcp`）启动无服务配置的 local-only Integration MCP；`npm run hub -- native --config <绝对配置路径>` 启动配置服务版 Native。两者均调用已有 Go 可执行文件，需通过 `GALAXY_NATIVE_EXECUTABLE` 或包含 Native 的 `GALAXY_RELEASE_DIRECTORY` 明确选择，详见[本机开发](docs/technical/native-client.md)。候选构建与源码接线不表示正式部署、安装或全部平台能力已验收；当前交付范围仍见 [WORK_STATUS](WORK_STATUS.md)。
 
 各组件按需安装和构建，具体命令、API 接线和配置位置见[开发指南](docs/technical/development.md)。自行运行服务或让 AI Agent 协助部署，请从[部署指南](docs/operations/deployment.md)开始，按实际组件发现配置、保管凭据并检查所需服务；不要把前端构建成功当作完整业务已运行。
 

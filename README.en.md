@@ -61,29 +61,35 @@ Independent Hubs can operate their own brands, members, services and data rules.
 
 | Area | Implementation |
 |---|---|
-| Website and browser workspace | Python site generator in `apps/galaxy-site/`; TypeScript, React, Vite and Tailwind CSS in `packages/galaxy-web/` |
-| Hub business services | Node.js, PostgreSQL, Zod and pg-boss in `packages/galaxy-official/` |
-| Local client and integrations | Core, Node and edge-mcp packages; Native and host adapters under `integrations/`; A2A adapters in `packages/galaxy-a2a/` |
+| Website and browser workspace | Dynamic Next.js / React pages and Python public-content compilation in `apps/galaxy-site/`; shared TypeScript, React and Tailwind CSS interactions in `packages/galaxy-web/`, with Vite retained for the standalone browser diagnostic entry |
+| Hub business services | Go, PostgreSQL and River in `go/cmd/galaxy-*` and `go/internal/`; API, Worker, Information Worker, publisher and maintenance commands retain separate responsibilities and permissions |
+| Local client and integrations | Local identity, data, MCP and connections in `go/cmd/galaxy/` and `go/internal/native/`; host JavaScript / TypeScript, model SDKs, Skills and panel resources remain under `integrations/` |
+| Agent collaboration | Peer, task, result and A2A integration in the Go core; host adapters and specialist runtimes retain their own responsibilities |
 | Operations console | Next.js, React and Payload in `apps/galaxy-admin/`, with separate management authentication and CMS storage |
 | AI execution and model gateway | Python Agno / AgentOS and LiteLLM adapters under `services/`; Galaxy retains business authorization and results |
 | Discovery services | Meilisearch, Gorse and OpenPanel adapters; business visibility remains enforced by Galaxy |
 | Authentication, chat and files | Keycloak, server-side Prosody / XMPP, S3-compatible storage and ClamAV; clients use Galaxy HTTPS business APIs |
 | Build and operations | Component-aware tooling in `scripts/`, deployment materials in `deploy/` and owning components |
 
-This is a shared-source monorepo, not a requirement to run every directory as a separate service. `docs/` holds current product, technical, operational and public documentation; `originals/` holds source materials and key discussions. See [source architecture](docs/technical/architecture.md), [component catalog](repository-components.json), [interfaces](docs/technical/interfaces.md) and [dependency provenance](docs/technical/source-and-licensing.md).
+This is a shared-source monorepo, not a requirement to run every directory as a separate service. `go/` holds the Hub and Native core, executable entry points and runtime examples; `packages/` retains shared browser code, contracts, resources and original interoperability references. `docs/` holds current product, technical, operational and public documentation; `originals/` holds source materials and key discussions. See [source architecture](docs/technical/architecture.md), [component catalog](repository-components.json), [interfaces](docs/technical/interfaces.md) and [dependency provenance](docs/technical/source-and-licensing.md).
 
 ## Develop or deploy
 
-Full source development uses **Node.js 24.13+**, npm and Git. Site generation needs **Python 3.11+**; AI services use their own locked Python 3.12 toolchains. Published client requirements are separate and follow the selected release.
+Full source development uses **Go 1.27.3**, **Node.js 24.13+**, npm and Git. Public-content compilation needs **Python 3.11+**; AI services use their own locked Python 3.12 toolchains. Running the Go core does not require a Node business process; the Next.js website, host plugins and specialist components retain their own runtimes. Published client requirements are separate and follow the selected release.
 
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
 npm ci --ignore-scripts --no-audit --no-fund
+npm run build:site
 npm run dev
 ```
 
-The browser development URL is **http://127.0.0.1:5179/app/**. Use `npm run build:web` for the workspace, or `npm run build` followed by `npm start` for the combined site preview. Frontend preview does not start the Hub, database, authentication or chat services.
+The website development URL is **http://127.0.0.1:5179/**, with business pages under `/app/`. Prepare public content once before development. `npm run build:web` builds the dynamic pages; `npm run build` prepares public content and builds the website; `npm start` runs the built Next.js website. These commands do not start the Hub, database, authentication or chat services.
+
+The Hub has separate Go build and run entries: `npm run build:hub -- --output <absolute-new-directory> --release <label> --configuration-version <configuration-version>` creates a server development candidate. After selecting `GALAXY_RELEASE_DIRECTORY` and the required runtime configuration, `npm run hub -- api` starts the actual Go API; other roles start independently. See the [Go runtime examples](go/deploy/README.md) for configuration, artifact verification and separate permissions.
+
+Local entry points also differ: `npm run mcp` (also `npm run integration:mcp`) starts local-only Integration MCP without service configuration; `npm run hub -- native --config <absolute-configuration-path>` starts Native with service configuration. Both launch an existing Go executable selected through `GALAXY_NATIVE_EXECUTABLE` or a `GALAXY_RELEASE_DIRECTORY` that includes Native; see [Native development](docs/technical/native-client.md). Candidate builds and source integration do not establish a production deployment, installation or verification of every platform capability. The current delivery scope remains in [WORK_STATUS](WORK_STATUS.md).
 
 Install and build only the components needed for the task. The [development guide](docs/technical/development.md) covers environments, configuration and scoped checks. The [deployment guide](docs/operations/deployment.md) covers self-hosting and AI-agent-assisted deployment, including configuration discovery, credential boundaries and actual service checks.
 

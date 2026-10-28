@@ -1,6 +1,6 @@
 import type { Action } from '../adapter-types.ts';
 import { createDeletionMenu } from '../deletion-menu.mjs';
-import { createLocalDeletionRecords } from '../../local-deletion-records.mjs';
+import { createLocalDeletionRecords } from '../bridge/legacy-local.mjs';
 import { createDataExportMenu } from '../data-export-menu.mjs';
 import { createProfileMenu } from '../profile-menu.mjs';
 import { createSearchMenu } from '../search-menu.mjs';

@@ -10,9 +10,30 @@ import { createContextDraftMenu } from '../context-draft-menu.mjs';
 import { describeConnectionState } from '../connection-state.mjs';
 import type { GalaxyMenuSession } from './session-context.ts';
 import { divider, localBoundary, formatModules } from './presentation.ts';
+import { createPurposeMenu } from '../purpose-menu.mjs';
+import { unwrap, plain } from '../purpose/presentation.mjs';
+import { nativeConnectionMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 
 export function createConnectionPages(session: GalaxyMenuSession) {
   async function showStatus(onBack: Action) {
+    if (session.nativeTools) {
+      const generation = session.pageGeneration;
+      try {
+        const status = unwrap(await session.nativeTools.call('galaxy_native_status', {}));
+        if (session.closed || generation !== session.pageGeneration) return;
+        session.showInfo(
+          session.activeLanguage === 'zh-CN' ? 'Galaxy / 本机状态' : 'Galaxy / Local status',
+          [nativeConnectionMessage(status, session.activeLanguage),
+            ...(status.identity ? [plain(status.identity)] : []),
+            ...(status.endpoint ? [plain(status.endpoint)] : [])].join('\n\n'),
+          onBack,
+        );
+      } catch {
+        if (!session.closed && generation === session.pageGeneration)
+          session.showInfo('Galaxy', session.activeLanguage === 'zh-CN' ? '当前本机状态暂不可读，已有资料保留。' : 'Local status is currently unavailable. Existing material is retained.', onBack);
+      }
+      return;
+    }
     const status = await session.store.getGalaxyIntegrationStatus(
       session.dataDirectory,
     );
@@ -26,6 +47,24 @@ export function createConnectionPages(session: GalaxyMenuSession) {
   }
 
   async function showConnection(onBack: Action) {
+    if (session.nativeTools) {
+      const generation = ++session.connectionGeneration;
+      session.purposeMenu?.close();
+      session.purposeMenu = createPurposeMenu({
+        nativeTools: session.nativeTools,
+        controller: session.connectionController,
+        select: session.showSelect,
+        prompt: session.showPrompt,
+        info: session.showInfo,
+        language: session.activeLanguage,
+        isCurrent: () => !session.closed && generation === session.connectionGeneration,
+        onBack,
+        onReturnWork: session.returnToWork,
+        readWorkContext: session.currentWorkContext,
+      });
+      session.purposeMenu.identity();
+      return;
+    }
     if (session.connectionController)
       return session.showManagedConnection(onBack);
     if (session.discovery) return showDiscovery(onBack);

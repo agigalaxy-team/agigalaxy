@@ -5,7 +5,7 @@ import { createPurposeContinuation } from './purpose/continuation.mjs';
 import { createNativeCapsuleMenu } from './capsule-native-menu.mjs';
 import { createNativeA2aMenu } from './a2a-native-menu.mjs';
 import { createProjectDiscoveryMenu } from './project-discovery-menu.mjs';
-import { nativeConfigurationMessage } from '../../../packages/galaxy-edge-mcp/src/native-v2/configuration.mjs';
+import { nativeConfigurationMessage } from '../../../packages/galaxy-edge-mcp/src/native-v2/configuration-message.mjs';
 import { unwrap, fingerprint } from './purpose/presentation.mjs';
 
 // Optional foreground Native bridge, supplied by the host. No service, model,

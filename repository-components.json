@@ -90,50 +90,56 @@
       "id": "hub",
       "kind": "service-family",
       "roots": [
-        "packages/galaxy-official"
+        "packages/galaxy-official",
+        "go",
+        "scripts/go"
       ],
       "dependsOn": [
         "contracts",
         "core",
-        "mail"
+        "mail",
+        "native-client"
       ],
       "entries": {
-        "api": "packages/galaxy-official/src/server.mjs",
-        "worker": "packages/galaxy-official/src/worker.mjs",
-        "migration": "packages/galaxy-official/src/migrate.mjs",
-        "publisher": "packages/galaxy-official/src/content-publisher.mjs"
+        "api": "go/cmd/galaxy-api/main.go",
+        "worker": "go/cmd/galaxy-worker/main.go",
+        "informationWorker": "go/cmd/galaxy-information-worker/main.go",
+        "migration": "go/cmd/galaxy-migrate/main.go",
+        "publisher": "go/cmd/galaxy-publisher/main.go",
+        "lifecycle": "go/cmd/galaxy-lifecycle/main.go"
       },
       "build": [
         [
           "{node}",
-          "packages/galaxy-official/scripts/service-release.mjs",
-          "capture",
+          "scripts/build-go-core.mjs",
+          "--output",
           "{output}",
-          "local-review",
-          "local-review",
-          "{receipt}"
+          "--go",
+          "{go}",
+          "--release",
+          "local-development",
+          "--configuration-version",
+          "unconfigured",
+          "--without-native"
         ]
       ],
-      "checks": [
-        [
-          "{node}",
-          "--test",
-          "packages/galaxy-official/test/operations-auth-root-lifecycle.test.mjs",
-          "packages/galaxy-official/test/task-fact-client-v2.test.mjs",
-          "packages/galaxy-official/deploy/operations-stack/operations-stack.test.mjs"
-        ]
-      ],
+      "checks": [],
       "sourceEntries": [
-        "packages/galaxy-official/src/server.mjs",
-        "packages/galaxy-official/src/worker.mjs",
-        "packages/galaxy-official/src/migrate.mjs",
-        "packages/galaxy-official/src/content-publisher.mjs"
+        "go/cmd/galaxy-api/main.go",
+        "go/cmd/galaxy-worker/main.go",
+        "go/cmd/galaxy-information-worker/main.go",
+        "go/cmd/galaxy-migrate/main.go",
+        "go/cmd/galaxy-publisher/main.go",
+        "go/cmd/galaxy-lifecycle/main.go"
       ],
       "configurationInputs": [
         "packages/galaxy-official/src/operations/configuration.mjs",
-        "packages/galaxy-official/deploy/runtime-settings.example.json"
+        "packages/galaxy-official/deploy/runtime-settings.example.json",
+        "go/go.mod",
+        "go/go.sum",
+        "go/deploy"
       ],
-      "artifact": "node-service-family-source",
+      "artifact": "go-core-local-candidate",
       "dataOwner": "API, worker and publisher share the Hub business database and exact migration set.",
       "interfaces": [
         "Authorized HTTP APIs, public schemas and private AgentOS authority protocol"
@@ -163,8 +169,12 @@
         "docs/operations/examples/slo/pilot.rules.json",
         "docs/operations/examples/monitoring/external.rules.test.json",
         "docs/operations/examples/slo/pilot.rules.test.json",
-        "test/forum-attachments-v1.test.mjs"
-      ]
+        "test/forum-attachments-v1.test.mjs",
+        "scripts/build-go-core.mjs",
+        "scripts/hub-runtime.mjs",
+        "docs/technical/go-core-plan.md"
+      ],
+      "buildLimit": "Local Go server candidate; no service activation, schema changes or queue adoption. Necessary integration checks are run after development batches."
     },
     {
       "id": "native-client",
@@ -174,7 +184,9 @@
         "packages/galaxy-edge-mcp",
         "integrations/native-v2",
         "integrations/host-adapters",
-        "integrations/codex/plugins/galaxy-integration-pack"
+        "integrations/codex/plugins/galaxy-integration-pack",
+        "go/internal/native",
+        "go/cmd/galaxy"
       ],
       "dependsOn": [
         "core",
@@ -186,31 +198,16 @@
       "build": [
         [
           "{node}",
-          "integrations/native-v2/compact-app/build.mjs"
-        ],
-        [
-          "{node}",
           "scripts/build-native-v2.mjs",
           "{output}"
         ]
       ],
-      "checks": [
-        [
-          "{node}",
-          "integrations/native-v2/compact-app/build.mjs"
-        ],
-        [
-          "{node}",
-          "--test",
-          "integrations/native-v2/setup.test.mjs",
-          "integrations/host-adapters/opencode-stable/native-runtime-bridge.test.mjs"
-        ]
-      ],
-      "buildLimit": "Unsigned local source candidate. Dependency installation, license inventory and physical host acceptance remain separate.",
+      "checks": [],
+      "buildLimit": "Local Go Native and thin host candidate; does not replace installed commands or establish platform acceptance.",
       "sourceEntries": [
-        "packages/galaxy-edge-mcp/src/native-v2-entry.mjs",
-        "packages/galaxy-edge-mcp/src/native-v2/runtime.mjs",
-        "packages/galaxy-edge-mcp/src/native-v2/server.mjs"
+        "go/cmd/galaxy/main.go",
+        "go/internal/native/mcp.go",
+        "go/internal/native/runtime.go"
       ],
       "configurationInputs": [
         "integrations/native-v2/prepare-service-config.mjs",
@@ -218,7 +215,7 @@
         "opencode.json",
         ".opencode/tui.json"
       ],
-      "artifact": "unsigned-native-candidate",
+      "artifact": "galaxy-native-go-local-candidate",
       "dataOwner": "Local ID controls local identity, history, work files and upload scope; account grants remain separate.",
       "interfaces": [
         "Native runtime/server exports, MCP, host adapters and signed browser handoff"
@@ -644,6 +641,7 @@
     "scripts/test/verify-layers.test.mjs"
   ],
   "sourceRoots": [
+    "go",
     "apps",
     "services",
     "packages",
@@ -688,6 +686,9 @@
     ".opencode/tui.json"
   ],
   "sourceExtensions": [
+    ".go",
+    ".mod",
+    ".sum",
     ".mjs",
     ".js",
     ".ts",

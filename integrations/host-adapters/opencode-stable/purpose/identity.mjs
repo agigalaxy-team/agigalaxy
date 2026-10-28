@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { nativeConnectionMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
 import { nativeChoiceUrl } from '../../../native-v2/compact-app/browser-choice.mjs';
-import { nativeConfigurationMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/configuration.mjs';
+import { nativeConfigurationMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/configuration-message.mjs';
 import { plain, unwrap, fingerprint } from './presentation.mjs';
 
 export function createPurposeIdentity(session) {

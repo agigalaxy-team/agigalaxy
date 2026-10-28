@@ -2,19 +2,21 @@
 
 按本次目标选组件与准确源码/冻结发行，再读取它的配置加载器、锁与保护配置引用。历史主机地址、端口、路径和回读不作为新实例默认；普通开发见[开发](../technical/development.md)。
 
+当前正式服务器仍运行旧 Node 服务。本轮 Go 服务器产物属于本地开发候选；源码迁移、隔离检查或候选构建完成，不表示已部署、已接管正式任务或正式 Go 发行就绪。
+
 ## 选择组件与配置
 
 | 运行目标 | 需要的组件与额外准备 |
 |---|---|
 | 官网/Web | 根 Node 工具链，Python 仅编译公开数据；前台 Node standalone、后台独立 Next，业务页接准确 API 和公开公钥配置 |
-| Hub | PostgreSQL、API/Worker、HTTPS反代；显式迁移、最小数据库角色、Ed25519签名和信任材料 |
+| Hub | Go 候选包含 API、Worker、Information Worker、Publisher、Migrate、Lifecycle 六个二进制；PostgreSQL、HTTPS 反代、最小数据库角色、原签名和信任材料保持各自职责。构建与运行准备见下节；正式服务器的 Node 维护见存量兼容部分 |
 | 网站账户 | OIDC/Keycloak、准确 issuer/client/redirect URI、Cookie/CSRF 与邮件 |
 | 聊天/附件 | Prosody、对象存储、ClamAV；私有读取、配额和扫描策略 |
 | CMS/Admin | 独立 Next/Payload 构建、CMS 数据库/迁移、持久媒体、管理 OIDC 与业务 BFF |
 | AgentOS/Gateway/Discovery | 各自 README、固定上游/锁与显式运行配置；不因目录存在而启用 |
 | 运维 | 按配置启用监控、日志、接收者、备份与所需恢复能力 |
 
-只启所需组件，不机械拆成微服务。API/Worker/migration 的环境约束由 [`runtime-environment.mjs`](../../packages/galaxy-official/src/infrastructure/runtime-environment.mjs) 执行：
+只启所需组件，不机械拆成微服务。Go 候选的实际配置发现以 [Go 运行说明](../../go/deploy/README.md#运行与配置发现)及各 owning loader 为准。存量 Node API/Worker/migration 的环境约束由 [`runtime-environment.mjs`](../../packages/galaxy-official/src/infrastructure/runtime-environment.mjs) 执行：
 
 | 约束 | 要求 |
 |---|---|
@@ -27,7 +29,19 @@
 
 其他配置按实际消费者发现：`GALAXY_BROWSER_POLICY_FILE` 供 API，`GALAXY_WEB_CONFIG_FILE` 供预览；`GALAXY_IDENTITY_CONFIG_FILE`、`GALAXY_ACCOUNT_CONFIG_FILE`、`GALAXY_CHAT_CONFIG_FILE`、`GALAXY_OPERATIONS_CONFIG_FILE` 处理身份、账户、聊天和管理。附件、预算、日志、规则变量从各加载器查，不猜字段补齐。Admin 以 [`apps/galaxy-admin/README.md`](../../apps/galaxy-admin/README.md) 和 `.env.example` 为准，CMS 不连接业务库；认证主题构建不修改 realm 或替代 Java provider 编译。
 
-## 准备 Linux 材料与应用
+## Go 服务器候选的构建与运行准备
+
+使用 [`scripts/build-go-core.mjs`](../../scripts/build-go-core.mjs) 构建全新的候选目录。入口、目标平台、构建参数、systemd 样例和各进程配置引用统一见 [`go/deploy/README.md`](../../go/deploy/README.md)，不从旧主机配置或示例补造凭据。常规 Hub 程序是 `galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle`，Windows 使用 `.exe`；Native 是独立子包。认证、专业服务和网站继续使用各自现行配置与构建，不随 Hub 二进制替换而改配。
+
+运行产物引用沿用 `GALAXY_RELEASE_DIRECTORY`、`GALAXY_RELEASE_SHA256`、`GALAXY_CONFIGURATION_VERSION`。pin 必须对应选定目录中真实 manifest 的原始字节：存量 `service-release.json` 使用原 Node 格式；Go 候选使用 `go-core-artifact.json`。loader 核文件 bytes/hash、配置版本和实际角色二进制归属；Information Worker 与普通 Worker 虽共享日志 component，仍对应不同二进制。未配置发行引用时不会生成版本元数据。候选的 `kind:galaxy-go-core-local-candidate`、`publicRelease:false`、`migrationComplete:false` 保持原意，不能当作 Node service-release，也不能据此调用旧发行部署器或宣称生产就绪。
+
+业务 schema 初始化／升级通过 `galaxy-migrate business-up` 显式执行，沿原 SQL、`schema_migrations` 和事务锁；角色供应按实际目标显式选择。jobs、storage 的技术迁移／角色供应及队列接管是分别授权的维护动作，准确命令与参数只维护在 [显式维护入口](../../go/deploy/README.md#显式维护入口)。服务启动不迁移 schema、不自动采用旧任务，Lifecycle 仍为显式维护程序。数据库角色、原业务 UUID、lease 和回执继续沿原职责使用，不能用新技术队列 ID 替换业务身份。
+
+准备接管时先核实际数据库及选定原工作，停止相应旧领取者，再执行获准的迁移和采用。旧 API 的信息订阅领取、Worker、独立 Publisher 都应按实际消费范围处理；Go 队列配置不能证明旧服务已停止。已发出或结果未知的工作继续查询原对象／operation，不作为未领取任务导入或重新提交。部署激活、生产数据库变更、认证调整和正式服务器切换仍须另行安排；本地构建本身不执行这些动作。
+
+## 存量 Node 服务的 Linux 材料与应用
+
+以下 `prepare-linux` 和 `service-release` 命令仅用于原 Node 服务包与现有维护／恢复兼容。它们不接受 Go core 候选，不能作为本轮 Go 六个二进制的安装器。
 
 ```text
 node packages/galaxy-official/scripts/prepare-linux.mjs <服务发行绝对目录> <发行摘要> <运行时pins绝对路径> <全新输出绝对目录> [settings绝对路径]
@@ -94,10 +108,11 @@ Runner只获得完成可信CI所需的独立低权限系统账号；无sudo、�
 
 前台部署运行包的 `start.mjs`，不再将公开数据目录当成现行网站根。运行配置与 unit 示例位于 Official deploy 的 `galaxy-website.*.example`；网站反代使用独立 loopback 端口，保留现有 HTTPS/域名边界。旧静态站脚本/CSP配置须按 Next.js 实际资源与连接方式适配，不能把动态页面当作 HTML 文件服务。
 
-部署代理先读取目标实际配置：Node 路径、前台端口、公开配置文件、软件内容根、CMS 指针、身份/业务数据库版本和原服务账户。秘密由保护文件/进程注入，不从示例推断可用凭据，不借部署扩大数据库或用户权限。
+部署代理先读取目标实际配置：选定 Hub 产物及其二进制／manifest、网站所需 Node 路径、前台端口、公开配置文件、软件内容根、CMS 指针、身份/业务数据库版本和原服务账户。Go 准备按上述候选运行说明，存量 Node 维护按其服务包；两类 manifest 不互换。秘密由保护文件/进程注入，不从示例推断可用凭据，不借部署扩大数据库或用户权限。
 
 本轮技术迁移 132/133 涉及原会话字段和网页事件表/触发器；不能只更新网页就宣称续期与变化推送可用。应用迁移、API role、API 服务及网站配置后，集中检查实际登录续期、一个真实提交到页面的事件、内容发布及原 operation 恢复。未获部署授权时只交付材料，不连接或改变生产。
 
 生产构建通过 `GALAXY_WEB_DEPLOYMENT_ID` 为前台与后台分别设置 Next.js 官方 deploymentId。发布时反代按 `X-Deployment-Id` 将在用页面的 RSC 请求送回同一构建；没有 ID 的旧构建仅以 RSC 请求作一次过渡，新文档进入新构建。只保留当前与上一运行版本，均执行当前业务权限，不延长认证或私有读取资格；收掉旧进程前需确认不再承接在用页面。不要将版本不匹配交给框架默认硬导航。反代优先使用真实配置的平滑重载；如使用 Caddy 管理接口，仅开放受限的本机 Unix socket，不开放公网管理端口。替换保护配置时保留原附加 ACL，避免 Worker／发布器失去既有读取权限。
 
 代码运行包支持只携带上一构建自身的 JS/CSS，避免打开中的页面因资源被移除报错；不长期积累历史产物，不把旧业务源码混入新运行包。使用不可变运行目录切换，不在运行中的 `.next` 目录原地构建。运行故障/结果未知保留原回执，不通过自动刷新或重发写入掩盖。
+

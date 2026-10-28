@@ -13,9 +13,9 @@
     "dev": "node scripts/web-runtime.mjs dev",
     "build": "node scripts/build-product.mjs",
     "start": "node scripts/web-runtime.mjs start",
-    "internal:galaxy-id": "node packages/galaxy-node/src/cli.mjs",
-    "mcp": "node packages/galaxy-edge-mcp/src/index.mjs",
-    "integration:mcp": "node packages/galaxy-edge-mcp/src/index.mjs",
+    "internal:galaxy-id": "node scripts/hub-runtime.mjs local-id",
+    "mcp": "node scripts/hub-runtime.mjs integration-mcp",
+    "integration:mcp": "node scripts/hub-runtime.mjs integration-mcp",
     "test": "node scripts/check.mjs test",
     "lint": "node scripts/check.mjs lint",
     "format": "oxfmt",
@@ -38,7 +38,9 @@
     "setup": "node scripts/setup-development.mjs",
     "docs:check": "node scripts/check-requirements.mjs",
     "docs:public": "python tools/sync_public_docs.py",
-    "build:browser-client": "vite build --config packages/galaxy-web/vite.config.mjs"
+    "build:browser-client": "vite build --config packages/galaxy-web/vite.config.mjs",
+    "build:hub": "node scripts/build-go-core.mjs --without-native",
+    "hub": "node scripts/hub-runtime.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

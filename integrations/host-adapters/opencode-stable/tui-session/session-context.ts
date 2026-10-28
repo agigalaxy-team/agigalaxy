@@ -19,8 +19,8 @@ import type { createReadTaskController } from '../../../shared/read-task.mjs';
 export interface GalaxyMenuSession {
   readonly api: StableHostApi;
   readonly closed: boolean;
-  readonly store: typeof import('../../../../packages/galaxy-core/src/local-store.mjs');
-  readonly connection: typeof import('../../../../packages/galaxy-core/src/connection-profile.mjs');
+  readonly store: Pick<typeof import('../../../../packages/galaxy-core/src/local-store.mjs'), 'getLocalSnapshot' | 'getGalaxyIntegrationStatus' | 'resetGalaxyIntegration'>;
+  readonly connection: Pick<typeof import('../../../../packages/galaxy-core/src/connection-profile.mjs'), 'getGalaxyConnectionStatus'>;
   readonly dataDirectory: string | undefined;
   connectionController: ConnectionController | null;
   readonly discovery: DiscoverySource | null;

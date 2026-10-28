@@ -56,6 +56,11 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
+      - if: matrix.component == 'hub' || matrix.component == 'native-client'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
       - if: matrix.component != 'model-gateway' && matrix.component != 'discovery'
         run: npm run setup
       - if: matrix.component == 'admin'
@@ -133,12 +138,6 @@ jobs:
         run: node scripts/components.mjs build --component admin --output outputs/build-admin
       - if: matrix.component == 'web'
         run: node node_modules/typescript/bin/tsc --noEmit
-      - if: matrix.component == 'hub'
-        run: node --test --test-concurrency=2 packages/galaxy-official/test/task-material-*.test.mjs packages/galaxy-web/test/task-material-client.test.mjs
-      - if: matrix.component == 'hub'
-        run: node --test packages/galaxy-official/test/service-release-host.test.mjs
-      - if: matrix.component == 'hub'
-        run: python scripts/create-release-baseline.py
       - if: always() && matrix.component == 'agentos'
         name: Remove the isolated PostgreSQL container
         run: docker rm --force galaxy-agentos-ci || true

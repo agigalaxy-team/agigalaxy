@@ -17,12 +17,7 @@ import type {
 } from './adapter-types.ts';
 import { createPurposeMenu } from './purpose-menu.mjs';
 import { createOpenCodeWorkRecorder } from './work-recorder.mjs';
-import { createLocalConversationArchive } from '../../../packages/galaxy-core/src/conversation-archive/index.mjs';
-import {
-  prepareOpenCodeLocalWork,
-  isOpenCodePreparationDeferred,
-  deferOpenCodePreparation,
-} from './local-preparation.mjs';
+import {store, connection, createLegacyArchive, prepareOpenCodeLocalWork, isOpenCodePreparationDeferred, deferOpenCodePreparation} from './bridge/legacy-local.mjs';
 import { createReadTaskController } from '../../shared/read-task.mjs';
 
 export function createGalaxyAdapter(
@@ -36,6 +31,7 @@ export function createGalaxyAdapter(
     recordWork = true,
     readLocalIdentity,
     onWorkSessionComplete,
+    hostPersistence,
     connectionUnavailable = false,
   }: {
     readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null;
@@ -49,10 +45,12 @@ export function createGalaxyAdapter(
     recordWork?: boolean;
     readLocalIdentity?: (directory: string) => Promise<{ id: string } | null>;
     onWorkSessionComplete?: (input: {
+      galaxyId: string;
       host: string;
       sessionId: string;
     }) => Promise<unknown>;
     connectionUnavailable?: boolean;
+    hostPersistence?: { history: ReturnType<typeof createOpenCodeWorkRecorder>['history']; archive: NonNullable<ReturnType<typeof createOpenCodeWorkRecorder>['archive']>; initialize(input:{initializationPath:'personal-galaxy';subjectType:'person'|'organization'}):Promise<unknown>; preparationStatus():Promise<{deferred:boolean}>; deferPreparation():Promise<unknown> };
   } = {},
 ) {
   let closed = false,
@@ -118,13 +116,6 @@ export function createGalaxyAdapter(
         };
       }
       try {
-        const [store, connection] = (await Promise.all([
-          import('../../../packages/galaxy-core/src/local-store.mjs'),
-          import('../../../packages/galaxy-core/src/connection-profile.mjs'),
-        ])) as [
-          typeof import('../../../packages/galaxy-core/src/local-store.mjs'),
-          typeof import('../../../packages/galaxy-core/src/connection-profile.mjs'),
-        ];
         if (closed) return;
         const dataDirectory =
           configuredDirectory ?? process.env.GALAXY_DATA_DIR;
@@ -133,7 +124,8 @@ export function createGalaxyAdapter(
             dataDirectory,
             getIdentity: readLocalIdentity,
             onSessionComplete: onWorkSessionComplete,
-            archive: createLocalConversationArchive({
+            ...(hostPersistence ? {history: hostPersistence.history} : {}),
+            archive: hostPersistence?.archive ?? createLegacyArchive({
               dataDirectory,
               getIdentity: readLocalIdentity,
             }),
@@ -447,7 +439,9 @@ export function createGalaxyAdapter(
           const requestedPage = pageGeneration,
             stillHere = () => !closed && requestedPage === pageGeneration;
           const owner = await workRecorder?.history.identity();
-          const snapshot = await store.getLocalSnapshot(dataDirectory);
+          const snapshot = hostPersistence
+            ? {identity:owner,recoveryRequired:false}
+            : await store.getLocalSnapshot(dataDirectory);
           if (!stillHere()) return;
           if (owner || snapshot.identity) {
             firstPreparationVisible = false;
@@ -472,8 +466,10 @@ export function createGalaxyAdapter(
             try {
               // A real TUI start choice is sufficient for this local-only operation.
               // No browser approval or account association repeats the same decision.
-              if (!(await workRecorder?.history.identity()))
-                await prepareOpenCodeLocalWork(dataDirectory, { subjectType });
+              if (!(await workRecorder?.history.identity())) {
+                if(hostPersistence)await hostPersistence.initialize({initializationPath:'personal-galaxy',subjectType});
+                else await prepareOpenCodeLocalWork(dataDirectory, { subjectType });
+              }
               await workRecorder?.refresh();
               if (atOriginalPage()) onReturn();
             } catch {
@@ -490,7 +486,7 @@ export function createGalaxyAdapter(
           firstPreparationVisible = firstStart;
           const later = async () => {
             firstPreparationVisible = false;
-            await deferOpenCodePreparation(dataDirectory).catch(() => {});
+            await (hostPersistence?hostPersistence.deferPreparation():deferOpenCodePreparation(dataDirectory)).catch(() => {});
             closeGalaxy();
           };
           showSelect({
@@ -750,7 +746,7 @@ export function createGalaxyAdapter(
             if (
               !closed &&
               !(await workRecorder.history.identity()) &&
-              !(await isOpenCodePreparationDeferred(dataDirectory))
+              !(hostPersistence?(await hostPersistence.preparationStatus()).deferred:await isOpenCodePreparationDeferred(dataDirectory))
             )
               await showQuickInitialize(closeGalaxy, true);
           } catch {
