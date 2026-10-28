@@ -8,13 +8,54 @@
 
 ## Go 服务器与本机核心实施
 
-用户已授权按[实施计划](docs/technical/go-core-plan.md)完成本地开发及隔离验收，生产、认证改配、真实迁移和GitHub上传前停止。起始基线597cafa，单一整合分支refactor/go-core；保留原文档改动。服务器和Native迁Go，界面及专业组件保留。本机存储已纠正：身份/连接JSON、PEM，履历history.sqlite、原件private.sqlite及独立协调SQLite；不重新生成身份或数据库。
+本轮本地实现及收束完成：服务器与Native核心、独立local-only Integration、正常源入口、原任务接续及候选产物已装配；必要网页流程分批覆盖，正式切换尚未执行。6个GPT-6.1 Sol／medium会话按领域实施，主会话整合并集中检查受影响范围；已过且未改部分未重复验证。不据本地结果宣称全部平台或生产环境已完成迁移。
 
-当前处于A／B：Go单一模块、独立1.27.3工具链、PostgreSQL事务、原签名、Native JSON／SQLite读取与跨进程锁已形成。Native开发二进制提供履历列表／详情、会话原件设置读取及本人选择保存；保留原工具名、文本JSON结果和原资料。两版MCP确认、实际TypeScript SDK启动Go子进程及原JavaScript回读已通过；新增设备／连接变化围栏仍沿原身份核验，不创建或重置身份。
+### 已接入的实际主链
 
-反馈已有真实Go提交、限流、分页、分类／状态更新、历史、审计及原操作回执，HTTP接线绑定原门户Cookie和事务内当前权限。独立PostgreSQL使用原项目完整迁移，Go写入的列表／详情与原JS投影一致；并发原操作去重、冲突、撤权、私有备注隔离、失败回滚及原提交触发器事件已通过。普通账户与管理账户保留不同认证源；原配置作用域哈希、门户AES-GCM互读、凭据轮换、刷新只交换一次、未知不重放及明确拒绝撤销已验证。Go OIDC使用真实本地发现／签名令牌检查；未调用正式Keycloak、模型或邮件。
+- 服务器：账户门户、登录续期、设备控制与绑定、资料与注册用户、业务角色及人员授权、AI账户／委派／自动授权，保留原身份与权限边界。
+- 业务：社区／版块／标签／公开内容、私聊及附件／共享摘要／联系人、项目与Recruitment、Task／Case／评论／材料成果及治理；Evidence／Proof／CI／VerificationRecord、配置／Context／v1/v2履历、资格／经验／贡献／荣誉、Capsule／Choices、Builders／Hubs／Peering、身份组与信息订阅均已挂实际服务。
+- 后台：反馈、审计、消息计划／公告／站内通知／SMTP、人工模型设置／用量、系统设置、维护、内容发布及网页事件。AI原20个typed查询、原工作台操作卡、策略与规则、搜索与推荐方向卡已接同一批实际实例，不靠空摘要代替消费者。
+- 任务：River承担原任务传输，业务ID／原操作及回执仍归原领域。Worker复用当前预算／Forum策略、原租约与源；Information Worker以同库两池分离源读取和队列领取。策略／Duty／私有execution身份不借管理员登录；未知写入只核原操作。
+- Native：原JSON／PEM、履历与原件SQLite及协调锁、身份／连接／本人选择、私有Host JSONL、上传选择、远端工具、Trust／Help／Watch／通知／Panel及宿主driver已有实际工厂装配。Runtime共享Help、Navigation、设备接续及Watch实例，关闭在锁外收尾。原Native条件名称并集388只用于覆盖梳理，不是实际可用工具数。
+- 数据维护：Go显式business-up沿原132条SQL、末版本133和4类可选角色；原18类导出、11类留存及Task redactor、本人Case正文两副本最小化、批准后的DB维护执行已接。文件安全删除与HEAD恢复沿实际状态，公开删除执行保持原不可用语义，不新增任意删除能力。
 
-`galaxy-api`目前仅是反馈领域的开发运行入口，沿用原受保护配置文件；不能替换完整现行API。尚未完成：实际网页/BFF与Go整合、完整登录签发和回调、全部身份与AI授权、附件上传/扫描/下载及字节存储、网页SSE发布者、River队列与在办迁移、其他服务器领域、Native其余读写/上传/连接/Apps、OpenCode切换及发行。现行默认入口和旧核心仍保留，待对应新路径完整覆盖后退出。未进行新Go网页无头验收，也未修改生产或GitHub；不能据当前检查报告B阶段或整轮完成。
+### 构建、入口与必要结果
+
+正常组件保留hub和native-client两种Go产物；build-go-core仍可生成合并审阅包，不另建重复组件。npm服务器／本机CLI由薄启动器调用真实Go executable，不自动编译、迁移或回退Node；网页Next／Payload和宿主模型SDK继续原职责。旧Node主打包函数已从正常Native builder移除。仍保留的JS有真实用途：网页／shared schema／宿主界面、当前迁移互通参照、旧Node发行包维护；它们不进入新Go业务产物。
+
+| 主会话阶段结果 | 实际范围 |
+|---|---|
+| 原业务schema PG 10.600s通过 | 首次完整SQL、重用历史／角色设置、缺失和较新历史拒绝 |
+| 规则卡PG 15.975s通过 | 真实当前人×AI角色、同一事务fresh、重复执行与原回执，只有一笔写入 |
+| 原队列交接PG 22.823s通过 | 真实pg-boss UUID、回滚／回放、活动任务拒绝、实际周期slot不重派 |
+| Native合并6.663s通过 | 实际MCP工厂、Help接续、Panel正文元数据隔离、关闭；独立无头仅原loopback页面错误／取消，不冒充完整Prepare或设备批准 |
+| 构建与产物身份通过 | 六服务器／Native及宿主资源、实际manifest文件校验与角色绑定；原组件工具9项通过 |
+| Native03实际子进程9项通过 | 7551.1616ms，无跳过；原选择、取消、Host保存、首次建档及无服务菜单接续 |
+| 网页前台定向覆盖 | 正常网站产物＋完整Go API：公开页面、论坛真实发布／回读／重载，聊天transport缺失错误与草稿重载；原整批在后续Admin段失败，不称同次全站通过 |
+| 后台standalone 34.007s通过 | 正常Admin产物、原CMS迁移、真实Go API／PG；原会话消费者signed-in、反馈保存／离开返回、最终账本processing及revision2；仅补跑Admin |
+| 受影响网页构建通过 | 官网生产构建；Admin按原CI构建配置的正常组件02，未部署 |
+
+最近受影响产物：Windows正常Native组件 `outputs/go-native-final-20261028-03/native-client`，Go executable SHA256 `9329049e5e66348d9acb414982a4503945591fa636b09aff0b9a031c6feab704`；Linux六服务器 `outputs/go-core-linux-final-20261028-01`，100文件，pin `bd06a561054af959fb2c8d1e35c9c6f11dd91ab3d1a1be0645f0e7dee5b814e7`。Linux仅交叉构建。Native03已覆盖宿主源默认Go、无服务Host及删除locator的本批改动，尚未执行真实宿主安装。
+
+独立Integration实际stdio流程已通过：TS SDK启动真实Go，初始化、Case、Disclosure、Consent／Proof及原JS消费者回读；故意无效的服务配置不影响local-only入口。Native03的宿主桥接／首次建档／无服务接续9项实际子进程检查通过，无跳过；新增路径覆盖履历、原件和locator写读，以及原重置后两份SQLite原件保留。本地按服务器、Native、入口及最终本机接线提交 `a881615`、`4a2ec6f`、`50fe631`、`9fd0fb5`，未推送。
+
+前批必要结果继续复用：API实际启动与路由、受限Worker领取／关闭、持久对话与管理卡、原角色及签名字节互通、信息源／个人MCP、专业组件HTTP协议等；不把它们说成最新全站实机验收。
+
+### 后续发布与未覆盖范围
+
+本轮本地任务已收束。GitHub上传、目标服务器迁移／切换及真实宿主安装仍按原边界另行安排；对应的外部组件、平台限制见下节，不能把它们计作已经验收。正常源宿主已默认Go，无服务操作走integration-host，不再隐式回退旧JS；保留网页／互通参照／旧发行仍有用途的JS。旧压力测试、活跃模拟、资料填充及广泛模型测试未恢复。
+
+连续网页流程暴露的真实读取故障已修：首次事件reset取消旧显式读取后，observer替代读取结果被忽略，界面永久显示CancelledError。共同Query只在原scope/lane与授权缓存仍存在时接续只读结果，离开／撤权不重启，写入不重发。受影响网站生产构建通过；实际论坛流程已越过原失败点。源码本地提交 `5937199`，未推送。
+
+### 已知限制与失败处理
+
+本轮未正式上传、迁移生产数据库、改真实认证、切服务器或改宿主安装；开发清单仍migrationComplete:false。Linux只已交叉构建，未在Linux机器运行；真实模型、正式Meili／Gorse／OpenPanel和全部宿主／平台未据此验收。完整API夹具的OIDC使用受控发现／目录协议源和临时既有会话，不是正式Keycloak密码登录验收；聊天未配置真实投递transport。原Claude正式装配没有reader profile验证来源，Go保持前台接续和零提示派发，不捏造就绪；Windows目录链接原子替换Access denied的已有平台限制仍保留。
+
+必要检查暴露并窄修：旧wrapper冒号周期key被真实pg-boss拒绝（19.806s），Go按实际旧定义接续；Native RE2大次数初始化panic（2.587s）改同ASCII字符集＋原长度；host_view_state对象union缺SDK顶层object（3.575s）补冗余类型并保分支。只补跑各自失败用例，原失败和前批整合错误均保留项目外操作记录，不改写成首次成功。
+
+最后浏览器夹具修正了临时pin期限、受控OIDC发现、TLS／本机域名，以及改目录地址时嵌套roles重排导致的会话配置ID变化；不修改生产认证和原hash。开发服务经临时代理的水合链路未通过，未将它标为已解决；最终验收使用正常standalone及原CMS迁移，不再维护额外开发代理设施。临时诊断代码已移除。15批浏览器安全证据保留在项目外 `work/galaxy-go-20261028/evidence/browser/`；本次3个受控子进程均已退出，其端口及API端口无监听。
+
+正式切换仍须停止旧API内Information领取者、旧Worker和Publisher；Go配置不能证明旧Node进程已停。选定旧任务及周期定义只按实际来源／slot接续，已发出或未知结果不换号重发。旧ID／UID／绑定／密钥及业务记录保持；构建、模型回答和静态注册都不单独算业务完成。
 
 ## 管理登录独立界面
 
