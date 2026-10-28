@@ -38,6 +38,12 @@ func (s *Store) archive(ctx context.Context, write bool, requested string, expec
 		}
 		owner, e := s.ownerWithin(dir, requested)
 		if e != nil {
+			if fault.Code(e) == "local_work_identity_changed" {
+				return fault.New("local_archive_identity_changed", 409)
+			}
+			if fault.Code(e) == "local_work_identity_recovery_required" {
+				return fault.New("local_archive_identity_recovery_required", 409)
+			}
 			return e
 		}
 		if owner == "" {
@@ -63,7 +69,13 @@ func (s *Store) archive(ctx context.Context, write bool, requested string, expec
 			if e != nil {
 				return e
 			}
-			f.Close()
+			if e = f.Chmod(0600); e != nil {
+				_ = f.Close()
+				return e
+			}
+			if e = f.Close(); e != nil {
+				return e
+			}
 		}
 		db, e := openSQLite(path, write)
 		if e != nil {

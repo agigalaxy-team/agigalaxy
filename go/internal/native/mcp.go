@@ -8,10 +8,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
-	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +27,25 @@ type toolRuntime struct {
 	key     []byte
 	mu      sync.Mutex
 	choices map[string]*choiceRecord
+	browser *BrowserChoices
+}
+type ToolServer struct {
+	*mcp.Server
+	browser       *BrowserChoices
+	closeServices func()
+}
+
+func (s *ToolServer) Close() {
+	if s != nil && s.closeServices != nil {
+		s.closeServices()
+	}
+	if s != nil && s.browser != nil {
+		s.browser.Close()
+	}
+}
+func (s *ToolServer) Run(ctx context.Context, transport mcp.Transport) error {
+	defer s.Close()
+	return s.Server.Run(ctx, transport)
 }
 
 func toolResult(v any) (*mcp.CallToolResult, error) {
@@ -43,21 +61,178 @@ func toolError(e error) (*mcp.CallToolResult, error) {
 	return r, nil
 }
 func objectSchema(properties map[string]any, required ...string) map[string]any {
+	if required == nil {
+		required = []string{}
+	}
 	return map[string]any{"type": "object", "properties": properties, "additionalProperties": false, "required": required}
 }
 func stringSchema() any { return map[string]any{"type": "string", "minLength": 1, "maxLength": 512} }
 func integerSchema(min, max, def int) any {
 	return map[string]any{"type": "integer", "minimum": min, "maximum": max, "default": def}
 }
-func NewToolServer(store *Store) (*mcp.Server, error) {
+func NewToolServer(store *Store) (*ToolServer, error) {
+	return newToolServer(store, nil)
+}
+
+func NewRuntimeToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArtifact) (*ToolServer, error) {
+	if runtime == nil || runtime.store != store {
+		return nil, fault.New("native_runtime_invalid", 400)
+	}
+	return newToolServer(store, runtime, artifacts...)
+}
+
+func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArtifact) (*ToolServer, error) {
+	if len(artifacts) > 1 {
+		return nil, fault.New("panel_artifact_required", 400)
+	}
 	key := make([]byte, 32)
 	if _, e := rand.Read(key); e != nil {
 		return nil, e
 	}
-	rt := &toolRuntime{store: store, key: key, choices: map[string]*choiceRecord{}}
-	s := mcp.NewServer(&mcp.Implementation{Name: "galaxy-native-v2", Version: "0.3.0-go-development"}, &mcp.ServerOptions{Instructions: "Development Go migration: only the listed local tools are migrated. No network connection, upload, model, device change or full-client readiness is implied. Preserve current identity and original operations."})
+	rt := &toolRuntime{store: store, key: key, choices: map[string]*choiceRecord{}, browser: NewBrowserChoices(store, nil)}
+	serverName := "galaxy-native-v2"
+	serverInstructions := "Development Go migration: only listed tools are implemented. An existing saved connection may be resumed by status; a new connection choice requires the person's confirmation. No implicit upload, model use, identity creation or device change. Preserve current identity and original operations; this is not the complete migrated client."
+	if runtime == nil {
+		serverName = "galaxy-integration-mcp"
+		serverInstructions = "Galaxy Integration Pack is local-only in Founding Beta. Treat /Galaxy as a state-aware entry: initialize only on first use or after the user explicitly requests a configuration change. Start by listing initialization paths and previewing the requested plan. Do not call galaxy_integration_initialize until the user has reviewed the plan and explicitly confirmed the local module selection. No current module uploads Case content, publishes Proof, creates a remote account, or claims independent verification. Open a browser only when the user explicitly requests the configured official website and confirms the dedicated website-opening action."
+	}
+	s := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: "0.3.0-go-development"}, &mcp.ServerOptions{Instructions: serverInstructions})
+	var closeServices func()
+	if runtime != nil {
+		if len(runtime.config.A2A) > 0 {
+			a2a, err := NewNativeA2a(runtime, runtime.config.A2A, A2aOptions{ReadEnvironment: os.LookupEnv})
+			if err != nil {
+				rt.browser.Close()
+				return nil, err
+			}
+			stopA2aCore := registerNativeA2aTools(s, rt, a2a)
+			var purposeOptions WorkerToolOptions
+			if len(artifacts) == 1 && artifacts[0].valid() {
+				purposeOptions.Meta = InteractionToolMeta(artifacts[0].URI, false)
+				purposeOptions.ComponentOnly = nativeCompactUIAdvertised
+			}
+			stopA2aWork := registerNativeA2aWorkTools(s, rt, a2a, purposeOptions)
+			closeServices = func() { stopA2aWork(); stopA2aCore() }
+		}
+		if len(runtime.config.WorkerPacks) > 0 {
+			worker, err := NewNativeWorkerHost(runtime, runtime.config.WorkerPacks, runtime.config.A2A, A2aOptions{ReadEnvironment: os.LookupEnv})
+			if err != nil {
+				if closeServices != nil {
+					closeServices()
+				}
+				rt.browser.Close()
+				return nil, err
+			}
+			var options WorkerToolOptions
+			if len(artifacts) == 1 && artifacts[0].valid() {
+				options.Meta = InteractionToolMeta(artifacts[0].URI, false)
+				options.ComponentOnly = nativeCompactUIAdvertised
+			}
+			stopWorker := registerNativeWorkerTools(s, rt, worker, options)
+			stopA2A := closeServices
+			closeServices = func() {
+				stopWorker()
+				if stopA2A != nil {
+					stopA2A()
+				}
+			}
+		}
+		registerRuntimeTools(s, rt, runtime)
+		registerUploadTools(s, rt, runtime)
+		registerNativeUploadPreviewTools(s, rt, runtime)
+		registerIdentityControlTools(s, rt, runtime)
+		registerCommandTools(s, rt, runtime)
+		registerRemoteChatTools(s, rt, runtime)
+		registerRemoteCommunityTools(s, rt, runtime)
+		registerNavigationTools(s, rt, runtime)
+		registerNativeReferenceTools(s, rt, runtime)
+		registerNativeAuthorizationTool(s, rt, runtime)
+		registerRemoteTaskTools(s, rt, runtime)
+		registerRemoteFactsTools(s, rt, runtime)
+		registerRemoteProjectTools(s, rt, runtime)
+		registerRemoteSummaryTools(s, rt, runtime)
+		registerRemoteInboxTools(s, rt, runtime)
+		registerRemoteCommentTools(s, rt, runtime)
+		registerRemoteHubTools(s, rt, runtime)
+		registerRemoteIdentityGroupTools(s, rt, runtime)
+		registerRemoteMaterialTools(s, rt, runtime)
+		registerRemoteReputationTools(s, rt, runtime)
+		registerRemoteCITools(s, rt, runtime)
+		registerRemoteContactsTools(s, rt, runtime)
+		registerRemoteInformationTools(s, rt, runtime)
+		registerRemoteWatchTools(s, rt, runtime)
+		registerExtendedRemoteTools(s, rt, runtime)
+		registerNativeBookmarkTool(s, rt, runtime)
+		registerNativeWorkSelectionTools(s, rt, runtime)
+		registerWorkContinuationTools(s, rt, runtime)
+		stopGroups := registerNativeIdentityGroupTools(s, rt, runtime)
+		stopSummaries := registerPersonalSummaryTools(s, rt, runtime)
+		stopCapsuleWork := registerNativeCapsuleWorkTools(s, rt, runtime)
+		stopTrust := registerNativeTrustTools(s, rt, runtime)
+		stopContacts := registerNativeContactWorkTools(s, rt, runtime)
+		stopWatch := registerNativeWatchTools(s, rt, runtime)
+		stopHelp := registerNativeHelpTools(s, rt, runtime)
+		stopWebHandoff := registerNativeWebHandoffTools(s, rt, runtime)
+		stopNotifications, notificationError := registerNativeHostNotificationTools(s, rt, runtime)
+		stopPrevious := closeServices
+		closeServices = func() {
+			if stopNotifications != nil {
+				stopNotifications()
+			}
+			stopWatch()
+			stopWebHandoff()
+			stopHelp()
+			stopContacts()
+			stopTrust()
+			stopCapsuleWork()
+			stopSummaries()
+			stopGroups()
+			if stopPrevious != nil {
+				stopPrevious()
+			}
+		}
+		if notificationError != nil {
+			closeServices()
+			rt.browser.Close()
+			return nil, notificationError
+		}
+		if len(artifacts) == 1 {
+			reviewer := func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+				copyRequest := *req
+				copyParams := *req.Params
+				copyParams.Name = name
+				copyRequest.Params = &copyParams
+				return rt.review(ctx, &copyRequest, input, message, run)
+			}
+			e := RegisterInteractionApps(s, runtime, artifacts[0], reviewer, InteractionAppOperations{SaveSettings: func(ctx context.Context, raw json.RawMessage, scope *ChoiceScope) (any, error) {
+				var input NativeLocalSettingsInput
+				if e := protocol.Decode(raw, &input); e != nil {
+					return nil, e
+				}
+				return runtime.SaveLocalSettingsReviewed(ctx, input, scope)
+			}})
+			if e != nil {
+				if closeServices != nil {
+					closeServices()
+				}
+				rt.browser.Close()
+				return nil, e
+			}
+			stopPanel := registerNativePanelTools(s, rt, runtime, runtime.nativeHelp, runtime.navigation, artifacts[0])
+			stopShared := closeServices
+			closeServices = func() {
+				stopPanel()
+				if stopShared != nil {
+					stopShared()
+				}
+			}
+		}
+	}
+	registerHistoryMaterial(s, store)
+	registerInitializationTools(s, rt)
+	registerLocalMaterialTools(s, rt)
 	listProps := map[string]any{"galaxyId": stringSchema(), "host": stringSchema(), "limit": integerSchema(1, 100, 20), "after": map[string]any{"type": "string", "pattern": "^[0-9]+$"}}
-	s.AddTool(&mcp.Tool{Name: "galaxy_local_work_list", Description: "Read current identity's actual local work history without creating an identity, connecting or running a model.", InputSchema: objectSchema(listProps)}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_list", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read current identity's actual local work history without creating an identity, connecting or running a model.", InputSchema: objectSchema(listProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var x struct {
 			GalaxyID string `json:"galaxyId"`
 			Host     string `json:"host"`
@@ -81,7 +256,7 @@ func NewToolServer(store *Store) (*mcp.Server, error) {
 		return toolResult(v)
 	})
 	getProps := map[string]any{"galaxyId": stringSchema(), "workId": stringSchema(), "host": stringSchema(), "sessionId": stringSchema(), "afterSequence": map[string]any{"type": "integer", "minimum": 0, "default": 0}, "limit": integerSchema(1, 200, 100)}
-	s.AddTool(&mcp.Tool{Name: "galaxy_local_work_get", Description: "Read actually retained observations and own-model summaries for the selected current-identity work.", InputSchema: objectSchema(getProps)}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_get", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read actually retained observations and own-model summaries for the selected current-identity work.", InputSchema: objectSchema(getProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var q WorkQuery
 		if e := protocol.Decode(req.Params.Arguments, &q); e != nil {
 			return toolError(e)
@@ -100,7 +275,7 @@ func NewToolServer(store *Store) (*mcp.Server, error) {
 		}
 		return toolResult(v)
 	})
-	s.AddTool(&mcp.Tool{Name: "galaxy_local_archive_settings", Description: "Read current identity's explicit local original-message capture settings. No upload or implicit selection.", InputSchema: objectSchema(map[string]any{})}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_archive_settings", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read current identity's explicit local original-message capture settings. No upload or implicit selection.", InputSchema: objectSchema(map[string]any{})}, "local_archive_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var x struct{}
 		if e := protocol.Decode(req.Params.Arguments, &x); e != nil {
 			return toolError(e)
@@ -112,8 +287,11 @@ func NewToolServer(store *Store) (*mcp.Server, error) {
 		return toolResult(v)
 	})
 	props := map[string]any{"galaxyId": stringSchema(), "enabled": map[string]any{"type": "boolean"}, "sessions": map[string]any{"type": "array", "maxItems": 500, "items": objectSchema(map[string]any{"host": stringSchema(), "sessionId": stringSchema()}, "host", "sessionId")}, "autoCleanAfterDays": map[string]any{"type": []string{"integer", "null"}, "minimum": 1, "maximum": 36500, "default": nil}}
-	s.AddTool(&mcp.Tool{Name: "galaxy_local_archive_configure", Description: "Choose exact existing host/session scopes for private local original capture and optional cleanup. Requires actual person input; no upload.", InputSchema: objectSchema(props, "enabled", "sessions")}, rt.configure)
-	return s, nil
+	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_archive_configure", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}, Description: "Choose exact existing host/session scopes for private local original capture and optional cleanup. Requires actual person input; no upload.", InputSchema: objectSchema(props, "enabled", "sessions")}, "local_archive_input_invalid", rt.configure)
+	if runtime == nil {
+		registerIntegrationTools(s, rt)
+	}
+	return &ToolServer{Server: s, browser: rt.browser, closeServices: closeServices}, nil
 }
 func (r *toolRuntime) token(nonce string) string {
 	m := hmac.New(sha256.New, r.key)
@@ -136,11 +314,10 @@ func (r *toolRuntime) configure(ctx context.Context, req *mcp.CallToolRequest) (
 	if e := ValidateArchive(x); e != nil {
 		return toolError(e)
 	}
-	scope, e := r.store.ChoiceScope(ctx)
+	owner, e := r.store.Owner(ctx)
 	if e != nil {
 		return toolError(e)
 	}
-	owner := scope.Owner
 	if owner == "" {
 		return toolError(fault.New("local_identity_required", 409))
 	}
@@ -148,81 +325,12 @@ func (r *toolRuntime) configure(ctx context.Context, req *mcp.CallToolRequest) (
 		return toolError(fault.New("local_identity_mismatch", 409))
 	}
 	x.GalaxyID = owner
-	canonical, e := identity.Canonical(struct {
-		Input ArchiveInput
-		Scope ChoiceScope
-	}{x, scope})
+	message, e := r.store.archiveChoiceMessage(ctx, x)
 	if e != nil {
 		return toolError(e)
 	}
-	hash := identity.Digest(canonical)
-	schema := objectSchema(map[string]any{"confirm": map[string]any{"type": "boolean", "title": "允许这里显示的内容与范围"}}, "confirm")
-	review, _ := protocol.Encode(x)
-	message := "银河：设置本机会话原件范围（不上传）。\n" + string(review)
-	if req.Session.InitializeParams().ProtocolVersion != "2026-07-28" {
-		caps := req.Session.InitializeParams().Capabilities
-		if caps == nil || caps.Elicitation == nil {
-			return toolError(fault.New("native_choice_browser_not_migrated", 503))
-		}
-		answer, e := req.Session.Elicit(ctx, &mcp.ElicitParams{Mode: "form", Message: message, RequestedSchema: schema})
-		if e != nil {
-			return toolError(fault.New("native_choice_unavailable", 503))
-		}
-		if answer.Action != "accept" || answer.Content["confirm"] != true {
-			return toolResult(map[string]any{"state": "declined", "sideEffect": false})
-		}
-		v, e := r.store.configureArchive(ctx, x, &scope)
-		if e != nil {
-			return toolError(e)
-		}
-		return toolResult(v)
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for nonce, v := range r.choices {
-		if time.Now().After(v.Expires) {
-			delete(r.choices, nonce)
-		}
-	}
-	if req.Params.RequestState == "" {
-		nonce := uuid.NewString()
-		r.choices[nonce] = &choiceRecord{Owner: owner, Hash: hash, Expires: time.Now().Add(5 * time.Minute)}
-		raw, e := protocol.Encode(map[string]any{"resultType": "input_required", "requestState": r.token(nonce), "inputRequests": map[string]any{"choice": map[string]any{"method": "elicitation/create", "params": map[string]any{"mode": "form", "message": message, "requestedSchema": schema}}}})
-		if e != nil {
-			return nil, e
-		}
-		var out mcp.CallToolResult
-		if e = json.Unmarshal(raw, &out); e != nil {
-			return nil, e
-		}
-		return &out, nil
-	}
-	nonce, ok := r.verify(req.Params.RequestState)
-	record := r.choices[nonce]
-	if !ok || record == nil || record.Owner != owner || record.Hash != hash {
-		return toolError(fault.New("native_choice_changed_or_expired", 409))
-	}
-	if record.Result != nil {
-		return record.Result, nil
-	}
-	if record.Running {
-		return toolError(fault.New("native_choice_in_progress", 409))
-	}
-	answer, ok := req.Params.InputResponses["choice"].(*mcp.ElicitResult)
-	if !ok {
-		return toolError(fault.New("native_choice_response_invalid", 400))
-	}
-	if answer.Action != "accept" || answer.Content["confirm"] != true {
-		delete(r.choices, nonce)
-		return toolResult(map[string]any{"state": "declined", "sideEffect": false})
-	}
-	record.Running = true
-	v, e := r.store.configureArchive(ctx, x, &scope)
-	record.Running = false
-	if e != nil {
-		record.Result, _ = toolError(e)
-		return record.Result, nil
-	}
-	record.Result, e = toolResult(v)
-	return record.Result, e
+	return r.review(ctx, req, x, message, func(scope *ChoiceScope) (any, error) {
+		x.GalaxyID = scope.Owner
+		return r.store.configureArchive(ctx, x, scope)
+	})
 }

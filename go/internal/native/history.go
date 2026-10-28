@@ -199,7 +199,7 @@ func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 		}
 		summaries := []any{}
 		for _, r := range sr {
-			summaries = append(summaries, map[string]any{"revision": r["revision"], "throughSequence": r["through_sequence"], "title": r["title"], "summary": r["summary"], "outcome": r["outcome"], "model": r["model"], "execution": decoded(r["execution_json"]), "exclusions": array(r["exclusions_json"]), "createdAt": r["created_at"], "sourceKind": "user-model", "sourceObservationIds": decoded(r["sources_json"])})
+			summaries = append(summaries, summaryView(r))
 		}
 		er, e := rowsMaps(ctx, db, "SELECT * FROM work_environments WHERE owner_id=? AND host=? AND session_id=? ORDER BY version", owner, work["host"], work["session_id"])
 		if e != nil {
@@ -207,7 +207,7 @@ func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 		}
 		environments := []any{}
 		for _, r := range er {
-			environments = append(environments, map[string]any{"id": r["id"], "version": r["version"], "observedAt": r["observed_at"], "facts": decoded(r["facts_json"]), "exclusions": array(r["exclusions_json"])})
+			environments = append(environments, environmentView(r))
 		}
 		out = map[string]any{"work": view, "observations": observations, "nextAfter": next, "summaries": summaries, "environments": environments}
 		return nil

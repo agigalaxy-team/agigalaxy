@@ -10,11 +10,27 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 )
 
 func run(ctx context.Context, args []string) error {
 	if len(args) < 1 {
-		return fault.New("native_command_required", 400)
+		return localCommand(ctx, "status", nil)
+	}
+	switch args[0] {
+	case "help", "--help", "-h":
+		usage()
+		return nil
+	case "init", "status", "export", "integration-mcp":
+		return localCommand(ctx, args[0], args[1:])
+	case "service-config":
+		return serviceConfigurationCommand(ctx, args[1:])
+	case "command":
+		return menuCommand(ctx, args[1:])
+	case "host-configs":
+		return hostConfigurationsCommand(ctx, args[1:])
+	case "setup":
+		return setupCommand(ctx, args[1:])
 	}
 	configPath := os.Getenv("GALAXY_NATIVE_CONFIG")
 	for i := 1; i < len(args); i++ {
@@ -33,12 +49,35 @@ func run(ctx context.Context, args []string) error {
 		return e
 	}
 	switch args[0] {
+	case "host":
+		return native.ServeHost(ctx, store, os.Stdin, os.Stdout)
 	case "native":
-		s, e := native.NewToolServer(store)
+		runtime, e := native.NewRuntime(store, c, native.ConnectionOptions{})
 		if e != nil {
 			return e
 		}
-		return s.Run(ctx, &mcp.StdioTransport{})
+		defer runtime.Close()
+		var artifacts []*native.InteractionArtifact
+		executable, e := os.Executable()
+		if e != nil {
+			return e
+		}
+		artifactDirectory := filepath.Join(filepath.Dir(executable), "dist")
+		if _, e = os.Stat(artifactDirectory); e == nil {
+			artifact, e := native.LoadInteractionArtifact(artifactDirectory)
+			if e != nil {
+				return e
+			}
+			artifacts = append(artifacts, artifact)
+		} else if !os.IsNotExist(e) {
+			return e
+		}
+		s, e := native.NewRuntimeToolServer(store, runtime, artifacts...)
+		if e != nil {
+			return e
+		}
+		runtime.ResumePrivateSync(0)
+		return s.Run(ctx, native.HostSessionTransport(runtime, &mcp.StdioTransport{}))
 	case "identity":
 		v, e := store.Identity(ctx)
 		if e != nil {

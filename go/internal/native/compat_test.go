@@ -123,6 +123,37 @@ func TestMissingIdentityReadCreatesNothing(t *testing.T) {
 		t.Fatal("read materialized data directory")
 	}
 }
+func TestRetainedMaterialMatchesOriginalPendingAndExport(t *testing.T) {
+	s, want := fixture(t)
+	ctx := context.Background()
+	work := want["list"].(map[string]any)["items"].([]any)[0].(map[string]any)["workId"].(string)
+	pending, e := s.WorkPending(ctx, WorkQuery{WorkID: work})
+	if e != nil {
+		t.Fatal(e)
+	}
+	same(t, want["pending"], pending)
+	exported, e := s.WorkExport(ctx, WorkQuery{WorkID: work})
+	if e != nil {
+		t.Fatal(e)
+	}
+	actual := exported.(map[string]any)
+	if _, e = time.Parse(time.RFC3339Nano, actual["exportedAt"].(string)); e != nil {
+		t.Fatal(e)
+	}
+	delete(actual, "exportedAt")
+	delete(want["export"].(map[string]any), "exportedAt")
+	same(t, want["export"], actual)
+	client := connectMCP(t, s, "2026-07-28", false)
+	for _, input := range []map[string]any{{"workId": work, "limit": nil}, {"workId": work, "limit": 0}, {"workId": work, "extra": "unexpected"}} {
+		result, e := client.CallTool(ctx, &mcp.CallToolParams{Name: "galaxy_local_work_pending", Arguments: input})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if !result.IsError {
+			t.Fatal("invalid material input accepted")
+		}
+	}
+}
 func TestCorruptLocalRecordsAreNotPresentedAsEmptyData(t *testing.T) {
 	s, _ := fixture(t)
 	ctx := context.Background()
@@ -220,7 +251,7 @@ func connectMCP(t *testing.T, store *Store, version string, answer bool) *mcp.Cl
 	if e != nil {
 		t.Fatal(e)
 	}
-	t.Cleanup(func() { cs.Close(); ss.Close() })
+	t.Cleanup(func() { cs.Close(); ss.Close(); s.Close() })
 	return cs
 }
 func TestActualMCPVersionsRequirePersonChoiceAndPreserveArchive(t *testing.T) {

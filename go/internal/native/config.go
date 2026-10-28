@@ -13,6 +13,7 @@ type Pin struct {
 	PublicKeyPEM string `json:"publicKeyPem"`
 	NotBefore    int64  `json:"notBefore"`
 	NotAfter     int64  `json:"notAfter"`
+	TrustedUntil *int64 `json:"trustedUntil,omitempty"`
 	Revoked      bool   `json:"revoked"`
 }
 type Configuration struct {
