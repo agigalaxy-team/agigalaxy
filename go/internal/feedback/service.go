@@ -27,6 +27,7 @@ type Authorization interface {
 type Operator struct {
 	ID, Role, RequestID string
 	CanManage           bool
+	operations          *operationsOperator
 }
 type Attachments interface {
 	Bind(context.Context, pgx.Tx, string, string, string, []Reference, time.Time) error
@@ -37,8 +38,11 @@ type Service struct {
 	Endpoint    string
 	Authority   Authorization
 	Attachments Attachments
-	RequestID   string
-	Now         func() time.Time
+	// Tasks is explicitly injected only when this domain uses the Go transport.
+	// Nil retains the original non-River path without touching queue tables.
+	Tasks     TaskProducer
+	RequestID string
+	Now       func() time.Time
 }
 
 func (s *Service) now() time.Time {
@@ -73,6 +77,9 @@ func (s *Service) operator(ctx context.Context, tx pgx.Tx, id, permission string
 	}
 	if a.ID == "" || a.ID != id {
 		return a, fault.New("business_admin_denied", 403)
+	}
+	if _, ok := s.operationsActor(a); ok {
+		return a, nil
 	}
 	var issuer, subject string
 	e = tx.QueryRow(ctx, "SELECT issuer,external_subject FROM operations_operator_principals_v1 WHERE operator_id=$1 AND endpoint=$2 FOR SHARE", a.ID, s.Endpoint).Scan(&issuer, &subject)
@@ -185,6 +192,9 @@ func (s *Service) SubmissionOperation(ctx context.Context, account, op string) (
 	})
 }
 func (s *Service) record(ctx context.Context, tx pgx.Tx, a Operator, action, op string, selection, result Object) error {
+	if proof, ok := s.operationsActor(a); ok {
+		return proof.owner.domain.Record(ctx, tx, proof.actor, action, selection, result, nullable(op))
+	}
 	if a.RequestID == "" {
 		a.RequestID = s.RequestID
 	}

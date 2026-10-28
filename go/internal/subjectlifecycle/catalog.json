@@ -1,0 +1,1232 @@
+{
+  "datasets": [
+    "identity",
+    "external-identity-links",
+    "bindings",
+    "consents",
+    "cases",
+    "case-events",
+    "evidence",
+    "observations",
+    "proofs",
+    "assistance-requests",
+    "assistance-events",
+    "context-grants",
+    "context-acceptances",
+    "notification-preferences",
+    "notification-reads",
+    "moderation-reports",
+    "moderation-events",
+    "capsules",
+    "capsule-events",
+    "capsule-uses",
+    "builders",
+    "builder-events",
+    "audit",
+    "audit-access-grants",
+    "audit-reads",
+    "export-reads",
+    "deletion-requests",
+    "deletion-events",
+    "deletion-executions",
+    "incident-notices",
+    "profile-statements",
+    "builder-probes",
+    "reading-bookmarks",
+    "reading-bookmark-operations",
+    "chat-human-message-reads",
+    "task-materials",
+    "forum-post-heads",
+    "forum-version-locators",
+    "forum-reply-locators",
+    "forum-events",
+    "forum-permissions",
+    "forum-report-locators",
+    "forum-governance-events",
+    "forum-write-receipts",
+    "forum-daily-usage",
+    "outcome-materials-v2",
+    "watch-controls",
+    "watch-control-operations",
+    "identity-group-heads",
+    "identity-group-operations",
+    "identity-group-approvals",
+    "information-watches",
+    "information-watch-operations",
+    "information-change-receipts",
+    "worker-pack-uses",
+    "worker-pack-use-events",
+    "hub-heads-v2",
+    "hub-events-v2",
+    "hub-memberships-v2",
+    "hub-intake-receipts-v2",
+    "hub-peering-agreements-v2",
+    "hub-peering-events-v2",
+    "hub-peering-grants-v2",
+    "hub-peering-changes-v2",
+    "hub-peering-receipts-v2",
+    "trust-package-permissions",
+    "qualification-request-receipts",
+    "qualification-request-events",
+    "chat-attachment-receipts",
+    "configuration-objects",
+    "configuration-events",
+    "choice-snapshot-preferences",
+    "choice-snapshot-heads",
+    "choice-snapshot-version-receipts",
+    "task-comments-v2",
+    "task-comment-events-v2",
+    "target-report-receipts-v2",
+    "target-governance-events-v2",
+    "comment-report-receipts-v2",
+    "comment-governance-events-v2",
+    "ci-requests-v2",
+    "ci-observations-v2",
+    "ci-proofs-v2",
+    "context-grants-v2",
+    "context-events-v2",
+    "contribution-publications",
+    "recruitment-opportunities",
+    "recruitment-events",
+    "recruitment-task-links",
+    "room-shared-summary-receipts",
+    "notification-options-v2",
+    "notification-presentations",
+    "personal-summary-preferences",
+    "personal-summary-heads",
+    "personal-summary-version-receipts",
+    "projects-v2",
+    "project-events-v2",
+    "project-roles-v2",
+    "project-field-sources-v2",
+    "project-transfers-v2",
+    "project-preferences-v2",
+    "contacts-v2",
+    "contact-events-v2",
+    "experience-objects",
+    "experience-events",
+    "qualification-calculation-grants",
+    "chat-created-room-receipts",
+    "chat-proposal-receipts",
+    "chat-memberships",
+    "chat-message-receipts",
+    "chat-message-operations",
+    "chat-cursors",
+    "chat-message-preferences",
+    "chat-agent-grants",
+    "capsule-permissions",
+    "capsule-uses-v2",
+    "identity-control-heads",
+    "identity-control-events",
+    "device-authorizations",
+    "recovery-authorizations",
+    "identity-operation-receipts",
+    "case-task-links",
+    "community-account-links",
+    "community-accounts",
+    "community-daily-usage",
+    "community-interactions",
+    "community-write-receipts",
+    "tasks",
+    "task-participations",
+    "task-events",
+    "verification-objects",
+    "verification-events",
+    "verification-dependencies",
+    "lifecycle-erasures"
+  ],
+  "viewScopes": {
+    "forum-post-version": "assistance",
+    "forum-reply": "assistance",
+    "builder-support": "builders",
+    "choice-snapshot": "binding",
+    "recruitment": "history",
+    "project": "history",
+    "contact": "history",
+    "personal-summary": "binding",
+    "assistance": "assistance",
+    "task": "assistance",
+    "case": "case-teaser",
+    "evidence": "evidence",
+    "verification": "evidence",
+    "context": "context",
+    "proof": "proof",
+    "capsule": "capsules",
+    "builder": "builders",
+    "moderation": "moderation"
+  },
+  "sources": {
+    "chat-human-message-reads": {
+      "from": "chat_human_message_reads t",
+      "owner": "t.subject_id",
+      "fields": "t.room_id,t.subject_id,t.message_id,t.read_at",
+      "key": "t.room_id::text||':'||t.subject_id||':'||t.message_id::text",
+      "cutoff": "t.read_at",
+      "transform": false
+    },
+    "reading-bookmarks": {
+      "from": "reading_bookmarks_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.reference_key,t.reference,t.saved,t.revision,t.created_at,t.saved_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "reading-bookmark-operations": {
+      "from": "reading_bookmark_operations_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.operation_id,t.request_hash,t.result,t.created_at",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "task-materials": {
+      "from": "task_materials_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.material_id,t.task_id,t.subject_id,t.root_event_id,t.consent_id,t.descriptor,t.body_text,t.text_hash,t.created_at,t.expires_at,t.erased_at",
+      "key": "t.material_id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "forum-post-heads": {
+      "from": "forum_posts_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.head_version,t.current_version_id,t.state,t.created_at,t.updated_at,t.erased_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "forum-version-locators": {
+      "from": "forum_versions_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.post_id,t.version_number,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "forum-reply-locators": {
+      "from": "forum_replies_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.post_id,t.post_version_id,t.reply_to_id,t.content_revision,t.revision,t.publication_event_id,t.permission_id,t.payload_hash,t.published_until,t.state,t.created_at,t.erased_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "forum-events": {
+      "from": "forum_events_v1 t LEFT JOIN forum_permissions_v1 p ON p.event_id=t.id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.kind,t.post_id,t.version_id,t.reply_id,t.payload_text,t.payload_hash,t.result,t.created_at,t.erased_at,p.id permission_id",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "forum-permissions": {
+      "from": "forum_permissions_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.event_id,t.consent_id,t.origin_binding_id,t.source_device_id,t.source_key_id,t.accepted_epoch,t.accepted_control_hash,t.signature_hash,t.payload_hash,t.action,t.object_id,t.visibility,t.fields,t.viewers,t.issued_at,t.published_until,t.accepted_at,t.authorization_audit_until,t.revoked_at,t.erased_at,t.policy_hash",
+      "key": "t.id::text",
+      "cutoff": "t.accepted_at",
+      "transform": false
+    },
+    "forum-report-locators": {
+      "from": "forum_reports_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.target,t.version,t.state,t.appeal_count,t.decision_event_id,t.restriction_event_id,t.restriction_until,t.created_at,t.closed_at,t.audit_until",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "forum-governance-events": {
+      "from": "forum_governance_events_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.operation_id,t.report_id,t.subject_id,t.version,t.kind,t.permission_id,t.payload_text,t.payload_hash,t.created_at,t.erased_at,t.resolution,t.effect_until",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "forum-write-receipts": {
+      "from": "forum_write_receipts_v1 t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.category,t.payload_hash,t.locator,t.result,t.created_at,t.retained_until",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "forum-daily-usage": {
+      "from": "forum_daily_usage_v1 t",
+      "owner": "(SELECT $1::text WHERE EXISTS(SELECT 1 FROM community_account_links l WHERE l.subject_id=$1 AND l.account_id=t.account_id))",
+      "fields": "t.account_id,t.day,t.category,t.used",
+      "key": "t.account_id::text||':'||t.day::text||':'||t.category",
+      "cutoff": "t.day::timestamp",
+      "transform": false
+    },
+    "outcome-materials-v2": {
+      "from": "outcome_materials_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.author_id,t.case_id,t.task_id,t.source,t.source_kind,t.audience,t.uses,t.title,t.request_id,t.approval_id,t.revision,t.state,t.created_at,t.request_expires_at,t.approved_at,t.expires_at,t.body_text,t.name,t.media_type,t.byte_size,t.sha256,t.scan_result,t.purge_pending,t.purged_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "watch-controls": {
+      "from": "watch_controls_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.watch_id,t.subject_id,t.room_id,t.task_id,t.purpose,t.revision,t.state,t.current_grant_id,t.current_binding_id,t.expires_at,t.created_at,t.updated_at,t.stopped_at",
+      "key": "t.watch_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "watch-control-operations": {
+      "from": "watch_control_operations_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.watch_id,t.subject_id,t.binding_id,t.kind,t.request_hash,t.result,t.created_at",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "identity-group-heads": {
+      "from": "identity_groups_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.version,t.state,t.current_operation_id,t.created_at,t.updated_at,t.source_erased_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "identity-group-operations": {
+      "from": "identity_group_operations_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.group_id,t.subject_id,t.kind,t.expected_version,t.payload_text,t.payload_hash,t.state,t.result_version,t.created_at,t.expires_at,t.closed_at,t.erased_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "identity-group-approvals": {
+      "from": "identity_group_approvals_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.operation_id,t.subject_id,t.decision,t.proof_text,t.signature,t.key_id,t.epoch,t.public_key,t.chain_head,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "information-watches": {
+      "from": "information_watches_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.revision,t.check_revision,t.state,t.plan,t.expires_at,t.last_checked_at,t.next_check_at,t.created_at,t.updated_at,t.ended_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "information-watch-operations": {
+      "from": "information_watch_operations_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.subject_id,t.watch_id,t.request_hash,t.result,t.created_at",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "information-change-receipts": {
+      "from": "information_watch_changes_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.watch_id,t.batch_key,t.created_at,t.available_at,t.expires_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "worker-pack-uses": {
+      "from": "worker_pack_uses t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.builder_id,t.manifest_id,t.case_id,t.attempt_id,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "worker-pack-use-events": {
+      "from": "worker_pack_use_events t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.use_id,t.subject_id,t.version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "hub-heads-v2": {
+      "from": "hub_heads_v2 t",
+      "owner": "t.owner_id",
+      "fields": "t.id,t.owner_id,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "hub-events-v2": {
+      "from": "hub_events_v2 t LEFT JOIN hub_intake_v2 i ON i.id=t.object_id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.kind,t.charter_version,t.object_id,t.object_version,t.consent_id,t.payload_text,t.payload_hash,t.received_at,i.expires_at",
+      "key": "t.id::text",
+      "cutoff": "to_timestamp(t.received_at)",
+      "transform": true
+    },
+    "hub-memberships-v2": {
+      "from": "hub_memberships_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.version,t.charter_version,t.state,t.scopes,t.invite_id,t.decision_id,t.expires_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "hub-intake-receipts-v2": {
+      "from": "hub_intake_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.version,t.state,t.created_at,t.expires_at",
+      "key": "t.id::text",
+      "cutoff": "to_timestamp(t.created_at)",
+      "transform": false
+    },
+    "hub-peering-agreements-v2": {
+      "from": "hub_peering_agreements_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.version,t.agreement_hash,t.state,t.event_id,t.expires_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "hub-peering-events-v2": {
+      "from": "hub_peering_events_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.kind,t.object_id,t.consent_id,t.payload_text,t.payload_hash,t.received_at",
+      "key": "t.id::text",
+      "cutoff": "to_timestamp(t.received_at)",
+      "transform": false
+    },
+    "hub-peering-grants-v2": {
+      "from": "hub_peering_grants_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.hub_id,t.subject_id,t.agreement_id,t.agreement_version,t.requester_ids,t.expires_at,t.revoked_at,t.last_state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "hub-peering-changes-v2": {
+      "from": "hub_peering_changes_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.sequence,t.grant_id,t.agreement_id,t.subject_id,t.state,t.observed_at",
+      "key": "lpad(t.sequence::text,20,'0')",
+      "cutoff": "to_timestamp(t.observed_at)",
+      "transform": false
+    },
+    "hub-peering-receipts-v2": {
+      "from": "hub_peering_receipts_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.query_id,t.side,t.agreement_id,t.subject_id,t.request_hash,t.response_hash,t.state,t.created_at,t.checked_at",
+      "key": "t.query_id::text||':'||t.side",
+      "cutoff": "to_timestamp(t.created_at)",
+      "transform": false
+    },
+    "trust-package-permissions": {
+      "from": "trust_package_permissions t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.grantee_id,t.operation_id,t.payload_text,t.signed,t.signature_hash,t.identity,t.created_at,t.expires_at,t.revoked_at,t.revoke_operation_id,t.revoke_payload_text,t.revoke_signed,t.revoke_signature_hash",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "qualification-request-receipts": {
+      "from": "qualification_permission_requests t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.source_author_id,t.task_id,t.scope_hash,t.root_event_id,t.version,t.state,t.expires_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "qualification-request-events": {
+      "from": "qualification_permission_request_events t JOIN qualification_permission_requests r ON r.id=t.request_id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.request_id,t.subject_id,t.version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,r.expires_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "chat-attachment-receipts": {
+      "from": "chat_attachments t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.room_id,t.subject_id,t.message_id,t.request_hash,t.name,t.media_type,t.byte_size,t.sha256,t.state,t.created_at,t.uploaded_at,t.expires_at,t.prepare_expires_at,t.scan_result,t.revoked_at,t.purge_pending,t.purged_at,t.policy_version",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "configuration-objects": {
+      "from": "configuration_objects t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "configuration-events": {
+      "from": "configuration_events t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.configuration_id,t.subject_id,t.version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "choice-snapshot-preferences": {
+      "from": "choice_snapshot_preferences t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.revision,t.endpoint,t.enabled,t.snapshot_ids,t.updated_at",
+      "key": "t.subject_id",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "choice-snapshot-heads": {
+      "from": "choice_snapshot_heads t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.snapshot_id,t.revision,t.current_version_id,t.deleted_at,t.created_at,t.updated_at",
+      "key": "t.subject_id||':'||t.snapshot_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "choice-snapshot-version-receipts": {
+      "from": "choice_snapshot_versions t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.snapshot_id,t.version_id,t.base_revision,t.revision,t.request_hash,t.state,t.created_at,t.expires_at",
+      "key": "t.subject_id||':'||t.version_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "task-comments-v2": {
+      "from": "task_comments_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.task_id,t.subject_id,t.revision,t.current_event_id,t.reply_to_id,t.reply_to_revision,t.state,t.review_state,t.rule_version,t.rule_reasons,t.created_at,t.expires_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "task-comment-events-v2": {
+      "from": "task_comment_events_v2 t JOIN task_comments_v2 c ON c.id=t.comment_id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.comment_id,t.task_id,t.subject_id,t.revision,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,t.erased_at,c.expires_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "target-report-receipts-v2": {
+      "from": "target_reports_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.target_type,t.task_id,t.room_id,t.target_version,t.root_event_id,t.version,t.state,t.restriction_scopes,t.restriction_until,t.closed_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "target-governance-events-v2": {
+      "from": "target_governance_events_v2 t JOIN target_reports_v2 r ON r.id=t.report_id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.report_id,t.subject_id,t.version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,t.erased_at,r.closed_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "comment-report-receipts-v2": {
+      "from": "comment_reports_v2 t",
+      "owner": "t.reporter_id",
+      "fields": "t.id,t.comment_id,t.comment_revision,t.reporter_id,t.version,t.state,t.pause_until,t.closed_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "comment-governance-events-v2": {
+      "from": "comment_governance_events_v2 t JOIN comment_reports_v2 r ON r.id=t.report_id",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.report_id,t.subject_id,t.version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,t.erased_at,r.closed_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "ci-requests-v2": {
+      "from": "ci_requests_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.consent_id,t.case_id,t.evidence_id,t.evidence_version,t.result_id,t.result_version,t.source_key,t.payload_text,t.payload_hash,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "ci-observations-v2": {
+      "from": "ci_observations_v2 t JOIN ci_requests_v2 r ON r.id=t.request_id",
+      "owner": "r.subject_id",
+      "fields": "t.id,t.request_id,t.job_id,t.attempt,t.observation,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "ci-proofs-v2": {
+      "from": "ci_proofs_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.request_id,t.observation_id,t.consent_id,t.payload_text,t.payload_hash,t.signed,t.revoked_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "context-grants-v2": {
+      "from": "context_grants_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.task_id,t.participation_id,t.subject_id,t.participant_id,t.scope_version,t.scope_event_id,t.consent_id,t.payload_text,t.payload_hash,t.materials_hash,t.expires_at,t.state,t.response_event_id,t.revoked_at,t.erased_at,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "context-events-v2": {
+      "from": "context_events_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.grant_id,t.subject_id,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "contribution-publications": {
+      "from": "contribution_publications t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.consent_id,t.source_refs,t.payload_text,t.payload_hash,t.revoked_at,t.revoke_id,t.revoke_consent_id,t.revoke_payload_text,t.revoke_payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "recruitment-opportunities": {
+      "from": "recruitment_opportunities t JOIN projects_v2 p ON p.id=t.project_id CROSS JOIN LATERAL (SELECT p.owner_id subject_id UNION SELECT t.publisher_id) own",
+      "owner": "own.subject_id",
+      "fields": "t.id,t.project_id,t.creator_id,t.publisher_id,t.contact_subject_id,t.revision,t.state,t.current_event_id,t.expires_at,t.created_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "recruitment-events": {
+      "from": "recruitment_events t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.recruitment_id,t.subject_id,t.revision,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "recruitment-task-links": {
+      "from": "recruitment_task_links t",
+      "owner": "t.subject_id",
+      "fields": "t.recruitment_id,t.task_id,t.subject_id,t.operation_id,t.created_at",
+      "key": "t.recruitment_id::text||':'||t.task_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "room-shared-summary-receipts": {
+      "from": "room_shared_summaries t",
+      "owner": "t.subject_id",
+      "fields": "t.share_id,t.subject_id,t.room_id,t.member_revision,t.request_hash,t.notice_hash,t.message_id,t.supersedes_share_id,t.state,t.created_at,t.expires_at,t.retracted_at",
+      "key": "t.share_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "notification-options-v2": {
+      "from": "notification_options_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.revision,t.settings,t.updated_at",
+      "key": "t.subject_id",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "notification-presentations": {
+      "from": "notification_presentations t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.kind,t.event_id,t.client_id,t.claim_id,t.lease_until,t.presented_at,t.expires_at",
+      "key": "t.subject_id||':'||t.kind||':'||t.event_id::text",
+      "cutoff": "t.lease_until - interval '30 seconds'",
+      "transform": false
+    },
+    "personal-summary-preferences": {
+      "from": "personal_summary_preferences t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.revision,t.endpoint,t.enabled,t.room_ids,t.include_existing,t.enabled_since,t.updated_at",
+      "key": "t.subject_id",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "personal-summary-heads": {
+      "from": "personal_summary_heads t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.summary_id,t.room_id,t.revision,t.current_version_id,t.deleted_at,t.created_at,t.updated_at",
+      "key": "t.subject_id||':'||t.summary_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "personal-summary-version-receipts": {
+      "from": "personal_summary_versions t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.summary_id,t.version_id,t.base_revision,t.revision,t.request_hash,t.state,t.created_at,t.expires_at",
+      "key": "t.subject_id||':'||t.version_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "projects-v2": {
+      "from": "projects_v2 t",
+      "owner": "t.owner_id",
+      "fields": "t.id,t.creator_id,t.owner_id,t.revision,t.state,t.document_event_id,t.policy_event_id,t.source_statement_id,t.created_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "project-events-v2": {
+      "from": "project_events_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.project_id,t.subject_id,t.revision,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.affected_fields,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "project-roles-v2": {
+      "from": "project_roles_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.project_id,t.subject_id,t.role,t.grant_event_id,t.revoke_event_id,t.state,t.created_at,t.updated_at",
+      "key": "t.project_id::text||':'||t.subject_id||':'||t.role",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "project-field-sources-v2": {
+      "from": "project_field_sources_v2 t JOIN projects_v2 p ON p.id=t.project_id",
+      "owner": "p.owner_id",
+      "fields": "t.project_id,t.field_name,t.event_id",
+      "key": "t.project_id::text||':'||md5(t.field_name)",
+      "cutoff": "p.updated_at",
+      "transform": false
+    },
+    "project-transfers-v2": {
+      "from": "project_transfers_v2 t CROSS JOIN LATERAL (SELECT t.from_subject_id subject_id UNION SELECT t.to_subject_id) own",
+      "owner": "own.subject_id",
+      "fields": "t.id,t.project_id,t.from_subject_id,t.to_subject_id,t.state,t.offer_event_id,t.response_event_id,t.created_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "project-preferences-v2": {
+      "from": "project_preferences_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.project_id,t.subject_id,t.revision,t.settings,t.updated_at",
+      "key": "t.project_id::text||':'||t.subject_id",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "contacts-v2": {
+      "from": "contacts_v2 t CROSS JOIN LATERAL (SELECT t.initiator_id subject_id UNION SELECT t.recipient_id) own",
+      "owner": "own.subject_id",
+      "fields": "t.id,t.initiator_id,t.recipient_id,t.purpose,t.state,t.revision,t.create_event_id,t.response_event_id,t.room_id,t.expires_at,t.created_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "contact-events-v2": {
+      "from": "contact_events_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.contact_id,t.subject_id,t.revision,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "experience-objects": {
+      "from": "experience_objects t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.object_type,t.subject_id,t.version,t.state,t.source_key,t.experience_id,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "experience-events": {
+      "from": "experience_events t JOIN experience_objects o ON o.id=t.object_id",
+      "owner": "o.subject_id",
+      "fields": "t.operation_id,t.object_id,t.version,t.consent_id,t.payload_text,t.payload_hash,t.context,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "qualification-calculation-grants": {
+      "from": "qualification_calculation_grants t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.task_id,t.consent_id,t.payload_text,t.payload_hash,t.revoked_at,t.revoke_id,t.revoke_consent_id,t.revoke_payload_text,t.revoke_payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "chat-created-room-receipts": {
+      "from": "chat_rooms t",
+      "owner": "t.creator_subject_id",
+      "fields": "t.room_id,t.creator_subject_id,t.operation_id,t.request_hash,t.created_at",
+      "key": "t.room_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "chat-proposal-receipts": {
+      "from": "chat_decisions t",
+      "owner": "t.proposer_subject_id",
+      "fields": "t.decision_id,t.room_id,t.proposer_subject_id,t.action,t.request_hash,t.state,t.created_at,t.expires_at",
+      "key": "t.decision_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "chat-memberships": {
+      "from": "chat_memberships t",
+      "owner": "t.subject_id",
+      "fields": "t.room_id,t.subject_id,t.controller_ref,t.joined_at,t.left_at,t.dismissed_revision",
+      "key": "t.room_id::text||':'||t.subject_id",
+      "cutoff": "t.joined_at",
+      "transform": false
+    },
+    "chat-message-receipts": {
+      "from": "chat_message_refs t",
+      "owner": "t.subject_id",
+      "fields": "t.message_id,t.sequence,t.room_id,t.subject_id,t.client_message_id,t.payload_hash,t.actor_kind,t.agent_grant_id,t.archive_id,t.reply_to,t.state,t.revision,t.sent_at,t.expires_at,t.edited_at,t.retracted_at,t.purge_pending,t.content_bytes",
+      "key": "t.message_id::text",
+      "cutoff": "t.sent_at",
+      "transform": false
+    },
+    "chat-message-operations": {
+      "from": "chat_message_operations t",
+      "owner": "t.subject_id",
+      "fields": "t.operation_id,t.room_id,t.message_id,t.subject_id,t.kind,t.request_hash,t.created_at,t.state,t.previous_content_bytes,t.target_content_bytes,t.base_revision,t.result->>'revision' AS result_revision,t.result->>'editedAt' AS result_edited_at",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "chat-cursors": {
+      "from": "chat_cursors t",
+      "owner": "t.subject_id",
+      "fields": "t.room_id,t.subject_id,t.cursor_kind,t.agent_ref,t.sequence,t.accepted_order,t.updated_at",
+      "key": "t.room_id::text||':'||t.subject_id||':'||t.cursor_kind||':'||md5(t.agent_ref)",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "chat-message-preferences": {
+      "from": "chat_message_preferences t",
+      "owner": "t.subject_id",
+      "fields": "t.room_id,t.subject_id,t.message_id,t.hidden,t.updated_at",
+      "key": "t.room_id::text||':'||t.subject_id||':'||t.message_id::text",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "chat-agent-grants": {
+      "from": "chat_agent_grants t",
+      "owner": "t.subject_id",
+      "fields": "t.grant_id,t.room_id,t.subject_id,t.binding_id,t.mode,t.primary_responder,t.expires_at,t.revoked_at,t.created_at",
+      "key": "t.grant_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "capsule-permissions": {
+      "from": "capsule_permissions t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.consent_id,t.payload_text,t.payload_hash,t.revoked_at,t.revoke_id,t.revoke_consent_id,t.revoke_payload_text,t.revoke_payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "capsule-uses-v2": {
+      "from": "capsule_uses_v2 t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.capsule_id,t.version_id,t.subject_id,t.case_id,t.attempt_id,t.attempt_version,t.result_id,t.result_version,t.prior_use_id,t.kind,t.observed_revision,t.verification_fingerprint,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "identity-control-heads": {
+      "from": "subject_control_heads t JOIN subject_control_events e ON e.subject_id=t.subject_id AND e.sequence=t.sequence",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.epoch,t.sequence,t.event_hash",
+      "key": "t.subject_id",
+      "cutoff": "e.accepted_at",
+      "transform": false
+    },
+    "identity-control-events": {
+      "from": "subject_control_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.sequence,t.epoch,t.kind,t.previous_event_hash,t.event_hash,t.payload_text,t.controller_signature,t.new_device_proof,t.signer_key_id,t.accepted_at",
+      "key": "t.id::text",
+      "cutoff": "t.accepted_at",
+      "transform": false
+    },
+    "device-authorizations": {
+      "from": "device_authorizations t JOIN subject_control_events e ON e.id=t.source_event_id",
+      "owner": "t.subject_id",
+      "fields": "t.device_id,t.subject_id,t.key_id,t.public_key,t.epoch,t.scopes,t.status,t.source_event_id,t.revoked_at",
+      "key": "t.device_id::text",
+      "cutoff": "e.accepted_at",
+      "transform": false
+    },
+    "recovery-authorizations": {
+      "from": "recovery_authorizations t JOIN subject_control_events e ON e.id=t.source_event_id",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.generation,t.epoch,t.public_key,t.source_event_id,t.status,t.save_declared_at",
+      "key": "t.subject_id||':'||lpad(t.generation::text,10,'0')",
+      "cutoff": "e.accepted_at",
+      "transform": false
+    },
+    "identity-operation-receipts": {
+      "from": "identity_control_operations t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.request_hash,t.state,t.expires_at,t.committed_at",
+      "key": "t.id::text",
+      "cutoff": "COALESCE(t.committed_at,t.expires_at)",
+      "transform": false
+    },
+    "case-task-links": {
+      "from": "case_task_links t",
+      "owner": "t.subject_id",
+      "fields": "t.task_id,t.case_id,t.operation_id,t.subject_id,t.payload_hash,t.receipt,t.created_at",
+      "key": "t.task_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "community-account-links": {
+      "from": "community_account_links t",
+      "owner": "t.subject_id",
+      "fields": "t.identity_link_id,t.account_id,t.subject_id,t.created_at",
+      "key": "t.identity_link_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "community-accounts": {
+      "from": "community_accounts t JOIN (SELECT DISTINCT account_id,subject_id FROM community_account_links) own ON own.account_id=t.id",
+      "owner": "own.subject_id",
+      "fields": "t.id,t.endpoint,t.issuer,t.external_subject,t.verification_method,t.verified_at,t.created_at,t.tier_override,t.restricted_until,t.restriction_reason",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "community-daily-usage": {
+      "from": "community_daily_usage t JOIN (SELECT DISTINCT account_id,subject_id FROM community_account_links) own ON own.account_id=t.account_id",
+      "owner": "own.subject_id",
+      "fields": "t.account_id,t.day,t.category,t.used",
+      "key": "t.account_id::text||':'||t.day::text||':'||t.category",
+      "cutoff": "t.day::timestamptz",
+      "transform": false
+    },
+    "community-interactions": {
+      "from": "community_interactions t JOIN task_events e ON e.id=t.source_id JOIN (SELECT DISTINCT account_id,subject_id FROM community_account_links) own ON own.account_id=t.account_id AND own.subject_id=e.subject_id",
+      "owner": "own.subject_id",
+      "fields": "t.account_id,t.source_id,t.source_kind,t.counterparty_id,t.created_at,t.invalidated_at",
+      "key": "t.account_id::text||':'||t.source_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "community-write-receipts": {
+      "from": "community_write_receipts t",
+      "owner": "t.subject_id",
+      "fields": "t.account_id,t.operation_id,t.category,t.subject_id,t.payload_hash,t.task_id,t.room_id,t.contact_id,t.recruitment_id,t.recipient_id,t.created_at,t.responded_at",
+      "key": "t.account_id::text||':'||t.category||':'||t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "tasks": {
+      "from": "task_requests t",
+      "owner": "t.requester_id",
+      "fields": "t.id,t.case_id,t.requester_id,t.root_event_id,t.version,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "task-participations": {
+      "from": "task_participations t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.task_id,t.subject_id,t.version,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "task-events": {
+      "from": "task_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.task_id,t.participation_id,t.subject_id,t.version,t.participation_version,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": true
+    },
+    "verification-objects": {
+      "from": "verification_objects t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.object_type,t.case_id,t.subject_id,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "verification-events": {
+      "from": "verification_events t JOIN verification_objects o ON o.id=t.object_id",
+      "owner": "o.subject_id",
+      "fields": "t.operation_id,t.object_id,t.version,t.consent_id,t.payload,t.payload_text,t.payload_hash,t.context,t.created_at,(t.payload_text='') AS content_erased",
+      "key": "t.operation_id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "verification-dependencies": {
+      "from": "verification_dependencies t JOIN verification_objects o ON o.id=t.object_id JOIN verification_events e ON e.object_id=t.object_id AND e.version=t.object_version",
+      "owner": "o.subject_id",
+      "fields": "t.object_id,t.object_version,t.target_type,t.target_id,t.target_version",
+      "key": "t.object_id::text||':'||lpad(t.object_version::text,10,'0')||':'||t.target_type||':'||t.target_id::text||':'||lpad(t.target_version::text,10,'0')",
+      "cutoff": "e.created_at",
+      "transform": false
+    },
+    "lifecycle-erasures": {
+      "from": "lifecycle_erasure_records t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.table_name,t.object_key,t.subject_id,t.reason,t.policy_version,t.original_payload_hash,t.request_id,t.erased_at,t.retained_until",
+      "key": "t.id::text",
+      "cutoff": "t.erased_at",
+      "transform": false
+    },
+    "builder-probes": {
+      "from": "builder_probes t JOIN builder_events r ON r.id=t.request_id",
+      "owner": "r.subject_id",
+      "fields": "t.id,t.request_id,t.job_id,t.attempt,t.observation,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "profile-statements": {
+      "from": "profile_statements t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.revision,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "incident-notices": {
+      "from": "incident_notices t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.runtime_config_id,t.incident_id,t.incident_revision,t.operator_ref,t.title,t.summary,t.command_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "deletion-executions": {
+      "from": "deletion_executions t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.request_id,t.subject_id,t.command_hash,t.result,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "deletion-requests": {
+      "from": "deletion_requests t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.binding_id,t.requester_public_key,t.payload_text,t.payload_hash,t.signature,t.state,t.revision,t.execution_result,t.minimized_at,t.created_at,t.updated_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "deletion-events": {
+      "from": "deletion_events t JOIN deletion_requests r ON r.id=t.request_id",
+      "owner": "r.subject_id",
+      "fields": "t.id,t.request_id,t.revision,t.actor_kind,t.actor_ref,t.kind,t.payload_text,t.payload_hash,t.signature,t.created_at,t.payload_minimized,t.retained_payload,t.retained_hash,t.signer_public_key,t.signer_control_chain",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "identity": {
+      "from": "subjects t",
+      "owner": "t.id",
+      "fields": "t.id,t.public_key,t.genesis_proof,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "external-identity-links": {
+      "from": "external_identity_links t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.binding_id,t.endpoint,t.provider_id,t.issuer,t.external_subject,t.client_id,t.payload_text,t.payload_hash,t.signature,t.created_at,t.revoked_at,t.signer_key_id,t.control_epoch,t.control_event_hash",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "bindings": {
+      "from": "bindings t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.audience,t.scopes,t.receipt,t.expires_at,t.revoked_at,t.created_at,t.device_id,t.key_id,t.control_epoch",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "consents": {
+      "from": "consents t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.binding_id,t.intent,t.expires_at,t.revoked_at,t.created_at,t.signature_envelope,t.signed_payload_text,t.signer_key_id,t.control_epoch,t.control_event_hash",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "cases": {
+      "from": "cases t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.local_ref,t.source_ref,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "case-events": {
+      "from": "case_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.case_id,t.subject_id,t.kind,t.version,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "evidence": {
+      "from": "evidence_submissions t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.case_id,t.result_id,t.consent_id,t.source_key,t.payload_text,t.payload_hash,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "observations": {
+      "from": "verification_attempts t JOIN evidence_submissions e ON e.id=t.evidence_id",
+      "owner": "e.subject_id",
+      "fields": "t.id,t.evidence_id,t.attempt,t.observation,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "proofs": {
+      "from": "proofs t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.evidence_id,t.observation_id,t.consent_id,t.payload_text,t.payload_hash,t.signed,t.revoked_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "assistance-requests": {
+      "from": "assistance_requests t",
+      "owner": "t.requester_id",
+      "fields": "t.id,t.case_id,t.requester_id,t.version,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "assistance-events": {
+      "from": "assistance_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.assistance_id,t.subject_id,t.version,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "context-grants": {
+      "from": "context_grants t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.assistance_id,t.subject_id,t.participant_id,t.consent_id,t.payload_text,t.payload_hash,t.revoked_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "context-acceptances": {
+      "from": "context_acceptances t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.grant_id,t.subject_id,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "notification-preferences": {
+      "from": "notification_preferences t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.revision,t.settings,t.archived_before,t.updated_at",
+      "key": "t.subject_id",
+      "cutoff": "t.updated_at",
+      "transform": false
+    },
+    "notification-reads": {
+      "from": "notification_reads t",
+      "owner": "t.subject_id",
+      "fields": "t.subject_id,t.kind,t.event_id,t.read_at",
+      "key": "t.kind||':'||t.event_id::text",
+      "cutoff": "t.read_at",
+      "transform": false
+    },
+    "moderation-reports": {
+      "from": "moderation_reports t",
+      "owner": "t.reporter_id",
+      "fields": "t.id,t.assistance_id,t.case_id,t.reporter_id,t.consent_id,t.payload_text,t.payload_hash,t.version,t.state,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "moderation-events": {
+      "from": "moderation_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.report_id,t.subject_id,t.consent_id,t.version,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "capsules": {
+      "from": "capsules t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.subject_id,t.revision,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "capsule-events": {
+      "from": "capsule_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.capsule_id,t.subject_id,t.revision,t.version_id,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "capsule-uses": {
+      "from": "capsule_uses t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.capsule_id,t.version_id,t.subject_id,t.case_id,t.attempt_id,t.result_id,t.prior_use_id,t.kind,t.observed_revision,t.consent_id,t.payload_text,t.payload_hash,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "builders": {
+      "from": "builders t",
+      "owner": "t.owner_id",
+      "fields": "t.id,t.owner_id,t.type,t.revision,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "builder-events": {
+      "from": "builder_events t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.builder_id,t.subject_id,t.revision,t.kind,t.consent_id,t.payload_text,t.payload_hash,t.received_at",
+      "key": "t.id::text",
+      "cutoff": "to_timestamp(t.received_at)",
+      "transform": false
+    },
+    "audit": {
+      "from": "audit_events t",
+      "owner": "t.actor",
+      "fields": "t.sequence::text,t.actor,t.action,t.object_id,t.request_id,t.outcome,t.created_at,t.scope,t.consent_id,t.binding_id",
+      "key": "lpad(t.sequence::text,20,'0')",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "audit-access-grants": {
+      "from": "audit_access_grants t",
+      "owner": "t.reviewer_id",
+      "fields": "t.id,t.reviewer_id,t.reader_id,t.payload_text,t.payload_hash,t.signature,t.expires_at,t.revoked_at,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "audit-reads": {
+      "from": "audit_reads t",
+      "owner": "t.actor_id",
+      "fields": "t.id,t.actor_id,t.subject_id,t.grant_id,t.action,t.selection,t.result_hash,t.result_count,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    },
+    "export-reads": {
+      "from": "data_export_reads t",
+      "owner": "t.subject_id",
+      "fields": "t.id,t.export_id,t.subject_id,t.dataset,t.after_cursor,t.result_hash,t.result_count,t.created_at",
+      "key": "t.id::text",
+      "cutoff": "t.created_at",
+      "transform": false
+    }
+  }
+}

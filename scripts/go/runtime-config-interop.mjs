@@ -1,0 +1,22 @@
+process.stdin.setEncoding('utf8');
+import pg from '../../packages/galaxy-official/node_modules/pg/lib/index.js';
+import {randomUUID} from 'node:crypto';
+import {migrate} from '../../packages/galaxy-official/src/infrastructure/database.mjs';
+import {runtimeConfigSnapshot,recordRuntimeConfig,verifyRuntimeConfigEvent,exportRuntimeConfigPage} from '../../packages/galaxy-official/src/operations/runtime-config-audit.mjs';
+import {honorRegistryManifest} from '../../packages/galaxy-official/src/infrastructure/honor-rule-registry.mjs';
+import {qualificationRegistryManifest} from '../../packages/galaxy-official/src/infrastructure/qualification-policy-registry.mjs';
+import {experienceReviewerRegistry} from '../../packages/galaxy-official/src/infrastructure/experience-reviewer-registry.mjs';
+import {governanceConfigSchema} from '../../packages/galaxy-official/src/governance/governance-config.mjs';
+import {digest} from '../../packages/galaxy-official/src/shared/digest.mjs';
+const endpoint='https://runtime.example.invalid',now=()=>2000000000,sha='a'.repeat(64),subject=n=>'GUID'+n.repeat(28);
+const governance=governanceConfigSchema.parse({auditReaderIds:[subject('B'),subject('A')],honorRules:[{id:'rule',version:'1.0',title:'Synthetic honor',capabilityId:'code',communityId:'isolated',kind:'open-contributor',members:[subject('B'),subject('A')],notBefore:0,notAfter:2100000000,windowFrom:0,windowUntil:2100000000,minAcceptedCases:1,minProofs:0,repositories:[{owner:'Owner',repository:'Repo'}]}],qualificationPolicies:[{id:'qual',version:'1',capabilityId:'code',title:'Synthetic qualification',collaboration:'open-assistance',notBefore:0,notAfter:2100000000,minProofs:0,minAcceptedCollaborations:0,historyWindowSeconds:3600,requireCiSuccess:false,repositories:[{owner:'OWNER',repository:'REPO'},{owner:'owner',repository:'repo'}]}],experienceReviewers:[{subjectId:subject('A'),capabilityIds:['z','a','a'],kinds:['challenge','external-work'],scope:'Synthetic scope',notBefore:0,notAfter:2100000000,authorityReference:'Synthetic reference'}]});
+const values={governance,incident:{version:1,id:'incident',revision:1,endpoint,state:'contained',updatedAt:now(),publicMessage:'  Synthetic incident. ',recovery:null},requestQuotaHash:sha,communityQuotaHash:sha,forumPolicyHash:sha,browserPolicyHash:sha,chatConfigurationHash:null,resourceBudgetHash:sha,identityConfigurationHash:sha,officialAccountConfigurationHash:null,personalMcpConfigurationHash:null,signingKeyId:'fixture',trustSequence:1,network:{type:'official',manifestSha256:sha}};
+const recordInput={endpoint,component:'api',operatorRef:'isolated-test',honorRules:governance.honorRules,qualificationPolicies:governance.qualificationPolicies,experienceReviewers:governance.experienceReviewers,snapshot:runtimeConfigSnapshot(values)};
+if(process.argv[2]==='oracle'){let text='';for await(const c of process.stdin)text+=c;const input=JSON.parse(text);console.log(JSON.stringify({snapshot:runtimeConfigSnapshot(input.values),honor:honorRegistryManifest(input.governance.honorRules),qualification:qualificationRegistryManifest(input.governance.qualificationPolicies),experience:experienceReviewerRegistry(input.governance.experienceReviewers)}));process.exit(0)}
+const address=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL??'');if(address.hostname!=='127.0.0.1'||!/^\/galaxy_go_test_[a-z0-9_]+$/.test(address.pathname))throw Error('isolated DB only');
+const pool=new pg.Pool({connectionString:address.href,max:2});
+try{
+ if(process.argv[2]==='setup'){await migrate(pool,{roles:['api']});await pool.query('SET ROLE galaxy_api');recordInput.id=randomUUID();const event=await recordRuntimeConfig(pool,recordInput,{now});console.log(JSON.stringify({values,recordInput,event}));}
+ else if(process.argv[2]==='verify'){let text='';for await(const c of process.stdin)text+=c;const input=JSON.parse(text);const rows=(await pool.query('SELECT * FROM runtime_config_events ORDER BY sequence')).rows;for(const row of rows)verifyRuntimeConfigEvent(row);if(input.event)verifyRuntimeConfigEvent(input.event);if(input.page){const {sha256,...page}=input.page;const normalize=v=>Array.isArray(v)?v.map(normalize):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,normalize(v[k])])):v;if(sha256!==digest(JSON.stringify(normalize(page))))throw Error('Go archive hash mismatch')};const page=await exportRuntimeConfigPage(pool,{endpoint,component:'api',limit:1});console.log(JSON.stringify({events:rows.length,page}));}
+ else throw Error('mode required');
+}finally{await pool.end()}

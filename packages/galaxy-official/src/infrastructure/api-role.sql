@@ -21,7 +21,7 @@ GRANT SELECT,INSERT ON task_materials_v1 TO galaxy_api;
 GRANT UPDATE(body_text,erased_at) ON task_materials_v1 TO galaxy_api;
 GRANT SELECT,INSERT ON chat_attachments TO galaxy_api;
 GRANT SELECT,INSERT ON outcome_materials_v2,outcome_material_events_v2 TO galaxy_api;
-GRANT UPDATE(state,approval_id,revision,approved_at,expires_at,body_text,name,media_type,byte_size,scan_result,last_error,purge_pending,purged_at) ON outcome_materials_v2 TO galaxy_api;
+GRANT UPDATE(state,approval_id,revision,approved_at,expires_at,body_text,name,media_type,byte_size,scan_result,last_error,purge_pending,purged_at,storage_key,encryption_key_id) ON outcome_materials_v2 TO galaxy_api;
 GRANT UPDATE(state,message_id,uploaded_at,expires_at,lease_id,lease_until,last_error,revoked_at,purge_pending) ON chat_attachments TO galaxy_api;
 GRANT SELECT,INSERT ON external_identity_links TO galaxy_api;
 GRANT UPDATE (revoked_at) ON external_identity_links TO galaxy_api;

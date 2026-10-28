@@ -20,6 +20,10 @@ func (s *Service) read(ctx context.Context, operator, action string, selection O
 		if e != nil {
 			return nil, e
 		}
+		a, e = s.authorizeOperations(ctx, tx, a, action, selection)
+		if e != nil {
+			return nil, e
+		}
 		out, e := fn(tx, a)
 		if e != nil {
 			return nil, e
@@ -54,6 +58,10 @@ func (s *Service) Update(ctx context.Context, operator, id string, raw []byte) (
 	}
 	result, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
 		a, e := s.operator(ctx, tx, operator, "feedback.update")
+		if e != nil {
+			return nil, e
+		}
+		a, e = s.authorizeOperations(ctx, tx, a, "feedback-update", selection)
 		if e != nil {
 			return nil, e
 		}

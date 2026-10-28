@@ -154,6 +154,34 @@ func (d *KeycloakDirectory) Roles(ctx context.Context, issuer, subject string) (
 	if ok && entry.expires > d.now() {
 		return append([]string(nil), entry.roles...), nil
 	}
+	roles, e := d.fetchRoles(ctx, subject)
+	if e != nil {
+		return nil, e
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if revision != d.revision {
+		return nil, directoryUnavailable()
+	}
+	for id, v := range d.roles {
+		if v.expires <= d.now() {
+			delete(d.roles, id)
+		}
+	}
+	if len(d.roles) >= 256 {
+		var oldest string
+		var at int64
+		for id, v := range d.roles {
+			if oldest == "" || v.expires < at {
+				oldest, at = id, v.expires
+			}
+		}
+		delete(d.roles, oldest)
+	}
+	d.roles[subject] = roleEntry{roles, d.now() + 15}
+	return append([]string(nil), roles...), nil
+}
+func (d *KeycloakDirectory) fetchRoles(ctx context.Context, subject string) ([]string, error) {
 	var user *struct {
 		ID      string `json:"id"`
 		Enabled bool   `json:"enabled"`
@@ -179,28 +207,25 @@ func (d *KeycloakDirectory) Roles(ctx context.Context, issuer, subject string) (
 			}
 		}
 	}
+	return append([]string(nil), roles...), nil
+}
+func (d *KeycloakDirectory) RolesFresh(ctx context.Context, issuer, subject string) ([]string, error) {
+	if issuer != d.issuer || !subjectPattern.MatchString(subject) {
+		return []string{}, nil
+	}
+	d.mu.Lock()
+	revision := d.revision
+	d.mu.Unlock()
+	roles, e := d.fetchRoles(ctx, subject)
+	if e != nil {
+		return nil, e
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if revision != d.revision {
 		return nil, directoryUnavailable()
 	}
-	for id, v := range d.roles {
-		if v.expires <= d.now() {
-			delete(d.roles, id)
-		}
-	}
-	if len(d.roles) >= 256 {
-		var oldest string
-		var at int64
-		for id, v := range d.roles {
-			if oldest == "" || v.expires < at {
-				oldest, at = id, v.expires
-			}
-		}
-		delete(d.roles, oldest)
-	}
-	d.roles[subject] = roleEntry{roles, d.now() + 15}
-	return append([]string(nil), roles...), nil
+	return roles, nil
 }
 func (d *KeycloakDirectory) Invalidate(issuer, subject string) bool {
 	if issuer != d.issuer || !subjectPattern.MatchString(subject) {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
@@ -67,8 +68,8 @@ func sequenceValid(s string) bool {
 	return e == nil && n > 0 && strconv.FormatInt(n, 10) == s
 }
 func (q *Query) normalize() error {
-	q.Query = strings.TrimSpace(q.Query)
-	if protocol.TextLength(q.Query) > 200 {
+	q.Query = feedbackTrim(q.Query)
+	if utf8.RuneCountInString(q.Query) > 200 {
 		return invalid()
 	}
 	if q.Days == "" {
@@ -173,6 +174,15 @@ func (s *Service) detail(ctx context.Context, tx pgx.Tx, a Operator, id, after s
 		if e = rows.Scan(&event, &seq, &kind, &operator, &name, &category, &module, &state, &note, &at); e != nil {
 			rows.Close()
 			return nil, e
+		}
+		if operator == nil || protocol.TextLength(*operator) > 256 || strings.HasPrefix(*operator, "executor:") {
+			name = nil
+		} else if name != nil {
+			current := feedbackTrim(*name)
+			name = &current
+			if current == "" {
+				name = nil
+			}
 		}
 		if len(history) == 50 {
 			next = strconv.FormatInt(last, 10)

@@ -1,0 +1,19 @@
+# Candidate example only; do not install/start without approved configuration.
+[Unit]
+Description=Galaxy Go publisher candidate
+After=network.target
+
+[Service]
+Type=simple
+User=galaxy
+Group=galaxy
+WorkingDirectory=/opt/galaxy/go-candidate
+EnvironmentFile=/etc/galaxy/publisher.env
+Environment=GALAXY_RUNTIME_LOG_INSTANCE=primary
+ExecStart=/opt/galaxy/go-candidate/galaxy-publisher
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

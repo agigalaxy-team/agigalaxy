@@ -1,0 +1,65 @@
+
+ALTER TABLE operations_business_roles_v1 DROP CONSTRAINT operations_business_roles_v1_permissions_check;
+ALTER TABLE operations_business_roles_v1 ADD CONSTRAINT operations_business_roles_v1_permissions_check CHECK(permissions<@ARRAY['workbench.read','accounts.read','accounts.identity.read','accounts.type.change','accounts.restriction.apply','accounts.restriction.release','accounts.registered.read','accounts.password.reset','accounts.login.disable','accounts.login.restore','accounts.sessions.revoke','accounts.profile.correct','management.accounts.read','management.accounts.create','management.accounts.profile.write','management.accounts.login.disable','management.accounts.login.restore','management.accounts.password.reset','management.accounts.sessions.revoke','management.accounts.delete','ai.use.overview','ai.use.governance','ai.use.messaging','ai.use.discovery','ai.use.maintenance','ai.accounts.read','ai.accounts.profile.write','ai.accounts.state.write','ai.accounts.roles.write','analytics.read','sections.read','sections.classify','sections.hide','sections.restore','content.read','content.hide','content.restore','content.curate','content.batch.hide','content.batch.restore','content.tags.read','content.tags.manage','recommendations.read','recommendations.configure','cases.read','cases.resolve','chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read','chat-reports.moderate','chat-messages.hide','chat-messages.restore','chat-messages.keep','resources.read','resources.hide','resources.restore','files.read','files.scan.retry','files.access.stop','files.access.restore','files.cleanup.plan','files.cleanup.approve','feedback.read','feedback.attachments.read','feedback.update','notices.read','notices.create','notices.update','notices.publish','notices.withdraw','smtp.read','smtp.configure','smtp.test.connection','smtp.test.delivery','rules.read','rules.write','strategies.read','strategies.configure','strategies.publish','strategies.run','strategies.control','strategies.ordinary.configure','strategies.ordinary.publish','audit.read','jobs.read','jobs.cancel','jobs.retry','search.read','search.retry','search-quality.read','search-quality.configure','search-quality.publish','search-quality.restore','maintenance.read','maintenance.logs.read','maintenance.backups.create','maintenance.backups.verify','maintenance.restore.plan','maintenance.restore.approve','maintenance.restore.execute','system.settings.read','system.settings.configure','system.settings.test','system.settings.apply','system.settings.credentials.write','models.read','models.configure','models.apply','retention.read','retention.request','cms.read','cms.edit','cms.publish','permissions.read','permissions.roles.write','permissions.assignments.write','permissions.automation.write']::text[]);
+ALTER TABLE operations_automation_grants_v1 DROP CONSTRAINT operations_automation_grants_v1_permissions_check;
+ALTER TABLE operations_automation_grants_v1 ADD CONSTRAINT operations_automation_grants_v1_permissions_check CHECK(permissions<@ARRAY['workbench.read','accounts.read','accounts.identity.read','accounts.type.change','accounts.restriction.apply','accounts.restriction.release','accounts.registered.read','accounts.password.reset','accounts.login.disable','accounts.login.restore','accounts.sessions.revoke','accounts.profile.correct','management.accounts.read','management.accounts.create','management.accounts.profile.write','management.accounts.login.disable','management.accounts.login.restore','management.accounts.password.reset','management.accounts.sessions.revoke','management.accounts.delete','ai.use.overview','ai.use.governance','ai.use.messaging','ai.use.discovery','ai.use.maintenance','ai.accounts.read','ai.accounts.profile.write','ai.accounts.state.write','ai.accounts.roles.write','analytics.read','sections.read','sections.classify','sections.hide','sections.restore','content.read','content.hide','content.restore','content.curate','content.batch.hide','content.batch.restore','content.tags.read','content.tags.manage','recommendations.read','recommendations.configure','cases.read','cases.resolve','chat-reports.read','chat-reports.materials.read','chat-reports.attachments.read','chat-reports.moderate','chat-messages.hide','chat-messages.restore','chat-messages.keep','resources.read','resources.hide','resources.restore','files.read','files.scan.retry','files.access.stop','files.access.restore','files.cleanup.plan','files.cleanup.approve','feedback.read','feedback.attachments.read','feedback.update','notices.read','notices.create','notices.update','notices.publish','notices.withdraw','smtp.read','smtp.configure','smtp.test.connection','smtp.test.delivery','rules.read','rules.write','strategies.read','strategies.configure','strategies.publish','strategies.run','strategies.control','strategies.ordinary.configure','strategies.ordinary.publish','audit.read','jobs.read','jobs.cancel','jobs.retry','search.read','search.retry','search-quality.read','search-quality.configure','search-quality.publish','search-quality.restore','maintenance.read','maintenance.logs.read','maintenance.backups.create','maintenance.backups.verify','maintenance.restore.plan','maintenance.restore.approve','maintenance.restore.execute','system.settings.read','system.settings.configure','system.settings.test','system.settings.apply','system.settings.credentials.write','models.read','models.configure','models.apply','retention.read','retention.request','cms.read','cms.edit','cms.publish','permissions.read','permissions.roles.write','permissions.assignments.write','permissions.automation.write']::text[]);
+
+CREATE TABLE IF NOT EXISTS operations_system_settings_versions_v1(
+ id uuid PRIMARY KEY,
+ endpoint text NOT NULL,
+ section text NOT NULL CHECK(section IN ('mail','service-connections')),
+ revision integer NOT NULL CHECK(revision>0),
+ configuration jsonb NOT NULL CHECK(jsonb_typeof(configuration)='object'),
+ operator_id text NOT NULL CHECK(operator_id ~ '^[0-9a-f]{64}$'),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(endpoint,section,revision),UNIQUE(endpoint,section,id)
+);
+CREATE TABLE IF NOT EXISTS operations_system_settings_commands_v1(
+ endpoint text NOT NULL,
+ operation_id uuid NOT NULL,
+ sequence bigint GENERATED ALWAYS AS IDENTITY,
+ operator_id text NOT NULL CHECK(operator_id ~ '^[0-9a-f]{64}$'),
+ operator_role text NOT NULL CHECK(operator_role IN ('administrator','reader')),
+ section text NOT NULL CHECK(section IN ('mail','service-connections')),
+ kind text NOT NULL CHECK(kind IN ('save','test','apply','credential')),
+ input jsonb NOT NULL CHECK(jsonb_typeof(input)='object'),
+ version_id uuid,
+ revision integer NOT NULL CHECK(revision>=0),
+ state text NOT NULL CHECK(state IN ('accepted','completed','partial','failed','unknown')),
+ result jsonb NOT NULL CHECK(jsonb_typeof(result)='object'),
+ created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(endpoint,operation_id),
+ FOREIGN KEY(endpoint,section,version_id) REFERENCES operations_system_settings_versions_v1(endpoint,section,id)
+);
+CREATE TABLE IF NOT EXISTS operations_system_settings_heads_v1(
+ endpoint text NOT NULL,
+ section text NOT NULL CHECK(section IN ('mail','service-connections')),
+ revision integer NOT NULL DEFAULT 0 CHECK(revision>=0),
+ version_id uuid,pending_operation uuid,
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(endpoint,section),
+ FOREIGN KEY(endpoint,section,version_id) REFERENCES operations_system_settings_versions_v1(endpoint,section,id),
+ FOREIGN KEY(endpoint,pending_operation) REFERENCES operations_system_settings_commands_v1(endpoint,operation_id)
+);
+CREATE INDEX IF NOT EXISTS operations_system_settings_commands_page_v1
+ ON operations_system_settings_commands_v1(endpoint,section,sequence DESC);
+ALTER TABLE site_publications_v1 ADD COLUMN IF NOT EXISTS base_publication_id uuid;
+CREATE TABLE IF NOT EXISTS operations_system_general_publications_v1(
+ endpoint text NOT NULL,operation_id uuid NOT NULL,operator_id text NOT NULL CHECK(operator_id ~ '^[0-9a-f]{64}$'),
+ input jsonb NOT NULL CHECK(jsonb_typeof(input)='object'),
+ publication_id uuid REFERENCES site_publications_v1(id),
+ result jsonb NOT NULL DEFAULT '{}' CHECK(jsonb_typeof(result)='object'),created_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(endpoint,operation_id)
+);
+
+
+DO $system_settings_audit$
+DECLARE previous text;
+BEGIN
+ SELECT pg_get_constraintdef(oid) INTO previous FROM pg_constraint
+ WHERE conrelid='business_admin_audit_v1'::regclass AND conname='business_admin_audit_v1_action_check';
+ IF previous IS NULL OR previous NOT LIKE 'CHECK (%' THEN RAISE EXCEPTION 'system_settings_audit_constraint_missing';END IF;
+ ALTER TABLE business_admin_audit_v1 DROP CONSTRAINT business_admin_audit_v1_action_check;
+ EXECUTE 'ALTER TABLE business_admin_audit_v1 ADD CONSTRAINT business_admin_audit_v1_action_check '||
+  'CHECK (('||substring(previous from 8 for length(previous)-8)||') OR action IN (''system-settings-save'',''system-settings-test'',''system-settings-apply'',''system-settings-credential-provision''))';
+END $system_settings_audit$;

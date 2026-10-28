@@ -1,0 +1,16 @@
+import * as schemas from '../../packages/galaxy-official/src/shared/p14-rules-schema.mjs';
+import {p14PolicySchemas} from '../../packages/galaxy-official/src/operations/rules/policies.mjs';
+import {P14RulesService} from '../../packages/galaxy-official/src/operations/rules/service.mjs';
+import {OperationsProductRules,createOperationsPolicyRuntime} from '../../packages/galaxy-official/src/operations/rules/product-rules.mjs';
+import {BusinessAdminService} from '../../packages/galaxy-official/src/operations/audit/service.mjs';
+import {OperationsPermissionsService} from '../../packages/galaxy-official/src/operations/permissions/service.mjs';
+import {p14Evaluate} from '../../packages/galaxy-official/src/operations/rules/evaluator.mjs';
+import pg from '../../packages/galaxy-official/node_modules/pg/lib/index.js';
+import {createHash} from 'node:crypto';
+let raw='';for await(const c of process.stdin)raw+=c;const x=JSON.parse(raw||'{}'),mode=process.argv[2];
+if(mode==='schema'){const out={};for(const [key,values]of Object.entries(x.policies??{}))out[key]=values.map(value=>{try{return schemas.p14Parse(p14PolicySchemas[key],value)}catch{return null}});out.samples=(x.samples??[]).map(v=>{try{return schemas.p14Parse(schemas.p14SampleSchema,v)}catch{return null}});out.evaluations=(x.evaluations??[]).map(v=>p14Evaluate(v.policy,v.facts));console.log(JSON.stringify(out));process.exit(0);}
+const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL??'');if(url.hostname!=='127.0.0.1'||!/^\/galaxy_go_test_[a-z0-9_]+$/.test(url.pathname))throw Error('isolated DB required');
+const db=new pg.Pool({connectionString:url.href,max:2}),endpoint=x.endpoint??'https://strategies.example.invalid',issuer='https://management.example.invalid/realms/management',id=createHash('sha256').update(issuer+'\0root').digest('hex'),now=()=>2000000000;
+try{await db.query('SET ROLE galaxy_api');const permissions=new OperationsPermissionsService({db,endpoint,now,operatorAuthorization:async a=>a.operatorId===id?'administrator':null}),businessAdmin=new BusinessAdminService({db,endpoint,now});businessAdmin.permissions=permissions;
+const legacy=new OperationsProductRules({db,endpoint,businessAdmin,now}),service=new P14RulesService({db,endpoint,businessAdmin,legacyRules:legacy,now}),actor={kind:'business-operator',endpoint,operatorId:id,role:'administrator',httpRequestId:null};let out;
+if(mode==='get')out=await service.get(actor,x.key);else if(mode==='overview')out=await service.overview(actor);else if(mode==='versions')out=await service.versions(actor,x.key,x.input??{});else if(mode==='draft')out=await service.saveDraft(actor,x.key,x.input,{authorize:async()=>actor});else if(mode==='publish')out=await service.publish(actor,x.key,x.input,{authorize:async()=>actor});else if(mode==='restore')out=await service.restore(actor,x.key,x.input,{authorize:async()=>actor});else if(mode==='sample')out=await service.sample(actor,x.key,x.input);else if(mode==='operation')out=await service.operation(actor,x.id);else if(mode==='initialize'){await service.initialize();out={ok:true}}else if(mode==='legacyGet')out=await legacy.get(actor,x.key);else throw Error('unknown mode');console.log(JSON.stringify(out));}finally{await db.end();}

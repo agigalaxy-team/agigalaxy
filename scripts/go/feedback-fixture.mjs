@@ -8,6 +8,8 @@ import {BusinessAdminService} from '../../packages/galaxy-official/src/operation
 import {OperationsFeedbackService} from '../../packages/galaxy-official/src/operations/feedback/service.mjs';
 import {feedbackSubmitSchema} from '../../packages/galaxy-official/src/shared/operations-feedback-schema.mjs';
 import {attachOperationsFixtureAuthority} from '../../packages/galaxy-official/test/fixtures/operations-authority.mjs';
+import {loadGovernanceConfig} from '../../packages/galaxy-official/src/governance/governance-config.mjs';
+import {runtimeConfigSnapshot,recordRuntimeConfig} from '../../packages/galaxy-official/src/operations/runtime-config-audit.mjs';
 import {digest} from '../../packages/galaxy-official/src/shared/digest.mjs';
 
 const address=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL??'');
@@ -28,6 +30,12 @@ try{
    VALUES($1,$2,'https://login.example.invalid',$1,$3,$4,$4)`,[id,endpoint,name,new Date(now()*1000)]);
   const submission={operationId:randomUUID(),body:'  搜索结果返回后，先前选择的分类未保留。\n请检查返回路径。  ',category:'problem',module:'discovery'};
   console.log(JSON.stringify({accounts,endpoint,submission,fingerprint:digest(canonicalize(feedbackSubmitSchema.parse(submission)))}));
+ }else if(process.argv[2]==='entry-runtime'){
+  const entryEndpoint=process.argv[3],url=new URL(entryEndpoint);
+  if(url.protocol!=='https:'||!url.hostname.endsWith('.invalid'))throw Error('isolated endpoint required');
+  const governance=await loadGovernanceConfig('');
+  await recordRuntimeConfig(pool,{endpoint:entryEndpoint,component:'api',operatorRef:'isolated-go-entry',honorRules:governance.honorRules,qualificationPolicies:governance.qualificationPolicies,experienceReviewers:governance.experienceReviewers??[],snapshot:runtimeConfigSnapshot({governance})},{now});
+  console.log(JSON.stringify({currentRegistry:true}));
  }else if(process.argv[2]==='read'){
   const admin={kind:'business-operator',endpoint,operatorId:'go-admin',role:'administrator'},reader={...admin,operatorId:'go-reader',role:'reader'};
   const businessAdmin=new BusinessAdminService({db:pool,endpoint,now});

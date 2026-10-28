@@ -1,0 +1,13 @@
+AGI Galaxy
+
+@@CATEGORY@@
+
+@@BODY@@
+
+@@REPLY@@
+@@CONTACT@@: team@agigalaxy.org
+
+@@ABOUT@@: https://agigalaxy.org/how-it-works/
+@@PRIVACY@@: https://agigalaxy.org/privacy/
+@@GUIDE@@: https://agigalaxy.org/docs/
+© @@YEAR@@ AGI Galaxy

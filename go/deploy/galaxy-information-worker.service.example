@@ -1,0 +1,19 @@
+# Candidate example only; do not install/start without approved configuration.
+[Unit]
+Description=Galaxy Go information-worker candidate
+After=network.target
+
+[Service]
+Type=simple
+User=galaxy
+Group=galaxy
+WorkingDirectory=/opt/galaxy/go-candidate
+EnvironmentFile=/etc/galaxy/information-worker.env
+Environment=GALAXY_RUNTIME_LOG_INSTANCE=information
+ExecStart=/opt/galaxy/go-candidate/galaxy-information-worker
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

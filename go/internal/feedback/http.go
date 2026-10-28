@@ -66,7 +66,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(path, "/")
 	account := len(parts) >= 2 && parts[0] == "account" && parts[1] == "feedback"
 	management := len(parts) >= 2 && parts[0] == "operations" && parts[1] == "feedback"
-	if !strings.HasPrefix(r.URL.Path, "/v1/") || !account && !management {
+	ownerData := len(parts) >= 3 && parts[0] == "account" && parts[1] == "data" && parts[2] == "feedback"
+	if !strings.HasPrefix(r.URL.Path, "/v1/") || !account && !management && !ownerData {
 		if h.Next != nil {
 			h.Next.ServeHTTP(w, r)
 		} else {
@@ -79,6 +80,13 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	requestID := uuid.NewString()
 	w.Header().Set("X-Request-ID", requestID)
+	if ownerData {
+		h.ownerDataHTTP(w, r, parts, requestID)
+		return
+	}
+	if h.attachmentHTTP(w, r, parts, account, requestID) {
+		return
+	}
 	result, status, e := h.dispatch(r, parts, account, requestID)
 	if e != nil {
 		status = fault.Status(e)

@@ -41,6 +41,34 @@ type Live struct {
 	ExpiresAt         int64
 }
 
+// Create attaches refresh material to the session inserted by the caller's
+// transaction; it neither creates another identity nor commits independently.
+func (s *Sessions) Create(ctx context.Context, tx pgx.Tx, hash string, tokens *Tokens) (bool, error) {
+	if tokens == nil || tokens.RefreshToken == "" {
+		return false, nil
+	}
+	if !hashPattern.MatchString(hash) || !validText(tokens.RefreshToken, 16384) || tokens.ExpiresAt <= s.stamp() {
+		return false, fault.New("portal_session_invalid", 400)
+	}
+	cipher, e := s.Encrypt(tokens.RefreshToken, hash)
+	if e != nil {
+		return false, e
+	}
+	at := s.stamp()
+	maximum := at + s.Policy.MaximumSeconds
+	args := s.args(hash)
+	n := len(args)
+	args = append(args, cipher, tokens.ExpiresAt, min(maximum, at+s.Policy.IdleSeconds), maximum)
+	result, e := tx.Exec(ctx, fmt.Sprintf("UPDATE %s SET refresh_cipher=$%d,upstream_expires_at=$%d,idle_expires_at=$%d,max_expires_at=$%d WHERE %s", s.table(), n+1, n+2, n+3, n+4, s.where()), args...)
+	if e != nil {
+		return false, e
+	}
+	if result.RowsAffected() != 1 {
+		return false, fault.New("portal_session_invalid", 409)
+	}
+	return true, nil
+}
+
 var hashPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func New(pool *pgxpool.Pool, kind string, scope []string, policy Policy, provider Provider) (*Sessions, error) {

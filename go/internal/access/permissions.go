@@ -40,48 +40,15 @@ func (g *Gateway) admitted(ctx context.Context, db queryer, r session) (bool, er
 	return true, nil
 }
 func (g *Gateway) authorize(ctx context.Context, tx pgx.Tx, r session, permission string) (feedback.Operator, error) {
-	if permission != "feedback.read" && permission != "feedback.update" {
+	if !knownPermission(permission) {
 		return feedback.Operator{}, fault.New("operations_permission_unknown", 403)
 	}
-	allowed, e := g.admitted(ctx, tx, r)
+	current, e := g.effective(ctx, tx, r)
 	if e != nil {
 		return feedback.Operator{}, e
 	}
-	if !allowed {
-		return feedback.Operator{}, fault.New("business_admin_denied", 403)
-	}
-	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared(hashtextextended($1,734912410))", g.Config.Endpoint); e != nil {
-		return feedback.Operator{}, e
-	}
-	root := g.Config.Root
-	isRoot := root != nil && r.ID == root.OperatorID && r.Issuer == root.Issuer && r.Subject == root.Subject
-	role := "reader"
-	permissions := []string{}
-	if isRoot {
-		role = "administrator"
-		permissions = []string{"feedback.read", "feedback.update"}
-	} else {
-		rows, e := tx.Query(ctx, `SELECT DISTINCT unnest(r.permissions) AS permission FROM operations_role_assignments_v1 a
-		 JOIN operations_business_roles_v1 r ON r.id=a.role_id AND r.endpoint=a.endpoint
-		 WHERE a.endpoint=$1 AND a.operator_id=$2 AND a.enabled AND r.enabled`, g.Config.Endpoint, r.ID)
-		if e != nil {
-			return feedback.Operator{}, e
-		}
-		for rows.Next() {
-			var p string
-			if e = rows.Scan(&p); e != nil {
-				rows.Close()
-				return feedback.Operator{}, e
-			}
-			permissions = append(permissions, p)
-		}
-		rows.Close()
-		if e = rows.Err(); e != nil {
-			return feedback.Operator{}, e
-		}
-	}
-	if !contains(permissions, permission) {
+	if !contains(current.Permissions, permission) {
 		return feedback.Operator{}, fault.New("operations_permission_denied", 403)
 	}
-	return feedback.Operator{ID: r.ID, Role: role, CanManage: contains(permissions, "feedback.update")}, nil
+	return feedback.Operator{ID: r.ID, Role: current.Role, CanManage: contains(current.Permissions, "feedback.update")}, nil
 }

@@ -114,7 +114,7 @@ func TestOriginalPortalCookiesAndCurrentRolesProtectGoFeedback(t *testing.T) {
 	}
 	g.Now = func() time.Time { return now }
 	s := &feedback.Service{Pool: pool, Endpoint: endpoint, Now: func() time.Time { return now }}
-	server := httptest.NewServer(feedback.Handler{Service: s, Identity: g})
+	server := httptest.NewServer(g.SessionHandler(feedback.Handler{Service: s, Identity: g}))
 	defer server.Close()
 	call := func(method, path, body, kind, token string, extra map[string]string) (int, feedback.Object) {
 		t.Helper()
@@ -154,6 +154,14 @@ func TestOriginalPortalCookiesAndCurrentRolesProtectGoFeedback(t *testing.T) {
 		t.Fatalf("authenticated Go feedback %d %v", status, out)
 	}
 	id := out["feedbackId"].(string)
+	status, out = call("GET", "/v1/operations/session", "", "operator", tokenRoot, nil)
+	if status != 200 || out["state"] != "signed-in" {
+		t.Fatalf("session projection %d %v", status, out)
+	}
+	snapshot := out["operator"].(map[string]any)
+	if snapshot["rootAdministrator"] != true || len(snapshot["businessAuthorization"].(map[string]any)["permissions"].([]any)) != len(permissionCodes) {
+		t.Fatal("session did not retain root's actual permission catalog")
+	}
 	status, out = call("GET", "/v1/operations/feedback/"+id, "", "operator", tokenRoot, nil)
 	if status != 200 {
 		t.Fatalf("root read %d %v", status, out)
@@ -236,9 +244,9 @@ func TestOriginalPortalCookiesAndCurrentRolesProtectGoFeedback(t *testing.T) {
 	if status != 401 {
 		t.Fatal("blocked management identity remained admitted")
 	}
-	_, e = pool.Exec(ctx, "DELETE FROM operations_operator_sessions_v1 WHERE operator_id=$1", rootID)
-	if e != nil {
-		t.Fatal(e)
+	status, out = call("POST", "/v1/operations/logout", "{}", "operator", tokenRoot, nil)
+	if status != 200 || out["state"] != "signed-out" {
+		t.Fatalf("logout %d %v", status, out)
 	}
 	status, _ = call("GET", "/v1/operations/feedback/"+id, "", "operator", tokenRoot, nil)
 	if status != 401 {

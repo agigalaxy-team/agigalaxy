@@ -10,8 +10,10 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
@@ -28,6 +30,9 @@ type Config struct {
 	Endpoint, WebsiteOrigin, AdminOrigin string
 	AccountIssuer, OperatorIssuer        string
 	AccountScope, OperatorConfiguration  string
+	AccountClientID                      string
+	AssociationClients                   []string
+	IdentityProviders                    []accounts.Provider
 	AdministratorRole, ReaderRole        string
 	Root                                 *Root
 	AllowLoopbackHTTP                    bool
@@ -38,6 +43,11 @@ type Gateway struct {
 	Directory                       Directory
 	AccountRenewal, OperatorRenewal *portal.Sessions
 	Now                             func() time.Time
+	operatorLogin                   *portal.Login
+	operatorLoginFactory            func(context.Context) (*portal.Login, error)
+	accountLogin                    *portal.Login
+	accountLoginFactory             func(context.Context) (*portal.Login, error)
+	loginMu                         sync.Mutex
 }
 type session struct {
 	ID, Issuer, Subject, CSRF, Hash string
@@ -69,6 +79,8 @@ func New(pool *pgxpool.Pool, c Config, d Directory) (*Gateway, error) {
 		root := *c.Root
 		c.Root = &root
 	}
+	c.AssociationClients = append([]string(nil), c.AssociationClients...)
+	c.IdentityProviders = append([]accounts.Provider(nil), c.IdentityProviders...)
 	return &Gateway{Pool: pool, Config: c, Directory: d}, nil
 }
 func (g *Gateway) now() int64 {
@@ -249,7 +261,7 @@ func (g *Gateway) Operator(r *http.Request, write bool, permission string) (stri
 		}
 		return "", nil, loginRequired("operator")
 	}
-	if permission != "feedback.read" && permission != "feedback.update" {
+	if !knownPermission(permission) {
 		return "", nil, fault.New("operations_permission_unknown", 403)
 	}
 	return s.ID, &bound{g, "operator", s.Hash, s.ID}, nil

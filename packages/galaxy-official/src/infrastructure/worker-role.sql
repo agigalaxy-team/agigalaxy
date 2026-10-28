@@ -104,12 +104,12 @@ GRANT INSERT ON ci_observations_v2 TO galaxy_evidence_worker;
 CREATE OR REPLACE FUNCTION public.galaxy_worker_lock_ci_case(request_id uuid,case_id uuid)
 RETURNS SETOF public.cases LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
  SELECT c.* FROM public.cases c JOIN public.ci_requests_v2 r ON r.case_id=c.id
- WHERE r.id=request_id AND c.id=case_id AND r.state<>'revoked' FOR SHARE OF c;
+ WHERE r.id=$1 AND c.id=$2 AND r.state<>'revoked' FOR SHARE OF c;
 $$;
 CREATE OR REPLACE FUNCTION public.galaxy_worker_lock_ci_record(request_id uuid,record_id uuid)
 RETURNS SETOF public.verification_objects LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
  SELECT o.* FROM public.verification_objects o JOIN public.ci_requests_v2 r ON r.case_id=o.case_id
- WHERE r.id=request_id AND o.id=record_id AND r.state<>'revoked' FOR SHARE OF o;
+ WHERE r.id=$1 AND o.id=$2 AND r.state<>'revoked' FOR SHARE OF o;
 $$;
 REVOKE ALL ON FUNCTION public.galaxy_worker_lock_ci_case(uuid,uuid),public.galaxy_worker_lock_ci_record(uuid,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.galaxy_worker_lock_ci_case(uuid,uuid),public.galaxy_worker_lock_ci_record(uuid,uuid) TO galaxy_evidence_worker;

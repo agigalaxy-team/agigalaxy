@@ -4,22 +4,27 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 )
 
-var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+var uuidPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$`)
 var hashPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var modules = map[string]bool{"account": true, "community": true, "chat": true, "work": true, "discovery": true, "other": true}
 var states = map[string]bool{"pending": true, "processing": true, "closed": true}
 
 func invalid() error               { return fault.New("invalid_feedback_request", 400) }
 func validCategory(s *string) bool { return s == nil || *s == "problem" || *s == "suggestion" }
+func feedbackTrim(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool { return r == 0xfeff || unicode.IsSpace(r) && r != 0x85 })
+}
 func text(s string, max int) (string, error) {
-	s = strings.TrimSpace(s)
-	if protocol.TextLength(s) < 1 || protocol.TextLength(s) > max {
+	s = feedbackTrim(s)
+	if utf8.RuneCountInString(s) < 1 || utf8.RuneCountInString(s) > max {
 		return "", invalid()
 	}
 	for _, r := range s {
