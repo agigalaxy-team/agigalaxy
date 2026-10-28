@@ -1,6 +1,5 @@
 import type { Action } from '../adapter-types.ts';
 import { createDeletionMenu } from '../deletion-menu.mjs';
-import { createLocalDeletionRecords } from '../bridge/legacy-local.mjs';
 import { createDataExportMenu } from '../data-export-menu.mjs';
 import { createProfileMenu } from '../profile-menu.mjs';
 import { createSearchMenu } from '../search-menu.mjs';
@@ -425,8 +424,7 @@ export function createConnectedMenu(session: GalaxyMenuSession) {
                       status.scopes?.includes('data-delete'),
                     info: session.showInfo,
                     language: session.activeLanguage,
-                    records: createLocalDeletionRecords({
-                      dataDirectory: session.dataDirectory,
+                    records: session.createDeletionRecords({
                       endpoint: status.endpoint,
                       isCurrent: () => current === session.connectionGeneration,
                     }),

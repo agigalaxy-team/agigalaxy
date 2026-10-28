@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {generateKeyPairSync} from 'node:crypto';
+import {generateKeyPairSync,randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createNativeRuntimeBridge} from '../native-runtime-bridge.mjs';
 import {createHostLocalClient} from './host-local-client.mjs';
@@ -92,4 +92,41 @@ test('owning host notification rejects a wrong original owner without becoming a
  assert.equal(data(await bridge.call('galaxy_local_work_list')).galaxyId,f.identity.id);assert.equal(diagnostics.length,before);
  await assert.rejects(bridge.call('notifications/galaxy/host-session-complete',{galaxyId:f.identity.id,host:'opencode',sessionId:'project-notes'}),/native_bridge_request_rejected/);
  await bridge.close();await assert.rejects(bridge.sessionComplete({galaxyId:f.identity.id,host:'opencode',sessionId:'project-notes'}),/native_bridge_closed/);
+});
+
+
+test('default Go bridge and private local Host retain offline menus, locators and independent work originals across reset',{skip:!executable&&'Set GALAXY_GO_TEST_BINARY to the development Go executable'},async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'galaxy-go-local-host-')),dataDirectory=join(directory,'data');
+ const saved=Object.fromEntries(['GALAXY_NATIVE_CONFIG','GALAXY_NATIVE_BACKEND'].map(key=>[key,process.env[key]]));
+ delete process.env.GALAXY_NATIVE_CONFIG;delete process.env.GALAXY_NATIVE_BACKEND;
+ const host=createHostLocalClient({executable,configPath:null,dataDirectory});
+ // Deliberately no backend option: this is the normal source default.
+ const bridge=createNativeRuntimeBridge({executable,configPath:null,dataDirectory});
+ t.after(async()=>{try{await bridge.close();await host.close();}finally{for(const[key,value]of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}const exact=resolve(directory);assert.ok(exact.startsWith(resolve(tmpdir())+sep));await rm(exact,{recursive:true,force:true});}});
+ assert.equal((await host.store.getLocalSnapshot()).identity,null);
+ await host.initialize({initializationPath:'personal-galaxy',subjectType:'person'});
+ const snapshot=await host.store.getLocalSnapshot(),identity=snapshot.identity;
+ assert.match(identity.id,/^GUID[0-9A-Z]{28}$/);
+ const status=await host.store.getGalaxyIntegrationStatus();
+ assert.equal(status.galaxyId.id,identity.id);assert.equal(status.initialized,true);assert.equal(status.localOnly,true);
+ const contract=await host.connection.getGalaxyConnectionStatus();assert.ok(contract&&typeof contract==='object');
+ const mcpStatus=data(await bridge.call('galaxy_integration_status'));
+ assert.equal(mcpStatus.galaxyId.id,identity.id);
+ const galaxyId=identity.id,hostName='opencode',sessionId='offline-synthetic';
+ await host.history.beginCapture({galaxyId,host:hostName,sessionId,observedAt:new Date().toISOString()});
+ await host.history.observe({galaxyId,host:hostName,sessionId,sourceId:'synthetic-observation',kind:'message',source:{kind:'host-event'},details:{role:'user'},content:{excerpt:'Offline synthetic work; outcome remains unknown.',originalLength:48,retained:'excerpt',availableFromHost:true}});
+ const work=await host.history.get({galaxyId,host:hostName,sessionId,limit:20});
+ assert.ok(work.observations.some(item=>item.content?.excerpt?.includes('Offline synthetic work')));
+ await host.archive.configure({galaxyId,enabled:true,sessions:[{host:hostName,sessionId}],autoCleanAfterDays:null});
+ const captured=await host.archive.captureMessage({galaxyId,host:hostName,sessionId,messageId:'offline-original',message:{id:'offline-original',role:'user'},parts:[{id:'offline-text',type:'text',text:'Owned offline original.'}]});
+ assert.equal(captured.captured,true);
+ const records=host.deletionRecords({endpoint:'https://offline-reference.invalid',isCurrent:()=>true}),requestId=randomUUID();
+ await records.observe({id:requestId,subjectId:galaxyId,state:'requested'});
+ const locators=await records.list();assert.equal(locators.currentStateVerified,false);assert.equal(locators.records[0].requestId,requestId);
+ const files=['work-history/history.sqlite','conversation-archive/private.sqlite'];
+ const before=await Promise.all(files.map(file=>readFile(join(dataDirectory,file))));
+ const reset=await host.store.resetGalaxyIntegration();assert.equal(reset.localOnly,true);
+ assert.equal((await host.store.getLocalSnapshot()).identity,null);
+ assert.equal(data(await bridge.call('galaxy_integration_status')).galaxyId,null);
+ for(let index=0;index<files.length;index++)assert.deepEqual(await readFile(join(dataDirectory,files[index])),before[index]);
 });

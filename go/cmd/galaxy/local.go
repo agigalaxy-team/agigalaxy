@@ -55,6 +55,8 @@ func localCommand(ctx context.Context, name string, args []string) error {
 	}
 	var value any
 	switch name {
+	case "integration-host":
+		return native.ServeHost(ctx, store, os.Stdin, os.Stdout)
 	case "integration-mcp":
 		server, err := native.NewToolServer(store)
 		if err != nil {
@@ -150,6 +152,7 @@ func usage() {
   galaxy command --config <absolute file> [--command open] [--language zh-CN|en-US] [--stage 1..5]
   galaxy init|status|export [--data-dir <path>] Local fallback; no service connection
   galaxy integration-mcp [--data-dir <path>]  Local-only MCP; ignores service configuration
+  galaxy integration-host [--data-dir <path>] Local-only trusted Host JSONL; no service configuration
   galaxy service-config inspect --website <HTTPS origin> [--endpoint <HTTPS origin>]
   galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file>
   galaxy host-configs <absolute config> <new output directory> [--package-dir <candidate>] [--hosts <comma-separated ids>]

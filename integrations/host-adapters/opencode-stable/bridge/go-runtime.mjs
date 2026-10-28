@@ -4,8 +4,9 @@ const resultValid=value=>value&&typeof value==='object'&&(Array.isArray(value.co
 
 // onInputRequest must be an actual foreground host UI callback. When absent,
 // preserve the original requestState for a caller's explicit UI continuation.
-export function createGoRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONFIG,executable=process.env.GALAXY_NATIVE_EXECUTABLE,requestTimeoutMs=30000,onInputRequest,onDiagnostic}={}){
- const rpc=createChildRPC({executable,configPath,requestTimeoutMs,command:'native',onDiagnostic});
+export function createGoRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONFIG,executable=process.env.GALAXY_NATIVE_EXECUTABLE,dataDirectory,requestTimeoutMs=30000,onInputRequest,onDiagnostic}={}){
+ const localOnly=!configPath;
+ const rpc=createChildRPC({executable,configPath,dataDirectory:localOnly?dataDirectory:undefined,requestTimeoutMs,command:localOnly?'integration-mcp':'native',onDiagnostic});
  let starting,closed=false;
  const lifetime=new AbortController();
  const context={'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'galaxy-opencode-native',version:'1'},'io.modelcontextprotocol/clientCapabilities':{elicitation:{form:{}}}};
@@ -38,6 +39,7 @@ export function createGoRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONF
   throw failure('native_bridge_input_limit');
  }
  async function sessionComplete({galaxyId,host,sessionId}={}){
+  if(localOnly)throw failure('native_bridge_host_notification_unavailable');
   if(![galaxyId,host,sessionId].every(value=>typeof value==='string'&&value.length>0&&value.length<=512))throw failure('native_bridge_host_notification_invalid');
   await start();
   await rpc.notify({jsonrpc:'2.0',method:'notifications/galaxy/host-session-complete',params:{galaxyId,host,sessionId}});

@@ -68,6 +68,22 @@ func hostDecode[T any](raw json.RawMessage) (T, error) {
 
 func (s *Store) hostCall(ctx context.Context, method string, params json.RawMessage) (any, error) {
 	switch method {
+	case "local.deletion.rememberPreview", "local.deletion.observe", "local.deletion.list":
+		return s.hostDeletionCall(ctx, method, params)
+	case "local.snapshot", "local.integrationStatus", "local.connectionStatus", "local.resetIntegration":
+		if _, e := hostDecode[struct{}](params); e != nil {
+			return nil, e
+		}
+		switch method {
+		case "local.snapshot":
+			return s.integrationSnapshot(ctx)
+		case "local.integrationStatus":
+			return s.IntegrationReadStatus(ctx)
+		case "local.connectionStatus":
+			return s.IntegrationConnectionStatus(ctx)
+		default:
+			return s.resetLocalIntegration(ctx)
+		}
 	case "native.preparationStatus":
 		if _, e := hostDecode[struct{}](params); e != nil {
 			return nil, e

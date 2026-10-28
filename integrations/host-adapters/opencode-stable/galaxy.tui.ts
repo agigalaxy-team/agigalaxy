@@ -17,7 +17,7 @@ import type {
 } from './adapter-types.ts';
 import { createPurposeMenu } from './purpose-menu.mjs';
 import { createOpenCodeWorkRecorder } from './work-recorder.mjs';
-import {store, connection, createLegacyArchive, prepareOpenCodeLocalWork, isOpenCodePreparationDeferred, deferOpenCodePreparation} from './bridge/legacy-local.mjs';
+import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import { createReadTaskController } from '../../shared/read-task.mjs';
 
 export function createGalaxyAdapter(
@@ -50,9 +50,12 @@ export function createGalaxyAdapter(
       sessionId: string;
     }) => Promise<unknown>;
     connectionUnavailable?: boolean;
-    hostPersistence?: { history: ReturnType<typeof createOpenCodeWorkRecorder>['history']; archive: NonNullable<ReturnType<typeof createOpenCodeWorkRecorder>['archive']>; initialize(input:{initializationPath:'personal-galaxy';subjectType:'person'|'organization'}):Promise<unknown>; preparationStatus():Promise<{deferred:boolean}>; deferPreparation():Promise<unknown> };
+    hostPersistence?: ReturnType<typeof createHostLocalClient>;
   } = {},
 ) {
+  const ownsPersistence = !hostPersistence;
+  const persistence = hostPersistence ?? createHostLocalClient({localOnly:true,dataDirectory:configuredDirectory});
+  const store = persistence.store, connection = persistence.connection;
   let closed = false,
     attached = false;
   const localPageReads = createReadTaskController('opencode-local-work');
@@ -74,7 +77,10 @@ export function createGalaxyAdapter(
         discovery?.close();
         disposeLifecycle?.();
         disposeLifecycle = null;
-        closing = workRecorder?.close() ?? Promise.resolve();
+        closing = (async () => {
+          try { await workRecorder?.close(); }
+          finally { if (ownsPersistence) await persistence.close(); }
+        })();
       }
     }
     return closing;
@@ -124,11 +130,8 @@ export function createGalaxyAdapter(
             dataDirectory,
             getIdentity: readLocalIdentity,
             onSessionComplete: onWorkSessionComplete,
-            ...(hostPersistence ? {history: hostPersistence.history} : {}),
-            archive: hostPersistence?.archive ?? createLegacyArchive({
-              dataDirectory,
-              getIdentity: readLocalIdentity,
-            }),
+            history: persistence.history,
+            archive: persistence.archive,
           });
         let discoveryAbort: AbortController | null = null;
         let disposeMenuKeys: Action | null = null;
@@ -327,6 +330,9 @@ export function createGalaxyAdapter(
           get store() {
             return store;
           },
+          get createDeletionRecords() {
+            return persistence.deletionRecords;
+          },
           get workRecorder() {
             return workRecorder;
           },
@@ -439,9 +445,7 @@ export function createGalaxyAdapter(
           const requestedPage = pageGeneration,
             stillHere = () => !closed && requestedPage === pageGeneration;
           const owner = await workRecorder?.history.identity();
-          const snapshot = hostPersistence
-            ? {identity:owner,recoveryRequired:false}
-            : await store.getLocalSnapshot(dataDirectory);
+          const snapshot = await store.getLocalSnapshot(dataDirectory);
           if (!stillHere()) return;
           if (owner || snapshot.identity) {
             firstPreparationVisible = false;
@@ -467,8 +471,7 @@ export function createGalaxyAdapter(
               // A real TUI start choice is sufficient for this local-only operation.
               // No browser approval or account association repeats the same decision.
               if (!(await workRecorder?.history.identity())) {
-                if(hostPersistence)await hostPersistence.initialize({initializationPath:'personal-galaxy',subjectType});
-                else await prepareOpenCodeLocalWork(dataDirectory, { subjectType });
+                await persistence.initialize({initializationPath:'personal-galaxy',subjectType});
               }
               await workRecorder?.refresh();
               if (atOriginalPage()) onReturn();
@@ -486,7 +489,7 @@ export function createGalaxyAdapter(
           firstPreparationVisible = firstStart;
           const later = async () => {
             firstPreparationVisible = false;
-            await (hostPersistence?hostPersistence.deferPreparation():deferOpenCodePreparation(dataDirectory)).catch(() => {});
+            await persistence.deferPreparation().catch(() => {});
             closeGalaxy();
           };
           showSelect({
@@ -746,7 +749,7 @@ export function createGalaxyAdapter(
             if (
               !closed &&
               !(await workRecorder.history.identity()) &&
-              !(hostPersistence?(await hostPersistence.preparationStatus()).deferred:await isOpenCodePreparationDeferred(dataDirectory))
+              !(await persistence.preparationStatus()).deferred
             )
               await showQuickInitialize(closeGalaxy, true);
           } catch {

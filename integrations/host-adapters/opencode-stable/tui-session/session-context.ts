@@ -21,6 +21,7 @@ export interface GalaxyMenuSession {
   readonly closed: boolean;
   readonly store: Pick<typeof import('../../../../packages/galaxy-core/src/local-store.mjs'), 'getLocalSnapshot' | 'getGalaxyIntegrationStatus' | 'resetGalaxyIntegration'>;
   readonly connection: Pick<typeof import('../../../../packages/galaxy-core/src/connection-profile.mjs'), 'getGalaxyConnectionStatus'>;
+  readonly createDeletionRecords: ReturnType<typeof import('../bridge/host-local-client.mjs').createHostLocalClient>['deletionRecords'];
   readonly dataDirectory: string | undefined;
   connectionController: ConnectionController | null;
   readonly discovery: DiscoverySource | null;

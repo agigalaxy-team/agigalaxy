@@ -17,9 +17,11 @@ Go 候选中的 `setup`、`service-config`、`host-configs` 子命令分别承�
 
 服务版公开配置仍为 `version:2`、精确 HTTPS `endpoint/website`、本机绝对 `dataDirectory`、`trustedKeys`（kid→publicKeyPem/notBefore/notAfter/revoked）；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不放 token、私钥或恢复码。配置准备不创建身份/绑定、不跟重定向或覆盖原信任；宿主生成只写选定输出，不自行修改用户配置。
 
-Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `native`，env 含公开配置路径。OpenCode 的 `opencode.js` 仅是宿主 UI／SDK 桥接，启动 Go MCP 子进程；录制和整理经独立 `galaxy host` 私有 JSONL 子进程保存原资料，该通道不是模型工具或网络服务。宿主事件取材及模型 SDK 调用留在宿主，不把观察方法开放给模型，也不偷偷改用服务器模型。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
+Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `native`，env 含公开配置路径。正常宿主源码和包内 `opencode.js` 默认使用 Go，不通过缺包或缺配置回退到旧 JS 内核；旧协议夹具需显式导入 reference 模块。OpenCode 的 JS 仅承担宿主 UI／SDK 桥接；有服务配置时启动 Go MCP 子进程，录制和整理经独立 `galaxy host` 私有 JSONL 子进程保存原资料。私有通道不是模型工具或网络服务。宿主事件取材及模型 SDK 调用留在宿主，不把观察方法开放给模型，也不偷偷改用服务器模型。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
 
-发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
+无服务配置的 OpenCode 保留原本机菜单、本人选择与材料／模型选择，持久处理使用 `galaxy integration-host --data-dir <目录>` 私有 JSONL 入口；它按与本机 CLI 相同的目录次序取值，不读取服务配置、不创建服务 Runtime，也不发会话完成上传通知。本机状态、初始化／延后、记录整理和原件管理复用现有本机方法；重置仍由原可信菜单确认，只重置原身份／集成文件，保留独立工作资料。服务配置存在时使用 `host`；两者都不把宿主观察和保存端口加入模型 MCP 清单。
+
+旧签名发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；其维护、验签和启动说明仍用于对应旧包，不表示 Go 候选沿用旧内核。源码中的旧 JS 实现可保留作协议对照、迁移差分与旧包维护参考；宿主 TUI、SDK 桥接和 UI 也仍有 JS，不应表述为全部 JS 已删除。信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
 
 `scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。宿主依赖在构建／搬移运行包时闭合，不在安装中联网补包。候选清单的目标平台与构建成功不表示真实宿主、系统提醒或对应操作系统已经验收，更不表示正式上线或用户已安装。宿主验收 launcher 在准备前传入并核对独立 profile；CLI 发现、真实隔离 TUI 与物理桌面仍分开记录。
 

@@ -1,4 +1,4 @@
-import {createLegacyHistory} from './bridge/legacy-local.mjs';
+import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
 import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
 
@@ -18,7 +18,9 @@ const content = text => ({excerpt: short(text), originalLength: typeof text === 
  * @param {*} api
  * @param {{dataDirectory?: string, getIdentity?: (directory: string) => WorkRecorderIdentity | Promise<WorkRecorderIdentity>, history?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/work-history/index.mjs').createLocalWorkHistory>, 'identity'|'beginCapture'|'observeEnvironment'|'observe'|'list'|'get'|'pending'|'setSummaryState'|'submitSummary'>, archive?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/conversation-archive/index.mjs').createLocalConversationArchive>, 'settings'|'captureMessage'|'configure'>, onSessionComplete?: (input: {galaxyId: string, host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
  */
-export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history = createLegacyHistory({dataDirectory, getIdentity}), archive, onSessionComplete, pollMs = 2000} = {}) {
+export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history, archive, onSessionComplete, pollMs = 2000} = {}) {
+  const persistence=history?null:createHostLocalClient({localOnly:true,dataDirectory});
+  history??=persistence.history;archive??=persistence?.archive;
   const diagnostics=nativeDiagnostics('host-client');
   diagnostics.emit({event:'host_recording',stage:'recording',outcome:'started',host:'opencode'});
   let accepting = true, closing, chain = Promise.resolve(), active = null, errorCode = null, selectedModel, actualModel;
@@ -293,7 +295,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, his
     for (const dispose of disposers.splice(0)) dispose();
     for (const controller of archiveControllers) controller.abort();
     archiveSyncRequests.clear();
-    closing = diagnostics.run('shutdown',()=>Promise.all([chain, summarizer.close(), Promise.allSettled([...archiveJobs.values(),...archiveSyncJobs.values()])]).then(() => {messages.clear(); parts.clear(); seen.clear();completedMessages.clear();}),{event:'host_recording',host:'opencode'});
+    closing = diagnostics.run('shutdown',async()=>{try{await Promise.all([chain, summarizer.close(), Promise.allSettled([...archiveJobs.values(),...archiveSyncJobs.values()])]);messages.clear();parts.clear();seen.clear();completedMessages.clear();}finally{await persistence?.close();}},{event:'host_recording',host:'opencode'});
     return closing;
   }
   return {history, archive, ready, refresh: () => enqueue(reconcile), backfillArchive, close,

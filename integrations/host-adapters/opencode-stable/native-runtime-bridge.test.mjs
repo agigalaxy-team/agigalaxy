@@ -4,10 +4,10 @@ import {mkdtemp,writeFile,readFile,stat,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep,basename} from 'node:path';
 import {generateKeyPairSync} from 'node:crypto';
-import {createNativeRuntimeBridge} from './native-runtime-bridge.mjs';
+import {createNativeRuntimeBridge} from './bridge/legacy-runtime.mjs';
 import {nativeData} from '../../../packages/galaxy-edge-mcp/test/native-result.mjs';
 
-test('ordinary OpenCode bridge loads the actual Native entry, keeps one real choice and leaves identity disconnected',async()=>{
+test('explicit historical bridge reference loads its original Native entry, keeps one real choice and leaves identity disconnected',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-opencode-bridge-')),configPath=join(directory,'public.json'),dataDirectory=join(directory,'data');
  const bridge=createNativeRuntimeBridge({configPath});let review;
  const before=['SIGINT','SIGTERM'].map(signal=>process.listenerCount(signal));

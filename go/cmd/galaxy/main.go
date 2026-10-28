@@ -21,7 +21,7 @@ func run(ctx context.Context, args []string) error {
 	case "help", "--help", "-h":
 		usage()
 		return nil
-	case "init", "status", "export", "integration-mcp":
+	case "init", "status", "export", "integration-mcp", "integration-host":
 		return localCommand(ctx, args[0], args[1:])
 	case "service-config":
 		return serviceConfigurationCommand(ctx, args[1:])
