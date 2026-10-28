@@ -27,10 +27,22 @@ func boundedFile(path string, limit int64, secret bool) ([]byte, error) {
 	if e != nil {
 		return nil, e
 	}
-	if !info.Mode().IsRegular() || info.Size() > limit || secret && runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 {
+	if !info.Mode().IsRegular() || info.Size() > limit || secret && runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 && !systemdCredential(path, info) {
 		return nil, fmt.Errorf("unsafe chat configuration file")
 	}
 	return os.ReadFile(path)
+}
+
+// systemd may expose LoadCredential files as 0440 in a service-private mount.
+// This exception is only for a direct regular file in this process's actual
+// credential directory; ordinary group-readable secret files remain rejected.
+func systemdCredential(path string, info os.FileInfo) bool {
+	directory := os.Getenv("CREDENTIALS_DIRECTORY")
+	if directory == "" || !filepath.IsAbs(directory) || info.Mode().Perm() != 0440 || filepath.Dir(filepath.Clean(path)) != filepath.Clean(directory) {
+		return false
+	}
+	dir, e := os.Lstat(directory)
+	return e == nil && dir.IsDir() && dir.Mode().Perm()&0027 == 0
 }
 
 // LoadTransport validates files without connecting. Start is an explicit

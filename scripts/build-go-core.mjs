@@ -52,7 +52,7 @@ export async function buildGoCore({destination,sourceDirectory=root,goExecutable
  }
  // Galaxy-owned source follows the root Apache-2.0 license and notice.
  // Dependency texts retain their own original licenses in the inventory.
- const packages=jsonStream((await invoke(['list','-mod=readonly','-deps','-json',...commands.map(c=>'./cmd/'+c),...(includeNative?['./cmd/galaxy']:[])])).stdout);
+ const packages=jsonStream((await invoke(['list','-mod=readonly','-buildvcs=false','-deps','-json',...commands.map(c=>'./cmd/'+c),...(includeNative?['./cmd/galaxy']:[])])).stdout);
  const modules=new Map();for(const pkg of packages){const m=pkg.Module;if(m&&!m.Main)modules.set(m.Path+'@'+m.Version,m);}
  const licenses=[],missing=[];
  async function legalFiles(directory,prefix=''){

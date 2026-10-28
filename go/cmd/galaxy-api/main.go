@@ -18,6 +18,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountsocial"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos/actions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/attachments"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/builders"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
@@ -507,6 +508,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	autonomy := &operationsautonomy.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, AIWork: permissionService.AIWork}
 	connectWorkbench(agentConversations, autonomy, logger)
 	queries := &operationsqueries.Service{Pool: pool, Permissions: permissionService, Messaging: messages}
+	agentConversations.ValidateSources = agentConversations.SourceValidator(queries.Revalidate)
 	operationsDomain := &businessadmin.Domain{Pool: pool, Endpoint: endpoint, Authority: &operationspermissions.BusinessAuthority{Human: gateway, Duty: autonomy}, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin}
 	businessAudit := &operationsaudit.Service{Domain: operationsDomain}
 	retention := &operationsretention.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, StoredAuthority: gateway.StoredOperators()}
@@ -528,6 +530,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	forumOperations := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Files: forumFiles, Links: links}
 	var executionDiscovery *discovery.Runtime
 	executionGateway, strategies := connectExecutions(gateway, permissionService, autonomy, forumOperations, agentClient, func() *discovery.Runtime { return executionDiscovery })
+	agentConversations.Tools.AuthorizedWork = (&actions.AuthorizedWork{Gateway: executionGateway}).Execute
 	forumPolicy, _ := forum.PolicySnapshot()
 	resourceOperations := &operationsresources.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, Projects: projectService, Capsules: capsuleSource, MaxHideSeconds: policySeconds(forumPolicy["maxGovernanceHideSeconds"])}
 	resourceOperations.MaxHideSecondsNow = func() int64 {

@@ -147,14 +147,13 @@ func (t *ConversationTools) assertCardBound(ctx context.Context, row *conversati
 
 func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversationTool, input Object) (Object, error) {
 	s := t.Conversations
-	if t.Prepare == nil {
+	if bound.publicReference == nil && t.Prepare == nil || bound.publicReference != nil && t.PrepareWithReference == nil {
 		return nil, fail("operations_agentos_conversation_not_ready", 503)
 	}
-	canonical, err := identity.Canonical(bound.args)
+	digest, err := conversationArgumentsDigest(bound.args, bound.publicReference)
 	if err != nil {
 		return nil, err
 	}
-	digest := identity.Digest(canonical)
 	query := `SELECT ` + conversationCardColumns + ` FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND turn_id=$2 AND request_digest=$3`
 	row, err := readConversationCard(s.Pool.QueryRow(ctx, query, s.Endpoint, input["turnId"], digest))
 	if err != nil {
@@ -162,7 +161,12 @@ func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversa
 	}
 	if row == nil {
 		operationID := uuid.NewString()
-		proposal, err := t.Prepare(ctx, bound.actor, bound.row, bound.args, operationID)
+		var proposal Object
+		if bound.publicReference != nil {
+			proposal, err = t.PrepareWithReference(ctx, bound.actor, bound.row, bound.args, operationID, bound.publicReference)
+		} else {
+			proposal, err = t.Prepare(ctx, bound.actor, bound.row, bound.args, operationID)
+		}
 		if err != nil {
 			return nil, err
 		}

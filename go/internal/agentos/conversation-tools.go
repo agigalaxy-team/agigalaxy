@@ -5,7 +5,6 @@ import (
 	"regexp"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/google/uuid"
@@ -19,6 +18,7 @@ type ConversationTools struct {
 	Query                 func(context.Context, operationspermissions.Actor, string, string, Object) (Object, error)
 	Summary               func(context.Context, operationspermissions.Actor, string, Object) (Object, error)
 	Prepare               func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error)
+	PrepareWithReference  func(context.Context, operationspermissions.Actor, Conversation, Object, string, Object) (Object, error)
 	PrepareStored         func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error)
 	CardReadPermission    func(string) (string, error)
 	ExecutePrepared       func(context.Context, operationspermissions.Actor, Object, string, func(context.Context, pgx.Tx) (operationspermissions.Actor, error)) (Object, error)
@@ -30,10 +30,11 @@ type ConversationTools struct {
 }
 
 type boundConversationTool struct {
-	row          Conversation
-	actor        operationspermissions.Actor
-	callID, tool string
-	args         Object
+	row             Conversation
+	actor           operationspermissions.Actor
+	callID, tool    string
+	args            Object
+	publicReference Object
 }
 
 var toolPairID = regexp.MustCompile(`^[\x21-\x7E]{1,200}$`)
@@ -42,7 +43,8 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 
 func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConversationTool, error) {
 	var out boundConversationTool
-	if len(input) != 7 {
+	_, hasReference := input["publicReference"]
+	if len(input) != 7 && (!hasReference || len(input) != 8) {
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	for _, key := range []string{"conversationId", "sessionId", "turnId", "runId", "callId", "tool", "arguments"} {
@@ -61,6 +63,17 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
+	var reference Object
+	if hasReference {
+		if tool != "read-operation-object" && tool != "prepare-operation" {
+			return out, fail("invalid_operations_agentos_request", 400)
+		}
+		var err error
+		reference, err = parseConversationPublicReference(input["publicReference"])
+		if err != nil {
+			return out, err
+		}
+	}
 	s := t.Conversations
 	if s == nil || s.Pool == nil {
 		return out, fail("operations_authorization_unavailable", 503)
@@ -72,11 +85,10 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 	if current.Row.SessionID != sessionID {
 		return out, fail("operations_agentos_scope_denied", 403)
 	}
-	canonical, err := identity.Canonical(args)
+	digest, err := conversationArgumentsDigest(args, reference)
 	if err != nil {
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
-	digest := identity.Digest(canonical)
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (boundConversationTool, error) {
 		fresh, err := s.CurrentWithin(ctx, tx, conversationID, nil)
 		if err != nil {
@@ -121,7 +133,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		if priorTurn != turnID || priorTool != tool || priorDigest != digest {
 			return out, fail("operations_agentos_operation_conflict", 409)
 		}
-		return boundConversationTool{row: *fresh.Row, actor: fresh.Actor, callID: id, tool: tool, args: args}, nil
+		return boundConversationTool{row: *fresh.Row, actor: fresh.Actor, callID: id, tool: tool, args: args, publicReference: reference}, nil
 	})
 }
 
@@ -151,8 +163,22 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		}
 	case "prepare-operation":
 		result, err = t.prepareCard(ctx, bound, input)
+	case "list-authorized-work", "run-authorized-work":
+		if bound.tool == "list-authorized-work" && len(bound.args) != 0 || bound.tool == "run-authorized-work" && (len(bound.args) != 1 || !validOperationID(text(bound.args, "executionId"))) {
+			err = fail("invalid_operations_agentos_action", 400)
+		} else if t.AuthorizedWork == nil {
+			err = fail("operations_agentos_conversation_not_ready", 503)
+		} else {
+			result, err = t.AuthorizedWork(ctx, bound.actor, bound.row, Object{"tool": bound.tool, "arguments": bound.args})
+		}
 	default:
 		err = fail("operations_agentos_conversation_not_ready", 503)
+	}
+	if err == nil && bound.publicReference != nil && bound.tool == "read-operation-object" {
+		err = checkConversationPublicReference(bound.publicReference, bound.args, object(result["data"]))
+	}
+	if err == nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object" || bound.tool == "read-ai-delegation") {
+		err = t.rememberSources(ctx, bound.row, result["evidenceRefs"])
 	}
 	if err == nil {
 		_, err = s.Current(ctx, bound.row.ID, nil)

@@ -18,6 +18,9 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 	tools.Prepare = func(ctx context.Context, actor p.Actor, row agentos.Conversation, request agentos.Object, operationID string) (agentos.Object, error) {
 		return service.Prepare(ctx, actor, row.Domain, request, operationID)
 	}
+	tools.PrepareWithReference = func(ctx context.Context, actor p.Actor, row agentos.Conversation, request agentos.Object, operationID string, reference agentos.Object) (agentos.Object, error) {
+		return service.PrepareWithReference(ctx, actor, row.Domain, request, operationID, reference)
+	}
 	tools.PrepareStored = func(ctx context.Context, actor p.Actor, row agentos.Conversation, proposal agentos.Object, operationID string) (agentos.Object, error) {
 		request, _ := proposal["request"].(map[string]any)
 		reference, _ := proposal["publicReference"].(map[string]any)
