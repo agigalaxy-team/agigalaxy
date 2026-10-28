@@ -1,0 +1,26 @@
+name: 文档纠错
+description: 指出资料错误、遗漏或与实际版本不一致的描述
+title: "[文档] "
+body:
+  - type: markdown
+    attributes:
+      value: 此反馈会公开显示，请先移除凭据、私人消息和个人资料。
+  - type: input
+    id: location
+    attributes:
+      label: 文档或页面
+      description: 文件路径或公开页面地址
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 哪些描述不准确
+      description: 说明原描述、实际情况及适用版本
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: 建议修正与依据
+      description: 可附公开来源、脱敏截图或建议文案

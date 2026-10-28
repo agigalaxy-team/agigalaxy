@@ -1,7 +1,20 @@
-name: 功能建议
-description: 描述使用目的、现有困难与期望结果
-title: "[Idea] "
+name: 使用反馈与建议
+description: 提交使用问题、体验反馈、兼容性问题或功能建议
+title: "[反馈] "
 body:
+  - type: markdown
+    attributes:
+      value: 请勿上传凭据、私人消息、个人资料或未公开项目材料。可复现的程序故障可使用“故障反馈”表单。
+  - type: dropdown
+    id: category
+    attributes:
+      label: 反馈类型
+      options:
+        - 使用问题或体验反馈
+        - 功能建议
+        - 安装与宿主兼容
+    validations:
+      required: true
   - type: textarea
     id: purpose
     attributes:
@@ -21,6 +34,11 @@ body:
     attributes:
       label: 建议的方式与取舍
       description: 可提出不同方案；不确定的细节可以保持待讨论
+  - type: input
+    id: environment
+    attributes:
+      label: 版本与环境
+      description: 如官网页面、客户端版本、宿主与操作系统；请移除本地用户名等私人信息
   - type: textarea
     id: references
     attributes:
