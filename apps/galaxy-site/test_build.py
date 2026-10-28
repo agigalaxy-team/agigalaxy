@@ -154,6 +154,17 @@ class PublicNavigationTests(unittest.TestCase):
             self.assertIn('SHA-256',json.dumps(verification))
             self.assertIn('a'*64,json.dumps(verification))
             self.assertIn('/downloads/native-client/0.0.1/release.jws',json.dumps(verification))
+            source=json.loads((output/'assets/public-pages/open-source/index.json').read_text(encoding='utf-8'))
+            content=json.dumps(source,ensure_ascii=False)
+            self.assertIn('https://github.com/agigalaxy-team/agigalaxy',content)
+            self.assertIn('Apache-2.0',content)
+            self.assertIn('/open-source/',json.dumps(home))
+            catalog=json.loads(Path(__file__).with_name('public-archive.json').read_text(encoding='utf-8'))
+            archives={name for name in catalog['files'] if name.startswith('open-source/')}
+            self.assertEqual(len(archives),8)
+            for name in archives:
+                self.assertIn('/'+name,content)
+            self.assertIn('/open-source/',(output/'llms.txt').read_text(encoding='utf-8'))
 
     def test_guide_prose_uses_words_while_technical_code_keeps_original_bytes(self):
         _, html, _ = render_markdown(

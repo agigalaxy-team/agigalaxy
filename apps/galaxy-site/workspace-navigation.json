@@ -11,6 +11,7 @@
     {"href": "/how-it-works/", "label": "怎样使用银河", "location": "关于银河"},
     {"href": "/network/", "label": "开放网络", "location": "关于银河"},
     {"href": "/docs/", "label": "使用说明", "location": "文档"},
+    {"href": "/open-source/", "label": "源码与许可", "location": "关于银河"},
     {"href": "/downloads/", "label": "客户端下载", "location": "账户"},
     {"href": "/start/", "label": "开始使用", "location": "账户"},
     {"href": "/privacy/", "label": "隐私与数据", "location": "隐私与数据"},

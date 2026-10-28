@@ -10,6 +10,8 @@ from home_page import render_homepage
 from cms_slots import content_slot
 from release_status import release_status_body
 
+REPOSITORY = 'https://github.com/agigalaxy-team/agigalaxy'
+
 
 def icon(name):
     paths = {
@@ -60,7 +62,21 @@ def render_product_pages(site):
         + '<figure class="network-picture"><div class="network-origin"><span>本机银河</span><strong>主体 ID · 本地履历</strong><small>个人、组织与独立 Agent 分别记录</small></div><svg class="network-links" viewBox="0 0 70 320" width="70" height="320" fill="none" aria-hidden="true"><path d="M0 160H30M30 80V240M30 80H70M30 240H70" stroke="#e8bed1" stroke-width="1.5"/><circle cx="30" cy="160" r="4" fill="#d38bab"/></svg><div class="network-services"><section><span>可选官方服务</span><strong>银河在线账户</strong><small>官网活动与所选同步资料</small></section><section><span>可选其他服务</span><strong>第三方 Hub</strong><small>由开源模块部署和接入</small></section></div><figcaption>本地使用无需连接线上服务，可按需关联官方账户或第三方 Hub。一个账户可关联多个 ID，同一 ID 也可关联多个账户；每次动作按指定账户与授权执行。</figcaption></figure>'
         + section("个人控制", '<p>模型和本地资料由用户自己的环境管理。连接服务不等于上传全部材料，私有同步和公开分享各有自己的范围。</p>', "/privacy/", "了解数据选择")
         + section("本机身份与官方账户", '<p>在线账户可直接注册和使用，无须先有本地 ID。关联后，账户可以保存所选同步资料，本地银河也能按授权操作指定账户。银河 ID 的创建与关联需要当前设备上的银河实际参与。</p>', "/app/settings/identity?section=account", "了解银河账户关联")
-        + section("建设与接入", '<p>连接自己的工具、资料与服务，参与开放网络的建设。</p>', "/app/builders", "建设者入口"))
+        + section("建设与接入", '<p>连接自己的工具、资料与服务，参与开放网络的建设。</p>', "/app/builders", "建设者入口")
+        + section("公开源码", '<p>银河主源码已公开，自有代码采用 Apache-2.0。第三方组件保留原许可，源代码、使用文档和贡献入口在同一主仓库维护。</p>', "/open-source/", "查看源码与许可"))
+
+    page("/open-source/", "源码与许可", "银河公开源码、Apache-2.0 许可、开发文档与第三方对应源码。",
+        intro("公开源码，一起建设。", "银河的源码、文档与贡献讨论统一在主仓库维护。")
+        + section("银河主源码", '<p>官网、社区、私聊、后台、Go 服务器与本机核心，以及宿主适配和专业服务接线，均可在主仓库查看。源码下载与已编译客户端安装包分别提供。</p><nav class="reading-resources" aria-label="源码与贡献"><a href="' + REPOSITORY + '">打开 GitHub 主仓库</a><a href="' + REPOSITORY + '/issues">反馈与讨论</a><a href="' + REPOSITORY + '/blob/main/CONTRIBUTING.md">参与贡献</a></nav>')
+        + section("许可与资料范围", '<p>银河自有代码采用 <strong>Apache-2.0</strong>，允许按许可条件使用、修改和分发。第三方代码、上游修改与外部资产保留原许可；用户资料、私人会话、生产配置、凭据与商标不随软件许可开放。</p><nav class="reading-resources" aria-label="许可文件"><a href="' + REPOSITORY + '/blob/main/LICENSE">Apache-2.0 原文</a><a href="' + REPOSITORY + '/blob/main/NOTICE">版权与声明</a><a href="' + REPOSITORY + '/blob/main/RIGHTS.md">许可范围</a></nav>')
+        + section("使用、开发与自建", '<p>现行使用说明和开发文档由主仓库统一维护。历史客户端指南按各自版本阅读；源码公开不表示所有候选功能都已发行或完成平台验收。</p><nav class="reading-resources" aria-label="现行源码文档"><a href="' + REPOSITORY + '/tree/main/docs/public">公开使用文档</a><a href="' + REPOSITORY + '/blob/main/docs/technical/development.md">开发指南</a><a href="' + REPOSITORY + '/blob/main/docs/operations/deployment.md">自建与部署</a><a href="' + REPOSITORY + '/blob/main/docs/technical/source-and-licensing.md">第三方来源与许可</a></nav>')
+        + section("OpenPanel 对应源码", '<p>银河使用的 OpenPanel 修改版继续遵守 GNU AGPLv3。以下完整对应源码包含固定上游、原许可、依赖锁、修改说明和构建材料；历史制品按原版本保留。</p><dl class="policy-list">'
+            + ''.join('<div><dt>' + label + '</dt><dd><a href="/open-source/' + name + '/source.tar.gz">下载完整源码</a> · <a href="/open-source/' + name + '/README.txt">版本与构建说明</a></dd></div>' for name, label in (
+                ('openpanel-public2-galaxy-path-memory-20261025-r1', '路径计算内存优化 · 2026-10-25 r1'),
+                ('openpanel-public2-galaxy-overview-20261024', '概览时区修正 · 2026-10-24'),
+                ('openpanel-public2-galaxy-search-20261023', '搜索图表系列 · 2026-10-23'),
+                ('openpanel-public2-galaxy-accounts-20261023', '账户范围分析 · 2026-10-23')))
+            + '</dl>'))
 
     page("/privacy/", "隐私与数据", "在具体内容上选择资料、可见范围和同步，管理设备、导出与删除。",
         intro("资料怎么用，由你决定。", "在分享内容、选择文件或使用同步时，查看真实范围并作选择。已有有效选择会继续使用。")
@@ -102,6 +118,7 @@ def render_product_pages(site):
         '<a href="/privacy/"><h2>资料与隐私</h2><p>分享、同步、设备、导出和删除。</p>' + '</a>'
         '<a href="' + escape(guides["installation"], quote=True) + '"><h2>安装客户端</h2><p>把银河接入所选的 AI 宿主。</p>' + '</a></nav>'
         + (section("浏览与回找", '<p>按主题搜索讨论，继续草稿与阅读，收藏帖子、方法、项目和人物。</p>', site['GUIDE_PAGES']['community'], "社区与收藏说明") if site.get('GUIDE_PAGES', {}).get('community') else '')
+        + section("源码与现行文档", '<p>银河主源码已公开，自有代码采用 Apache-2.0。使用、开发与自建资料在主仓库统一维护。</p><nav class="reading-resources" aria-label="源码与现行文档"><a href="/open-source/">源码与许可</a><a href="' + REPOSITORY + '/tree/main/docs/public">完整使用文档</a><a href="' + REPOSITORY + '/blob/main/docs/technical/development.md">开发指南</a><a href="' + REPOSITORY + '/blob/main/docs/operations/deployment.md">自建与部署</a></nav>')
         + section("开发与开放接入", '<p>协议与字段为实际接入提供参考。当前产品入口、版本化接口和旧发行说明各有自己的适用范围。</p>', "/app/builders", "打开建设者入口")
         + '<div class="reading-resources"><a href="/docs/builders-support-v2.md">接口说明</a><a href="/llms.txt">Agent 文档索引</a><a href="/docs/v0.4/overview.md">历史 v0.4 概览</a><a href="/changelog.md">发行记录</a></div>')
 
@@ -115,5 +132,5 @@ def render_product_pages(site):
 
     community = metadata.get('webGuides', {}).get('community')
     guides = raw_guides
-    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。\n\n普通官网参与使用在线账户，不要求本地 ID、模型或外部认证。银河 ID 只由已安装的本机银河创建；网页配合当前设备创建、关联和接续，不独立生成或缓存 ID。账户与 ID 可双向多关联，各次动作保留明确的目标与授权；列表和选择不授予 ID 控制。正常客户端默认个人，独立 Agent 走 Worker 路径。版本化发行原件按其原发行范围阅读，当前本机接入从 /app/account?section=access 取得。\n\n银河官方不承担 AI 模型能力，也不提供主体或专业认证。模型由用户或参与者自己选择和使用，负责理解、总结和判断；银河提供实际的数据、身份、网络服务及确定性后台处理。普通工作默认本地积累，四档上传与线上查询分别控制，完整会话只按所选范围私有归档。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
-    site["write"]("llms.txt", "# 银河\n\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")
+    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + guides["installation"] + "。机读索引见 /llms.txt。银河主源码已公开：" + REPOSITORY + "。源码、文档与许可入口为 /open-source/；银河自有代码采用 Apache-2.0，第三方保留原许可。\n\n普通官网参与使用在线账户，不要求本地 ID、模型或外部认证。银河 ID 只由已安装的本机银河创建；网页配合当前设备创建、关联和接续，不独立生成或缓存 ID。账户与 ID 可双向多关联，各次动作保留明确的目标与授权；列表和选择不授予 ID 控制。正常客户端默认个人，独立 Agent 走 Worker 路径。版本化发行原件按其原发行范围阅读，当前本机接入从 /app/account?section=access 取得。\n\n银河官方不承担 AI 模型能力，也不提供主体或专业认证。模型由用户或参与者自己选择和使用，负责理解、总结和判断；银河提供实际的数据、身份、网络服务及确定性后台处理。普通工作默认本地积累，四档上传与线上查询分别控制，完整会话只按所选范围私有归档。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
+    site["write"]("llms.txt", "# 银河\n\n主源码已公开，银河自有代码采用 Apache-2.0；第三方保留原许可。\n\n- [源码与许可](/open-source/)\n- [GitHub 主仓库](" + REPOSITORY + ")\n- [现行使用文档](" + REPOSITORY + "/tree/main/docs/public)\n- [开发与部署](" + REPOSITORY + "/blob/main/docs/operations/deployment.md)\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + guides["installation"] + ")\n- [宿主支持](" + guides["hosts"] + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")

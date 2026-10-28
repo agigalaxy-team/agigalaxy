@@ -102,7 +102,7 @@ def page(path, title, description, body):
     location = public_location(path)
     footer = (f'<footer class="site-footer"><div class="shell footer-grid">{brand}<nav aria-label="银河说明">{content_slot("footer-links", footer_links)}</nav></div>\n'
               f'<div class="shell footer-continue"><span>继续使用</span><nav aria-label="个人与工作入口">{continue_links}</nav></div>\n'
-              '<div class="shell footer-bottom"><span>© 2026 银河 · GALAXY NETWORK</span>\n<span>'
+              '<div class="shell footer-bottom"><span>© 2026 银河 · GALAXY NETWORK · <a href="/open-source/">源码与许可</a></span>\n<span>'
               + ('交互示例中的资料、身份与回答均为预设内容。' if is_home else '从真实工作出发，由你决定下一步。')
               + '</span></div>\n</footer>')
     header = ''

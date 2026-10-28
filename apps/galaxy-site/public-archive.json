@@ -313,6 +313,14 @@
     "downloads/native-client/0.1.16/package-files.json": "084f4aa88f5d052bba9fcc2cf1688c09b5af71152a5495656b17acfa3ba958b2",
     "downloads/native-client/0.1.16/package-metadata.json": "837c7241f03f2f92c78b3f4e4efaa13d9176e50cdbe977a3174c3a337519446b",
     "downloads/native-client/0.1.16/verify-native-client-download.mjs": "6397736f1fec98fa163edb71fb8feeb91ac74351bccd64de310e2493444d887a",
-    "downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip": "46e5c885dcb57641d6e8860a9c1b7de36304ffafecbdb6c60b1afbedf2e820ed"
+    "downloads/native-client/0.1.16/galaxy-native-client-0.1.16-install.zip": "46e5c885dcb57641d6e8860a9c1b7de36304ffafecbdb6c60b1afbedf2e820ed",
+    "open-source/openpanel-public2-galaxy-accounts-20261023/README.txt": "57a197bc09961da6d47464e80710096426095dc58e1e176a98b79cae71c01a63",
+    "open-source/openpanel-public2-galaxy-accounts-20261023/source.tar.gz": "87303e8d59b09f068f0ef1bc24ac06bf4d622806b48f62a104036f306de3803a",
+    "open-source/openpanel-public2-galaxy-overview-20261024/README.txt": "658e11155448d92ca957ee3a3f44985b117e3fb5e5d1be8207d3841040fad06e",
+    "open-source/openpanel-public2-galaxy-overview-20261024/source.tar.gz": "22317fbd10664809a2f6dbbdc080b00a96bc02208864fb18929bd5961d1a3190",
+    "open-source/openpanel-public2-galaxy-path-memory-20261025-r1/README.txt": "ff0a50a82d111fd45e070afebb4c0720cb83379ccb64112954aea5a79773a85e",
+    "open-source/openpanel-public2-galaxy-path-memory-20261025-r1/source.tar.gz": "03a7582dfb79c061e1dcb3fd41440c5a6bf4fc2364fa03dd1bcf708d192e6b46",
+    "open-source/openpanel-public2-galaxy-search-20261023/README.txt": "87b470b311f3a5b041a47b4956e17ca83ef682fd22089c1a56413cc0751bc8fa",
+    "open-source/openpanel-public2-galaxy-search-20261023/source.tar.gz": "79fe20216fa60874681631435a1839d56761238682f8d5cc147f073ed4d19adb"
   }
 }

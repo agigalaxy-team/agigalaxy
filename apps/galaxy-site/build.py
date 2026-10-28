@@ -116,7 +116,7 @@ def main():
         name, digest = item
         relative = PurePosixPath(name)
         if (relative.is_absolute() or '..' in relative.parts or '\\' in name
-                or not (name.startswith(('docs/', 'downloads/', 'releases/'))
+                or not (name.startswith(('docs/', 'downloads/', 'releases/', 'open-source/'))
                         or name in ('favicon.svg', 'changelog.md'))
                 or not re.fullmatch('[a-f0-9]{64}', digest)):
             raise ValueError('Invalid public archive entry')
@@ -130,6 +130,8 @@ def main():
             if selected.is_symlink() or not selected.is_file() or not resolved_file_path(selected).is_relative_to(preserved_source):
                 raise ValueError('The selected existing release is missing a public file: ' + name)
             raw = selected.read_bytes()
+            if name.startswith('open-source/') and hashlib.sha256(raw).hexdigest() != digest:
+                raise ValueError('Corresponding source differs from its catalog: ' + name)
         elif source and source.exists():
             if source.is_symlink() or not resolved_file_path(source).is_relative_to(archive_source):
                 raise ValueError('Captured public asset escaped the selected source')
@@ -202,7 +204,7 @@ def main():
     guide_pages = render_versioned_guides(site, metadata)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
     chrome.write('assets/public-pages/index.json', json.dumps({'version': 1, 'routes': chrome.PUBLIC_PAGES}, indent=2) + '\n')
-    pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/docs/', '/privacy/', '/status/']
+    pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/open-source/', '/docs/', '/privacy/', '/status/']
     pages.extend(guide_pages.values())
     chrome.write('robots.txt', 'User-agent: *\nDisallow: /\n' if preview else
                  'User-agent: *\nAllow: /\nSitemap: https://agigalaxy.org/sitemap.xml\n')
