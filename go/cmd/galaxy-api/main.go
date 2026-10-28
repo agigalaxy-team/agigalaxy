@@ -564,6 +564,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	businessActions.Feedback = feedbackOperations
 	businessActions.Jobs = jobOperations
 	businessActions.Strategies, businessActions.Rules = strategies, policyRuntime.Service
+	permissionService.AIWork.HandlerReady = businessActions.ActionReady
 	strategies.ActionReady = func(code, mode string) bool {
 		if mode == "code" && code != "content.restore" && code != "files.scan.retry" {
 			return false
