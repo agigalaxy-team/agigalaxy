@@ -1,4 +1,4 @@
-import {QueryObserver,useQueryClient,type QueryClient,type QueryObserverResult} from '@tanstack/react-query';
+import {QueryObserver,useQueryClient,isCancelledError,type QueryClient,type QueryObserverResult} from '@tanstack/react-query';
 import {useLayoutEffect,useMemo,useRef} from 'react';
 import {galaxyQueryKey,type GalaxyQueryScope} from '../shared/runtime/query-client';
 import type {ReadTasks,ReadCallbacks,ReadTaskResult} from '../shared/reading/use-read-task';
@@ -58,14 +58,27 @@ function createQueryReads(query:QueryClient,scope:GalaxyQueryScope,module:string
    return{status:'success',value:cached.data as T};
   }
   lane.observer.setOptions({queryKey,queryFn:({signal})=>read({signal}),enabled:true,staleTime:Infinity});
-  try{
-   // query() shares an already-started initial/invalidated observer read.
-   // Unlike refetch(), it does not cancel and restart that same read.
-   const value=await query.query<T>({queryKey,queryFn:({signal})=>read({signal}),staleTime:0});
-   lane.explicit=false;
-   if(!active||lanes.get(identity.lane)!==lane)return{status:'superseded'};
-   return{status:'success',value};
-  }catch(error){lane.explicit=false;return !active||lanes.get(identity.lane)!==lane?{status:'superseded'}:{status:'error',error};}
+  for(let attempt=0;;attempt++){
+   try{
+    // query() shares an already-started initial/invalidated observer read.
+    // Unlike refetch(), it does not cancel and restart that same read.
+    const value=await query.query<T>({queryKey,queryFn:({signal})=>read({signal}),staleTime:0});
+    lane.explicit=false;
+    if(!active||lanes.get(identity.lane)!==lane)return{status:'superseded'};
+    return{status:'success',value};
+   }catch(error){
+    if(!active||lanes.get(identity.lane)!==lane){lane.explicit=false;return{status:'superseded'};}
+    // A current-scope event reset cancels this imperative promise while its
+    // observer starts the authorized replacement read. Rejoin that query so
+    // the explicit caller receives its result instead of a CancelledError.
+    // Removed scopes/lanes never restart, and business errors are not retried.
+    if(isCancelledError(error)){
+     if(!query.getQueryCache().find({queryKey,exact:true})){lane.explicit=false;return{status:'superseded'};}
+     if(attempt<2)continue;
+    }
+    lane.explicit=false;return{status:'error',error};
+   }
+  }
 
  }};
 }
