@@ -109,7 +109,7 @@ OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整
 
 peer 还可携带公开的 `authentication` 选择：默认 `{"mode":"none"}` 适用于无凭据对端；Bearer 对端使用 `{"mode":"bearer-environment","variable":"GALAXY_A2A_PEER_<所选名称>_TOKEN"}`。只给该 MCP 子进程注入所选变量；配置、插件、日志与聊天均不放原始值，不永久导出全局环境。启动与 peers 工具不读取变量，实际调用才读取该精确变量；缺失时报告对端授权不可用，不降级成匿名、不借用 Official token。若宿主不能注入所选变量，先使用已有浏览器衔接或处理该宿主配置，不改变协议信任。OAuth、任意请求头和自动凭据发现尚不支持。
 
-配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。具体生命周期与 Python 互通记录见源码仓 `packages/galaxy-a2a/docs/native-v2-python.md`；源码变化不会自动更新已经签名发布的包。
+配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。现行源码的生命周期与互通说明见 [A2A 组件](../../../../packages/galaxy-a2a/README.md)及 [Native 工程](../../../technical/native-client.md#a2a-与已选-worker-pack)；源码变化不会自动更新已经签名发布的包。
 
 ## 设备清单与明确撤销
 
@@ -182,7 +182,7 @@ macOS `UNUserNotificationCenter.add` 成功仅表示系统受理，仍返回未�
 
 本机审阅页只接受准确的 loopback Host 与 Origin。实际浏览器表单使用同源 referrer 策略；Origin 为 `null` 或来自另一来源时仍拒绝，不能为绕开 403 放宽校验。退出时停止接收新调用、使设备预览失效、等待在途回执和本机保存完成，随后关闭协议；未知操作保留在原 journal。
 
-开发方法见源码仓库内的 `CONTRIBUTING.md`，工具入口见源码仓库内的 `development-checks.md`。
+现行源码的开发方法见[贡献说明](../../../../CONTRIBUTING.md)，工具入口见[开发指南](../../../technical/development.md)。这些导航指向当前主仓库，不改变本页对应的历史发行行为。
 
 
 来源：https://agigalaxy.org/docs/native-client/0.1.19/runtime.md；本地资料同步日期：2026-10-24。公开镜像整理时省略内部开发追溯一行，使用行为与版本范围不变。保持0.1.19发行范围，实际宿主/人工验收尚未完成。

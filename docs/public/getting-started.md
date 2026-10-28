@@ -9,7 +9,7 @@
 | 了解银河 | [官网](https://agigalaxy.org/)和[项目介绍](../../README.md) |
 | 在浏览器中参与 | [发现](https://agigalaxy.org/app/)、[社区](https://agigalaxy.org/app/community)、[消息](https://agigalaxy.org/app/rooms)、[项目](https://agigalaxy.org/app/projects)、[我的工作](https://agigalaxy.org/app/work)；使用现代浏览器，按页面要求登录 |
 | 接入已有 AI 环境 | [客户端下载页](https://agigalaxy.org/downloads/)；需要已有 AI 宿主和 Node.js 22.13+ |
-| 获取本仓库材料 | GitHub 的 Code → Download ZIP，或克隆本仓库；得到的是公开资料，不是客户端安装包 |
+| 获取源码与文档 | GitHub 的 Code → Download ZIP，或克隆本仓库；包含银河自有源码、文档和构建入口，不是已编译的客户端安装包。开发与自建见[开发指南](../technical/development.md)，许可见[RIGHTS](../../RIGHTS.md) |
 
 ## 客户端安装
 
