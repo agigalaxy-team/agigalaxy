@@ -10,11 +10,11 @@ def event(value):
     return b'data: ' + json.dumps(value).encode() + b'\n\n'
 
 
-async def run(parts):
+async def run(parts, *, responses=False):
     sent, rejected = [], []
     async def send(message): sent.append(message)
     async def reject(): rejected.append(True)
-    guard = ResponseGuard(send, stream=True, responses=False, version='v1',
+    guard = ResponseGuard(send, stream=True, responses=responses, version='v1',
         rejected=reject, call_id='fixture-call')
     await guard.send({'type': 'http.response.start', 'status': 200,
         'headers': [(b'content-type', b'text/event-stream')]})
@@ -107,6 +107,38 @@ class ResponseDiagnostics(unittest.TestCase):
                 _, sent, _ = self.inspect(first + failed)
             self.assertEqual(sent[0]['status'], 200)
             self.assertNotIn(b'model_gateway_transient_failure', b''.join(x.get('body',b'') for x in sent))
+
+    def test_only_proven_empty_chat_stop_done_is_retryable(self):
+        role = event({'choices':[{'delta':{'role':'assistant'},'finish_reason':None}]})
+        stop = event({'choices':[{'delta':{},'finish_reason':'stop'}]})
+        done = b'data: [DONE]\n\n'
+        logs, sent, rejected = self.inspect(role + stop + done)
+        self.assertTrue(rejected)
+        self.assertEqual(sent[0]['status'], 502)
+        self.assertEqual(json.loads(sent[1]['body'])['error'], {'code':'model_gateway_empty_completion',
+            'source':'model-gateway','status':502,'category':'empty-completion','outputStarted':False})
+        self.assertEqual(logs[0]['reason'], 'gateway-empty-completion')
+        with patch('galaxy_model_gateway.output.emit'):
+            response_sent, response_rejected = asyncio.run(run([role + stop + done], responses=True))
+        self.assertTrue(response_rejected)
+        self.assertNotIn(b'model_gateway_empty_completion', b''.join(x.get('body', b'') for x in response_sent))
+        cases = [
+            role + event({'choices':[{'delta':{},'finish_reason':'length'}]}) + done,
+            role + event({'choices':[{'delta':{},'finish_reason':'content_filter'}]}) + done,
+            role + event({'choices':[{'delta':{},'finish_reason':'unknown-value'}]}) + done,
+            role + event({'choices':[{'delta':{},'finish_reason':'length'}]}) + stop + done,
+            role + stop, role + stop + done + b'data: {',
+            role + event({'choices':[{'delta':{'refusal':''},'finish_reason':'stop'}]}) + done,
+            role + event({'error':{}}) + stop + done,
+            role + event({'choices':[{'delta':{'tool_calls':[{'index':0}]},'finish_reason':'stop'}]}) + done,
+            role + event({'choices':[{'delta':{'content':'text'},'finish_reason':'stop'}]}) + done,
+            role + stop + done + event({'choices':[{'delta':{},'finish_reason':'stop'}]}),
+        ]
+        for body in cases:
+            with self.subTest(body=body):
+                logs, sent, _ = self.inspect(body)
+                self.assertNotEqual(logs[-1].get('reason'), 'gateway-empty-completion')
+                self.assertNotIn(b'model_gateway_empty_completion', b''.join(x.get('body',b'') for x in sent))
 
 
 if __name__ == '__main__':

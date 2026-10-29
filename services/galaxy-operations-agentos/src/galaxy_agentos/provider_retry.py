@@ -37,11 +37,34 @@ def gateway_transient_failure(error):
     return None
 
 
+def gateway_empty_completion(error):
+    if not isinstance(error, ModelProviderError):
+        return None
+    reported = getattr(error, 'status_code', None)
+    if reported is not None and (type(reported) is not int or reported != 502):
+        return None
+    current = error
+    for _ in range(5):
+        body = getattr(current, 'body', None)
+        if isinstance(body, dict):
+            info = body.get('error', body)
+            if (isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}
+                    and info.get('code') == 'model_gateway_empty_completion'
+                    and info.get('source') == 'model-gateway' and type(info.get('status')) is int
+                    and info['status'] == 502 and info.get('category') == 'empty-completion'
+                    and info.get('outputStarted') is False):
+                return {'status': 502, 'source': 'model-gateway'}
+        current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+        if current is None:
+            break
+    return None
+
+
 def _retryable(error):
     failure = provider_failure(error)
     if failure and (failure['status'] in (408, 429) or 500 <= failure['status'] <= 599):
         return failure
-    return gateway_transient_failure(error)
+    return gateway_transient_failure(error) or gateway_empty_completion(error)
 
 
 def _snapshot(args, kwargs):

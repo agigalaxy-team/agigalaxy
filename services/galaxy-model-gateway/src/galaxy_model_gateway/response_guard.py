@@ -56,6 +56,10 @@ class ResponseGuard:
         self.useful = self.terminal = self.finish_reason = False
         self.stage = 'start'
         self.saw_done = False
+        self.empty_done = False
+        self.finish_stop_seen = False
+        self.finish_stop_only = True
+        self.refusal_seen = False
         self.chat_finish = 'none'
         self.responses_terminal = 'none'
         self.frame_count = self.choice_count = self.tool_delta_count = 0
@@ -106,6 +110,9 @@ class ResponseGuard:
         self.diagnostic('model-response-rejected', reason=reason, status=status)
         await self.rejected()
         body = {"error": {"code": code}} if code else ERROR
+        if reason == 'gateway-empty-completion':
+            body = {'error': {'code': 'model_gateway_empty_completion', 'source': 'model-gateway',
+                'status': 502, 'category': 'empty-completion', 'outputStarted': False}}
         if reason == 'gateway-transient-error':
             body = {'error': {'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
                 'status': 503, 'category': 'service-unavailable', 'outputStarted': False}}
@@ -183,6 +190,8 @@ class ResponseGuard:
             self.buffer[:] = rest
             await self.frame(bytes(frame) + b"\n\n")
         if not message.get("more_body") and not self.ended:
+            if self.empty_done and not self.buffer.strip():
+                return await self.reject(status=502, reason="gateway-empty-completion")
             if self.buffer.strip() or not (self.useful and self.terminal):
                 return await self.reject(reason="incomplete-stream")
             await self.begin()
@@ -194,10 +203,18 @@ class ResponseGuard:
         self.stage = 'frame'
         self.frame_count += 1
         data = b"\n".join(line[5:].lstrip(b" ") for line in frame.splitlines() if line.startswith(b"data:"))
+        if self.empty_done:
+            return await self.reject(reason="invalid-stream-event")
         if data == b"[DONE]":
             self.saw_done = True
             if not (self.useful and (self.terminal if self.responses else self.finish_reason)):
-                return await self.reject(reason="premature-stream-end")
+                if (not self.responses and not self.started and not self.useful
+                        and self.tool_delta_count == 0 and not self.error_present and not self.refusal_seen
+                        and self.choice_count > 0 and self.finish_stop_seen and self.finish_stop_only
+                        and self.json_state == 'ok'):
+                    self.empty_done = True
+                else:
+                    return await self.reject(reason="premature-stream-end")
             self.terminal = True
         elif data:
             try:
@@ -248,11 +265,16 @@ class ResponseGuard:
                     for choice in value.get("choices", []) or []:
                         self.choice_count += 1
                         delta = choice.get("delta") or {}
+                        if isinstance(delta, dict) and delta.get("refusal") is not None:
+                            self.refusal_seen = True
                         calls = delta.get('tool_calls')
                         if isinstance(calls, list):
                             self.tool_delta_count += len(calls)
                         finish = choice.get('finish_reason')
                         if finish is not None:
+                            if finish != '':
+                                self.finish_stop_seen = self.finish_stop_seen or finish == 'stop'
+                                self.finish_stop_only = self.finish_stop_only and finish == 'stop'
                             self.chat_finish = finish if isinstance(finish, str) and finish in {'stop', 'length', 'tool_calls', 'content_filter', 'function_call'} else 'unknown'
                         self.useful = self.useful or useful_message(delta) or bool(delta.get("tool_calls"))
                         self.finish_reason = self.finish_reason or choice.get("finish_reason") is not None

@@ -32,6 +32,17 @@ def gateway_rejected(**changes):
     return error
 
 
+def gateway_empty(**changes):
+    value = {'code':'model_gateway_empty_completion','source':'model-gateway','status':502,
+        'category':'empty-completion','outputStarted':False}
+    value.update(changes)
+    cause = RuntimeError('private body')
+    cause.body = {'error':value}
+    error = ModelProviderError('closed', status_code=502, model_name='test', model_id='test')
+    error.__cause__ = cause
+    return error
+
+
 class Model:
     def __init__(self, results, name='galaxy-test'):
         self.id, self.results, self.calls = name, list(results), 0
@@ -181,6 +192,31 @@ class ProviderRetry(unittest.TestCase):
         self.assertTrue(model.assert_clean)
         self.assertEqual(assistant.tool_calls, [{'id': 'final'}])
         self.assertEqual(len(tool_calls), 1)
+
+    @patch('galaxy_agentos.provider_retry.time.sleep')
+    def test_gateway_empty_only_retries_same_call_once(self, _sleep):
+        model = with_provider_retry(Model([gateway_empty(), 'ok']))
+        self.assertEqual(model.invoke(messages=[]), 'ok')
+        self.assertEqual(model.calls, 2)
+        model = with_provider_retry(Model([gateway_empty(), ['ok']]))
+        self.assertEqual(list(model.invoke_stream(messages=[])), ['ok'])
+        self.assertEqual(model.calls, 2)
+        model = with_provider_retry(Model([['fragment', gateway_empty()], ['unexpected']]))
+        stream = model.invoke_stream(messages=[])
+        self.assertEqual(next(stream), 'fragment')
+        with self.assertRaises(ModelProviderError): next(stream)
+        self.assertEqual(model.calls, 1)
+        first, second = gateway_rejected(), gateway_empty()
+        model = with_provider_retry(Model([first, second, 'unexpected']))
+        with self.assertRaises(ModelProviderError) as caught: model.invoke(messages=[])
+        self.assertIs(caught.exception, second)
+        self.assertEqual(model.calls, 2)
+        conflict = gateway_empty()
+        conflict.status_code = 401
+        for error in [gateway_empty(outputStarted=True), gateway_empty(category='other'), gateway_empty(status=503), conflict]:
+            model = with_provider_retry(Model([error, 'unexpected']))
+            with self.assertRaises(ModelProviderError): model.invoke(messages=[])
+            self.assertEqual(model.calls, 1)
 
 
 if __name__ == '__main__':
