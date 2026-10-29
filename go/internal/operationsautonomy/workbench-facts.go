@@ -48,7 +48,7 @@ func WorkbenchRunFact(run Object) Object {
 	return Object{"nativeRunId": run["runId"], "modelState": model, "status": status, "usage": out}
 }
 
-var targetTypes = map[string]string{"post": "content-post", "reply": "content-reply", "section": "content-section", "account": "account", "public-case": "community-report", "case": "community-report", "community-report": "community-report", "chat-report": "chat-report", "feedback": "feedback", "project": "project", "projects": "project", "method": "method", "methods": "method", "chat-file": "file-chat", "forum-file": "file-forum", "file-cleanup-plan": "file-cleanup-plan", "message-plan": "messaging-plan", "notice": "notice", "messaging-plan": "messaging-plan", "recommendation-theme": "recommendation-policy", "recommendation-policy": "recommendation-policy", "search-configuration": "search-quality", "search-quality": "search-quality", "rule": "rule-key", "rule-key": "rule-key", "queue-job": "queue-job", "search-job": "search-job", "strategy": "strategy", "strategy-configuration": "strategy-configuration", "strategy-run": "strategy-run", "ai-work-account": "ai-work-account", "ai-work-prompt": "ai-work-account", "ai-role": "ai-role", "ai-role-assignment": "ai-role-assignment"}
+var targetTypes = map[string]string{"post": "content-post", "reply": "content-reply", "section": "content-section", "account": "account", "public-case": "community-report", "case": "community-report", "community-report": "community-report", "chat-report": "chat-report", "feedback": "feedback", "project": "project", "projects": "project", "method": "method", "methods": "method", "chat-file": "file-chat", "forum-file": "file-forum", "file-cleanup-plan": "file-cleanup-plan", "message-plan": "messaging-plan", "notice": "notice", "content-tag": "content-tag", "messaging-plan": "messaging-plan", "recommendation-theme": "recommendation-policy", "recommendation-policy": "recommendation-policy", "search-configuration": "search-quality", "search-quality": "search-quality", "rule": "rule-key", "rule-key": "rule-key", "queue-job": "queue-job", "search-job": "search-job", "strategy": "strategy", "strategy-configuration": "strategy-configuration", "strategy-run": "strategy-run", "ai-work-account": "ai-work-account", "ai-work-prompt": "ai-work-account", "ai-role": "ai-role", "ai-role-assignment": "ai-role-assignment"}
 
 func OriginalOperationTarget(target, request Object) Object {
 	kind := targetTypes[str(target["kind"])]
@@ -153,6 +153,42 @@ func WorkbenchCardFact(card Object) Object {
 		}
 	} else {
 		target = OriginalOperationTarget(obj(proposal["target"]), obj(proposal["request"]))
+		if has([]string{"file-cleanup-plan-create", "file-cleanup-plan-cancel"}, kind) {
+			proposalTarget := obj(proposal["target"])
+			if kind == "file-cleanup-plan-create" {
+				if proposalTarget["kind"] != "file-cleanup-creation" || proposalTarget["id"] != nil {
+					return nil
+				}
+				target = Object{"targetType": nil, "targetId": nil}
+			} else if target["targetType"] != "file-cleanup-plan" || !schemaUUID.MatchString(str(target["targetId"])) {
+				return nil
+			}
+			if state == "completed" {
+				id := str(obj(result["receipt"])["planId"])
+				if !schemaUUID.MatchString(id) || kind == "file-cleanup-plan-cancel" && id != str(target["targetId"]) {
+					return nil
+				}
+				target = Object{"targetType": "file-cleanup-plan", "targetId": id}
+			}
+		}
+		if has([]string{"content-tag-create", "content-tag-update"}, kind) {
+			proposalTarget := obj(proposal["target"])
+			if kind == "content-tag-create" {
+				if proposalTarget["kind"] != "tag-creation" || proposalTarget["id"] != nil {
+					return nil
+				}
+				target = Object{"targetType": nil, "targetId": nil}
+			} else if target["targetType"] != "content-tag" || !schemaUUID.MatchString(str(target["targetId"])) {
+				return nil
+			}
+			if state == "completed" {
+				id := str(obj(result["receipt"])["tagId"])
+				if !schemaUUID.MatchString(id) || kind == "content-tag-update" && id != str(target["targetId"]) {
+					return nil
+				}
+				target = Object{"targetType": "content-tag", "targetId": id}
+			}
+		}
 		if has([]string{"notice-draft-create", "notice-draft-save", "notice-state"}, kind) {
 			// Notice effects are projected from the validated original receipt, never
 			// from model text or a messaging-plan identifier. Keep the original

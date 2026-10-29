@@ -69,6 +69,8 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 	}
 	p := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
 	switch kind {
+	case "file-cleanup-plan-create", "file-cleanup-plan-cancel":
+		e = s.prepareCleanupPlan(ctx, actor, x, &p)
 	case "content-tag-create", "content-tag-update":
 		e = s.prepareContentTag(ctx, actor, x, &p)
 	case "notice-draft-create", "notice-draft-save", "notice-state":

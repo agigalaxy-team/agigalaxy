@@ -185,6 +185,14 @@ func (s *Service) UpdateWorkbenchWithin(ctx context.Context, tx pgx.Tx, in Workb
 	if in.Receipt != nil {
 		r := *in.Receipt
 		r.TaskID = str(row["id"])
+		// Only a same-task original card can supply the ID assigned after a
+		// previously unknown creation. Never change a known/terminal target.
+		if (r.Action == "content-tag-create" && r.TargetType != nil && *r.TargetType == "content-tag" || r.Action == "file-cleanup-plan-create" && r.TargetType != nil && *r.TargetType == "file-cleanup-plan") && r.State == "completed" && r.Basis == "workbench-original-domain-receipt" && r.TargetID != nil && schemaUUID.MatchString(*r.TargetID) {
+			_, e = tx.Exec(ctx, `UPDATE operations_autonomy_receipts_v1 SET target_type=$4,target_id=$5 WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3 AND action=$6 AND state='unknown' AND target_type IS NULL AND target_id IS NULL AND basis='workbench-original-domain-receipt' AND EXISTS(SELECT 1 FROM public.galaxy_autonomy_workbench_receipts_v1($1,$2) original WHERE original.operation_id=$3 AND original.action=$6 AND original.state='completed' AND original.target_type=$4 AND original.target_id=$5)`, s.Endpoint, r.TaskID, r.OperationID, *r.TargetType, *r.TargetID, r.Action)
+			if e != nil {
+				return nil, e
+			}
+		}
 		if e = s.RecordBusinessReceiptWithin(ctx, tx, r); e != nil {
 			return nil, e
 		}

@@ -91,3 +91,18 @@ func TestFixedInspectionOnlyCoversItsDocumentedCurrentScopes(t *testing.T) {
 		t.Fatal("empty-plan history proof too broad")
 	}
 }
+
+func TestUnresolvedDelegationRetainsOnlyValidatedTarget(t *testing.T) {
+	id := "11111111-1111-4111-8111-111111111111"
+	call := Object{"tool": "read-ai-delegation", "state": "failed", "arguments": Object{"aiAccountId": id}}
+	coverage := summarizeReadCoverage([]Object{call}, nil)
+	unresolved := coverage["unresolved"].([]Object)
+	if len(unresolved) != 1 || obj(unresolved[0]["scope"])["aiAccountId"] != id {
+		t.Fatalf("missing target: %v", coverage)
+	}
+	obj(call["arguments"])["aiAccountId"] = "not-an-id"
+	unresolved = summarizeReadCoverage([]Object{call}, nil)["unresolved"].([]Object)
+	if unresolved[0]["scope"] != nil {
+		t.Fatalf("invalid target leaked: %v", unresolved)
+	}
+}

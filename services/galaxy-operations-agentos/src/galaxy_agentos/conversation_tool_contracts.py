@@ -424,6 +424,32 @@ class RuleRestore(ClosedArguments):
     reason: RuleReason
 
 
+class CleanupPlanItem(ClosedArguments):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+    kind: Literal["chat", "forum"]
+    id: UUID
+    expectedVersion: Annotated[str, Field(min_length=1, max_length=4096)]
+
+
+class CleanupPlanCreate(ClosedArguments):
+    kind: Literal["file-cleanup-plan-create"]
+    items: Annotated[list[CleanupPlanItem], Field(min_length=1, max_length=50)]
+    reason: Annotated[str, Field(max_length=1600)] = ""
+
+    @model_validator(mode="after")
+    def unique_items(self):
+        keys = [(item.kind, item.id) for item in self.items]
+        if len(keys) != len(set(keys)):
+            raise ValueError("agentos_cleanup_duplicate_items")
+        return self
+
+
+class CleanupPlanCancel(ClosedArguments):
+    kind: Literal["file-cleanup-plan-cancel"]
+    targetId: UUID
+    expectedRevision: Annotated[int, Field(strict=True, ge=1, le=9007199254740991)]
+
+
 class ContentTagCreate(ClosedArguments):
     kind: Literal["content-tag-create"]
     name: Annotated[str, Field(min_length=1, max_length=40)]
@@ -484,7 +510,7 @@ from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave, N
 from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 
 
-_BusinessOperation = Union[ContentTagCreate, ContentTagUpdate, JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
+_BusinessOperation = Union[CleanupPlanCreate, CleanupPlanCancel, ContentTagCreate, ContentTagUpdate, JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,

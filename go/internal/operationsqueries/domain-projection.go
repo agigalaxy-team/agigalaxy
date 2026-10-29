@@ -17,6 +17,16 @@ func oneOf(value any, allowed ...string) any {
 }
 func fileItem(x Object) Object {
 	out := object(project(x, merge(shape("id kind name state processingState scope version processingVersion createdAt uploadedAt expiresAt removedAt revokedAt", "s"), shape("size scanAttempts", "n"), shape("cleanupPending processingAvailable canRetryScan canRetryCleanup", "b"), Object{"access": merge(Object{"revision": "n", "until": "n", "restoreBlockedReason": "s"}, shape("stopped canStop canRestore", "b")), "scan": shape("state checkedAt", "s"), "cleanup": merge(Object{"state": "s"}, shape("objectRemoved executionObserved failureObserved", "b")), "accounting": shape("reservedBytes actualStoredBytes", "n")})))
+	processing, truncated := utf16Preview(x["processingVersion"], 4096)
+	if value, ok := processing.(string); !ok || value == "" || truncated {
+		out["processingVersion"] = nil
+		out["processingVersionUnavailable"] = true
+		if original, ok := x["version"].(string); ok && original == str(x["processingVersion"]) {
+			out["version"] = nil
+		}
+	} else {
+		out["processingVersion"] = value
+	}
 	out["lastError"] = safeCode(x["lastError"])
 	return out
 }
@@ -35,6 +45,13 @@ func safeCode(value any) any {
 func cleanupCandidateItem(x Object) Object {
 	out := object(project(x, merge(shape("id name expiresAt", "s"), shape("size referenceCount activeReferences", "n"), Object{"eligible": "b"})))
 	out["kind"], out["reason"], out["blockedReason"] = oneOf(x["kind"], "chat", "forum"), oneOf(x["reason"], "expired", "unreferenced"), oneOf(x["blockedReason"], "processing-active", "reference-check-incomplete", "storage-unavailable")
+	version, truncated := utf16Preview(x["expectedVersion"], 4096)
+	if text, ok := version.(string); ok && text != "" && !truncated {
+		out["expectedVersion"] = text
+	} else {
+		out["expectedVersion"] = nil
+		out["expectedVersionUnavailable"] = true
+	}
 	return out
 }
 func cleanupPlanItem(x Object) Object {

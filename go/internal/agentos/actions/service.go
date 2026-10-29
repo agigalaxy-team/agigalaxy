@@ -159,6 +159,9 @@ var cardReadOnce sync.Once
 var cardReads map[string]string
 
 func CardReadPermission(kind string) (string, error) {
+	if cleanupPlanKind(kind) {
+		return "files.read", nil
+	}
 	if contentTagKind(kind) {
 		return "content.tags.read", nil
 	}
@@ -303,6 +306,8 @@ func required(x Object) string {
 		return "files.access." + str(x["action"])
 	case "file-cleanup-approve":
 		return "files.cleanup.approve"
+	case "file-cleanup-plan-create", "file-cleanup-plan-cancel":
+		return "files.cleanup.plan"
 	case "section-classification":
 		return "sections.classify"
 	case "section-visibility":
