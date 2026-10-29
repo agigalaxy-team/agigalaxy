@@ -130,7 +130,8 @@ func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (q
 		if n, ok := number(value["checkedAt"]); ok {
 			at = int64(n)
 		}
-		return queryResult{source: value, data: Object{"kind": value["kind"], "data": analyticsData(value["data"], args.view, at, object(value["basis"])), "basis": analyticsBasis(value["basis"]), "source": value["source"], "purpose": value["purpose"], "coverage": value["coverage"], "historicalBackfill": value["historicalBackfill"]}}, nil
+		analytics := analyticsData(value["data"], args.view, at, object(value["basis"]))
+		return queryResult{source: value, data: Object{"kind": value["kind"], "data": analytics, "basis": analyticsBasis(value["basis"]), "timeFacts": analyticsTimeFacts(object(value["basis"]), object(analytics)), "source": value["source"], "purpose": value["purpose"], "coverage": value["coverage"], "historicalBackfill": value["historicalBackfill"]}}, nil
 	}
 	if args.view == "history" {
 		if args.module == "search" {
