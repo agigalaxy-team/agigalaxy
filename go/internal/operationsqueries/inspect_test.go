@@ -70,3 +70,20 @@ func TestInspectUnavailableNativeMetricsAreNotComplete(t *testing.T) {
 		t.Fatal("observed zero is valid")
 	}
 }
+
+func TestInspectMaintenanceRetainsAdoptedQueueScope(t *testing.T) {
+	queue := Object{"availability": Object{"state": "available"}, "scope": "adopted-galaxy-river-transport", "includesAllPlatformQueues": false, "items": []any{Object{"name": "messaging-run", "counts": Object{"created": 0, "retry": 0, "active": 0, "completed": 1, "cancelled": 0, "failed": 0}}}}
+	components := Object{"complete": true}
+	if !inspectMaintenanceComplete(queue, components) {
+		t.Fatal("available adopted transport was rejected")
+	}
+	queue["items"] = nil
+	if inspectMaintenanceComplete(queue, components) {
+		t.Fatal("missing counts were treated as a complete queue snapshot")
+	}
+	queue["items"] = []any{}
+	components["complete"] = false
+	if inspectMaintenanceComplete(queue, components) {
+		t.Fatal("incomplete components were accepted")
+	}
+}

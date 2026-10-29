@@ -423,4 +423,24 @@ func TestDutyCurrentInspectionWithholdsControlledOtherTaskAndKeepsOriginalReceip
 	if err != nil || result["sourceWithheld"] != true || len(result["tasks"].([]a.Object)) != 1 {
 		t.Fatalf("coalesced event sources must be withheld %#v %v", result, err)
 	}
+	if _, err = pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET event_ids='{}' WHERE endpoint=$1 AND id=$2`, f.Endpoint, other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, `INSERT INTO operations_autonomy_receipts_v1(id,endpoint,task_id,operation_id,action,state,basis,target_type,target_id,created_at) VALUES(gen_random_uuid(),$1,$2,$3,'fixture','unknown','original-operation-query','search-quality',$4,now())`, f.Endpoint, other, uuid.NewString(), uuid.NewString()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=array_append(permissions,'search-quality.read') WHERE id=$1`, base["role"]); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.DutyCurrentInspection(ctx, actor, "overview")
+	if err != nil || result["sourceWithheld"] != false || len(result["tasks"].([]a.Object)) != 2 {
+		t.Fatalf("authorized original search source %#v %v", result, err)
+	}
+	if _, err = pool.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=array_remove(permissions,'search-quality.read') WHERE id=$1`, base["role"]); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.DutyCurrentInspection(ctx, actor, "overview")
+	if err != nil || result["sourceWithheld"] != true || len(result["tasks"].([]a.Object)) != 1 {
+		t.Fatalf("revoked original search source %#v %v", result, err)
+	}
 }

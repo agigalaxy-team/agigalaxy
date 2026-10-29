@@ -83,12 +83,12 @@ func (s *Service) InspectOperations(ctx context.Context, actor Actor, domain str
 		data := object(out["data"])
 		queues := object(data["queues"])
 		components := object(data["componentSummary"])
-		ok := object(queues["availability"])["state"] == "available" && queues["includesAllPlatformQueues"] == true && components["complete"] == true
+		ok := inspectMaintenanceComplete(queues, components)
 		state := "available"
 		if !ok {
 			state = "partial"
 		}
-		return Object{"availability": state, "basis": "maintenance-overview", "scope": "queue-counts-and-components", "coverage": "current-source", "collectionComplete": ok, "data": data}, d
+		return Object{"availability": state, "basis": "maintenance-overview", "scope": "adopted-galaxy-river-queue-counts-and-components", "coverage": "current-source-not-all-platform-queues", "collectionComplete": ok, "data": data}, d
 	})
 	add("search", func() (Object, int64) {
 		out, d, e := query("search", Object{"days": 7, "limit": 20})
@@ -227,6 +227,25 @@ func (s *Service) InspectOperations(ctx context.Context, actor Actor, domain str
 		return nil, fail("operations_query_response_too_large", 503)
 	}
 	return out, nil
+}
+
+func inspectMaintenanceComplete(queues, components Object) bool {
+	items, present := queues["items"].([]any)
+	if object(queues["availability"])["state"] != "available" || queues["scope"] != "adopted-galaxy-river-transport" || queues["includesAllPlatformQueues"] != false || !present || len(items) >= 100 || components["complete"] != true {
+		return false
+	}
+	for _, item := range items {
+		row := object(item)
+		if str(row["name"]) == "" {
+			return false
+		}
+		for _, key := range []string{"created", "retry", "active", "completed", "cancelled", "failed"} {
+			if safeInteger(object(row["counts"])[key]) == nil {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (s *Service) inspectDelegation(ctx context.Context, actor Actor, domain string) (Object, int64) {

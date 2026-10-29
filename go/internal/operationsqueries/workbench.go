@@ -115,7 +115,7 @@ func (b *Workbench) summary(ctx context.Context, d *businessadmin.Domain, a Acto
 		return nil
 	}
 	var fresh Actor
-	snapshot, e := current.Run(ctx, a, "operations-summary-read", Object{}, func(tx pgx.Tx, actor Actor) (Object, error) {
+	collect := func(tx pgx.Tx, actor Actor) (Object, error) {
 		fresh = actor
 		availability := Object{}
 		read := func(key, permission, query string, args ...any) (Object, error) {
@@ -217,7 +217,40 @@ func (b *Workbench) summary(ctx context.Context, d *businessadmin.Domain, a Acto
 			fileStats = Object{"scanPending": files["scan_pending"], "scanFailed": files["scan_failed"], "cleanupPending": files["cleanup_pending"], "cleanupFailed": nil, "cleanupResultUnknown": files["cleanup_unknown"]}
 		}
 		return Object{"communityReports": reports, "chatReports": chat, "sections": sections, "resources": resources, "files": fileStats, "jobs": jobs, "search": search, "feedback": feedback, "availability": availability, "operator": Object{"id": actor.ID, "role": actor.Role, "businessAuthorization": Object{"version": actor.Version, "permissions": actor.Permissions}}, "analytics": Object{"available": false, "state": "not-collected", "reason": "usage-events-not-collected", "visitors": nil, "pageViews": nil, "activeAccounts": nil, "returnRate": nil, "dailyActivity": []any{}, "retention": []any{}}, "businessActivity": activity, "recentOperations": recent, "ai": nil, "autonomy": nil, "checkedAt": b.now(), "readExpiresAt": b.now() + 30}, nil
-	}, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	}
+	var snapshot Object
+	var e error
+	if current.IsDuty(a) {
+		// The summary is a read, while workbench.read is not an autonomous
+		// action. Preserve the real task proof without routing this read through
+		// the business command/grant path.
+		tx, err := current.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback(ctx)
+		fresh, e = current.Fresh(ctx, tx, a, "workbench.read")
+		if e == nil {
+			e = current.Principal(ctx, tx, fresh)
+		}
+		if e == nil {
+			snapshot, e = collect(tx, fresh)
+		}
+		if e == nil {
+			fresh, e = current.Fresh(ctx, tx, fresh, "workbench.read")
+		}
+		if e == nil {
+			e = current.Principal(ctx, tx, fresh)
+		}
+		if e == nil {
+			e = current.Record(ctx, tx, fresh, "operations-summary-read", Object{}, Object{"count": nil}, nil)
+		}
+		if e == nil {
+			e = tx.Commit(ctx)
+		}
+	} else {
+		snapshot, e = current.Run(ctx, a, "operations-summary-read", Object{}, collect, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	}
 	if e != nil {
 		return nil, e
 	}

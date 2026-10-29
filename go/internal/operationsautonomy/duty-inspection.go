@@ -2,6 +2,7 @@ package operationsautonomy
 
 import (
 	"context"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 )
@@ -45,9 +46,23 @@ func (s *Service) DutyCurrentInspection(ctx context.Context, actor Actor, domain
 		counts := Object{}
 		for _, row := range candidates {
 			self := row["id"] == metadata["taskId"]
-			if !self && (str(row["target_type"]) != "" || len(texts(row["event_ids"])) > 0 || len(refs[str(row["id"])]) > 0) {
-				withheld = true
-				continue
+			if !self {
+				if len(texts(row["event_ids"])) > 0 {
+					withheld = true
+					continue
+				}
+				sources := append([]Object(nil), refs[str(row["id"])]...)
+				if str(row["target_type"]) != "" {
+					sources = append(sources, Object{"target_type": row["target_type"], "target_id": row["target_id"]})
+				}
+				allowed, e := s.dutyInspectionSourcesWithin(ctx, tx, fresh, row, sources)
+				if e != nil {
+					return nil, e
+				}
+				if !allowed {
+					withheld = true
+					continue
+				}
 			}
 			receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operation_id,state FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2 ORDER BY created_at,operation_id LIMIT 51) r`, s.Endpoint, row["id"])
 			if e != nil {
@@ -76,4 +91,46 @@ func (s *Service) DutyCurrentInspection(ctx context.Context, actor Actor, domain
 		}
 		return Object{"availability": "available", "basis": "current-nonterminal-tasks-with-source-qualification", "accounts": accounts, "tasks": tasks, "taskCounts": exactCounts, "sampleLimit": 100, "sourceWithheld": withheld, "receiptCoverageComplete": !partialReceipts, "collectionComplete": complete, "checkedAt": s.now().Unix(), "readExpiresAt": s.now().Unix() + 30}, nil
 	})
+}
+
+// Qualify only supported original source metadata using the current duty's
+// own read authority. Event sources and unsupported kinds remain withheld.
+func (s *Service) dutyInspectionSourcesWithin(ctx context.Context, tx pgx.Tx, actor Actor, row Object, sources []Object) (bool, error) {
+	for _, source := range sources {
+		targetType, id := str(source["target_type"]), str(source["target_id"])
+		if id == "" {
+			return false, nil
+		}
+		permission, kind := "", ""
+		switch targetType {
+		case "search-quality":
+			permission = "search-quality.read"
+		case "feedback", "content-post", "content-reply":
+			kind = taskReadMap[targetType]
+			permission = kindPermission[kind]
+		default:
+			return false, nil
+		}
+		fresh, err := s.RequireDutyAction(ctx, tx, actor, permission, "query")
+		if err == nil && kind != "" {
+			if s.ReadTargetWithin == nil {
+				return false, nil
+			}
+			var result Object
+			result, err = s.ReadTargetWithin(ctx, tx, fresh, str(row["domain"]), kind, id)
+			if err == nil && result["availability"] != "available" {
+				return false, nil
+			}
+		}
+		if err == nil {
+			_, err = s.RequireDutyAction(ctx, tx, actor, permission, "query")
+		}
+		if err != nil {
+			if status := fault.Status(err); status == 403 || status == 404 || status == 503 {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	return true, nil
 }
