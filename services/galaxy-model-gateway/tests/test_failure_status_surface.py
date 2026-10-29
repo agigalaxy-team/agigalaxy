@@ -27,7 +27,13 @@ class FailureStatusSurfaceTest(unittest.TestCase):
                 messages=asyncio.run(exchange(status))
                 self.assertEqual(messages[0]['status'],502 if status==418 else status)
                 body=b''.join(message.get('body',b'') for message in messages[1:])
-                self.assertEqual(json.loads(body),{'error':{'code':'model_gateway_request_failed','source':'model-gateway'}})
+                categories = {408: 'timeout', 429: 'rate-limit', 529: 'rate-limit',
+                              504: 'timeout', 503: 'service-unavailable'}
+                expected = ({'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
+                             'status': status, 'category': categories[status], 'outputStarted': False}
+                            if status in categories else
+                            {'code': 'model_gateway_request_failed', 'source': 'model-gateway'})
+                self.assertEqual(json.loads(body), {'error': expected})
                 self.assertNotIn('PRIVATE_PROVIDER_CANARY',repr(messages))
 
 if __name__=='__main__':unittest.main()
