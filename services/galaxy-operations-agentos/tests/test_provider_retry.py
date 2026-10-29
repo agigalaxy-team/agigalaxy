@@ -218,6 +218,26 @@ class ProviderRetry(unittest.TestCase):
             with self.assertRaises(ModelProviderError): model.invoke(messages=[])
             self.assertEqual(model.calls, 1)
 
+    @patch('galaxy_agentos.provider_retry.time.sleep')
+    def test_preoutput_http_502_retries_once_without_provider_failover(self, _sleep):
+        error=gateway_rejected(status=502,category='service-unavailable')
+        error.status_code=502
+        model=with_provider_retry(Model([error,'ok']))
+        self.assertEqual(model.invoke(messages=[]),'ok');self.assertEqual(model.calls,2)
+        first=gateway_rejected(status=502,category='service-unavailable');first.status_code=502
+        second=gateway_rejected();model=with_provider_retry(Model([first,second,'unexpected']))
+        with self.assertRaises(ModelProviderError) as caught:model.invoke(messages=[])
+        self.assertIs(caught.exception,second);self.assertEqual(model.calls,2)
+        streamed=gateway_rejected(status=502,category='service-unavailable');streamed.status_code=502
+        model=with_provider_retry(Model([['partial',streamed],['unexpected']]))
+        stream=model.invoke_stream(messages=[]);self.assertEqual(next(stream),'partial')
+        with self.assertRaises(ModelProviderError):next(stream)
+        self.assertEqual(model.calls,1)
+        mismatch=gateway_rejected(status=502,category='service-unavailable');mismatch.status_code=401
+        model=with_provider_retry(Model([mismatch,'unexpected']))
+        with self.assertRaises(ModelProviderError):model.invoke(messages=[])
+        self.assertEqual(model.calls,1)
+
 
 if __name__ == '__main__':
     unittest.main()

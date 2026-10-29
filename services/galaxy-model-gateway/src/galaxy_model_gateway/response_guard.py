@@ -16,6 +16,16 @@ def http_error_status(value):
     return None
 
 
+def gateway_transient_category(status):
+    if status in (408, 504):
+        return 'timeout'
+    if status in (429, 529):
+        return 'rate-limit'
+    if 500 <= status <= 599:
+        return 'service-unavailable'
+    return None
+
+
 def useful_message(value):
     if not isinstance(value, dict):
         return False
@@ -115,7 +125,7 @@ class ResponseGuard:
                 'status': 502, 'category': 'empty-completion', 'outputStarted': False}}
         if reason == 'gateway-transient-error':
             body = {'error': {'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
-                'status': 503, 'category': 'service-unavailable', 'outputStarted': False}}
+                'status': status, 'category': gateway_transient_category(status), 'outputStarted': False}}
         if reason in {'upstream-http-error','native-provider-error'}:
             from .metadata import provider_failure_for
             origin=provider_failure_for(self.call_id)
@@ -144,6 +154,17 @@ class ResponseGuard:
             status = message["status"]
             if status >= 400:
                 allowed = {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, *range(500, 600)}
+                from .metadata import gateway_failure_for, provider_failure_for
+                provider = provider_failure_for(self.call_id)
+                confirmed = provider.get('httpStatus') == status or provider.get('category') in {'timeout', 'connection'}
+                observed = gateway_failure_for(self.call_id)
+                known_statuses = [observed.get('httpStatus'), observed.get('reportedStatus')]
+                conflict = (observed.get('category') in {'context-limit', 'request-rejected'}
+                    or any(type(value) is int and value not in {408, 429, *range(500, 600)} for value in known_statuses))
+                if (type(status) is int and gateway_transient_category(status) is not None
+                        and not self.started and not self.useful and self.tool_delta_count == 0
+                        and not confirmed and not conflict):
+                    return await self.reject(status=status, reason='gateway-transient-error')
                 return await self.reject(status=status if status in allowed else 502,
                     code="model_gateway_request_failed", reason="upstream-http-error")
             headers = [(k, v) for k, v in message.get("headers", [])

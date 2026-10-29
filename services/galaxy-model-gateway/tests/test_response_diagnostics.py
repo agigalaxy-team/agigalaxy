@@ -140,6 +140,30 @@ class ResponseDiagnostics(unittest.TestCase):
                 self.assertNotEqual(logs[-1].get('reason'), 'gateway-empty-completion')
                 self.assertNotIn(b'model_gateway_empty_completion', b''.join(x.get('body',b'') for x in sent))
 
+    def test_transient_headers_keep_actual_status_and_source_boundary(self):
+        async def one(status, observed=None, provider=None, started=False):
+            sent=[];rejected=[]
+            async def send(v): sent.append(v)
+            async def reject(): rejected.append(True)
+            guard=ResponseGuard(send,stream=True,responses=False,version='v1',rejected=reject,call_id='fixture')
+            if started:
+                guard.started=True
+            with patch('galaxy_model_gateway.metadata.gateway_failure_for',return_value=observed or {}), patch('galaxy_model_gateway.metadata.provider_failure_for',return_value=provider or {}), patch('galaxy_model_gateway.output.emit'):
+                await guard.send({'type':'http.response.start','status':status,'headers':[]})
+            return sent,rejected
+        expected={408:'timeout',429:'rate-limit',500:'service-unavailable',502:'service-unavailable',503:'service-unavailable',504:'timeout',529:'rate-limit'}
+        for status,category in expected.items():
+            with self.subTest(status=status):
+                sent,rejected=asyncio.run(one(status))
+                self.assertTrue(rejected);self.assertEqual(sent[0]['status'],status)
+                self.assertEqual(json.loads(sent[1]['body'])['error'],{'code':'model_gateway_transient_failure','source':'model-gateway','status':status,'category':category,'outputStarted':False})
+        for status,observed,provider,started in [(400,{}, {},False),(401,{}, {},False),(403,{}, {},False),
+                (502,{'category':'context-limit'}, {},False),(502,{'category':'request-rejected'}, {},False),
+                (502,{'httpStatus':401}, {},False),(502,{}, {'httpStatus':502},False),(502,{}, {},True)]:
+            with self.subTest(status=status,observed=observed,provider=provider,started=started):
+                sent,_=asyncio.run(one(status,observed,provider,started))
+                self.assertNotIn(b'model_gateway_transient_failure',b''.join(x.get('body',b'') for x in sent))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -18,19 +18,21 @@ def gateway_transient_failure(error):
     if not isinstance(error, ModelProviderError):
         return None
     reported = getattr(error, 'status_code', None)
-    if reported is not None and (type(reported) is not int or reported != 503):
+    if reported is not None and type(reported) is not int:
         return None
     current = error
     for _ in range(5):
         body = getattr(current, 'body', None)
         if isinstance(body, dict):
             info = body.get('error', body)
-            if (isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}
-                    and info.get('code') == 'model_gateway_transient_failure'
-                    and info.get('source') == 'model-gateway' and type(info.get('status')) is int
-                    and info['status'] == 503 and info.get('category') == 'service-unavailable'
-                    and info.get('outputStarted') is False):
-                return {'status': 503, 'source': 'model-gateway'}
+            if isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}:
+                status = info.get('status')
+                category = ('timeout' if status in (408, 504) else 'rate-limit' if status in (429, 529)
+                    else 'service-unavailable' if type(status) is int and 500 <= status <= 599 else None)
+                if (info.get('code') == 'model_gateway_transient_failure' and info.get('source') == 'model-gateway'
+                        and type(status) is int and category is not None and info.get('category') == category
+                        and info.get('outputStarted') is False and (reported is None or reported == status)):
+                    return {'status': status, 'source': 'model-gateway'}
         current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
         if current is None:
             break
