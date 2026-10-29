@@ -24,6 +24,7 @@ test('workbench conversation resources read independently and clear together on 
    <div id="conversation">{data.conversation?.runs.map(run=><p id={run.operationId==='${oldTurn}'?'old-run':undefined} key={run.operationId}>{run.content}</p>)}</div>
    <output id="history-raw">{data.history.value?.runs.map(run=>run.content).join('|')??'empty'}</output>
    <output id="cards">{data.cards.value?.items.map(item=>item.title).join('|')??'empty'}</output>
+   <output id="blocked-reason">{data.conversation?.blockedReason??'none'}</output>
    <output id="context">{data.context.value?.conversationId??'empty'}</output>
    <output id="management">{data.management.value?.managementCapabilities?'present':'empty'}</output>
    <output id="denied">{String(data.denied)}</output><output id="history-done">{historyDone}</output>
@@ -82,7 +83,7 @@ test('workbench conversation resources read independently and clear together on 
   releaseHeld();await waitOutput(current.page,'history-raw','completed original');await current.context.close();
 
   hold=null;fail=null;current=await freshPage();const page=current.page;
-  await waitOutput(page,'history-raw','completed original');await waitOutput(page,'cards','existing card');await waitOutput(page,'context',conversationId);await waitOutput(page,'management','present');
+  await waitOutput(page,'history-raw','completed original');await waitOutput(page,'cards','existing card');await waitOutput(page,'blocked-reason','none');await waitOutput(page,'context',conversationId);await waitOutput(page,'management','present');
   fail={kind:'history',status:503};await page.getByRole('button',{name:'Read history'}).click();await page.waitForFunction(()=>!!document.querySelector('#history-error')?.textContent);
   assert.equal(await page.locator('#history-raw').textContent(),'completed original');assert.equal(await page.locator('#cards').textContent(),'existing card','history 503 must not erase cards');
   fail=null;await page.getByRole('button',{name:'Read history'}).click();await waitOutput(page,'history-error','');
