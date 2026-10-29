@@ -36,5 +36,12 @@ func inspectionOutcome(result Object) Object {
 		}
 		projected[key] = Object{"availability": availability, "profileComplete": segmentComplete && availability == "available", "reason": reason}
 	}
-	return Object{"profile": "current-operations-v1", "profileComplete": complete, "segments": projected}
+	out := Object{"profile": "current-operations-v1", "profileComplete": complete, "segments": projected}
+	if report := inspectionReport(result["inspectionReport"]); report != nil {
+		if !complete {
+			report["profileComplete"] = false
+		}
+		out["inspectionReport"] = report
+	}
+	return out
 }

@@ -295,6 +295,13 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			var outcome any
 			if tool == "inspect-operations" {
 				if projected := inspectionOutcome(result); projected != nil {
+					var bytes int
+					if e = tx.QueryRow(ctx, `SELECT octet_length($1::jsonb::text)`, jsonText(projected)).Scan(&bytes); e != nil {
+						return false, e
+					}
+					if bytes > 8192 {
+						delete(projected, "inspectionReport")
+					}
 					outcome = jsonText(projected)
 				}
 			}

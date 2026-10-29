@@ -74,16 +74,46 @@ def duty_database(db, gateway):
     projected = copy(db)
     projected.id = str(db.id) + "-duty-storage"
 
-    def report(run_id, fields=None):
+    def report(run_id, fields=None, *, session_id=None, user_id=None, strong_binding=False):
         try:
             row = db.get_run(run_id=run_id, deserialize=False)
             if not isinstance(row, dict) or row.get("agent_id") != "galaxy-duty":
                 return
-            user_id = row.get("user_id") or (row.get("run_data") or {}).get("user_id")
-            if not isinstance(user_id, str) or not user_id.startswith("autonomy:"):
+            nested = row.get("run_data") if isinstance(row.get("run_data"), dict) else {}
+            row_user = row.get("user_id") or nested.get("user_id")
+            if not isinstance(row_user, str) or not row_user.startswith("autonomy:"):
                 return
-            UUID(user_id[9:])
-            gateway.duty_report(user_id, duty_report_fields(row))
+            UUID(row_user[9:])
+            output = duty_report_fields(row)
+            # Only the original, unfiltered fields from this successful persist
+            # may supply a final result. A later GET cannot reconstruct it.
+            if isinstance(fields, dict) and output["status"] == "completed" and output["modelState"] == "completed":
+                source_status = fields.get("status")
+                source_status = str(getattr(source_status, "value", source_status) or "").upper()
+                source_run = fields.get("run_id") or run_id
+                source_meta = fields.get("metadata") if isinstance(fields.get("metadata"), dict) else {}
+                row_meta = nested.get("metadata") if isinstance(nested.get("metadata"), dict) else row.get("metadata")
+                row_meta = row_meta if isinstance(row_meta, dict) else {}
+                source_session = fields.get("session_id") or session_id
+                row_session = row.get("session_id") or nested.get("session_id")
+                keys = ("taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion", "delegationVersion", "roleVersion", "domain", "aiAccountId", "modelSettingsVersion", "modelSettingsVersions", "runtimeRevision")
+                bindings_match = all(key not in source_meta or source_meta[key] == row_meta.get(key) for key in keys)
+                required = ("taskId", "operationId", "planId", "planVersion", "promptVersion", "domain", "aiAccountId", "modelSettingsVersion")
+                strong = not strong_binding or (all(source_meta.get(key) is not None for key in required)
+                    and source_meta.get("taskId") == row_user[9:] and bool(source_session))
+                content = fields.get("content")
+                if (source_status == "COMPLETED" and isinstance(content, str) and content.strip()
+                        and output["nativeRunId"] == run_id == source_run and row_meta.get("taskId") == row_user[9:]
+                        and (user_id is None or user_id == row_user) and (source_session is None or source_session == row_session)
+                        and bindings_match and strong):
+                    try:
+                        size = len(content.encode("utf-8"))
+                    except UnicodeEncodeError:
+                        size = None
+                    if size is not None:
+                        output["finalAnalysis"] = ({"state": "available", "text": content} if size <= 12000
+                            else {"state": "too-large", "byteLength": size})
+            gateway.duty_report(row_user, output)
         except Exception:
             # The committed native record is the original result. Never retry
             # the model or invent a business success because a callback failed.
@@ -92,7 +122,8 @@ def duty_database(db, gateway):
     def upsert_run(run, *args, **kwargs):
         fields = run.to_dict() if hasattr(run, "to_dict") else run
         result = db.upsert_run(duty_storage_fields(fields), *args, **kwargs)
-        report(fields.get("run_id"))
+        report(fields.get("run_id"), fields if result is None or result is True or result == RunPersistOutcome.UPDATED else None, session_id=kwargs.get("session_id") or (args[0] if args else None),
+            user_id=kwargs.get("user_id") or (args[1] if len(args) > 1 else None), strong_binding=True)
         return result
 
     def update_run_in_session(*args, fields, **kwargs):
@@ -102,13 +133,14 @@ def duty_database(db, gateway):
             kwargs["content_if_absent"] = None
         result = db.update_run_in_session(*args, fields=duty_storage_fields(fields), **kwargs)
         if result is True or result == RunPersistOutcome.UPDATED:
-            report(kwargs.get("run_id") or (args[1] if len(args) > 1 else None))
+            report(kwargs.get("run_id") or (args[1] if len(args) > 1 else None), fields,
+                session_id=kwargs.get("session_id") or (args[0] if args else None), user_id=kwargs.get("user_id"))
         return result
 
     def append_run_to_session_if_absent(*args, run_dict, **kwargs):
         result = db.append_run_to_session_if_absent(*args, run_dict=duty_storage_fields(run_dict), **kwargs)
         if result is True:
-            report(run_dict.get("run_id"))
+            report(run_dict.get("run_id"), run_dict, session_id=kwargs.get("session_id") or (args[0] if args else None), user_id=kwargs.get("user_id"))
         return result
 
     projected.upsert_run = upsert_run

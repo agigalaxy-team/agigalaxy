@@ -240,6 +240,18 @@ func inspectionCoversFailure(failed, evidence Object) bool {
 		}
 		return true
 	}
+	return fixedOverviewScope(failed)
+}
+
+// fixedOverviewScope classifies an existing query's bounded overview scope;
+// it does not assert that any inspection or business read occurred.
+func fixedOverviewScope(failed Object) bool {
+	args := obj(failed["arguments"])
+	filters := obj(args["filters"])
+	if filters["after"] != nil || filters["page"] != nil || filters["pageSize"] != nil {
+		return false
+	}
+	module, view := str(args["module"]), str(args["view"])
 	if view != "overview" {
 		return false
 	}

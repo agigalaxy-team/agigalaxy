@@ -526,6 +526,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	queries.Audit, queries.Workbench = businessAudit, workbench
 	connectWorkbenchSummary(agentConversations, autonomy, queries)
 	agentConversations.Tools.Query = queries.Query
+	autonomy.QueryReadPermission = operationsqueries.QueryReadPermission
 	autonomy.QueryTool = queries.Query
 	permissionService.Duty = autonomy
 	forumOperations := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Files: forumFiles, Links: links}

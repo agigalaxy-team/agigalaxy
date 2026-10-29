@@ -132,6 +132,13 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 	}
 	out["strategyVersionId"] = obj(obj(row["configuration"])["versionBindings"])["strategyVersionId"]
 	out["effects"], out["businessReceipts"], out["pendingCalls"], out["continuation"], out["workbenchHref"], out["availableControls"] = receipts, receipts, pending, continuation, href, controls
+	if includeReceipts && checkTarget {
+		report, err := s.taskReportWithin(ctx, tx, row, a)
+		if err != nil {
+			return nil, err
+		}
+		out["inspectionReport"], out["finalAnalysis"], out["assessmentSummary"] = report["inspectionReport"], report["finalAnalysis"], report["assessmentSummary"]
+	}
 	usage := obj(row["model_usage"])
 	out["calls"] = finite(usage["calls"])
 	out["tokens"] = Object{"input": finite(usage["inputTokens"]), "output": finite(usage["outputTokens"]), "total": finite(usage["totalTokens"])}

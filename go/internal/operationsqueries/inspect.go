@@ -222,6 +222,7 @@ func (s *Service) InspectOperations(ctx context.Context, actor Actor, domain str
 		status = "partial"
 	}
 	out := Object{"tool": "inspect-operations", "profile": "current-operations-v1", "availability": status, "inspectionChecked": checked, "profileComplete": checked, "segments": segments, "checkedAt": s.now(), "readExpiresAt": deadline, "evidenceRefs": []any{}}
+	out["inspectionReport"] = inspectionReport(out)
 	raw, e := json.Marshal(out)
 	if e != nil || len(raw) > 180000 {
 		return nil, fail("operations_query_response_too_large", 503)

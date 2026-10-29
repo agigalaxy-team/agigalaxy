@@ -53,7 +53,11 @@ callbacks为固定private prefix的autonomy/authorize、tools/execute、report�
 
 新显式profile任务a0714e3a自然结束为未完成，原`read_outcome`明确五段完整，另有工作台not-authorized、维护incomplete及自治source-withheld，不能把最后一次current评估等同裁决通过。对应修复已在源码实现、待上线和新任务验收：工作台真实Duty使用原聚合主体及同事务只读身份屏障，避免将`workbench.read`误送入业务写授权；维护保持真实`adopted-galaxy-river-transport`和`includesAllPlatformQueues=false`，按这个范围的可用性、完整计数及组件集合核查，不承诺其它原生队列全集；自治元数据逐条核当前Duty的搜索配置读取权，或反馈/公开内容的真实来源，事件及其它未接来源仍扣留。观察到unhealthy或原操作unknown应如实报告，不要求先把业务修绿才能完成读取；未取得的必需信息仍不能声称已核。旧任务冻结目标与失败历史不回写，下轮目标须明确实际队列口径。
 
-源码允许纯读取计划显式冻结`inspectionProfile=current-operations-v1`，限`ai/ai-human`且actions、grantIds、strategyIds、resourceIds、eventTypes五数组为空。136在原工具账本增加有界`read_outcome`，只保存固定八段的覆盖状态和闭合缺因，不存材料正文；旧记录缺此字段保持未知，不回填历史缺段。补续把实际completion裁决、必需未决范围与附带读取失败分别回给同run，不能只给reasonCode让模型反复宣称全部正常。明确profile之外的可证失败如实保留，但不自动扩大原巡检目标；未知写入和范围歧义仍独立阻止假完成。业务异常是巡检发现，读取其状态不等于要求模型先修复它。此前760842a7原两次inspect均partial且最终未完成，现存账本不足以倒推具体缺段；修后显式profile仍待新任务实际验收。精确反馈小目标7c1d0b9d已取得完整对象读取和随后有效评估，独立回读一致，无业务写。
+源码允许纯读取计划显式冻结`inspectionProfile=current-operations-v1`，限`ai/ai-human`且actions、grantIds、strategyIds、resourceIds、eventTypes五数组为空。136在原工具账本增加有界`read_outcome`，只保存固定八段的覆盖状态和闭合缺因，不存材料正文；旧记录缺此字段保持未知，不回填历史缺段。补续把实际completion裁决、必需未决范围与附带读取失败分别回给同run，不能只给reasonCode让模型反复宣称全部正常。明确profile之外的可证失败如实保留，但不自动扩大原巡检目标；未知写入和范围歧义仍独立阻止假完成。业务异常是巡检发现，读取其状态不等于要求模型先修复它。此前760842a7原两次inspect均partial且最终未完成，现存账本不足以倒推具体缺段，这些旧任务不回写成功。精确反馈小目标7c1d0b9d已取得完整对象读取和随后有效评估，独立回读一致，无业务写。
+
+后续真实profile任务ca2632d9已取得八段完整结果，最后有效评估后自然完成，四次实际模型调用、无业务写，证明有界读取与结束主链可完成；原模型摘要仍把River范围误称全平台，不能把这一摘要当作准确巡检报告。139源码因此把程序事实与AI分析分别交付：inspect的固定范围、窗口、覆盖、授权内安全计数及闭合异常保存到原call的`read_outcome.inspectionReport`，不存检索词、岗位正文、对象材料或受众；原目标评估摘要保留。
+
+Duty原生存储原本主动清除最终content，因此native内容为空不证明模型没生成回答。新的生产者在原persist成功且同run/task/user/session及版本核准后，从本次未过滤COMPLETED纯文本提取最终分析，经原Report送Go；native仍不留正文。139只在原任务表增加有界`result`保存这个独立结果，原summary和assess历史不改。文本超过12000 UTF-8字节或结果包络超16KiB时只记超限事实，不截断冒充完整分析；迟到仅同原run的允许状态可首次补入，相同重报幂等、冲突不覆盖，不把失败/未知任务改绿。没有原文字段的旧记录保持缺失，不自动重跑模型补写历史。程序事实、原目标评估与AI分析由现任务详情及工作台绑定任务的同一组件分列显示；当前读取权限和原来源仍复核，无法证明用途来源的AI正文保持不可读。139及这两处消费者已完成源码和定向检查，真实交付验收仍待发布后的新任务，不以程序facts代替AI分析已验证。
 
 API能够连接AgentOS不证明Worker已加载相同运行配置。原health记录Worker实际加载的native配置事实和观察时间，缺观察或观察过期保持未知，不能以ready=true表示已经可以派发；配置就绪、Worker派发资格、原生服务和模型可用分别核对。程序规则也沿Worker的原任务transport回调API执行，免模型不等于免native transport。受保护配置可通过systemd `LoadCredential`提供给Worker自己的运行凭据目录，`GALAXY_AGENTOS_CONFIG_FILE`只指向该只读文件，不需要把Worker加入API账户组或复制原密钥到源码。
 
@@ -66,6 +70,8 @@ API能够连接AgentOS不证明Worker已加载相同运行配置。原health记�
 `store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入/最终回答是会话历史，Go绑定来源失效时轮换/withhold会话；不宣称物理擦除旧行或新增保留期。Duty存元数据与真实usage，目的材料/卡/命令仍归Go账本。trace不含prompt/completion/tool正文或异常原文。
 
 普通沟通成功准备操作卡后，以真实`state=prepared`、`card.state=prepared`和cardId为依据，只克隆本次FunctionCall的Function并启用Agno原生`stop_after_tool_call/show_result`，停止后续模型续答。流中工具前的临时文字沿原ToolCallStarted reset清除，工具显示及post-hook保存的最终沟通内容统一为程序的确认提示；失败制卡仍允许按原schema修参，不以停止异常伪造成功。该轮普通沟通的COMPLETED只表示制卡沟通已经结束，业务仍等待原卡人工确认，以后续真实业务operation回执判断效果；不把它改成无人能续接的原生PAUSED，也不将旧卡标记带入新重试轮次。这是当前源码实现，生产采用及真实卡流结果另按发布证据验收。
+
+普通会话的多prepare批次在执行前统一返回对应callId的纠正反馈，避免Agno并发批次在首卡成功停步前继续生成其它卡；同批只读仍可正常运行。原会话角色轮04619614实际provider顺序和当前user均正确，模型仍沿旧搜索目标推进，不能归因Gateway或输入丢失。后续provider副本投影仅将`from_history`记录封装为明确的只读引用数据，保其原文、角色、次序及非文本引用，当前system/user和当前工具配对不动；数据库与用户可见历史不改，也不把历史准备表述判成当前未决队列。当前原生retry的问题仍按原请求续接，只有更晚轮次中的旧请求按历史引用读取，不新增一份用户消息。修后同原会话已成功准备并确认AI专用角色及分配，完整回收及各边界验收按实际回执分别记录，不宣称模型从此不会偏离目标。
 
 准备读、确认写与Duty写使用不同的可信入口。卡读取保留query-purpose固定AI proof；确认时原回调先复核真实人员、原卡和固定AI，再在实际业务事务内重建同账户的prepare-purpose proof。共同`ExecutePrepared`必须把这个写回调传给各领域`WithAuthorize`，不能用原query回调覆盖首次取得的prepare actor；Duty继续使用原operation绑定授权，管理角色/提示词沿独立消费者。真实完整策略卡曾因该混用确认失败，原操作未落账；共同修复已覆盖真实query回调的定向PG正反例，仍须新卡实际写入验收，不能靠加角色掩盖接线错误。
 
@@ -125,9 +131,9 @@ AI查询和准备卡使用持久绑定的人员与AI上下文，由共同主体�
 
 | 能力 | 当前模型工具与真实业务入口 | 本轮证据及剩余边界 |
 |---|---|---|
-| 其他AI角色与岗位要求 | `read-ai-delegation`、角色/提示词专用工具；人工卡与Duty委派分别办理 | 当前总控正式权限/四目标委派已配置；岗位要求已通过真实卡修改及新操作恢复，制卡停步已有真实策略准备正例。角色创建尚未通过：103772e8原参数被拒，223fbcaf输入正确却偏入旧搜索目标、无卡无角色写，须核实际上下文而非扩权。不得修改自身上限、共享/人员角色或模型。 |
+| 其他AI角色与岗位要求 | `read-ai-delegation`、角色/提示词专用工具；人工卡与Duty委派分别办理 | 岗位要求已通过真实卡修改及原文恢复；历史103772e8参数拒绝、223fbcaf/04619614偏旧目标保留，历史引用投影后同会话已真实创建角色并分配。独立Duty任务e76fcba3已完成创建/分配/读取/撤回/停用/读取/评估，13次实际调用、四原回执与最终权限恢复已独立核对。治理岗位在随后人审赋权窗口已真实成功读取analytics概况，精确数值/窗口另按证据核；不据隔离测试替代角色使用。不得修改自身上限、共享/人员角色或模型。 |
 | 完整策略与普通日常维护 | 精确策略版本读取、完整草稿/预演/发布卡；ordinary专用工具仍按原bounds | 生产已生成完整草稿卡且只提示确认；原确认因query/prepare回调混用被拒，未写入，修后真实写入链仍待验收。完整目标、结构和授权变更保持人工确认，不能由ordinary权限扩大。 |
-| 自动任务与结束判断 | 原task/Agno durable run、assess、同run补续、原操作reconcile、固定inspect及Worker健康 | 首任务原号恢复后仍有覆盖缺口，旧历史保持原样；精确反馈小目标7c1d0b9d已通过真实读取、评估及独立回读，无业务写。五域760842a7自然未完成，136补固定profile缺段持久化和结构化续答，显式profile真实新轮仍待验收。没有机械8次调用上限。 |
+| 自动任务与结束判断 | 原task/Agno durable run、assess、同run补续、原操作reconcile、固定inspect及Worker健康 | 精确反馈小目标7c1d0b9d已通过真实读取、评估及独立回读，无业务写；原失败历史保留。profile ca2632d9已在四次实际调用内完成八段读取及有效评估，读取/结束主链通过；原摘要范围表述错误，139事实报告与最终AI分析交付仍待真实新轮验收。没有机械8次调用上限。 |
 | 用户账户业务限制 | 当前账户读取、`account-restriction`及原限制/解除回执 | 源码接通；本轮总控真实限制与恢复未验收。账户密码、登录、会话及管理人员权限不因该业务动作获得自动处理权。 |
 | 公开治理、举报申诉 | 选定post/reply与公开案件材料、visibility/curation/batch/case-resolve | 本轮已正常创建一个受控公开对象，selected自动处理及原状态恢复待执行；原人类/其他授权处置不能被新AI决定覆盖。 |
 | 线索触发的私聊审查 | 精确chat-report引用、用途限定材料及已选消息处理 | 源码有专门用途支路，本轮真实线索/材料/消息回执尚未覆盖；普通目录或workbench.read不能扩大为任意私聊读取。 |
@@ -136,7 +142,7 @@ AI查询和准备卡使用持久绑定的人员与AI上下文，由共同主体�
 | 内容标签维护 | 精确标签读取、人工创建/更名/启停卡及原命令回执 | 已补现有词表业务的typed入口、完整影响审阅和实际随机tagId关联，定向检查通过，真实业务卡链待验收。模型候选须由人确认，不授予自主改变正式词表或分类政策的权限。 |
 | 消息与实际投递 | 消息计划草稿、完整发布审阅与原命令恢复；独立notice精确读、草稿及发布/撤回卡 | 消息计划与独立notice是不同对象及账本。独立notice源码已补接，发布只安排投递；实际送达须原operation、delivery计数与受控账户收到相同notice共同核对，不冒称存在管理recipient列表。计划仍用run/recipient回执。受控单账户实际投递均待验收，SMTP既有证据不要求重复外发。 |
 | 分析、画像与推荐 | 固定分析视图、真实窗口/覆盖、推荐soft direction，以及已有policy控制与theme精确修改卡 | 只依据实际收集与允许用途，保unknown及分母口径；已有策略启停/防重防集中、现有主题label/enabled/mapping已补人工卡、精确读和原hash恢复，实际跨模块修改与恢复待验收。不开放AI自行建立正式主题分类，不把供给样本口径冒作全站覆盖。 |
-| 搜索 | 当前统计与配置、草稿保存及精确版本设置读取、apply/restore完整审阅 | 本轮已真实保存v7、应用并核native采用；原号恢复操作1f80c7e9已applied为新v8且设置等原active前像，但卡因误比较输入来源ID与新结果ID仍unknown。已定位恢复校验修复，须只核原号；原v6草稿的等价内容另待恢复，当前draft指针不会假称回到旧ID。配置采用不证明召回效果提升。 |
+| 搜索 | 当前统计与配置、草稿保存及精确版本设置读取、apply/restore完整审阅 | 已真实保存v7、应用并核native采用，再沿原操作恢复原active语义；来源版本与新产物ID误比的回执修复后，原卡同号恢复，未重复业务restore。当前active/native等原v2设置，draft为新ID但内容等原v6，旧v6历史保留，配置闭环通过。没有把草稿指针变化说成原ID还原，也未以配置采用证明召回效果提升。 |
 | 运维、告警与来源 | 当前组件信号、任务、获准日志/备份方案等安全投影 | 可用范围以每次返回coverage/basis为准；本轮总控跨模块读取及实际告警路由待覆盖。Worker自检不是独立监测，标签不证明已送达；不自动改变模型、凭据或生产恢复方案。 |
 
 selected只证明明确对象范围。`eligible`必须显式批准，并由当前来源、策略条件、CAS及原人工决定等固定资格检查约束，才包含以后出现的新合格对象；现有scope并不支持任意账户/状态谓词，不能只写在prompt里就声称程序强制。持续全对象能力的验收须保持原授权/策略版本，新增来源后取得新task与真实业务回执，并保不合格来源无写入的对照；本轮尚未取得这组真实证据。

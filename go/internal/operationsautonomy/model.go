@@ -38,6 +38,7 @@ type Service struct {
 	EnqueueWithin                func(context.Context, pgx.Tx, string, Object, string, *time.Time) error
 	Permissions                  *perms.Service
 	QueryTool                    func(context.Context, Actor, string, string, Object) (Object, error)
+	QueryReadPermission          func(string, Object) (string, error)
 	ActionReady                  func(string) bool
 	ExecuteDutyOperation         func(context.Context, Actor, string, Object, bool) (Object, error)
 	SummaryForTask               func(context.Context, Actor, Object) (Object, error)

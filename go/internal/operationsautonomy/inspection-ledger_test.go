@@ -20,7 +20,7 @@ func TestInspectionOutcomeRecordedOnOriginalToolCall(t *testing.T) {
 	ctx := context.Background()
 	f := operationsfixture.NewEndpoint(t, pool, "https://profile-ledger.invalid")
 	base := autonomyfixture.Setup(t, f, f.Automation(t))
-	s := &a.Service{Pool: pool, Endpoint: f.Endpoint, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: time.Now}
+	s := &a.Service{Pool: pool, Endpoint: f.Endpoint, Authority: f.Gateway, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: time.Now}
 	id := uuid.NewString()
 	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (a.Object, error) {
 		return s.LinkWorkbenchWithin(ctx, tx, a.WorkbenchLink{OperationID: id, Domain: "overview", AIAccountID: base["aiAccountId"].(string)})
@@ -34,7 +34,12 @@ func TestInspectionOutcomeRecordedOnOriginalToolCall(t *testing.T) {
 		t.Fatal(e)
 	}
 	s.QueryTool = func(context.Context, a.Actor, string, string, a.Object) (a.Object, error) {
-		return a.Object{"profile": "current-operations-v1", "availability": "partial", "inspectionChecked": false, "profileComplete": false, "segments": a.Object{"autonomy": a.Object{"availability": "available", "collectionComplete": false, "sourceWithheld": true, "data": a.Object{"private": "must-not-store"}}}}, nil
+		sections := a.Object{}
+		for _, key := range []string{"workbench", "maintenance", "search", "recommendations", "analytics", "messaging", "autonomy", "delegation"} {
+			sections[key] = a.Object{"availability": "available", "complete": true, "window": a.Object{}, "coverage": a.Object{}, "facts": a.Object{}, "findingCodes": []any{}}
+		}
+		sections["maintenance"].(map[string]any)["facts"] = a.Object{"componentTotal": 3, "private": "must-not-store"}
+		return a.Object{"profile": "current-operations-v1", "availability": "partial", "inspectionChecked": false, "profileComplete": false, "segments": a.Object{"autonomy": a.Object{"availability": "available", "collectionComplete": false, "sourceWithheld": true, "data": a.Object{"private": "must-not-store"}}}, "inspectionReport": a.Object{"schemaVersion": 1, "profile": "current-operations-v1", "checkedAt": time.Now().Unix(), "profileComplete": false, "sections": sections}}, nil
 	}
 	call := uuid.NewString()
 	if _, e := s.Tool(ctx, a.Object{"taskId": id, "callId": call, "tool": "inspect-operations", "arguments": a.Object{}}, false); e != nil {
@@ -49,5 +54,22 @@ func TestInspectionOutcomeRecordedOnOriginalToolCall(t *testing.T) {
 	autonomy, _ := segments["autonomy"].(map[string]any)
 	if code != "inspection-current-partial" || autonomy["reason"] != "source-withheld" || autonomy["data"] != nil {
 		t.Fatalf("unsafe or missing outcome: %s %#v", code, outcome)
+	}
+	report, _ := outcome["inspectionReport"].(map[string]any)
+	if report == nil || report["profileComplete"] != false {
+		t.Fatalf("report not saved on original call %#v", outcome)
+	}
+	section := report["sections"].(map[string]any)["maintenance"].(map[string]any)
+	if section["facts"].(map[string]any)["componentTotal"] != float64(3) || section["facts"].(map[string]any)["private"] != nil {
+		t.Fatalf("unsafe report facts %#v", section)
+	}
+	view, e := s.GetTask(ctx, f.Root, id)
+	if e != nil {
+		t.Fatal(e)
+	}
+	task := view["task"].(map[string]any)
+	visible, _ := task["inspectionReport"].(map[string]any)
+	if visible == nil || visible["callId"] != call {
+		t.Fatalf("task report missing original call %#v", task)
 	}
 }
