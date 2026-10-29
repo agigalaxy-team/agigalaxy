@@ -52,7 +52,13 @@ class ConnectionRobustnessTest(unittest.TestCase):
             with self.subTest(options=options, body=body):
                 output, failures = asyncio.run(guarded(body,**options))
                 self.assertEqual(len(failures),1)
-                self.assertIn(b"model_gateway_response_invalid",b"".join(x.get("body",b"") for x in output))
+                payload=b"".join(x.get("body",b"") for x in output)
+                if options.get("stream") and body[0].endswith(b"data: [DONE]\n\n"):
+                    self.assertEqual(output[0]["status"],502)
+                    self.assertEqual(json.loads(payload)["error"],{"code":"model_gateway_empty_completion",
+                        "source":"model-gateway","status":502,"category":"empty-completion","outputStarted":False})
+                else:
+                    self.assertIn(b"model_gateway_response_invalid",payload)
                 self.assertNotIn("PRIVATE_CANARY",repr(output))
                 self.assertFalse(output[-1].get("more_body"))
 
