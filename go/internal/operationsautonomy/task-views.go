@@ -115,6 +115,9 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 			}
 			controls = append(controls, "stop")
 		}
+		if row["source"] != "workbench" && row["mode"] == "ai" && has([]string{"failed", "unknown"}, state) && row["model_state"] == "failed" && row["human_decision"] == nil && str(row["native_run_id"]) != "" {
+			controls = append(controls, "retry")
+		}
 		if row["dispatch_started_at"] != nil && state != "stopped" {
 			controls = append(controls, "reconcile")
 		}
@@ -130,12 +133,26 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		}
 	}
 	out := Object{}
-	for result, k := range map[string]string{"id": "id", "taskId": "id", "operationId": "id", "title": "title", "domain": "domain", "source": "source", "mode": "mode", "state": "state", "modelState": "model_state", "businessState": "business_state", "revision": "revision", "aiAccountId": "ai_account_id", "planId": "config_id", "configRevision": "config_revision", "promptVersion": "prompt_version", "planVersion": "plan_version", "delegationVersion": "delegation_version", "nativeRunId": "native_run_id", "targetType": "target_type", "targetId": "target_id", "summary": "summary", "code": "code", "humanDecision": "human_decision"} {
+	for result, k := range map[string]string{"id": "id", "taskId": "id", "operationId": "id", "title": "title", "domain": "domain", "source": "source", "mode": "mode", "state": "state", "modelState": "model_state", "businessState": "business_state", "revision": "revision", "controlRevision": "control_revision", "aiAccountId": "ai_account_id", "planId": "config_id", "configRevision": "config_revision", "promptVersion": "prompt_version", "planVersion": "plan_version", "delegationVersion": "delegation_version", "nativeRunId": "native_run_id", "nativeAttemptId": "native_attempt_id", "targetType": "target_type", "targetId": "target_id", "summary": "summary", "code": "code", "humanDecision": "human_decision"} {
 		out[result] = row[k]
+	}
+	if row["native_attempt_id"] != nil {
+		command, err := optional(ctx, tx, `SELECT to_jsonb(c) FROM (SELECT result FROM operations_autonomy_commands_v1 WHERE endpoint=$1 AND operation_id=$2 AND kind='control' AND result->'task'->>'id'=$3) c`, s.Endpoint, row["native_attempt_id"], row["id"])
+		if err != nil {
+			return nil, err
+		}
+		previous := obj(obj(command["result"])["previousAttempt"])
+		if previous != nil {
+			out["previousAttempt"] = Object{"nativeRunId": previous["nativeRunId"], "nativeAttemptId": previous["nativeAttemptId"], "sessionId": previous["sessionId"], "status": previous["status"], "modelState": previous["modelState"]}
+		}
 	}
 	out["strategyVersionId"] = obj(obj(row["configuration"])["versionBindings"])["strategyVersionId"]
 	if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
-		out["manualPause"] = Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "nativeRunId": control["nativeRunId"]}
+		pause := Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "nativeRunId": control["nativeRunId"]}
+		if has([]string{"native-ended", "native-ended-after-checkpoint", "resumed", "stopped", "takeover", "natural-human-review"}, str(control["outcome"])) {
+			pause["outcome"] = control["outcome"]
+		}
+		out["manualPause"] = pause
 	}
 	out["effects"], out["businessReceipts"], out["pendingCalls"], out["continuation"], out["workbenchHref"], out["availableControls"] = receipts, receipts, pending, continuation, href, controls
 	if includeReceipts && checkTarget {

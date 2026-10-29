@@ -71,3 +71,27 @@ func TestAutonomyTaskTransportUsesOriginalScopeAndNeverReplaysLostPOST(t *testin
 		t.Fatal("uncontrolled task endpoint accepted", err)
 	}
 }
+
+func TestAutonomyTransportBindsAttemptToSignedScope(t *testing.T) {
+	task, plan, account, attempt := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	key := strings.Repeat("j", 32)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := verifyFixtureToken(key, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		if !ok || claims["taskId"] != task || claims["nativeAttemptId"] != attempt || r.Header.Get("Idempotency-Key") != attempt {
+			t.Error("attempt was not signed and bound")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"state":"accepted"}`))
+	}))
+	defer server.Close()
+	client, err := New(Configuration{URL: server.URL, SigningKey: key, ServiceKey: strings.Repeat("k", 32)}, Options{Now: func() time.Time { return time.Unix(2000000000, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.AutonomyAttemptRequest(context.Background(), task, plan, account, nil, attempt, "/runs", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.AutonomyAttemptRequest(context.Background(), task, plan, account, nil, "bad-attempt", "/runs", true); fault.Code(err) != "invalid_operations_autonomy_request" {
+		t.Fatal("invalid attempt accepted")
+	}
+}

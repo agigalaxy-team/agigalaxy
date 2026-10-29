@@ -93,6 +93,18 @@ func TestAccountDutyOriginalReceiptAndCurrentRead(t *testing.T) {
 	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET configuration=jsonb_set(configuration,'{plan,actions}','["accounts.restriction.apply","accounts.restriction.release"]'::jsonb),dispatch_started_at=$3,native_run_id='synthetic-run' WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, now()); e != nil {
 		t.Fatal(e)
 	}
+	invalidCall := uuid.NewString()
+	invalidRequest := Object{"kind": "account-restriction", "targetId": uuid.NewString(), "action": "apply", "until": now().Add(time.Hour).Format(time.RFC3339), "reason": "No such source"}
+	if _, err := duty.Tool(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": invalidCall, "tool": "execute-operation", "arguments": invalidRequest}, false); err == nil {
+		t.Fatal("unavailable source was admitted")
+	}
+	var rejected Object
+	if e = owner.QueryRow(ctx, `SELECT to_jsonb(c) FROM operations_autonomy_tool_calls_v1 c WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, taskID, invalidCall).Scan(&rejected); e != nil {
+		t.Fatal(e)
+	}
+	if rejected["state"] != "not-admitted" || obj(obj(rejected["read_outcome"])["preDispatch"])["basis"] != "typed-pre-dispatch-rejection" {
+		t.Fatalf("typed rejection lost no-effect fact: %v", rejected)
+	}
 	apply := Object{"kind": "account-restriction", "targetId": account.ID, "action": "apply", "until": now().Add(time.Hour).Format(time.RFC3339), "reason": "  Synthetic short restriction  "}
 	result, e := duty.Tool(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": uuid.NewString(), "tool": "execute-operation", "arguments": apply}, false)
 	if e != nil {
@@ -102,6 +114,28 @@ func TestAccountDutyOriginalReceiptAndCurrentRead(t *testing.T) {
 		t.Fatalf("apply %v", result)
 	}
 	op := str(result["operationId"])
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='unknown' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_receipts_v1 SET state='unknown' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	blockedCall := uuid.NewString()
+	blockedInput := Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": blockedCall, "tool": "execute-operation", "arguments": Object{"kind": "account-restriction", "targetId": account.ID, "action": "release", "reason": "Later recovery"}}
+	blocked, err := duty.Tool(ctx, blockedInput, false)
+	if err != nil || blocked["state"] != "not-admitted" || blocked["code"] != "operations_autonomy_original_operation_unknown" {
+		t.Fatalf("unknown allowed new effect: %v %v", blocked, err)
+	}
+	again, err := duty.Tool(ctx, blockedInput, false)
+	if err != nil || again["operationId"] != blocked["operationId"] || again["state"] != "not-admitted" {
+		t.Fatalf("not-admitted replay changed: %v %v", again, err)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='completed' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_receipts_v1 SET state='completed' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = duty.GetTask(ctx, f.Root, taskID); e != nil {
 		t.Fatal("task source", e)
 	}
@@ -215,6 +249,9 @@ func TestAccountDutyOriginalReceiptAndCurrentRead(t *testing.T) {
 	if _, e = owner.Exec(ctx, `UPDATE business_admin_audit_v1 SET actor_kind='operations-ai-service',operator_id='ai:'||$3::text,operator_role=NULL,grant_id=$4::uuid,actor_context=$5 WHERE endpoint=$1 AND operation_id=$2`, f.Endpoint, op, base["aiAccountId"], policy["grantId"], originalContext); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='started' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
 	release := Object{"kind": "account-restriction", "targetId": account.ID, "action": "release", "reason": "Synthetic short restriction ended"}
 	released, err := duty.Tool(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": uuid.NewString(), "tool": "execute-operation", "arguments": release}, false)
 	if err != nil || released["state"] != "completed" {
@@ -234,5 +271,86 @@ func TestAccountDutyOriginalReceiptAndCurrentRead(t *testing.T) {
 	}
 	if _, err := query(); err == nil {
 		t.Fatal("AI without current accounts.read accepted")
+	}
+	// The original effect is already in the domain ledger; simulate lost task
+	// acknowledgement and recover only that original call with current reads.
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='unknown' WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='unknown' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_receipts_v1 SET state='unknown' WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	denied, err := duty.ReconcileOriginalWrites(ctx, taskID, "synthetic-run")
+	if err != nil || len(items(denied["operations"])) != 1 || obj(items(denied["operations"])[0])["state"] != "unknown" {
+		t.Fatalf("revoked read recovered receipt: %v %v", denied, err)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['autonomy.read','accounts.read','accounts.restriction.apply','accounts.restriction.release'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); e != nil {
+		t.Fatal(e)
+	}
+	recovered, err := duty.ReconcileOriginalWrites(ctx, taskID, "synthetic-run")
+	if err != nil || len(items(recovered["operations"])) != 1 || obj(items(recovered["operations"])[0])["state"] != "completed" {
+		t.Fatalf("original receipt recovery: %v %v", recovered, err)
+	}
+	var taskState, receiptState string
+	if e = owner.QueryRow(ctx, `SELECT t.state,r.state FROM operations_autonomy_tasks_v1 t JOIN operations_autonomy_receipts_v1 r ON r.endpoint=t.endpoint AND r.task_id=t.id WHERE t.endpoint=$1 AND t.id=$2 AND r.operation_id=$3`, f.Endpoint, taskID, op).Scan(&taskState, &receiptState); e != nil || taskState != "unknown" || receiptState != "completed" {
+		t.Fatalf("recovery changed task or lost original: %s %s %v", taskState, receiptState, e)
+	}
+	// Original absence is conclusive only for the two explicitly supported P13
+	// commands, under the task UPDATE fence and with no original ledger row.
+	duty.ValidateDutyRequest = ParseRequest
+	createRequest := Object{"kind": "ordinary-strategy-create-draft", "sourceStrategyId": uuid.NewString(), "sourceVersionId": uuid.NewString(), "expectedRevision": 1, "name": "Controlled strategy", "reason": "Approved source"}
+	rehearsalRequest := Object{"kind": "strategy-rehearsal", "versionId": uuid.NewString(), "executionIds": []any{}}
+	missingCreate, missingRehearsal, hasCommand, hasDuty, hasReceipt := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	for _, entry := range []struct {
+		id   string
+		args Object
+	}{{missingCreate, createRequest}, {missingRehearsal, rehearsalRequest}, {hasCommand, createRequest}, {hasDuty, createRequest}, {hasReceipt, createRequest}} {
+		if _, e = owner.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,native_run_id,created_at,updated_at) VALUES($1,$2,$3,'execute-operation',$4,$5,'unknown','fixture-original-code','synthetic-run',$6,$6)`, f.Endpoint, taskID, uuid.NewString(), entry.args, entry.id, now()); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_p13_strategy_commands_v1(endpoint,operation_id,operator_id,kind,input,result,created_at) VALUES($1,$2,$3,'fixture','{}','{}',$4)`, f.Endpoint, hasCommand, f.IDs["root"], now()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_ai_duty_operations_v1(endpoint,operation_id,task_id,ai_account_id,kind,request,proposal,binding,state,created_at,updated_at) VALUES($1,$2,$3,$4,'ordinary-strategy-create-draft','{}','{}','{}','unknown',$5,$5)`, f.Endpoint, hasDuty, taskID, base["aiAccountId"], now()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_autonomy_receipts_v1(id,endpoint,task_id,operation_id,action,state,basis,created_at) VALUES($1,$2,$3,$4,'fixture','unknown','original-operation-query',$5)`, uuid.NewString(), f.Endpoint, taskID, hasReceipt, now()); e != nil {
+		t.Fatal(e)
+	}
+	if _, err = postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (bool, error) {
+		var row Object
+		if e := tx.QueryRow(ctx, `SELECT to_jsonb(t) FROM operations_autonomy_tasks_v1 t WHERE endpoint=$1 AND id=$2 FOR UPDATE`, f.Endpoint, taskID).Scan(&row); e != nil {
+			return false, e
+		}
+		return true, duty.ResolvePreDispatchAbsenceWithin(ctx, tx, row)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []struct{ id, state string }{{missingCreate, "not-admitted"}, {missingRehearsal, "not-admitted"}, {hasCommand, "unknown"}, {hasDuty, "unknown"}, {hasReceipt, "unknown"}} {
+		var state, code string
+		if e = owner.QueryRow(ctx, `SELECT state,code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, entry.id).Scan(&state, &code); e != nil || state != entry.state || code != "fixture-original-code" {
+			t.Fatalf("original evidence %s: %s %s %v", entry.id, state, code, e)
+		}
+	}
+	// The freshly allocated attempt is authoritative even before its native
+	// run is bound: an old callback cannot exploit a temporarily empty run ID.
+	newAttempt := uuid.NewString()
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_attempt_id=$3,native_run_id=NULL WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, newAttempt); e != nil {
+		t.Fatal(e)
+	}
+	if _, err = duty.Tool(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": uuid.NewString(), "tool": "current-summary", "arguments": Object{}}, false); err == nil {
+		t.Fatal("old Tool callback accepted during new attempt")
+	}
+	if _, err = duty.Report(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "modelState": "completed", "status": "completed"}); err == nil {
+		t.Fatal("old Report callback accepted during new attempt")
+	}
+	var gotAttempt *string
+	var gotRun *string
+	if e = owner.QueryRow(ctx, `SELECT native_attempt_id::text,native_run_id FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID).Scan(&gotAttempt, &gotRun); e != nil || gotAttempt == nil || *gotAttempt != newAttempt || gotRun != nil {
+		t.Fatalf("old callback changed new attempt: %v %v %v", gotAttempt, gotRun, e)
 	}
 }

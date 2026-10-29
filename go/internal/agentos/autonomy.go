@@ -16,10 +16,14 @@ import (
 // AutonomyRequest shares the loaded transport/keys, but signs the separate
 // original duty-task scope. It conveys no management Cookie or human AI proof.
 func (c *Client) AutonomyRequest(ctx context.Context, taskID, planID, accountID string, delegationVersion *int64, suffix string, write bool) (Object, error) {
+	return c.AutonomyAttemptRequest(ctx, taskID, planID, accountID, delegationVersion, "", suffix, write)
+}
+
+func (c *Client) AutonomyAttemptRequest(ctx context.Context, taskID, planID, accountID string, delegationVersion *int64, attemptID, suffix string, write bool) (Object, error) {
 	if c == nil || !c.Configured() || c.configuration.ServiceKey == "" {
 		return nil, fail("operations_agentos_not_configured", 503)
 	}
-	if !validOperationID(taskID) || !validOperationID(planID) || !validOperationID(accountID) || write && (suffix != "/runs" && suffix != "/cancel" && suffix != "/continue") || !write && suffix != "" {
+	if !validOperationID(taskID) || !validOperationID(planID) || !validOperationID(accountID) || attemptID != "" && !validOperationID(attemptID) || write && (suffix != "/runs" && suffix != "/cancel" && suffix != "/continue") || !write && suffix != "" {
 		return nil, fail("invalid_operations_autonomy_request", 400)
 	}
 	at := c.now().Unix()
@@ -35,7 +39,8 @@ func (c *Client) AutonomyRequest(ctx context.Context, taskID, planID, accountID 
 		PlanID            string `json:"planId"`
 		AccountID         string `json:"accountId"`
 		DelegationVersion *int64 `json:"delegationVersion"`
-	}{"autonomy:" + taskID, "galaxy-operations", "galaxy-agentos", at, at + 60, uuid.NewString(), "task", taskID, planID, accountID, delegationVersion}
+		NativeAttemptID   string `json:"nativeAttemptId,omitempty"`
+	}{"autonomy:" + taskID, "galaxy-operations", "galaxy-agentos", at, at + 60, uuid.NewString(), "task", taskID, planID, accountID, delegationVersion, attemptID}
 	token, err := c.signToken(claims)
 	if err != nil {
 		return nil, err
@@ -57,7 +62,11 @@ func (c *Client) AutonomyRequest(ctx context.Context, taskID, planID, accountID 
 	request.Header.Set("X-Galaxy-Service-Key", c.configuration.ServiceKey)
 	if write {
 		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Idempotency-Key", taskID)
+		idempotencyKey := taskID
+		if attemptID != "" {
+			idempotencyKey = attemptID
+		}
+		request.Header.Set("Idempotency-Key", idempotencyKey)
 	}
 	response, err := c.http.Do(request)
 	if err != nil {

@@ -15,6 +15,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from .duties import task_context, BOUNDARY_VERSION
+from .duty_attempt import AttemptGateway, attempt_id
 from .duty_storage import MODEL_STATES, duty_report_fields, manual_pause_marker, manual_resume_consumed
 from .gateway import AuthorityDenied, AuthorityUnavailable, autonomy_id
 from .duty_continuation import continuation_tools, pending_tools
@@ -33,6 +34,7 @@ def duty_view(task_id, run=None, *, read_expires_at=None):
         "user_id": raw.get("user_id"), "session_id": raw.get("session_id"), "status": status,
         "created_at": raw.get("created_at"), "updated_at": raw.get("updated_at")})
     return {"taskId": task_id, "operationId": task_id, "nativeRunId": ident, "runId": ident,
+        "sessionId": raw.get("session_id"), "nativeAttemptId": attempt_id(metadata.get("nativeAttemptId")),
         "status": status, "modelState": MODEL_STATES.get(status, "not-started" if status == "NOT_RECORDED" else "unknown"),
         "awaitingHuman": status == "PAUSED", "continuable": status == "PAUSED" and bool(pending_tools(raw)), "readExpiresAt": read_expires_at,
         **({"manualPause": marker} if status == "PAUSED" and (marker := manual_pause_marker(metadata.get("manualPause"))) else {}),
@@ -78,11 +80,13 @@ class DutySurface:
             if native and not hmac.compare_digest(one("x-galaxy-duty-internal"), self.settings.service_key):
                 raise AuthorityDenied()
             operation = "run" if native or found and found[2] in {"runs", "continue"} else "read"
-            result = task_context(self.runtime["gateway"], user_id, operation=operation)
+            bound_gateway = AttemptGateway(self.runtime["gateway"], claims.get("nativeAttemptId"))
+            result = task_context(bound_gateway, user_id, operation=operation)
             task = result["task"]
             if (claims.get("scope") != "task" or claims.get("taskId") != ident
                     or claims.get("planId") != task.get("planId") or claims.get("accountId") != task.get("aiAccountId")
-                    or claims.get("delegationVersion") != task.get("delegationVersion")):
+                    or claims.get("delegationVersion") != task.get("delegationVersion")
+                    or attempt_id(task.get("nativeAttemptId")) != bound_gateway.attempt):
                 raise AuthorityDenied()
             if method == "POST":
                 chunks, size = [], 0
@@ -103,9 +107,9 @@ class DutySurface:
                     values = parse_qs(body.decode(), keep_blank_values=True)
                     expected = {"message": [json.dumps({"taskId": ident})], "session_id": [task["sessionId"]],
                         "factory_input": [json.dumps({"taskId": ident})], "background": ["true"], "stream": ["false"]}
-                    if values != expected or one("idempotency-key") != ident:
+                    if values != expected or one("idempotency-key") != (bound_gateway.attempt or ident):
                         raise AuthorityDenied()
-                elif one("content-type").split(";")[0] != "application/json" or json.loads(body or b"{}") != {} or one("idempotency-key") != ident:
+                elif one("content-type").split(";")[0] != "application/json" or json.loads(body or b"{}") != {} or one("idempotency-key") != (bound_gateway.attempt or ident):
                     raise AuthorityDenied()
                 delivered = False
                 async def replay():
@@ -118,6 +122,7 @@ class DutySurface:
                 replay = receive
             scope.setdefault("state", {})["galaxy_duty"] = result
             scope["state"]["galaxy_duty_user"] = user_id
+            scope["state"]["galaxy_duty_gateway"] = bound_gateway
             return await downstream(scope, replay, send)
         except AuthorityUnavailable:
             return await JSONResponse({"error": "agentos_authority_unavailable"}, status_code=503)(scope, receive, send)
@@ -128,37 +133,86 @@ class DutySurface:
 def install_duty_routes(app, settings, runtime):
     gateway, db = runtime["gateway"], runtime["db"]
 
-    def stored(ctx, user_id):
+    def ticket_attempt(ticket, ctx, user_id):
+        task = ctx["task"]
+        attempt = attempt_id(task.get("nativeAttemptId"))
+        scope = ((ticket or {}).get("payload") or {}).get("scope") or {}
+        source, signed = scope.get("context") or {}, (scope.get("context") or {}).get("claims") or {}
+        if (not ticket or ticket.get("component_type") != "agent" or ticket.get("component_id") != "galaxy-duty"
+                or ticket.get("user_id") != user_id or ticket.get("session_id") != task["sessionId"]
+                or ticket.get("idempotency_key") != (attempt or task["taskId"]) or scope.get("source") != "factory"
+                or source.get("user_id") != user_id or source.get("session_id") != task["sessionId"]
+                or source.get("input") != {"taskId": task["taskId"]}
+                or signed.get("sub") != user_id or signed.get("taskId") != task["taskId"]
+                or attempt_id(signed.get("nativeAttemptId")) != attempt):
+            raise AuthorityDenied("agentos_autonomy_operation_conflict")
+        return attempt_id(signed.get("nativeAttemptId"))
+
+    async def stored(ctx, user_id, request):
         rows = db.get_runs(session_id=ctx["task"]["sessionId"], user_id=user_id,
             agent_id="galaxy-duty", limit=2, page=1, sort_by="created_at", sort_order="asc")
         if len(rows) > 1:
             raise AuthorityDenied("agentos_autonomy_operation_conflict")
-        return rows[0] if rows else None
+        worker = getattr(request.app.state, "queue_worker", None)
+        store = getattr(worker, "store", None)
+        if rows:
+            raw = rows[0].to_dict() if hasattr(rows[0], "to_dict") else rows[0]
+            metadata = raw.get("metadata") or {}
+            current_attempt = attempt_id(ctx["task"].get("nativeAttemptId"))
+            if raw.get("session_id") != ctx["task"]["sessionId"]:
+                raise AuthorityDenied("agentos_autonomy_operation_conflict")
+            if attempt_id(metadata.get("nativeAttemptId")) != current_attempt:
+                # Before factory execution only this run's original ticket can
+                # establish its signed attempt; do not borrow current task data.
+                ticket = await store.get_job(raw.get("run_id")) if store and raw.get("run_id") else None
+                if metadata.get("nativeAttemptId") is not None or not current_attempt or not ticket or ticket.get("id") != raw.get("run_id"):
+                    raise AuthorityDenied("agentos_autonomy_operation_conflict")
+                raw["metadata"] = {**metadata, "nativeAttemptId": ticket_attempt(ticket, ctx, user_id)}
+                return raw
+            return rows[0]
+        # A committed ticket can precede creation of its native run row.
+        # Look up only this task's fixed session and user; ambiguity is not a
+        # license to choose a different accepted job.
+        if store and hasattr(store, "list_jobs"):
+            jobs, count = await store.list_jobs(session_id=ctx["task"]["sessionId"], user_id=user_id,
+                limit=2, page=1, raise_on_error=True)
+            if count > 1:
+                raise AuthorityDenied("agentos_autonomy_operation_conflict")
+            if jobs:
+                ticket = jobs[0]
+                attempt = ticket_attempt(ticket, ctx, user_id)
+                if ticket.get("status") not in {"queued", "running"} or not ticket.get("id"):
+                    raise AuthorityUnavailable("agentos_autonomy_original_run_unavailable")
+                return {"run_id": ticket["id"], "session_id": ticket["session_id"],
+                    "status": "PENDING" if ticket["status"] == "queued" else "RUNNING",
+                    "metadata": {"nativeAttemptId": attempt}}
+        return None
 
-    def view(request, run):
+    def view(request, run, *, report=True):
         ctx, user_id = request.state.galaxy_duty, request.state.galaxy_duty_user
-        if run:
+        if run and report:
             try:
                 gateway.duty_report(user_id, duty_report_fields(run.to_dict() if hasattr(run, "to_dict") else run))
             except (AuthorityDenied, AuthorityUnavailable):
                 pass
-        current = task_context(gateway, user_id, operation="read")
+        current = task_context(request.state.galaxy_duty_gateway, user_id, operation="read")
         return duty_view(ctx["task"]["taskId"], run, read_expires_at=current.get("readExpiresAt"))
 
     async def observed(ctx, user_id, request):
-        run = stored(ctx, user_id)
-        if run and str(getattr(run.status, "value", run.status)).upper() == "PAUSED":
+        run = await stored(ctx, user_id, request)
+        raw = run.to_dict() if hasattr(run, "to_dict") else run or {}
+        status = raw.get("status")
+        if run and str(getattr(status, "value", status)).upper() == "PAUSED":
             worker = getattr(request.app.state, "queue_worker", None)
             if worker is not None and getattr(worker, "store", None) is not None:
                 # After the native continuation CAS, the run row can briefly
                 # remain PAUSED until the worker stamps RUNNING. Read that
                 # original ticket's facts so a health poll cannot re-pause the
                 # Node task and cause its just-accepted factory claim to fail.
-                ticket = await worker.store.get_job(run.run_id)
+                ticket = await worker.store.get_job(raw.get("run_id"))
                 if (ticket and ticket.get("component_type") == "agent" and ticket.get("component_id") == "galaxy-duty"
                         and ticket.get("session_id") == ctx["task"]["sessionId"] and ticket.get("user_id") == user_id
                         and (ticket.get("payload") or {}).get("continue") and ticket.get("status") in {"queued", "running"}):
-                    raw = run.to_dict()
                     raw["status"] = "PENDING" if ticket["status"] == "queued" else "RUNNING"
                     return raw
         return run
@@ -166,13 +220,13 @@ def install_duty_routes(app, settings, runtime):
     @app.get("/galaxy/autonomy/tasks/{task_id}")
     async def read_duty(task_id: str, request: Request):
         if request.state.galaxy_duty["task"].get("mode") == "code":
-            ctx = task_context(gateway, request.state.galaxy_duty_user, operation="read")
+            ctx = task_context(request.state.galaxy_duty_gateway, request.state.galaxy_duty_user, operation="read")
             task = ctx["task"]
             status = {"completed": "COMPLETED", "waiting-human": "PAUSED", "paused": "PAUSED",
                 "failed": "ERROR", "stopped": "CANCELLED", "running": "RUNNING", "queued": "PENDING"}.get(task.get("state"), "UNKNOWN")
             return {"taskId": task_id, "operationId": task_id, "nativeRunId": None, "runId": None,
                 "status": status, "modelState": "not-required", "awaitingHuman": status == "PAUSED", "readExpiresAt": ctx.get("readExpiresAt")}
-        return view(request, await observed(request.state.galaxy_duty, request.state.galaxy_duty_user, request))
+        return view(request, await observed(request.state.galaxy_duty, request.state.galaxy_duty_user, request), report=False)
 
     @app.post("/galaxy/autonomy/tasks/{task_id}/runs")
     async def start_duty(task_id: str, request: Request):
@@ -184,21 +238,22 @@ def install_duty_routes(app, settings, runtime):
             if value.get("taskId") != task_id or value.get("modelState") != "not-required":
                 return JSONResponse({"error": "agentos_autonomy_code_result_invalid"}, status_code=503)
             return {key: value.get(key) for key in ("taskId", "operationId", "nativeRunId", "status", "modelState", "awaitingHuman", "readExpiresAt")}
-        prior = stored(ctx, user_id)
+        prior = await stored(ctx, user_id, request)
         if prior:
             return view(request, await observed(ctx, user_id, request))
         if getattr(request.app.state, "queue_worker", None) is None:
             return JSONResponse({"error": "agentos_durable_queue_unavailable"}, status_code=503)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://agentos.internal") as client:
             response = await client.post("/agents/galaxy-duty/runs", headers={
-                "Authorization": request.headers["authorization"], "Idempotency-Key": task_id,
+                "Authorization": request.headers["authorization"], "Idempotency-Key": attempt_id(ctx["task"].get("nativeAttemptId")) or task_id,
                 "X-Galaxy-Service-Key": settings.service_key, "X-Galaxy-Duty-Internal": settings.service_key},
                 data={"message": json.dumps({"taskId": task_id}), "session_id": ctx["task"]["sessionId"],
                     "factory_input": json.dumps({"taskId": task_id}), "background": "true", "stream": "false"})
         if response.status_code not in {200, 202}:
             return JSONResponse({"error": "agentos_autonomy_dispatch_unknown"}, status_code=503)
         data = response.json()
-        return JSONResponse(duty_view(task_id, {"run_id": data.get("run_id"), "status": data.get("status")},
+        return JSONResponse(duty_view(task_id, {"run_id": data.get("run_id"), "status": data.get("status"), "session_id": ctx["task"]["sessionId"],
+            "metadata": {"nativeAttemptId": ctx["task"].get("nativeAttemptId")}},
             read_expires_at=ctx.get("readExpiresAt")), status_code=response.status_code)
 
     @app.post("/galaxy/autonomy/tasks/{task_id}/cancel")
@@ -206,23 +261,25 @@ def install_duty_routes(app, settings, runtime):
         ctx, user_id = request.state.galaxy_duty, request.state.galaxy_duty_user
         if ctx["task"].get("mode") == "code":
             return await read_duty(task_id, request)
-        run = stored(ctx, user_id)
+        run = await stored(ctx, user_id, request)
         if run:
             # Native cancellation after Node has fenced this task. A stopped
             # plan cannot pass agents:run again just to stop its old run.
             from agno.agent._run import acancel_run
             worker = getattr(request.app.state, "queue_worker", None)
+            raw = run.to_dict() if hasattr(run, "to_dict") else run
+            run_id = raw.get("run_id")
             if worker is not None:
-                await worker.acancel_queued(run.run_id)
-            await acancel_run(run.run_id)
-        return view(request, stored(ctx, user_id))
+                await worker.acancel_queued(run_id)
+            await acancel_run(run_id)
+        return view(request, await stored(ctx, user_id, request))
 
     @app.post("/galaxy/autonomy/tasks/{task_id}/continue")
     async def continue_duty(task_id: str, request: Request):
         ctx, user_id = request.state.galaxy_duty, request.state.galaxy_duty_user
         if ctx["task"].get("mode") == "code":
             return JSONResponse({"error": "agentos_autonomy_run_not_continuable"}, status_code=409)
-        original = stored(ctx, user_id)
+        original = await stored(ctx, user_id, request)
         try:
             tools = continuation_tools(ctx["task"], original)
         except AuthorityDenied:
@@ -238,7 +295,7 @@ def install_duty_routes(app, settings, runtime):
         from agno.run.authorization import RunAuthorization, authorization_scope
         from .authorization import GalaxyAuthorization
         authority = RunAuthorization(provider=GalaxyAuthorization(gateway),
-            context=AuthorizationContext(principal_id=user_id), enforce_tools=False)
+            context=AuthorizationContext(principal_id=user_id, claims={"nativeAttemptId": request.state.galaxy_duty_gateway.attempt}), enforce_tools=False)
         with authorization_scope(lambda: authority):
             accepted = await acontinue_via_queue(worker, original.run_id,
                 {"updated_tools": tools, "input": None, "continue_from": "end", "kwargs": {}},
@@ -247,6 +304,6 @@ def install_duty_routes(app, settings, runtime):
             return JSONResponse({"error": "agentos_autonomy_continue_not_accepted"}, status_code=409)
         raw = original.to_dict()
         raw["status"] = "PENDING"
-        return JSONResponse(duty_view(task_id, raw, read_expires_at=ctx.get("readExpiresAt")), status_code=202)
+        return JSONResponse(view(request, raw), status_code=202)
 
     return DutySurface(settings, runtime)

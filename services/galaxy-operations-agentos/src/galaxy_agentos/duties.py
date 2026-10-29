@@ -17,6 +17,7 @@ from .duty_storage import duty_database
 from .duty_deadline import DutyAgent, MAX_ROUND_SECONDS
 from .duty_continuation import call_reference, with_duty_pauses
 from .gateway import AuthorityDenied, autonomy_id
+from .duty_attempt import AttemptGateway, attempt_id
 from .model_gate import with_current_authority
 from .model_settings import domain_model
 
@@ -75,6 +76,7 @@ def task_context(gateway, user_id, *, operation="read"):
             raise ValueError()
     except (ValueError, KeyError, TypeError, AttributeError):
         raise AuthorityDenied("agentos_autonomy_context_invalid") from None
+    attempt_id(task.get("nativeAttemptId"))
     return result
 
 
@@ -217,12 +219,14 @@ def duty_factory(*, settings, db, gateway, model_factory=None):
             ident = autonomy_id(ctx.user_id)
             if not isinstance(ctx.input, DutyInput) or str(ctx.input.taskId) != ident:
                 raise AuthorityDenied("agentos_autonomy_context_invalid")
-            task = task_context(gateway, ctx.user_id, operation="run")["task"]
             claims = ctx.trusted.claims
+            bound_gateway = AttemptGateway(gateway, claims.get("nativeAttemptId"))
+            task = task_context(bound_gateway, ctx.user_id, operation="run")["task"]
             if (ctx.session_id != task["sessionId"] or claims.get("sub") != ctx.user_id
                     or claims.get("scope") != "task" or claims.get("taskId") != ident
                     or claims.get("planId") != task.get("planId") or claims.get("accountId") != task.get("aiAccountId")
-                    or claims.get("delegationVersion") != task.get("delegationVersion")):
+                    or claims.get("delegationVersion") != task.get("delegationVersion")
+                    or attempt_id(task.get("nativeAttemptId")) != bound_gateway.attempt):
                 raise AuthorityDenied("agentos_autonomy_context_denied")
             prompt = task.get("prompt")
             if not isinstance(prompt, dict) or not isinstance(prompt.get("role"), str) or len(prompt["role"]) > 24000:
@@ -230,30 +234,30 @@ def duty_factory(*, settings, db, gateway, model_factory=None):
             context = json.dumps(prompt.get("context", {}), ensure_ascii=False, allow_nan=False)
             if len(context) > 24000:
                 raise AuthorityDenied("agentos_autonomy_prompt_invalid")
-            tools = duty_tools(gateway, set(task.get("tools") or []))
+            tools = duty_tools(bound_gateway, set(task.get("tools") or []))
             round_seconds = task.get("roundSeconds", settings.work_timeout_seconds)
             if type(round_seconds) is not int or not 30 <= round_seconds <= MAX_ROUND_SECONDS:
                 raise AuthorityDenied("agentos_autonomy_round_timeout_invalid")
-            selected = (with_current_authority(model_factory(), gateway) if model_factory is not None
-                else domain_model(settings, task["domain"], gateway))
+            selected = (with_current_authority(model_factory(), bound_gateway) if model_factory is not None
+                else domain_model(settings, task["domain"], bound_gateway))
             from .duty_completion import with_duty_completion
-            selected = with_duty_completion(selected, gateway)
-            selected = with_duty_pauses(selected, gateway)
+            selected = with_duty_completion(selected, bound_gateway)
+            selected = with_duty_pauses(selected, bound_gateway)
             selected._galaxy_usage_database = projected
             model_version = getattr(selected, "_galaxy_settings_version", "explicit-test-model")
             metadata = {key: task.get(key) for key in ("taskId", "operationId", "planId", "planVersion", "promptVersion",
-                "delegationVersion", "roleVersion", "domain", "aiAccountId", "source", "purpose")}
+                "delegationVersion", "roleVersion", "domain", "aiAccountId", "source", "purpose", "nativeAttemptId")}
             metadata.update(boundaryVersion=BOUNDARY_VERSION, modelSettingsVersion=model_version,
                 modelSettingsVersions=[model_version], roundSeconds=round_seconds, runtimeRevision=(task.get("runtime") or {}).get("revision"))
 
             def current(run_context: RunContext):
-                now = task_context(gateway, run_context.user_id, operation="run")["task"]
+                now = task_context(bound_gateway, run_context.user_id, operation="run")["task"]
                 if (now["sessionId"] != run_context.session_id or any(now.get(key) != task.get(key)
-                        for key in ("planId", "planVersion", "promptVersion", "aiAccountId", "purpose", "roleVersion", "delegationVersion"))):
+                        for key in ("planId", "planVersion", "promptVersion", "aiAccountId", "purpose", "roleVersion", "delegationVersion", "nativeAttemptId"))):
                     raise AuthorityDenied("agentos_autonomy_context_changed")
 
             return DutyAgent(round_seconds=round_seconds,
-                current_task=lambda user_id: task_context(gateway, user_id, operation="run")["task"],
+                current_task=lambda user_id: task_context(bound_gateway, user_id, operation="run")["task"],
                 id="galaxy-duty", name="银河后台值守", model=selected, db=projected,
                 tools=tools, pre_hooks=[current], post_hooks=[current],
                 instructions=[*BOUNDARIES, "岗位工作要求：\n" + prompt["role"],

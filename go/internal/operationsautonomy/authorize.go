@@ -59,12 +59,15 @@ func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor 
 	return tools, nil
 }
 func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "operation"}, nil) || !schemaUUID.MatchString(str(input["taskId"])) || !has([]string{"read", "run", "tool"}, str(input["operation"])) {
+	if !closed(input, []string{"taskId", "operation"}, []string{"nativeAttemptId"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has([]string{"read", "run", "tool"}, str(input["operation"])) {
 		return nil, invalid()
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
 		row, e := s.taskWithin(ctx, tx, str(input["taskId"]), "")
 		if e != nil {
+			return nil, e
+		}
+		if e = RequireNativeAttempt(row, input); e != nil {
 			return nil, e
 		}
 		tools := []string{}
@@ -106,6 +109,9 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 			return nil, e
 		}
 		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
+		if row["native_attempt_id"] != nil {
+			task["nativeAttemptId"] = row["native_attempt_id"]
+		}
 		if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
 			task["manualPause"] = Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "resumeOperationId": control["resumeOperationId"], "nativeRunId": control["nativeRunId"], "checkpointCallIds": control["checkpointCallIds"]}
 			if control["phase"] == "requested" {

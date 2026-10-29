@@ -11,6 +11,7 @@ from agno.run.status_persist import RunPersistOutcome
 from .conversation_storage import conversation_storage_fields
 from .duty_continuation import WRITE_TOOLS, call_reference
 from .gateway import AuthorityDenied, AuthorityUnavailable
+from .duty_attempt import attempt_id
 
 
 MODEL_STATES = {"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "completed",
@@ -54,6 +55,7 @@ def duty_report_fields(run):
     failure = (metadata or {}).get("completionFailureCode")
     code = failure if isinstance(failure, str) and failure in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"} else "operations_autonomy_model_failed"
     return {"nativeRunId": run.get("run_id") or nested.get("run_id"),
+        **({"nativeAttemptId": attempt} if (attempt := attempt_id((metadata or {}).get("nativeAttemptId"))) else {}),
         "modelState": MODEL_STATES.get(status, "unknown"),
         "status": "waiting-human" if status == "PAUSED" else "completed" if status == "COMPLETED"
             else "failed" if status in {"ERROR", "CANCELLED"} else "running" if status in {"PENDING", "RUNNING"} else "unknown",
@@ -95,7 +97,7 @@ def duty_storage_fields(fields):
             result[key] = None
     metadata = result.get("metadata")
     if isinstance(metadata, dict):
-        allowed = {"taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion",
+        allowed = {"nativeAttemptId", "taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion",
             "delegationVersion", "roleVersion", "domain", "aiAccountId", "source", "purpose", "modelSettingsVersion",
             "roundSeconds", "runtimeRevision", "modelCalls", "activeDurationBefore", "completionFailureCode"}
         result["metadata"] = {key: value for key, value in metadata.items() if key in allowed
@@ -140,7 +142,7 @@ def duty_database(db, gateway):
                 row_meta = row_meta if isinstance(row_meta, dict) else {}
                 source_session = fields.get("session_id") or session_id
                 row_session = row.get("session_id") or nested.get("session_id")
-                keys = ("taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion", "delegationVersion", "roleVersion", "domain", "aiAccountId", "modelSettingsVersion", "modelSettingsVersions", "runtimeRevision")
+                keys = ("nativeAttemptId", "taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion", "delegationVersion", "roleVersion", "domain", "aiAccountId", "modelSettingsVersion", "modelSettingsVersions", "runtimeRevision")
                 bindings_match = all(key not in source_meta or source_meta[key] == row_meta.get(key) for key in keys)
                 required = ("taskId", "operationId", "planId", "planVersion", "promptVersion", "domain", "aiAccountId", "modelSettingsVersion")
                 strong = not strong_binding or (all(source_meta.get(key) is not None for key in required)

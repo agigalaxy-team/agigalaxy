@@ -15,6 +15,7 @@ import (
 
 type DutyInput struct {
 	Domain, AIAccountID, TaskID, Purpose, AccessPurpose, PlanID string
+	NativeAttemptID                                             string
 	PlanVersion                                                 int64
 	DelegationVersion                                           *int64
 	ResourceIDs                                                 []string
@@ -26,6 +27,8 @@ type dutyProof struct {
 	operation    Object
 	continuation bool
 	stored       Object
+	recovery     bool
+	recoveryRun  string
 }
 
 var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -50,6 +53,9 @@ func (s *Service) dutyAuthorizationWithin(ctx context.Context, tx pgx.Tx, input 
 	if row["domain"] != input.Domain || row["ai_account_id"] != input.AIAccountID || row["config_id"] != input.PlanID || num(row["plan_version"]) != input.PlanVersion || obj(row["configuration"])["purpose"] != input.Purpose {
 		return fault.New("operations_autonomy_scope_denied", 403)
 	}
+	if e = RequireNativeAttempt(row, Object{"nativeAttemptId": input.NativeAttemptID}); e != nil {
+		return e
+	}
 	inactive := row["source"] == "workbench" || cfg["enabled"] != true || row["human_decision"] != nil
 	if persisted {
 		inactive = inactive || !has([]string{"running", "completed"}, str(row["state"]))
@@ -72,6 +78,9 @@ func (s *Service) CurrentDutyWithin(ctx context.Context, tx pgx.Tx, in DutyInput
 	if !has(domains, in.Domain) || !uuidPattern.MatchString(in.AIAccountID) || !uuidPattern.MatchString(in.TaskID) || !uuidPattern.MatchString(in.PlanID) || strings.Trim(in.Purpose, "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff") == "" || protocol.TextLength(in.Purpose) > 120 || in.PlanVersion < 1 || in.PlanVersion > 9007199254740991 || !has([]string{"query", "prepare", "execution"}, in.AccessPurpose) || len(in.ResourceIDs) > 200 {
 		return Actor{}, dutyFail("operations_agentos_scope_denied")
 	}
+	if in.NativeAttemptID != "" && !schemaUUID.MatchString(in.NativeAttemptID) {
+		return Actor{}, dutyFail("operations_agentos_scope_denied")
+	}
 	for _, id := range in.ResourceIDs {
 		if !uuidPattern.MatchString(id) {
 			return Actor{}, dutyFail("operations_agentos_scope_denied")
@@ -88,7 +97,11 @@ func (s *Service) currentDuty(ctx context.Context, tx pgx.Tx, proof *dutyProof) 
 	if _, e := tx.Exec(ctx, `SELECT pg_advisory_xact_lock_shared(hashtextextended($1,734912410))`, s.Endpoint); e != nil {
 		return Actor{}, e
 	}
-	if proof.continuation {
+	if proof.recovery {
+		if e := s.recoveryDutyAuthorizationWithin(ctx, tx, proof); e != nil {
+			return Actor{}, e
+		}
+	} else if proof.continuation {
 		if _, e := s.validatePersistedWithin(ctx, tx, proof, nil, nil); e != nil {
 			return Actor{}, e
 		}
@@ -121,6 +134,9 @@ func (s *Service) RequireDutyAction(ctx context.Context, tx pgx.Tx, a Actor, act
 	if e != nil {
 		return Actor{}, e
 	}
+	if p.recovery && purpose != "" && purpose != "query" {
+		return Actor{}, dutyFail("operations_ai_duty_operation_denied")
+	}
 	copy := *p
 	copy.input = p.input
 	copy.input.ResourceIDs = append([]string{}, p.input.ResourceIDs...)
@@ -142,6 +158,11 @@ func (s *Service) RequireDutyAction(ctx context.Context, tx pgx.Tx, a Actor, act
 		if obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			return Actor{}, fault.New("operations_autonomy_pause_requested", 409)
 		}
+		if unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, str(copy.audit["operationId"])); err != nil {
+			return Actor{}, err
+		} else if unresolved {
+			return Actor{}, fault.New("operations_autonomy_original_operation_unknown", 409)
+		}
 	}
 	if action != "workbench.read" && !has(fresh.Permissions, action) {
 		return Actor{}, fault.New("operations_permission_denied", 403)
@@ -159,6 +180,9 @@ func (s *Service) DutyMetadata(a Actor) (Object, error) {
 		delegation = *in.DelegationVersion
 	}
 	out := Object{"domain": in.Domain, "aiAccountId": in.AIAccountID, "taskId": in.TaskID, "purpose": in.Purpose, "accessPurpose": in.AccessPurpose, "planId": in.PlanID, "planVersion": in.PlanVersion, "delegationVersion": delegation, "resourceIds": append([]string{}, in.ResourceIDs...), "contextSchemaVersion": 1, "endpoint": s.Endpoint}
+	if in.NativeAttemptID != "" {
+		out["nativeAttemptId"] = in.NativeAttemptID
+	}
 	if p.audit != nil {
 		out["auditSource"] = clone(p.audit)
 	}
@@ -178,12 +202,15 @@ func (s *Service) DutyForTaskWithin(ctx context.Context, tx pgx.Tx, id, purpose 
 		delegation = &v
 	}
 	cfg := obj(r["configuration"])
-	return s.CurrentDutyWithin(ctx, tx, DutyInput{Domain: str(r["domain"]), AIAccountID: str(r["ai_account_id"]), TaskID: id, Purpose: str(cfg["purpose"]), AccessPurpose: purpose, PlanID: str(r["config_id"]), PlanVersion: num(r["plan_version"]), DelegationVersion: delegation, ResourceIDs: texts(obj(cfg["plan"])["resourceIds"])})
+	return s.CurrentDutyWithin(ctx, tx, DutyInput{Domain: str(r["domain"]), AIAccountID: str(r["ai_account_id"]), TaskID: id, Purpose: str(cfg["purpose"]), AccessPurpose: purpose, PlanID: str(r["config_id"]), PlanVersion: num(r["plan_version"]), DelegationVersion: delegation, NativeAttemptID: str(r["native_attempt_id"]), ResourceIDs: texts(obj(cfg["plan"])["resourceIds"])})
 }
 func (s *Service) BindDutyAuditSourceWithin(ctx context.Context, tx pgx.Tx, a Actor, callID, operationID string, nativeRunID *string, ruleSource bool) (Actor, error) {
 	p, e := s.proof(a)
 	if e != nil {
 		return Actor{}, e
+	}
+	if p.recovery {
+		return Actor{}, dutyFail("operations_ai_duty_operation_denied")
 	}
 	r, e := optional(ctx, tx, `SELECT to_jsonb(t) FROM(SELECT t.native_run_id,t.mode FROM operations_autonomy_tasks_v1 t JOIN operations_autonomy_tool_calls_v1 c ON c.endpoint=t.endpoint AND c.task_id=t.id WHERE t.endpoint=$1 AND t.id=$2 AND t.ai_account_id=$3 AND c.call_id=$4 AND c.operation_id=$5)t`, s.Endpoint, p.input.TaskID, p.input.AIAccountID, callID, operationID)
 	if e != nil {

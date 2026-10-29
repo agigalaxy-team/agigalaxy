@@ -58,7 +58,7 @@ func parseAssessment(args Object) error {
 // completionWithin only uses the persisted original task, receipts and call IDs.
 // The caller holds the task lock when writing a terminal decision.
 func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, requireAssessment bool) (Object, error) {
-	receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operation_id,state FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2) r`, s.Endpoint, row["id"])
+	receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operation_id,state,basis FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2) r`, s.Endpoint, row["id"])
 	if e != nil {
 		return nil, e
 	}
@@ -67,11 +67,13 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 		return nil, e
 	}
 	byID := map[string]string{}
+	verified := map[string]bool{}
 	business := "not-started"
 	unknown, failed, human := false, false, false
 	for _, r := range receipts {
 		state := str(r["state"])
 		byID[str(r["operation_id"])] = state
+		verified[str(r["operation_id"])] = has([]string{"completed", "failed", "no-action"}, state) && has([]string{"persisted-domain-operation-receipt", "original-operation-query", "persisted-ai-role-delegation-event"}, str(r["basis"]))
 		switch state {
 		case "unknown":
 			unknown = true
@@ -100,7 +102,7 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 			continue
 		}
 		state := str(c["state"])
-		if state == "not-admitted" && c["code"] == "operations_autonomy_pause_requested" {
+		if isNoEffect(c) {
 			continue
 		}
 		receipt := byID[str(c["operation_id"])]
@@ -110,7 +112,7 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 			}
 			continue
 		}
-		if state == "started" || state == "unknown" || receipt == "" || receipt == "unknown" {
+		if !verified[str(c["operation_id"])] {
 			unknown = true
 		}
 	}

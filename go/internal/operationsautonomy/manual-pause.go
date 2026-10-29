@@ -6,7 +6,7 @@ import (
 )
 
 func manualWriterSettled(call, receipt Object) bool {
-	return call["state"] == "not-admitted" && call["code"] == "operations_autonomy_pause_requested" || receipt != nil && has([]string{"completed", "failed", "no-action"}, str(receipt["state"])) && has([]string{"persisted-domain-operation-receipt", "original-operation-query", "persisted-ai-role-delegation-event"}, str(receipt["basis"]))
+	return isNoEffect(call) || receipt != nil && has([]string{"completed", "failed", "no-action"}, str(receipt["state"])) && has([]string{"persisted-domain-operation-receipt", "original-operation-query", "persisted-ai-role-delegation-event"}, str(receipt["basis"]))
 }
 
 // manualPauseReportWithin is the single state arbiter for native reports. It
@@ -55,7 +55,7 @@ func (s *Service) manualPauseReportWithin(ctx context.Context, tx pgx.Tx, row, x
 		}
 		control = obj(clone(control))
 		control["phase"], control["outcome"] = "ended", "resumed"
-		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
+		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,control_revision=control_revision+1 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
 		return nil, false, err
 	}
 	if phase == "paused" && has([]string{"running", "unknown"}, str(x["status"])) || phase == "ended" && control["outcome"] == "natural-human-review" && row["state"] == "waiting-human" && has([]string{"running", "unknown"}, str(x["status"])) {
@@ -66,10 +66,12 @@ func (s *Service) manualPauseReportWithin(ctx context.Context, tx pgx.Tx, row, x
 		control["phase"] = "ended"
 		if state == "waiting-human" {
 			control["outcome"] = "natural-human-review"
+		} else if phase == "paused" || phase == "resuming" {
+			control["outcome"] = "native-ended-after-checkpoint"
 		} else {
 			control["outcome"] = "native-ended"
 		}
-		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
+		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,control_revision=control_revision+1 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
 		return nil, false, err
 	}
 	return nil, false, nil
@@ -91,7 +93,7 @@ func (s *Service) manualPauseAnchorsWithin(ctx context.Context, tx pgx.Tx, row, 
 	if err != nil || blocked {
 		return []string{}, err
 	}
-	calls, err := many(ctx, tx, `SELECT to_jsonb(t) FROM (SELECT c.call_id,c.tool,c.state,c.code,r.state AS receipt_state,r.basis AS receipt_basis FROM operations_autonomy_tool_calls_v1 c LEFT JOIN operations_autonomy_receipts_v1 r ON r.endpoint=c.endpoint AND r.task_id=c.task_id AND r.operation_id=c.operation_id WHERE c.endpoint=$1 AND c.task_id=$2 ORDER BY c.updated_at DESC,c.call_id DESC LIMIT 64)t`, s.Endpoint, row["id"])
+	calls, err := many(ctx, tx, `SELECT to_jsonb(t) FROM (SELECT c.call_id,c.tool,c.state,c.code,c.read_outcome,r.state AS receipt_state,r.basis AS receipt_basis FROM operations_autonomy_tool_calls_v1 c LEFT JOIN operations_autonomy_receipts_v1 r ON r.endpoint=c.endpoint AND r.task_id=c.task_id AND r.operation_id=c.operation_id WHERE c.endpoint=$1 AND c.task_id=$2 ORDER BY c.updated_at DESC,c.call_id DESC LIMIT 64)t`, s.Endpoint, row["id"])
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +159,6 @@ func (s *Service) settleManualPauseWithin(ctx context.Context, tx pgx.Tx, row, x
 	control["phase"] = "paused"
 	control["nativeRunId"] = x["nativeRunId"]
 	control["checkpointCallIds"] = ids
-	_, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,state='paused',model_state=$4,native_run_id=COALESCE(native_run_id,$5),native_continuable=true,lease_until=NULL,revision=revision+1,updated_at=$6,business_state=$7 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control), x["modelState"], x["nativeRunId"], s.now(), completion["businessState"])
+	_, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,control_revision=control_revision+1,state='paused',model_state=$4,native_run_id=COALESCE(native_run_id,$5),native_continuable=true,lease_until=NULL,revision=revision+1,updated_at=$6,business_state=$7 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control), x["modelState"], x["nativeRunId"], s.now(), completion["businessState"])
 	return e == nil, e
 }

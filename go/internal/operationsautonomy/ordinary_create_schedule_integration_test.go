@@ -138,6 +138,42 @@ func TestOrdinaryCreatedStrategySchedulesOriginalAuthorizedBusinessOperation(t *
 	if newID == source || newID == createID || createdReceipt["sourceStrategyId"] != source {
 		t.Fatalf("source/new binding %#v", createdReceipt)
 	}
+	readOwnArtifacts := func(caller a.Actor, taskID string) (a.Object, error) {
+		return postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (a.Object, error) { return duty.DutyStrategyArtifactsWithin(ctx, tx, caller, taskID) })
+	}
+	own, err := readOwnArtifacts(actor, task)
+	if err != nil || own["availability"] != "available" || own["currentPublishEligibility"] != "not-checked" {
+		t.Fatalf("duty original artifact %#v %v", own, err)
+	}
+	items := own["items"].([]a.Object)
+	if len(items) != 1 || items[0]["operationId"] != createID || items[0]["sourceStrategyId"] != source || items[0]["newStrategyId"] != newID || items[0]["versionId"] != versionID {
+		t.Fatalf("duty artifact identity %#v", own)
+	}
+	summary, err := duty.Tool(ctx, a.Object{"taskId": task, "nativeRunId": "synthetic-run", "callId": uuid.NewString(), "tool": "current-summary", "arguments": a.Object{}}, false)
+	if err != nil {
+		t.Fatalf("duty current-summary: %v", err)
+	}
+	summaryArtifacts, ok := summary["strategyArtifacts"].(map[string]any)
+	if !ok || summaryArtifacts["availability"] != "available" || summaryArtifacts["currentPublishEligibility"] != "not-checked" {
+		t.Fatalf("summary original artifacts %#v", summary)
+	}
+	summaryItems, ok := summaryArtifacts["items"].([]a.Object)
+	if !ok || len(summaryItems) != 1 || summaryItems[0]["operationId"] != createID || summaryItems[0]["sourceStrategyId"] != source || summaryItems[0]["sourceVersionId"] != policy["versionId"] || summaryItems[0]["newStrategyId"] != newID || summaryItems[0]["versionId"] != versionID {
+		t.Fatalf("summary artifact identity %#v", summaryArtifacts)
+	}
+	if _, err = readOwnArtifacts(actor, uuid.NewString()); err == nil {
+		t.Fatal("cross-task artifact accepted")
+	}
+	if _, err = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['strategies.ordinary.configure','strategies.ordinary.publish','content.read','content.hide'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); err != nil {
+		t.Fatal(err)
+	}
+	own, err = readOwnArtifacts(actor, task)
+	if err != nil || own["availability"] != "not-authorized" || len(own["items"].([]a.Object)) != 0 {
+		t.Fatalf("revoked duty read %#v %v", own, err)
+	}
+	if _, err = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['strategies.read','strategies.ordinary.configure','strategies.ordinary.publish','content.read','content.hide'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); err != nil {
+		t.Fatal(err)
+	}
 	view, err := duty.GetTask(ctx, f.Root, task)
 	if err != nil {
 		t.Fatalf("original task artifact: %v", err)

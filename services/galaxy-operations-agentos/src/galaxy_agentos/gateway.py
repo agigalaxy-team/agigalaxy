@@ -197,14 +197,16 @@ class GalaxyGateway:
         return self.request("authorize", {"executionId": execution_id(user_id), "operation": operation,
             "resourceType": resource_type, "resourceId": resource_id})
 
-    def duty_authorize(self, user_id, *, operation="read"):
+    def duty_authorize(self, user_id, *, operation="read", native_attempt_id=None):
         if operation not in {"read", "run", "tool"}:
             raise AuthorityDenied("agentos_autonomy_operation_invalid")
-        return self.request("autonomy/authorize", {"taskId": autonomy_id(user_id), "operation": operation})
+        return self.request("autonomy/authorize", {"taskId": autonomy_id(user_id), "operation": operation,
+            **({"nativeAttemptId": str(UUID(native_attempt_id))} if native_attempt_id is not None else {})})
 
-    def duty_tool(self, user_id, tool, arguments, *, call_id, run_id, validation_failure=None):
+    def duty_tool(self, user_id, tool, arguments, *, call_id, run_id, validation_failure=None, native_attempt_id=None):
         payload = {"taskId": autonomy_id(user_id), "callId": str(UUID(call_id)),
-            "nativeRunId": run_id, "tool": tool, "arguments": arguments}
+            "nativeRunId": run_id, "tool": tool, "arguments": arguments,
+            **({"nativeAttemptId": str(UUID(native_attempt_id))} if native_attempt_id is not None else {})}
         if validation_failure is not None:
             payload["validationFailure"] = validation_failure
         return self.request("autonomy/tools/execute", payload, tool_feedback=True)

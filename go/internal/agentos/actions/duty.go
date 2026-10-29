@@ -389,6 +389,11 @@ func (s *Service) ExecuteDutyOperation(ctx context.Context, a Actor, operationID
 		if e != pgx.ErrNoRows {
 			return storedResult{}, e
 		}
+		// Revalidate the original bound proof under the task share lock before
+		// dispatch. An earlier attempt cannot insert after a retry fences it.
+		if _, e = s.Permissions.Duty.RequireDutyAction(ctx, tx, bound, permission, "execution"); e != nil {
+			return storedResult{}, e
+		}
 		e = tx.QueryRow(ctx, `INSERT INTO operations_ai_duty_operations_v1(operation_id,endpoint,task_id,ai_account_id,kind,request,proposal,binding,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'dispatching',$9,$9) RETURNING to_jsonb(operations_ai_duty_operations_v1)`, operationID, s.Endpoint, metadata["taskId"], metadata["aiAccountId"], request["kind"], request, frozen, binding, time.Unix(s.now(), 0)).Scan(&row)
 		return storedResult{row, false}, e
 	})

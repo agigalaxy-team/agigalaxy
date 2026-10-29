@@ -36,6 +36,7 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 	autonomy.ActionReady = service.ActionReady
 	autonomy.QualifyTargetWithin = service.QualifyTargetWithin
 	autonomy.ExecuteDutyOperation = service.ExecuteDutyOperation
+	autonomy.ValidateDutyRequest = actions.ParseRequest
 	// checkTargetWithin owns the surrounding current read-authority checks.
 	// These source readers use the same transaction and return no content.
 	autonomy.ReadTargetWithin = func(ctx context.Context, tx pgx.Tx, actor p.Actor, _ string, kind, id string) (agentos.Object, error) {

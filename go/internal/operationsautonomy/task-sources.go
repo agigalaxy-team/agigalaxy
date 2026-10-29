@@ -88,7 +88,7 @@ func (s *Service) checkTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, row
 		if s.ReadTargetWithin == nil {
 			return fault.New("operations_autonomy_source_unavailable", 503)
 		}
-		viewer, e := s.actor(ctx, tx, a, kindPermission[kind], nil)
+		viewer, e := s.sourceReadActorWithin(ctx, tx, a, kindPermission[kind])
 		if e != nil {
 			return e
 		}
@@ -99,13 +99,20 @@ func (s *Service) checkTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, row
 		if value["availability"] != nil && value["availability"] != "" && value["availability"] != "available" {
 			return fail("operations_autonomy_source_unavailable")
 		}
-		_, e = s.actor(ctx, tx, viewer, kindPermission[kind], nil)
+		_, e = s.sourceReadActorWithin(ctx, tx, viewer, kindPermission[kind])
 		return e
 	}
 	permission := modulePermission[str(row["target_type"])]
 	if permission == "" {
 		return fail("operations_autonomy_source_unavailable")
 	}
-	_, e := s.actor(ctx, tx, a, permission, nil)
+	_, e := s.sourceReadActorWithin(ctx, tx, a, permission)
 	return e
+}
+
+func (s *Service) sourceReadActorWithin(ctx context.Context, tx pgx.Tx, a Actor, permission string) (Actor, error) {
+	if p, err := s.proof(a); err == nil && p.recovery {
+		return s.RequireDutyAction(ctx, tx, a, permission, "query")
+	}
+	return s.actor(ctx, tx, a, permission, nil)
 }

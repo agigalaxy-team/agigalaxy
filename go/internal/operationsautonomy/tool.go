@@ -14,7 +14,7 @@ import (
 var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations"}
 
 func parseTool(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
+	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "nativeAttemptId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
 		return nil, invalid()
 	}
 	if v, ok := input["validationFailure"]; ok {
@@ -29,6 +29,9 @@ func parseTool(input Object) (Object, error) {
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
 		return nil, invalid()
 	}
+	if v, ok := input["nativeAttemptId"]; ok && !schemaUUID.MatchString(str(v)) {
+		return nil, invalid()
+	}
 	return obj(clone(input)), nil
 }
 
@@ -38,6 +41,7 @@ type toolBinding struct {
 	operationID   string
 	localRecorded bool
 	pauseRejected bool
+	rejectionCode string
 }
 
 func errorCode(e error) string {
@@ -70,6 +74,11 @@ func (s *Service) taskSummaryWithin(ctx context.Context, tx pgx.Tx, row Object) 
 		state = "available"
 	}
 	out := Object{"tool": "current-summary", "availability": "available", "basis": "capability-discovery-not-business-inspection", "inspectionChecked": false, "taskVersionBasis": "persisted-task-snapshot-with-current-authority", "task": Object{"taskId": current["id"], "aiAccountId": current["ai_account_id"], "domain": current["domain"], "source": current["source"], "mode": current["mode"], "state": current["state"], "planId": current["config_id"], "configRevision": current["config_revision"], "planVersion": current["plan_version"], "promptVersion": current["prompt_version"], "delegationVersion": current["delegation_version"], "roleVersion": actor.Version}, "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "queryAccess": operationsai.QueryAccess(actor.Permissions), "managementCapabilities": management, "managementAvailability": state}
+	artifacts, e := s.DutyStrategyArtifactsWithin(ctx, tx, actor, str(current["id"]))
+	if e != nil {
+		return nil, e
+	}
+	out["strategyArtifacts"] = artifacts
 	return s.stamp(out), nil
 }
 func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Object, error) {
@@ -80,6 +89,9 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	binding, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (toolBinding, error) {
 		row, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
 		if e != nil {
+			return toolBinding{}, e
+		}
+		if e = RequireNativeAttempt(row, x); e != nil {
 			return toolBinding{}, e
 		}
 		actor, e := s.DutyForTaskWithin(ctx, tx, str(row["id"]), "query")
@@ -102,6 +114,9 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		prior, e := optional(ctx, tx, `SELECT to_jsonb(c) FROM operations_autonomy_tool_calls_v1 c WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, row["id"], x["callId"])
 		if e != nil {
 			return toolBinding{}, e
+		}
+		if prior != nil && (str(prior["native_attempt_id"]) != str(x["nativeAttemptId"]) || str(prior["native_run_id"]) != "" && prior["native_run_id"] != x["nativeRunId"] || str(prior["native_run_id"]) == "" && str(row["native_attempt_id"]) != "") {
+			return toolBinding{}, fail("operations_autonomy_operation_conflict")
 		}
 		if x["validationFailure"] != nil {
 			args := obj(x["arguments"])
@@ -138,7 +153,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			if ambiguous {
 				code = "local-validation-ambiguous"
 			}
-			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'invalid-request',$7,$8,$8)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(safe), uuid.NewString(), code, s.now()); e != nil {
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at,native_run_id,native_attempt_id) VALUES($1,$2,$3,$4,$5,$6,'invalid-request',$7,$8,$8,$9,$10)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(safe), uuid.NewString(), code, s.now(), x["nativeRunId"], x["nativeAttemptId"]); e != nil {
 				return toolBinding{}, e
 			}
 			return toolBinding{row: row, actor: actor, localRecorded: true}, nil
@@ -149,15 +164,28 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if prior != nil && (prior["tool"] != x["tool"] || !sameValue(prior["arguments"], x["arguments"])) {
 			return toolBinding{}, fail("operations_autonomy_operation_conflict")
 		}
-		if prior != nil && prior["state"] == "not-admitted" && prior["code"] == "operations_autonomy_pause_requested" {
-			return toolBinding{row: row, prior: prior, operationID: str(prior["operation_id"]), pauseRejected: true}, nil
+		if prior != nil && isNoEffect(prior) {
+			return toolBinding{row: row, prior: prior, operationID: str(prior["operation_id"]), pauseRejected: true, rejectionCode: str(prior["code"])}, nil
 		}
 		if prior == nil && has(dutyWriters, str(x["tool"])) && obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			operationID := uuid.NewString()
-			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_pause_requested',$7,$7)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now()); e != nil {
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at,native_run_id,native_attempt_id) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_pause_requested',$7,$7,$8,$9)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now(), x["nativeRunId"], x["nativeAttemptId"]); e != nil {
 				return toolBinding{}, e
 			}
-			return toolBinding{row: row, operationID: operationID, pauseRejected: true}, nil
+			return toolBinding{row: row, operationID: operationID, pauseRejected: true, rejectionCode: "operations_autonomy_pause_requested"}, nil
+		}
+		if prior == nil && has(dutyWriters, str(x["tool"])) {
+			unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, "")
+			if err != nil {
+				return toolBinding{}, err
+			}
+			if unresolved {
+				operationID := uuid.NewString()
+				if _, err = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at,native_run_id,native_attempt_id) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_original_operation_unknown',$7,$7,$8,$9)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now(), x["nativeRunId"], x["nativeAttemptId"]); err != nil {
+					return toolBinding{}, err
+				}
+				return toolBinding{row: row, operationID: operationID, pauseRejected: true, rejectionCode: "operations_autonomy_original_operation_unknown"}, nil
+			}
 		}
 		operationID := str(prior["operation_id"])
 		if prior == nil {
@@ -169,7 +197,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 				return toolBinding{}, e
 			}
 			operationID = uuid.NewString()
-			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'started',$7,$7)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now()); e != nil {
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at,native_run_id,native_attempt_id) VALUES($1,$2,$3,$4,$5,$6,'started',$7,$7,$8,$9)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now(), x["nativeRunId"], x["nativeAttemptId"]); e != nil {
 				return toolBinding{}, e
 			}
 		}
@@ -183,7 +211,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		return Object{"state": "recorded"}, nil
 	}
 	if binding.pauseRejected {
-		return Object{"operationId": binding.operationID, "state": "not-admitted", "effectState": "not-started", "code": "operations_autonomy_pause_requested"}, nil
+		return Object{"operationId": binding.operationID, "state": "not-admitted", "effectState": "not-started", "code": binding.rejectionCode}, nil
 	}
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID
@@ -245,6 +273,12 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			current, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
 			if e != nil {
 				return false, e
+			}
+			if e = RequireNativeAttempt(current, x); e != nil {
+				return false, e
+			}
+			if str(current["native_run_id"]) != "" && current["native_run_id"] != x["nativeRunId"] {
+				return false, fail("operations_autonomy_operation_conflict")
 			}
 			tool := str(x["tool"])
 			if has([]string{"current-summary", "query-operations", "read-operation-object", "inspect-operations"}, tool) {
@@ -354,7 +388,15 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		})
 	}
 	if e != nil {
-		if _, save := s.Pool.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='unknown',code=$4,updated_at=$5 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], errorCode(e), s.now()); save != nil {
+		var rejection *PreparationRejection
+		if errors.As(e, &rejection) {
+			if recorded, err := s.recordTypedPreDispatchRejection(ctx, x, binding.operationID, rejection); err != nil {
+				return nil, err
+			} else if recorded {
+				return nil, e
+			}
+		}
+		if _, save := s.Pool.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 c SET state='unknown',code=$4,updated_at=$5 WHERE c.endpoint=$1 AND c.task_id=$2 AND c.call_id=$3 AND c.state IN ('started','unknown') AND EXISTS(SELECT 1 FROM operations_autonomy_tasks_v1 t WHERE t.endpoint=c.endpoint AND t.id=c.task_id AND t.native_attempt_id IS NOT DISTINCT FROM $6::uuid AND (t.native_run_id IS NULL OR t.native_run_id=$7))`, s.Endpoint, x["taskId"], x["callId"], errorCode(e), s.now(), x["nativeAttemptId"], x["nativeRunId"]); save != nil {
 			return nil, save
 		}
 		return nil, e

@@ -42,6 +42,7 @@ type Service struct {
 	OriginalStrategyArtifactWithin func(context.Context, pgx.Tx, string, string, string) (Object, error)
 	ActionReady                    func(string) bool
 	ExecuteDutyOperation           func(context.Context, Actor, string, Object, bool) (Object, error)
+	ValidateDutyRequest            func(Object) (Object, error)
 	SummaryForTask                 func(context.Context, Actor, Object) (Object, error)
 	WorkbenchRunDetail             func(context.Context, string) (Object, error)
 	Log                            func(Object)

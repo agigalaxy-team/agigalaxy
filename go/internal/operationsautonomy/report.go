@@ -16,10 +16,13 @@ var nativeRunPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 var modelStates = []string{"not-started", "dispatching", "accepted", "running", "completed", "failed", "cancelled", "unknown", "not-required"}
 
 func parseReport(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
+	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
 		return nil, invalid()
 	}
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
+		return nil, invalid()
+	}
+	if v, ok := input["nativeAttemptId"]; ok && !schemaUUID.MatchString(str(v)) {
 		return nil, invalid()
 	}
 	if v, ok := input["nativeContinuable"]; ok {
@@ -81,6 +84,9 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
 		row, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
 		if e != nil {
+			return nil, e
+		}
+		if e = RequireNativeAttempt(row, x); e != nil {
 			return nil, e
 		}
 		if row["dispatch_started_at"] == nil {

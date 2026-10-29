@@ -12,7 +12,7 @@ type Native interface {
 	Continue(context.Context, Object) (Object, error)
 }
 type TaskTransport interface {
-	AutonomyRequest(context.Context, string, string, string, *int64, string, bool) (Object, error)
+	AutonomyAttemptRequest(context.Context, string, string, string, *int64, string, string, bool) (Object, error)
 }
 
 // NativeClient consumes the existing AgentOS client's loaded task transport;
@@ -28,7 +28,7 @@ func (n *NativeClient) request(ctx context.Context, row Object, suffix string, w
 		v := num(row["delegation_version"])
 		delegation = &v
 	}
-	return n.Client.AutonomyRequest(ctx, str(row["id"]), str(row["config_id"]), str(row["ai_account_id"]), delegation, suffix, write)
+	return n.Client.AutonomyAttemptRequest(ctx, str(row["id"]), str(row["config_id"]), str(row["ai_account_id"]), delegation, str(row["native_attempt_id"]), suffix, write)
 }
 func (n *NativeClient) Run(ctx context.Context, row Object) (Object, error) {
 	return n.request(ctx, row, "/runs", true)

@@ -61,6 +61,11 @@ func (s *Service) authorizeOperationWithin(ctx context.Context, tx pgx.Tx, a Act
 	if obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 		return nil, fault.New("operations_autonomy_pause_requested", 409)
 	}
+	if unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, in.OperationID); err != nil {
+		return nil, err
+	} else if unresolved {
+		return nil, fault.New("operations_autonomy_original_operation_unknown", 409)
+	}
 	cfg := obj(row["configuration"])
 	plan := obj(cfg["plan"])
 	if persisted {
@@ -257,7 +262,7 @@ func (s *Service) authorizeOperationWithin(ctx context.Context, tx pgx.Tx, a Act
 }
 func (s *Service) BindDutyOperationWithin(ctx context.Context, tx pgx.Tx, a Actor, in DutyOperation) (Actor, error) {
 	p, e := s.proof(a)
-	if e != nil || in.Permission == "" || in.OperationID == "" {
+	if e != nil || p.recovery || in.Permission == "" || in.OperationID == "" {
 		return Actor{}, dutyFail("operations_ai_duty_operation_denied")
 	}
 	current, e := s.RequireDutyAction(ctx, tx, a, in.Permission, "execution")

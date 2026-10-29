@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"time"
 )
@@ -83,10 +84,25 @@ func (s *Service) enqueueReconcileWithin(ctx context.Context, tx pgx.Tx, row Obj
 	if s.EnqueueWithin == nil {
 		return nil
 	}
-	return s.EnqueueWithin(ctx, tx, "autonomy-task", Object{"taskId": row["id"], "reconcile": true}, fmt.Sprintf("%s:reconcile:%d", str(row["id"]), s.now().Unix()/30), nil)
+	return s.EnqueueWithin(ctx, tx, "autonomy-task", taskJobInput(row, true), fmt.Sprintf("%s:reconcile:%d", str(row["id"]), s.now().Unix()/30), nil)
 }
 func parseControl(input Object) (Object, error) {
-	if !closed(input, []string{"operationId", "expectedRevision", "kind"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) || !integer(input["expectedRevision"], 1, 9007199254740991) || !has([]string{"pause", "resume", "stop", "takeover", "reconcile"}, str(input["kind"])) {
+	if !closed(input, []string{"operationId", "kind"}, []string{"expectedRevision", "expectedControlRevision", "expectedNativeRunId", "expectedNativeAttemptId"}) || !schemaUUID.MatchString(str(input["operationId"])) || !has([]string{"pause", "resume", "stop", "takeover", "reconcile", "retry"}, str(input["kind"])) {
+		return nil, invalid()
+	}
+	if input["expectedControlRevision"] != nil {
+		_, hasRun := input["expectedNativeRunId"]
+		_, hasAttempt := input["expectedNativeAttemptId"]
+		if !has([]string{"pause", "resume"}, str(input["kind"])) || !hasRun || !hasAttempt || !integer(input["expectedControlRevision"], 1, 9007199254740991) || input["expectedRevision"] != nil {
+			return nil, invalid()
+		}
+		if input["expectedNativeRunId"] != nil && (str(input["expectedNativeRunId"]) == "" || len(str(input["expectedNativeRunId"])) > 128) {
+			return nil, invalid()
+		}
+		if input["expectedNativeAttemptId"] != nil && !uuidPattern.MatchString(str(input["expectedNativeAttemptId"])) {
+			return nil, invalid()
+		}
+	} else if !integer(input["expectedRevision"], 1, 9007199254740991) || input["expectedNativeRunId"] != nil || input["expectedNativeAttemptId"] != nil {
 		return nil, invalid()
 	}
 	return obj(clone(input)), nil
@@ -103,6 +119,55 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		return nil, e
 	}
 	var nativeBefore, continueTask Object
+	if x["kind"] == "retry" {
+		if !uuidPattern.MatchString(str(x["operationId"])) {
+			return nil, invalid()
+		}
+		// Same control operation is replayed before consulting a changed native.
+		prior, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+			actor, err := s.actor(ctx, tx, a, "autonomy.control", authorize)
+			if err != nil {
+				return nil, err
+			}
+			intent := obj(clone(x))
+			intent["id"] = id
+			prior, err := s.previousWithin(ctx, tx, actor, str(x["operationId"]), "control", intent)
+			if err != nil || prior != nil {
+				return prior, err
+			}
+			row, err := s.taskWithin(ctx, tx, id, "")
+			if err != nil {
+				return nil, err
+			}
+			if err = s.checkTargetWithin(ctx, tx, actor, row, true); err != nil {
+				return nil, err
+			}
+			if num(row["revision"]) != num(x["expectedRevision"]) {
+				return nil, fail("operations_autonomy_revision_changed")
+			}
+			return nil, nil
+		})
+		if err != nil || prior != nil {
+			return prior, err
+		}
+		candidate, err := s.readTask(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if s.Native == nil {
+			return nil, fault.New("operations_agentos_not_configured", 503)
+		}
+		nativeBefore, err = s.Native.Read(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
+		if nativeBefore["status"] != "ERROR" || nativeBefore["taskId"] != candidate["id"] || nativeBefore["nativeRunId"] != candidate["native_run_id"] || nativeBefore["sessionId"] != candidate["session_id"] || RequireNativeAttempt(candidate, nativeBefore) != nil {
+			return nil, fail("operations_autonomy_original_run_not_retryable")
+		}
+		if _, err = s.ReconcileOriginalWrites(ctx, id, str(candidate["native_run_id"])); err != nil {
+			return nil, err
+		}
+	}
 	if x["kind"] == "resume" {
 		candidate, e := s.readTask(ctx, id)
 		if e != nil {
@@ -147,7 +212,11 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		if e = s.checkTargetWithin(ctx, tx, actor, row, true); e != nil {
 			return nil, e
 		}
-		if num(row["revision"]) != num(x["expectedRevision"]) {
+		if x["expectedControlRevision"] != nil {
+			if num(row["control_revision"]) != num(x["expectedControlRevision"]) || str(row["native_run_id"]) != str(x["expectedNativeRunId"]) || str(row["native_attempt_id"]) != str(x["expectedNativeAttemptId"]) {
+				return nil, fail("operations_autonomy_revision_changed")
+			}
+		} else if num(row["revision"]) != num(x["expectedRevision"]) {
 			return nil, fail("operations_autonomy_revision_changed")
 		}
 		finish := func(task Object) (Object, error) {
@@ -162,6 +231,77 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 				return nil, e
 			}
 			return finish(row)
+		}
+		if x["kind"] == "retry" {
+			if row["source"] == "workbench" || row["mode"] != "ai" || !has([]string{"failed", "unknown"}, str(row["state"])) || row["human_decision"] != nil || cfg["enabled"] != true || str(row["native_run_id"]) == "" || str(row["session_id"]) == "" {
+				return nil, fail("operations_autonomy_original_run_not_retryable")
+			}
+			if nativeBefore["status"] != "ERROR" || nativeBefore["taskId"] != row["id"] || nativeBefore["nativeRunId"] != row["native_run_id"] || nativeBefore["sessionId"] != row["session_id"] || RequireNativeAttempt(row, nativeBefore) != nil {
+				return nil, fail("operations_autonomy_original_run_not_retryable")
+			}
+			if s.AIWork == nil {
+				return nil, fault.New("operations_ai_work_unavailable", 503)
+			}
+			account := str(row["ai_account_id"])
+			currentRole, err := s.AIWork.AuthorizationWithin(ctx, tx, str(row["domain"]), &account)
+			if err != nil {
+				return nil, err
+			}
+			if !currentRole.Enabled || currentRole.AccountID != account {
+				return nil, dutyFail("operations_ai_work_disabled")
+			}
+			for _, action := range texts(obj(obj(row["configuration"])["plan"])["actions"]) {
+				if !has(currentRole.Permissions, action) {
+					return nil, dutyFail("operations_permission_denied")
+				}
+			}
+			if err := s.ResolvePreDispatchAbsenceWithin(ctx, tx, row); err != nil {
+				return nil, err
+			}
+			unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, "")
+			if err != nil {
+				return nil, err
+			}
+			if unresolved {
+				return nil, fail("operations_autonomy_original_operation_unknown")
+			}
+			var pending bool
+			err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_autonomy_tool_calls_v1 c WHERE c.endpoint=$1 AND c.task_id=$2 AND c.state='waiting-human' AND NOT EXISTS(SELECT 1 FROM operations_autonomy_decisions_v1 d WHERE d.endpoint=c.endpoint AND d.task_id=c.task_id AND d.call_id=c.call_id AND d.operation_id=c.operation_id))`, s.Endpoint, id).Scan(&pending)
+			if err != nil {
+				return nil, err
+			}
+			if pending {
+				return nil, fail("operations_autonomy_human_required")
+			}
+			if s.EnqueueWithin == nil {
+				return nil, fault.New("operations_autonomy_unavailable", 503)
+			}
+			previous := Object{"nativeRunId": row["native_run_id"], "nativeAttemptId": row["native_attempt_id"], "sessionId": row["session_id"], "status": "ERROR", "modelState": row["model_state"], "modelUsage": row["model_usage"], "code": row["code"]}
+			session := uuid.NewString()
+			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state='queued',native_attempt_id=$3,session_id=$4,native_run_id=NULL,dispatch_started_at=NULL,model_state='not-started',native_continuable=false,lease_owner=NULL,lease_until=NULL,control_state=NULL,code=NULL,completed_at=NULL,control_revision=control_revision+1,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, x["operationId"], session, s.now())
+			if err != nil {
+				return nil, err
+			}
+			if err = s.EnqueueWithin(ctx, tx, "autonomy-task", taskJobInput(saved, false), fmt.Sprintf("%s:retry:%s", id, x["operationId"]), nil); err != nil {
+				return nil, err
+			}
+			view, err := s.taskViewWithin(ctx, tx, saved, actor, true, true)
+			if err != nil {
+				return nil, err
+			}
+			view["previousAttempt"] = Object{"nativeRunId": previous["nativeRunId"], "nativeAttemptId": previous["nativeAttemptId"], "sessionId": previous["sessionId"], "status": previous["status"], "modelState": previous["modelState"]}
+			return s.recordWithin(ctx, tx, actor, str(x["operationId"]), "control", intent, Object{"operationId": x["operationId"], "task": view, "previousAttempt": previous, "replayed": false})
+		}
+		if x["kind"] == "pause" && x["expectedControlRevision"] != nil && (has(terminal, str(row["state"])) || has([]string{"completed", "failed", "cancelled"}, str(row["model_state"])) || row["state"] == "waiting-human") {
+			outcome := "native-ended"
+			if row["state"] == "waiting-human" {
+				outcome = "human-review-waiting"
+			}
+			view, err := s.taskViewWithin(ctx, tx, row, actor, true, true)
+			if err != nil {
+				return nil, err
+			}
+			return s.recordWithin(ctx, tx, actor, str(x["operationId"]), "control", intent, Object{"operationId": x["operationId"], "task": view, "applied": false, "outcome": outcome, "replayed": false})
 		}
 		if has(terminal, str(row["state"])) {
 			return nil, fail("operations_autonomy_task_terminal")
@@ -181,7 +321,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 				phase, nextState = "paused", "paused"
 			}
 			control := Object{"kind": "manual-pause", "phase": phase, "pauseOperationId": x["operationId"], "operatorId": actor.ID, "nativeRunId": row["native_run_id"], "checkpointCallIds": []string{}}
-			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,state=$4,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(control), nextState, s.now())
+			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,state=$4,control_revision=control_revision+1,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(control), nextState, s.now())
 			if err != nil {
 				return nil, err
 			}
@@ -268,7 +408,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 			}
 			lease = s.now().Add(time.Duration(num(round)) * time.Second)
 		}
-		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,human_decision=$4,native_continuable=false,lease_owner=NULL,lease_until=$6,control_state=$7,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, state, decisionJSON, s.now(), lease, controlJSON)
+		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,human_decision=$4,native_continuable=false,lease_owner=NULL,lease_until=$6,control_state=$7,control_revision=control_revision+1,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, state, decisionJSON, s.now(), lease, controlJSON)
 		if e != nil {
 			return nil, e
 		}
@@ -279,7 +419,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 			continueTask = saved
 		}
 		if state == "queued" && s.EnqueueWithin != nil {
-			if e = s.EnqueueWithin(ctx, tx, "autonomy-task", Object{"taskId": id}, fmt.Sprintf("%s:resume:%d", id, num(saved["revision"])), nil); e != nil {
+			if e = s.EnqueueWithin(ctx, tx, "autonomy-task", taskJobInput(saved, false), fmt.Sprintf("%s:resume:%d", id, num(saved["revision"])), nil); e != nil {
 				return nil, e
 			}
 		}
@@ -287,6 +427,14 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 	})
 	if e != nil {
 		return nil, e
+	}
+	if x["kind"] == "reconcile" {
+		task := obj(result["task"])
+		if has([]string{"unknown", "failed"}, str(task["state"])) && str(task["nativeRunId"]) != "" {
+			if _, err := s.ReconcileOriginalWrites(ctx, id, str(task["nativeRunId"])); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if has([]string{"stop", "takeover"}, str(x["kind"])) && str(obj(result["task"])["nativeRunId"]) != "" && s.Native != nil {
 		row, e := s.readTask(ctx, id)
@@ -307,10 +455,14 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 			if model == nil {
 				model = "accepted"
 			}
-			_, e = s.Report(ctx, Object{"taskId": id, "nativeRunId": continueTask["native_run_id"], "modelState": model, "status": "running"})
+			report := Object{"taskId": id, "nativeRunId": continueTask["native_run_id"], "modelState": model, "status": "running"}
+			if continueTask["native_attempt_id"] != nil {
+				report["nativeAttemptId"] = continueTask["native_attempt_id"]
+			}
+			_, e = s.Report(ctx, report)
 		}
 		if e != nil {
-			if _, save := s.Pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='unknown',model_state='unknown',code=$3,revision=revision+1,updated_at=$4 WHERE endpoint=$1 AND id=$2 AND state='running'`, s.Endpoint, id, errorCode(e), s.now()); save != nil {
+			if _, save := s.Pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='unknown',model_state='unknown',code=$3,revision=revision+1,updated_at=$4 WHERE endpoint=$1 AND id=$2 AND state='running' AND native_attempt_id IS NOT DISTINCT FROM $5::uuid AND session_id=$6`, s.Endpoint, id, errorCode(e), s.now(), continueTask["native_attempt_id"], continueTask["session_id"]); save != nil {
 				return nil, save
 			}
 		}
@@ -373,7 +525,7 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		if recorded["decision_operation_id"] != x["operationId"] {
 			return nil, fail("operations_autonomy_decision_already_recorded")
 		}
-		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET human_decision=$3,revision=revision+1,updated_at=$4 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(Object{"kind": "resolved", "operatorId": actor.ID, "operationId": call["operation_id"], "decision": x["decision"], "at": s.now().UTC().Format("2006-01-02T15:04:05.000Z")}), s.now())
+		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET human_decision=$3,control_revision=control_revision+1,revision=revision+1,updated_at=$4 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(Object{"kind": "resolved", "operatorId": actor.ID, "operationId": call["operation_id"], "decision": x["decision"], "at": s.now().UTC().Format("2006-01-02T15:04:05.000Z")}), s.now())
 		if e != nil {
 			return nil, e
 		}
