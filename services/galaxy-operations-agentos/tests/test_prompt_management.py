@@ -206,7 +206,12 @@ class ManagementToolNativeTest(unittest.TestCase):
         workbench_mapping = TypeAdapter(PreparedOperation).json_schema()["discriminator"]["mapping"]
         business_mapping = TypeAdapter(DutyPreparedOperation).json_schema()["discriminator"]["mapping"]
         self.assertEqual(set(workbench_mapping) - set(business_mapping), {"ai-work-prompt-save", "ai-role-command"})
-        self.assertEqual(set(business_mapping) - set(workbench_mapping), set())
+        self.assertEqual(set(business_mapping) - set(workbench_mapping), {"ordinary-strategy-create-draft"})
+        self.assertNotIn('"ordinary-strategy-create-draft"', operation_schema)
+        duty_only = {"kind": "ordinary-strategy-create-draft", "sourceStrategyId": str(uuid4()),
+            "sourceVersionId": str(uuid4()), "expectedRevision": 1, "name": "受控策略", "reason": "批准范围内"}
+        with self.assertRaises(ValidationError):
+            TypeAdapter(PreparedOperation).validate_python(duty_only)
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()), user_id="conversation:" + str(uuid4()),
             metadata={"operationId": str(uuid4())})
         target = str(uuid4())
