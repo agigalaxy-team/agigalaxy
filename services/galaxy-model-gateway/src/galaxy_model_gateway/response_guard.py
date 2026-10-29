@@ -44,6 +44,21 @@ class ResponseGuard:
         self.buffer = bytearray()
         self.pending = bytearray()
         self.useful = self.terminal = self.finish_reason = False
+        self.stage = 'start'
+        self.saw_done = False
+        self.chat_finish = 'none'
+        self.responses_terminal = 'none'
+        self.frame_count = self.choice_count = self.tool_delta_count = 0
+        self.json_state = 'not-seen'
+
+    def diagnostic(self, event, **extra):
+        from .output import emit
+        emit({'event': event, 'callId': self.call_id, 'stage': self.stage,
+            'stream': self.stream, 'useful': self.useful, 'sawDone': self.saw_done,
+            'chatFinishReason': self.chat_finish, 'responsesTerminalEvent': self.responses_terminal,
+            'frameCount': self.frame_count, 'choiceCount': self.choice_count,
+            'toolDeltaCount': self.tool_delta_count, 'partialBufferBytes': len(self.buffer),
+            'jsonParse': self.json_state, **extra})
 
     async def begin(self):
         if not self.started:
@@ -54,9 +69,7 @@ class ResponseGuard:
         if self.ended:
             return
         self.bad = True
-        from .output import emit
-        emit({"event": "model-response-rejected", "callId": self.call_id,
-            "reason": reason, "status": status, "stream": self.stream})
+        self.diagnostic('model-response-rejected', reason=reason, status=status)
         await self.rejected()
         body = {"error": {"code": code}} if code else ERROR
         if reason in {'upstream-http-error','native-provider-error'}:
@@ -83,6 +96,7 @@ class ResponseGuard:
         if self.ended:
             return
         if message["type"] == "http.response.start":
+            self.stage = 'headers'
             status = message["status"]
             if status >= 400:
                 allowed = {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, *range(500, 600)}
@@ -99,6 +113,7 @@ class ResponseGuard:
             return
         if message["type"] != "http.response.body":
             return
+        self.stage = 'body'
         if self.start is None:
             return await self.reject(reason="missing-response-start")
         self.buffer.extend(message.get("body", b""))
@@ -108,8 +123,10 @@ class ResponseGuard:
             if not message.get("more_body"):
                 try:
                     value = json.loads(self.buffer)
+                    self.json_state = 'ok'
                     valid = useful_response(value, self.responses)
                 except (ValueError, TypeError, RecursionError):
+                    self.json_state = 'invalid'
                     return await self.reject(reason="invalid-json")
                 if not valid:
                     reason = "upstream-error-object" if isinstance(value, dict) and value.get("error") else "no-final-answer-or-tool"
@@ -118,6 +135,7 @@ class ResponseGuard:
                 await self.downstream({"type": "http.response.body", "body": bytes(self.buffer), "more_body": False})
                 self.buffer.clear()
                 self.ended = True
+                self.diagnostic('model-response-completed')
             return
         # Keep incomplete frames until their delimiter; network packet boundaries
         # need not coincide with SSE events or UTF-8 characters.
@@ -132,16 +150,21 @@ class ResponseGuard:
             await self.begin()
             await self.downstream({"type": "http.response.body", "body": b"", "more_body": False})
             self.ended = True
+            self.diagnostic('model-response-completed')
 
     async def frame(self, frame):
+        self.stage = 'frame'
+        self.frame_count += 1
         data = b"\n".join(line[5:].lstrip(b" ") for line in frame.splitlines() if line.startswith(b"data:"))
         if data == b"[DONE]":
+            self.saw_done = True
             if not (self.useful and (self.terminal if self.responses else self.finish_reason)):
                 return await self.reject(reason="premature-stream-end")
             self.terminal = True
         elif data:
             try:
                 value = json.loads(data)
+                self.json_state = 'ok'
                 if isinstance(value, dict) and (value.get('error') or self.responses and value.get('type') in {'error','response.failed','response.incomplete'}):
                     from .metadata import provider_failure_for
                     origin=provider_failure_for(self.call_id)
@@ -152,6 +175,8 @@ class ResponseGuard:
                     return await self.reject(reason="invalid-stream-event")
                 if self.responses:
                     kind = value.get("type", "")
+                    if kind in {'response.completed', 'response.failed', 'response.incomplete', 'error'}:
+                        self.responses_terminal = kind
                     if kind in {"error", "response.failed", "response.incomplete"}:
                         return await self.reject(reason="upstream-stream-failed")
                     if kind == "response.completed":
@@ -163,10 +188,18 @@ class ResponseGuard:
                         self.useful = True
                 else:
                     for choice in value.get("choices", []) or []:
+                        self.choice_count += 1
                         delta = choice.get("delta") or {}
+                        calls = delta.get('tool_calls')
+                        if isinstance(calls, list):
+                            self.tool_delta_count += len(calls)
+                        finish = choice.get('finish_reason')
+                        if finish is not None:
+                            self.chat_finish = finish if isinstance(finish, str) and finish in {'stop', 'length', 'tool_calls', 'content_filter', 'function_call'} else 'unknown'
                         self.useful = self.useful or useful_message(delta) or bool(delta.get("tool_calls"))
                         self.finish_reason = self.finish_reason or choice.get("finish_reason") is not None
             except (ValueError, TypeError, AttributeError, RecursionError):
+                self.json_state = 'invalid'
                 return await self.reject(reason="invalid-stream-json")
         self.pending.extend(frame)
         if self.useful:
@@ -176,4 +209,5 @@ class ResponseGuard:
 
     async def complete(self):
         if not self.ended:
+            self.stage = 'complete'
             await self.reject(reason="response-not-completed")
