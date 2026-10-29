@@ -195,11 +195,6 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 	if value["status"] == "NOT_RECORDED" || str(row["native_run_id"]) != "" && str(runID) != "" && row["native_run_id"] != runID {
 		return Object{"state": "unknown"}, nil
 	}
-	if !has(terminal, str(row["state"])) {
-		if _, e = s.Pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_continuable=$3,native_run_id=COALESCE(native_run_id,$4) WHERE endpoint=$1 AND id=$2 AND state NOT IN ('completed','failed','stopped','blocked')`, s.Endpoint, row["id"], value["continuable"] == true, runID); e != nil {
-			return nil, e
-		}
-	}
 	status := "running"
 	switch {
 	case value["awaitingHuman"] == true || value["status"] == "PAUSED":
@@ -212,6 +207,27 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 		lease, _ := time.Parse(time.RFC3339Nano, str(row["lease_until"]))
 		if row["lease_until"] != nil && !lease.After(s.now()) {
 			status = "unknown"
+		}
+	}
+	report := Object{"taskId": row["id"], "modelState": value["modelState"], "status": status, "nativeContinuable": value["continuable"] == true}
+	if report["modelState"] == nil {
+		report["modelState"] = "unknown"
+	}
+	if value["status"] == "PAUSED" && value["manualPause"] != nil {
+		report["manualPause"] = value["manualPause"]
+	}
+	if value["status"] == "RUNNING" && value["manualResumeConsumed"] != nil {
+		report["manualResumeConsumed"] = value["manualResumeConsumed"]
+	}
+
+	if str(runID) != "" {
+		report["nativeRunId"] = runID
+	}
+	result := Object{"state": row["state"], "usageReconciled": str(runID) != "" && obj(value["run"]) != nil}
+	if !has(terminal, str(row["state"])) {
+		result, e = s.Report(ctx, report)
+		if e != nil {
+			return nil, e
 		}
 	}
 	if run := obj(value["run"]); run != nil && str(runID) != "" {
@@ -227,24 +243,7 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 			return nil, e
 		}
 	}
-	if has(terminal, str(row["state"])) {
-		return Object{"state": row["state"], "usageReconciled": str(runID) != "" && obj(value["run"]) != nil}, nil
-	}
-	report := Object{"taskId": row["id"], "modelState": value["modelState"], "status": status}
-	if report["modelState"] == nil {
-		report["modelState"] = "unknown"
-	}
-	if value["status"] == "PAUSED" && value["manualPause"] != nil {
-		report["manualPause"] = value["manualPause"]
-	}
-	if value["status"] == "RUNNING" && value["manualResumeConsumed"] != nil {
-		report["manualResumeConsumed"] = value["manualResumeConsumed"]
-	}
-
-	if str(runID) != "" {
-		report["nativeRunId"] = runID
-	}
-	return s.Report(ctx, report)
+	return result, nil
 }
 func (w *Worker) Tick(ctx context.Context) (Object, error) {
 	s := w.Service

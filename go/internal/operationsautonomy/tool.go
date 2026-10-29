@@ -152,7 +152,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if prior != nil && prior["state"] == "not-admitted" && prior["code"] == "operations_autonomy_pause_requested" {
 			return toolBinding{row: row, prior: prior, operationID: str(prior["operation_id"]), pauseRejected: true}, nil
 		}
-		if prior == nil && has(dutyWriters, str(x["tool"])) && obj(row["control_state"])["kind"] == "manual-pause" && obj(row["control_state"])["phase"] == "requested" {
+		if prior == nil && has(dutyWriters, str(x["tool"])) && obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			operationID := uuid.NewString()
 			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_pause_requested',$7,$7)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now()); e != nil {
 				return toolBinding{}, e

@@ -139,7 +139,7 @@ func (s *Service) RequireDutyAction(ctx context.Context, tx pgx.Tx, a Actor, act
 		if err != nil {
 			return Actor{}, err
 		}
-		if obj(row["control_state"])["kind"] == "manual-pause" && obj(row["control_state"])["phase"] == "requested" {
+		if obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			return Actor{}, fault.New("operations_autonomy_pause_requested", 409)
 		}
 	}

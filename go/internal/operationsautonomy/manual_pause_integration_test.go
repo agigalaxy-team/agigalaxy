@@ -182,6 +182,16 @@ func TestManualPauseRequestsCheckpointAndContinuesOriginalRun(t *testing.T) {
 	if again, err := svc.Report(ctx, pauseReport); err != nil || again["state"] != "paused" {
 		t.Fatalf("repeat pause changed state: %v %v", again, err)
 	}
+	for _, staleStatus := range []string{"running", "unknown"} {
+		stale, err := svc.Report(ctx, a.Object{"taskId": task, "nativeRunId": native.runID, "nativeContinuable": false, "modelState": "running", "status": staleStatus})
+		if err != nil || stale["state"] != "paused" {
+			t.Fatalf("old %s progress lost real pause: %v %v", staleStatus, stale, err)
+		}
+	}
+	var stillContinuable bool
+	if e = owner.QueryRow(ctx, `SELECT native_continuable FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&stillContinuable); e != nil || !stillContinuable {
+		t.Fatalf("old progress removed continuation: %v %v", stillContinuable, e)
+	}
 	current, e := svc.GetTask(ctx, f.Root, task)
 	if e != nil {
 		t.Fatal(e)
@@ -210,6 +220,18 @@ func TestManualPauseRequestsCheckpointAndContinuesOriginalRun(t *testing.T) {
 	}
 	if late, err := svc.Report(ctx, pauseReport); err != nil || late["state"] != "running" {
 		t.Fatalf("late prior pause changed resumed run: %v %v", late, err)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='waiting-human',control_state=jsonb_set(control_state,'{outcome}',to_jsonb('natural-human-review'::text)) WHERE endpoint=$1 AND id=$2`, f.Endpoint, task); e != nil {
+		t.Fatal(e)
+	}
+	if late, err := svc.Report(ctx, pauseReport); err != nil || late["state"] != "waiting-human" {
+		t.Fatalf("old checkpoint changed natural human review: %v %v", late, err)
+	}
+	if late, err := svc.Report(ctx, a.Object{"taskId": task, "nativeRunId": native.runID, "modelState": "running", "status": "running"}); err != nil || late["state"] != "waiting-human" {
+		t.Fatalf("old progress changed natural human review: %v %v", late, err)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='running',control_state=jsonb_set(control_state,'{outcome}',to_jsonb('resumed'::text)) WHERE endpoint=$1 AND id=$2`, f.Endpoint, task); e != nil {
+		t.Fatal(e)
 	}
 	if e = owner.QueryRow(ctx, `SELECT revision FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&revision); e != nil {
 		t.Fatal(e)

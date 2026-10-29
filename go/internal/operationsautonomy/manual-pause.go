@@ -9,6 +9,72 @@ func manualWriterSettled(call, receipt Object) bool {
 	return call["state"] == "not-admitted" && call["code"] == "operations_autonomy_pause_requested" || receipt != nil && has([]string{"completed", "failed", "no-action"}, str(receipt["state"])) && has([]string{"persisted-domain-operation-receipt", "original-operation-query", "persisted-ai-role-delegation-event"}, str(receipt["basis"]))
 }
 
+// manualPauseReportWithin is the single state arbiter for native reports. It
+// runs under the task lock; old progress can never undo a real checkpoint.
+func (s *Service) manualPauseReportWithin(ctx context.Context, tx pgx.Tx, row, x, completion Object, state string) (Object, bool, error) {
+	control := obj(row["control_state"])
+	phase := str(control["phase"])
+	marker := obj(x["manualPause"])
+	consumed := obj(x["manualResumeConsumed"])
+	if control["kind"] != "manual-pause" {
+		if marker != nil || consumed != nil {
+			return nil, false, fail("operations_autonomy_operation_conflict")
+		}
+		return nil, false, nil
+	}
+	current := func() Object { return s.stamp(Object{"taskId": row["id"], "state": row["state"]}) }
+	if marker != nil {
+		if control["pauseOperationId"] != marker["pauseOperationId"] || phase != "requested" && !sameValue(control["checkpointCallIds"], marker["checkpointCallIds"]) {
+			return nil, false, fail("operations_autonomy_operation_conflict")
+		}
+		if str(control["nativeRunId"]) != "" && control["nativeRunId"] != x["nativeRunId"] {
+			return nil, false, fail("operations_autonomy_operation_conflict")
+		}
+		if has([]string{"paused", "resuming", "ended"}, phase) {
+			if row["native_run_id"] != x["nativeRunId"] || control["nativeRunId"] != x["nativeRunId"] {
+				return nil, false, fail("operations_autonomy_operation_conflict")
+			}
+			return current(), true, nil
+		}
+		paused, err := s.settleManualPauseWithin(ctx, tx, row, x, completion)
+		if err != nil {
+			return nil, false, err
+		}
+		if paused {
+			return s.stamp(Object{"taskId": row["id"], "state": "paused"}), true, nil
+		}
+		x["status"] = "unknown"
+		return nil, false, nil
+	}
+	if consumed != nil {
+		if !(phase == "resuming" || phase == "ended" && control["outcome"] == "resumed") || control["pauseOperationId"] != consumed["pauseOperationId"] || control["resumeOperationId"] != consumed["resumeOperationId"] || row["native_run_id"] != x["nativeRunId"] || !sameValue(control["checkpointCallIds"], consumed["checkpointCallIds"]) {
+			return nil, false, fail("operations_autonomy_operation_conflict")
+		}
+		if phase == "ended" {
+			return current(), true, nil
+		}
+		control = obj(clone(control))
+		control["phase"], control["outcome"] = "ended", "resumed"
+		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
+		return nil, false, err
+	}
+	if phase == "paused" && has([]string{"running", "unknown"}, str(x["status"])) || phase == "ended" && control["outcome"] == "natural-human-review" && row["state"] == "waiting-human" && has([]string{"running", "unknown"}, str(x["status"])) {
+		return current(), true, nil
+	}
+	if has([]string{"requested", "paused", "resuming"}, phase) && (has([]string{"completed", "failed"}, str(x["status"])) || state == "waiting-human") {
+		control = obj(clone(control))
+		control["phase"] = "ended"
+		if state == "waiting-human" {
+			control["outcome"] = "natural-human-review"
+		} else {
+			control["outcome"] = "native-ended"
+		}
+		_, err := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control))
+		return nil, false, err
+	}
+	return nil, false, nil
+}
+
 func (s *Service) manualPauseBlockedWithin(ctx context.Context, tx pgx.Tx, row, completion Object) (bool, error) {
 	if has([]string{"unknown", "waiting-human"}, str(completion["disposition"])) || row["human_decision"] != nil {
 		return true, nil
