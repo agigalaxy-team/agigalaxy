@@ -51,12 +51,13 @@ class NodeTransport:
         self.row, self.calls = row, []
         self.execution_id, self.object_id = str(uuid4()), str(uuid4())
         self.status = 200
+        self.error = "SECRET_UPSTREAM_ERROR_PROSE"
 
     def __call__(self, request):
         value = json.loads(request.content)
         self.calls.append((request.url.path, value))
         if self.status != 200:
-            return httpx.Response(self.status, json={"error": "SECRET_UPSTREAM_ERROR_PROSE"})
+            return httpx.Response(self.status, json={"error": self.error})
         if request.url.path.endswith("/authorize"):
             return httpx.Response(200, json={"allowed": True, "execution": dict(self.row),
                 "resourceIds": ["galaxy-conversation-overview"], "readExpiresAt": int(time.time()) + 30})
@@ -403,8 +404,20 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             with self.assertRaises(error) as raised:
                 gateway.conversation_tool("conversation:" + row["id"], "list-authorized-work", {}, **context)
             self.assertNotIn("SECRET", str(raised.exception))
-        for status, state in [(400, "invalid-request"), (422, "invalid-request"),
-                (404, "unavailable"), (409, "changed")]:
+        for status in (400, 422):
+            node.status = status
+            with self.assertRaises(AuthorityUnavailable) as raised:
+                gateway.conversation_tool("conversation:" + row["id"],
+                    "query-operations", {"module": "rules", "view": "overview"}, **context)
+            self.assertNotIn("SECRET", str(raised.exception))
+            node.error = "invalid_operations_agentos_query"
+            feedback = gateway.conversation_tool("conversation:" + row["id"],
+                "query-operations", {"module": "rules", "view": "overview"}, **context)
+            self.assertEqual(feedback, {"state":"invalid-request", "reason":node.error,
+                "httpStatus":status, "scope":"backend-request-validation", "retryable":True,
+                "action":"correct-arguments"})
+            node.error = "SECRET_UPSTREAM_ERROR_PROSE"
+        for status, state in [(404, "unavailable"), (409, "changed")]:
             node.status = status
             feedback = gateway.conversation_tool("conversation:" + row["id"],
                 "query-operations", {"module": "rules", "view": "overview"}, **context)
