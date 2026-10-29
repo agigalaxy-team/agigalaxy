@@ -9,6 +9,7 @@ from agno.tools.function import FunctionCall
 from pydantic import BaseModel, ConfigDict
 
 from .conversation_tools import conversation_tools
+from .conversation_tool_feedback import _summary_feedback
 from .conversation_tool_contracts import DutyPreparedOperation, _prepared_arguments
 from .duty_storage import duty_database
 from .duty_deadline import DutyAgent, MAX_ROUND_SECONDS
@@ -70,6 +71,8 @@ def _send(gateway, run_context, native_call_id, name, arguments):
     call_id = call_reference(current["taskId"], run_context.run_id, native_call_id)
     value = gateway.duty_tool(run_context.user_id, name, arguments,
         call_id=call_id, run_id=run_context.run_id)
+    if name == "current-summary":
+        value = _summary_feedback(value)
     return json.dumps(value, ensure_ascii=False, allow_nan=False)
 
 

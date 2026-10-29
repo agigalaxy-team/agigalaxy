@@ -12,6 +12,7 @@ from .conversation_storage import conversation_database
 from .conversation_tools import conversation_tools
 from .conversation_references import reference_aware_instructions
 from .conversation_prompt import current_role_instructions
+from .conversation_tool_feedback import _summary_feedback
 from .gateway import AuthorityDenied
 
 
@@ -25,9 +26,9 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         """
         if not fc.call_id:
             raise AuthorityDenied("agentos_native_tool_call_required")
-        return json.dumps(gateway.conversation_summary(run_context.user_id,
+        return json.dumps(_summary_feedback(gateway.conversation_summary(run_context.user_id,
             run_id=run_context.run_id, call_id=fc.call_id, session_id=run_context.session_id,
-            turn_id=(run_context.metadata or {}).get("operationId")), ensure_ascii=False)
+            turn_id=(run_context.metadata or {}).get("operationId"))), ensure_ascii=False)
 
     def authorized_run(run_context: RunContext):
         current = gateway.authorize(run_context.user_id, operation="run")

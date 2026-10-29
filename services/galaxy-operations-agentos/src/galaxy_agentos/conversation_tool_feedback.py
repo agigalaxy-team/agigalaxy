@@ -1,5 +1,6 @@
 """Deterministic argument diagnostics and interpretation of original Node receipts."""
 from uuid import UUID
+from datetime import datetime, timedelta, timezone
 from pydantic import ValidationError
 
 from .conversation_tool_contracts import FeedbackMetadataFilters
@@ -159,3 +160,37 @@ def _preparation_feedback(result):
             "report": "本次未返回已准备的真实卡；如实说明原拒绝或限制，不得声称制卡成功，也不猜被隐去的具体原因。"}
     return {**result, "preparationFeedback": {**feedback,
         "businessEffect": "not-proven-by-preparation", "automaticRetry": False}}
+
+
+def _summary_feedback(result):
+    """Interpret independent current capability facts, never confer authority."""
+    if not isinstance(result, dict) or result.get("state") in ("denied", "unavailable", "unknown") or result.get("error") is not None or result.get("availability") in ("unavailable", "denied"):
+        return result
+    capabilities = result.get("managementCapabilities")
+    if not isinstance(capabilities, dict):
+        return result
+    groups = (("AI专用角色", "role", (("读取", "read"), ("创建", "create"), ("修改", "update"), ("分配", "assign"), ("撤回", "revoke"))),
+        ("岗位工作提示词", "prompt", (("读取", "read"), ("修改", "update"))),
+        ("日常策略", "ordinaryStrategy", (("编辑", "configure"), ("发布", "publish"))))
+    facts = {}
+    for label, key, actions in groups:
+        group = capabilities.get(key)
+        group = group if isinstance(group, dict) else {}
+        facts[label] = {}
+        for action, code in actions:
+            fact = group.get(code)
+            fact = fact if isinstance(fact, dict) else {}
+            support = {"connected": "功能已接通", "not-connected": "功能尚未接通", "human-only": "仅由人工办理"}.get(fact.get("systemSupport") if isinstance(fact.get("systemSupport"), str) else None, "功能接通状态未核实")
+            permission = "权限已分配" if fact.get("permissionAllowed") is True else "权限未分配" if fact.get("permissionAllowed") is False else "权限未核实"
+            delegated = "已委派" if fact.get("delegated") is True else "尚未委派" if fact.get("delegated") is False else "委派未核实"
+            available = "当前可办理" if fact.get("available") is True else "当前不可办理" if fact.get("available") is False else "当前可用性未核实"
+            facts[label][action] = "；".join((support, permission, delegated, available))
+    feedback = {"capabilityFacts": facts,
+        "interpretation": "分别依据本轮功能接通、权限和委派事实回答。未分配权限或尚未委派不表示功能未开发或未接通；已明确不可读取的目录无需再次尝试。采用业务名称，不复述内部字段和错误码，不自行补取数时间。"}
+    checked = result.get("checkedAt")
+    if type(checked) in (int, float):
+        try:
+            feedback["observedAt"] = datetime.fromtimestamp(checked, timezone(timedelta(hours=8))).isoformat()
+        except (ValueError, OverflowError, OSError):
+            pass
+    return {**result, "summaryFeedback": feedback}
