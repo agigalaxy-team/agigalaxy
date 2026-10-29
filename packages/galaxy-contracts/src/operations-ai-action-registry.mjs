@@ -28,6 +28,9 @@ const definitions=[
  ['message-draft-save','messaging','保存待核实消息草稿','notices.read',['notices.update'],'messaging',['save','get','commandResult','assertDutyDraftWithin','validateConfig'],['draft-only','current-source','human-facts-required','publication-not-authorized']],
  ['ordinary-strategy-draft','overview','在已批准边界内调整日常策略','strategies.read',['strategies.ordinary.configure'],'ordinaryStrategies',['read','prepare','command','operation','inspectWithin'],['ordinary','approved-fields','current-source']],
  ['ordinary-strategy-publish','overview','发布已预演的日常策略调整','strategies.read',['strategies.ordinary.publish'],'ordinaryStrategies',['read','prepare','command','operation','inspectWithin'],['ordinary','approved-version','rehearsal-required','current-source']],
+ ['strategy-draft','overview','保存完整策略草稿','strategies.read',['strategies.configure'],'strategies',['saveDraft'],['human-confirmation'],true],
+ ['strategy-rehearsal','overview','预演已保存的策略草稿','strategies.read',['strategies.read'],'strategies',['rehearsal'],['side-effect-free'],true],
+ ['strategy-publish','overview','发布已预演的策略草稿','strategies.read',['strategies.publish'],'strategies',['publish'],['human-confirmation','rehearsal-required'],true],
  ['strategy-control','overview','暂停或恢复策略执行','strategies.read',['strategies.control'],'strategies',['control'],[],true],
  ['strategy-continue','governance','决定已暂停的具体策略事项','strategies.read',['strategies.run'],'strategies',['continue'],[],true],
  ['search-apply','discovery','应用已保存搜索草稿','search-quality.read',['search-quality.publish'],'searchQuality',['overview','command'],['ordinary','prior-automatic-decision']],
@@ -45,7 +48,7 @@ const extra=[
  ['ai.roles.revoke','ai.roles.read','ai-role-delegation','permissions',['delegatedAssignment'],['delegated-ai-only']],
 ];
 const byPermission=new Map();
-const autonomousAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation']);
+const implementedAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation','strategy-draft','strategy-rehearsal','strategy-publish','strategy-control','strategy-continue','rule-publish','rule-restore','file-cleanup-approve']);
 for(const entry of aiWorkPreparationRegistry)for(const permission of entry.actions)if(!byPermission.has(permission))byPermission.set(permission,{kind:entry.kind,read:entry.read,handler:entry.handler,conditions:entry.conditions,humanOnly:entry.humanOnly});
 for(const [permission,read,kind,service,methods,conditions] of extra)byPermission.set(permission,{kind,read,handler:{service,methods},conditions,humanOnly:false});
 byPermission.set('chat-reports.materials.read',{kind:'private-case-materials',read:'chat-reports.materials.read',handler:{service:'chatReports',methods:['operatorGet','assertDutyCaseWithin']},conditions:['triggered-case','purpose-bound-materials'],humanOnly:false,purposeBoundRead:true});
@@ -53,7 +56,7 @@ export const operationsAiActionRegistry=Object.freeze(operationsPermissionCatalo
  const definition=byPermission.get(permission.code),query=queryCodes.includes(permission.code);
  return Object.freeze({permission:permission.code,label:permission.label,kind:definition?.kind??null,read:query?permission.code:definition?.read??null,
   query,purposeBoundRead:definition?.purposeBoundRead===true,autonomous:query||!!definition&&!definition.purposeBoundRead&&!definition.humanOnly&&!permission.humanOnly,humanOnly:!query&&(permission.humanOnly||definition?.humanOnly===true),
-  handler:definition?.handler??null,conditions:Object.freeze(definition?.conditions??[]),handlerImplemented:query||definition?.purposeBoundRead===true||autonomousAdapters.has(definition?.kind)});
+  handler:definition?.handler??null,conditions:Object.freeze(definition?.conditions??[]),handlerImplemented:query||definition?.purposeBoundRead===true||implementedAdapters.has(definition?.kind)});
 }));
 const registry=new Map(operationsAiActionRegistry.map(entry=>[entry.permission,entry]));
 export const aiActionDefinition=permission=>registry.get(permission)??null;

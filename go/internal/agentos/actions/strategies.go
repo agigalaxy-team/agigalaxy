@@ -2,6 +2,8 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsrules"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsstrategies"
 	"slices"
@@ -10,6 +12,29 @@ import (
 
 func parseStrategyRuleRequest(x Object) (Object, error) {
 	kind := str(x["kind"])
+	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" {
+		method := map[string]string{"strategy-draft": "prepared-draft", "strategy-rehearsal": "rehearsal", "strategy-publish": "publish"}[kind]
+		command := clone(x)
+		delete(command, "kind")
+		command["operationId"] = "00000000-0000-0000-0000-000000000000"
+		if kind == "strategy-draft" && command["expectedDraftId"] == nil {
+			command["expectedDraftId"] = nil
+		}
+		if kind != "strategy-rehearsal" {
+			command["expectedRevision"] = 0
+		}
+		normalized, e := operationsstrategies.ParseCommand(method, command)
+		if e != nil {
+			return nil, e
+		}
+		delete(normalized, "operationId")
+		delete(normalized, "expectedRevision")
+		if kind == "strategy-draft" && normalized["expectedDraftId"] == nil {
+			delete(normalized, "expectedDraftId")
+		}
+		normalized["kind"] = kind
+		return normalized, nil
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		command := pick(x, "strategyId", "parameterEdits", "mode", "enabled", "versionId")
 		command["operationId"], command["expectedRevision"] = "00000000-0000-0000-0000-000000000000", 0
@@ -66,6 +91,103 @@ func (s *Service) prepareStrategy(ctx context.Context, a Actor, x Object, p *pre
 		return e
 	}
 	kind := str(x["kind"])
+	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" {
+		item, e := source.Get(ctx, a)
+		if e != nil {
+			return e
+		}
+		p.expiry(item["readExpiresAt"])
+		p.target = Object{"kind": "strategy-configuration", "label": "策略配置", "href": "/admin/operations/strategy"}
+		p.command = clone(x)
+		delete(p.command, "kind")
+		if kind != "strategy-rehearsal" {
+			p.command["expectedRevision"] = item["revision"]
+		}
+		p.basis = []any{basis("当前管理版本", fmt.Sprint(item["revision"]))}
+		if kind == "strategy-draft" {
+			if e = capability(obj(item["capabilities"])["canConfigure"]); e != nil {
+				return e
+			}
+			p.title = "保存完整策略草稿"
+			draft := obj(item["draft"])
+			if draft != nil && (draft["id"] != x["expectedDraftId"] || draft["createdBy"] != a.ID || draft["ordinaryExecutionId"] != nil || draft["ordinaryStrategyId"] != nil) || draft == nil && x["expectedDraftId"] != nil {
+				return fail("p13_existing_draft_requires_human", 409)
+			}
+			p.command["expectedDraftId"] = x["expectedDraftId"]
+			p.target["id"] = draft["id"]
+			p.impact = append(p.impact, "只保存草稿，不改变已发布策略。")
+		} else {
+			draft := obj(item["draft"])
+			if draft == nil || draft["id"] != x["versionId"] {
+				return fail("p13_strategy_draft_changed", 409)
+			}
+			p.target["id"] = x["versionId"]
+			if kind == "strategy-rehearsal" {
+				p.title = "预演已保存策略草稿"
+				p.impact = append(p.impact, "检查所选样本及当前消费者资格；不执行策略动作，也不调用模型。")
+			} else {
+				if e = capability(obj(item["capabilities"])["canPublish"]); e != nil {
+					return e
+				}
+				rehearsal, e := source.RehearsalOperation(ctx, a, str(x["rehearsalId"]))
+				if e != nil {
+					return e
+				}
+				if rehearsal["state"] != "recorded" || rehearsal["versionId"] != x["versionId"] || obj(rehearsal["result"])["valid"] != true {
+					return fail("p13_rehearsal_required", 409)
+				}
+				p.expiry(rehearsal["readExpiresAt"])
+				p.title = "发布已预演策略草稿"
+				p.impact = append(p.impact, "仅用于新事项；在办事项继续使用原版本。发布前重新核对预演和当前条件。")
+			}
+		}
+		configuration := obj(x["configuration"])
+		before := obj(item["configuration"])
+		if kind == "strategy-draft" && item["draft"] != nil {
+			before = obj(obj(item["draft"])["configuration"])
+		}
+		if kind != "strategy-draft" {
+			configuration = obj(obj(item["draft"])["configuration"])
+		}
+		changes, e := strategyDifference(before, configuration)
+		if e != nil {
+			return e
+		}
+		for _, change := range changes {
+			p.impact = append(p.impact, change)
+		}
+		if len(changes) == 0 {
+			p.impact = append(p.impact, "策略配置与当前比较版本相同。")
+		}
+		for _, entry := range []struct {
+			label string
+			value Object
+		}{{"变更前完整配置", before}, {"变更后完整配置", configuration}} {
+			raw, e := json.Marshal(entry.value)
+			if e != nil {
+				return e
+			}
+			parts := strategyReviewChunks(string(raw), 4000)
+			for i, part := range parts {
+				p.impact = append(p.impact, fmt.Sprintf("%s（%d/%d）：%s", entry.label, i+1, len(parts), part))
+			}
+		}
+		if x["reason"] != nil {
+			p.impact = append(p.impact, "变更说明："+str(x["reason"]))
+		}
+		total := 0
+		for _, v := range p.impact {
+			n := jsLength(str(v))
+			total += n
+			if n > 5000 {
+				return fail("operations_agentos_strategy_review_required", 409)
+			}
+		}
+		if len(p.impact) > 80 || total > 20000 {
+			return fail("operations_agentos_strategy_review_required", 409)
+		}
+		return nil
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		mode := "draft"
 		if kind == "ordinary-strategy-publish" {
@@ -144,4 +266,98 @@ func (s *Service) prepareStrategy(ctx context.Context, a Actor, x Object, p *pre
 	p.basis = []any{basis("当前步骤", label(native["currentStep"], "等待本次人工决定"))}
 	p.impact = []any{impact}
 	return nil
+}
+
+func strategyReviewChunks(value string, limit int) []string {
+	out, chunk, width := []string{}, []rune{}, 0
+	for _, r := range value {
+		n := 1
+		if r > 0xffff {
+			n = 2
+		}
+		if width+n > limit {
+			out = append(out, string(chunk))
+			chunk, width = nil, 0
+		}
+		chunk, width = append(chunk, r), width+n
+	}
+	if len(chunk) != 0 {
+		out = append(out, string(chunk))
+	}
+	return out
+}
+
+// strategyDifference includes every changed field, keeping nested conditions,
+// scopes, grants, bounds and recovery values intact for the human reviewer.
+func strategyDifference(before, after Object) ([]string, error) {
+	lines := []string{}
+	add := func(label string, old, next any) error {
+		if same(old, next) {
+			return nil
+		}
+		a, e := json.Marshal(old)
+		if e != nil {
+			return e
+		}
+		b, e := json.Marshal(next)
+		if e != nil {
+			return e
+		}
+		lines = append(lines, label+"："+string(a)+" → "+string(b))
+		return nil
+	}
+	if e := add("共同目标与自动执行", before["common"], after["common"]); e != nil {
+		return nil, e
+	}
+	for _, v := range items(after["domains"]) {
+		next := obj(v)
+		var old Object
+		for _, v := range items(before["domains"]) {
+			if obj(v)["key"] == next["key"] {
+				old = obj(v)
+				break
+			}
+		}
+		if e := add("领域 "+str(next["key"]), old, next); e != nil {
+			return nil, e
+		}
+	}
+	oldByID, nextByID := map[string]Object{}, map[string]Object{}
+	ids := []string{}
+	oldOrder, nextOrder := []string{}, []string{}
+	for _, v := range items(before["strategies"]) {
+		s := obj(v)
+		id := str(s["id"])
+		oldByID[id] = s
+		ids = append(ids, id)
+		oldOrder = append(oldOrder, id)
+	}
+	for _, v := range items(after["strategies"]) {
+		s := obj(v)
+		id := str(s["id"])
+		nextByID[id] = s
+		nextOrder = append(nextOrder, id)
+		if oldByID[id] == nil {
+			ids = append(ids, id)
+		}
+	}
+	if e := add("策略顺序", oldOrder, nextOrder); e != nil {
+		return nil, e
+	}
+	fields := []string{"name", "domain", "objective", "enabled", "mode", "template", "judgment", "instructions", "condition", "execution", "ordinaryBounds", "recovery"}
+	for _, id := range ids {
+		old, next := oldByID[id], nextByID[id]
+		if old == nil || next == nil {
+			if e := add("策略 "+id+" 增删", old, next); e != nil {
+				return nil, e
+			}
+			continue
+		}
+		for _, field := range fields {
+			if e := add("策略 "+id+" "+field, old[field], next[field]); e != nil {
+				return nil, e
+			}
+		}
+	}
+	return lines, nil
 }

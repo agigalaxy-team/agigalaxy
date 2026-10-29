@@ -10,6 +10,16 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 )
 
+func TestHumanConfirmedActionsHaveConnectedHandlersWithoutAutonomy(t *testing.T) {
+	for _, permission := range []string{"strategies.configure", "strategies.publish", "strategies.control", "strategies.run", "rules.write", "files.cleanup.approve"} {
+		definition := Definition(permission)
+		projection := Projection(permission, []string{permission}, nil, nil)
+		if definition["handlerImplemented"] != true || definition["humanOnly"] != true || definition["autonomous"] != false || projection["handlerReady"] != true || projection["humanRequired"] != true {
+			t.Fatalf("incorrect human-card capability %s: %#v %#v", permission, definition, projection)
+		}
+	}
+}
+
 func TestGeneratedAIActionCapabilitiesMatchSharedContract(t *testing.T) {
 	inputs := [][]string{{}, {"feedback.update", "feedback.read", "ai.roles.create", "ai.roles.read", "ai.prompts.update", "ai.prompts.read"}, {"content.hide", "permissions.roles.write", "models.configure", "accounts.restriction.apply", "jobs.retry", "jobs.read"}}
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))

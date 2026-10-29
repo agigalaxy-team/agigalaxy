@@ -81,6 +81,24 @@ func TestAutonomySettingsAndDisabledConfigurationOriginalInterop(t *testing.T) {
 	if first["config"] == nil || first["readiness"] == nil {
 		t.Fatal("initial configuration missing")
 	}
+	if first["readiness"].(map[string]any)["workerNative"] != "unknown" {
+		t.Fatal("missing worker observation must remain unknown")
+	}
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_autonomy_health_v1(endpoint,started_at,checked_at,last_tick_at,native_configured,native_checked_at) VALUES($1,$2,$2,$2,false,$2)`, endpoint, now()); e != nil {
+		t.Fatal(e)
+	}
+	observed, e := service.GetConfig(ctx, actor, "overview")
+	if e != nil || observed["readiness"].(map[string]any)["workerNative"] != "not-configured" {
+		t.Fatalf("worker config observation: %#v %v", observed, e)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_health_v1 SET native_checked_at=$2 WHERE endpoint=$1`, endpoint, now().Add(-time.Hour)); e != nil {
+		t.Fatal(e)
+	}
+	observed, e = service.GetConfig(ctx, actor, "overview")
+	if e != nil || observed["readiness"].(map[string]any)["workerNative"] != "unknown" {
+		t.Fatalf("stale worker config observation: %#v %v", observed, e)
+	}
+
 	configuration := a.Object{"operationId": uuid.NewString(), "expectedRevision": 1, "enabled": false, "mode": "ai-human", "schedule": a.Object{"kind": "interval", "minutes": 45}, "purpose": " original purpose ", "goal": strings.Repeat("😀", 4000), "prompt": strings.Repeat("😀", 16000), "plan": a.Object{}}
 	saved, e = service.SaveConfig(ctx, actor, "overview", configuration, authorize)
 	if e != nil {

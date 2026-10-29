@@ -3,6 +3,7 @@ package operationsstrategies
 import (
 	"context"
 	"encoding/json"
+	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -45,7 +46,11 @@ func (s *Service) actor(ctx context.Context, tx pgx.Tx, a Actor, action string, 
 		if action != "strategies.read" {
 			return Actor{}, fail("business_admin_denied", 403)
 		}
-		if q, ok := s.Authority.(interface{ AcceptsQuery(Actor) bool }); !ok || !q.AcceptsQuery(a) {
+		authority := s.Authority
+		if combined, ok := authority.(*p.BusinessAuthority); ok {
+			authority = combined.Human
+		}
+		if q, ok := authority.(interface{ AcceptsQuery(Actor) bool }); !ok || !q.AcceptsQuery(a) {
 			return Actor{}, fail("business_admin_denied", 403)
 		}
 	}
@@ -160,7 +165,34 @@ func (s *Service) SaveDraft(ctx context.Context, a Actor, input Object, authoriz
 	if e != nil {
 		return nil, e
 	}
+	return s.saveDraft(ctx, a, x, authorize, false)
+}
+
+// SavePreparedDraft binds an operation card to the exact draft reviewed.
+func (s *Service) SavePreparedDraft(ctx context.Context, a Actor, input Object, authorize func() (Actor, error)) (Object, error) {
+	x, e := ParseCommand("prepared-draft", input)
+	if e != nil {
+		return nil, e
+	}
+	return s.saveDraft(ctx, a, x, authorize, true)
+}
+
+func (s *Service) saveDraft(ctx context.Context, a Actor, x Object, authorize func() (Actor, error), prepared bool) (Object, error) {
 	return s.command(ctx, a, "draft", x, authorize, func(tx pgx.Tx, actor Actor, head Object) (Object, error) {
+		if prepared {
+			if head["draft_id"] != x["expectedDraftId"] {
+				return nil, fail("p13_strategy_draft_changed", 409)
+			}
+			if head["draft_id"] != nil {
+				previous, e := s.version(ctx, tx, head["draft_id"])
+				if e != nil {
+					return nil, e
+				}
+				if previous == nil || previous["created_by"] != actor.ID || previous["ordinary_task_id"] != nil || previous["ordinary_execution_id"] != nil {
+					return nil, fail("p13_existing_draft_requires_human", 409)
+				}
+			}
+		}
 		var version int64
 		if e := tx.QueryRow(ctx, `SELECT coalesce(max(version),0)+1 FROM operations_p13_strategy_versions_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&version); e != nil {
 			return nil, e

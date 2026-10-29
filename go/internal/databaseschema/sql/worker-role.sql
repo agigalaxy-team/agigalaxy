@@ -239,6 +239,7 @@ GRANT SELECT,INSERT ON operations_autonomy_configs_v1 TO galaxy_evidence_worker;
 GRANT UPDATE(next_due_at,last_valid_at) ON operations_autonomy_configs_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT ON operations_autonomy_versions_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE ON operations_autonomy_tasks_v1,operations_autonomy_health_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON operations_autonomy_commands_v1 TO galaxy_evidence_worker;
 GRANT SELECT,UPDATE ON operations_autonomy_events_v1 TO galaxy_evidence_worker;
 GRANT SELECT ON operations_autonomy_receipts_v1,operations_autonomy_tool_calls_v1,operations_ai_role_delegations_v1 TO galaxy_evidence_worker;
 GRANT SELECT(id,name,enabled) ON operations_ai_work_accounts_v1 TO galaxy_evidence_worker;

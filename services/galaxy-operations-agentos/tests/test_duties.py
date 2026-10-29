@@ -66,7 +66,8 @@ class CurrentTask:
             "domain": "messaging", "aiAccountId": str(uuid4()), "mode": "ai",
             "source": "routine", "purpose": "operations-messaging", "sessionId": str(uuid4()),
             "roleVersion": "ai:current:1", "prompt": {"role": "核对当前待办", "context": {"title": "本轮巡检"}},
-            "tools": ["current-summary", "query-operations", "read-operation-object"]}
+            "tools": ["current-summary", "query-operations", "read-operation-object", "assess-task"],
+            "completion": {"disposition": "continue", "reasonCode": "task-assessment-required"}}
         self.revoked, self.calls, self.reports = False, [], []
 
     def duty_authorize(self, user_id, *, operation="read"):
@@ -81,6 +82,8 @@ class CurrentTask:
     def duty_tool(self, user_id, tool, arguments, **binding):
         self.duty_authorize(user_id, operation="tool")
         self.calls.append({"user": user_id, "tool": tool, "arguments": arguments, **binding})
+        if tool == "assess-task":
+            self.task["completion"] = {"disposition": "completed", "reasonCode": "task-goal-satisfied"}
         return {"state": "available", "counts": {"pending": 0}, "basis": "explicit-local-double"}
 
     def duty_report(self, user_id, value):
@@ -100,6 +103,9 @@ class LocalModel(Model):
         if self.calls == 1:
             return ModelResponse(role="assistant", tool_calls=[{"id": "local-summary", "type": "function",
                 "function": {"name": "current_summary", "arguments": "{}"}}])
+        if self.calls == 2:
+            return ModelResponse(role="assistant", tool_calls=[{"id": "local-assessment", "type": "function",
+                "function": {"name": "assess_task", "arguments": json.dumps({"assessment": {"goalSatisfied": True, "remainingWork": [], "summary": "local double"}})}}])
         return ModelResponse(role="assistant", content="PRIVATE_MODEL_RESULT_NOT_A_BUSINESS_RECEIPT")
     async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
     def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
@@ -143,7 +149,7 @@ class DutyContracts(unittest.TestCase):
             with authorization_scope(lambda: authorization):
                 result = asyncio.run(agent.arun("本次服务端任务", session_id=gateway.task["sessionId"], user_id=principal))
             self.assertEqual(result.status, RunStatus.completed)
-            self.assertEqual(duty_view(gateway.task["taskId"], result)["run"]["calls"], 2)
+            self.assertEqual(duty_view(gateway.task["taskId"], result)["run"]["calls"], 3)
             self.assertIsNone(duty_view(gateway.task["taskId"], result)["run"]["tokens"]["total"])
             self.assertEqual(gateway.calls[0]["tool"], "current-summary")
             self.assertEqual(gateway.calls[0]["run_id"], result.run_id)
@@ -203,7 +209,7 @@ class DutyContracts(unittest.TestCase):
 
     def test_native_human_pause_continues_same_run_from_original_node_fact_without_reexecuting_writer(self):
         gateway, selected = CurrentTask(), settings()
-        task = gateway.task; task["tools"] = ["execute-operation"]
+        task = gateway.task; task["tools"] = ["execute-operation", "assess-task"]
         original_operation, target_id = str(uuid4()), str(uuid4())
         class HumanModel(LocalModel):
             def invoke(self, *args, **kwargs):
@@ -214,10 +220,17 @@ class DutyContracts(unittest.TestCase):
                             "kind": "content-curation", "targetKind": "post", "targetId": target_id,
                             "pinned": True, "reason": "PRIVATE_DUTY_REASON"}})}}],
                         response_usage=MessageMetrics(input_tokens=10, output_tokens=2, total_tokens=12))
+                if self.calls == 2:
+                    return ModelResponse(role="assistant", tool_calls=[{"id": "resumed-assessment", "type": "function",
+                        "function": {"name": "assess_task", "arguments": json.dumps({"assessment": {"goalSatisfied": True, "remainingWork": [], "summary": "decision applied"}})}}],
+                        response_usage=MessageMetrics(input_tokens=10, output_tokens=2, total_tokens=12))
                 return ModelResponse(role="assistant", content="PRIVATE_RESUMED_MODEL_BODY",
                     response_usage=MessageMetrics(input_tokens=10, output_tokens=2, total_tokens=12))
         def wait(user_id, tool, arguments, **binding):
             gateway.calls.append({"tool": tool, "arguments": arguments, **binding})
+            if tool == "assess-task":
+                task["completion"] = {"disposition": "completed"}
+                return {"state": "available"}
             return {"state": "waiting-human", "operationId": original_operation, "code": "operations_autonomy_human_required"}
         gateway.duty_tool = wait
         with tempfile.TemporaryDirectory() as directory, ExitStack() as resources:
@@ -246,13 +259,13 @@ class DutyContracts(unittest.TestCase):
                 continued = asyncio.run(agent.acontinue_run(run_id=paused.run_id, session_id=task["sessionId"], user_id=ctx.user_id, stream=False))
             self.assertEqual(continued.run_id, paused.run_id)
             self.assertEqual(continued.status, RunStatus.completed)
-            self.assertEqual(agent.model.calls, 2)
+            self.assertEqual(agent.model.calls, 3)
             usage = duty_view(task["taskId"], continued)["run"]
-            self.assertEqual(usage["calls"], 2)
-            self.assertEqual(usage["tokens"], {"input": 20, "output": 4, "total": 24})
+            self.assertEqual(usage["calls"], 3)
+            self.assertEqual(usage["tokens"], {"input": 30, "output": 6, "total": 36})
             self.assertEqual(continued.metadata["modelSettingsVersion"], "manual-v2")
             self.assertEqual(continued.metadata["modelSettingsVersions"], ["manual-v1", "manual-v2"])
-            self.assertEqual(len(gateway.calls), 1)
+            self.assertEqual([call["tool"] for call in gateway.calls], ["execute-operation", "assess-task"])
             persisted = db.get_run(run_id=paused.run_id)
             self.assertGreater(duty_view(task["taskId"], persisted)["run"]["durationMs"], continued.metrics.duration * 1000,
                 "Active duration includes the earlier execution leg without the human waiting interval")

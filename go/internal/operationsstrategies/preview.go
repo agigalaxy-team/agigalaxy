@@ -133,9 +133,6 @@ func (s *Service) PreviewWithin(ctx context.Context, tx pgx.Tx, configuration Ob
 			continue
 		}
 		ids := texts(scope["resourceIds"])
-		if len(ids) > 20 {
-			ids = ids[:20]
-		}
 		for _, id := range ids {
 			var source Object
 			if s.PreviewObjectWithin == nil {

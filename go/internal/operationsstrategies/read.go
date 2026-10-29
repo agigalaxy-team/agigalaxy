@@ -137,6 +137,60 @@ func (s *Service) Operation(ctx context.Context, a Actor, id string) (Object, er
 	}
 	return s.metadata(Object{"state": "not-recorded", "operationId": id}), nil
 }
+
+// RehearsalOperation recovers the original qualification without running it again.
+func (s *Service) RehearsalOperation(ctx context.Context, a Actor, id string) (Object, error) {
+	if !uuidPattern.MatchString(id) {
+		return nil, invalid()
+	}
+	actor, e := s.current(ctx, a, "strategies.read")
+	if e != nil {
+		return nil, e
+	}
+	row, e := one(ctx, s.Pool, `SELECT to_jsonb(r) FROM operations_p13_strategy_rehearsals_v1 r WHERE endpoint=$1 AND id=$2`, s.Endpoint, id)
+	if e != nil {
+		return nil, e
+	}
+	if row == nil {
+		return s.metadata(Object{"state": "not-recorded", "operationId": id}), nil
+	}
+	if row["operator_id"] != actor.ID {
+		return nil, fail("p13_operation_not_found", 404)
+	}
+	if _, e = s.current(ctx, a, "strategies.read"); e != nil {
+		return nil, e
+	}
+	result := clone(obj(row["result"]))
+	result["rehearsalId"], result["replayed"] = id, true
+	return s.metadata(Object{"state": "recorded", "versionId": row["version_id"], "executionIds": row["execution_ids"], "result": result}), nil
+}
+
+// OriginalCommand recovers only an exactly matching original command for its owner.
+func (s *Service) OriginalCommand(ctx context.Context, a Actor, id, kind string, input Object) (Object, error) {
+	if !uuidPattern.MatchString(id) || !has([]string{"draft", "publish"}, kind) {
+		return nil, invalid()
+	}
+	actor, e := s.current(ctx, a, "strategies.read")
+	if e != nil {
+		return nil, e
+	}
+	row, e := one(ctx, s.Pool, `SELECT to_jsonb(c) FROM operations_p13_strategy_commands_v1 c WHERE endpoint=$1 AND operation_id=$2`, s.Endpoint, id)
+	if e != nil {
+		return nil, e
+	}
+	if row == nil {
+		return s.metadata(Object{"state": "not-recorded"}), nil
+	}
+	if row["operator_id"] != actor.ID || row["kind"] != kind || !same(row["input"], input) {
+		return nil, fail("p13_operation_conflict", 409)
+	}
+	if _, e = s.current(ctx, a, "strategies.read"); e != nil {
+		return nil, e
+	}
+	result := clone(obj(row["result"]))
+	result["replayed"] = true
+	return s.metadata(Object{"state": "recorded", "result": result}), nil
+}
 func (s *Service) Options(ctx context.Context, a Actor) (Object, error) {
 	actor, e := s.current(ctx, a, "strategies.read")
 	if e != nil {

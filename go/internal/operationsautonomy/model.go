@@ -28,6 +28,7 @@ type Service struct {
 	CurrentPublicSourceWithin func(context.Context, pgx.Tx, string, string) (Object, error)
 	PersistedSourceWithin     func(context.Context, pgx.Tx, Object) (bool, error)
 	RuntimeStatus             func(context.Context) (Object, error)
+	NativeConfigured          func() bool
 	CodeRunner                func(context.Context, string) (Object, error)
 	ReadTargetWithin          func(context.Context, pgx.Tx, Actor, string, string, string) (Object, error)
 	Native                    Native

@@ -150,6 +150,27 @@ func (s *Service) runtime(ctx context.Context) Object {
 func (s *Service) readinessWithin(ctx context.Context, tx pgx.Tx, row, runtime Object) (Object, error) {
 	reasons := []Object{}
 	add := func(code, message string) { reasons = append(reasons, Object{"code": code, "message": message}) }
+	health, e := optional(ctx, tx, `SELECT to_jsonb(h) FROM(SELECT checked_at,native_configured,native_checked_at FROM operations_autonomy_health_v1 WHERE endpoint=$1)h`, s.Endpoint)
+	if e != nil {
+		return nil, e
+	}
+	settings, e := s.refreshSettingsWithin(ctx, tx)
+	if e != nil {
+		return nil, e
+	}
+	freshFor := time.Duration(num(settings["healthSeconds"])+num(settings["startGraceSeconds"])) * time.Second
+	workerNative := "unknown"
+	if health != nil && health["native_checked_at"] != nil && !date(health["native_checked_at"]).After(s.now()) && s.now().Sub(date(health["native_checked_at"])) <= freshFor && !date(health["checked_at"]).After(s.now()) && s.now().Sub(date(health["checked_at"])) <= freshFor {
+		if health["native_configured"] == true {
+			workerNative = "configured"
+		} else if health["native_configured"] == false {
+			workerNative = "not-configured"
+			add("worker-native-not-configured", "后台值守进程尚未加载完整运行配置")
+		}
+	}
+	if workerNative == "unknown" {
+		add("worker-native-unknown", "后台值守进程配置状态尚未确认")
+	}
 	var role *operationsai.Authorization
 	var account Object
 	if s.AIWork == nil {
@@ -273,7 +294,19 @@ func (s *Service) readinessWithin(ctx context.Context, tx pgx.Tx, row, runtime O
 			add("authorization-inactive", "所选自动授权尚未覆盖当前岗位与动作")
 		}
 	}
-	return Object{"ready": len(reasons) == 0, "reasons": reasons, "account": account, "role": role}, nil
+	configurationReady := true
+	for _, reason := range reasons {
+		if reason["code"] != "worker-native-unknown" && reason["code"] != "worker-native-not-configured" {
+			configurationReady = false
+		}
+	}
+	executionReady := "blocked"
+	if workerNative == "unknown" {
+		executionReady = "unknown"
+	} else if len(reasons) == 0 {
+		executionReady = "ready"
+	}
+	return Object{"ready": len(reasons) == 0, "configurationReady": configurationReady, "executionReady": executionReady, "reasons": reasons, "account": account, "role": role, "workerNative": workerNative, "workerNativeCheckedAt": iso(health["native_checked_at"])}, nil
 }
 func (s *Service) GetConfig(ctx context.Context, a Actor, domain string) (Object, error) {
 	if _, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) { return s.actor(ctx, tx, a, "autonomy.read", nil) }); e != nil {
@@ -303,6 +336,6 @@ func (s *Service) GetConfig(ctx context.Context, a Actor, domain string) (Object
 		for _, r := range rows {
 			history = append(history, Object{"revision": r["revision"], "promptVersion": r["prompt_version"], "planVersion": r["plan_version"], "delegationVersion": r["delegation_version"], "createdAt": iso(r["created_at"])})
 		}
-		return s.stamp(Object{"config": present(row), "readiness": Object{"ready": ready["ready"], "reasons": ready["reasons"]}, "history": history}), nil
+		return s.stamp(Object{"config": present(row), "readiness": Object{"ready": ready["ready"], "configurationReady": ready["configurationReady"], "executionReady": ready["executionReady"], "reasons": ready["reasons"], "workerNative": ready["workerNative"], "workerNativeCheckedAt": ready["workerNativeCheckedAt"]}, "history": history}), nil
 	})
 }

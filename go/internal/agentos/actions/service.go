@@ -159,6 +159,9 @@ var cardReadOnce sync.Once
 var cardReads map[string]string
 
 func CardReadPermission(kind string) (string, error) {
+	if kind == "strategy-rehearsal" {
+		return "strategies.read", nil
+	}
 	cardReadOnce.Do(func() {
 		cardReads = map[string]string{}
 		for _, code := range operationspermissions.PermissionCodes() {
@@ -247,6 +250,12 @@ func (s *Service) chatReports(a Actor) (*chat.ReportService, error) {
 }
 func required(x Object) string {
 	switch str(x["kind"]) {
+	case "strategy-draft":
+		return "strategies.configure"
+	case "strategy-rehearsal":
+		return "strategies.read"
+	case "strategy-publish":
+		return "strategies.publish"
 	case "ordinary-strategy-draft":
 		return "strategies.ordinary.configure"
 	case "ordinary-strategy-publish":

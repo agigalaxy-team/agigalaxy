@@ -66,7 +66,7 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
 	view := args.view
-	if args.kind == "strategy-run" {
+	if args.kind == "strategy-run" || args.kind == "strategy-version" {
 		view = args.kind
 	}
 	value, e := s.Strategies.QueryRead(ctx, a, s.reader(a), view, args.id, args.filters)
@@ -77,6 +77,12 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 	if e != nil {
 		return queryResult{}, e
 	}
+	if args.kind == "strategy-version" {
+		version := object(value["version"])
+		data := object(project(version, Object{"id": "s", "version": "n", "createdAt": "s"}))
+		data["configuration"] = version["configuration"]
+		return queryResult{source: value, data: data}, nil
+	}
 	if args.kind != "" {
 		row := object(value["run"])
 		data := object(project(row, merge(shape("id strategyId state code createdAt updatedAt", "s"), Object{"strategy": shape("id name domain mode", "s"), "target": merge(shape("kind id", "s"), Object{"sourceVersion": "n"}), "canContinue": "b", "continueCode": "s", "native": merge(shape("runId status pauseKind", "s"), Object{"awaitingHuman": "b"})})))
@@ -85,6 +91,9 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 	if args.view == "overview" {
 		data := object(project(value, Object{"revision": "n", "paused": "b", "active": Object{"id": "s", "version": "n", "createdAt": "s"}, "draft": Object{"id": "s", "version": "n", "createdAt": "s"}, "native": Object{"state": "s"}}))
 		data["configuration"] = value["configuration"]
+		if draft := object(value["draft"]); draft != nil {
+			object(data["draft"])["configuration"] = draft["configuration"]
+		}
 		return queryResult{source: value, data: data}, nil
 	}
 	if args.view == "versions" {

@@ -2,7 +2,7 @@
 // Source is the current shared permission catalog, not inferred Go privileges.
 package access
 
-var permissionCodes = []string{
+var permissionCodes=[]string{
 	"workbench.read",
 	"accounts.read",
 	"accounts.identity.read",
@@ -133,7 +133,7 @@ var permissionCodes = []string{
 	"permissions.assignments.write",
 	"permissions.automation.write",
 }
-var maintainerCodes = []string{
+var maintainerCodes=[]string{
 	"management.accounts.create",
 	"management.accounts.profile.write",
 	"management.accounts.login.disable",
@@ -143,5 +143,4 @@ var maintainerCodes = []string{
 	"management.accounts.delete",
 	"permissions.assignments.write",
 }
-
-func knownPermission(code string) bool { return contains(permissionCodes, code) }
+func knownPermission(code string)bool{return contains(permissionCodes,code)}

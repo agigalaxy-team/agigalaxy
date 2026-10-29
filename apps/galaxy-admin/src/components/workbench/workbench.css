@@ -161,6 +161,7 @@
 .galaxy-workbench .wb-action-card header a{color:#b93265;text-decoration:underline;text-underline-offset:3px}
 .galaxy-workbench .wb-action-impact{list-style:disc;padding-left:18px;margin:10px 0}
 .galaxy-workbench .wb-action-impact li+li{margin-top:4px}
+.galaxy-workbench .wb-strategy-impact li{white-space:pre-wrap}
 .galaxy-workbench .wb-action-basis{margin-top:10px;padding-top:9px;border-top:1px solid #f1dfe6;color:#65718b}
 .galaxy-workbench .wb-action-basis>div{display:grid;grid-template-columns:minmax(65px,.35fr) minmax(0,1fr);gap:10px;margin-bottom:4px}
 .galaxy-workbench .wb-action-basis dt{font-weight:500}

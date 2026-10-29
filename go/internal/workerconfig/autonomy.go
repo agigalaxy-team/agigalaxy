@@ -26,6 +26,7 @@ func autonomyWorker(pool *pgxpool.Pool, c Config, stored *access.StoredOperatorA
 	ai := &operationsai.Service{Endpoint: c.Endpoint}
 	permissions := &operationspermissions.Service{Pool: pool, Endpoint: c.Endpoint, StoredAuthority: stored, AIWork: ai}
 	service := &operationsautonomy.Service{Pool: pool, Endpoint: c.Endpoint, AIWork: ai, Permissions: permissions, Native: &operationsautonomy.NativeClient{Client: client}, RuntimeStatus: func(ctx context.Context) (operationsautonomy.Object, error) { return client.Status(ctx), nil }}
+	service.NativeConfigured = client.DutyConfigured
 	service.CodeRunner = service.RunWorkerCodeTask
 	permissions.Duty = service
 	service.QueryTool = (&operationsqueries.Service{Pool: pool, Permissions: permissions, Messaging: messages}).Query

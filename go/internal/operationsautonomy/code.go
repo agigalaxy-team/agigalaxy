@@ -255,7 +255,7 @@ func (s *Service) RunCodeTask(ctx context.Context, input Object) (Object, error)
 			if e != nil {
 				return nil, e
 			}
-			if result["state"] == "waiting-human" || result["state"] == "unknown" {
+			if result["state"] == "waiting-human" {
 				needsHuman = true
 			}
 		}
@@ -266,23 +266,40 @@ func (s *Service) RunCodeTask(ctx context.Context, input Object) (Object, error)
 	if checked == 0 {
 		return wait("operations_autonomy_effective_check_required")
 	}
-	_, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
+	finalState, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (string, error) {
 		if _, e := s.DutyForTaskWithin(ctx, tx, taskID, "query"); e != nil {
-			return false, e
+			return "", e
 		}
 		if hits == 0 {
 			if e := s.RecordBusinessReceiptWithin(ctx, tx, BusinessReceipt{TaskID: taskID, OperationID: taskID, Action: "fixed-rule-check", State: "no-action", Basis: "published-p14-rule-on-current-qualified-source"}); e != nil {
-				return false, e
+				return "", e
 			}
 		}
-		if _, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='completed',model_state='not-required',effective_check=true,lease_until=NULL,completed_at=$3,updated_at=$3,revision=revision+1 WHERE endpoint=$1 AND id=$2`, s.Endpoint, taskID, s.now()); e != nil {
-			return false, e
+		current, e := s.taskWithin(ctx, tx, taskID, " FOR UPDATE")
+		if e != nil {
+			return "", e
 		}
-		_, e := tx.Exec(ctx, `UPDATE operations_autonomy_configs_v1 SET last_valid_at=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["config_id"], s.now())
-		return true, e
+		current["effective_check"] = true
+		completion, e := s.completionWithin(ctx, tx, current, false)
+		if e != nil {
+			return "", e
+		}
+		state := str(completion["disposition"])
+		if state == "continue" {
+			state = "unknown"
+		}
+		if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,model_state='not-required',business_state=$4,effective_check=true,code=$5,lease_until=NULL,completed_at=CASE WHEN $3 IN ('completed','failed') THEN $6 ELSE completed_at END,updated_at=$6,revision=revision+1 WHERE endpoint=$1 AND id=$2`, s.Endpoint, taskID, state, completion["businessState"], completion["reasonCode"], s.now()); e != nil {
+			return "", e
+		}
+		if state == "completed" {
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_configs_v1 SET last_valid_at=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["config_id"], s.now()); e != nil {
+				return "", e
+			}
+		}
+		return state, nil
 	})
 	if e != nil {
 		return nil, e
 	}
-	return response("completed"), nil
+	return response(finalState), nil
 }

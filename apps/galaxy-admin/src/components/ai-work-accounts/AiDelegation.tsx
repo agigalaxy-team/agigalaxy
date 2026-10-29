@@ -32,7 +32,7 @@ export function AiDelegation({csrfToken,canConfigure,ownPermissions,draft,onDraf
  const locked=command.locked||!!restored;
  useLayoutEffect(()=>{callbacks.current.onStatus({dirty:!!draft,pending:locked,operationId:restored?.operationId??(command.pending?String(command.pending.body.operationId):null)});},[!!draft,locked,restored?.operationId,command.pending]);
  useLayoutEffect(()=>()=>callbacks.current.onStatus({dirty:!!draft,pending:false,operationId:null}),[]);
- const grantable=new Set(ownPermissions),available=(catalog?.items??[]).filter(action=>!action.humanOnly&&!/^(?:ai\.(?:roles|prompts|delegation)\.|permissions\.|models\.|management\.)/.test(action.code));
+ const grantable=new Set(ownPermissions),available=(catalog?.items??[]).filter(action=>!action.humanOnly&&!/^ai\.(?:roles|prompts|delegation|accounts|use)\./.test(action.code));
  const merged=fields(input),conflicts:{key:keyof AiDelegationFields;label:string;mine:string;current:string}[]=[];
  const labels={enabled:'总控管理授权',targetAiAccountIds:'管理岗位',grantablePermissions:'可授予权限上限',allowedManagementActions:'允许管理动作'};
  const present=(key:keyof AiDelegationFields,value:unknown)=>key==='enabled'?value?'启用':'停用':Array.isArray(value)?value.map(id=>key==='grantablePermissions'?operatorPermissionLabel(id):key==='allowedManagementActions'?actions[id as AiDelegationAction]:read.value?.targetAiAccounts.find(account=>account.id===id)?.name||'工作岗位').join('、')||'未选择':'未选择';

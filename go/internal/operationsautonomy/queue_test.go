@@ -3,6 +3,7 @@ package operationsautonomy_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
@@ -164,5 +166,50 @@ func TestTickOriginalCatchUpAndRealRiverWorkerRole(t *testing.T) {
 	var enabled int
 	if e = admin.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_configs_v1 WHERE endpoint=$1 AND domain<>'overview' AND enabled`, endpoint).Scan(&enabled); e != nil || enabled != 0 {
 		t.Fatalf("new plans enabled%d %v", enabled, e)
+	}
+}
+
+func TestTickDefersEventWhenRoutineCreatedAndFiltersBeforeLimit(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.NewEndpoint(t, pool, "https://autonomy-scheduling.example.invalid")
+	autonomyfixture.Setup(t, f, f.Automation(t))
+	at := time.Now().UTC().Truncate(time.Second)
+	s := &a.Service{Pool: pool, Endpoint: f.Endpoint, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: func() time.Time { return at }}
+	s.EnqueueWithin = func(context.Context, pgx.Tx, string, a.Object, string, *time.Time) error { return nil }
+	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (bool, error) { return true, s.EnsureWithin(ctx, tx) }); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := pool.Exec(ctx, `UPDATE operations_autonomy_configs_v1 SET enabled=true,configuration=jsonb_set(configuration,'{plan,eventTypes}','["feedback.changed"]'),next_due_at=$2 WHERE endpoint=$1 AND domain='overview'`, f.Endpoint, at.Add(-time.Minute)); e != nil {
+		t.Fatal(e)
+	}
+	for i := 0; i < 101; i++ {
+		if _, e := pool.Exec(ctx, `INSERT INTO operations_autonomy_events_v1(id,endpoint,domain,event_key,event_type,created_at,available_at) VALUES(gen_random_uuid(),$1,'overview',$2,'other.changed',$3,$3)`, f.Endpoint, fmt.Sprintf("other:%d", i), at.Add(-time.Hour)); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e := pool.Exec(ctx, `INSERT INTO operations_autonomy_events_v1(id,endpoint,domain,event_key,event_type,created_at,available_at) VALUES(gen_random_uuid(),$1,'overview','eligible','feedback.changed',$2,$2)`, f.Endpoint, at.Add(-time.Minute)); e != nil {
+		t.Fatal(e)
+	}
+	worker := a.NewWorker(s)
+	if _, e := worker.Tick(ctx); e != nil {
+		t.Fatal(e)
+	}
+	var routine, events int
+	if e := pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE source='routine'),count(*) FILTER (WHERE source='event') FROM operations_autonomy_tasks_v1 WHERE endpoint=$1`, f.Endpoint).Scan(&routine, &events); e != nil || routine != 1 || events != 0 {
+		t.Fatalf("same tick routine=%d events=%d: %v", routine, events, e)
+	}
+	if _, e := pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='completed' WHERE endpoint=$1 AND source='routine'`, f.Endpoint); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := worker.Tick(ctx); e != nil {
+		t.Fatal(e)
+	}
+	var processed bool
+	if e := pool.QueryRow(ctx, `SELECT processed_at IS NOT NULL FROM operations_autonomy_events_v1 WHERE endpoint=$1 AND event_key='eligible'`, f.Endpoint).Scan(&processed); e != nil || !processed {
+		t.Fatalf("subscribed event starved: %v %v", processed, e)
+	}
+	if e := pool.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND source='event'`, f.Endpoint).Scan(&events); e != nil || events != 1 {
+		t.Fatalf("event tasks=%d: %v", events, e)
 	}
 }

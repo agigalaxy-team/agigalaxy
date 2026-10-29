@@ -147,7 +147,7 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 			config := present(cfg)
 			delete(config, "lastValidAt")
 			delete(config, "updatedAt")
-			out := Object{"id": account["id"], "domain": cfg["domain"], "name": name, "enabled": cfg["enabled"], "configRevision": cfg["revision"], "readiness": Object{"ready": ready["ready"], "reasons": ready["reasons"]}, "health": state, "lastValidAt": iso(cfg["last_valid_at"]), "nextDueAt": iso(cfg["next_due_at"]), "config": config}
+			out := Object{"id": account["id"], "domain": cfg["domain"], "name": name, "enabled": cfg["enabled"], "configRevision": cfg["revision"], "readiness": Object{"ready": ready["ready"], "configurationReady": ready["configurationReady"], "executionReady": ready["executionReady"], "reasons": ready["reasons"], "workerNative": ready["workerNative"], "workerNativeCheckedAt": ready["workerNativeCheckedAt"]}, "health": state, "lastValidAt": iso(cfg["last_valid_at"]), "nextDueAt": iso(cfg["next_due_at"]), "config": config}
 			for k, v := range m {
 				out[k] = v
 			}

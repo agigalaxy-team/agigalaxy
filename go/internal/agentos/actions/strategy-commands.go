@@ -21,12 +21,15 @@ func normalizeStrategyRuleCommand(x, command Object) (Object, error) {
 		}
 		return out, nil
 	}
-	method := map[string]string{"ordinary-strategy-draft": "ordinary-draft", "ordinary-strategy-publish": "ordinary-publish", "strategy-control": "control", "strategy-continue": "continue"}[kind]
+	method := map[string]string{"strategy-draft": "prepared-draft", "strategy-rehearsal": "rehearsal", "strategy-publish": "publish", "ordinary-strategy-draft": "ordinary-draft", "ordinary-strategy-publish": "ordinary-publish", "strategy-control": "control", "strategy-continue": "continue"}[kind]
 	out, e := operationsstrategies.ParseCommand(method, command)
 	if e != nil {
 		return nil, e
 	}
-	for _, key := range []string{"strategyId", "parameterEdits", "mode", "enabled", "reason", "versionId"} {
+	if kind == "strategy-draft" && !same(x["expectedDraftId"], out["expectedDraftId"]) {
+		return nil, invalid()
+	}
+	for _, key := range []string{"configuration", "executionIds", "rehearsalId", "expectedDraftId", "strategyId", "parameterEdits", "mode", "enabled", "reason", "versionId"} {
 		if v, ok := x[key]; ok && !same(v, out[key]) {
 			return nil, invalid()
 		}
@@ -53,6 +56,15 @@ func (s *Service) executeStrategyRule(ctx context.Context, a Actor, x, command O
 		return nil, fail("operations_agentos_action_not_connected", 503)
 	}
 	source := s.Strategies.WithAuthorize(s.authority(a), fresh)
+	current := func() (Actor, error) { return a, nil }
+	switch kind {
+	case "strategy-draft":
+		return source.SavePreparedDraft(ctx, a, command, current)
+	case "strategy-rehearsal":
+		return source.Rehearsal(ctx, a, command)
+	case "strategy-publish":
+		return source.Publish(ctx, a, command, current)
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		method := "draft"
 		if kind == "ordinary-strategy-publish" {
@@ -60,7 +72,6 @@ func (s *Service) executeStrategyRule(ctx context.Context, a Actor, x, command O
 		}
 		return source.CommandOrdinary(ctx, a, method, command)
 	}
-	current := func() (Actor, error) { return a, nil }
 	if kind == "strategy-control" {
 		return source.Control(ctx, a, command, current)
 	}
@@ -97,6 +108,27 @@ func (s *Service) recoverStrategyRule(ctx context.Context, a Actor, x, command O
 	if e != nil {
 		return nil, nil, e
 	}
+	if kind == "strategy-rehearsal" {
+		saved, e := source.RehearsalOperation(ctx, a, operation)
+		if e != nil || saved["state"] == "not-recorded" {
+			return nil, nil, e
+		}
+		if saved["versionId"] != command["versionId"] || !same(saved["executionIds"], command["executionIds"]) {
+			return nil, nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		return obj(saved["result"]), nil, nil
+	}
+	if kind == "strategy-draft" || kind == "strategy-publish" {
+		method := "draft"
+		if kind == "strategy-publish" {
+			method = "publish"
+		}
+		saved, e := source.OriginalCommand(ctx, a, operation, method, command)
+		if e != nil || saved["state"] == "not-recorded" {
+			return nil, nil, e
+		}
+		return obj(saved["result"]), nil, nil
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		saved, e := source.OrdinaryOperation(ctx, a, str(x["strategyId"]), operation)
 		if e != nil {
@@ -122,6 +154,12 @@ func (s *Service) recoverStrategyRule(ctx context.Context, a Actor, x, command O
 		return nil, nil, nil
 	}
 	expected := "control"
+	if kind == "strategy-draft" {
+		expected = "draft"
+	}
+	if kind == "strategy-publish" {
+		expected = "publish"
+	}
 	if kind == "strategy-continue" {
 		expected = "continue"
 	}
@@ -151,6 +189,26 @@ func (s *Service) recoverStrategyRule(ctx context.Context, a Actor, x, command O
 	return result, nil, nil
 }
 func strategyRuleResult(kind string, result Object, operation string, x Object) (Object, error) {
+	if kind == "strategy-draft" || kind == "strategy-publish" || kind == "strategy-rehearsal" {
+		if kind == "strategy-rehearsal" {
+			if result["rehearsalId"] != operation || result["versionId"] != x["versionId"] {
+				return nil, fail("operations_agentos_operation_conflict", 409)
+			}
+			summary := "预演未通过，请查看检查结果。"
+			if result["valid"] == true {
+				summary = "策略预演通过，可提交发布。"
+			}
+			return Object{"operationId": operation, "state": "completed", "summary": summary, "receipt": result}, nil
+		}
+		state, summary := "saved", "策略草稿已保存。"
+		if kind == "strategy-publish" {
+			state, summary = "active-for-new-matters", "策略已发布，仅用于新事项。"
+		}
+		if result["operationId"] != operation || result["state"] != state || !validID(result["versionId"]) || (kind == "strategy-publish" && result["versionId"] != x["versionId"]) {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		return Object{"operationId": operation, "state": "completed", "summary": summary, "receipt": pick(result, "operationId", "versionId", "version", "revision", "state", "replayed")}, nil
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		state := "saved"
 		summary := "日常策略调整已保存为草稿。"
@@ -192,5 +250,5 @@ func strategyRuleResult(kind string, result Object, operation string, x Object) 
 	return Object{"operationId": operation, "state": "completed", "summary": "本次处理已完成。", "receipt": receipt}, nil
 }
 func strategyRuleKind(kind string) bool {
-	return slices.Contains([]string{"ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore"}, kind)
+	return slices.Contains([]string{"strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore"}, kind)
 }

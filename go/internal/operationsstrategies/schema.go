@@ -299,6 +299,8 @@ func ParseCommand(kind string, input Object) (Object, error) {
 	switch kind {
 	case "draft":
 		req = append(req, "expectedRevision", "configuration", "reason")
+	case "prepared-draft":
+		req = append(req, "expectedRevision", "configuration", "reason", "expectedDraftId")
 	case "publish":
 		req = append(req, "expectedRevision", "versionId", "rehearsalId", "reason")
 	case "control":
@@ -336,7 +338,10 @@ func ParseCommand(kind string, input Object) (Object, error) {
 		}
 		x["reason"] = r
 	}
-	if kind == "draft" {
+	if kind == "prepared-draft" && x["expectedDraftId"] != nil && !uuidPattern.MatchString(str(x["expectedDraftId"])) {
+		return nil, invalid()
+	}
+	if kind == "draft" || kind == "prepared-draft" {
 		c, e := ParseConfiguration(obj(x["configuration"]))
 		if e != nil {
 			return nil, e

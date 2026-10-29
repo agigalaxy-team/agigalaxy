@@ -39,6 +39,13 @@ func ParseRequest(input Object) (Object, error) {
 	required := []string{"kind"}
 	optional := []string{}
 	switch kind {
+	case "strategy-draft":
+		required = append(required, "configuration", "reason")
+		optional = append(optional, "expectedDraftId")
+	case "strategy-rehearsal":
+		required = append(required, "versionId", "executionIds")
+	case "strategy-publish":
+		required = append(required, "versionId", "rehearsalId", "reason")
 	case "ordinary-strategy-draft":
 		required = append(required, "strategyId")
 		optional = append(optional, "parameterEdits", "mode", "enabled")
@@ -108,7 +115,7 @@ func ParseRequest(input Object) (Object, error) {
 	if !exact(x, required, optional) {
 		return nil, invalid()
 	}
-	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" || kind == "strategy-control" || kind == "strategy-continue" || kind == "rule-publish" || kind == "rule-restore" {
+	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" || kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" || kind == "strategy-control" || kind == "strategy-continue" || kind == "rule-publish" || kind == "rule-restore" {
 		return parseStrategyRuleRequest(x)
 	}
 	if (kind == "job-cancel" || kind == "job-retry") && !slices.Contains(operationsjobs.Queues[:7], str(x["queue"])) {

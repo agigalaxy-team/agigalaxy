@@ -1,6 +1,8 @@
 """Native per-task Agents, rebuilt from current Node authority at claim time."""
 import json
 from uuid import UUID
+from typing import Literal
+from pydantic import Field, model_validator
 
 from agno.agent import Agent, AgentFactory
 from agno.factory import FactoryPermissionError
@@ -30,6 +32,7 @@ BOUNDARIES = [
     "私聊仅沿已触发线索和批准范围取必要片段，不常态浏览其他聊天。私聊、案件及专门取材和派生材料、公告及系统邮件不进入兴趣画像或推荐，也不经共享记忆绕行。",
     "模型、供应商、凭据及管理人员权限由人工管理。获准总控仅可用专门工具在人工委派上限内维护其他AI专用角色及普通岗位工作提示词，不可编辑共享角色、代码固定边界或给自己扩大上限；岗位工作提示词不同于模型配置。",
     "回答能否维护AI岗位、提示词或日常策略前，先用current_summary核对真实capability及当前计划，再用read_ai_delegation读取本任务获准委派和目标版本。无权、范围外和未接通分别说明，不能凭岗位名称或历史完全否认/承诺。普通日常策略只按当前已获准typed动作办理，不扩大授权或目标。",
+    "每次拟结束前用assess_task评估当前冻结目标；如有剩余获准工作继续办理，未知写结果只用reconcile_task_operations查询原号。",
     "保留原人工决定与任务方案。模型结束、工具受理和建议不能当作业务完成；只以原业务operation回执说明真实效果。未知结果仅查询原操作，不换编号重发或盲目重放。",
     "不自行批准具体文件清理、整站恢复、重要正式消息或改变已有人工处置。需要人工时保留原任务和具体原因，日常无变化不制造提醒。",
 ]
@@ -38,6 +41,25 @@ BOUNDARIES = [
 class DutyInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     taskId: UUID
+
+
+class RemainingWork(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["read", "action", "human"]
+    description: str = Field(min_length=1, max_length=240)
+
+
+class TaskAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goalSatisfied: bool
+    remainingWork: list[RemainingWork] = Field(max_length=8)
+    summary: str = Field(max_length=1000)
+
+    @model_validator(mode="after")
+    def consistent(self):
+        if self.goalSatisfied != (len(self.remainingWork) == 0):
+            raise ValueError("agentos_task_assessment_invalid")
+        return self
 
 
 def task_context(gateway, user_id, *, operation="read"):
@@ -88,6 +110,14 @@ class _DutyReadGateway:
 
 
 def duty_tools(gateway, allowed):
+    def assess_task(run_context: RunContext, fc: FunctionCall, assessment: TaskAssessment) -> str:
+        """Assess the frozen task goal and list remaining work; this never proves an effect."""
+        return _call(gateway, run_context, fc, "assess-task", assessment.model_dump(mode="json"))
+
+    def reconcile_task_operations(run_context: RunContext, fc: FunctionCall) -> str:
+        """Query original uncertain write operations without resending them."""
+        return _call(gateway, run_context, fc, "reconcile-task-operations", {})
+
     def current_summary(run_context: RunContext, fc: FunctionCall) -> str:
         """Read current permitted operational counts and this task's current scope."""
         return _call(gateway, run_context, fc, "current-summary", {})
@@ -115,7 +145,7 @@ def duty_tools(gateway, allowed):
         return _call(gateway, run_context, fc, "read-ai-delegation", arguments)
 
     reads = conversation_tools(_DutyReadGateway(gateway))[:2]
-    candidates = {"current-summary": current_summary, "query-operations": reads[0],
+    candidates = {"assess-task": assess_task, "reconcile-task-operations": reconcile_task_operations, "current-summary": current_summary, "query-operations": reads[0],
         "read-operation-object": reads[1], "execute-operation": execute_operation,
         "read-ai-delegation": read_ai_delegation}
     # The delegated role writer is supplied below from the matching closed
@@ -155,6 +185,8 @@ def duty_factory(*, settings, db, gateway, model_factory=None):
                 raise AuthorityDenied("agentos_autonomy_round_timeout_invalid")
             selected = (with_current_authority(model_factory(), gateway) if model_factory is not None
                 else domain_model(settings, task["domain"], gateway))
+            from .duty_completion import with_duty_completion
+            selected = with_duty_completion(selected, gateway)
             selected = with_duty_pauses(selected)
             selected._galaxy_usage_database = projected
             model_version = getattr(selected, "_galaxy_settings_version", "explicit-test-model")

@@ -66,6 +66,11 @@ func New(configuration Configuration, options Options) (*Client, error) {
 func (c *Client) Configured() bool {
 	return c != nil && c.configuration.URL != "" && protocol.TextLength(c.configuration.SigningKey) >= 32
 }
+
+// DutyConfigured describes only this process's loaded task transport, not network health.
+func (c *Client) DutyConfigured() bool {
+	return c.Configured() && protocol.TextLength(c.configuration.ServiceKey) >= 32
+}
 func (c *Client) token(execution Execution) (string, error) {
 	if !c.Configured() {
 		return "", fail("operations_agentos_not_configured", 503)

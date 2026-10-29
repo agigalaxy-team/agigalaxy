@@ -23,7 +23,7 @@ View = Literal["list", "summary", "sections", "tags", "projects", "methods", "ov
     "cleanup-candidates", "cleanup-plans", "general", "mail", "service-connections", "advanced"]
 ReadKind = Literal["account", "account-summary", "post", "reply", "section", "case",
     "chat-report", "feedback", "chat-file", "forum-file", "project", "method",
-    "message-plan", "message-run", "rule", "strategy-run", "ai-run", "backup-point",
+    "message-plan", "message-run", "rule", "strategy-run", "strategy-version", "ai-run", "backup-point",
     "restore-plan", "role", "file-cleanup-plan", "file-cleanup-operation", "registered-user"]
 VIEWS = {"accounts": {"list", "summary"}, "content": {"list", "sections", "tags"},
     "cases": {"list"}, "chat-reports": {"list"}, "feedback": {"list"},
@@ -313,6 +313,26 @@ class StrategyContinue(ClosedArguments):
     decision: Literal["proceed", "no-action"]
 
 
+class StrategyDraft(ClosedArguments):
+    kind: Literal["strategy-draft"]
+    configuration: dict
+    reason: Reason
+    expectedDraftId: UUID | None = None
+
+
+class StrategyRehearsal(ClosedArguments):
+    kind: Literal["strategy-rehearsal"]
+    versionId: UUID
+    executionIds: Annotated[list[UUID], Field(max_length=200)]
+
+
+class StrategyPublish(ClosedArguments):
+    kind: Literal["strategy-publish"]
+    versionId: UUID
+    rehearsalId: UUID
+    reason: Reason
+
+
 class OrdinaryParameterEdit(ClosedArguments):
     path: Annotated[list[Annotated[int, Field(ge=0, le=19)]], Field(min_length=1, max_length=6)]
     value: Annotated[int, Field(ge=0)]
@@ -404,7 +424,7 @@ from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 _BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
-    OrdinaryStrategyDraft, OrdinaryStrategyPublish,
+    OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
     SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
 DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
 PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
@@ -430,6 +450,7 @@ def _prepared_arguments(operation):
         "feedback-update": ("module", "state", "note"),
         "case-resolve": ("restrictionAction", "hideUntil"),
         "ordinary-strategy-draft": ("mode", "enabled"),
+        "strategy-draft": ("expectedDraftId",),
     }
     for name in optional_only.get(value["kind"], ()):
         if value.get(name) is None:

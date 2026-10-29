@@ -19,3 +19,14 @@ test('typed queue and index cards retain the concrete reviewed target and unknow
   assert.equal(workbenchActionCards([{...raw,state:'unknown'}],domain)[0].capability.canConfirm,false);
  }
 });
+
+
+test('strategy cards preserve complete reviewed differences and refuse incomplete review',()=>{
+ const raw={cardId:'11111111-1111-4111-8111-111111111111',operationId:'22222222-2222-4222-8222-222222222222',kind:'strategy-draft',domain:'overview',state:'prepared',target:{kind:'strategy',label:'策略',href:'/admin/operations/strategy'},title:'保存策略',impact:Array.from({length:80},(_,i)=>`差异 ${i}\n完整内容`),basis:[{label:'当前管理版本',value:'3'}],requiredAction:'strategies.configure',capability:{canConfirm:true},checkedAt:1000,readExpiresAt:1030};
+ for(const kind of ['strategy-draft','strategy-rehearsal','strategy-publish']){
+  const card=workbenchActionCards([{...raw,kind}],'overview')[0];assert.deepEqual(card.impact,raw.impact);assert.deepEqual(card.basis,raw.basis);assert.equal(card.capability.canConfirm,true);
+  for(const bad of [{impact:[]},{basis:[]},{impact:[...raw.impact,'超出行数']},{impact:['x'.repeat(5001)]},{impact:Array(5).fill('x'.repeat(5000))},{basis:[{label:'版本',value:'x'.repeat(5001)}]}]){
+   const invalid=workbenchActionCards([{...raw,...bad,kind}],'overview')[0];assert.equal(invalid.capability.canConfirm,false);assert.equal(invalid.capability.reason,'strategy-review-unavailable');
+  }
+ }
+});

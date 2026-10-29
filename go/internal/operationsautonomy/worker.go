@@ -180,6 +180,9 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 	if runID == nil {
 		runID = value["runId"]
 	}
+	if value["status"] == "NOT_RECORDED" && row["code"] == "operations_agentos_not_configured" {
+		return w.recoverUnsent(ctx, row)
+	}
 	if value["status"] == "NOT_RECORDED" || str(row["native_run_id"]) != "" && str(runID) != "" && row["native_run_id"] != runID {
 		return Object{"state": "unknown"}, nil
 	}
@@ -232,7 +235,11 @@ func (w *Worker) Tick(ctx context.Context) (Object, error) {
 			return false, e
 		}
 		at := s.now()
-		if _, e := tx.Exec(ctx, `INSERT INTO operations_autonomy_health_v1(endpoint,started_at,checked_at,last_tick_at) VALUES($1,$2,$2,$2) ON CONFLICT(endpoint) DO UPDATE SET checked_at=EXCLUDED.checked_at,last_tick_at=EXCLUDED.last_tick_at`, s.Endpoint, at); e != nil {
+		var configured, configuredAt any
+		if s.NativeConfigured != nil {
+			configured, configuredAt = s.NativeConfigured(), at
+		}
+		if _, e := tx.Exec(ctx, `INSERT INTO operations_autonomy_health_v1(endpoint,started_at,checked_at,last_tick_at,native_configured,native_checked_at) VALUES($1,$2,$2,$2,$3,$4) ON CONFLICT(endpoint) DO UPDATE SET checked_at=EXCLUDED.checked_at,last_tick_at=EXCLUDED.last_tick_at,native_configured=EXCLUDED.native_configured,native_checked_at=EXCLUDED.native_checked_at`, s.Endpoint, at, configured, configuredAt); e != nil {
 			return false, e
 		}
 		if e := s.EnsureWithin(ctx, tx); e != nil {
@@ -252,9 +259,11 @@ func (w *Worker) Tick(ctx context.Context) (Object, error) {
 			}
 			due, _ := time.Parse(time.RFC3339Nano, str(cfg["next_due_at"]))
 			if cfg["next_due_at"] != nil && !due.After(at) && !busy {
-				if _, e = s.createTaskWithin(ctx, tx, cfg, TaskInput{Key: "routine:" + str(cfg["id"]) + ":" + str(iso(cfg["next_due_at"])), Due: &due}); e != nil {
-					return false, e
+				task, err := s.createTaskWithin(ctx, tx, cfg, TaskInput{Key: "routine:" + str(cfg["id"]) + ":" + str(iso(cfg["next_due_at"])), Due: &due})
+				if err != nil {
+					return false, err
 				}
+				busy = task != nil
 				next, e := NextDue(obj(obj(cfg["configuration"])["schedule"]), at)
 				if e != nil {
 					return false, e
@@ -263,7 +272,12 @@ func (w *Worker) Tick(ctx context.Context) (Object, error) {
 					return false, e
 				}
 			}
-			events, e := many(ctx, tx, `SELECT to_jsonb(e) FROM operations_autonomy_events_v1 e WHERE endpoint=$1 AND domain=$2 AND processed_at IS NULL AND available_at<=$3 ORDER BY created_at,id LIMIT 100 FOR UPDATE`, s.Endpoint, cfg["domain"], at)
+			// Filter before LIMIT so unrelated retained events cannot starve subscribed ones.
+			eventTypes := texts(obj(obj(cfg["configuration"])["plan"])["eventTypes"])
+			if busy || len(eventTypes) == 0 {
+				continue
+			}
+			events, e := many(ctx, tx, `SELECT to_jsonb(e) FROM operations_autonomy_events_v1 e WHERE endpoint=$1 AND domain=$2 AND processed_at IS NULL AND available_at<=$3 AND event_type=ANY($4::text[]) ORDER BY created_at,id LIMIT 100 FOR UPDATE`, s.Endpoint, cfg["domain"], at, eventTypes)
 			if e != nil {
 				return false, e
 			}

@@ -28,6 +28,24 @@ func (s *Service) QueryRead(ctx context.Context, a Actor, authority p.Authority,
 		return reader.Records(ctx, a, input)
 	case "strategy-run":
 		return reader.RunDetail(ctx, a, id)
+	case "strategy-version":
+		if !uuidPattern.MatchString(id) {
+			return nil, invalid()
+		}
+		if _, e := reader.current(ctx, a, "strategies.read"); e != nil {
+			return nil, e
+		}
+		version, e := reader.version(ctx, reader.Pool, id)
+		if e != nil {
+			return nil, e
+		}
+		if version == nil {
+			return nil, fail("p13_version_not_found", 404)
+		}
+		if _, e = reader.current(ctx, a, "strategies.read"); e != nil {
+			return nil, e
+		}
+		return reader.metadata(Object{"version": VersionView(version)}), nil
 	}
 	return nil, invalid()
 }

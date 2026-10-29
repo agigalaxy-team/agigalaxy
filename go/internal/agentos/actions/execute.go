@@ -33,7 +33,7 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 	}
 	kind := str(x["kind"])
 	switch kind {
-	case "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
+	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		var err error
 		command, err = normalizeStrategyRuleCommand(x, command)
 		if err != nil {
@@ -230,7 +230,7 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 	kind := str(x["kind"])
 	var result Object
 	switch kind {
-	case "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
+	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		result, e = s.executeStrategyRule(ctx, actor, x, command, authorize)
 	case "search-apply", "search-restore", "recommendation-direction":
 		result, e = s.executeDiscovery(ctx, actor, x, command, authorize)

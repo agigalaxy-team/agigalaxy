@@ -49,29 +49,29 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 			}
 			return s.stamp(Object{"taskId": row["id"], "state": row["state"]}), nil
 		}
-		receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM(SELECT state FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2)r`, s.Endpoint, row["id"])
+		completion, e := s.completionWithin(ctx, tx, row, row["mode"] != "code")
 		if e != nil {
 			return nil, e
 		}
-		business := str(row["business_state"])
-		for _, state := range []string{"unknown", "failed", "completed", "no-action"} {
-			found := false
-			for _, r := range receipts {
-				found = found || r["state"] == state
-			}
-			if found {
-				business = state
-				break
-			}
-		}
+		business := str(completion["businessState"])
 		state := str(x["status"])
-		if state == "completed" && row["effective_check"] != true && business != "completed" && business != "no-action" {
-			state = "waiting-human"
+		if state == "failed" && completion["disposition"] == "unknown" {
+			state = "unknown"
+		}
+		if state == "completed" {
+			switch completion["disposition"] {
+			case "waiting-human":
+				state = "waiting-human"
+			case "failed":
+				state = "failed"
+			case "unknown", "continue":
+				state = "unknown"
+			}
 		}
 		done := state == "completed" || state == "failed"
 		code := x["code"]
-		if code == nil && state == "waiting-human" && x["status"] == "completed" {
-			code = "effective-check-required"
+		if code == nil && state != "completed" && x["status"] == "completed" {
+			code = completion["reasonCode"]
 		}
 		if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,model_state=$4,business_state=$5,native_run_id=COALESCE(native_run_id,$6),code=$7,lease_until=CASE WHEN $8 OR $3='waiting-human' THEN NULL ELSE lease_until END,completed_at=CASE WHEN $8 THEN $9 ELSE completed_at END,revision=revision+1,updated_at=$9 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], state, x["modelState"], business, x["nativeRunId"], code, done, s.now()); e != nil {
 			return nil, e

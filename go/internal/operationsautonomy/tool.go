@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation"}
+var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations"}
 
 func parseTool(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
@@ -62,7 +62,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		return nil, e
 	}
 	binding, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (toolBinding, error) {
-		row, e := s.taskWithin(ctx, tx, str(x["taskId"]), "")
+		row, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
 		if e != nil {
 			return toolBinding{}, e
 		}
@@ -87,11 +87,21 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if e != nil {
 			return toolBinding{}, e
 		}
+		if prior != nil && x["tool"] == "assess-task" && prior["code"] != "task-assessment-current" {
+			return toolBinding{}, fail("operations_autonomy_assessment_stale")
+		}
 		if prior != nil && (prior["tool"] != x["tool"] || !sameValue(prior["arguments"], x["arguments"])) {
 			return toolBinding{}, fail("operations_autonomy_operation_conflict")
 		}
 		operationID := str(prior["operation_id"])
 		if prior == nil {
+			if x["tool"] != "assess-task" {
+				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-stale' WHERE endpoint=$1 AND task_id=$2 AND tool='assess-task' AND (code='task-assessment-current' OR state='started' AND code IS NULL)`, s.Endpoint, row["id"]); e != nil {
+					return toolBinding{}, e
+				}
+			} else if e = parseAssessment(obj(x["arguments"])); e != nil {
+				return toolBinding{}, e
+			}
 			operationID = uuid.NewString()
 			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'started',$7,$7)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now()); e != nil {
 				return toolBinding{}, e
@@ -106,6 +116,15 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID
 		tool, args := str(x["tool"]), obj(x["arguments"])
+		if tool == "assess-task" {
+			return Object{"availability": "available"}, nil
+		}
+		if tool == "reconcile-task-operations" {
+			if len(args) != 0 {
+				return nil, invalid()
+			}
+			return s.reconcileTaskOperations(ctx, str(row["id"]), str(x["nativeRunId"]))
+		}
 		if tool == "query-operations" || tool == "read-operation-object" {
 			if s.QueryTool == nil {
 				return nil, fault.New("operations_autonomy_tool_not_configured", 503)
@@ -145,7 +164,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	}()
 	if e == nil {
 		_, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
-			current, e := s.taskWithin(ctx, tx, str(x["taskId"]), "")
+			current, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
 			if e != nil {
 				return false, e
 			}
@@ -157,6 +176,27 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			}
 			state := "completed"
 			var code any
+			if tool == "assess-task" {
+				if _, e = s.DutyForTaskWithin(ctx, tx, str(current["id"]), "query"); e != nil {
+					return false, e
+				}
+				var assessmentCode *string
+				if e = tx.QueryRow(ctx, `SELECT code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"]).Scan(&assessmentCode); e != nil {
+					return false, e
+				}
+				if assessmentCode == nil || *assessmentCode == "task-assessment-current" {
+					if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-superseded' WHERE endpoint=$1 AND task_id=$2 AND tool='assess-task' AND code='task-assessment-current' AND call_id<>$3`, s.Endpoint, x["taskId"], x["callId"]); e != nil {
+						return false, e
+					}
+					code = "task-assessment-current"
+				} else {
+					code = *assessmentCode
+				}
+			} else {
+				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-stale' WHERE endpoint=$1 AND task_id=$2 AND tool='assess-task' AND (code='task-assessment-current' OR state='started' AND code IS NULL)`, s.Endpoint, x["taskId"]); e != nil {
+					return false, e
+				}
+			}
 			if result["state"] == "waiting-human" {
 				state = "waiting-human"
 				code = result["reason"]
@@ -189,6 +229,12 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 					code = "operations_autonomy_human_required"
 				}
 				if e = s.WaitForHumanWithin(ctx, tx, str(x["taskId"]), binding.operationID, code); e != nil {
+					return false, e
+				}
+			}
+			if tool == "assess-task" {
+				result, e = s.completionWithin(ctx, tx, current, true)
+				if e != nil {
 					return false, e
 				}
 			}
