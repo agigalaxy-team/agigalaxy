@@ -6,12 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsaccounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -126,6 +128,20 @@ func TestOriginalAIReceiptProductionSourceWiring(t *testing.T) {
 	content := &operationscommunity.Service{Pool: f.Pool, Endpoint: f.Endpoint, Forum: forum, Now: f.Now}
 	service := connectWorkbenchActions(&agentos.Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Tools: &agentos.ConversationTools{}}, autonomy, content, nil)
 	service.Feedback = &feedback.Operations{Service: &feedback.Service{Pool: f.Pool, Endpoint: f.Endpoint}}
+	service.AccountGovernance = &operationsaccounts.Service{Domain: &businessadmin.Domain{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, Now: f.Now}}
+	accountSource := func(id string) (agentos.Object, error) {
+		return postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (agentos.Object, error) {
+			return autonomy.ReadTargetWithin(ctx, tx, f.Root, "overview", "account", id)
+		})
+	}
+	accountValue, accountErr := accountSource(account.ID)
+	if accountErr != nil || accountValue["availability"] != "available" || len(accountValue) != 1 {
+		t.Fatalf("account metadata source: %v %v", accountValue, accountErr)
+	}
+	if _, accountErr = accountSource(uuid.NewString()); accountErr == nil {
+		t.Fatal("unknown account source accepted")
+	}
+
 	check := func(id string) (agentos.Object, error) {
 		return postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (agentos.Object, error) {
 			return autonomy.ReadTargetWithin(ctx, tx, f.Root, "overview", "feedback", id)
@@ -165,6 +181,70 @@ func TestOriginalAIReceiptProductionSourceWiring(t *testing.T) {
 	}
 	if _, err = postCheck(); fault.Status(err) != 503 {
 		t.Fatalf("withdrawn source accepted: %v", err)
+	}
+}
+
+func TestCaseTaskSourceProductionHumanAndQueryWiring(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	f := operationsfixture.New(t, owner)
+	ctx := context.Background()
+	automation := f.Automation(t)
+	published := publicationfixture.Prepare(t, f.Pool, f.Endpoint, f.Now)
+	forum := &community.Service{Pool: f.Pool, Endpoint: f.Endpoint, Authority: receiptPublicationAuthority{}, Now: f.Now, OperationsHandling: true}
+	payload := published["payload"].(community.Object)
+	raw, _ := json.Marshal(payload)
+	account := published["accounts"].([]any)[0].(string)
+	if _, e := forum.Publish(ctx, account, string(raw)); e != nil {
+		t.Fatal(e)
+	}
+	report := community.Object{"schemaVersion": 1, "operationId": uuid.NewString(), "reportId": uuid.NewString(), "target": community.Object{"kind": "post-version", "postId": payload["postId"], "versionId": payload["versionId"]}, "category": "privacy", "summary": "Synthetic case"}
+	community.BindForumIDs("create-report", account, report)
+	raw, _ = json.Marshal(report)
+	if _, e := forum.Report(ctx, account, string(raw)); e != nil {
+		t.Fatal(e)
+	}
+	role, e := f.Permissions.SaveRole(ctx, f.Root, agentos.Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Case source isolated role", "description": "Current source read", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"autonomy.read", "cases.read"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", agentos.Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": role["role"].(map[string]any)["id"], "enabled": true}); e != nil {
+		t.Fatal(e)
+	}
+	autonomy := &operationsautonomy.Service{Pool: f.Pool, Endpoint: f.Endpoint}
+	content := &operationscommunity.Service{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, PrincipalWithin: f.Gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: f.Gateway.ReadOperationsPrincipalWithin, Forum: forum, Links: &accountlinks.Service{Endpoint: f.Endpoint}, Now: f.Now}
+	connectWorkbenchActions(&agentos.Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Tools: &agentos.ConversationTools{}}, autonomy, content, nil)
+	id := report["reportId"].(string)
+	read := func(query bool) (agentos.Object, error) {
+		return postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (agentos.Object, error) {
+			a := f.Root
+			if query {
+				var err error
+				a, err = f.Permissions.HumanAIAccountReadWithin(ctx, tx, a, "overview", automation["accounts"].(map[string]any)["overview"].(string), "query", "cases.read")
+				if err != nil {
+					return nil, err
+				}
+			}
+			return autonomy.ReadTargetWithin(ctx, tx, a, "overview", "case", id)
+		})
+	}
+	for _, query := range []bool{false, true} {
+		v, err := read(query)
+		if err != nil || v["availability"] != "available" || len(v) != 1 {
+			t.Fatalf("case source query=%v: %v %v", query, v, err)
+		}
+	}
+	if _, err := owner.Exec(ctx, `UPDATE forum_reports_v1 SET state='resolved' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := read(true); err != nil || v["availability"] != "available" {
+		t.Fatalf("resolved case source %v %v", v, err)
+	}
+	if _, err := postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (agentos.Object, error) {
+		a := f.Root
+		a.AIProof = struct{}{}
+		return autonomy.ReadTargetWithin(ctx, tx, a, "overview", "case", id)
+	}); fault.Status(err) != 403 {
+		t.Fatalf("fake query proof: %v", err)
 	}
 }
 

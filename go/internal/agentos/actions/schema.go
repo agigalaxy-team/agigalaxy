@@ -2,6 +2,7 @@ package actions
 
 import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsaccounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsjobs"
 	"github.com/google/uuid"
 	"slices"
@@ -125,6 +126,13 @@ func ParseRequest(input Object) (Object, error) {
 	}
 	if !exact(x, required, optional) {
 		return nil, invalid()
+	}
+	if kind == "account-restriction" {
+		value, err := operationsaccounts.NormalizeRestrictionRequest(x)
+		if err != nil {
+			return nil, invalid()
+		}
+		return value, nil
 	}
 	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" || kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-create-draft" || kind == "ordinary-strategy-publish" || kind == "strategy-control" || kind == "strategy-continue" || kind == "rule-publish" || kind == "rule-restore" {
 		return parseStrategyRuleRequest(x)

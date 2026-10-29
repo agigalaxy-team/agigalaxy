@@ -79,6 +79,12 @@ func (d *Domain) OriginalAIRecordWithin(ctx context.Context, tx pgx.Tx, src Orig
 		if action, ok := src.Request["action"].(string); ok && (action == "stop" || action == "restore") {
 			permission = "files.access." + action
 		}
+	case "account-restriction":
+		if action, ok := src.Request["action"].(string); ok && (action == "apply" || action == "release") {
+			permission = "accounts.restriction." + action
+		}
+	case "case-resolve":
+		permission = "cases.resolve"
 	}
 	if str(row, "actor_kind") != "operations-ai-service" || str(row, "operator_id") != "ai:"+src.AIAccountID ||
 		!sameOriginal(actor["schemaVersion"], 1) || actor["taskId"] != src.TaskID || actor["aiAccountId"] != src.AIAccountID || actor["domain"] != src.Domain || actor["planId"] != src.PlanID ||

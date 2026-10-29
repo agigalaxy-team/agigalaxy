@@ -196,6 +196,11 @@ func (s *Service) changeRestriction(ctx context.Context, a Actor, id string, inp
 		if num(row["restriction_revision"]) != num(x["expectedRevision"]) {
 			return nil, fail("account_restriction_changed", 409)
 		}
+		if d.IsDuty(actor) {
+			if e = s.priorDutyRestrictionWithin(ctx, tx, actor, id, row); e != nil {
+				return nil, e
+			}
+		}
 		var until, reason any
 		if !release {
 			t, _ := time.Parse(time.RFC3339Nano, str(x["until"]))

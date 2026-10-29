@@ -16,7 +16,7 @@ func OriginalAIReceiptQueryReaderMatches(authority Authority, actor Actor) bool 
 // WithOriginalAIReceiptReadWithin preserves the query proof and rechecks both
 // intersected read permissions before and after the transaction-local callback.
 func (s *Service) WithOriginalAIReceiptReadWithin(ctx context.Context, tx pgx.Tx, actor Actor, businessRead string, read func(Actor, Authority) (Object, error)) (Object, error) {
-	if businessRead != "feedback.read" && businessRead != "content.read" && businessRead != "files.read" || read == nil {
+	if businessRead != "feedback.read" && businessRead != "content.read" && businessRead != "files.read" && businessRead != "accounts.read" && businessRead != "cases.read" || read == nil {
 		return nil, fail("operations_agentos_scope_denied", 403)
 	}
 	fresh, e := s.RequireQueryWithin(ctx, tx, actor, "autonomy.read")

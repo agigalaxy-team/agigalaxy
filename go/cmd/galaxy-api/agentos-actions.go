@@ -52,6 +52,43 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 				return nil, fault.New("operations_autonomy_source_unavailable", 503)
 			}
 			return agentos.Object{"availability": "available"}, nil
+		case "account":
+			if service.AccountGovernance == nil || service.AccountGovernance.Domain == nil {
+				break
+			}
+			value, err := service.AccountGovernance.AccountWithin(ctx, tx, id, false)
+			if err != nil {
+				return nil, err
+			}
+			if value["id"] != id {
+				return nil, fault.New("operations_autonomy_source_unavailable", 503)
+			}
+			return agentos.Object{"availability": "available"}, nil
+		case "case":
+			if service.Content == nil {
+				break
+			}
+			var value agentos.Object
+			var err error
+			if actor.AIProof != nil {
+				if conversations.Permissions == nil {
+					return nil, fault.New("operations_autonomy_source_unavailable", 503)
+				}
+				reader := conversations.Permissions.QueryReader()
+				if !p.OriginalAIReceiptQueryReaderMatches(reader, actor) {
+					return nil, fault.New("business_admin_denied", 403)
+				}
+				value, err = service.Content.CaseReadSourceQueryWithin(ctx, tx, actor, reader, id)
+			} else {
+				value, err = service.Content.CaseReadSourceWithin(ctx, tx, actor, id)
+			}
+			if err != nil {
+				return nil, err
+			}
+			if value["id"] != id || value["available"] != true {
+				return nil, fault.New("operations_autonomy_source_unavailable", 503)
+			}
+			return agentos.Object{"availability": "available"}, nil
 		case "forum-file", "chat-file":
 			if service.Files == nil {
 				break
@@ -104,6 +141,14 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 			if service.Files != nil {
 				return service.Files.OriginalAIReceiptWithin(ctx, tx, human, src)
 			}
+		case "account-restriction":
+			if service.AccountGovernance != nil {
+				return service.AccountGovernance.OriginalAIReceiptWithin(ctx, tx, human, src)
+			}
+		case "case-resolve":
+			if service.Content != nil {
+				return service.Content.CaseOriginalAIReceiptWithin(ctx, tx, human, src)
+			}
 		}
 		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)
 	}
@@ -125,6 +170,14 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 		case "file-access":
 			if service.Files != nil {
 				return service.Files.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
+			}
+		case "account-restriction":
+			if service.AccountGovernance != nil {
+				return service.AccountGovernance.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
+			}
+		case "case-resolve":
+			if service.Content != nil {
+				return service.Content.CaseOriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
 			}
 		}
 		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)

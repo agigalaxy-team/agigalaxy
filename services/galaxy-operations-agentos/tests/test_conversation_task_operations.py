@@ -15,6 +15,8 @@ class TaskOperationToolTest(unittest.TestCase):
         tool = task_operation_tool(send)
         function = Function.from_callable(tool)
         self.assertEqual(function.name, "read_task_operation")
+        for supported in ("file access", "account restriction", "public-case resolution"):
+            self.assertIn(supported, function.description)
         self.assertEqual(set(function.parameters["required"]), {"task_id", "operation_id"})
         task, operation = uuid4(), uuid4()
         call = FunctionCall(function=function, call_id="original-call")

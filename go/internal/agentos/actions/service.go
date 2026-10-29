@@ -5,6 +5,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/chat"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -125,7 +126,7 @@ func wire(o Object) (Object, error) {
 	return out, e
 }
 func trim(v string) string {
-	return strings.TrimFunc(v, func(r rune) bool { return r == '\ufeff' || unicode.IsSpace(r) && r != 0x85 })
+	return businessadmin.TrimActionText(v)
 }
 func jsLength(v string) int { return len(utf16.Encode([]rune(v))) }
 func label(v any, fallback string) string {

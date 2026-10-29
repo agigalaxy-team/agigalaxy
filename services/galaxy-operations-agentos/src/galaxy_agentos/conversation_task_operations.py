@@ -10,7 +10,8 @@ def task_operation_tool(send):
                             task_id: UUID, operation_id: UUID) -> str:
         """Read the original task operation's recorded, unknown or not-recorded receipt.
 
-        Supports original feedback-update and public post/reply visibility operations.
+        Supports original feedback updates, public post/reply visibility, file access,
+        short account restriction and public-case resolution operations.
         This returns historical receipt metadata, not current object details. Use
         identifiers from an existing task and operation. It never executes, retries
         or resumes the task; unknown does not establish business success.
