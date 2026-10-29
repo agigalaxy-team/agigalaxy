@@ -61,7 +61,19 @@ func (s *Service) rules(ctx context.Context, a Actor, args arguments) (queryResu
 		return merge(historyItem(x), Object{"version": project(x["version"], merge(shape("id key source createdAt", "s"), shape("version publishedVersion", "n")))})
 	}, nil)
 }
-func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (queryResult, error) {
+
+func strategyRunItem(row Object, known bool) Object {
+	data := object(project(row, merge(shape("id strategyId state code createdAt updatedAt", "s"), Object{"strategy": shape("id name domain mode", "s"), "target": merge(shape("kind id", "s"), Object{"sourceVersion": "n"}), "canContinue": "b", "continueCode": "s", "native": merge(shape("runId status pauseKind", "s"), Object{"awaitingHuman": "b"})})))
+	data["capabilityPurpose"] = oneOf(row["capabilityPurpose"], "human-confirmation-preparation")
+	if !known {
+		data["canContinue"], data["continueCode"], data["capabilityPurpose"] = nil, nil, nil
+	}
+	for key, value := range preparationBasis(known) {
+		data[key] = value
+	}
+	return data
+}
+func (s *Service) strategies(ctx context.Context, a Actor, domain string, args arguments) (queryResult, error) {
 	if s.Strategies == nil {
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
@@ -69,7 +81,16 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 	if args.kind == "strategy-run" || args.kind == "strategy-version" {
 		view = args.kind
 	}
-	value, e := s.Strategies.QueryRead(ctx, a, s.reader(a), view, args.id, args.filters)
+	authority := s.reader(a)
+	known := false
+	if args.kind == "strategy-run" {
+		var e error
+		a, authority, known, e = s.preparationReadContext(ctx, a, domain, "strategies.read")
+		if e != nil {
+			return queryResult{}, e
+		}
+	}
+	value, e := s.Strategies.QueryRead(ctx, a, authority, view, args.id, args.filters)
 	if e != nil {
 		return queryResult{}, e
 	}
@@ -88,7 +109,7 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 	}
 	if args.kind != "" {
 		row := object(value["run"])
-		data := object(project(row, merge(shape("id strategyId state code createdAt updatedAt", "s"), Object{"strategy": shape("id name domain mode", "s"), "target": merge(shape("kind id", "s"), Object{"sourceVersion": "n"}), "canContinue": "b", "continueCode": "s", "native": merge(shape("runId status pauseKind", "s"), Object{"awaitingHuman": "b"})})))
+		data := strategyRunItem(row, known)
 		return queryResult{source: value, data: data, refs: []reference{{kind: args.kind, id: args.id, row: row, filters: args.filters}}}, nil
 	}
 	if args.view == "overview" {

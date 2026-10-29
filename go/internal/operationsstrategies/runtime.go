@@ -63,6 +63,9 @@ func (s *Service) RunDetail(ctx context.Context, a Actor, id string) (Object, er
 	if continuation["canContinue"] == true && !has(current.Permissions, "strategies.run") {
 		continuation = Object{"canContinue": false, "continueCode": "permission-denied"}
 	}
+	if s.acceptsPreparation(a) {
+		continuation["capabilityPurpose"] = "human-confirmation-preparation"
+	}
 	var strategyView, versionView any
 	if strategy != nil {
 		strategyView = Object{"id": strategy["id"], "name": strategy["name"], "domain": strategy["domain"], "mode": strategy["mode"], "judgment": strategy["judgment"]}
@@ -90,7 +93,7 @@ func (s *Service) continuationCapability(ctx context.Context, a Actor, row, nati
 	if native["runId"] != row["native_run_id"] || native["workflowId"] != row["workflow_id"] || !same(native["workflowVersion"], row["workflow_version"]) || !pauseID.MatchString(str(native["pauseId"])) {
 		return no("check-unavailable")
 	}
-	_, e := s.current(ctx, a, "strategies.run")
+	_, e := s.continuationAuthority(ctx, a)
 	if e == nil {
 		head, err := s.head(ctx, s.Pool)
 		e = err

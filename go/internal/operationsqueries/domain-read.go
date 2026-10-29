@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsresources"
 )
 
@@ -110,7 +111,7 @@ func resourceItem(x Object) Object {
 	}
 	return out
 }
-func (s *Service) community(ctx context.Context, a Actor, args arguments) (queryResult, error) {
+func (s *Service) community(ctx context.Context, a Actor, domain string, args arguments) (queryResult, error) {
 	if s.Community == nil {
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
@@ -118,6 +119,15 @@ func (s *Service) community(ctx context.Context, a Actor, args arguments) (query
 	reader := &operationscommunity.Service{Pool: live.Pool, Endpoint: live.Endpoint, Authority: s.reader(a), Duty: live.Duty, PrincipalWithin: live.PrincipalWithin, ReadPrincipalWithin: live.ReadPrincipalWithin, Forum: live.Forum, Files: live.Files, Links: live.Links, Now: live.Now}
 	var value Object
 	var e error
+	casePreparationKnown := false
+	if args.kind == "case" {
+		var authority operationspermissions.Authority
+		a, authority, casePreparationKnown, e = s.preparationReadContext(ctx, a, domain, "cases.read")
+		if e != nil {
+			return queryResult{}, e
+		}
+		reader.Authority = authority
+	}
 	if args.kind == "content-tag" {
 		value, e := reader.TagByID(ctx, a, args.id)
 		if e != nil {
@@ -162,6 +172,9 @@ func (s *Service) community(ctx context.Context, a Actor, args arguments) (query
 				return queryResult{}, fail("operations_query_response_invalid", 503)
 			}
 			data, e = caseDetail(row)
+			if e == nil {
+				projectCasePreparation(data, casePreparationKnown)
+			}
 			purpose = "public-case-review"
 		}
 		return queryResult{source: value, data: data, purpose: purpose, refs: []reference{{kind: args.kind, id: args.id, row: row, filters: args.filters, purpose: purpose}}}, e
@@ -247,7 +260,7 @@ func (s *Service) resources(ctx context.Context, a Actor, args arguments) (query
 	}
 	return typedList(args, value, resourceItem, fixedKind(kind))
 }
-func (s *Service) files(ctx context.Context, a Actor, args arguments) (queryResult, error) {
+func (s *Service) files(ctx context.Context, a Actor, domain string, args arguments) (queryResult, error) {
 	if s.Files == nil {
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
@@ -255,6 +268,15 @@ func (s *Service) files(ctx context.Context, a Actor, args arguments) (queryResu
 	reader := &filegovernance.Service{Pool: x.Pool, Endpoint: x.Endpoint, Authority: s.reader(a), Duty: x.Duty, StoredAuthority: x.StoredAuthority, PrincipalWithin: x.PrincipalWithin, Chat: x.Chat, Forum: x.Forum, Now: x.Now, Diagnostic: x.Diagnostic}
 	var value Object
 	var e error
+	filePreparationKnown := false
+	if args.kind == "chat-file" || args.kind == "forum-file" || args.view == "list" {
+		var authority operationspermissions.Authority
+		a, authority, filePreparationKnown, e = s.preparationReadContext(ctx, a, domain, "files.read")
+		if e != nil {
+			return queryResult{}, e
+		}
+		reader.Authority = authority
+	}
 	if args.kind != "" {
 		switch args.kind {
 		case "chat-file", "forum-file":
@@ -277,7 +299,7 @@ func (s *Service) files(ctx context.Context, a Actor, args arguments) (queryResu
 		if e != nil {
 			return queryResult{}, e
 		}
-		data := fileItem(value)
+		data := fileItemPreparation(value, filePreparationKnown)
 		if args.kind == "file-cleanup-plan" {
 			data = cleanupPlanItem(value)
 		} else if args.kind == "file-cleanup-operation" {
@@ -285,7 +307,7 @@ func (s *Service) files(ctx context.Context, a Actor, args arguments) (queryResu
 		}
 		return queryResult{source: value, data: data, refs: []reference{{kind: args.kind, id: args.id, row: value, filters: args.filters}}}, nil
 	}
-	projector, kind := fileItem, func(x Object) string { return str(x["kind"]) + "-file" }
+	projector, kind := func(x Object) Object { return fileItemPreparation(x, filePreparationKnown) }, func(x Object) string { return str(x["kind"]) + "-file" }
 	switch args.view {
 	case "list":
 		value, e = reader.List(ctx, a, args.filters)

@@ -10,6 +10,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/publicationfixture"
@@ -293,6 +294,54 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 	humanView, e := strategy.RunDetail(ctx, human, humanRunID)
 	if e != nil || obj(humanView["run"])["canContinue"] != true {
 		t.Fatalf("actual original pause not continuable %v %#v", e, humanView)
+	}
+	role, e := currentFixture.Permissions.SaveRole(ctx, currentFixture.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Strategy preparation reader", "description": "Review a specific paused run", "subjectScope": "ai-only", "enabled": true, "permissions": []string{"strategies.read", "strategies.run"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	roleID := str(obj(role["role"])["id"])
+	if _, e = currentFixture.Permissions.AIWorkAssignment(ctx, currentFixture.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": roleID, "enabled": true}); e != nil {
+		t.Fatal(e)
+	}
+	var aiID string
+	if e = owner.QueryRow(ctx, `SELECT id::text FROM operations_ai_work_accounts_v1 WHERE endpoint=$1 AND domain='overview'`, endpoint).Scan(&aiID); e != nil {
+		t.Fatal(e)
+	}
+	stored, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Actor, error) {
+		return permissions.StoredHumanAIWithin(ctx, tx, human.ID, "overview", aiID, "prepare", "strategies.read")
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	reader := strategy.WithAuthority(&p.BusinessAuthority{Human: permissions.PreparationReader()})
+	preparedView, e := reader.RunDetail(ctx, stored, humanRunID)
+	if e != nil || obj(preparedView["run"])["canContinue"] != true || obj(preparedView["run"])["capabilityPurpose"] != "human-confirmation-preparation" {
+		t.Fatalf("stored prepare eligibility: %v %#v", e, preparedView)
+	}
+	queryView, e := strategy.QueryRead(ctx, stored, &p.BusinessAuthority{Human: permissions.PreparationReader()}, "strategy-run", humanRunID, nil)
+	if e != nil || obj(queryView["run"])["canContinue"] != true || obj(queryView["run"])["capabilityPurpose"] != "human-confirmation-preparation" {
+		t.Fatalf("stored prepare QueryRead: %v %#v", e, queryView)
+	}
+	metadata["status"], metadata["awaitingHuman"] = "RUNNING", false
+	preparedView, e = reader.RunDetail(ctx, stored, humanRunID)
+	if e != nil || obj(preparedView["run"])["canContinue"] != false {
+		t.Fatalf("unpaused run eligible: %v %#v", e, preparedView)
+	}
+	metadata["status"], metadata["awaitingHuman"] = "PAUSED", true
+	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['strategies.read'] WHERE endpoint=$1 AND id=$2`, endpoint, roleID); e != nil {
+		t.Fatal(e)
+	}
+	preparedView, e = reader.RunDetail(ctx, stored, humanRunID)
+	if e != nil || obj(preparedView["run"])["canContinue"] != false || obj(preparedView["run"])["continueCode"] != "permission-denied" {
+		t.Fatalf("revoked run eligibility: %v %#v", e, preparedView)
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['strategies.read','strategies.run'] WHERE endpoint=$1 AND id=$2`, endpoint, roleID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Actor, error) {
+		return permissions.PreparationReader().RequireWithin(ctx, tx, stored, "strategies.run")
+	}); e == nil {
+		t.Fatal("stored preparation authorized a run write")
 	}
 	decision := Object{"operationId": uuid.NewString(), "confirmed": true}
 	if _, e = strategy.Continue(ctx, human, humanRunID, decision, authorize); e == nil {

@@ -6,8 +6,6 @@ import (
 	"slices"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
-	"github.com/jackc/pgx/v5"
 )
 
 var deliveryStates = merge(shape("total pending submitting submitted delivered skipped failed unknown blocked bounced opened clicked", "n"), Object{"receipts": "s"})
@@ -63,15 +61,15 @@ func (s *Service) execute(ctx context.Context, a Actor, domain string, args argu
 	}
 	switch args.module {
 	case "content", "cases":
-		return s.community(ctx, a, args)
+		return s.community(ctx, a, domain, args)
 	case "resources":
 		return s.resources(ctx, a, args)
 	case "files":
-		return s.files(ctx, a, args)
+		return s.files(ctx, a, domain, args)
 	case "chat-reports":
 		return s.chatReports(ctx, a, args)
 	case "strategies":
-		return s.strategies(ctx, a, args)
+		return s.strategies(ctx, a, domain, args)
 	case "rules":
 		return s.rules(ctx, a, args)
 	case "maintenance":
@@ -97,19 +95,12 @@ func (s *Service) execute(ctx context.Context, a Actor, domain string, args argu
 	}
 	if args.kind != "" {
 		known := false
-		if args.kind == "message-plan" && (s.Permissions.Duty == nil || !s.Permissions.Duty.AcceptsDuty(a)) {
-			// The normal query proof filters out preparation permissions. Obtain
-			// the same person's fixed-AI preparation projection for this read
-			// only, without invoking any prepare or mutation operation.
-			prepared, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) {
-				return s.Permissions.HumanAIReadWithin(ctx, tx, a, domain, "prepare", "notices.read")
-			})
+		if args.kind == "message-plan" {
+			prepared, authority, checked, err := s.preparationReadContext(ctx, a, domain, "notices.read")
 			if err != nil {
 				return queryResult{}, err
 			}
-			a = prepared
-			source.Authority = s.Permissions.PreparationReader()
-			known = true
+			a, source.Authority, known = prepared, authority, checked
 		}
 		return s.readMessage(ctx, source, a, args, known)
 	}
