@@ -120,6 +120,7 @@ func (s *Service) strategies(ctx context.Context, a Actor, domain string, args a
 	}
 	if args.view == "overview" {
 		data := object(project(value, Object{"revision": "n", "paused": "b", "active": Object{"id": "s", "version": "n", "createdAt": "s"}, "draft": Object{"id": "s", "version": "n", "createdAt": "s"}, "native": Object{"state": "s"}}))
+		data["policyRevision"], data["revisionKind"] = data["revision"], "strategy-head"
 		data["configuration"] = value["configuration"]
 		if draft := object(value["draft"]); draft != nil {
 			object(data["draft"])["configuration"] = draft["configuration"]

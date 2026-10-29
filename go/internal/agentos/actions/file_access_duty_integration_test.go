@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -100,8 +101,15 @@ func TestFileAccessThroughOpaqueDutyOriginalOperation(t *testing.T) {
 	}
 	request := Object{"kind": "file-access", "targetKind": "forum", "targetId": fileID, "action": "stop", "until": now().Add(30 * time.Minute).Unix(), "reason": "Synthetic authorized file test"}
 	outside := Object{"kind": "file-access", "targetKind": "forum", "targetId": otherFileID, "action": "stop", "until": now().Add(30 * time.Minute).Unix(), "reason": "Outside selected grant"}
-	if _, e = service.ExecuteDutyOperation(ctx, actor, uuid.NewString(), outside, false); e == nil {
-		t.Fatal("file outside selected grant accepted")
+	outsideID := uuid.NewString()
+	_, e = service.ExecuteDutyOperation(ctx, actor, outsideID, outside, false)
+	var rejected *operationsautonomy.PreparationRejection
+	if !errors.As(e, &rejected) || rejected.Phase() != "bind" {
+		t.Fatalf("outside scope did not fail before dispatch: %v", e)
+	}
+	var count int
+	if e = owner.QueryRow(ctx, `SELECT count(*) FROM operations_ai_duty_operations_v1 WHERE endpoint=$1 AND operation_id=$2`, f.Endpoint, outsideID).Scan(&count); e != nil || count != 0 {
+		t.Fatalf("rejected operation persisted: count=%d err=%v", count, e)
 	}
 	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET dispatch_started_at=$3,native_run_id='synthetic-run' WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, now()); e != nil {
 		t.Fatal(e)

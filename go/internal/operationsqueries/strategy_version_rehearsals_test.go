@@ -35,6 +35,14 @@ func TestStrategyVersionRehearsalsReachFixedAIQueryPG(t *testing.T) {
 		t.Fatal(e)
 	}
 	s := &q.Service{Pool: f.Pool, Permissions: f.Permissions, Strategies: strategy, Now: f.Now}
+	overview, e := s.Query(ctx, f.Root, "overview", "query-operations", map[string]any{"module": "strategies", "view": "overview"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	strategyData := overview["data"].(map[string]any)
+	if strategyData["revision"] != strategyData["policyRevision"] || strategyData["policyRevision"] != float64(1) || strategyData["revisionKind"] != "strategy-head" {
+		t.Fatalf("strategy revision distinction %#v", strategyData)
+	}
 	result, e := s.Query(ctx, f.Root, "overview", "read-operation-object", map[string]any{"kind": "strategy-version", "id": id, "filters": map[string]any{"limit": 1}})
 	if e != nil {
 		t.Fatal(e)

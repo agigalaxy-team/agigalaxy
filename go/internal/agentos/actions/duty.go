@@ -345,14 +345,14 @@ func (s *Service) ExecuteDutyOperation(ctx context.Context, a Actor, operationID
 	}
 	proposal, e := s.Prepare(ctx, a, str(metadata["domain"]), request, operationID)
 	if e != nil {
-		return nil, e
+		return nil, operationsautonomy.MarkPreparationRejected("prepare", e)
 	}
 	target := str(obj(proposal["target"])["id"])
 	bound, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) {
 		return s.Autonomy.BindDutyOperationWithin(ctx, tx, a, operationsautonomy.DutyOperation{Permission: permission, TargetID: target, OperationID: operationID, Request: request, Command: obj(proposal["command"])})
 	})
 	if e != nil {
-		return nil, e
+		return nil, operationsautonomy.MarkPreparationRejected("bind", e)
 	}
 	binding, e := s.Permissions.Duty.DutyMetadata(bound)
 	if e != nil {
@@ -365,7 +365,7 @@ func (s *Service) ExecuteDutyOperation(ctx context.Context, a Actor, operationID
 			}
 		}
 		e = s.QualifyTargetWithin(ctx, tx, bound, permission, target, request, obj(proposal["command"]), str(obj(binding["operation"])["grantId"]))
-		return e == nil, e
+		return e == nil, operationsautonomy.MarkPreparationRejected("qualify", e)
 	})
 	if e != nil {
 		return nil, e

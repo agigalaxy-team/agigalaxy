@@ -389,16 +389,23 @@ class OrdinaryStrategyDraft(ClosedArguments):
 
 
 class OrdinaryStrategyPublish(ClosedArguments):
+    """Publish this task's own ordinary draft under its authorized source strategy.
+
+    The owning service performs current, side-effect-free program rehearsal
+    inside publication; a separate generic strategy rehearsal is not needed.
+    Current source, task, AI, grant and draft checks still apply.
+    """
     kind: Literal["ordinary-strategy-publish"]
-    strategyId: UUID
-    versionId: UUID
+    strategyId: UUID = Field(description="The authorized source template strategy ID from this task's original creation receipt, not newStrategyId.")
+    versionId: UUID = Field(description="The actual draft configuration version ID from this same task's original creation receipt.")
 
 
 class OrdinaryStrategyCreateDraft(ClosedArguments):
+    """Create a bounded ordinary draft from the approved current source template."""
     kind: Literal["ordinary-strategy-create-draft"]
-    sourceStrategyId: UUID
-    sourceVersionId: UUID
-    expectedRevision: Annotated[int, Field(strict=True, ge=0)]
+    sourceStrategyId: UUID = Field(description="The selected authorized source template strategy ID.")
+    sourceVersionId: UUID = Field(description="The current active strategy configuration version ID containing that source.")
+    expectedRevision: Annotated[int, Field(strict=True, ge=0, description="The current strategy head policyRevision from strategies/overview; never the autonomous task configRevision or planVersion.")]
     name: Annotated[str, Field(min_length=1, max_length=120)]
     reason: Reason
     parameterEdits: Annotated[list[OrdinaryParameterEdit], Field(max_length=30)] = Field(default_factory=list)

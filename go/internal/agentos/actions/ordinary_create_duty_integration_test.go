@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -109,6 +110,18 @@ func TestOrdinaryCreateThroughOpaqueDutyAndOriginalReceiptPG(t *testing.T) {
 	}
 	if _, err = owner.Exec(ctx, `UPDATE operations_p13_strategy_heads_v1 SET draft_id=NULL WHERE endpoint=$1`, f.Endpoint); err != nil {
 		t.Fatal(err)
+	}
+	stale := copyJSON(request)
+	stale["expectedRevision"] = 21
+	staleID := uuid.NewString()
+	_, err = service.ExecuteDutyOperation(ctx, actor, staleID, stale, false)
+	var rejected *operationsautonomy.PreparationRejection
+	if !errors.As(err, &rejected) || rejected.Phase() != "prepare" {
+		t.Fatalf("stale prepare did not produce pre-dispatch rejection: %v", err)
+	}
+	var dutyCount, commandCount int
+	if err = owner.QueryRow(ctx, `SELECT (SELECT count(*) FROM operations_ai_duty_operations_v1 WHERE endpoint=$1 AND operation_id=$2),(SELECT count(*) FROM operations_p13_strategy_commands_v1 WHERE endpoint=$1 AND operation_id=$2)`, f.Endpoint, staleID).Scan(&dutyCount, &commandCount); err != nil || dutyCount != 0 || commandCount != 0 {
+		t.Fatalf("preparation had durable effects: duty=%d command=%d err=%v", dutyCount, commandCount, err)
 	}
 	created, err := service.ExecuteDutyOperation(ctx, actor, operationID, request, false)
 	if err != nil {
