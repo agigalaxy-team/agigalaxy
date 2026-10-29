@@ -2,6 +2,7 @@ package operationsautonomy_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,11 +17,17 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type retryNative struct{ task, run, session string }
+type retryNative struct {
+	task, run, session string
+	omitUsage          bool
+}
 
 func (n *retryNative) Run(context.Context, a.Object) (a.Object, error) { return nil, nil }
 func (n *retryNative) Read(context.Context, a.Object) (a.Object, error) {
-	return a.Object{"taskId": n.task, "nativeRunId": n.run, "sessionId": n.session, "status": "ERROR"}, nil
+	if n.omitUsage {
+		return a.Object{"taskId": n.task, "nativeRunId": n.run, "sessionId": n.session, "status": "ERROR"}, nil
+	}
+	return a.Object{"taskId": n.task, "nativeRunId": n.run, "sessionId": n.session, "status": "ERROR", "run": a.Object{"runId": n.run, "calls": 29, "tokens": a.Object{"input": 1432518, "output": 10852, "total": 1443370}, "durationMs": 223831.4}}, nil
 }
 func (n *retryNative) Cancel(context.Context, a.Object) (a.Object, error)   { return nil, nil }
 func (n *retryNative) Continue(context.Context, a.Object) (a.Object, error) { return nil, nil }
@@ -94,6 +101,14 @@ func TestRetryNativeAttemptPreservesOriginalAndRejectsStale(t *testing.T) {
 	if !ok || previous["nativeRunId"] != native.run || previous["status"] != "ERROR" {
 		t.Fatalf("previous identity missing: %v", result)
 	}
+	primary, _ := previous["primaryModelUsage"].(map[string]any)
+	if primary["calls"] != 29 {
+		t.Fatalf("original native usage not preserved: %v", primary)
+	}
+	var currentPrimary a.Object
+	if err := owner.QueryRow(ctx, `SELECT primary_model_usage FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&currentPrimary); err != nil || currentPrimary != nil {
+		t.Fatalf("new attempt inherited old primary: %v %v", currentPrimary, err)
+	}
 	if len(jobs) != 1 || jobs[0]["nativeAttemptId"] != op || jobs[0]["sessionId"] == native.session {
 		t.Fatalf("bad job binding: %v", jobs)
 	}
@@ -103,5 +118,35 @@ func TestRetryNativeAttemptPreservesOriginalAndRejectsStale(t *testing.T) {
 	}
 	if a.RequireNativeAttempt(a.Object{"native_attempt_id": op}, a.Object{}) == nil || a.RequireNativeAttempt(a.Object{"native_attempt_id": op}, a.Object{"nativeAttemptId": op}) != nil {
 		t.Fatal("attempt matcher failed")
+	}
+
+	// A terminal identity without a native usage snapshot cannot prove the old
+	// observation was final. Preserve it as history, but leave the new total unknown.
+	task = uuid.NewString()
+	native.task, native.run, native.session, native.omitUsage = task, uuid.NewString(), uuid.NewString(), true
+	if _, err := postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (a.Object, error) {
+		return svc.LinkWorkbenchWithin(ctx, tx, a.WorkbenchLink{OperationID: task, Domain: "overview", AIAccountID: base["aiAccountId"].(string)})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	oldUsage := a.Object{"calls": 7, "inputTokens": 131400, "outputTokens": 3509, "totalTokens": 134909, "durationMs": 31732.65}
+	if _, err := owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET source='routine',mode='ai',state='unknown',model_state='failed',session_id=$3,native_run_id=$4,dispatch_started_at=$5,primary_model_usage=$6,model_usage=$6 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task, native.session, native.run, now(), oldUsage); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.QueryRow(ctx, `SELECT revision FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&revision); err != nil {
+		t.Fatal(err)
+	}
+	result, err = svc.Control(ctx, f.Root, task, a.Object{"kind": "retry", "operationId": uuid.NewString(), "expectedRevision": revision}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, _ = result["previousAttempt"].(map[string]any)
+	old, _ := previous["modelUsage"].(map[string]any)
+	if previous["primaryModelUsage"] != nil || fmt.Sprint(old["calls"]) != "7" {
+		t.Fatalf("missing native snapshot did not preserve only the old observation: %v", previous)
+	}
+	var currentTotal a.Object
+	if err := owner.QueryRow(ctx, `SELECT primary_model_usage,model_usage FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&currentPrimary, &currentTotal); err != nil || currentPrimary != nil || currentTotal["calls"] != nil || currentTotal["inputTokens"] != nil || currentTotal["outputTokens"] != nil || currentTotal["totalTokens"] != nil || currentTotal["durationMs"] != nil {
+		t.Fatalf("missing native snapshot did not keep current total unknown: %v %v %v", currentPrimary, currentTotal, err)
 	}
 }

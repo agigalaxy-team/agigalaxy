@@ -243,14 +243,19 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 		}
 	}
 	if run := obj(value["run"]); run != nil && str(runID) != "" {
-		tokens := obj(run["tokens"])
-		usage := Object{"calls": finite(run["calls"]), "inputTokens": finite(tokens["input"]), "outputTokens": finite(tokens["output"]), "totalTokens": finite(tokens["total"]), "durationMs": finite(run["durationMs"])}
+		usage := nativeUsageFromView(run)
 		if _, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
-			if _, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET primary_model_usage=$3 WHERE endpoint=$1 AND id=$2 AND native_run_id=$4 AND native_attempt_id IS NOT DISTINCT FROM $5::uuid AND session_id=$6`, s.Endpoint, row["id"], jsonText(usage), runID, row["native_attempt_id"], row["session_id"]); e != nil {
-				return false, e
+			current, err := s.taskWithin(ctx, tx, str(row["id"]), " FOR UPDATE")
+			if err != nil {
+				return false, err
 			}
-			_, e := s.refreshUsageWithin(ctx, tx, str(row["id"]))
-			return true, e
+			if current["native_run_id"] != runID || current["native_attempt_id"] != row["native_attempt_id"] || current["session_id"] != row["session_id"] {
+				return false, nil
+			}
+			if err = s.storeNativeUsageWithin(ctx, tx, current, str(runID), usage); err != nil {
+				return false, err
+			}
+			return true, nil
 		}); e != nil {
 			return nil, e
 		}

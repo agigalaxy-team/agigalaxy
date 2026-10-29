@@ -276,11 +276,32 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 			if s.EnqueueWithin == nil {
 				return nil, fault.New("operations_autonomy_unavailable", 503)
 			}
-			previous := Object{"nativeRunId": row["native_run_id"], "nativeAttemptId": row["native_attempt_id"], "sessionId": row["session_id"], "status": "ERROR", "modelState": row["model_state"], "modelUsage": row["model_usage"], "code": row["code"]}
+			var previousPrimary any
+			if run := obj(nativeBefore["run"]); run != nil && run["runId"] == row["native_run_id"] {
+				usage := nativeUsageFromView(run)
+				if validNativeUsage(usage) && nativeUsageNotOlder(obj(row["primary_model_usage"]), usage) {
+					if err = s.storeNativeUsageWithin(ctx, tx, row, str(row["native_run_id"]), usage); err != nil {
+						return nil, err
+					}
+					previousPrimary = usage
+					row, err = s.taskWithin(ctx, tx, id, "")
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+			previous := Object{"nativeRunId": row["native_run_id"], "nativeAttemptId": row["native_attempt_id"], "sessionId": row["session_id"], "status": "ERROR", "modelState": row["model_state"], "modelUsage": row["model_usage"], "primaryModelUsage": previousPrimary, "code": row["code"]}
 			session := uuid.NewString()
-			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state='queued',native_attempt_id=$3,session_id=$4,native_run_id=NULL,dispatch_started_at=NULL,model_state='not-started',native_continuable=false,lease_owner=NULL,lease_until=NULL,control_state=NULL,code=NULL,completed_at=NULL,control_revision=control_revision+1,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, x["operationId"], session, s.now())
+			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state='queued',native_attempt_id=$3,session_id=$4,native_run_id=NULL,dispatch_started_at=NULL,model_state='not-started',native_continuable=false,primary_model_usage=NULL,lease_owner=NULL,lease_until=NULL,control_state=NULL,code=NULL,completed_at=NULL,control_revision=control_revision+1,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, x["operationId"], session, s.now())
 			if err != nil {
 				return nil, err
+			}
+			if previousPrimary == nil {
+				unknown := Object{"calls": nil, "inputTokens": nil, "outputTokens": nil, "totalTokens": nil, "durationMs": nil}
+				if _, err = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET model_usage=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, id, jsonText(unknown)); err != nil {
+					return nil, err
+				}
+				saved["model_usage"] = unknown
 			}
 			if err = s.EnqueueWithin(ctx, tx, "autonomy-task", taskJobInput(saved, false), fmt.Sprintf("%s:retry:%s", id, x["operationId"]), nil); err != nil {
 				return nil, err

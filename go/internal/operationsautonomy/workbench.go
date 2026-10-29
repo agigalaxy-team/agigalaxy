@@ -115,6 +115,11 @@ func (s *Service) refreshUsageWithin(ctx context.Context, tx pgx.Tx, id string) 
 	}
 	if r["source"] != "workbench" {
 		runs = append([]Object{{"usage": r["primary_model_usage"]}}, runs...)
+		previous, err := many(ctx, tx, `SELECT to_jsonb(p) FROM (SELECT result->'previousAttempt'->'primaryModelUsage' AS usage FROM operations_autonomy_commands_v1 WHERE endpoint=$1 AND kind='control' AND input->>'kind'='retry' AND input->>'id'=$2 ORDER BY created_at,operation_id)p`, s.Endpoint, id)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, previous...)
 	}
 	combined := Object{}
 	for _, k := range usageKeys {

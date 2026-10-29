@@ -12,6 +12,7 @@ from .conversation_storage import conversation_storage_fields
 from .duty_continuation import WRITE_TOOLS, call_reference
 from .gateway import AuthorityDenied, AuthorityUnavailable
 from .duty_attempt import attempt_id
+from .read_model import usage_snapshot
 
 
 MODEL_STATES = {"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "completed",
@@ -52,6 +53,7 @@ def duty_report_fields(run):
     status_value = run.get("status") or nested.get("status")
     status = str(getattr(status_value, "value", status_value) or "").upper()
     metadata = run.get("metadata") if isinstance(run.get("metadata"), dict) else nested.get("metadata")
+    usage = usage_snapshot(nested if nested else run)
     failure = (metadata or {}).get("completionFailureCode")
     code = failure if isinstance(failure, str) and failure in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"} else "operations_autonomy_model_failed"
     return {"nativeRunId": run.get("run_id") or nested.get("run_id"),
@@ -60,6 +62,7 @@ def duty_report_fields(run):
         "status": "waiting-human" if status == "PAUSED" else "completed" if status == "COMPLETED"
             else "failed" if status in {"ERROR", "CANCELLED"} else "running" if status in {"PENDING", "RUNNING"} else "unknown",
         **({"code": code} if status == "ERROR" else {}),
+        **({"modelUsage": usage} if any(value is not None for value in usage.values()) else {}),
         **({"manualPause": marker} if status == "PAUSED" and (marker := manual_pause_marker((metadata or {}).get("manualPause"))) else {}),
         **({"manualResumeConsumed": consumed} if status == "RUNNING" and (consumed := manual_resume_consumed((metadata or {}).get("manualResumeConsumed"))) else {})}
 

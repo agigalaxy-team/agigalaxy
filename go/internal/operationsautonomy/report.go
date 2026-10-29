@@ -16,7 +16,7 @@ var nativeRunPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 var modelStates = []string{"not-started", "dispatching", "accepted", "running", "completed", "failed", "cancelled", "unknown", "not-required"}
 
 func parseReport(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
+	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed", "modelUsage"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
 		return nil, invalid()
 	}
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
@@ -29,6 +29,9 @@ func parseReport(input Object) (Object, error) {
 		if _, ok := v.(bool); !ok {
 			return nil, invalid()
 		}
+	}
+	if v, ok := input["modelUsage"]; ok && (!validNativeUsage(obj(v)) || !nativeRunPattern.MatchString(str(input["nativeRunId"]))) {
+		return nil, invalid()
 	}
 	if v, ok := input["code"]; ok && !safeCode.MatchString(str(v)) {
 		return nil, invalid()
@@ -95,6 +98,17 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 		if str(row["native_run_id"]) != "" && str(x["nativeRunId"]) != "" && row["native_run_id"] != x["nativeRunId"] {
 			return nil, fail("operations_autonomy_operation_conflict")
 		}
+		if usage := obj(x["modelUsage"]); usage != nil {
+			if str(row["native_run_id"]) == "" && !has(terminal, str(row["state"])) {
+				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_run_id=$3 WHERE endpoint=$1 AND id=$2 AND native_run_id IS NULL`, s.Endpoint, row["id"], x["nativeRunId"]); e != nil {
+					return nil, e
+				}
+				row["native_run_id"] = x["nativeRunId"]
+			}
+			if e = s.storeNativeUsageWithin(ctx, tx, row, str(x["nativeRunId"]), usage); e != nil {
+				return nil, e
+			}
+		}
 		lateAnalysis := x["finalAnalysis"] != nil && has([]string{"unknown", "paused", "waiting-human"}, str(row["state"])) && obj(row["control_state"])["kind"] != "manual-pause"
 		if lateAnalysis || has(terminal, str(row["state"])) || has([]string{"paused", "waiting-human"}, str(row["state"])) && row["human_decision"] != nil {
 			if x["finalAnalysis"] != nil && has([]string{"completed", "failed", "unknown"}, str(row["state"])) && row["model_state"] == "completed" && str(row["native_run_id"]) != "" && row["native_run_id"] == x["nativeRunId"] && !has([]string{"stop", "stopped", "pause", "paused", "takeover"}, str(obj(row["human_decision"])["kind"])) {
@@ -103,6 +117,9 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 				}
 			}
 			if x["finalAnalysis"] != nil {
+				return s.stamp(Object{"taskId": row["id"], "state": row["state"]}), nil
+			}
+			if x["modelUsage"] != nil && has(terminal, str(row["state"])) {
 				return s.stamp(Object{"taskId": row["id"], "state": row["state"]}), nil
 			}
 			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_run_id=COALESCE(native_run_id,$3),model_state=$4 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], x["nativeRunId"], x["modelState"]); e != nil {

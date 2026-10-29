@@ -12,6 +12,24 @@ def number(value):
     return value if isinstance(value, (float, int)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0 else None
 
 
+def usage_snapshot(data):
+    context = data.get("metadata") or {}
+    metrics = data.get("metrics") or {}
+    calls = context.get("modelCalls")
+    if type(calls) is not int or not 0 <= calls <= 9007199254740991:
+        calls = None
+    has_model = bool(metrics.get("details")) and any(number(metrics.get(key)) for key in ("input_tokens", "output_tokens", "total_tokens"))
+    def tokens(key):
+        value = number(metrics.get(key)) if has_model else None
+        return value if value is not None and value <= 9007199254740991 and float(value).is_integer() else None
+    duration = number(metrics.get("duration"))
+    duration_ms = number((duration + (number(context.get("activeDurationBefore")) or 0)) * 1000) if duration is not None else None
+    if duration_ms is not None and duration_ms > 9007199254740991:
+        duration_ms = None
+    return {"calls": calls, "inputTokens": tokens("input_tokens"), "outputTokens": tokens("output_tokens"),
+        "totalTokens": tokens("total_tokens"), "durationMs": duration_ms}
+
+
 def conversation_id(user_id, component_id, domain):
     if not isinstance(user_id, str) or not user_id.startswith("conversation:") or domain not in DOMAINS or component_id != "galaxy-conversation-" + domain:
         return None
@@ -35,13 +53,7 @@ def metadata(row):
             task_id = str(UUID(user_id[9:]))
         except ValueError:
             pass
-    metrics = data.get("metrics") or {}
-    calls = context.get("modelCalls")
-    if type(calls) is not int or calls < 0:
-        calls = None
-    # Native metrics initialize counts to zero even when there was no model.
-    # A token total is reported only with a recorded model metrics detail.
-    has_model = bool(metrics.get("details")) and any(number(metrics.get(key)) for key in ("input_tokens", "output_tokens", "total_tokens"))
+    usage = usage_snapshot(data)
     error_code = "operations_agentos_run_failed" if row.get("status") == "ERROR" else None
     for event in data.get("events") or []:
         if error_code and event.get("error_type") == "AuthorityUnavailable":
@@ -80,11 +92,9 @@ def metadata(row):
         "state": row.get("status"), "errorCode": error_code, "createdAt": row.get("created_at"), "updatedAt": row.get("updated_at"),
         "promptVersion": duty_prompt if task_id else P13_WORKFLOW if row.get("run_type") == "workflow" and component_id == P13_WORKFLOW
             else context.get("promptVersion") if context.get("promptVersion") in {"galaxy-operations-v1", "galaxy-prepared-review-v1", "galaxy-conversation-v1", "galaxy-conversation-v2"} else None,
-        "tokens": {"input": number(metrics.get("input_tokens")) if has_model else None,
-            "output": number(metrics.get("output_tokens")) if has_model else None,
-            "total": number(metrics.get("total_tokens")) if has_model else None},
-        "calls": calls,
-        "durationMs": (number(metrics.get("duration")) + (number(context.get("activeDurationBefore")) or 0)) * 1000 if number(metrics.get("duration")) is not None else None,
+        "tokens": {"input": usage["inputTokens"], "output": usage["outputTokens"], "total": usage["totalTokens"]},
+        "calls": usage["calls"],
+        "durationMs": usage["durationMs"],
         "retryCount": None, "retryState": "not-recorded", "metadataOnly": True}
 
 
